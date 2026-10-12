@@ -15,7 +15,7 @@ export function tileLabel(tile: Tile): string {
 }
 
 type Point = readonly [number, number];
-// Symmetric arrangements keep every count recognizable at hand size.
+// Base positions; seven and eight use the traditional suit-specific layouts.
 const PATTERNS: Record<Rank, readonly Point[]> = {
   1: [[30, 42]],
   2: [[30, 25], [30, 59]],
@@ -23,7 +23,7 @@ const PATTERNS: Record<Rank, readonly Point[]> = {
   4: [[17, 25], [43, 25], [17, 59], [43, 59]],
   5: [[17, 22], [43, 22], [30, 42], [17, 62], [43, 62]],
   6: [[17, 22], [43, 22], [17, 42], [43, 42], [17, 62], [43, 62]],
-  7: [[16, 20], [30, 20], [44, 20], [20, 42], [40, 42], [20, 63], [40, 63]],
+  7: [[16, 18], [30, 28], [44, 38], [17, 51], [43, 51], [17, 66], [43, 66]],
   8: [[17, 16], [43, 16], [17, 33], [43, 33], [17, 51], [43, 51], [17, 68], [43, 68]],
   9: [[16, 22], [30, 22], [44, 22], [16, 42], [30, 42], [44, 42], [16, 62], [30, 62], [44, 62]],
 };
@@ -42,17 +42,23 @@ function bambooMark([x, y]: Point, height: number, color: string): string {
   </g>`;
 }
 
-// An original, simple bird silhouette for the traditional one bamboo tile.
+// Original peacock: a spread tail with eyespots, slender neck and a small crest.
 function bambooBird(): string {
-  return `<g fill="${GREEN}" stroke-linejoin="round">
-    <path d="M26 47Q15 46 12 37Q23 38 29 32Q38 28 42 39Q47 57 28 61L17 70L21 57Q18 53 26 47Z"/>
-    <path d="M28 34Q24 22 31 17Q41 13 44 22L42 35Z"/>
-    <path d="M42 22L51 26L42 29Z" fill="${RED}"/>
-    <path d="M28 42Q33 39 36 42Q38 49 29 53" fill="none" stroke="#fffdf7" stroke-width="2.5" stroke-linecap="round"/>
-    <circle cx="37" cy="22" r="1.9" fill="#fffdf7"/><circle cx="37.4" cy="22" r=".9" fill="${INK}"/>
-    <path d="M29 60v7m8-10v10m-11 0h7m1 0h7" fill="none" stroke="${GREEN}" stroke-width="2.3" stroke-linecap="round"/>
+  const feathers: readonly Point[] = [[12, 32], [19, 23], [30, 19], [41, 23], [48, 32]];
+  return `<g stroke-linecap="round" stroke-linejoin="round">
+    <path d="M30 59Q8 54 8 34Q7 23 17 24Q16 12 26 16Q30 9 34 16Q44 12 43 24Q53 23 52 34Q52 54 30 59Z" fill="${GREEN}"/>
+    ${feathers.map(([x, y]) => `<path d="M30 56L${x} ${y}" stroke="#fffdf7" stroke-width="1.5"/><ellipse cx="${x}" cy="${y}" rx="3.5" ry="4.5" fill="${BLUE}" stroke="#fffdf7" stroke-width="1.3"/><circle cx="${x}" cy="${y}" r="1.3" fill="${RED}"/>`).join('')}
+    <path d="M24 56Q20 49 28 44Q36 40 34 31L33 24Q33 19 38 19Q43 19 43 24Q42 28 39 29L40 44Q43 56 32 61Z" fill="${BLUE}" stroke="#fffdf7" stroke-width="1.5"/>
+    <path d="M42 23L49 26L42 28Z" fill="${RED}"/>
+    <path d="M36 18L34 13M38 17V12M40 18L42 13" stroke="${BLUE}" stroke-width="2"/>
+    <circle cx="39" cy="23" r="1.2" fill="#fffdf7"/>
+    <path d="M26 49Q33 46 35 50L29 56" fill="none" stroke="#fffdf7" stroke-width="1.8"/>
+    <path d="M27 61L25 69M34 61L36 69M22 70H29M33 70H40" stroke="${GREEN}" stroke-width="2.2"/>
   </g>`;
 }
+
+const SEVEN_BAMBOO: readonly Point[] = [[30, 19], [16, 41], [30, 41], [44, 41], [16, 63], [30, 63], [44, 63]];
+const EIGHT_BAMBOO: readonly Point[] = [[13, 24], [47, 24], [23, 24], [37, 24], [13, 60], [47, 60], [23, 60], [37, 60]];
 
 /** Original local vector artwork; fixed 60:84 ratio and no external assets. */
 export function tileSvgMarkup(tile: Tile): string {
@@ -61,7 +67,7 @@ export function tileSvgMarkup(tile: Tile): string {
   if (tile.category === 'honor') {
     const color = tile.honor === 'green' ? GREEN : tile.honor === 'red' ? RED : INK;
     face = tile.honor === 'white'
-      ? '<rect x="12" y="15" width="36" height="53" rx="4" fill="#fffefa" stroke="#8fa8b5" stroke-width="2.5"/><rect x="16" y="19" width="28" height="45" rx="2" fill="none" stroke="#dce5e8" stroke-width="1.2"/>'
+      ? ''
       : `<text x="30" y="58" font-size="44" fill="${color}">${HONOR_LABELS[tile.honor]}</text>`;
   } else if (tile.suit === 'man') {
     face = `<text x="30" y="34" font-size="32" fill="${tile.isRed ? RED : INK}">${['', '一', '二', '三', '四', '五', '六', '七', '八', '九'][tile.rank]}</text>
@@ -69,18 +75,27 @@ export function tileSvgMarkup(tile: Tile): string {
   } else if (tile.suit === 'sou' && tile.rank === 1) {
     face = bambooBird();
   } else {
-    face = PATTERNS[tile.rank].map((point, i) => {
+    const points = tile.suit === 'sou' && tile.rank === 7 ? SEVEN_BAMBOO
+      : tile.suit === 'sou' && tile.rank === 8 ? EIGHT_BAMBOO : PATTERNS[tile.rank];
+    face = points.map((point, i) => {
       if (tile.suit === 'pin') {
-        const color = tile.isRed ? RED : tile.rank === 5 && i === 2 ? RED : BLUE;
+        const redMark = tile.rank === 1 || (tile.rank === 3 && i === 1)
+          || (tile.rank === 5 && i === 2) || (tile.rank === 6 && i >= 2);
+        const color = tile.isRed || redMark ? RED : BLUE;
         return circleMark(point, tile.rank === 1 ? 18 : tile.rank >= 7 ? 5.7 : 7.2, color);
       }
-      return bambooMark(point, tile.rank === 8 ? 13 : 16, tile.isRed ? RED : GREEN);
+      const redMark = (tile.rank === 5 && i === 2) || (tile.rank === 7 && i === 0)
+        || (tile.rank === 9 && i % 3 === 1);
+      const mark = bambooMark(point, tile.rank === 8 ? 22 : 16, tile.isRed || redMark ? RED : GREEN);
+      // Each group of four forms two outward-slanting pairs (八).
+      return tile.rank === 8
+        ? `<g transform="rotate(${i % 2 === 0 ? 15 : -15} ${point[0]} ${point[1]})">${mark}</g>` : mark;
     }).join('');
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 84" role="img" aria-label="${label}" class="tile-svg">
     <title>${label}</title>
     <rect x="1" y="2" width="58" height="81" rx="6" fill="#dfd9c9"/>
-    <rect x="1" y="1" width="58" height="78" rx="6" fill="#fffdf7" stroke="#c4c7bb" stroke-width="1"/>
+    <rect x="1" y="1" width="58" height="78" rx="6" fill="#fffdf7" stroke="${tile.category === 'honor' && tile.honor === 'white' ? '#8fa49b' : '#c4c7bb'}" stroke-width="${tile.category === 'honor' && tile.honor === 'white' ? 1.8 : 1}"/>
     <path d="M8 3h44" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
     <g text-anchor="middle" font-family="'Hiragino Sans', 'Yu Gothic', 'Noto Sans CJK JP', sans-serif" font-weight="700">${face}</g>
     ${tile.isRed ? `<path d="M48 4h7v7Z" fill="${RED}"/>` : ''}
