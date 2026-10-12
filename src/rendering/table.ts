@@ -1,6 +1,7 @@
 import type { GameState, PlayerId, PlayerState, PhysicalTile, SeatWind } from '../model/game.ts';
 import { HONORS, SUITS, type Tile } from '../model/tile.ts';
 import { createTileElement, tileLabel } from './tile-svg.ts';
+import { canDeclareRon, getRonTile } from '../game/ron.ts';
 import { canDeclareTsumo } from '../game/tsumo.ts';
 import type { YakuId } from '../analysis/yaku.ts';
 import { canDiscard } from '../game/discard.ts';
@@ -10,7 +11,13 @@ import { renderDoraIndicators } from './dora.ts';
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
 const seatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
 function turnLabel(game: GameState): string {
-  if (game.phase === 'won') return `${seatNames[game.winResult!.winnerId]}がツモ和了！`;
+  if (game.phase === 'won') {
+    const result = game.winResult!;
+    return result.winMethod === 'ron'
+      ? `${result.winners.map(w => seatNames[w.winnerId]).join('・')}がロン和了！ 放銃：${seatNames[result.discarderId]}`
+      : `${seatNames[result.winnerId]}がツモ和了！`;
+  }
+  if (game.phase === 'awaiting-ron') return 'ロン宣言待ち';
   if (game.phase === 'wall-exhausted') return '牌山がなくなりました';
   return `${game.turnPlayerId === 0 ? 'あなた' : seatNames[game.turnPlayerId]}の手番`;
 }
@@ -54,6 +61,7 @@ function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement
 
 export function renderTable(game: GameState): void {
   renderWinResult(game);
+  document.querySelector<HTMLElement>('#wall-count')!.className = game.winResult?.winMethod === 'ron' ? 'ron-summary' : '';
   renderDoraIndicators(document.querySelector<HTMLElement>('#dora-indicators')!, exposedDoraIndicators(game));
   for (const player of game.players) {
     const id: PlayerId = player.id;
@@ -89,6 +97,20 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
   for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('#player-hand button'))) {
     button.setAttribute('aria-pressed', String(button.dataset.tileId === selectedTileId));
   }
+  const ron = document.querySelector<HTMLElement>('#ron-controls')!;
+  const wasHidden = ron.hidden;
+  const canRon = game.players[0].control === 'human' && canDeclareRon(game, 0);
+  ron.hidden = !canRon;
+  const tile = getRonTile(game);
+  if (canRon && tile) {
+    document.querySelector<HTMLElement>('#ron-status')!.textContent =
+      `${seatNames[game.ronWindow!.discarderId]}の捨て牌：${tileLabel(tile.tile)}。ロンできます`;
+  }
+  document.querySelector<HTMLButtonElement>('#ron')!.disabled = !canRon;
+  document.querySelector<HTMLButtonElement>('#pass-ron')!.disabled = !canRon;
+  if (canRon && wasHidden) document.querySelector<HTMLButtonElement>('#ron')!.focus({ preventScroll: true });
+  document.querySelector<HTMLElement>('.discard-controls')!.classList.toggle('ron-pending', canRon);
+  document.querySelector<HTMLElement>('.discard-controls')!.classList.toggle('game-ended', game.phase === 'won');
   const player = game.players[0];
   const selected = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
     .find(tile => tile.id === selectedTileId);
@@ -108,44 +130,56 @@ const yakuNames: Record<YakuId, string> = {
 };
 function renderWinResult(game: GameState): void {
   const panel = document.querySelector<HTMLElement>('#win-result')!;
-  const result = game.winResult;
-  panel.hidden = !result;
+  const win = game.winResult;
+  panel.hidden = !win;
   panel.replaceChildren();
-  if (!result) return;
-  const text = (tag: string, textContent: string) => Object.assign(document.createElement(tag), { textContent });
-  const player = game.players[result.winnerId];
-  panel.append(text('h2', 'ツモ和了！'));
-  panel.append(text('p', `${seatNames[player.id]}（${winds[player.wind]}）`));
-  if (player.control === 'cpu') {
-    panel.append(text('p', '和了手牌：'));
-    const hand = document.createElement('ol');
-    hand.className = 'winning-hand';
-    hand.setAttribute('aria-label', '和了手牌');
-    const tiles = [...player.hand].sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
-    for (const physical of [...tiles, player.drawnTile!]) {
-      const item = document.createElement('li');
-      item.dataset.tileId = physical.id;
-      if (physical.id === result.winningTileId) item.className = 'winning-draw';
-      item.append(createTileElement(physical.tile));
-      hand.append(item);
+  if (!win) return;
+  for (const result of win.winMethod === 'ron' ? win.winners : [win]) {
+    const section = document.createElement('section');
+    section.className = 'winner-result';
+    section.dataset.winnerId = String(result.winnerId);
+    panel.append(section);
+    const text = (tag: string, textContent: string) => Object.assign(document.createElement(tag), { textContent });
+    const player = game.players[result.winnerId];
+    section.append(text('h2', result.winMethod === 'ron' ? 'ロン和了！' : 'ツモ和了！'));
+    section.append(text('p', `${result.winMethod === 'ron' ? '和了者：' : ''}${seatNames[player.id]}（${winds[player.wind]}）`));
+    if (result.winMethod === 'ron') {
+      const discarder = game.players[result.discarderId];
+      section.append(text('p', `放銃者：${seatNames[discarder.id]}（${winds[discarder.wind]}）`));
     }
-    panel.append(hand);
+    if (player.control === 'cpu' || result.winMethod === 'ron') {
+      section.append(text('p', '和了手牌：'));
+      const hand = document.createElement('ol');
+      hand.className = 'winning-hand';
+      hand.setAttribute('aria-label', '和了手牌');
+      const tiles = [...player.hand].sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
+      const winningTile = result.winMethod === 'ron'
+        ? game.players[result.discarderId].river.find(t => t.id === result.winningTileId)! : player.drawnTile!;
+      for (const physical of [...tiles, winningTile]) {
+        const item = document.createElement('li');
+        item.dataset.tileId = physical.id;
+        if (physical.id === result.winningTileId) item.className = 'winning-draw';
+        item.append(createTileElement(physical.tile));
+        hand.append(item);
+      }
+      section.append(hand);
+    }
+    section.append(text('p', '今回対応している役の判定結果'));
+    const list = document.createElement('ul');
+    for (const yaku of result.candidate.yaku) list.append(text('li',
+      `${yakuNames[yaku.id]} ${yaku.yakuman > 0 ? `${yaku.yakuman}役満` : `${yaku.han}翻`}`));
+    section.append(list);
+    if (result.yakumanCount > 0) {
+      section.append(text('p', `役満：${result.yakumanCount}役満`));
+    } else {
+      section.append(text('p', `役合計：${result.yakuHan}翻`));
+      const bonuses = document.createElement('div');
+      bonuses.className = 'win-bonuses';
+      bonuses.append(text('p', `通常ドラ：${result.doraCount}枚（${result.doraHan}翻）`));
+      bonuses.append(text('p', `赤ドラ：${result.redDoraCount}枚（${result.redDoraHan}翻）`));
+      section.append(bonuses);
+      section.append(text('p', `合計：${result.totalHanIncludingDora}翻`));
+    }
+    section.append(text('p', '点数計算は未実装です。'));
   }
-  panel.append(text('p', '今回対応している役の判定結果'));
-  const list = document.createElement('ul');
-  for (const yaku of result.candidate.yaku) list.append(text('li',
-    `${yakuNames[yaku.id]} ${yaku.yakuman > 0 ? `${yaku.yakuman}役満` : `${yaku.han}翻`}`));
-  panel.append(list);
-  if (result.yakumanCount > 0) {
-    panel.append(text('p', `役満：${result.yakumanCount}役満`));
-  } else {
-    panel.append(text('p', `役合計：${result.yakuHan}翻`));
-    const bonuses = document.createElement('div');
-    bonuses.className = 'win-bonuses';
-    bonuses.append(text('p', `通常ドラ：${result.doraCount}枚（${result.doraHan}翻）`));
-    bonuses.append(text('p', `赤ドラ：${result.redDoraCount}枚（${result.redDoraHan}翻）`));
-    panel.append(bonuses);
-    panel.append(text('p', `合計：${result.totalHanIncludingDora}翻`));
-  }
-  panel.append(text('p', '点数計算は未実装です。'));
 }

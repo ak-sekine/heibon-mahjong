@@ -12,15 +12,15 @@ export interface PlayerState {
   readonly hand: readonly PhysicalTile[];
   readonly drawnTile: PhysicalTile | null;
   readonly drawnTileSource: 'deal' | 'live-wall' | null;
+  readonly temporaryFuriten: boolean;
   readonly river: readonly PhysicalTile[];
 }
 export interface WallState {
   readonly liveWall: readonly PhysicalTile[];
   readonly deadWall: readonly PhysicalTile[];
 }
-export interface TsumoResult {
+export interface WinDetails {
   readonly winnerId: PlayerId;
-  readonly winMethod: 'tsumo';
   readonly winningTileId: string;
   readonly analysis: YakuAnalysis;
   readonly candidate: YakuCandidate;
@@ -36,10 +36,29 @@ export interface TsumoResult {
   readonly totalHanIncludingDora: number;
   readonly yakumanCount: number;
 }
+export interface TsumoResult extends WinDetails {
+  readonly winMethod: 'tsumo';
+}
+export interface RonCandidate extends WinDetails {
+  readonly winMethod: 'ron';
+  readonly discarderId: PlayerId;
+}
+export interface RonResult {
+  readonly winMethod: 'ron';
+  readonly discarderId: PlayerId;
+  readonly winningTileId: string;
+  readonly winners: readonly RonCandidate[];
+}
+/** Exists only for the current discard, never survives a draw or a reset. */
+export interface RonWindow {
+  readonly discarderId: PlayerId;
+  readonly tileId: string;
+}
 export interface GameState extends WallState {
-  readonly winResult: TsumoResult | null;
+  readonly ronWindow: RonWindow | null;
+  readonly winResult: TsumoResult | RonResult | null;
   readonly dealerId: PlayerId;
   readonly turnPlayerId: PlayerId;
-  readonly phase: 'awaiting-draw' | 'awaiting-discard' | 'wall-exhausted' | 'won';
+  readonly phase: 'awaiting-draw' | 'awaiting-ron' | 'awaiting-discard' | 'wall-exhausted' | 'won';
   readonly players: readonly [PlayerState, PlayerState, PlayerState, PlayerState];
 }

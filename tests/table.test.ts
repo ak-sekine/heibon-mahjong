@@ -23,6 +23,9 @@ class ElementStub {
   hidden = false;
   content = { firstElementChild: this };
   innerHTML = '';
+  focused = false;
+  focus() { assert.equal(this.disabled, false); this.focused = true; }
+  classList = { toggle() {} };
   attributes: Record<string, string> = {};
   setAttribute(name: string, value: string) { this.attributes[name] = value; }
   replaceChildren(...children: ElementStub[]) { this.children = children; }
@@ -36,6 +39,9 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'yakuman'] as const) test(`resul
     nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
   }
   for (const key of ['#player-hand', '#wall-count', '#win-result', '#dora-indicators']) nodes.set(key, new ElementStub());
+  for (const key of ['#ron-controls', '#ron-status', '#ron', '#pass-ron', '.discard-controls']) {
+    const node = new ElementStub(); node.hidden = true; nodes.set(key, node);
+  }
   const original = globalThis.document;
   globalThis.document = {
     querySelector: (selector: string) => nodes.get(selector),
@@ -50,7 +56,7 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'yakuman'] as const) test(`resul
     const panel = nodes.get('#win-result')!;
     const strings = (node: ElementStub): string[] => [node.textContent, ...node.children.flatMap(strings)];
     const output = strings(panel);
-    const list = panel.children.find(c => c.tagName === 'ul')!;
+    const list = panel.children[0].children.find(c => c.tagName === 'ul')!;
     assert.ok(!strings(list).some(s => s.includes('ドラ')));
     const exposed = nodes.get('#dora-indicators')!.children;
     assert.equal(exposed.length, 5);
@@ -70,7 +76,7 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'yakuman'] as const) test(`resul
       assert.ok(output.includes(`通常ドラ：${normal}枚（${normal}翻）`));
       assert.ok(output.includes(`赤ドラ：${red}枚（${red}翻）`));
       assert.ok(output.includes(`合計：${2 + normal + red}翻`));
-      assert.equal(panel.children.filter(c => c.className === 'win-bonuses').length, 1);
+      assert.equal(panel.children[0].children.filter(c => c.className === 'win-bonuses').length, 1);
     }
   } finally { globalThis.document = original; }
 });
@@ -93,6 +99,9 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
   nodes.set('#tsumo', new ElementStub());
   nodes.set('#discard', new ElementStub());
   nodes.set('#selection-status', new ElementStub());
+  for (const key of ['#ron-controls', '#ron-status', '#ron', '#pass-ron', '.discard-controls']) {
+    const node = new ElementStub(); node.hidden = true; nodes.set(key, node);
+  }
   const original = globalThis.document;
   globalThis.document = {
     querySelector: (selector: string) => nodes.get(selector),
@@ -184,8 +193,8 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
     assert.equal(nodes.get('#discard')!.disabled, true);
     assert.equal(nodes.get('#player-hand')!.children.length, 14);
     assert.equal(nodes.get('#win-result')!.hidden, false);
-    assert.ok(nodes.get('#win-result')!.children.some(c => c.textContent === 'ツモ和了！'));
-    assert.ok(nodes.get('#win-result')!.children.some(c => c.textContent === '役合計：2翻'));
+    assert.ok(nodes.get('#win-result')!.children[0].children.some(c => c.textContent === 'ツモ和了！'));
+    assert.ok(nodes.get('#win-result')!.children[0].children.some(c => c.textContent === '役合計：2翻'));
     assert.equal(nodes.get('#label-0')!.dataset.active, 'false');
     renderTable(startGame());
     assert.equal(nodes.get('#win-result')!.hidden, true);
@@ -201,6 +210,9 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     nodes.set(`.river[data-player-id="${seat}"]`, new ElementStub());
   }
   for (const key of ['#player-hand', '#wall-count', '#win-result', '#dora-indicators', '#discard', '#tsumo', '#selection-status']) nodes.set(key, new ElementStub());
+  for (const key of ['#ron-controls', '#ron-status', '#ron', '#pass-ron', '.discard-controls']) {
+    const node = new ElementStub(); node.hidden = true; nodes.set(key, node);
+  }
   const original = globalThis.document;
   globalThis.document = {
     querySelector: (s: string) => nodes.get(s),
@@ -221,7 +233,7 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     renderTable(won); renderSelection(won, null);
     const panel = nodes.get('#win-result')!;
     assert.equal(panel.hidden, false);
-    const hand = panel.children.find(n => n.className === 'winning-hand')!;
+    const hand = panel.children[0].children.find(n => n.className === 'winning-hand')!;
     assert.equal(hand.tagName, 'ol'); assert.equal(hand.children.length, 14);
     const player = game.players[id];
     const order = (t: typeof player.hand[number]) => t.tile.category === 'suited'
@@ -248,3 +260,67 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     assert.equal(panel.hidden, true); assert.equal(panel.children.length, 0);
   } finally { globalThis.document = original; }
 });
+
+for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','furiten','CPU1','CPU2','CPU3'] as const) {
+  test(`ron DOM: ${scenario}, dedicated controls, shared red tile, independent winners and hidden others`, async () => {
+    const { ronStart, ronGame, withRiverTile } = await import('./ron-fixture.ts');
+    const { declareRon, passRon } = await import('../src/game/ron.ts');
+    const nodes = new Map<string, ElementStub>();
+    for (const id of [0,1,2,3]) {
+      nodes.set(`#label-${id}`,new ElementStub());
+      nodes.set(`.river[data-player-id="${id}"]`,new ElementStub());
+    }
+    for (const key of ['#player-hand','#wall-count','#win-result','#dora-indicators','#discard','#tsumo','#selection-status','#ron-controls','#ron-status','#ron','#pass-ron','.discard-controls']) nodes.set(key,new ElementStub());
+    nodes.get('#ron-controls')!.hidden = true;
+    nodes.get('#ron')!.disabled = true;
+    const original = globalThis.document;
+    globalThis.document = {
+      querySelector:(s:string)=>nodes.get(s),
+      querySelectorAll:()=>nodes.get('#player-hand')!.children.map(c=>c.children[0]),
+      createElement:(tag:string)=>new ElementStub(tag),
+    } as unknown as Document;
+    const descend = (n:ElementStub):ElementStub[]=>[n,...n.children.flatMap(descend)];
+    try {
+      const winners = scenario === 'triple' ? [0,2,3] as const : scenario === 'double' || scenario === 'pass-cpu' ? [0,2] as const : [0] as const;
+      let game = ronGame(1,winners);
+      if (scenario === 'furiten') {
+        const initial = withRiverTile(ronStart(),0,'sou-2');
+        game = discardTile(initial,1,initial.players[1].drawnTile!.id);
+      } else if (scenario.startsWith('CPU')) {
+        const winner = Number(scenario.at(-1)) as 1|2|3;
+        game = ronGame(((winner+3)%4) as 0|1|2,[winner]);
+      } else if (scenario === 'pass' || scenario === 'pass-cpu') game = passRon(game,0);
+      else if (scenario !== 'waiting') game = declareRon(game,0);
+      const snapshot = structuredClone(game);
+      renderTable(game); renderSelection(game,null,true);
+      assert.deepEqual(game,snapshot);
+      const pending = scenario === 'waiting';
+      assert.equal(nodes.get('#ron-controls')!.hidden,!pending);
+      assert.equal(nodes.get('#ron')!.disabled,!pending);
+      assert.equal(nodes.get('#pass-ron')!.disabled,!pending);
+      if (pending) {
+        assert.equal(nodes.get('#ron')!.focused,true);
+        assert.match(nodes.get('#ron-status')!.textContent,/CPU1の捨て牌：赤5索/);
+      }
+      assert.equal(nodes.get('#discard')!.disabled,true); assert.equal(nodes.get('#tsumo')!.disabled,true);
+      assert.ok(nodes.get('#player-hand')!.children.every(c=>c.children[0].disabled));
+      const panel = nodes.get('#win-result')!;
+      assert.equal(panel.hidden,game.phase!=='won');
+      const actualWinners = game.winResult?.winMethod==='ron' ? game.winResult.winners.map(w=>w.winnerId) : [];
+      assert.deepEqual(panel.children.map(c=>Number(c.dataset.winnerId)),actualWinners);
+      for (const section of panel.children) {
+        const list = section.children.find(c=>c.className==='winning-hand')!;
+        assert.equal(list.children.length,14);
+        assert.equal(list.children[13].dataset.tileId,game.winResult!.winningTileId);
+        assert.equal(list.children[13].className,'winning-draw');
+        assert.match(list.children[13].children[0].innerHTML,/aria-label="赤5索"/);
+        assert.ok(!descend(section).some(n=>n.textContent.includes('門前清自摸和')));
+      }
+      const publicNodes = [...nodes.values()].flatMap(descend);
+      for (const player of game.players.slice(1).filter(p=>!actualWinners.includes(p.id))) {
+        for (const tile of player.hand) assert.ok(!publicNodes.some(n=>n.dataset.tileId===tile.id));
+      }
+      for (const tile of game.deadWall.filter((_,i)=>i!==4)) assert.ok(!publicNodes.some(n=>n.dataset.tileId===tile.id));
+    } finally { globalThis.document = original; }
+  });
+}

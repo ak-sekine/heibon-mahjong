@@ -45,7 +45,7 @@ export class AutomaticTurnRunner {
     try {
       while (current()) {
         let game = read();
-        if (game.phase === 'wall-exhausted' || game.phase === 'won') return;
+        if (game.phase === 'wall-exhausted' || game.phase === 'won' || game.phase === 'awaiting-ron') return;
         if (game.phase === 'awaiting-draw') {
           game = drawOrStop(game);
           write(game);

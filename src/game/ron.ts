@@ -1,0 +1,83 @@
+import type { GameState, PhysicalTile, PlayerId, PlayerState, RonCandidate } from '../model/game.ts';
+import { TILE_KINDS, ordinaryTile, tileKindKey, type Tile, type TileKind } from '../model/tile.ts';
+import { isWinningShape } from '../analysis/winning-shape.ts';
+import { evaluateWin } from './win.ts';
+import { nextPlayerId } from './turn.ts';
+
+/** Shape waits deliberately ignore yaku; an impossible fifth copy is excluded. */
+export function getWaitingTileKinds(hand: readonly Tile[]): readonly TileKind[] {
+  if (hand.length !== 13) throw new RangeError('Waiting tiles require thirteen tiles');
+  return TILE_KINDS.filter(kind => {
+    if (hand.filter(t => tileKindKey(t) === tileKindKey(kind)).length >= 4) return false;
+    return isWinningShape([...hand, ordinaryTile(kind)]);
+  });
+}
+export function isDiscardFuriten(player: PlayerState): boolean {
+  const waits = new Set(getWaitingTileKinds(player.hand.map(t => t.tile)).map(tileKindKey));
+  return player.river.some(t => waits.has(tileKindKey(t.tile)));
+}
+/** The window must still point at the discarder seat's latest physical discard. */
+export function getRonTile(game: GameState): PhysicalTile | null {
+  const window = game.ronWindow;
+  if (game.phase !== 'awaiting-ron' || game.winResult !== null || !window ||
+      game.turnPlayerId !== window.discarderId) return null;
+  const player = game.players[window.discarderId];
+  if (!player || player.id !== window.discarderId || player.hand.length !== 13 ||
+      player.drawnTile !== null || player.drawnTileSource !== null) return null;
+  const tile = player.river.at(-1);
+  return tile?.id === window.tileId ? tile : null;
+}
+export function getRonCandidates(game: GameState): readonly RonCandidate[] {
+  const tile = getRonTile(game);
+  if (!tile) return [];
+  const discarderId = game.ronWindow!.discarderId;
+  const candidates: RonCandidate[] = [];
+  for (let offset = 1; offset <= 3; offset++) {
+    const id = ((discarderId + offset) % 4) as PlayerId;
+    const player = game.players[id];
+    if (player.id !== id || player.hand.length !== 13 || player.drawnTile || player.temporaryFuriten) continue;
+    try {
+      if (isDiscardFuriten(player)) continue;
+      const result = evaluateWin(game, id, tile, 'ron');
+      if (result) candidates.push({ ...result, winMethod: 'ron', discarderId });
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+    }
+  }
+  return candidates;
+}
+export function canDeclareRon(game: GameState, playerId: PlayerId): boolean {
+  return getRonCandidates(game).some(c => c.winnerId === playerId);
+}
+function resolve(game: GameState, winners: readonly RonCandidate[]): GameState {
+  if (!getRonTile(game)) throw new RangeError('No current ron window');
+  const { discarderId, tileId } = game.ronWindow!;
+  if (winners.length) return { ...game, phase: 'won', ronWindow: null,
+    winResult: { winMethod: 'ron', discarderId, winningTileId: tileId, winners } };
+  return { ...game, phase: 'awaiting-draw', turnPlayerId: nextPlayerId(discarderId), ronWindow: null };
+}
+/** Called after every legal discard. CPU declarations wait for the human decision. */
+export function resolveDiscardRon(game: GameState): GameState {
+  if (!getRonTile(game)) throw new RangeError('No current ron window');
+  const candidates = getRonCandidates(game);
+  if (candidates.some(c => game.players[c.winnerId].control === 'human')) return game;
+  return resolve(game, candidates);
+}
+/** The human decision atomically includes all automatic CPU declarations. */
+export function declareRon(game: GameState, playerId: PlayerId): GameState {
+  const candidates = getRonCandidates(game);
+  if (!candidates.some(c => c.winnerId === playerId)) throw new RangeError('Ron is not allowed now');
+  if (candidates.some(c => c.winnerId !== playerId && game.players[c.winnerId].control === 'human')) {
+    throw new RangeError('Human ron decision is still required');
+  }
+  return resolve(game, candidates);
+}
+export function passRon(game: GameState, playerId: PlayerId): GameState {
+  if (game.players[playerId]?.control !== 'human' || !canDeclareRon(game, playerId)) {
+    throw new RangeError('Passing ron is not allowed now');
+  }
+  const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
+  players[playerId] = { ...players[playerId], temporaryFuriten: true };
+  const passed = { ...game, players };
+  return resolve(passed, getRonCandidates(passed));
+}

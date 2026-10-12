@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { startGame } from '../src/game/start.ts';
 import { drawTile, drawOrStop } from '../src/game/draw.ts';
+import { passRon } from '../src/game/ron.ts';
 import { discardTile } from '../src/game/discard.ts';
 import { nextPlayerId, stopAtEmptyWall } from '../src/game/turn.ts';
 import type { GameState, PlayerState } from '../src/model/game.ts';
@@ -41,7 +42,7 @@ test('wrong player, phase, hand size, occupied drawn slot and empty wall are rej
   assert.deepEqual(game, snapshot);
 });
 
-test('all seats consume the complete live wall across many rounds with inventory conserved at every transition', () => {
+test('seeded games preserve inventory through exhaustion or early ron; seed zero consumes the complete wall', () => {
   for (let seed = 0; seed < 20; seed++) {
     const random = seeded(seed);
     const initial = startGame(random);
@@ -49,7 +50,9 @@ test('all seats consume the complete live wall across many rounds with inventory
     let discards = 0;
     let draws = 0;
     inventory(game, initial);
-    while (game.phase !== 'wall-exhausted') {
+    while (game.phase !== 'wall-exhausted' && game.phase !== 'won') {
+      if (game.phase === 'awaiting-ron') game = transition(game, initial, g => passRon(g, 0));
+      if (game.phase === 'won') break;
       if (game.phase === 'awaiting-draw') {
         const remaining = game.liveWall.length;
         game = transition(game, initial, drawOrStop);
@@ -67,10 +70,15 @@ test('all seats consume the complete live wall across many rounds with inventory
       game = transition(game, initial, state => discardTile(state, id, tile.id));
       assert.equal(game.players[id].river.at(-1), tile);
       assert.equal(game.players[id].drawnTile, null);
-      assert.equal(game.turnPlayerId, (id + 1) % 4);
-      assert.equal(game.phase, 'awaiting-draw');
+      if (game.phase === 'awaiting-draw') assert.equal(game.turnPlayerId, (id + 1) % 4);
+      else assert.ok(game.phase === 'awaiting-ron' || game.phase === 'won');
       assert.throws(() => discardTile(game, id, game.players[id].hand[0].id), RangeError);
       discards++;
+    }
+    if (game.phase === 'won') {
+      assert.notEqual(seed, 0, 'fixed seed zero must retain full-wall coverage');
+      inventory(game, initial);
+      continue;
     }
     assert.equal(draws, 69);
     assert.equal(discards, 70);

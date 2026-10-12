@@ -1,5 +1,5 @@
 import type { GameState, PlayerId, PlayerState } from '../model/game.ts';
-import { nextPlayerId } from './turn.ts';
+import { resolveDiscardRon } from './ron.ts';
 
 /** Shared tile movement; no human/CPU policy or turn progression here. */
 export function discardFromPlayer(player: PlayerState, tileId: string): PlayerState {
@@ -17,7 +17,7 @@ export function discardFromPlayer(player: PlayerState, tileId: string): PlayerSt
 /** The same rules apply to every seat, on every turn. */
 export function canDiscard(game: GameState, playerId: PlayerId): boolean {
   const player = game.players[playerId];
-  return game.phase === 'awaiting-discard' && game.turnPlayerId === playerId
+  return game.phase === 'awaiting-discard' && game.winResult === null && game.ronWindow === null && game.turnPlayerId === playerId
     && player?.id === playerId && player.hand.length === 13 && player.drawnTile !== null;
 }
 
@@ -27,5 +27,6 @@ export function discardTile(game: GameState, playerId: PlayerId, tileId: string)
   const player = discardFromPlayer(game.players[playerId], tileId);
   const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
   players[playerId] = player;
-  return { ...game, players, turnPlayerId: nextPlayerId(playerId), phase: 'awaiting-draw' };
+  return resolveDiscardRon({ ...game, players, phase: 'awaiting-ron',
+    ronWindow: { discarderId: playerId, tileId: player.river.at(-1)!.id } });
 }

@@ -76,3 +76,20 @@ summary { cursor:pointer; padding:4px; }
 .winning-hand { display:grid; grid-template-columns:repeat(13,minmax(0,1fr)) minmax(0,1.25fr); gap:1px; padding:0; margin:8px 0; list-style:none; width:100%; max-width:560px; }
 .winning-hand li { min-width:0; }
 .winning-hand .winning-draw { padding-left:20%; }
+
+/* The declaration replaces the usual controls, retaining their compact height. */
+#ron-controls[hidden] { display:none; }
+#ron-controls { width:100%; display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px; }
+#ron-status { width:100%; margin:0; font-size:14px; }
+#ron, #pass-ron { min-width:100px; min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
+#ron:focus-visible, #pass-ron:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
+.ron-pending > #selection-status, .ron-pending > #discard, .ron-pending > #tsumo, .ron-pending > .keyboard-help { display:none; }
+/* Normal document flow keeps the hand clear even when the viewport is short. */
+.discard-controls.ron-pending, .discard-controls.game-ended { position:relative; bottom:auto; }
+.winner-result + .winner-result { border-top:1px solid #63947a; margin-top:16px; padding-top:16px; }
+
+/* A compact final message uses the existing three-line status area. Counts
+   remain available to VoiceOver; the dora grid and river geometry stay fixed. */
+#wall-count.ron-summary { min-height:36px; justify-content:center; }
+#wall-count.ron-summary span:not(:last-child) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+#wall-count.ron-summary span:last-child { font-size:9px; line-height:9px; }

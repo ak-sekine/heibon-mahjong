@@ -25,8 +25,8 @@ function inventory(game: GameState): void {
   assert.deepEqual(game.players.map(p => p.hand.length), [13, 13, 13, 13]);
   assert.deepEqual(game.players.map(p => p.river.length), [1, 0, 0, 0]);
   assert.ok(game.players.every(p => p.drawnTile === null));
-  assert.equal(game.phase, 'awaiting-draw');
-  assert.equal(game.turnPlayerId, 1);
+  assert.ok(game.phase === 'awaiting-draw' || (game.phase === 'won' && game.winResult?.winMethod === 'ron'));
+  if (game.phase === 'awaiting-draw') assert.equal(game.turnPlayerId, 1);
 }
 
 test('drawn and hand discards preserve inventory, identities and frozen source over 100 games', () => {

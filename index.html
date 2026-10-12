@@ -30,6 +30,11 @@
     <section class="seat seat-bottom" data-player-id="0" aria-label="自分の席"><h2 class="seat-label" id="label-0"></h2><ul id="player-hand" aria-label="自分の手牌"></ul></section>
   </section>
   <section class="discard-controls" aria-label="打牌操作">
+    <div id="ron-controls" hidden role="group" aria-labelledby="ron-status">
+      <p id="ron-status" role="status" aria-live="polite"></p>
+      <button id="ron" type="button" aria-describedby="ron-status">ロン和了</button>
+      <button id="pass-ron" type="button" aria-describedby="ron-status">見逃す</button>
+    </div>
     <p id="selection-status" role="status" aria-live="polite"></p>
     <button id="discard" type="button" disabled>打牌する</button>
     <button id="tsumo" type="button" disabled>ツモ和了</button>

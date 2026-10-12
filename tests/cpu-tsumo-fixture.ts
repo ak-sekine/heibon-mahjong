@@ -2,6 +2,7 @@ import { createWall, reserveDeadWall } from '../src/game/wall.ts';
 import { deal } from '../src/game/deal.ts';
 import { discardTile } from '../src/game/discard.ts';
 import { drawTile } from '../src/game/draw.ts';
+import { getWaitingTileKinds } from '../src/game/ron.ts';
 import { shuffle } from '../src/game/shuffle.ts';
 import { tileKindKey, TILE_KINDS } from '../src/model/tile.ts';
 import type { GameState, PhysicalTile, PlayerId } from '../src/model/game.ts';
@@ -23,6 +24,12 @@ export function cpuTsumoStart(winner: 1 | 2 | 3, groups = ['123m', '456m', '789p
   const wall: (PhysicalTile | undefined)[] = Array(136);
   desired.forEach((tile, round) => { wall[round * 4 + winner] = tile; });
   wall[52 + winner] = winning;
+  // Earlier ordinary discards must not complete the winner's shape before its draw.
+  const waits = new Set(getWaitingTileKinds(desired.map(t => t.tile)).map(tileKindKey));
+  for (let i = 0; i < winner; i++) {
+    const index = pool.findIndex(t => !waits.has(tileKindKey(t.tile)));
+    wall[52 + i] = pool.splice(index, 1)[0];
+  }
   wall[126] = take(indicator);
   for (let i = 0; i < 136; i++) if (!wall[i]) wall[i] = pool.shift()!;
   return deal(reserveDeadWall(wall as PhysicalTile[]));

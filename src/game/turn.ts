@@ -7,7 +7,7 @@ export function nextPlayerId(id: PlayerId): PlayerId {
 
 export function requireDrawTurn(game: GameState, id: PlayerId): PlayerState {
   const player = game.players[id];
-  if (game.phase !== 'awaiting-draw' || game.turnPlayerId !== id || player?.id !== id
+  if (game.phase !== 'awaiting-draw' || game.winResult !== null || game.ronWindow !== null || game.turnPlayerId !== id || player?.id !== id
     || player.hand.length !== 13 || player.drawnTile !== null) {
     throw new RangeError('Draw is not allowed now');
   }

@@ -253,6 +253,7 @@ with sync_playwright() as p:
                 page.set_viewport_size({'width':w,'height':h})
             page.clock.run_for(1000)
             if turn_round < 17:
+                page.wait_for_function('document.querySelectorAll("#player-hand button:enabled").length === 14')
                 assert page.locator('#player-hand li').count()==14
                 assert page.locator('#player-hand button:enabled').count()==14
             geometry(page)
@@ -338,6 +339,8 @@ with sync_playwright() as p:
             source = response.text()
             source, count = re.subn(r'new GameController\((?:undefined|void 0),', 'new GameController(() => tsumoStart(RED_PINFU, false, undefined, fixtureStarts++ % 2 ? \"sou-8\" : \"man-4\"),', source)
             assert count == 1
+            # Match tsumoGame(): deterministic real discards avoid an earlier human ron.
+            source = source.replace('onChange: render', 'chooseDiscard: p => p.drawnTile.id, onChange: render')
             source = 'let fixtureStarts = 0;\nimport { tsumoStart, RED_PINFU } from "/quill-mahjong/tests/tsumo-fixture.ts";\n' + source
             route.fulfill(response=response, body=source)
         for w,h in [(320,568),(375,667),(390,844),(414,896),(1280,800)]:

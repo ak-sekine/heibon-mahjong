@@ -34,7 +34,7 @@ export function inventory(game: GameState, initial: GameState): void {
   for (const p of game.players) {
     assert.equal(p.hand.length, 13);
     assert.equal(p.drawnTileSource === null, p.drawnTile === null);
-    assert.equal(p.drawnTile !== null, (game.phase === 'awaiting-discard' || game.phase === 'won') && game.turnPlayerId === p.id);
+    assert.equal(p.drawnTile !== null, (game.phase === 'awaiting-discard' || (game.phase === 'won' && game.winResult?.winMethod === 'tsumo')) && game.turnPlayerId === p.id);
   }
 }
 

@@ -1,5 +1,6 @@
 import type { GameState } from '../model/game.ts';
 import { canDeclareTsumo, declareTsumo } from '../game/tsumo.ts';
+import { canDeclareRon, declareRon, passRon } from '../game/ron.ts';
 import { startGame } from '../game/start.ts';
 import { canDiscard, discardTile } from '../game/discard.ts';
 import { AutomaticTurnRunner, type AutomaticTurnOptions } from '../game/automatic-turns.ts';
@@ -39,6 +40,24 @@ export class GameController {
     this.game = won;
     this.selectedTileId = null;
     this.onChange();
+  }
+  get canRon(): boolean { return this.game.players[0].control === 'human' && canDeclareRon(this.game, 0); }
+  declareRon(): void {
+    if (!this.canRon) throw new RangeError('Human ron is not allowed now');
+    const won = declareRon(this.game, 0);
+    this.runner.cancel();
+    this.game = won;
+    this.selectedTileId = null;
+    this.onChange();
+  }
+  passRon(): Promise<void> {
+    if (!this.canRon) throw new RangeError('Human pass is not allowed now');
+    const passed = passRon(this.game, 0);
+    this.runner.cancel();
+    this.game = passed;
+    this.selectedTileId = null;
+    this.onChange();
+    return this.runner.run(() => this.game, game => { this.game = game; this.onChange(); }, this.onChange);
   }
   newGame(): void {
     this.runner.cancel();

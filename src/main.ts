@@ -24,6 +24,14 @@ document.querySelector<HTMLButtonElement>('#discard')!.addEventListener('click',
 document.querySelector<HTMLButtonElement>('#tsumo')!.addEventListener('click', () => {
   controller.declareTsumo();
 });
+document.querySelector<HTMLButtonElement>('#ron')!.addEventListener('click', () => {
+  controller.declareRon();
+  document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
+});
+document.querySelector<HTMLButtonElement>('#pass-ron')!.addEventListener('click', () => {
+  void controller.passRon().catch(error => console.error('Turn progression failed', error));
+  document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
+});
 render();
 
 const gallery = document.querySelector<HTMLUListElement>('#tile-gallery')!;
