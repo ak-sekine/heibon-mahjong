@@ -1,29 +1,30 @@
 <!doctype html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="description" content="Quill Mahjong — 配牌を確認できる日本式麻雀" />
-    <meta name="theme-color" content="#185640" />
-    <title>Quill Mahjong</title>
-  </head>
-  <body>
-    <main>
-      <header><h1>Quill Mahjong</h1><p>配牌を確認できる日本式麻雀</p></header>
-      <section class="game-info" aria-label="配牌状況">
-        <ul id="cpu-counts"></ul>
-        <p id="wall-count" role="status" aria-live="polite"></p>
-        <button id="new-game" type="button">新しい対局</button>
-      </section>
-      <details class="catalog"><summary>全34種類と赤5を見る</summary>
-        <ul id="tile-gallery" aria-label="全牌種と赤5の一覧"></ul>
-      </details>
-      <section class="hand-section" aria-labelledby="hand-heading">
-        <h2 id="hand-heading">自分 · 東 · 親 <span>14枚</span></h2>
-        <ul id="player-hand" aria-label="自分の手牌13枚と親の追加1枚"></ul>
-        <p class="note">右端の離れた牌が親の追加1枚 · 赤5は右上の印が目印</p>
-      </section>
-    </main>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="Quill Mahjong — 4人麻雀の配牌画面" />
+  <meta name="theme-color" content="#185640" />
+  <title>Quill Mahjong</title>
+</head>
+<body>
+<main>
+  <header><h1>Quill Mahjong</h1><button id="new-game" type="button">新しい対局</button></header>
+  <section class="table" aria-label="4人麻雀卓">
+    <section class="seat seat-top" data-player-id="2" aria-label="CPU2の席"><p class="seat-label" id="label-2"></p><ul class="cpu-hand" id="hand-2" aria-hidden="true"></ul></section>
+    <section class="seat seat-right" data-player-id="1" aria-label="CPU1の席"><p class="seat-label" id="label-1"></p><ul class="cpu-hand" id="hand-1" aria-hidden="true"></ul></section>
+    <section class="seat seat-left" data-player-id="3" aria-label="CPU3の席"><p class="seat-label" id="label-3"></p><ul class="cpu-hand" id="hand-3" aria-hidden="true"></ul></section>
+    <section class="rivers" aria-label="4人の河">
+      <div class="river river-top" data-player-id="2" aria-label="CPU2の河"></div>
+      <div class="river river-right" data-player-id="1" aria-label="CPU1の河"></div>
+      <div class="river river-bottom" data-player-id="0" aria-label="自分の河"></div>
+      <div class="river river-left" data-player-id="3" aria-label="CPU3の河"></div>
+      <div class="center-info" id="wall-count" role="status" aria-live="polite"></div>
+    </section>
+    <section class="seat seat-bottom" data-player-id="0" aria-label="自分の席"><h2 class="seat-label" id="label-0"></h2><ul id="player-hand" aria-label="自分の手牌"></ul></section>
+  </section>
+  <details class="catalog"><summary>開発用：全34種類と赤5を見る</summary><ul id="tile-gallery" aria-label="全牌種と赤5の一覧"></ul></details>
+</main>
+<script type="module" src="/src/main.ts"></script>
+</body>
 </html>
