@@ -17,13 +17,49 @@ def separate(a,b):
     return a['x']+a['width']<=b['x'] or b['x']+b['width']<=a['x'] or a['y']+a['height']<=b['y'] or b['y']+b['height']<=a['y']
 def geometry(page):
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-    assert box(page,'.table')['height'] <= max(390, min(740, page.viewport_size['height'] - 180)) + 1
     tiles=page.locator('#player-hand li')
     bounds=[tiles.nth(i).bounding_box() for i in range(tiles.count())]
     assert len(set(round(b['y'],1) for b in bounds))==1
     assert all(b['x']>=0 and b['x']+b['width']<=page.viewport_size['width'] for b in bounds)
     for river in ['top','right','bottom','left']:
         assert separate(box(page,f'.river-{river}'),box(page,'.center-info')), (river, box(page,f'.river-{river}'), box(page,'.center-info'))
+    river_boxes = [box(page, f'.river-{name}') for name in ['top','right','bottom','left']]
+    for i, bounds in enumerate(river_boxes):
+        assert all(separate(bounds, other) for other in river_boxes[i+1:])
+    # Check every tile's coordinates and scroll dimensions, not merely SVG counts.
+    report = page.locator('.river').evaluate_all("""els => els.map(el => {
+        const r = el.getBoundingClientRect();
+        const columns = el.matches('.river-left,.river-right') ? 3 : 6;
+        const tiles = [...el.querySelectorAll('.river-tile')].map(tile => {
+            const t = tile.getBoundingClientRect();
+            const svg = tile.querySelector('svg').getBoundingClientRect();
+            return {x:t.x,y:t.y,width:t.width,height:t.height,
+                contained:t.left >= r.left + el.clientLeft - .5 &&
+                    t.right <= r.left + el.clientLeft + el.clientWidth + .5 &&
+                    t.top >= r.top + el.clientTop - .5 &&
+                    t.bottom <= r.top + el.clientTop + el.clientHeight + .5,
+                svgContained:svg.left >= t.left-.5 && svg.right <= t.right+.5 &&
+                    svg.top >= t.top-.5 && svg.bottom <= t.bottom+.5};
+        });
+        return {player:el.dataset.playerId,columns,tiles,
+            client:[el.clientWidth,el.clientHeight],scroll:[el.scrollWidth,el.scrollHeight],
+            overflow:getComputedStyle(el).overflow};
+    })""")
+    for river in report:
+        assert river['scroll'][0] <= river['client'][0], river
+        assert river['scroll'][1] <= river['client'][1], river
+        assert river['overflow'] == 'visible', river
+        tiles = river['tiles']
+        for i, tile in enumerate(tiles):
+            assert tile['contained'] and tile['svgContained'], (river['player'], i, tile)
+            assert tile['width'] >= 20 and tile['height'] >= 28, tile
+            assert tile['x'] >= 0 and tile['x']+tile['width'] <= page.viewport_size['width'], tile
+            if i:
+                previous = tiles[i-1]
+                if i % river['columns']:
+                    assert abs(tile['y']-previous['y']) < .5 and tile['x'] > previous['x']
+                else:
+                    assert tile['y'] > previous['y'] and abs(tile['x']-tiles[0]['x']) < .5
     assert separate(box(page,'#player-hand'),box(page,'.rivers'))
     control=box(page,'#discard')
     assert control['width']>=44 and control['height']>=44
@@ -37,7 +73,7 @@ def geometry(page):
         assert page.locator(f'#hand-{id}').evaluate('(el) => !el.innerHTML.includes("data-tile-id") && !el.innerHTML.includes("<svg")')
 with sync_playwright() as p:
     browser=p.chromium.launch(executable_path=shutil.which('chromium') or shutil.which('chromium-browser'),args=['--no-sandbox'])
-    for w,h in [(320,568),(375,667),(390,844),(1280,800)]:
+    for w,h in [(320,568),(375,667),(390,844),(414,896),(1280,800)]:
         page=browser.new_page(viewport={'width':w,'height':h})
         errors=[]
         page.on('pageerror',lambda err:errors.append(str(err)))
@@ -116,8 +152,10 @@ with sync_playwright() as p:
         assert page.locator('#player-hand li').evaluate_all('(els) => els.map(el => el.dataset.tileId)')==reset_ids
         assert page.locator('#player-hand li').count()==14 and page.locator('.river svg').count()==0
         assert '69枚' in page.locator('#wall-count').inner_text()
+        page.screenshot(path=f'{options.screenshots}/{w}-initial.png',full_page=True)
         # Clock control skips presentation time, without exposing private state to DOM.
         page.clock.install()
+        previous_rivers = [[] for _ in range(4)]
         for turn_round in range(18):
             page.locator('#player-hand button').first.click()
             page.locator('#discard').click()
@@ -126,6 +164,23 @@ with sync_playwright() as p:
                 assert page.locator('#player-hand li').count()==14
                 assert page.locator('#player-hand button:enabled').count()==14
             geometry(page)
+            current_rivers = [page.locator(f'.river[data-player-id="{id}"] [data-tile-id]').evaluate_all(
+                '(els) => els.map(el => el.dataset.tileId)') for id in range(4)]
+            for previous, current in zip(previous_rivers, current_rivers):
+                assert current[:len(previous)] == previous, (previous, current)
+            previous_rivers = current_rivers
+            if turn_round == 6:
+                assert [page.locator(f'.river[data-player-id="{id}"] svg').count() for id in range(4)] == [7]*4
+                page.screenshot(path=f'{options.screenshots}/{w}-midgame.png',full_page=True)
+            if turn_round == 7:
+                assert [page.locator(f'.river[data-player-id="{id}"] svg').count() for id in range(4)] == [8]*4
+                page.screenshot(path=f'{options.screenshots}/{w}-midgame-8.png',full_page=True)
+        # All rivers must be simultaneously in view on the requested larger screens.
+        page.evaluate('window.scrollTo(0,0)')
+        if w != 320:
+            assert all(b['y'] >= 0 and b['y']+b['height'] <= h for b in
+                       [box(page,f'.river-{name}') for name in ['top','right','bottom','left']])
+        print(json.dumps({'viewport':[w,h], 'pageVerticalScroll':page.evaluate('document.documentElement.scrollHeight > innerHeight')}))
         assert '牌山がなくなりました' in page.locator('#selection-status').inner_text()
         assert '生きた牌山 0枚' in page.locator('#wall-count').inner_text()
         assert '王牌 14枚' in page.locator('#wall-count').inner_text()

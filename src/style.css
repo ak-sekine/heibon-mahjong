@@ -7,7 +7,7 @@ h1 { margin:0; font-size:clamp(1rem,5vw,1.5rem); white-space:nowrap; }
 #new-game { min-width:108px; min-height:44px; padding:8px 12px; border:1px solid #d4e5db; border-radius:8px; background:#fffdf7; color:#185640; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
 #new-game:focus-visible { outline:3px solid #ffda7d; outline-offset:2px; }
 ul { list-style:none; padding:0; margin:0; }
-.table { flex:none; height:clamp(390px,calc(100svh - 180px),740px); min-height:390px; max-height:740px; width:100%; display:grid; grid-template-columns:minmax(42px,14%) minmax(0,1fr) minmax(42px,14%); grid-template-rows:84px minmax(0,1fr) auto; grid-template-areas:". top ." "left rivers right" "bottom bottom bottom"; gap:4px; border:2px solid #39765e; border-radius:18px; background:#216b50; padding:6px 3px 8px; }
+.table { flex:none;  width:100%; display:grid; grid-template-columns:clamp(32px,8.6vw,48px) minmax(0,1fr) clamp(32px,8.6vw,48px); grid-template-rows:44px auto auto; grid-template-areas:". top ." "left rivers right" "bottom bottom bottom"; gap:4px; border:2px solid #39765e; border-radius:18px; background:#216b50; padding:6px 3px 8px; }
 .seat { min-width:0; min-height:0; display:flex; align-items:center; justify-content:center; gap:4px; }
 .seat-label { margin:0; color:#f2e9c9; font-size:clamp(10px,2.8vw,14px); line-height:1.2; font-weight:600; text-align:center; }
 .seat-label[data-active="true"] { color:#ffda7d; background:#154e3c; outline:1px solid #ffda7d; border-radius:4px; }
@@ -22,10 +22,13 @@ ul { list-style:none; padding:0; margin:0; }
 .tile-back { flex:none; width:clamp(12px,3.8vw,19px); height:clamp(18px,5.3vw,27px); border:2px solid #ede7d1; border-radius:3px; background:linear-gradient(135deg,#356f73,#184b5a); box-shadow:inset 0 0 0 2px #287a80,0 1px 2px #123e38; }
 .seat-top .tile-back + .tile-back { margin-left:clamp(-5px,-1vw,-2px); }
 .seat-left .tile-back + .tile-back,.seat-right .tile-back + .tile-back { margin-top:clamp(-12px,-3vw,-6px); }
-.rivers { grid-area:rivers; display:grid; min-width:0; min-height:0; grid-template-columns:minmax(0,1fr) minmax(80px,1.25fr) minmax(0,1fr); grid-template-rows:minmax(0,1fr) minmax(82px,32%) minmax(0,1fr); grid-template-areas:". top ." "left info right" ". bottom ."; gap:3px; padding:4px; border:1px solid #488269; border-radius:12px; background:#1c6048; }
-.river { min-width:0; min-height:0; border:1px dashed #63947a; border-radius:5px; display:flex; flex-wrap:wrap; align-content:start; gap:2px; padding:2px; overflow:auto; }
-.river-tile { width:min(26px,100%); flex:none; }
+/* Reserve all 18 discards, including empty cells, without a nested scroller.
+   Top/bottom span the central width; the middle row separates side rivers/info. */
+.rivers { --river-tile-width:clamp(20px,5.87vw,28px); --river-tile-height:calc(var(--river-tile-width) * 1.4); grid-area:rivers; display:grid; min-width:0; grid-template-columns:calc(var(--river-tile-width) * 3 + 10px) minmax(0,1fr) calc(var(--river-tile-width) * 3 + 10px); grid-template-rows:auto auto auto; grid-template-areas:"top top top" "left info right" "bottom bottom bottom"; gap:4px; padding:4px; border:1px solid #488269; border-radius:12px; background:#1c6048; }
+.river { min-width:0; border:1px dashed #63947a; border-radius:5px; display:grid; grid-template-columns:repeat(6,var(--river-tile-width)); grid-template-rows:repeat(3,var(--river-tile-height)); justify-content:center; align-content:start; gap:2px; padding:2px; overflow:visible; }
+.river-tile { width:var(--river-tile-width); }
 .river-top { grid-area:top; }.river-right { grid-area:right; }.river-bottom { grid-area:bottom; }.river-left { grid-area:left; }
+.river-left,.river-right { grid-template-columns:repeat(3,var(--river-tile-width)); grid-template-rows:repeat(6,var(--river-tile-height)); }
 .center-info { grid-area:info; min-width:0; padding:6px 2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border-radius:8px; background:#154e3c; color:#fff5d7; font-size:clamp(10px,2.8vw,14px); font-weight:600; text-align:center; }
 #player-hand { width:100%; display:grid; grid-template-columns:repeat(13,minmax(0,1fr)) minmax(0,1.25fr); gap:1px; }
 #player-hand li { min-width:0; }
@@ -48,4 +51,4 @@ summary { cursor:pointer; padding:4px; }
 #tile-gallery li { text-align:center; }
 #tile-gallery .tile-svg { max-width:60px; margin:auto; }
 #tile-gallery span { display:block; margin-top:3px; }
-@media (max-height:650px) { .table { min-height:390px; } .seat-top { gap:1px; } }
+@media (max-height:650px) { .seat-top { gap:1px; } }
