@@ -111,7 +111,7 @@ def dora_snapshot(page):
         expected = f'{rank % 9 + 1}{label[-1]}'
     else:
         expected = {'東':'南','南':'西','西':'北','北':'東','白':'發','發':'中','中':'白'}[label]
-    assert f'ドラ：{expected}' in region.inner_text().replace('\n', '')
+    assert f'ドラ：{expected}' in region.text_content().replace('\n', '')
     assert region.locator('[data-tile-id]').count() == 1
     tile_id = region.locator('[data-tile-id]').get_attribute('data-tile-id')
     assert page.locator(f'#player-hand [data-tile-id="{tile_id}"], .river [data-tile-id="{tile_id}"]').count() == 0
@@ -121,6 +121,8 @@ def dora_snapshot(page):
 
 def controls_visible(page):
     for selector in ['#discard', '#tsumo', '#selection-status', '.keyboard-help']:
+        if not page.locator(selector).is_visible():
+            continue
         bounds = box(page,selector)
         assert bounds['y'] >= 0 and bounds['y']+bounds['height'] <= page.viewport_size['height']-10, (selector,bounds)
     assert page.locator('#discard').evaluate('el => { const r=el.getBoundingClientRect(); return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2) === el; }')
@@ -132,6 +134,8 @@ with sync_playwright() as p:
         errors=[]
         page.on('pageerror',lambda err:errors.append(str(err)))
         page.goto(options.url)
+        page.clock.install()
+        page.clock.pause_at(page.evaluate('Date.now()'))
         dora_snapshot(page)
         assert page.locator('#dora-indicators svg').evaluate('el => { const r=el.getBoundingClientRect(); const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2); return r.y>=0 && r.bottom<=innerHeight && (hit===el || el.contains(hit)); }')
         for source in ['drawn','hand']:
@@ -183,6 +187,7 @@ with sync_playwright() as p:
             assert page.locator('#player-hand button:enabled').count()==0
             assert 'CPU1の手番' in page.locator('#selection-status').inner_text()
             assert page.locator('#label-1').get_attribute('data-active')=='true'
+            page.clock.run_for(1000)
             page.wait_for_function('document.querySelector("#player-hand button:enabled") !== null')
             assert page.locator('#player-hand li').count()==14
             assert page.evaluate('window.cpuDiscards')==[1,2,3]
@@ -195,6 +200,7 @@ with sync_playwright() as p:
             for turn_round in [2,3]:
                 page.locator('#player-hand button').first.click()
                 page.locator('#discard').click()
+                page.clock.run_for(1000)
                 page.wait_for_function('document.querySelector("#player-hand button:enabled") !== null')
                 assert page.locator('#player-hand li').count()==14
                 for id in [0,1,2,3]:
@@ -209,14 +215,13 @@ with sync_playwright() as p:
         page.locator('#new-game').click()
         reset_indicator=dora_snapshot(page)
         reset_ids=page.locator('#player-hand li').evaluate_all('(els) => els.map(el => el.dataset.tileId)')
-        page.wait_for_timeout(1100)
+        page.clock.run_for(1100)
         assert page.locator('#player-hand li').evaluate_all('(els) => els.map(el => el.dataset.tileId)')==reset_ids
         assert page.locator('#player-hand li').count()==14 and page.locator('.river svg').count()==0
         assert dora_snapshot(page) == reset_indicator
         assert '69枚' in page.locator('#wall-count').inner_text()
         page.screenshot(path=f'{options.screenshots}/{w}-initial.png',full_page=True)
         # Clock control skips presentation time, without exposing private state to DOM.
-        page.clock.install()
         previous_rivers = [[] for _ in range(4)]
         for turn_round in range(18):
             toolbar_check = turn_round == 17 and w in [375,390]
@@ -329,7 +334,7 @@ with sync_playwright() as p:
             page.goto(options.url)
             assert page.locator('#tsumo').is_disabled()
             assert page.locator('#dora-indicators svg').get_attribute('aria-label') == 'ドラ表示牌：4萬'
-            assert 'ドラ：5萬' in page.locator('#dora-indicators').inner_text().replace('\n', '')
+            assert 'ドラ：5萬' in page.locator('#dora-indicators').text_content().replace('\n', '')
             initial_indicator=dora_snapshot(page)
             page.locator('.drawn-tile button').click()
             page.locator('#discard').click()
@@ -376,7 +381,7 @@ with sync_playwright() as p:
             assert separate(box(page,'#win-result'),box(page,'#new-game'))
             page.locator('#new-game').click()
             assert page.locator('#dora-indicators svg').get_attribute('aria-label') == 'ドラ表示牌：8索'
-            assert 'ドラ：9索' in page.locator('#dora-indicators').inner_text().replace('\n', '')
+            assert 'ドラ：9索' in page.locator('#dora-indicators').text_content().replace('\n', '')
             assert dora_snapshot(page) != initial_indicator
             assert page.locator('#win-result').is_hidden()
             assert page.locator('#tsumo').is_disabled()

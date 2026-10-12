@@ -7,18 +7,18 @@ h1 { margin:0; font-size:clamp(1rem,5vw,1.5rem); white-space:nowrap; }
 #new-game { min-width:108px; min-height:44px; padding:8px 12px; border:1px solid #d4e5db; border-radius:8px; background:#fffdf7; color:#185640; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
 #new-game:focus-visible { outline:3px solid #ffda7d; outline-offset:2px; }
 ul { list-style:none; padding:0; margin:0; }
-.table { flex:none;  width:100%; display:grid; grid-template-columns:clamp(32px,8.6vw,48px) minmax(0,1fr) clamp(32px,8.6vw,48px); grid-template-rows:20px auto auto; grid-template-areas:". top ." "left rivers right" "bottom bottom bottom"; gap:4px; border:2px solid #39765e; border-radius:18px; background:#216b50; padding:6px 3px 8px; }
+.table { flex:none;  width:100%; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); grid-template-rows:18px auto auto; grid-template-areas:"left top right" "rivers rivers rivers" "bottom bottom bottom"; gap:4px; border:2px solid #39765e; border-radius:18px; background:#216b50; padding:4px 3px 4px; }
 .seat { min-width:0; min-height:0; display:flex; align-items:center; justify-content:center; gap:4px; }
 .seat-label { margin:0; color:#f2e9c9; font-size:clamp(10px,2.8vw,14px); line-height:1.2; font-weight:600; text-align:center; }
 .seat-label[data-active="true"] { color:#ffda7d; background:#154e3c; outline:1px solid #ffda7d; border-radius:4px; }
 .seat-top { grid-area:top; flex-direction:column; }
-.seat-bottom { grid-area:bottom; flex-direction:column; align-items:stretch; padding-top:2px; gap:14px; }
+.seat-bottom { grid-area:bottom; flex-direction:column; align-items:stretch; padding-top:2px; gap:10px; }
 .seat-left { grid-area:left; flex-direction:column; }
 .seat-right { grid-area:right; flex-direction:column; }
 .seat-left .seat-label,.seat-right .seat-label { overflow-wrap:anywhere; }
 /* Reserve all 18 discards, including empty cells, without a nested scroller.
    Top/bottom span the central width; the middle row separates side rivers/info. */
-.rivers { --river-tile-width:clamp(20px,5.4vw,24px); --river-tile-height:calc(var(--river-tile-width) * 1.4); grid-area:rivers; display:grid; min-width:0; grid-template-columns:calc(var(--river-tile-height) * 3 + 10px) minmax(0,1fr) calc(var(--river-tile-height) * 3 + 10px); grid-template-rows:auto auto auto; grid-template-areas:"top top top" "left info right" "bottom bottom bottom"; gap:4px; padding:4px; border:1px solid #488269; border-radius:12px; background:#1c6048; }
+.rivers { --river-tile-width:clamp(20px,5.4vw,24px); --river-tile-height:calc(var(--river-tile-width) * 1.4); grid-area:rivers; display:grid; min-width:0; grid-template-columns:calc(var(--river-tile-height) * 3 + 10px) minmax(0,1fr) calc(var(--river-tile-height) * 3 + 10px); grid-template-rows:auto auto auto; grid-template-areas:"top top top" "left info right" "bottom bottom bottom"; gap:2px; padding:2px; border:1px solid #488269; border-radius:12px; background:#1c6048; }
 .river { min-width:0; border:1px dashed #63947a; border-radius:5px; display:grid; grid-template-columns:repeat(6,var(--river-tile-width)); grid-template-rows:repeat(3,var(--river-tile-height)); justify-content:center; align-content:start; gap:2px; padding:2px; overflow:visible; }
 .river-tile { position:relative; width:var(--river-tile-width); height:var(--river-tile-height); }
 .river-top .tile-svg { transform:rotate(180deg); }
@@ -28,7 +28,7 @@ ul { list-style:none; padding:0; margin:0; }
 .river-left .river-tile,.river-right .river-tile { width:var(--river-tile-height); height:var(--river-tile-width); }
 .river-top { grid-area:top; }.river-right { grid-area:right; }.river-bottom { grid-area:bottom; }.river-left { grid-area:left; }
 .river-left,.river-right { grid-template-columns:repeat(3,var(--river-tile-height)); grid-template-rows:repeat(6,var(--river-tile-width)); }
-.center-info { grid-area:info; min-width:0; padding:6px 2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border-radius:8px; background:#154e3c; color:#fff5d7; font-size:clamp(10px,2.8vw,14px); font-weight:600; text-align:center; }
+.center-info { grid-area:info; min-width:0; padding:2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; border-radius:8px; background:#154e3c; color:#fff5d7; font-size:10px; line-height:12px; font-weight:600; text-align:center; }
 #player-hand { width:100%; display:grid; grid-template-columns:repeat(13,minmax(0,1fr)) minmax(0,1.25fr); gap:1px; }
 #player-hand li { min-width:0; }
 #player-hand .drawn-tile { padding-left:20%; }
@@ -55,17 +55,19 @@ summary { cursor:pointer; padding:4px; }
 #win-result { padding:12px; border:1px solid #ffda7d; border-radius:8px; overflow-wrap:anywhere; }
 #win-result h2 { margin:0; font-size:1.2rem; }
 #win-result p { margin:8px 0; }
-#wall-count { display:flex; flex-direction:column; gap:3px; }
-/* Five public slots stay the same size regardless of how many are exposed. */
-.dora-area { flex:none; width:100%; padding:6px 8px; border:1px solid #63947a; border-radius:10px; background:#154e3c; }
-.dora-area h2 { margin:0 0 4px; font-size:12px; line-height:18px; font-weight:600; }
-#dora-indicators { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; width:100%; }
-.dora-slot { min-width:0; display:grid; grid-template-rows:18px 44.8px 36px; justify-items:center; align-items:center; gap:2px; font-size:12px; line-height:18px; text-align:center; }
-#dora-indicators .tile-svg { width:32px; height:44.8px; }
-.dora-kind { width:100%; white-space:pre-line; overflow-wrap:anywhere; }
-/* Empty slots contain no tile markup, text, IDs, or hidden tile data. */
-.dora-placeholder::before { content:""; grid-row:2; width:32px; height:44.8px; border:1px dashed #82ac97; border-radius:4px; background:repeating-linear-gradient(135deg,#285f49 0 4px,#326d55 4px 8px); }
+#wall-count { display:flex; flex-direction:column; gap:0; }
+/* Fixed 3 + 2 slots: public count never changes the table geometry. */
+.dora-area { width:100%; }
+.dora-area h2 { margin:0 0 3px; font-size:10px; line-height:14px; font-weight:600; }
+#dora-indicators { display:grid; grid-template-columns:repeat(3,26px); grid-template-rows:repeat(2,36.4px); justify-content:center; gap:3px 2px; }
+.dora-slot { position:relative; width:26px; height:36.4px; }
+#dora-indicators .tile-svg { width:26px; height:36.4px; }
+/* Names remain available to assistive technology; faces take priority on a phone. */
+.dora-slot span { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+/* Empty slots contain no tile markup, IDs or hidden tile data. */
+.dora-placeholder::before { content:""; display:block; width:26px; height:36.4px; border:1px dashed #82ac97; border-radius:4px; background:repeating-linear-gradient(135deg,#285f49 0 4px,#326d55 4px 8px); }
 @media (max-width:350px) {
-  .center-info { padding:2px 0; font-size:8px; line-height:1.1; gap:2px; }
-  #wall-count { gap:1px; }
+  .discard-controls { padding:4px 6px calc(10px + env(safe-area-inset-bottom, 0px)); gap:4px; }
+  #selection-status { font-size:12px; }
+  .keyboard-help { display:none; }
 }
