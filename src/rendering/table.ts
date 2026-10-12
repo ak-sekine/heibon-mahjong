@@ -5,8 +5,7 @@ import { canDeclareTsumo } from '../game/tsumo.ts';
 import type { YakuId } from '../analysis/yaku.ts';
 import { canDiscard } from '../game/discard.ts';
 import { exposedDoraIndicators } from '../game/dora.ts';
-import { doraKindFromIndicator } from '../analysis/dora.ts';
-import { ordinaryTile } from '../model/tile.ts';
+import { renderDoraIndicators } from './dora.ts';
 
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
 const seatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
@@ -55,17 +54,7 @@ function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement
 
 export function renderTable(game: GameState): void {
   renderWinResult(game);
-  const indicators = document.querySelector<HTMLElement>('#dora-indicators')!;
-  indicators.replaceChildren(...exposedDoraIndicators(game).map(physical => {
-    const item = document.createElement('div');
-    item.dataset.tileId = physical.id;
-    const label = document.createElement('span');
-    label.textContent = 'ドラ表示牌';
-    const dora = document.createElement('span');
-    dora.textContent = `ドラ：${tileLabel(ordinaryTile(doraKindFromIndicator(physical.tile)))}`;
-    item.append(label, createTileElement(physical.tile), dora);
-    return item;
-  }));
+  renderDoraIndicators(document.querySelector<HTMLElement>('#dora-indicators')!, exposedDoraIndicators(game));
   for (const player of game.players) {
     const id: PlayerId = player.id;
     const count = player.hand.length + Number(player.drawnTile !== null);

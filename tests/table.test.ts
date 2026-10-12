@@ -53,10 +53,11 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'yakuman'] as const) test(`resul
     const list = panel.children.find(c => c.tagName === 'ul')!;
     assert.ok(!strings(list).some(s => s.includes('ドラ')));
     const exposed = nodes.get('#dora-indicators')!.children;
-    assert.equal(exposed.length, 1);
+    assert.equal(exposed.length, 5);
+    assert.ok(exposed.slice(1).every(slot => slot.className === 'dora-slot dora-placeholder' && slot.children.length === 0 && Object.keys(slot.dataset).length === 0));
     assert.equal(exposed[0].dataset.tileId, game.deadWall[4].id);
     assert.equal(exposed[0].children[1].innerHTML, tileSvgMarkup(game.deadWall[4].tile));
-    assert.equal(exposed[0].children[2].textContent, `ドラ：${tileLabel(ordinaryTile(doraKindFromIndicator(game.deadWall[4].tile)))}`);
+    assert.equal(exposed[0].children[2].textContent, `ドラ：\n${tileLabel(ordinaryTile(doraKindFromIndicator(game.deadWall[4].tile)))}`);
     assert.ok(output.includes('点数計算は未実装です。'));
     if (count === 'yakuman') {
       assert.ok(output.includes('国士無双 1役満'));
@@ -103,7 +104,8 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       const game = startGame(seeded(seed));
       renderTable(game);
       const exposed = nodes.get('#dora-indicators')!.children;
-      assert.equal(exposed.length, 1);
+      assert.equal(exposed.length, 5);
+      assert.ok(exposed.slice(1).every(slot => slot.className === 'dora-slot dora-placeholder' && slot.children.length === 0 && Object.keys(slot.dataset).length === 0));
       assert.equal(exposed[0].dataset.tileId, game.deadWall[4].id);
       assert.equal(exposed[0].children[1].innerHTML, tileSvgMarkup(game.deadWall[4].tile));
       const publicIds = [...nodes.values()].flatMap(node => node.children.flatMap(child => child.dataset.tileId ? [child.dataset.tileId] : []));

@@ -10,6 +10,10 @@
 <body>
 <main>
   <header><h1>Quill Mahjong</h1><button id="new-game" type="button">新しい対局</button></header>
+  <section class="dora-area" aria-labelledby="dora-heading">
+    <h2 id="dora-heading">ドラ表示牌</h2>
+    <div id="dora-indicators" role="group" aria-label="ドラ表示牌と対応するドラ牌種"></div>
+  </section>
   <section class="table" aria-label="4人麻雀卓">
     <section class="seat seat-top" data-player-id="2" aria-label="CPU2の席"><p class="seat-label" id="label-2"></p></section>
     <section class="seat seat-right" data-player-id="1" aria-label="CPU1の席"><p class="seat-label" id="label-1"></p></section>
@@ -21,7 +25,6 @@
       <div class="river river-left" data-player-id="3" aria-label="CPU3の河"></div>
       <div class="center-info">
         <div id="wall-count" role="status" aria-live="polite"></div>
-        <div id="dora-indicators" aria-label="ドラ表示牌"></div>
       </div>
     </section>
     <section class="seat seat-bottom" data-player-id="0" aria-label="自分の席"><h2 class="seat-label" id="label-0"></h2><ul id="player-hand" aria-label="自分の手牌"></ul></section>

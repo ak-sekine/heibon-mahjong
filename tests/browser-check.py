@@ -104,14 +104,14 @@ def dora_snapshot(page):
     assert region.locator('svg.tile-svg').count() == 1
     svg = region.locator('svg')
     assert svg.get_attribute('viewBox') == '0 0 60 84'
-    label = svg.get_attribute('aria-label')
+    label = svg.get_attribute('aria-label').removeprefix('ドラ表示牌：')
     assert label
     if re.fullmatch(r'赤?[1-9][萬筒索]', label):
         rank = int(re.search(r'[1-9]', label).group())
         expected = f'{rank % 9 + 1}{label[-1]}'
     else:
         expected = {'東':'南','南':'西','西':'北','北':'東','白':'發','發':'中','中':'白'}[label]
-    assert f'ドラ：{expected}' in region.inner_text()
+    assert f'ドラ：{expected}' in region.inner_text().replace('\n', '')
     assert region.locator('[data-tile-id]').count() == 1
     tile_id = region.locator('[data-tile-id]').get_attribute('data-tile-id')
     assert page.locator(f'#player-hand [data-tile-id="{tile_id}"], .river [data-tile-id="{tile_id}"]').count() == 0
@@ -328,8 +328,8 @@ with sync_playwright() as p:
             page.route('**/src/main.ts', inject)
             page.goto(options.url)
             assert page.locator('#tsumo').is_disabled()
-            assert page.locator('#dora-indicators svg').get_attribute('aria-label') == '4萬'
-            assert 'ドラ：5萬' in page.locator('#dora-indicators').inner_text()
+            assert page.locator('#dora-indicators svg').get_attribute('aria-label') == 'ドラ表示牌：4萬'
+            assert 'ドラ：5萬' in page.locator('#dora-indicators').inner_text().replace('\n', '')
             initial_indicator=dora_snapshot(page)
             page.locator('.drawn-tile button').click()
             page.locator('#discard').click()
@@ -375,8 +375,8 @@ with sync_playwright() as p:
             assert separate(box(page,'#win-result'),box(page,'#player-hand'))
             assert separate(box(page,'#win-result'),box(page,'#new-game'))
             page.locator('#new-game').click()
-            assert page.locator('#dora-indicators svg').get_attribute('aria-label') == '8索'
-            assert 'ドラ：9索' in page.locator('#dora-indicators').inner_text()
+            assert page.locator('#dora-indicators svg').get_attribute('aria-label') == 'ドラ表示牌：8索'
+            assert 'ドラ：9索' in page.locator('#dora-indicators').inner_text().replace('\n', '')
             assert dora_snapshot(page) != initial_indicator
             assert page.locator('#win-result').is_hidden()
             assert page.locator('#tsumo').is_disabled()

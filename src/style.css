@@ -56,12 +56,16 @@ summary { cursor:pointer; padding:4px; }
 #win-result h2 { margin:0; font-size:1.2rem; }
 #win-result p { margin:8px 0; }
 #wall-count { display:flex; flex-direction:column; gap:3px; }
-#dora-indicators { width:100%; font-size:9px; line-height:1.15; }
-#dora-indicators > div { display:flex; flex-direction:column; align-items:center; gap:2px; }
-#dora-indicators .tile-svg { width:24px; height:33.6px; flex:none; }
+/* Five public slots stay the same size regardless of how many are exposed. */
+.dora-area { flex:none; width:100%; padding:6px 8px; border:1px solid #63947a; border-radius:10px; background:#154e3c; }
+.dora-area h2 { margin:0 0 4px; font-size:12px; line-height:18px; font-weight:600; }
+#dora-indicators { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; width:100%; }
+.dora-slot { min-width:0; display:grid; grid-template-rows:18px 44.8px 36px; justify-items:center; align-items:center; gap:2px; font-size:12px; line-height:18px; text-align:center; }
+#dora-indicators .tile-svg { width:32px; height:44.8px; }
+.dora-kind { width:100%; white-space:pre-line; overflow-wrap:anywhere; }
+/* Empty slots contain no tile markup, text, IDs, or hidden tile data. */
+.dora-placeholder::before { content:""; grid-row:2; width:32px; height:44.8px; border:1px dashed #82ac97; border-radius:4px; background:repeating-linear-gradient(135deg,#285f49 0 4px,#326d55 4px 8px); }
 @media (max-width:350px) {
   .center-info { padding:2px 0; font-size:8px; line-height:1.1; gap:2px; }
   #wall-count { gap:1px; }
-  #dora-indicators { font-size:8px; line-height:1.1; }
-  #dora-indicators > div { gap:1px; }
 }
