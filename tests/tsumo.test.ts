@@ -12,7 +12,9 @@ import type { PhysicalTile } from '../src/model/game.ts';
 import { startGame } from '../src/game/start.ts';
 import type { GameState, PlayerId } from '../src/model/game.ts';
 import { allTiles, freeze, inventory } from './helpers.ts';
-import { STANDARD, tsumoStart, tsumoGame } from './tsumo-fixture.ts';
+import { RED_PINFU, STANDARD, tsumoStart, tsumoGame } from './tsumo-fixture.ts';
+import { SUITS } from '../src/model/tile.ts';
+import { countRedDora } from '../src/analysis/dora.ts';
 
 for (const [name, groups, last] of [
   ['standard with red five', STANDARD, false],
@@ -33,6 +35,10 @@ for (const [name, groups, last] of [
   assert.equal(won.deadWall, game.deadWall);
   assert.equal(won.players[0].drawnTile, game.players[0].drawnTile);
   const result = won.winResult!;
+  assert.equal(result.yakuHan, result.totalHan);
+  assert.equal(result.redDoraCount, countRedDora([...game.players[0].hand, game.players[0].drawnTile!].map(t => t.tile)));
+  assert.equal(result.redDoraHan, result.yakumanCount > 0 ? 0 : result.redDoraCount);
+  assert.equal(result.totalHanIncludingDora, result.yakumanCount > 0 ? 0 : result.yakuHan + result.redDoraHan);
   assert.equal(result.winnerId, 0);
   assert.equal(result.winMethod, 'tsumo');
   assert.equal(result.winningTileId, game.players[0].drawnTile!.id);
@@ -49,6 +55,90 @@ for (const [name, groups, last] of [
   if (name === 'standard with red five') assert.ok(game.players[0].hand.some(t => t.tile.isRed));
   if (last) assert.equal(won.liveWall.length, 0);
   inventory(won, game);
+});
+
+test('menzen tsumo and pinfu keep two yaku han and add two red dora once', () => {
+  const game = tsumoGame(RED_PINFU);
+  const snapshot = structuredClone(game); freeze(game);
+  const won = declareTsumo(game, 0), result = won.winResult!;
+  assert.deepEqual(result.candidate.yaku.map(y => y.id).sort(), ['menzen-tsumo', 'pinfu']);
+  assert.equal(result.candidate.totalHan, 2);
+  assert.equal(result.totalHan, 2); assert.equal(result.yakuHan, 2);
+  assert.equal(result.redDoraCount, 2); assert.equal(result.redDoraHan, 2);
+  assert.equal(result.totalHanIncludingDora, 4);
+  assert.deepEqual(game, snapshot); inventory(won, game);
+});
+
+test('the actual red winning draw is included in the bonus', () => {
+  const game = tsumoGame(['123m', '678p', '234s', '22p', '345m']);
+  assert.equal(game.players[0].drawnTile!.tile.isRed, true);
+  const result = declareTsumo(game, 0).winResult!;
+  assert.equal(result.redDoraCount, 1); assert.equal(result.redDoraHan, 1);
+  assert.equal(result.totalHanIncludingDora, result.yakuHan + 1);
+  inventory(game, game);
+});
+
+test('seven pairs and standard candidates share one physical hand bonus', () => {
+  const game = tsumoGame(['11223344556677m']);
+  const result = declareTsumo(game, 0).winResult!;
+  assert.ok(result.analysis.candidates.some(c => c.shape === 'standard'));
+  assert.ok(result.analysis.candidates.some(c => c.shape === 'seven-pairs'));
+  assert.equal(result.redDoraCount, 1); assert.equal(result.redDoraHan, 1);
+  assert.equal(result.totalHanIncludingDora, result.yakuHan + 1);
+  assert.ok(result.analysis.candidates.every(c => c.yaku.every(y => !String(y.id).includes('dora'))));
+  inventory(game, game);
+});
+
+test('red seven pairs add bonuses separately from chiitoitsu', () => {
+  const game = tsumoGame(['1155m', '2255p', '335566s']);
+  const result = declareTsumo(game, 0).winResult!;
+  assert.equal(result.candidate.shape, 'seven-pairs');
+  assert.ok(result.candidate.yaku.some(y => y.id === 'chiitoitsu' && y.han === 2));
+  assert.equal(result.redDoraCount, 3); assert.equal(result.redDoraHan, 3);
+  assert.equal(result.totalHanIncludingDora, result.yakuHan + 3);
+  inventory(game, game);
+});
+
+test('kokushi remains one yakuman with no normal han or dora total', () => {
+  const game = tsumoGame(['19m', '19p', '19s', '12345677z']);
+  const result = declareTsumo(game, 0).winResult!;
+  assert.equal(result.yakumanCount, 1);
+  for (const value of [result.totalHan, result.yakuHan, result.redDoraCount, result.redDoraHan, result.totalHanIncludingDora]) assert.equal(value, 0);
+  inventory(game, game);
+});
+
+for (const count of [0, 1, 2, 3]) test(`tsumo eligibility and candidate choice are independent of ${count} red dora`, () => {
+  const groups = ['123m', '456m', '456p', '456s', '22p'];
+  const game = tsumoGame(groups, false, SUITS.slice(0, count));
+  const ordinary = declareTsumo(tsumoGame(groups, false, []), 0).winResult!;
+  assert.equal(canDeclareTsumo(game, 0), true);
+  const result = declareTsumo(game, 0).winResult!;
+  assert.equal(result.redDoraCount, count);
+  assert.deepEqual(result.analysis, ordinary.analysis);
+  assert.equal(result.candidate.id, ordinary.candidate.id);
+  const initial = tsumoStart(groups, false, SUITS.slice(0, count));
+  assert.equal(canDeclareTsumo(initial, 0), false);
+  inventory(game, game); inventory(initial, initial);
+});
+
+test('red bonuses do not make a supported-yaku-free shape a yaku', () => {
+  const game = tsumoGame(RED_PINFU);
+  const tiles = [...game.players[0].hand, game.players[0].drawnTile!].map(t => t.tile);
+  // Ron on the pair removes menzen tsumo and pinfu; this engine supports no other yaku here.
+  const analysis = analyzeYaku(tiles, { winMethod: 'ron', winningTile: { category: 'suited', suit: 'pin', rank: 2 }, seatWind: 'east', roundWind: 'east' });
+  assert.equal(countRedDora(tiles), 2);
+  assert.equal(analysis.isWinningShape, true); assert.equal(analysis.hasSupportedYaku, false);
+  assert.equal(selectTsumoCandidate(analysis), null);
+});
+
+test('duplicate red physical tile is rejected before bonus counting', () => {
+  const game = tsumoGame(RED_PINFU);
+  const red = game.players[0].hand.find(t => t.tile.isRed)!;
+  const invalid = { ...game, players: [{ ...game.players[0], drawnTile: red }, ...game.players.slice(1)] as GameState['players'] };
+  const snapshot = structuredClone(invalid); freeze(invalid);
+  assert.equal(canDeclareTsumo(invalid, 0), false);
+  assert.throws(() => declareTsumo(invalid, 0), RangeError);
+  assert.deepEqual(invalid, snapshot);
 });
 
 const replaceSelf = (game: GameState, change: Partial<GameState['players'][0]>): GameState => ({

@@ -24,7 +24,13 @@ export interface TsumoResult {
   readonly winningTileId: string;
   readonly analysis: YakuAnalysis;
   readonly candidate: YakuCandidate;
+  /** Supported yaku han only, preserved for Step 8 callers. */
   readonly totalHan: number;
+  readonly yakuHan: number;
+  readonly redDoraCount: number;
+  /** Zero for yakuman; bonuses never increase a yakuman. */
+  readonly redDoraHan: number;
+  readonly totalHanIncludingDora: number;
   readonly yakumanCount: number;
 }
 export interface GameState extends WallState {

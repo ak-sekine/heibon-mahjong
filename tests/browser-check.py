@@ -289,9 +289,9 @@ with sync_playwright() as p:
         def inject(route):
             response = route.fetch()
             source = response.text()
-            source, count = re.subn(r'new GameController\((?:undefined|void 0),', 'new GameController(() => tsumoStart(),', source)
+            source, count = re.subn(r'new GameController\((?:undefined|void 0),', 'new GameController(() => tsumoStart(RED_PINFU),', source)
             assert count == 1
-            source = 'import { tsumoStart } from "/quill-mahjong/tests/tsumo-fixture.ts";\n' + source
+            source = 'import { tsumoStart, RED_PINFU } from "/quill-mahjong/tests/tsumo-fixture.ts";\n' + source
             route.fulfill(response=response, body=source)
         for w,h in [(320,568),(375,667),(390,844),(414,896),(1280,800)]:
             page=browser.new_page(viewport={'width':w,'height':h})
@@ -323,7 +323,8 @@ with sync_playwright() as p:
             page.evaluate('document.querySelector("#tsumo").click()')
             assert page.locator('#win-result').is_visible()
             result=page.locator('#win-result').inner_text()
-            assert all(text in result for text in ['ツモ和了！','自分（東）','門前清自摸和 1翻','断么九 1翻','対応役合計：2翻','今回対応している役','点数計算は未実装'])
+            assert all(text in result for text in ['ツモ和了！','自分（東）','門前清自摸和 1翻','平和 1翻','役合計：2翻','赤ドラ：2枚（2翻）','合計：4翻','今回対応している役','点数計算は未実装'])
+            assert '赤ドラ' not in page.locator('#win-result ul').inner_text()
             assert page.locator('.drawn-tile button').get_attribute('data-tile-id')==draw_id
             assert page.locator('#player-hand li').evaluate_all('(els)=>els.map(el=>el.dataset.tileId)')==ids
             assert page.locator('[aria-pressed="true"]').count()==0

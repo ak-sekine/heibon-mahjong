@@ -118,6 +118,15 @@ function renderWinResult(game: GameState): void {
   for (const yaku of result.candidate.yaku) list.append(text('li',
     `${yakuNames[yaku.id]} ${yaku.yakuman > 0 ? `${yaku.yakuman}役満` : `${yaku.han}翻`}`));
   panel.append(list);
-  panel.append(text('p', result.yakumanCount > 0 ? `役満：${result.yakumanCount}役満` : `対応役合計：${result.totalHan}翻`));
+  if (result.yakumanCount > 0) {
+    panel.append(text('p', `役満：${result.yakumanCount}役満`));
+  } else {
+    panel.append(text('p', `役合計：${result.yakuHan}翻`));
+    const bonuses = document.createElement('div');
+    bonuses.className = 'win-bonuses';
+    bonuses.append(text('p', `赤ドラ：${result.redDoraCount}枚（${result.redDoraHan}翻）`));
+    panel.append(bonuses);
+    panel.append(text('p', `合計：${result.totalHanIncludingDora}翻`));
+  }
   panel.append(text('p', '点数計算は未実装です。'));
 }

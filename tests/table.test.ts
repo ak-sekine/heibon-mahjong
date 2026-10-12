@@ -5,8 +5,12 @@ import { declareTsumo } from '../src/game/tsumo.ts';
 import { startGame } from '../src/game/start.ts';
 import { renderTable, renderSelection } from '../src/rendering/table.ts';
 import { discardTile } from '../src/game/discard.ts';
+import { SUITS } from '../src/model/tile.ts';
+import { inventory } from './helpers.ts';
 
 class ElementStub {
+  readonly tagName: string;
+  constructor(tagName = '') { this.tagName = tagName; }
   children: ElementStub[] = [];
   dataset: Record<string, string> = {};
   className = '';
@@ -21,6 +25,44 @@ class ElementStub {
   replaceChildren(...children: ElementStub[]) { this.children = children; }
   append(child: ElementStub) { this.children.push(child); }
 }
+
+for (const count of [0, 1, 2, 3, 'yakuman'] as const) test(`result separates yaku and bonuses: ${count}`, () => {
+  const nodes = new Map<string, ElementStub>();
+  for (const id of [0, 1, 2, 3]) {
+    nodes.set(`#label-${id}`, new ElementStub());
+    nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
+  }
+  for (const key of ['#player-hand', '#wall-count', '#win-result']) nodes.set(key, new ElementStub());
+  const original = globalThis.document;
+  globalThis.document = {
+    querySelector: (selector: string) => nodes.get(selector),
+    createElement: (tag: string) => new ElementStub(tag),
+  } as unknown as Document;
+  try {
+    const game = count === 'yakuman'
+      ? tsumoGame(['19m', '19p', '19s', '12345677z'])
+      : tsumoGame(['123m', '456m', '456p', '22p', '456s'], false, SUITS.slice(0, count));
+    const won = declareTsumo(game, 0);
+    renderTable(won); inventory(won, game);
+    const panel = nodes.get('#win-result')!;
+    const strings = (node: ElementStub): string[] => [node.textContent, ...node.children.flatMap(strings)];
+    const output = strings(panel);
+    const list = panel.children.find(c => c.tagName === 'ul')!;
+    assert.ok(!strings(list).some(s => s.includes('赤ドラ')));
+    assert.ok(output.includes('点数計算は未実装です。'));
+    if (count === 'yakuman') {
+      assert.ok(output.includes('国士無双 1役満'));
+      assert.ok(output.includes('役満：1役満'));
+      assert.ok(!output.some(s => s.includes('翻') || s.includes('合計：') || s.includes('赤ドラ')));
+    } else {
+      assert.deepEqual(list.children.map(c => c.textContent).sort(), ['平和 1翻', '門前清自摸和 1翻']);
+      assert.ok(output.includes('役合計：2翻'));
+      assert.ok(output.includes(`赤ドラ：${count}枚（${count}翻）`));
+      assert.ok(output.includes(`合計：${2 + count}翻`));
+      assert.equal(panel.children.filter(c => c.className === 'win-bonuses').length, 1);
+    }
+  } finally { globalThis.document = original; }
+});
 
 function seeded(seed: number): () => number {
   return () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
@@ -123,7 +165,7 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
     assert.equal(nodes.get('#player-hand')!.children.length, 14);
     assert.equal(nodes.get('#win-result')!.hidden, false);
     assert.ok(nodes.get('#win-result')!.children.some(c => c.textContent === 'ツモ和了！'));
-    assert.ok(nodes.get('#win-result')!.children.some(c => c.textContent === '対応役合計：2翻'));
+    assert.ok(nodes.get('#win-result')!.children.some(c => c.textContent === '役合計：2翻'));
     assert.equal(nodes.get('#label-0')!.dataset.active, 'false');
     renderTable(startGame());
     assert.equal(nodes.get('#win-result')!.hidden, true);
