@@ -83,7 +83,7 @@ export function tileSvgMarkup(tile: Tile): string {
       if (tile.suit === 'pin') {
         const redMark = (tile.rank === 3 && i === 1)
           || (tile.rank === 5 && i === 2) || (tile.rank === 6 && i >= 2)
-          || (tile.rank === 7 && i >= 3);
+          || (tile.rank === 7 && i >= 3) || (tile.rank === 9 && i >= 3 && i <= 5);
         const color = tile.isRed || redMark ? RED : BLUE;
         return circleMark(point, tile.rank === 1 ? 18 : tile.rank >= 7 ? 5.7 : 7.2, color, tile.rank === 1 ? RED : color);
       }

@@ -47,3 +47,22 @@ test('all 34 kinds and three red variants produce labeled SVG without emoji', ()
   }
 });
 
+test('nine circles has blue top and bottom rows and a red middle row', () => {
+  const svg = tileSvgMarkup(ordinaryTile({ category: 'suited', suit: 'pin', rank: 9 }));
+  const circles = [...svg.matchAll(/<circle cx="([^"]+)" cy="([^"]+)" r="([^"]+)" fill="([^"]+)"\/>/g)]
+    .map(([, x, y, radius, fill]) => ({ x: Number(x), y: Number(y), radius: Number(radius), fill }));
+
+  assert.equal(circles.length, 27);
+  const colors = ['#316482', '#c64246', '#316482'];
+  for (let i = 0; i < 9; i++) {
+    const x = [16, 30, 44][i % 3];
+    const y = [22, 42, 62][Math.floor(i / 3)];
+    const color = colors[Math.floor(i / 3)];
+    assert.deepEqual(circles.slice(i * 3, i * 3 + 3), [
+      { x, y, radius: 5.7, fill: color },
+      { x, y, radius: 5.7 * .57, fill: '#fffdf7' },
+      { x, y, radius: 5.7 * .24, fill: color },
+    ]);
+  }
+});
+
