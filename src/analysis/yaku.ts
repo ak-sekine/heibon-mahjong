@@ -1,0 +1,141 @@
+import { TILE_KINDS, tileKindKey } from '../model/tile.ts';
+import type { Tile, TileKind } from '../model/tile.ts';
+import type { SeatWind } from '../model/game.ts';
+import { analyzeWinningShapes } from './winning-shape.ts';
+import type { StandardDecomposition, WinningMeld } from './winning-shape.ts';
+
+export interface WinningContext {
+  readonly winMethod: 'tsumo' | 'ron';
+  readonly winningTile: TileKind;
+  readonly seatWind: SeatWind;
+  readonly roundWind: SeatWind;
+  /** Only closed hands are supported. false is rejected, never evaluated as closed. */
+  readonly isClosed?: true;
+}
+export type YakuId = 'menzen-tsumo' | 'tanyao' | 'yakuhai-white' | 'yakuhai-green' |
+  'yakuhai-red' | 'yakuhai-seat-wind' | 'yakuhai-round-wind' | 'pinfu' |
+  'iipeikou' | 'chiitoitsu' | 'toitoi' | 'kokushi-musou';
+export type RecognizedYaku =
+  | Readonly<{ id: Exclude<YakuId, 'kokushi-musou'>; han: 1 | 2; yakuman: 0 }>
+  | Readonly<{ id: 'kokushi-musou'; han: 0; yakuman: 1 }>;
+export type WaitType = 'ryanmen' | 'kanchan' | 'penchan' | 'tanki' | 'shanpon';
+export type WinningTileAssignment =
+  | Readonly<{ type: 'pair' }>
+  | Readonly<{ type: 'meld'; meldIndex: number; tileIndex: 0 | 1 | 2 }>;
+interface CandidateBase {
+  readonly id: string;
+  readonly yaku: readonly RecognizedYaku[];
+  readonly totalHan: number;
+  readonly yakumanCount: number;
+}
+export type YakuCandidate = CandidateBase & (
+  | Readonly<{ shape: 'standard'; decompositionId: string; decomposition: StandardDecomposition;
+      assignment: WinningTileAssignment; wait: WaitType }>
+  | Readonly<{ shape: 'seven-pairs'; pairs: readonly TileKind[]; assignment: Readonly<{ type: 'pair'; pairIndex: number }>; wait: 'tanki' }>
+  | Readonly<{ shape: 'thirteen-orphans'; duplicate: TileKind; assignment: null; wait: null }>
+);
+export interface YakuAnalysis {
+  readonly isWinningShape: boolean;
+  /** Supported subset only; this does not establish legal win eligibility. */
+  readonly hasSupportedYaku: boolean;
+  readonly candidates: readonly YakuCandidate[];
+}
+const winds: readonly SeatWind[] = ['east', 'south', 'west', 'north'];
+const same = (a: TileKind, b: TileKind) => tileKindKey(a) === tileKindKey(b);
+function validateContext(context: WinningContext, tiles: readonly Tile[]): void {
+  if (!context || typeof context !== 'object' ||
+      !['tsumo', 'ron'].includes(context.winMethod) ||
+      !winds.includes(context.seatWind) || !winds.includes(context.roundWind) ||
+      (context.isClosed !== undefined && context.isClosed !== true)) {
+    throw new RangeError('Invalid winning context; only closed hands are supported');
+  }
+  const kind = context.winningTile;
+  if (!kind || typeof kind !== 'object' || !TILE_KINDS.some(k =>
+    k.category === kind.category && (k.category === 'honor'
+      ? kind.category === 'honor' && k.honor === kind.honor
+      : kind.category === 'suited' && k.suit === kind.suit && k.rank === kind.rank))) {
+    throw new RangeError('Invalid winning tile kind');
+  }
+  if (!tiles.some(t => same(t, kind))) throw new RangeError('Winning tile is not in the hand');
+}
+function valuePair(kind: TileKind, context: WinningContext): boolean {
+  return kind.category === 'honor' &&
+    (['white', 'green', 'red'].includes(kind.honor) ||
+      kind.honor === context.seatWind || kind.honor === context.roundWind);
+}
+function meldKey(meld: WinningMeld): string {
+  return meld.type === 'triplet' ? `triplet:${tileKindKey(meld.tile)}`
+    : `sequence:${tileKindKey(meld.tiles[0])}`;
+}
+function sequenceWait(meld: Extract<WinningMeld, { type: 'sequence' }>, index: number): WaitType {
+  if (index === 1) return 'kanchan';
+  const first = meld.tiles[0];
+  if (first.category === 'suited' && ((first.rank === 1 && index === 2) ||
+      (first.rank === 7 && index === 0))) return 'penchan';
+  return 'ryanmen';
+}
+function totals(yaku: readonly RecognizedYaku[]) {
+  return { yaku, totalHan: yaku.reduce((n, y) => n + y.han, 0),
+    yakumanCount: yaku.reduce((n, y) => n + y.yakuman, 0) };
+}
+/** Pure, closed 14-tile evaluation. Reuses Step 6 validation and all shape decompositions. */
+export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): YakuAnalysis {
+  const shapes = analyzeWinningShapes(tiles);
+  validateContext(context, tiles);
+  const common: RecognizedYaku[] = [];
+  const add = (list: RecognizedYaku[], id: Exclude<YakuId, 'kokushi-musou'>, han: 1 | 2 = 1) =>
+    list.push({ id, han, yakuman: 0 });
+  if (context.winMethod === 'tsumo') add(common, 'menzen-tsumo');
+  if (tiles.every(t => t.category === 'suited' && t.rank >= 2 && t.rank <= 8)) add(common, 'tanyao');
+  const candidates: YakuCandidate[] = [];
+  for (const decomposition of shapes.standard.decompositions) {
+    const { pair, melds } = decomposition;
+    const decompositionId = `${tileKindKey(pair)}|${melds.map(meldKey).join('|')}`;
+    const base = [...common];
+    for (const meld of melds) {
+      if (meld.type !== 'triplet' || meld.tile.category !== 'honor') continue;
+      const honor = meld.tile.honor;
+      if (honor === 'white') add(base, 'yakuhai-white');
+      if (honor === 'green') add(base, 'yakuhai-green');
+      if (honor === 'red') add(base, 'yakuhai-red');
+      if (honor === context.seatWind) add(base, 'yakuhai-seat-wind');
+      if (honor === context.roundWind) add(base, 'yakuhai-round-wind');
+    }
+    const sequences = melds.filter(m => m.type === 'sequence').map(meldKey);
+    const iipeikou = new Set(sequences).size < sequences.length;
+    const toitoi = melds.every(m => m.type === 'triplet');
+    const emit = (assignment: WinningTileAssignment, wait: WaitType, position: string) => {
+      const yaku = [...base];
+      if (melds.every(m => m.type === 'sequence') && !valuePair(pair, context) && wait === 'ryanmen') add(yaku, 'pinfu');
+      if (iipeikou) add(yaku, 'iipeikou');
+      if (toitoi) add(yaku, 'toitoi', 2);
+      candidates.push({ shape: 'standard', id: `standard:${decompositionId}:${position}`,
+        decompositionId, decomposition, assignment, wait, ...totals(yaku) });
+    };
+    if (same(pair, context.winningTile)) emit({ type: 'pair' }, 'tanki', 'pair');
+    // Equal melds are symmetric. Keep the first canonical index, without duplicate candidates.
+    const seen = new Set<string>();
+    melds.forEach((meld, meldIndex) => {
+      const key = meldKey(meld);
+      if (seen.has(key)) return;
+      seen.add(key);
+      if (meld.type === 'triplet') {
+        if (same(meld.tile, context.winningTile)) emit({ type: 'meld', meldIndex, tileIndex: 0 }, 'shanpon', `meld:${meldIndex}:0`);
+      } else {
+        const index = meld.tiles.findIndex(k => same(k, context.winningTile));
+        if (index !== -1) emit({ type: 'meld', meldIndex, tileIndex: index as 0 | 1 | 2 }, sequenceWait(meld, index), `meld:${meldIndex}:${index}`);
+      }
+    });
+  }
+  if (shapes.sevenPairs.isWinning) {
+    const yaku = [...common];
+    add(yaku, 'chiitoitsu', 2);
+    candidates.push({ shape: 'seven-pairs', id: 'seven-pairs', pairs: shapes.sevenPairs.pairs,
+      assignment: { type: 'pair', pairIndex: shapes.sevenPairs.pairs.findIndex(k => same(k, context.winningTile)) },
+      wait: 'tanki', ...totals(yaku) });
+  }
+  if (shapes.thirteenOrphans.isWinning) candidates.push({ shape: 'thirteen-orphans', id: 'thirteen-orphans',
+    duplicate: shapes.thirteenOrphans.duplicate, assignment: null, wait: null,
+    ...totals([{ id: 'kokushi-musou', han: 0, yakuman: 1 }]) });
+  return { isWinningShape: shapes.isWinning, hasSupportedYaku: candidates.some(c => c.yaku.length > 0), candidates };
+}
