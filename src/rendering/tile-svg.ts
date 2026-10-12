@@ -28,10 +28,10 @@ const PATTERNS: Record<Rank, readonly Point[]> = {
   9: [[16, 22], [30, 22], [44, 22], [16, 42], [30, 42], [44, 42], [16, 62], [30, 62], [44, 62]],
 };
 
-function circleMark([x, y]: Point, radius: number, color: string): string {
+function circleMark([x, y]: Point, radius: number, color: string, centerColor = color): string {
   return `<circle cx="${x}" cy="${y}" r="${radius}" fill="${color}"/>
     <circle cx="${x}" cy="${y}" r="${radius * .57}" fill="#fffdf7"/>
-    <circle cx="${x}" cy="${y}" r="${radius * .24}" fill="${color}"/>`;
+    <circle cx="${x}" cy="${y}" r="${radius * .24}" fill="${centerColor}"/>`;
 }
 
 function bambooMark([x, y]: Point, height: number, color: string): string {
@@ -58,7 +58,9 @@ function bambooBird(): string {
 }
 
 const SEVEN_BAMBOO: readonly Point[] = [[30, 19], [16, 41], [30, 41], [44, 41], [16, 63], [30, 63], [44, 63]];
-const EIGHT_BAMBOO: readonly Point[] = [[13, 24], [47, 24], [23, 24], [37, 24], [13, 60], [47, 60], [23, 60], [37, 60]];
+// Four upright marks flank four diagonal marks forming a central diamond.
+const EIGHT_BAMBOO: readonly Point[] = [[12, 23], [48, 23], [12, 61], [48, 61], [24, 32], [36, 32], [24, 52], [36, 52]];
+const EIGHT_BAMBOO_ANGLES = [0, 0, 0, 0, 38, -38, -38, 38] as const;
 
 /** Original local vector artwork; fixed 60:84 ratio and no external assets. */
 export function tileSvgMarkup(tile: Tile): string {
@@ -79,17 +81,18 @@ export function tileSvgMarkup(tile: Tile): string {
       : tile.suit === 'sou' && tile.rank === 8 ? EIGHT_BAMBOO : PATTERNS[tile.rank];
     face = points.map((point, i) => {
       if (tile.suit === 'pin') {
-        const redMark = tile.rank === 1 || (tile.rank === 3 && i === 1)
-          || (tile.rank === 5 && i === 2) || (tile.rank === 6 && i >= 2);
+        const redMark = (tile.rank === 3 && i === 1)
+          || (tile.rank === 5 && i === 2) || (tile.rank === 6 && i >= 2)
+          || (tile.rank === 7 && i >= 3);
         const color = tile.isRed || redMark ? RED : BLUE;
-        return circleMark(point, tile.rank === 1 ? 18 : tile.rank >= 7 ? 5.7 : 7.2, color);
+        return circleMark(point, tile.rank === 1 ? 18 : tile.rank >= 7 ? 5.7 : 7.2, color, tile.rank === 1 ? RED : color);
       }
       const redMark = (tile.rank === 5 && i === 2) || (tile.rank === 7 && i === 0)
         || (tile.rank === 9 && i % 3 === 1);
-      const mark = bambooMark(point, tile.rank === 8 ? 22 : 16, tile.isRed || redMark ? RED : GREEN);
-      // Each group of four forms two outward-slanting pairs (八).
+      const mark = bambooMark(point, tile.rank === 8 ? 18 : 16, tile.isRed || redMark ? RED : GREEN);
+      // Keep the outer four upright and leave space around the central diamond.
       return tile.rank === 8
-        ? `<g transform="rotate(${i % 2 === 0 ? 15 : -15} ${point[0]} ${point[1]})">${mark}</g>` : mark;
+        ? `<g transform="rotate(${EIGHT_BAMBOO_ANGLES[i]} ${point[0]} ${point[1]})">${mark}</g>` : mark;
     }).join('');
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 84" role="img" aria-label="${label}" class="tile-svg">
