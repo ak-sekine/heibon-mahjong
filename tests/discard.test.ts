@@ -25,7 +25,8 @@ function inventory(game: GameState): void {
   assert.deepEqual(game.players.map(p => p.hand.length), [13, 13, 13, 13]);
   assert.deepEqual(game.players.map(p => p.river.length), [1, 0, 0, 0]);
   assert.ok(game.players.every(p => p.drawnTile === null));
-  assert.equal(game.phase, 'stopped');
+  assert.equal(game.phase, 'awaiting-draw');
+  assert.equal(game.turnPlayerId, 1);
 }
 
 test('drawn and hand discards preserve inventory, identities and frozen source over 100 games', () => {
@@ -71,7 +72,7 @@ test('red five and same-kind copies retain exact physical identity', () => {
   }
 });
 
-test('invalid ownership, CPU, dealer, turn, phase and malformed hands are rejected without changes', () => {
+test('invalid ownership, turn, phase and malformed hands are rejected without changes', () => {
   const game = startGame();
   const snapshot = structuredClone(game);
   const id = game.players[0].drawnTile!.id;
@@ -80,11 +81,12 @@ test('invalid ownership, CPU, dealer, turn, phase and malformed hands are reject
   assert.throws(() => discardTile(game, 0, game.liveWall[0].id), RangeError);
   assert.throws(() => discardTile(game, 1, game.players[1].hand[0].id), RangeError);
   assert.throws(() => discardTile(game, 99 as 0, id), RangeError);
-  assert.throws(() => discardTile({ ...game, dealerId: 1 }, 0, id), RangeError);
+  assert.equal(discardTile({ ...game, dealerId: 1 }, 0, id).turnPlayerId, 1);
   assert.throws(() => discardTile({ ...game, turnPlayerId: 1 }, 0, id), RangeError);
-  assert.throws(() => discardTile({ ...game, phase: 'stopped' }, 0, id), RangeError);
+  assert.throws(() => discardTile({ ...game, phase: 'wall-exhausted' }, 0, id), RangeError);
+  assert.throws(() => discardTile({ ...game, phase: 'awaiting-draw' }, 0, id), RangeError);
   const cpuDealer = startGame(undefined, 1);
-  assert.throws(() => discardTile(cpuDealer, 1, cpuDealer.players[1].drawnTile!.id), RangeError);
+  assert.equal(discardTile(cpuDealer, 1, cpuDealer.players[1].drawnTile!.id).turnPlayerId, 2);
   assert.throws(() => discardTile(cpuDealer, 0, cpuDealer.players[0].hand[0].id), RangeError);
   assert.throws(() => discardFromPlayer({ ...game.players[0], drawnTile: null }, id), RangeError);
   assert.deepEqual(game, snapshot);

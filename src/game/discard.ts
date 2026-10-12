@@ -1,4 +1,5 @@
 import type { GameState, PlayerId, PlayerState } from '../model/game.ts';
+import { nextPlayerId } from './turn.ts';
 
 /** Shared tile movement; no human/CPU policy or turn progression here. */
 export function discardFromPlayer(player: PlayerState, tileId: string): PlayerState {
@@ -13,12 +14,11 @@ export function discardFromPlayer(player: PlayerState, tileId: string): PlayerSt
   return { ...player, hand, drawnTile: null, river: [...player.river, tile] };
 }
 
-/** Step 4 supports only the human dealer's first discard. */
+/** The same rules apply to every seat, on every turn. */
 export function canDiscard(game: GameState, playerId: PlayerId): boolean {
-  const player = game.players.find(player => player.id === playerId);
+  const player = game.players[playerId];
   return game.phase === 'awaiting-discard' && game.turnPlayerId === playerId
-    && game.dealerId === playerId && playerId === 0 && player?.control === 'human'
-    && player.hand.length === 13 && player.drawnTile !== null && player.river.length === 0;
+    && player?.id === playerId && player.hand.length === 13 && player.drawnTile !== null;
 }
 
 /** Invalid operations throw, leaving the input state untouched. */
@@ -27,5 +27,5 @@ export function discardTile(game: GameState, playerId: PlayerId, tileId: string)
   const player = discardFromPlayer(game.players[playerId], tileId);
   const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
   players[playerId] = player;
-  return { ...game, players, phase: 'stopped' };
+  return { ...game, players, turnPlayerId: nextPlayerId(playerId), phase: 'awaiting-draw' };
 }

@@ -19,6 +19,6 @@ export interface WallState {
 export interface GameState extends WallState {
   readonly dealerId: PlayerId;
   readonly turnPlayerId: PlayerId;
-  readonly phase: 'awaiting-discard' | 'stopped';
+  readonly phase: 'awaiting-draw' | 'awaiting-discard' | 'wall-exhausted';
   readonly players: readonly [PlayerState, PlayerState, PlayerState, PlayerState];
 }

@@ -4,12 +4,12 @@ import { createTileElement, tileLabel } from './rendering/tile-svg.ts';
 import { renderTable, renderSelection } from './rendering/table.ts';
 import { GameController } from './ui/controller.ts';
 
-const controller = new GameController();
+const controller = new GameController(undefined, { onChange: render });
 function render(): void {
   renderTable(controller.game);
   renderSelection(controller.game, controller.selectedTileId);
 }
-function newGame(): void { controller.newGame(); render(); }
+function newGame(): void { controller.newGame(); }
 document.querySelector<HTMLButtonElement>('#new-game')!.addEventListener('click', newGame);
 document.querySelector('#player-hand')!.addEventListener('click', event => {
   const button = (event.target as Element).closest<HTMLButtonElement>('button[data-tile-id]');
@@ -18,8 +18,7 @@ document.querySelector('#player-hand')!.addEventListener('click', event => {
   renderSelection(controller.game, controller.selectedTileId);
 });
 document.querySelector<HTMLButtonElement>('#discard')!.addEventListener('click', () => {
-  controller.confirm();
-  render();
+  void controller.confirm().catch(error => console.error('Turn progression failed', error));
   document.querySelector<HTMLButtonElement>('#new-game')!.focus();
 });
 render();
