@@ -1,18 +1,23 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="description" content="Quill Mahjong — Coming Soon" />
+    <meta name="description" content="Quill Mahjong — 麻雀牌の表示確認" />
     <meta name="theme-color" content="#f5f3ec" />
     <title>Quill Mahjong</title>
   </head>
   <body>
     <main>
-      <div class="intro">
-        <h1>Quill Mahjong</h1>
-        <p>Coming Soon</p>
-      </div>
+      <header><h1>Quill Mahjong</h1><p>麻雀牌の表示確認</p></header>
+      <details class="catalog"><summary>全34種類と赤5を見る</summary>
+        <ul id="tile-gallery" aria-label="全牌種と赤5の一覧"></ul>
+      </details>
+      <section class="hand-section" aria-labelledby="hand-heading">
+        <h2 id="hand-heading">サンプル手牌 <span>14枚</span></h2>
+        <ul id="sample-hand" aria-label="固定のサンプル手牌14枚"></ul>
+        <p class="note">表示専用 · 赤5は赤い図柄と右上の印が目印</p>
+      </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
