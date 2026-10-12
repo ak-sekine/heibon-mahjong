@@ -6,6 +6,9 @@ import { startGame } from '../src/game/start.ts';
 import { renderTable, renderSelection } from '../src/rendering/table.ts';
 import { discardTile } from '../src/game/discard.ts';
 import { SUITS } from '../src/model/tile.ts';
+import { tileSvgMarkup, tileLabel } from '../src/rendering/tile-svg.ts';
+import { doraKindFromIndicator } from '../src/analysis/dora.ts';
+import { ordinaryTile } from '../src/model/tile.ts';
 import { inventory } from './helpers.ts';
 
 class ElementStub {
@@ -23,16 +26,16 @@ class ElementStub {
   attributes: Record<string, string> = {};
   setAttribute(name: string, value: string) { this.attributes[name] = value; }
   replaceChildren(...children: ElementStub[]) { this.children = children; }
-  append(child: ElementStub) { this.children.push(child); }
+  append(...children: ElementStub[]) { this.children.push(...children); }
 }
 
-for (const count of [0, 1, 2, 3, 'yakuman'] as const) test(`result separates yaku and bonuses: ${count}`, () => {
+for (const count of [0, 1, 2, 3, 'zero-normal', 'yakuman'] as const) test(`result separates yaku and bonuses: ${count}`, () => {
   const nodes = new Map<string, ElementStub>();
   for (const id of [0, 1, 2, 3]) {
     nodes.set(`#label-${id}`, new ElementStub());
     nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
   }
-  for (const key of ['#player-hand', '#wall-count', '#win-result']) nodes.set(key, new ElementStub());
+  for (const key of ['#player-hand', '#wall-count', '#win-result', '#dora-indicators']) nodes.set(key, new ElementStub());
   const original = globalThis.document;
   globalThis.document = {
     querySelector: (selector: string) => nodes.get(selector),
@@ -40,15 +43,20 @@ for (const count of [0, 1, 2, 3, 'yakuman'] as const) test(`result separates yak
   } as unknown as Document;
   try {
     const game = count === 'yakuman'
-      ? tsumoGame(['19m', '19p', '19s', '12345677z'])
-      : tsumoGame(['123m', '456m', '456p', '22p', '456s'], false, SUITS.slice(0, count));
+      ? tsumoGame(['19m', '19p', '19s', '12345677z'], false, undefined, 'man-9')
+      : tsumoGame(['123m', '456m', '456p', '22p', '456s'], false, SUITS.slice(0, count === 'zero-normal' ? 2 : count), count === 'zero-normal' ? 'sou-8' : 'man-4');
     const won = declareTsumo(game, 0);
     renderTable(won); inventory(won, game);
     const panel = nodes.get('#win-result')!;
     const strings = (node: ElementStub): string[] => [node.textContent, ...node.children.flatMap(strings)];
     const output = strings(panel);
     const list = panel.children.find(c => c.tagName === 'ul')!;
-    assert.ok(!strings(list).some(s => s.includes('赤ドラ')));
+    assert.ok(!strings(list).some(s => s.includes('ドラ')));
+    const exposed = nodes.get('#dora-indicators')!.children;
+    assert.equal(exposed.length, 1);
+    assert.equal(exposed[0].dataset.tileId, game.deadWall[4].id);
+    assert.equal(exposed[0].children[1].innerHTML, tileSvgMarkup(game.deadWall[4].tile));
+    assert.equal(exposed[0].children[2].textContent, `ドラ：${tileLabel(ordinaryTile(doraKindFromIndicator(game.deadWall[4].tile)))}`);
     assert.ok(output.includes('点数計算は未実装です。'));
     if (count === 'yakuman') {
       assert.ok(output.includes('国士無双 1役満'));
@@ -57,8 +65,10 @@ for (const count of [0, 1, 2, 3, 'yakuman'] as const) test(`result separates yak
     } else {
       assert.deepEqual(list.children.map(c => c.textContent).sort(), ['平和 1翻', '門前清自摸和 1翻']);
       assert.ok(output.includes('役合計：2翻'));
-      assert.ok(output.includes(`赤ドラ：${count}枚（${count}翻）`));
-      assert.ok(output.includes(`合計：${2 + count}翻`));
+      const normal = count === 'zero-normal' ? 0 : 1, red = count === 'zero-normal' ? 2 : count;
+      assert.ok(output.includes(`通常ドラ：${normal}枚（${normal}翻）`));
+      assert.ok(output.includes(`赤ドラ：${red}枚（${red}翻）`));
+      assert.ok(output.includes(`合計：${2 + normal + red}翻`));
       assert.equal(panel.children.filter(c => c.className === 'win-bonuses').length, 1);
     }
   } finally { globalThis.document = original; }
@@ -77,6 +87,7 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
   }
   nodes.set('#player-hand', new ElementStub());
   nodes.set('#wall-count', new ElementStub());
+  nodes.set('#dora-indicators', new ElementStub());
   nodes.set('#win-result', new ElementStub());
   nodes.set('#tsumo', new ElementStub());
   nodes.set('#discard', new ElementStub());
@@ -91,6 +102,13 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
     for (let seed = 0; seed < 20; seed++) {
       const game = startGame(seeded(seed));
       renderTable(game);
+      const exposed = nodes.get('#dora-indicators')!.children;
+      assert.equal(exposed.length, 1);
+      assert.equal(exposed[0].dataset.tileId, game.deadWall[4].id);
+      assert.equal(exposed[0].children[1].innerHTML, tileSvgMarkup(game.deadWall[4].tile));
+      const publicIds = [...nodes.values()].flatMap(node => node.children.flatMap(child => child.dataset.tileId ? [child.dataset.tileId] : []));
+      for (const physical of game.deadWall.filter((_,i) => i !== 4)) assert.ok(!publicIds.includes(physical.id));
+      for (const player of game.players.slice(1)) for (const physical of player.hand) assert.ok(!publicIds.includes(physical.id));
       renderSelection(game, null);
       assert.equal(nodes.get('#discard')!.disabled, true);
       const own = nodes.get('#player-hand')!.children;

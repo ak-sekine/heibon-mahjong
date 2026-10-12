@@ -55,3 +55,13 @@ summary { cursor:pointer; padding:4px; }
 #win-result { padding:12px; border:1px solid #ffda7d; border-radius:8px; overflow-wrap:anywhere; }
 #win-result h2 { margin:0; font-size:1.2rem; }
 #win-result p { margin:8px 0; }
+#wall-count { display:flex; flex-direction:column; gap:3px; }
+#dora-indicators { width:100%; font-size:9px; line-height:1.15; }
+#dora-indicators > div { display:flex; flex-direction:column; align-items:center; gap:2px; }
+#dora-indicators .tile-svg { width:24px; height:33.6px; flex:none; }
+@media (max-width:350px) {
+  .center-info { padding:2px 0; font-size:8px; line-height:1.1; gap:2px; }
+  #wall-count { gap:1px; }
+  #dora-indicators { font-size:8px; line-height:1.1; }
+  #dora-indicators > div { gap:1px; }
+}

@@ -1,0 +1,102 @@
+[
+  {
+    "viewport": [
+      375,
+      667
+    ],
+    "before": {
+      ".table": {
+        "top": 60,
+        "bottom": 513.953125,
+        "height": 453.953125
+      },
+      "#player-hand": {
+        "top": 470.15625,
+        "bottom": 503.953125,
+        "height": 33.796875
+      },
+      "#discard": {
+        "top": 555.953125,
+        "bottom": 599.953125,
+        "height": 44
+      },
+      "#tsumo": {
+        "top": 555.953125,
+        "bottom": 599.953125,
+        "height": 44
+      }
+    },
+    "after": {
+      ".table": {
+        "top": 60,
+        "bottom": 515.734375,
+        "height": 455.734375
+      },
+      "#player-hand": {
+        "top": 471.9375,
+        "bottom": 505.734375,
+        "height": 33.796875
+      },
+      "#discard": {
+        "top": 557.734375,
+        "bottom": 601.734375,
+        "height": 44
+      },
+      "#tsumo": {
+        "top": 557.734375,
+        "bottom": 601.734375,
+        "height": 44
+      }
+    }
+  },
+  {
+    "viewport": [
+      390,
+      844
+    ],
+    "before": {
+      ".table": {
+        "top": 60,
+        "bottom": 527.46875,
+        "height": 467.46875
+      },
+      "#player-hand": {
+        "top": 482.1875,
+        "bottom": 517.46875,
+        "height": 35.28125
+      },
+      "#discard": {
+        "top": 569.46875,
+        "bottom": 613.46875,
+        "height": 44
+      },
+      "#tsumo": {
+        "top": 569.46875,
+        "bottom": 613.46875,
+        "height": 44
+      }
+    },
+    "after": {
+      ".table": {
+        "top": 60,
+        "bottom": 528.46875,
+        "height": 468.46875
+      },
+      "#player-hand": {
+        "top": 483.1875,
+        "bottom": 518.46875,
+        "height": 35.28125
+      },
+      "#discard": {
+        "top": 570.46875,
+        "bottom": 614.46875,
+        "height": 44
+      },
+      "#tsumo": {
+        "top": 570.46875,
+        "bottom": 614.46875,
+        "height": 44
+      }
+    }
+  }
+]

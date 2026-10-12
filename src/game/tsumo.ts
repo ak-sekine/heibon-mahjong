@@ -1,6 +1,7 @@
 import type { GameState, PlayerId, SeatWind } from '../model/game.ts';
 import { analyzeYaku } from '../analysis/yaku.ts';
-import { countRedDora } from '../analysis/dora.ts';
+import { countDora, countRedDora } from '../analysis/dora.ts';
+import { exposedDoraIndicators } from './dora.ts';
 import type { YakuAnalysis, YakuCandidate } from '../analysis/yaku.ts';
 
 /** Step 8 has no round progression. Replace this context when rounds are added. */
@@ -13,7 +14,7 @@ export function selectTsumoCandidate(analysis: YakuAnalysis): YakuCandidate | nu
     (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0] ?? null;
 }
 
-function analyzeTsumo(game: GameState, playerId: PlayerId): { analysis: YakuAnalysis; redDoraCount: number } | null {
+function analyzeTsumo(game: GameState, playerId: PlayerId): { analysis: YakuAnalysis; redDoraCount: number; doraCount: number } | null {
   const player = game.players[playerId];
   if (playerId !== 0 || player?.id !== playerId || player.control !== 'human' ||
       game.turnPlayerId !== playerId || game.phase !== 'awaiting-discard' || game.winResult !== null ||
@@ -23,11 +24,12 @@ function analyzeTsumo(game: GameState, playerId: PlayerId): { analysis: YakuAnal
   try {
     const faces = tiles.map(t => t.tile);
     const redDoraCount = countRedDora(faces);
+    const doraCount = countDora(faces, exposedDoraIndicators(game).map(t => t.tile));
     const analysis = analyzeYaku(faces, {
       winMethod: 'tsumo', winningTile: player.drawnTile.tile,
       seatWind: player.wind, roundWind: ROUND_WIND,
     });
-    return analysis.isWinningShape && analysis.hasSupportedYaku ? { analysis, redDoraCount } : null;
+    return analysis.isWinningShape && analysis.hasSupportedYaku ? { analysis, redDoraCount, doraCount } : null;
   } catch (error) {
     if (error instanceof RangeError) return null;
     throw error;
@@ -44,12 +46,13 @@ export function declareTsumo(game: GameState, playerId: PlayerId): GameState {
   const evaluated = analyzeTsumo(game, playerId);
   const candidate = evaluated && selectTsumoCandidate(evaluated.analysis);
   if (!evaluated || !candidate) throw new RangeError('Tsumo is not allowed now');
-  const { analysis, redDoraCount } = evaluated;
+  const { analysis, redDoraCount, doraCount } = evaluated;
+  const doraHan = candidate.yakumanCount > 0 ? 0 : doraCount;
   const redDoraHan = candidate.yakumanCount > 0 ? 0 : redDoraCount;
   return { ...game, phase: 'won', winResult: {
     winnerId: playerId, winMethod: 'tsumo', winningTileId: game.players[playerId].drawnTile!.id,
     analysis, candidate, totalHan: candidate.totalHan, yakumanCount: candidate.yakumanCount,
-    yakuHan: candidate.totalHan, redDoraCount, redDoraHan,
-    totalHanIncludingDora: candidate.yakumanCount > 0 ? 0 : candidate.totalHan + redDoraHan,
+    yakuHan: candidate.totalHan, doraCount, doraHan, redDoraCount, redDoraHan,
+    totalHanIncludingDora: candidate.yakumanCount > 0 ? 0 : candidate.totalHan + doraHan + redDoraHan,
   } };
 }

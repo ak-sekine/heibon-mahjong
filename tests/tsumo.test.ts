@@ -38,7 +38,7 @@ for (const [name, groups, last] of [
   assert.equal(result.yakuHan, result.totalHan);
   assert.equal(result.redDoraCount, countRedDora([...game.players[0].hand, game.players[0].drawnTile!].map(t => t.tile)));
   assert.equal(result.redDoraHan, result.yakumanCount > 0 ? 0 : result.redDoraCount);
-  assert.equal(result.totalHanIncludingDora, result.yakumanCount > 0 ? 0 : result.yakuHan + result.redDoraHan);
+  assert.equal(result.totalHanIncludingDora, result.yakumanCount > 0 ? 0 : result.yakuHan + result.doraHan + result.redDoraHan);
   assert.equal(result.winnerId, 0);
   assert.equal(result.winMethod, 'tsumo');
   assert.equal(result.winningTileId, game.players[0].drawnTile!.id);
@@ -65,7 +65,7 @@ test('menzen tsumo and pinfu keep two yaku han and add two red dora once', () =>
   assert.equal(result.candidate.totalHan, 2);
   assert.equal(result.totalHan, 2); assert.equal(result.yakuHan, 2);
   assert.equal(result.redDoraCount, 2); assert.equal(result.redDoraHan, 2);
-  assert.equal(result.totalHanIncludingDora, 4);
+  assert.equal(result.totalHanIncludingDora, 4 + result.doraHan);
   assert.deepEqual(game, snapshot); inventory(won, game);
 });
 
@@ -74,7 +74,7 @@ test('the actual red winning draw is included in the bonus', () => {
   assert.equal(game.players[0].drawnTile!.tile.isRed, true);
   const result = declareTsumo(game, 0).winResult!;
   assert.equal(result.redDoraCount, 1); assert.equal(result.redDoraHan, 1);
-  assert.equal(result.totalHanIncludingDora, result.yakuHan + 1);
+  assert.equal(result.totalHanIncludingDora, result.yakuHan + result.doraHan + 1);
   inventory(game, game);
 });
 
@@ -84,7 +84,7 @@ test('seven pairs and standard candidates share one physical hand bonus', () => 
   assert.ok(result.analysis.candidates.some(c => c.shape === 'standard'));
   assert.ok(result.analysis.candidates.some(c => c.shape === 'seven-pairs'));
   assert.equal(result.redDoraCount, 1); assert.equal(result.redDoraHan, 1);
-  assert.equal(result.totalHanIncludingDora, result.yakuHan + 1);
+  assert.equal(result.totalHanIncludingDora, result.yakuHan + result.doraHan + 1);
   assert.ok(result.analysis.candidates.every(c => c.yaku.every(y => !String(y.id).includes('dora'))));
   inventory(game, game);
 });
@@ -95,7 +95,7 @@ test('red seven pairs add bonuses separately from chiitoitsu', () => {
   assert.equal(result.candidate.shape, 'seven-pairs');
   assert.ok(result.candidate.yaku.some(y => y.id === 'chiitoitsu' && y.han === 2));
   assert.equal(result.redDoraCount, 3); assert.equal(result.redDoraHan, 3);
-  assert.equal(result.totalHanIncludingDora, result.yakuHan + 3);
+  assert.equal(result.totalHanIncludingDora, result.yakuHan + result.doraHan + 3);
   inventory(game, game);
 });
 

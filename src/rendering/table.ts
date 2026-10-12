@@ -4,6 +4,9 @@ import { createTileElement, tileLabel } from './tile-svg.ts';
 import { canDeclareTsumo } from '../game/tsumo.ts';
 import type { YakuId } from '../analysis/yaku.ts';
 import { canDiscard } from '../game/discard.ts';
+import { exposedDoraIndicators } from '../game/dora.ts';
+import { doraKindFromIndicator } from '../analysis/dora.ts';
+import { ordinaryTile } from '../model/tile.ts';
 
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
 const seatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
@@ -52,6 +55,17 @@ function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement
 
 export function renderTable(game: GameState): void {
   renderWinResult(game);
+  const indicators = document.querySelector<HTMLElement>('#dora-indicators')!;
+  indicators.replaceChildren(...exposedDoraIndicators(game).map(physical => {
+    const item = document.createElement('div');
+    item.dataset.tileId = physical.id;
+    const label = document.createElement('span');
+    label.textContent = 'ドラ表示牌';
+    const dora = document.createElement('span');
+    dora.textContent = `ドラ：${tileLabel(ordinaryTile(doraKindFromIndicator(physical.tile)))}`;
+    item.append(label, createTileElement(physical.tile), dora);
+    return item;
+  }));
   for (const player of game.players) {
     const id: PlayerId = player.id;
     const count = player.hand.length + Number(player.drawnTile !== null);
@@ -124,6 +138,7 @@ function renderWinResult(game: GameState): void {
     panel.append(text('p', `役合計：${result.yakuHan}翻`));
     const bonuses = document.createElement('div');
     bonuses.className = 'win-bonuses';
+    bonuses.append(text('p', `通常ドラ：${result.doraCount}枚（${result.doraHan}翻）`));
     bonuses.append(text('p', `赤ドラ：${result.redDoraCount}枚（${result.redDoraHan}翻）`));
     panel.append(bonuses);
     panel.append(text('p', `合計：${result.totalHanIncludingDora}翻`));

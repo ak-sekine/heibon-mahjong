@@ -27,6 +27,9 @@ export interface TsumoResult {
   /** Supported yaku han only, preserved for Step 8 callers. */
   readonly totalHan: number;
   readonly yakuHan: number;
+  readonly doraCount: number;
+  /** Zero for yakuman. */
+  readonly doraHan: number;
   readonly redDoraCount: number;
   /** Zero for yakuman; bonuses never increase a yakuman. */
   readonly redDoraHan: number;
