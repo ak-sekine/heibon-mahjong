@@ -1,15 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { startGame } from '../src/game/start.ts';
-import { renderTable } from '../src/rendering/table.ts';
+import { renderTable, renderSelection } from '../src/rendering/table.ts';
+import { discardTile } from '../src/game/discard.ts';
 
 class ElementStub {
   children: ElementStub[] = [];
   dataset: Record<string, string> = {};
   className = '';
   textContent = '';
+  disabled = false;
   content = { firstElementChild: this };
   innerHTML = '';
+  attributes: Record<string, string> = {};
+  setAttribute(name: string, value: string) { this.attributes[name] = value; }
   replaceChildren(...children: ElementStub[]) { this.children = children; }
   append(child: ElementStub) { this.children.push(child); }
 }
@@ -22,19 +26,25 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
   const nodes = new Map<string, ElementStub>();
   for (const id of [0, 1, 2, 3]) {
     nodes.set(`#label-${id}`, new ElementStub());
+    nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
     if (id) nodes.set(`#hand-${id}`, new ElementStub());
   }
   nodes.set('#player-hand', new ElementStub());
   nodes.set('#wall-count', new ElementStub());
+  nodes.set('#discard', new ElementStub());
+  nodes.set('#selection-status', new ElementStub());
   const original = globalThis.document;
   globalThis.document = {
     querySelector: (selector: string) => nodes.get(selector),
+    querySelectorAll: () => nodes.get('#player-hand')!.children.map(item => item.children[0]),
     createElement: () => new ElementStub(),
   } as unknown as Document;
   try {
     for (let seed = 0; seed < 20; seed++) {
       const game = startGame(seeded(seed));
       renderTable(game);
+      renderSelection(game, null);
+      assert.equal(nodes.get('#discard')!.disabled, true);
       const own = nodes.get('#player-hand')!.children;
       assert.equal(own.length, 14);
       assert.equal(own.filter(item => item.className === 'drawn-tile').length, 1);
@@ -50,6 +60,28 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
         assert.match(nodes.get(`#label-${id}`)!.textContent, new RegExp(`^CPU${id} · ${['', '南', '西', '北'][id]} · 13枚$`));
       }
       assert.deepEqual(nodes.get('#wall-count')!.children.map(item => item.textContent), ['生きた牌山 69枚', '王牌 14枚']);
+      assert.ok([0, 1, 2, 3].every(id => nodes.get(`.river[data-player-id="${id}"]`)!.children.length === 0));
+      const selected = game.players[0].drawnTile!;
+      const snapshot = structuredClone(game);
+      renderSelection(game, selected.id);
+      assert.equal(nodes.get('#discard')!.disabled, false);
+      assert.equal(own[13].children[0].attributes['aria-pressed'], 'true');
+      assert.deepEqual(game, snapshot);
+      renderSelection(game, game.players[0].hand[0].id);
+      assert.equal(own[13].children[0].attributes['aria-pressed'], 'false');
+      renderSelection(game, null);
+      assert.equal(nodes.get('#discard')!.disabled, true);
+      const stopped = discardTile(game, 0, selected.id);
+      renderTable(stopped);
+      renderSelection(stopped, null);
+      assert.equal(nodes.get('#player-hand')!.children.length, 13);
+      assert.ok(nodes.get('#player-hand')!.children.every(item => item.className !== 'drawn-tile' && item.children[0].disabled));
+      const river = nodes.get('.river[data-player-id="0"]')!.children;
+      assert.equal(river.length, 1);
+      assert.equal(river[0].dataset.tileId, selected.id);
+      assert.equal(nodes.get('#discard')!.disabled, true);
+      assert.match(nodes.get('#selection-status')!.textContent, /打牌完了/);
+      // Next loop renders a new game and proves old river and selection are cleared.
     }
   } finally { globalThis.document = original; }
 });

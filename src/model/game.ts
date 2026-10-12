@@ -10,6 +10,7 @@ export interface PlayerState {
   readonly wind: SeatWind;
   readonly hand: readonly PhysicalTile[];
   readonly drawnTile: PhysicalTile | null;
+  readonly river: readonly PhysicalTile[];
 }
 export interface WallState {
   readonly liveWall: readonly PhysicalTile[];
@@ -17,5 +18,7 @@ export interface WallState {
 }
 export interface GameState extends WallState {
   readonly dealerId: PlayerId;
+  readonly turnPlayerId: PlayerId;
+  readonly phase: 'awaiting-discard' | 'stopped';
   readonly players: readonly [PlayerState, PlayerState, PlayerState, PlayerState];
 }

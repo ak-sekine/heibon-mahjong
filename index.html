@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="description" content="Quill Mahjong — 4人麻雀の配牌画面" />
+  <meta name="description" content="Quill Mahjong — 手牌選択と最初の打牌" />
   <meta name="theme-color" content="#185640" />
   <title>Quill Mahjong</title>
 </head>
@@ -22,6 +22,11 @@
       <div class="center-info" id="wall-count" role="status" aria-live="polite"></div>
     </section>
     <section class="seat seat-bottom" data-player-id="0" aria-label="自分の席"><h2 class="seat-label" id="label-0"></h2><ul id="player-hand" aria-label="自分の手牌"></ul></section>
+  </section>
+  <section class="discard-controls" aria-label="打牌操作">
+    <p id="selection-status" role="status" aria-live="polite"></p>
+    <button id="discard" type="button" disabled>打牌する</button>
+    <p class="keyboard-help">Tabで牌とボタンへ移動、Enter／Spaceで選択・確定</p>
   </section>
   <details class="catalog"><summary>開発用：全34種類と赤5を見る</summary><ul id="tile-gallery" aria-label="全牌種と赤5の一覧"></ul></details>
 </main>

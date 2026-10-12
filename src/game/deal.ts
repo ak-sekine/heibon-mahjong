@@ -20,10 +20,11 @@ export function deal(wall: WallState, dealerId: PlayerId = 0): GameState {
   const player = (id: PlayerId): PlayerState => ({
     id, control: id === 0 ? 'human' : 'cpu',
     wind: WINDS[(id - dealerId + 4) % 4],
-    hand: hands[id], drawnTile: id === dealerId ? extra : null,
+    hand: hands[id], drawnTile: id === dealerId ? extra : null, river: [],
   });
   return {
-    dealerId, players: [player(0), player(1), player(2), player(3)],
+    dealerId, turnPlayerId: dealerId, phase: 'awaiting-discard',
+    players: [player(0), player(1), player(2), player(3)],
     liveWall: wall.liveWall.slice(cursor), deadWall: [...wall.deadWall],
   };
 }
