@@ -88,5 +88,22 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       assert.equal(nodes.get('#selection-status')!.textContent, '牌山がなくなりました');
       // Next loop renders a new game and proves old river and selection are cleared.
     }
+    // Render all 18 entries for every seat, preserving state and DOM discard order.
+    const game = startGame(seeded(42));
+    const tiles = game.liveWall.slice(0, 18);
+    const fullRivers = { ...game, players: game.players.map(player => ({ ...player, river: tiles })) };
+    const snapshot = structuredClone(fullRivers);
+    renderTable(fullRivers);
+    for (const id of [0, 1, 2, 3]) {
+      const items = nodes.get(`.river[data-player-id="${id}"]`)!.children;
+      assert.deepEqual(items.map(item => item.dataset.tileId), tiles.map(tile => tile.id));
+      assert.equal(new Set(items.map(item => `${item.style.gridRow},${item.style.gridColumn}`)).size, 18);
+      for (const [index, item] of items.entries()) {
+        const row = Math.floor(index / 6), col = index % 6;
+        const expected = [[row+1,col+1], [6-col,row+1], [3-row,6-col], [col+1,3-row]][id];
+        assert.deepEqual([Number(item.style.gridRow), Number(item.style.gridColumn)], expected);
+      }
+    }
+    assert.deepEqual(fullRivers, snapshot);
   } finally { globalThis.document = original; }
 });

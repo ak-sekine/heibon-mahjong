@@ -58,11 +58,28 @@ def geometry(page):
             assert tile['x'] >= 0 and tile['x']+tile['width'] <= page.viewport_size['width'], tile
             player = int(river['player'])
             row, column = divmod(i, 6)
-            expected = {0:(row+1,column+1),1:(column+1,3-row),2:(3-row,6-column),3:(6-column,row+1)}[player]
+            expected = {0:(row+1,column+1),1:(6-column,row+1),2:(3-row,6-column),3:(column+1,3-row)}[player]
             assert (tile['row'],tile['column']) == expected, (player,i,tile)
-            matrix = {0:'none',1:'matrix(0, 1, -1, 0,',2:'matrix(-1, 0, 0, -1,',3:'matrix(0, -1, 1, 0,'}[player]
+            matrix = {0:'none',1:'matrix(0, -1, 1, 0,',2:'matrix(-1, 0, 0, -1,',3:'matrix(0, 1, -1, 0,'}[player]
             assert tile['transform'].startswith(matrix), tile
             assert all(separate(tile, other) for other in tiles[i+1:]), (player,i)
+            if i:
+                previous = tiles[i-1]
+                if column:
+                    if player in [0,2]:
+                        assert abs(tile['y']-previous['y']) < .5
+                        assert (tile['x']-previous['x']) * (1 if player == 0 else -1) > 0
+                    else:
+                        assert abs(tile['x']-previous['x']) < .5
+                        assert (tile['y']-previous['y']) * (-1 if player == 1 else 1) > 0
+                else:
+                    first = tiles[0]
+                    if player in [0,2]:
+                        assert abs(tile['x']-first['x']) < .5
+                        assert (tile['y']-previous['y']) * (1 if player == 0 else -1) > 0
+                    else:
+                        assert abs(tile['y']-first['y']) < .5
+                        assert (tile['x']-previous['x']) * (1 if player == 1 else -1) > 0
     assert separate(box(page,'#player-hand'),box(page,'.rivers'))
     control=box(page,'#discard')
     assert control['width']>=44 and control['height']>=44
@@ -236,6 +253,21 @@ with sync_playwright() as p:
         page.evaluate('document.querySelector("#discard").click()')
         page.clock.run_for(2000)
         assert page.locator('.river svg').count()==70
+        # Rendering-only capacity fixture: normal wall exhaustion leaves CPU2/3 at 17.
+        # Clone the public tile into their last cell without changing game state.
+        page.evaluate('''() => {
+            for (const id of [2,3]) {
+                const river = document.querySelector(`.river[data-player-id="${id}"]`);
+                const tile = river.lastElementChild.cloneNode(true);
+                tile.dataset.tileId = `capacity-${id}`;
+                tile.style.gridRow = id === 2 ? '1' : '6';
+                tile.style.gridColumn = '1';
+                river.append(tile);
+            }
+        }''')
+        assert [page.locator(f'.river[data-player-id="{id}"] svg').count() for id in range(4)] == [18]*4
+        geometry(page)
+        page.screenshot(path=f'{options.screenshots}/{w}-capacity-18.png',full_page=True)
         page.locator('#new-game').click()
         assert page.locator('#player-hand li').count()==14 and page.locator('.river svg').count()==0
         page.locator('#player-hand button').first.click()

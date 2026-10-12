@@ -62,8 +62,8 @@ export function renderTable(game: GameState): void {
       item.dataset.tileId = physical.id;
       // Keep DOM/data in discard order; map the seat's 6-wide rows to screen cells.
       const row = Math.floor(index / 6), column = index % 6;
-      const screenRow = id === 1 ? column : id === 3 ? 5 - column : id === 2 ? 2 - row : row;
-      const screenColumn = id === 1 ? 2 - row : id === 3 ? row : id === 2 ? 5 - column : column;
+      const screenRow = id === 1 ? 5 - column : id === 3 ? column : id === 2 ? 2 - row : row;
+      const screenColumn = id === 1 ? row : id === 3 ? 2 - row : id === 2 ? 5 - column : column;
       item.style.gridRow = String(screenRow + 1);
       item.style.gridColumn = String(screenColumn + 1);
       item.append(createTileElement(physical.tile));

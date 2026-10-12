@@ -23,8 +23,8 @@ ul { list-style:none; padding:0; margin:0; }
 .river-tile { position:relative; width:var(--river-tile-width); height:var(--river-tile-height); }
 .river-top .tile-svg { transform:rotate(180deg); }
 .river-right .tile-svg,.river-left .tile-svg { position:absolute; width:var(--river-tile-width); height:var(--river-tile-height); left:50%; top:50%; }
-.river-right .tile-svg { transform:translate(-50%,-50%) rotate(90deg); }
-.river-left .tile-svg { transform:translate(-50%,-50%) rotate(270deg); }
+.river-right .tile-svg { transform:translate(-50%,-50%) rotate(270deg); }
+.river-left .tile-svg { transform:translate(-50%,-50%) rotate(90deg); }
 .river-left .river-tile,.river-right .river-tile { width:var(--river-tile-height); height:var(--river-tile-width); }
 .river-top { grid-area:top; }.river-right { grid-area:right; }.river-bottom { grid-area:bottom; }.river-left { grid-area:left; }
 .river-left,.river-right { grid-template-columns:repeat(3,var(--river-tile-height)); grid-template-rows:repeat(6,var(--river-tile-width)); }
