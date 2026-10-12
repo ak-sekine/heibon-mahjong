@@ -7,7 +7,7 @@ export function drawTile(game: GameState, playerId: PlayerId): GameState {
   const tile = game.liveWall[0];
   if (!tile) throw new RangeError('Live wall is empty');
   const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
-  players[playerId] = { ...player, drawnTile: tile };
+  players[playerId] = { ...player, drawnTile: tile, drawnTileSource: 'live-wall' };
   return { ...game, players, liveWall: game.liveWall.slice(1), phase: 'awaiting-discard' };
 }
 

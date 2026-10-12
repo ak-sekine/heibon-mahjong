@@ -35,7 +35,7 @@ export class AutomaticTurnRunner {
     this.active?.abort();
     this.active = null;
   }
-  async run(read: () => GameState, write: (game: GameState) => void): Promise<void> {
+  async run(read: () => GameState, write: (game: GameState) => void, onComplete: () => void = () => {}): Promise<void> {
     if (this.running) return;
     const token = this.generation;
     const abort = new AbortController();
@@ -44,7 +44,7 @@ export class AutomaticTurnRunner {
     try {
       while (current()) {
         let game = read();
-        if (game.phase === 'wall-exhausted') return;
+        if (game.phase === 'wall-exhausted' || game.phase === 'won') return;
         if (game.phase === 'awaiting-draw') {
           game = drawOrStop(game);
           write(game);
@@ -61,7 +61,10 @@ export class AutomaticTurnRunner {
         write(discardTile(game, player.id, id));
       }
     } finally {
-      if (token === this.generation) this.active = null;
+      if (token === this.generation) {
+        this.active = null;
+        onComplete();
+      }
     }
   }
 }

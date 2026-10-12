@@ -7,7 +7,7 @@ import { GameController } from './ui/controller.ts';
 const controller = new GameController(undefined, { onChange: render });
 function render(): void {
   renderTable(controller.game);
-  renderSelection(controller.game, controller.selectedTileId);
+  renderSelection(controller.game, controller.selectedTileId, controller.progressing);
 }
 function newGame(): void { controller.newGame(); }
 document.querySelector<HTMLButtonElement>('#new-game')!.addEventListener('click', newGame);
@@ -15,11 +15,14 @@ document.querySelector('#player-hand')!.addEventListener('click', event => {
   const button = (event.target as Element).closest<HTMLButtonElement>('button[data-tile-id]');
   if (!button) return;
   controller.select(button.dataset.tileId!);
-  renderSelection(controller.game, controller.selectedTileId);
+  renderSelection(controller.game, controller.selectedTileId, controller.progressing);
 });
 document.querySelector<HTMLButtonElement>('#discard')!.addEventListener('click', () => {
   void controller.confirm().catch(error => console.error('Turn progression failed', error));
   document.querySelector<HTMLButtonElement>('#new-game')!.focus();
+});
+document.querySelector<HTMLButtonElement>('#tsumo')!.addEventListener('click', () => {
+  controller.declareTsumo();
 });
 render();
 

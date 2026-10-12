@@ -1,5 +1,6 @@
 from playwright.sync_api import sync_playwright
 import json
+import re
 import argparse
 import pathlib
 import shutil
@@ -8,6 +9,7 @@ import tempfile
 parser = argparse.ArgumentParser(description="Optional Chromium check (requires Python Playwright and Chromium)")
 parser.add_argument("--url", default="http://localhost:4173/quill-mahjong/")
 parser.add_argument("--screenshots", default=str(pathlib.Path(tempfile.gettempdir()) / "quill-screenshots"))
+parser.add_argument("--tsumo-fixture", action="store_true", help="Also test tsumo with a fixed legal wall (requires Vite dev server)")
 options = parser.parse_args()
 pathlib.Path(options.screenshots).mkdir(parents=True, exist_ok=True)
 
@@ -83,6 +85,9 @@ def geometry(page):
     assert separate(box(page,'#player-hand'),box(page,'.rivers'))
     control=box(page,'#discard')
     assert control['width']>=44 and control['height']>=44
+    tsumo=box(page,'#tsumo')
+    assert tsumo['width']>=44 and tsumo['height']>=44
+    assert separate(control,tsumo)
     selected=page.locator('[aria-pressed="true"]')
     if selected.count():
         assert separate(selected.bounding_box(),box(page,'#label-0'))
@@ -94,7 +99,7 @@ def geometry(page):
         assert '枚' in page.locator(f'#label-{id}').inner_text()
 
 def controls_visible(page):
-    for selector in ['#discard', '#selection-status', '.keyboard-help']:
+    for selector in ['#discard', '#tsumo', '#selection-status', '.keyboard-help']:
         bounds = box(page,selector)
         assert bounds['y'] >= 0 and bounds['y']+bounds['height'] <= page.viewport_size['height']-10, (selector,bounds)
     assert page.locator('#discard').evaluate('el => { const r=el.getBoundingClientRect(); return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2) === el; }')
@@ -111,6 +116,7 @@ with sync_playwright() as p:
             assert page.locator('#player-hand li').count()==14
             assert page.locator('.river svg').count()==0
             assert page.locator('#discard').is_disabled()
+            assert page.locator('#tsumo').is_disabled()
             assert page.locator('[aria-pressed="true"]').count()==0
             geometry(page)
             choices=page.locator('#player-hand button')
@@ -277,4 +283,75 @@ with sync_playwright() as p:
         assert not errors, errors
         print(json.dumps({'viewport':[w,h],'drawn':'pass','hand':'pass','resetDuringCPU':'pass','keyboard':'pass','geometry':'pass','cpuOrder':'pass','multipleRounds':'pass','wallExhaustion':'pass','concealment':'pass','pageErrors':errors}))
         page.close()
+    if options.tsumo_fixture:
+        # Replace the module's injected start factory in the test browser only.
+        # Production source/bundle has no fixture import, globals or cheat controls.
+        def inject(route):
+            response = route.fetch()
+            source = response.text()
+            source, count = re.subn(r'new GameController\((?:undefined|void 0),', 'new GameController(() => tsumoStart(),', source)
+            assert count == 1
+            source = 'import { tsumoStart } from "/quill-mahjong/tests/tsumo-fixture.ts";\n' + source
+            route.fulfill(response=response, body=source)
+        for w,h in [(320,568),(375,667),(390,844),(414,896),(1280,800)]:
+            page=browser.new_page(viewport={'width':w,'height':h})
+            page.route('**/src/main.ts', inject)
+            page.goto(options.url)
+            assert page.locator('#tsumo').is_disabled()
+            page.locator('.drawn-tile button').click()
+            page.locator('#discard').click()
+            assert page.locator('#tsumo').is_disabled()
+            page.wait_for_function('!document.querySelector("#tsumo").disabled')
+            assert page.locator('#player-hand li').count()==14
+            draw_id=page.locator('.drawn-tile button').get_attribute('data-tile-id')
+            page.locator('#player-hand button').first.click()
+            assert page.locator('#tsumo').is_enabled()
+            geometry(page)
+            page.screenshot(path=f'{options.screenshots}/{w}-tsumo-eligible.png',full_page=True)
+            # Reduce usable height, scroll naturally and check both tap targets.
+            page.set_viewport_size({'width':w,'height':h-120})
+            page.evaluate('window.scrollTo(0,document.documentElement.scrollHeight)')
+            page.locator('#tsumo').scroll_into_view_if_needed()
+            assert separate(box(page,'#player-hand'),box(page,'.discard-controls'))
+            controls_visible(page)
+            geometry(page)
+            page.screenshot(path=f'{options.screenshots}/{w}-tsumo-toolbar.png')
+            rivers=page.locator('.river').evaluate_all('(els)=>els.map(el=>el.innerHTML)')
+            wall=page.locator('#wall-count').inner_text().splitlines()[:2]
+            ids=page.locator('#player-hand li').evaluate_all('(els)=>els.map(el=>el.dataset.tileId)')
+            page.locator('#tsumo').click()
+            page.evaluate('document.querySelector("#tsumo").click()')
+            assert page.locator('#win-result').is_visible()
+            result=page.locator('#win-result').inner_text()
+            assert all(text in result for text in ['ツモ和了！','自分（東）','門前清自摸和 1翻','断么九 1翻','対応役合計：2翻','今回対応している役','点数計算は未実装'])
+            assert page.locator('.drawn-tile button').get_attribute('data-tile-id')==draw_id
+            assert page.locator('#player-hand li').evaluate_all('(els)=>els.map(el=>el.dataset.tileId)')==ids
+            assert page.locator('[aria-pressed="true"]').count()==0
+            assert page.locator('#discard').is_disabled() and page.locator('#tsumo').is_disabled()
+            assert page.locator('#player-hand button:enabled').count()==0
+            page.evaluate('document.querySelector("#discard").click()')
+            page.wait_for_timeout(1100)
+            assert page.locator('.river').evaluate_all('(els)=>els.map(el=>el.innerHTML)')==rivers
+            assert page.locator('#wall-count').inner_text().splitlines()[:2]==wall
+            geometry(page)
+            page.set_viewport_size({'width':w,'height':h})
+            page.screenshot(path=f'{options.screenshots}/{w}-tsumo-won.png',full_page=True)
+            assert separate(box(page,'#win-result'),box(page,'#player-hand'))
+            assert separate(box(page,'#win-result'),box(page,'#new-game'))
+            page.locator('#new-game').click()
+            assert page.locator('#win-result').is_hidden()
+            assert page.locator('#tsumo').is_disabled()
+            assert page.locator('#player-hand li').count()==14
+            assert page.locator('.river svg').count()==0
+            page.locator('.drawn-tile button').click()
+            page.locator('#discard').click()
+            page.wait_for_function('!document.querySelector("#tsumo").disabled')
+            # Choosing an ordinary discard remains supported at the winning position.
+            page.locator('.drawn-tile button').click()
+            page.locator('#discard').click()
+            assert page.locator('#tsumo').is_disabled()
+            page.wait_for_function('!document.querySelector("#tsumo").disabled')
+            assert page.locator('.river-bottom svg').count()==2
+            print(json.dumps({'viewport':[w,h],'tsumoUI':'pass','selectionIndependent':'pass','wonStops':'pass','reset':'pass','toolbar':'pass','optionalDiscard':'pass'}))
+            page.close()
     browser.close()

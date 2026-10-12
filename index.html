@@ -26,8 +26,10 @@
   <section class="discard-controls" aria-label="打牌操作">
     <p id="selection-status" role="status" aria-live="polite"></p>
     <button id="discard" type="button" disabled>打牌する</button>
+    <button id="tsumo" type="button" disabled>ツモ和了</button>
     <p class="keyboard-help">Tabで牌とボタンへ移動、Enter／Spaceで選択・確定</p>
   </section>
+  <section id="win-result" role="status" aria-live="polite" hidden></section>
   <details class="catalog"><summary>開発用：全34種類と赤5を見る</summary><ul id="tile-gallery" aria-label="全牌種と赤5の一覧"></ul></details>
 </main>
 <script type="module" src="/src/main.ts"></script>

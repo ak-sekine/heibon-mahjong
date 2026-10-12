@@ -11,7 +11,7 @@ export function discardFromPlayer(player: PlayerState, tileId: string): PlayerSt
   if (!tile) throw new RangeError('Tile is not owned by this player');
   const hand = tile === player.drawnTile ? player.hand
     : [...player.hand.filter(candidate => candidate.id !== tileId), player.drawnTile];
-  return { ...player, hand, drawnTile: null, river: [...player.river, tile] };
+  return { ...player, hand, drawnTile: null, drawnTileSource: null, river: [...player.river, tile] };
 }
 
 /** The same rules apply to every seat, on every turn. */

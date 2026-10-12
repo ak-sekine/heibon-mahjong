@@ -1,11 +1,14 @@
 import type { GameState, PlayerId, PlayerState, PhysicalTile, SeatWind } from '../model/game.ts';
 import { HONORS, SUITS, type Tile } from '../model/tile.ts';
 import { createTileElement, tileLabel } from './tile-svg.ts';
+import { canDeclareTsumo } from '../game/tsumo.ts';
+import type { YakuId } from '../analysis/yaku.ts';
 import { canDiscard } from '../game/discard.ts';
 
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
 const seatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
 function turnLabel(game: GameState): string {
+  if (game.phase === 'won') return 'ツモ和了！';
   if (game.phase === 'wall-exhausted') return '牌山がなくなりました';
   return `${game.turnPlayerId === 0 ? 'あなた' : seatNames[game.turnPlayerId]}の手番`;
 }
@@ -48,12 +51,13 @@ function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement
 }
 
 export function renderTable(game: GameState): void {
+  renderWinResult(game);
   for (const player of game.players) {
     const id: PlayerId = player.id;
     const count = player.hand.length + Number(player.drawnTile !== null);
     const label = document.querySelector<HTMLElement>(`#label-${id}`)!;
     label.textContent = `${seatNames[id]} · ${winds[player.wind]} · ${count}枚${game.dealerId === id ? ' · 親' : ''}`;
-    label.dataset.active = String(game.phase !== 'wall-exhausted' && game.turnPlayerId === id);
+    label.dataset.active = String(game.phase !== 'wall-exhausted' && game.phase !== 'won' && game.turnPlayerId === id);
     if (id === 0) renderSelf(player, canDiscard(game, 0));
     const river = document.querySelector<HTMLElement>(`.river[data-player-id="${id}"]`)!;
     river.replaceChildren(...player.river.map((physical, index) => {
@@ -78,16 +82,42 @@ export function renderTable(game: GameState): void {
 }
 
 /** Selection rendering never changes GameState or rebuilds focused tile buttons. */
-export function renderSelection(game: GameState, selectedTileId: string | null): void {
+export function renderSelection(game: GameState, selectedTileId: string | null, progressing = false): void {
   for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('#player-hand button'))) {
     button.setAttribute('aria-pressed', String(button.dataset.tileId === selectedTileId));
   }
   const player = game.players[0];
   const selected = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
     .find(tile => tile.id === selectedTileId);
-  document.querySelector<HTMLButtonElement>('#discard')!.disabled = !selected || !canDiscard(game, 0);
+  document.querySelector<HTMLButtonElement>('#discard')!.disabled = progressing || !selected || !canDiscard(game, 0);
+  document.querySelector<HTMLButtonElement>('#tsumo')!.disabled = progressing || !canDeclareTsumo(game, 0);
   document.querySelector<HTMLElement>('#selection-status')!.textContent = game.phase === 'wall-exhausted'
     ? '牌山がなくなりました'
     : !canDiscard(game, 0) ? turnLabel(game)
     : selected ? `選択：${tileLabel(selected.tile)}` : 'あなたの手番：牌を選択して「打牌する」で確定';
+}
+
+const yakuNames: Record<YakuId, string> = {
+  'menzen-tsumo': '門前清自摸和', tanyao: '断么九',
+  'yakuhai-white': '役牌：白', 'yakuhai-green': '役牌：發', 'yakuhai-red': '役牌：中',
+  'yakuhai-seat-wind': '役牌：自風', 'yakuhai-round-wind': '役牌：場風',
+  pinfu: '平和', iipeikou: '一盃口', chiitoitsu: '七対子', toitoi: '対々和', 'kokushi-musou': '国士無双',
+};
+function renderWinResult(game: GameState): void {
+  const panel = document.querySelector<HTMLElement>('#win-result')!;
+  const result = game.winResult;
+  panel.hidden = !result;
+  panel.replaceChildren();
+  if (!result) return;
+  const text = (tag: string, textContent: string) => Object.assign(document.createElement(tag), { textContent });
+  const player = game.players[result.winnerId];
+  panel.append(text('h2', 'ツモ和了！'));
+  panel.append(text('p', `${seatNames[player.id]}（${winds[player.wind]}）`));
+  panel.append(text('p', '今回対応している役の判定結果'));
+  const list = document.createElement('ul');
+  for (const yaku of result.candidate.yaku) list.append(text('li',
+    `${yakuNames[yaku.id]} ${yaku.yakuman > 0 ? `${yaku.yakuman}役満` : `${yaku.han}翻`}`));
+  panel.append(list);
+  panel.append(text('p', result.yakumanCount > 0 ? `役満：${result.yakumanCount}役満` : `対応役合計：${result.totalHan}翻`));
+  panel.append(text('p', '点数計算は未実装です。'));
 }

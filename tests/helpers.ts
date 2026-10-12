@@ -26,11 +26,15 @@ export function inventory(game: GameState, initial: GameState): void {
   assert.equal(counts.size, 34);
   assert.ok([...counts.values()].every(n => n === 4));
   assert.equal(tiles.filter(t => t.tile.isRed).length, 3);
+  for (const suit of ['man', 'pin', 'sou']) {
+    assert.equal(tiles.filter(t => t.tile.isRed && t.tile.category === 'suited' && t.tile.suit === suit).length, 1);
+  }
   assert.equal(game.deadWall.length, 14);
   assert.deepEqual(game.deadWall, initial.deadWall);
   for (const p of game.players) {
     assert.equal(p.hand.length, 13);
-    assert.equal(p.drawnTile !== null, game.phase === 'awaiting-discard' && game.turnPlayerId === p.id);
+    assert.equal(p.drawnTileSource === null, p.drawnTile === null);
+    assert.equal(p.drawnTile !== null, (game.phase === 'awaiting-discard' || game.phase === 'won') && game.turnPlayerId === p.id);
   }
 }
 

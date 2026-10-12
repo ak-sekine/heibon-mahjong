@@ -1,4 +1,5 @@
 import type { GameState } from '../model/game.ts';
+import { canDeclareTsumo, declareTsumo } from '../game/tsumo.ts';
 import { startGame } from '../game/start.ts';
 import { canDiscard, discardTile } from '../game/discard.ts';
 import { AutomaticTurnRunner, type AutomaticTurnOptions } from '../game/automatic-turns.ts';
@@ -28,7 +29,16 @@ export class GameController {
     this.game = discardTile(this.game, 0, this.selectedTileId!);
     this.selectedTileId = null;
     this.onChange();
-    return this.runner.run(() => this.game, game => { this.game = game; this.onChange(); });
+    return this.runner.run(() => this.game, game => { this.game = game; this.onChange(); }, this.onChange);
+  }
+  get canTsumo(): boolean { return !this.progressing && canDeclareTsumo(this.game, 0); }
+  declareTsumo(): void {
+    if (!this.canTsumo) return;
+    const won = declareTsumo(this.game, 0);
+    this.runner.cancel();
+    this.game = won;
+    this.selectedTileId = null;
+    this.onChange();
   }
   newGame(): void {
     this.runner.cancel();

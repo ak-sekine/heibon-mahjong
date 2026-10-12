@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { tsumoGame } from './tsumo-fixture.ts';
+import { declareTsumo } from '../src/game/tsumo.ts';
 import { startGame } from '../src/game/start.ts';
 import { renderTable, renderSelection } from '../src/rendering/table.ts';
 import { discardTile } from '../src/game/discard.ts';
@@ -11,6 +13,7 @@ class ElementStub {
   style: Record<string, string> = {};
   textContent = '';
   disabled = false;
+  hidden = false;
   content = { firstElementChild: this };
   innerHTML = '';
   attributes: Record<string, string> = {};
@@ -32,6 +35,8 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
   }
   nodes.set('#player-hand', new ElementStub());
   nodes.set('#wall-count', new ElementStub());
+  nodes.set('#win-result', new ElementStub());
+  nodes.set('#tsumo', new ElementStub());
   nodes.set('#discard', new ElementStub());
   nodes.set('#selection-status', new ElementStub());
   const original = globalThis.document;
@@ -105,5 +110,23 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       }
     }
     assert.deepEqual(fullRivers, snapshot);
+    const eligible = tsumoGame();
+    renderTable(eligible);
+    renderSelection(eligible, eligible.players[0].hand[0].id);
+    assert.equal(nodes.get('#tsumo')!.disabled, false);
+    renderSelection(eligible, null, true);
+    assert.equal(nodes.get('#tsumo')!.disabled, true);
+    const won = declareTsumo(eligible, 0);
+    renderTable(won); renderSelection(won, null);
+    assert.equal(nodes.get('#tsumo')!.disabled, true);
+    assert.equal(nodes.get('#discard')!.disabled, true);
+    assert.equal(nodes.get('#player-hand')!.children.length, 14);
+    assert.equal(nodes.get('#win-result')!.hidden, false);
+    assert.ok(nodes.get('#win-result')!.children.some(c => c.textContent === 'ツモ和了！'));
+    assert.ok(nodes.get('#win-result')!.children.some(c => c.textContent === '対応役合計：2翻'));
+    assert.equal(nodes.get('#label-0')!.dataset.active, 'false');
+    renderTable(startGame());
+    assert.equal(nodes.get('#win-result')!.hidden, true);
+    assert.equal(nodes.get('#win-result')!.children.length, 0);
   } finally { globalThis.document = original; }
 });

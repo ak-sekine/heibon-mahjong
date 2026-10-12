@@ -38,10 +38,10 @@ ul { list-style:none; padding:0; margin:0; }
 .tile-choice:focus-visible { outline:2px solid #82dcff; outline-offset:0; }
 .tile-choice:disabled { cursor:default; opacity:1; }
 .discard-controls { position:sticky; bottom:0; z-index:2; background:#185640; border-radius:8px; padding:8px 6px calc(12px + env(safe-area-inset-bottom, 0px)); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; }
-#selection-status { flex:1; min-width:0; margin:0; font-size:14px; overflow-wrap:anywhere; }
-#discard { min-width:100px; min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; touch-action:manipulation; cursor:pointer; }
-#discard:disabled { background:#d4e5db; opacity:.6; cursor:default; }
-#discard:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
+#selection-status { flex:1 1 100%; min-width:0; margin:0; font-size:14px; overflow-wrap:anywhere; }
+#discard, #tsumo { min-width:100px; min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; touch-action:manipulation; cursor:pointer; }
+#discard:disabled, #tsumo:disabled { background:#d4e5db; opacity:.6; cursor:default; }
+#discard:focus-visible, #tsumo:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
 .keyboard-help { width:100%; margin:0; font-size:11px; color:#d4e5db; }
 .tile-svg { display:block; width:100%; height:auto; aspect-ratio:60/84; }
 .catalog { width:100%; padding:0 6px; font-size:12px; }
@@ -51,3 +51,7 @@ summary { cursor:pointer; padding:4px; }
 #tile-gallery .tile-svg { max-width:60px; margin:auto; }
 #tile-gallery span { display:block; margin-top:3px; }
 @media (max-height:650px) { .seat-top { gap:1px; } }
+
+#win-result { padding:12px; border:1px solid #ffda7d; border-radius:8px; overflow-wrap:anywhere; }
+#win-result h2 { margin:0; font-size:1.2rem; }
+#win-result p { margin:8px 0; }
