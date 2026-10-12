@@ -35,5 +35,12 @@ summary { cursor: pointer; line-height: 1.5; overflow-wrap: anywhere; }
 .hand-section { width: min(100%, 900px); min-width: 0; margin-top: auto; }
 h2 { margin: 0 0 12px; font-size: 1rem; font-weight: 500; padding: 0 4px; overflow-wrap: anywhere; }
 h2 span { color: #d4e5db; font-size: .8em; margin-left: 8px; }
-#sample-hand { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 1px; width: 100%; }
+#player-hand { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)) minmax(0, 1.25fr); gap: 1px; width: 100%; }
 .note { font-size: .75rem; padding: 0 4px; }
+
+#player-hand .drawn-tile { padding-left: 20%; }
+.game-info { text-align: center; width: min(100%, 640px); padding: 0 12px; }
+#cpu-counts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; font-size: .875rem; }
+#new-game { min-height: 48px; margin-top: 16px; padding: 12px 28px; border: 1px solid #d4e5db; border-radius: 8px; background: #fffdf7; color: #185640; font: inherit; font-weight: 600; cursor: pointer; touch-action: manipulation; }
+#new-game:focus-visible { outline: 3px solid #ffda7d; outline-offset: 4px; }
+#new-game:active { background: #d4e5db; }
