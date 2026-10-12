@@ -192,3 +192,59 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
     assert.equal(nodes.get('#win-result')!.children.length, 0);
   } finally { globalThis.document = original; }
 });
+
+for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner, sorted thirteen plus accessible red winning draw, disables UI and resets`, async () => {
+  const { cpuTsumoGame, cpuTsumoStart } = await import('./cpu-tsumo-fixture.ts');
+  const nodes = new Map<string, ElementStub>();
+  for (const seat of [0, 1, 2, 3]) {
+    nodes.set(`#label-${seat}`, new ElementStub());
+    nodes.set(`.river[data-player-id="${seat}"]`, new ElementStub());
+  }
+  for (const key of ['#player-hand', '#wall-count', '#win-result', '#dora-indicators', '#discard', '#tsumo', '#selection-status']) nodes.set(key, new ElementStub());
+  const original = globalThis.document;
+  globalThis.document = {
+    querySelector: (s: string) => nodes.get(s),
+    querySelectorAll: () => nodes.get('#player-hand')!.children.map(c => c.children[0]),
+    createElement: (tag: string) => new ElementStub(tag),
+  } as unknown as Document;
+  const descend = (n: ElementStub): ElementStub[] => [n, ...n.children.flatMap(descend)];
+  const rendered = () => [...nodes.values()].flatMap(descend);
+  try {
+    // Red five is the actual winning tile; all three colors remain in inventory.
+    const game = cpuTsumoGame(id, ['123m', '456m', '789p', '22p', '345s']);
+    renderTable(game);
+    for (const p of game.players.slice(1)) for (const t of [...p.hand, ...(p.drawnTile ? [p.drawnTile] : [])]) {
+      assert.ok(!rendered().some(n => n.dataset.tileId === t.id));
+    }
+    const own = nodes.get('#player-hand')!.children.map(n => n.dataset.tileId);
+    const won = declareTsumo(game, id);
+    renderTable(won); renderSelection(won, null);
+    const panel = nodes.get('#win-result')!;
+    assert.equal(panel.hidden, false);
+    const hand = panel.children.find(n => n.className === 'winning-hand')!;
+    assert.equal(hand.tagName, 'ol'); assert.equal(hand.children.length, 14);
+    const player = game.players[id];
+    const order = (t: typeof player.hand[number]) => t.tile.category === 'suited'
+      ? ['man', 'pin', 'sou'].indexOf(t.tile.suit) * 9 + t.tile.rank - 1
+      : 27 + ['east','south','west','north','white','green','red'].indexOf(t.tile.honor);
+    const sorted = [...player.hand].sort((a,b) => order(a)-order(b) || a.id.localeCompare(b.id));
+    assert.deepEqual(hand.children.map(n => n.dataset.tileId), [...sorted, player.drawnTile!].map(t => t.id));
+    assert.equal(hand.children[13].className, 'winning-draw');
+    assert.equal(hand.children[13].children[0].innerHTML, tileSvgMarkup(player.drawnTile!.tile));
+    assert.match(hand.children[13].children[0].innerHTML, /aria-label="赤5索"/);
+    assert.ok(!descend(hand).some(n => n.tagName === 'button'));
+    for (const p of game.players.slice(1).filter(p => p.id !== id)) for (const t of p.hand) {
+      assert.ok(!rendered().some(n => n.dataset.tileId === t.id));
+    }
+    assert.deepEqual(nodes.get('#player-hand')!.children.map(n => n.dataset.tileId), own);
+    assert.ok(nodes.get('#player-hand')!.children.every(n => n.children[0].disabled));
+    assert.equal(nodes.get('#discard')!.disabled, true); assert.equal(nodes.get('#tsumo')!.disabled, true);
+    const text = descend(panel).map(n => n.textContent);
+    assert.ok(text.includes(`CPU${id}（${['', '南','西','北'][id]}）`));
+    for (const s of ['平和 1翻', '門前清自摸和 1翻', '通常ドラ：1枚（1翻）', '赤ドラ：2枚（2翻）', '合計：5翻']) assert.ok(text.includes(s));
+    assert.ok(nodes.get('#wall-count')!.children.some(n => n.textContent === `CPU${id}がツモ和了！`));
+    inventory(won, game);
+    renderTable(cpuTsumoStart(id));
+    assert.equal(panel.hidden, true); assert.equal(panel.children.length, 0);
+  } finally { globalThis.document = original; }
+});

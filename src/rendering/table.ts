@@ -10,7 +10,7 @@ import { renderDoraIndicators } from './dora.ts';
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
 const seatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
 function turnLabel(game: GameState): string {
-  if (game.phase === 'won') return 'ツモ和了！';
+  if (game.phase === 'won') return `${seatNames[game.winResult!.winnerId]}がツモ和了！`;
   if (game.phase === 'wall-exhausted') return '牌山がなくなりました';
   return `${game.turnPlayerId === 0 ? 'あなた' : seatNames[game.turnPlayerId]}の手番`;
 }
@@ -93,7 +93,7 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
   const selected = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
     .find(tile => tile.id === selectedTileId);
   document.querySelector<HTMLButtonElement>('#discard')!.disabled = progressing || !selected || !canDiscard(game, 0);
-  document.querySelector<HTMLButtonElement>('#tsumo')!.disabled = progressing || !canDeclareTsumo(game, 0);
+  document.querySelector<HTMLButtonElement>('#tsumo')!.disabled = progressing || game.players[0].control !== 'human' || !canDeclareTsumo(game, 0);
   document.querySelector<HTMLElement>('#selection-status')!.textContent = game.phase === 'wall-exhausted'
     ? '牌山がなくなりました'
     : !canDiscard(game, 0) ? turnLabel(game)
@@ -116,6 +116,21 @@ function renderWinResult(game: GameState): void {
   const player = game.players[result.winnerId];
   panel.append(text('h2', 'ツモ和了！'));
   panel.append(text('p', `${seatNames[player.id]}（${winds[player.wind]}）`));
+  if (player.control === 'cpu') {
+    panel.append(text('p', '和了手牌：'));
+    const hand = document.createElement('ol');
+    hand.className = 'winning-hand';
+    hand.setAttribute('aria-label', '和了手牌');
+    const tiles = [...player.hand].sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
+    for (const physical of [...tiles, player.drawnTile!]) {
+      const item = document.createElement('li');
+      item.dataset.tileId = physical.id;
+      if (physical.id === result.winningTileId) item.className = 'winning-draw';
+      item.append(createTileElement(physical.tile));
+      hand.append(item);
+    }
+    panel.append(hand);
+  }
   panel.append(text('p', '今回対応している役の判定結果'));
   const list = document.createElement('ul');
   for (const yaku of result.candidate.yaku) list.append(text('li',

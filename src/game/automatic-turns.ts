@@ -1,4 +1,5 @@
 import type { GameState } from '../model/game.ts';
+import { canDeclareTsumo, declareTsumo } from './tsumo.ts';
 import { drawOrStop } from './draw.ts';
 import { discardTile } from './discard.ts';
 import { chooseRandomDiscard, type DiscardStrategy } from './cpu.ts';
@@ -56,7 +57,11 @@ export class AutomaticTurnRunner {
         if (!current()) return;
         // Read again after waiting, never commit an old snapshot.
         game = read();
-        if (game.turnPlayerId !== player.id || game.phase !== 'awaiting-discard') return;
+        if (!current() || game.turnPlayerId !== player.id || game.phase !== 'awaiting-discard') return;
+        if (canDeclareTsumo(game, player.id)) {
+          write(declareTsumo(game, player.id));
+          return;
+        }
         const id = (this.options.chooseDiscard ?? chooseRandomDiscard)(game.players[player.id], this.options.random ?? Math.random);
         write(discardTile(game, player.id, id));
       }

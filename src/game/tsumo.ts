@@ -16,7 +16,7 @@ export function selectTsumoCandidate(analysis: YakuAnalysis): YakuCandidate | nu
 
 function analyzeTsumo(game: GameState, playerId: PlayerId): { analysis: YakuAnalysis; redDoraCount: number; doraCount: number } | null {
   const player = game.players[playerId];
-  if (playerId !== 0 || player?.id !== playerId || player.control !== 'human' ||
+  if (player?.id !== playerId ||
       game.turnPlayerId !== playerId || game.phase !== 'awaiting-discard' || game.winResult !== null ||
       player.hand.length !== 13 || !player.drawnTile || player.drawnTileSource !== 'live-wall') return null;
   const tiles = [...player.hand, player.drawnTile];

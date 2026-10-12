@@ -31,7 +31,7 @@ export class GameController {
     this.onChange();
     return this.runner.run(() => this.game, game => { this.game = game; this.onChange(); }, this.onChange);
   }
-  get canTsumo(): boolean { return !this.progressing && canDeclareTsumo(this.game, 0); }
+  get canTsumo(): boolean { return this.game.players[0].control === 'human' && !this.progressing && canDeclareTsumo(this.game, 0); }
   declareTsumo(): void {
     if (!this.canTsumo) return;
     const won = declareTsumo(this.game, 0);

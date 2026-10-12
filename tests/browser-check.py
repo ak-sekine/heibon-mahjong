@@ -133,6 +133,18 @@ with sync_playwright() as p:
         page=browser.new_page(viewport={'width':w,'height':h})
         errors=[]
         page.on('pageerror',lambda err:errors.append(str(err)))
+        # Fixed seeds keep turn-order/wall-exhaustion regression checks repeatable.
+        def inject_progression(route):
+            response = route.fetch()
+            source, count = re.subn(r'new GameController\((?:undefined|void 0),',
+                'new GameController(() => { discardRandom = seeded(5); return startGame(seeded(4)); },', response.text())
+            assert count == 1
+            source = source.replace('onChange: render', 'random: () => discardRandom(), onChange: render')
+            source = ('import { startGame } from "/quill-mahjong/src/game/start.ts";\n'
+                'const seeded = seed => () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);\n'
+                'let discardRandom = seeded(5);\n' + source)
+            route.fulfill(response=response, body=source)
+        page.route('**/src/main.ts', inject_progression)
         page.goto(options.url)
         page.clock.install()
         page.clock.pause_at(page.evaluate('Date.now()'))

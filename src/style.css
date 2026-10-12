@@ -71,3 +71,8 @@ summary { cursor:pointer; padding:4px; }
   #selection-status { font-size:12px; }
   .keyboard-help { display:none; }
 }
+
+/* Public winning CPU hand stays in the result panel, separate from table geometry. */
+.winning-hand { display:grid; grid-template-columns:repeat(13,minmax(0,1fr)) minmax(0,1.25fr); gap:1px; padding:0; margin:8px 0; list-style:none; width:100%; max-width:560px; }
+.winning-hand li { min-width:0; }
+.winning-hand .winning-draw { padding-left:20%; }

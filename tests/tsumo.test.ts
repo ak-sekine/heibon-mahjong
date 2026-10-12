@@ -149,7 +149,6 @@ const invalid: [string, (g: GameState) => GameState, PlayerId][] = [
   ['initial dealer winning fourteen', g => replaceSelf(g, { drawnTileSource: 'deal' }), 0],
   ['other turn', g => ({ ...g, turnPlayerId: 1 }), 0],
   ['CPU turn', g => ({ ...g, turnPlayerId: 1 }), 1],
-  ['CPU control at self seat', g => replaceSelf(g, { control: 'cpu' }), 0],
   ['missing draw', g => replaceSelf(g, { drawnTile: null, drawnTileSource: null }), 0],
   ['twelve hand tiles', g => replaceSelf(g, { hand: g.players[0].hand.slice(1) }), 0],
   ['fourteen hand tiles', g => replaceSelf(g, { hand: [...g.players[0].hand, g.players[0].drawnTile!] }), 0],
@@ -297,4 +296,13 @@ test('a real dealer deal with a supported winning shape still cannot declare ord
   assert.equal(canDeclareTsumo(game, 0), false);
   assert.throws(() => declareTsumo(game, 0), RangeError);
   assert.deepEqual(game, snapshot); inventory(game, game);
+});
+
+test('game API supports CPU control at seat zero, UI declaration still requires human control', () => {
+  const g = tsumoGame();
+  const game = { ...g, players: g.players.map(p => p.id === 0 ? { ...p, control: 'cpu' } : p) } as GameState;
+  assert.equal(canDeclareTsumo(game, 0), true);
+  assert.equal(declareTsumo(game, 0).phase, 'won');
+  const ui = new GameController(() => game);
+  assert.equal(ui.canTsumo, false); ui.declareTsumo(); assert.equal(ui.game, game);
 });
