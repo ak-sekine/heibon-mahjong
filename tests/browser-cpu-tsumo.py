@@ -56,7 +56,7 @@ with sync_playwright() as p:
             panel = page.locator('#win-result')
             result = panel.inner_text()
             for text in [f'CPU{winner}（{["", "南", "西", "北"][winner]}）', '門前清自摸和 1翻', '平和 1翻',
-                         '役合計：2翻', '通常ドラ：1枚（1翻）', '赤ドラ：2枚（2翻）', '合計：5翻', '点数計算は未実装です。']:
+                         '役合計：2翻', '通常ドラ：1枚（1翻）', '赤ドラ：2枚（2翻）', '合計：5翻', '獲得点数：']:
                 assert text in result, result
             hand = page.locator('.winning-hand li')
             assert hand.count() == 14
@@ -87,8 +87,8 @@ with sync_playwright() as p:
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
             assert bounds[-1]['x'] > bounds[-2]['x'] + bounds[-2]['width']
             page.screenshot(path=f'{options.screenshots}/cpu{winner}-{width}-won.png', full_page=True)
-            panel.locator('p').last.scroll_into_view_if_needed()
-            assert panel.locator('p').last.is_visible()
+            panel.locator('.win-payments').scroll_into_view_if_needed()
+            assert panel.locator('.win-payments').is_visible()
             snapshot = page.locator('main').inner_html()
             page.clock.run_for(3000)
             assert page.locator('main').inner_html() == snapshot

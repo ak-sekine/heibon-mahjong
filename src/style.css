@@ -93,3 +93,11 @@ summary { cursor:pointer; padding:4px; }
 #wall-count.ron-summary { min-height:36px; justify-content:center; }
 #wall-count.ron-summary span:not(:last-child) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 #wall-count.ron-summary span:last-child { font-size:9px; line-height:9px; }
+
+/* Scoring belongs to the result panel and never reserves space on the table. */
+.win-score { font-weight:700; }
+.win-payments { padding-left:20px; overflow-wrap:anywhere; }
+.fu-details { margin:12px 0; }
+.fu-details summary { min-height:44px; padding:10px 0; cursor:pointer; }
+.fu-details summary:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
+.fu-details ul { padding-left:20px; }

@@ -159,7 +159,7 @@ with sync_playwright() as p:
                     assert set(tiles.evaluate_all('els=>els.map(e=>e.dataset.tileId)')[:-1]) == set(initial['players'][winner]['hand'])
                     assert section.locator('.winning-hand svg[aria-label="赤5索"]').count() == 1
                     text = section.inner_text()
-                    for label in ['平和 1翻','役合計：1翻','通常ドラ：1枚（1翻）','赤ドラ：1枚（1翻）','合計：3翻','点数計算は未実装です。']:
+                    for label in ['平和 1翻','役合計：1翻','通常ドラ：1枚（1翻）','赤ドラ：1枚（1翻）','合計：3翻','獲得点数：']:
                         assert label in text, text
                     assert '門前清自摸和' not in text
                     section.scroll_into_view_if_needed()

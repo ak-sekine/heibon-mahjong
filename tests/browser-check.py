@@ -376,10 +376,10 @@ with sync_playwright() as p:
             page.evaluate('document.querySelector("#tsumo").click()')
             assert page.locator('#win-result').is_visible()
             result=page.locator('#win-result').inner_text()
-            assert all(text in result for text in ['ツモ和了！','自分（東）','門前清自摸和 1翻','平和 1翻','役合計：2翻','通常ドラ：1枚（1翻）','赤ドラ：2枚（2翻）','合計：5翻','今回対応している役','点数計算は未実装'])
+            assert all(text in result for text in ['ツモ和了！','自分（東）','門前清自摸和 1翻','平和 1翻','役合計：2翻','通常ドラ：1枚（1翻）','赤ドラ：2枚（2翻）','合計：5翻','今回対応している役','獲得点数：'])
             assert dora_snapshot(page) == initial_indicator
-            assert '通常ドラ' not in page.locator('#win-result ul').inner_text()
-            assert '赤ドラ' not in page.locator('#win-result ul').inner_text()
+            assert '通常ドラ' not in page.locator('#win-result ul').first.inner_text()
+            assert '赤ドラ' not in page.locator('#win-result ul').first.inner_text()
             assert page.locator('.drawn-tile button').get_attribute('data-tile-id')==draw_id
             assert page.locator('#player-hand li').evaluate_all('(els)=>els.map(el=>el.dataset.tileId)')==ids
             assert page.locator('[aria-pressed="true"]').count()==0

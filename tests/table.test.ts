@@ -64,7 +64,9 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'yakuman'] as const) test(`resul
     assert.equal(exposed[0].dataset.tileId, game.deadWall[4].id);
     assert.equal(exposed[0].children[1].innerHTML, tileSvgMarkup(game.deadWall[4].tile));
     assert.equal(exposed[0].children[2].textContent, `ドラ：\n${tileLabel(ordinaryTile(doraKindFromIndicator(game.deadWall[4].tile)))}`);
-    assert.ok(output.includes('点数計算は未実装です。'));
+    assert.ok(output.some(s => s.startsWith('獲得点数：')));
+    assert.ok(output.includes('支払い：'));
+    assert.equal(output.includes('符の内訳'), count !== 'yakuman');
     if (count === 'yakuman') {
       assert.ok(output.includes('国士無双 1役満'));
       assert.ok(output.includes('役満：1役満'));

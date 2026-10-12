@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-12",
+  "baselineCommit": "baa2408e5c8ac0c1e9e5d593542e4310966c475e",
+  "node": "24.19.0",
+  "baselineTests": 347,
+  "addedTests": 127,
+  "totalTests": 474,
+  "tests": "pass",
+  "build": "pass",
+  "chromium": {
+    "viewports": [
+      [
+        320,
+        568
+      ],
+      [
+        375,
+        667
+      ],
+      [
+        390,
+        844
+      ],
+      [
+        414,
+        896
+      ],
+      [
+        1280,
+        800
+      ]
+    ],
+    "scoringCases": 90,
+    "ronCases": 55,
+    "cpuTsumoCases": 15,
+    "regression": "all 5 sizes, full game and human tsumo",
+    "shortViewportScoring": [
+      [
+        375,
+        547
+      ],
+      [
+        390,
+        724
+      ]
+    ],
+    "pageErrors": 0,
+    "result": "pass"
+  },
+  "screenshotsReviewed": [
+    "scoring/320-ron-parent.png",
+    "scoring/375-pinfu-child.png",
+    "scoring/390-yakuman-parent.png",
+    "ron/390-triple-result.png",
+    "scoring/414-sanbaiman.png",
+    "scoring/1280-triple.png"
+  ],
+  "iphoneSafari": "not tested on a device",
+  "scope": "Step 11 only; no balances or round progression"
+}

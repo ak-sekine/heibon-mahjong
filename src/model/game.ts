@@ -1,3 +1,5 @@
+import type { FuResult } from '../analysis/fu.ts';
+import type { ScoreResult } from '../analysis/score.ts';
 import type { YakuAnalysis, YakuCandidate } from '../analysis/yaku.ts';
 import type { Tile } from './tile.ts';
 
@@ -19,7 +21,7 @@ export interface WallState {
   readonly liveWall: readonly PhysicalTile[];
   readonly deadWall: readonly PhysicalTile[];
 }
-export interface WinDetails {
+export interface WinDetails extends FuResult, ScoreResult {
   readonly winnerId: PlayerId;
   readonly winningTileId: string;
   readonly analysis: YakuAnalysis;

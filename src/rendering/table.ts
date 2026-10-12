@@ -1,3 +1,6 @@
+import { ordinaryTile } from '../model/tile.ts';
+import type { FuEntry } from '../analysis/fu.ts';
+import type { ScoreTier } from '../analysis/score.ts';
 import type { GameState, PlayerId, PlayerState, PhysicalTile, SeatWind } from '../model/game.ts';
 import { HONORS, SUITS, type Tile } from '../model/tile.ts';
 import { createTileElement, tileLabel } from './tile-svg.ts';
@@ -180,6 +183,42 @@ function renderWinResult(game: GameState): void {
       section.append(bonuses);
       section.append(text('p', `合計：${result.totalHanIncludingDora}翻`));
     }
-    section.append(text('p', '点数計算は未実装です。'));
+    if (result.fu !== null) section.append(text('p', `符：${result.fu}符`));
+    const tier = scoreTierNames[result.scoreTier];
+    const method = `${result.winnerId === game.dealerId ? '親' : '子'}の${result.winMethod === 'ron' ? 'ロン' : 'ツモ'}`;
+    const score = text('p', `獲得点数：${tier ? `${tier} ` : ''}${result.totalPoints}点（${method}）`);
+    score.className = 'win-score';
+    section.append(score, text('p', '支払い：'));
+    const payments = document.createElement('ul');
+    payments.className = 'win-payments';
+    for (const payment of result.payments) payments.append(text('li',
+      `${seatNames[payment.playerId]}（${payment.playerId === game.dealerId ? '親' : '子'}） → ${seatNames[result.winnerId]} ${payment.points}点`));
+    section.append(payments);
+    if (result.fu !== null) {
+      const details = document.createElement('details');
+      details.className = 'fu-details';
+      details.append(text('summary', '符の内訳'));
+      const breakdown = document.createElement('ul');
+      for (const entry of result.fuBreakdown) breakdown.append(text('li', `${fuEntryLabel(entry)}：${entry.fu}符`));
+      details.append(breakdown, text('p', `切り上げ前：${result.rawFu}符`), text('p', `最終：${result.fu}符`));
+      section.append(details);
+    }
+  }
+}
+
+const scoreTierNames: Record<ScoreTier, string> = {
+  normal: '', mangan: '満貫', haneman: '跳満', baiman: '倍満', sanbaiman: '三倍満',
+  'kazoe-yakuman': '数え役満', yakuman: '役満',
+};
+function fuEntryLabel(entry: FuEntry): string {
+  switch (entry.type) {
+    case 'base': return '基本符';
+    case 'menzen-ron': return '門前ロン';
+    case 'tsumo': return 'ツモ';
+    case 'pinfu-tsumo': return '平和ツモ（20符固定）';
+    case 'seven-pairs': return '七対子（25符固定）';
+    case 'triplet': return `${entry.concealed ? '暗刻' : '明刻'}（${tileLabel(ordinaryTile(entry.tile))}・${entry.terminalOrHonor ? '么九牌・字牌' : '中張牌'}）`;
+    case 'pair': return `雀頭（${tileLabel(ordinaryTile(entry.tile))}${entry.dragon ? '・三元牌' : ''}${entry.seatWind ? '・自風' : ''}${entry.roundWind ? '・場風' : ''}）`;
+    case 'wait': return `${({ ryanmen: '両面', shanpon: 'シャンポン', kanchan: '嵌張', penchan: '辺張', tanki: '単騎' })[entry.wait]}待ち`;
   }
 }
