@@ -34,6 +34,8 @@ def geometry(page):
             const t = tile.getBoundingClientRect();
             const svg = tile.querySelector('svg').getBoundingClientRect();
             return {x:t.x,y:t.y,width:t.width,height:t.height,
+                row:Number(tile.style.gridRow),column:Number(tile.style.gridColumn),
+                transform:getComputedStyle(tile.querySelector("svg")).transform,
                 contained:t.left >= r.left + el.clientLeft - .5 &&
                     t.right <= r.left + el.clientLeft + el.clientWidth + .5 &&
                     t.top >= r.top + el.clientTop - .5 &&
@@ -52,14 +54,15 @@ def geometry(page):
         tiles = river['tiles']
         for i, tile in enumerate(tiles):
             assert tile['contained'] and tile['svgContained'], (river['player'], i, tile)
-            assert tile['width'] >= 20 and tile['height'] >= 28, tile
+            assert min(tile['width'],tile['height']) >= 20, tile
             assert tile['x'] >= 0 and tile['x']+tile['width'] <= page.viewport_size['width'], tile
-            if i:
-                previous = tiles[i-1]
-                if i % river['columns']:
-                    assert abs(tile['y']-previous['y']) < .5 and tile['x'] > previous['x']
-                else:
-                    assert tile['y'] > previous['y'] and abs(tile['x']-tiles[0]['x']) < .5
+            player = int(river['player'])
+            row, column = divmod(i, 6)
+            expected = {0:(row+1,column+1),1:(column+1,3-row),2:(3-row,6-column),3:(6-column,row+1)}[player]
+            assert (tile['row'],tile['column']) == expected, (player,i,tile)
+            matrix = {0:'none',1:'matrix(0, 1, -1, 0,',2:'matrix(-1, 0, 0, -1,',3:'matrix(0, -1, 1, 0,'}[player]
+            assert tile['transform'].startswith(matrix), tile
+            assert all(separate(tile, other) for other in tiles[i+1:]), (player,i)
     assert separate(box(page,'#player-hand'),box(page,'.rivers'))
     control=box(page,'#discard')
     assert control['width']>=44 and control['height']>=44
@@ -68,9 +71,17 @@ def geometry(page):
         assert separate(selected.bounding_box(),box(page,'#label-0'))
         assert separate(selected.bounding_box(),box(page,'.rivers'))
     for id in [1,2,3]:
-        assert page.locator(f'#hand-{id} .tile-back').count() in [13,14]
-        assert page.locator(f'#hand-{id} svg, #hand-{id} [data-tile-id], #hand-{id} [aria-label]').count()==0
-        assert page.locator(f'#hand-{id}').evaluate('(el) => !el.innerHTML.includes("data-tile-id") && !el.innerHTML.includes("<svg")')
+        assert page.locator(f'#hand-{id}, .seat[data-player-id="{id}"] .tile-back').count()==0
+        assert page.locator(f'.seat[data-player-id="{id}"] svg, .seat[data-player-id="{id}"] [data-tile-id]').count()==0
+        assert f'CPU{id}' in page.locator(f'#label-{id}').inner_text()
+        assert '枚' in page.locator(f'#label-{id}').inner_text()
+
+def controls_visible(page):
+    for selector in ['#discard', '#selection-status', '.keyboard-help']:
+        bounds = box(page,selector)
+        assert bounds['y'] >= 0 and bounds['y']+bounds['height'] <= page.viewport_size['height']-10, (selector,bounds)
+    assert page.locator('#discard').evaluate('el => { const r=el.getBoundingClientRect(); return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2) === el; }')
+
 with sync_playwright() as p:
     browser=p.chromium.launch(executable_path=shutil.which('chromium') or shutil.which('chromium-browser'),args=['--no-sandbox'])
     for w,h in [(320,568),(375,667),(390,844),(414,896),(1280,800)]:
@@ -129,7 +140,6 @@ with sync_playwright() as p:
             assert page.locator('#label-0').get_attribute('data-active')=='true'
             for id in [1,2,3]:
                 assert page.locator(f'.river[data-player-id="{id}"] svg').count()==1
-                assert page.locator(f'#hand-{id} .tile-back').count()==13
             assert '65枚' in page.locator('#wall-count').inner_text() and '14枚' in page.locator('#wall-count').inner_text()
             # Two more complete rounds prove selection becomes usable repeatedly.
             for turn_round in [2,3]:
@@ -157,13 +167,32 @@ with sync_playwright() as p:
         page.clock.install()
         previous_rivers = [[] for _ in range(4)]
         for turn_round in range(18):
+            toolbar_check = turn_round == 17 and w in [375,390]
+            if toolbar_check:
+                page.set_viewport_size({'width':w,'height':h-120})
+                # Scroll the document to expose hand and controls together.
+                page.evaluate('window.scrollTo(0,document.documentElement.scrollHeight)')
             page.locator('#player-hand button').first.click()
+            if toolbar_check:
+                geometry(page)
+                controls_visible(page)
+                assert page.locator('#discard').is_enabled()
+                assert separate(box(page,'#player-hand'),box(page,'.discard-controls'))
+                page.screenshot(path=f'{options.screenshots}/{w}-toolbar-selected-viewport.png')
             page.locator('#discard').click()
+            if toolbar_check:
+                page.set_viewport_size({'width':w,'height':h})
             page.clock.run_for(1000)
             if turn_round < 17:
                 assert page.locator('#player-hand li').count()==14
                 assert page.locator('#player-hand button:enabled').count()==14
             geometry(page)
+            if turn_round == 16:
+                page.locator('#player-hand button').first.click()
+                page.locator('#discard').scroll_into_view_if_needed()
+                controls_visible(page)
+                page.screenshot(path=f'{options.screenshots}/{w}-late-selected-viewport.png')
+                page.locator('#player-hand button').first.click()
             current_rivers = [page.locator(f'.river[data-player-id="{id}"] [data-tile-id]').evaluate_all(
                 '(els) => els.map(el => el.dataset.tileId)') for id in range(4)]
             for previous, current in zip(previous_rivers, current_rivers):
@@ -178,6 +207,8 @@ with sync_playwright() as p:
         # All rivers must be simultaneously in view on the requested larger screens.
         page.evaluate('window.scrollTo(0,0)')
         if w != 320:
+            controls_visible(page)
+        if w != 320:
             assert all(b['y'] >= 0 and b['y']+b['height'] <= h for b in
                        [box(page,f'.river-{name}') for name in ['top','right','bottom','left']])
         print(json.dumps({'viewport':[w,h], 'pageVerticalScroll':page.evaluate('document.documentElement.scrollHeight > innerHeight')}))
@@ -190,7 +221,18 @@ with sync_playwright() as p:
         assert [page.locator(f'.river[data-player-id="{id}"] svg').count() for id in [0,1,2,3]]==[18,18,17,17]
         river_ids=page.locator('.river [data-tile-id]').evaluate_all('(els) => els.map(el => el.dataset.tileId)')
         assert len(set(river_ids))==70
+        page.locator('#discard').scroll_into_view_if_needed()
+        controls_visible(page)
         page.screenshot(path=f'{options.screenshots}/{w}-exhausted.png',full_page=True)
+        page.screenshot(path=f'{options.screenshots}/{w}-exhausted-viewport.png')
+        # Approximate browser chrome with 120px less usable height, then resize back.
+        if w in [375,390]:
+            page.set_viewport_size({'width':w,'height':h-120})
+            page.locator('#discard').scroll_into_view_if_needed()
+            controls_visible(page)
+            geometry(page)
+            page.screenshot(path=f'{options.screenshots}/{w}-toolbar-viewport.png')
+            page.set_viewport_size({'width':w,'height':h})
         page.evaluate('document.querySelector("#discard").click()')
         page.clock.run_for(2000)
         assert page.locator('.river svg').count()==70

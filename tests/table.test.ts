@@ -8,6 +8,7 @@ class ElementStub {
   children: ElementStub[] = [];
   dataset: Record<string, string> = {};
   className = '';
+  style: Record<string, string> = {};
   textContent = '';
   disabled = false;
   content = { firstElementChild: this };
@@ -55,7 +56,7 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       assert.match(nodes.get('#label-0')!.textContent, /^自分 · 東 · 14枚 · 親$/);
       for (const id of [1, 2, 3]) {
         const backs = nodes.get(`#hand-${id}`)!.children;
-        assert.equal(backs.length, 13);
+        assert.equal(backs.length, 0);
         assert.ok(backs.every(item => item.className === 'tile-back' && item.children.length === 0 && Object.keys(item.dataset).length === 0));
         assert.match(nodes.get(`#label-${id}`)!.textContent, new RegExp(`^CPU${id} · ${['', '南', '西', '北'][id]} · 13枚$`));
       }

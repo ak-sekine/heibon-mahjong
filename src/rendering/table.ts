@@ -47,17 +47,6 @@ function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement
   return button;
 }
 
-function renderCpu(player: PlayerState): void {
-  const hand = document.querySelector<HTMLUListElement>(`#hand-${player.id}`)!;
-  const count = player.hand.length + Number(player.drawnTile !== null);
-  const backs = Array.from({ length: count }, () => {
-    const item = document.createElement('li');
-    item.className = 'tile-back';
-    return item;
-  });
-  hand.replaceChildren(...backs);
-}
-
 export function renderTable(game: GameState): void {
   for (const player of game.players) {
     const id: PlayerId = player.id;
@@ -66,12 +55,17 @@ export function renderTable(game: GameState): void {
     label.textContent = `${seatNames[id]} · ${winds[player.wind]} · ${count}枚${game.dealerId === id ? ' · 親' : ''}`;
     label.dataset.active = String(game.phase !== 'wall-exhausted' && game.turnPlayerId === id);
     if (id === 0) renderSelf(player, canDiscard(game, 0));
-    else renderCpu(player);
     const river = document.querySelector<HTMLElement>(`.river[data-player-id="${id}"]`)!;
-    river.replaceChildren(...player.river.map(physical => {
+    river.replaceChildren(...player.river.map((physical, index) => {
       const item = document.createElement('div');
       item.className = 'river-tile';
       item.dataset.tileId = physical.id;
+      // Keep DOM/data in discard order; map the seat's 6-wide rows to screen cells.
+      const row = Math.floor(index / 6), column = index % 6;
+      const screenRow = id === 1 ? column : id === 3 ? 5 - column : id === 2 ? 2 - row : row;
+      const screenColumn = id === 1 ? 2 - row : id === 3 ? row : id === 2 ? 5 - column : column;
+      item.style.gridRow = String(screenRow + 1);
+      item.style.gridColumn = String(screenColumn + 1);
       item.append(createTileElement(physical.tile));
       return item;
     }));
