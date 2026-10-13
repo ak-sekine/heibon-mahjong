@@ -1,0 +1,62 @@
+{
+  "step": "13.1.1",
+  "baseMain": "496a35201892079b4833edb985ca23173f166d10",
+  "tests": {
+    "existing": 607,
+    "added": 21,
+    "total": 628,
+    "failed": 0,
+    "npmTest": "passed",
+    "individualCount": "passed"
+  },
+  "build": "passed",
+  "chromium": {
+    "cases": 42,
+    "sizes": [
+      [
+        320,
+        568
+      ],
+      [
+        375,
+        667
+      ],
+      [
+        390,
+        844
+      ],
+      [
+        414,
+        896
+      ],
+      [
+        1280,
+        800
+      ],
+      [
+        375,
+        547
+      ],
+      [
+        390,
+        724
+      ]
+    ],
+    "amounts": [
+      0,
+      1000,
+      5000,
+      6000,
+      10000,
+      17000
+    ],
+    "tableHeightUnchanged": true,
+    "handClearOfControls": true,
+    "horizontalScroll": false,
+    "overlap": false,
+    "privateTilesExposed": false,
+    "screenshotsVisuallyReviewed": 42,
+    "lifecycleSizesPassed": 7
+  },
+  "iphoneSafariDevice": "not verified"
+}

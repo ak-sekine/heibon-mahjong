@@ -29,6 +29,11 @@ ul { list-style:none; padding:0; margin:0; }
 .river-top { grid-area:top; }.river-right { grid-area:right; }.river-bottom { grid-area:bottom; }.river-left { grid-area:left; }
 .river-left,.river-right { grid-template-columns:repeat(3,var(--river-tile-height)); grid-template-rows:repeat(6,var(--river-tile-width)); }
 .center-info { grid-area:info; min-width:0; padding:2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; border-radius:8px; background:#154e3c; color:#fff5d7; font-size:10px; line-height:12px; font-weight:600; text-align:center; }
+/* The unused sixth cell of the public 3 + 2 dora grid is central table space.
+   Four exchanged sticks fit without changing any table/river/hand dimensions. */
+#deposit-sticks { position:absolute; left:calc(50% + 15px); bottom:0; display:flex; flex-wrap:wrap; justify-content:center; align-content:start; gap:1px; width:26px; max-height:36.4px; overflow-y:auto; overflow-x:hidden; }
+.deposit-stick { display:block; width:26px; height:8px; flex:none; }
+.deposit-stick svg { display:block; width:100%; height:100%; }
 #player-hand { width:100%; display:grid; grid-template-columns:repeat(13,minmax(0,1fr)) minmax(0,1.25fr); gap:1px; }
 #player-hand li { min-width:0; }
 #player-hand .drawn-tile { padding-left:20%; }
@@ -57,7 +62,7 @@ summary { cursor:pointer; padding:4px; }
 #win-result p { margin:8px 0; }
 #wall-count { display:flex; flex-direction:column; gap:0; }
 /* Fixed 3 + 2 slots: public count never changes the table geometry. */
-.dora-area { width:100%; }
+.dora-area { width:100%; position:relative; }
 .dora-area h2 { margin:0 0 3px; font-size:10px; line-height:14px; font-weight:600; }
 #dora-indicators { display:grid; grid-template-columns:repeat(3,26px); grid-template-rows:repeat(2,36.4px); justify-content:center; gap:3px 2px; }
 .dora-slot { position:relative; width:26px; height:36.4px; }

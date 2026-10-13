@@ -1,9 +1,12 @@
 import type { MatchState } from '../model/match.ts';
 import { rankPlayers } from '../game/match.ts';
 import { createTileElement } from './tile-svg.ts';
+import { renderDepositSticks } from './deposit-sticks.ts';
 const names = ['自分','CPU1','CPU2','CPU3'];
 const renderedSettlements = new WeakMap<HTMLElement, MatchState['lastSettlement']>();
 export function renderMatch(match: MatchState): void {
+  const deposits = document.querySelector<HTMLElement>('#deposit-sticks');
+  if (deposits) renderDepositSticks(deposits, match.depositSticks);
   document.querySelector('#match-info')!.textContent = `東${match.roundNumber}局 ${match.honba}本場 · 親：${names[match.dealerId]} · 供託：${match.depositSticks}本`;
   const panel = document.querySelector<HTMLElement>('#match-result')!;
   const button = document.querySelector<HTMLButtonElement>('#next-round')!;
