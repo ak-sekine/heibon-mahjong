@@ -53,7 +53,7 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
   select_draw();assert page.locator('#riichi').is_enabled();geometry();shot('before')
   page.locator('#discard').click();assert page.evaluate('riichiCheck().depositSticks')==0;assert page.evaluate('riichiCheck().game.players[0].riichi') is None;conservation()
   page.evaluate("riichiFixture('tsumo')");select_draw();page.locator('#riichi').click();assert page.evaluate('riichiCheck().depositSticks')==1
-  assert page.evaluate('riichiCheck().points[0]')==24000;assert 'リーチ' in page.locator('#label-0').inner_text();assert page.locator('#riichi').is_hidden();conservation();geometry();shot('established')
+  assert page.evaluate('riichiCheck().points[0]')==24000;assert 'リーチ' in page.locator('#label-0').inner_text();assert page.locator('#riichi').is_visible();assert page.locator('#riichi').is_disabled();conservation();geometry();shot('established')
   assert page.locator('#player-hand button:enabled').count()==0
   # Stop the scheduler by resetting its generation while retaining the test match.
   page.evaluate('window.savedRiichi=riichiCheck()')

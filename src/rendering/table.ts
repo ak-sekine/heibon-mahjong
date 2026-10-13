@@ -142,7 +142,6 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
   discard.disabled = progressing || (!player.riichi && !selected) || !canDiscard(game, 0);
   const riichi = document.querySelector<HTMLButtonElement>('#riichi');
   if (riichi) {
-    riichi.hidden = Boolean(player.riichi) || !canDiscard(game, 0) || canRon;
     riichi.disabled = progressing || !selected || !canDeclareRiichi(game, 0, selected.id, points);
   }
   document.querySelector<HTMLButtonElement>('#tsumo')!.disabled = progressing || game.players[0].control !== 'human' || !canDeclareTsumo(game, 0);

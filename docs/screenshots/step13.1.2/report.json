@@ -1,0 +1,2165 @@
+[
+  {
+    "width": 320,
+    "height": 568,
+    "result": "passed",
+    "measurements": [
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 494.40625,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 111.328125,
+          "y": 494.40625,
+          "width": 97.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 212.671875,
+          "y": 494.40625,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 497.234375,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 111.328125,
+          "y": 497.234375,
+          "width": 97.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 212.671875,
+          "y": 497.234375,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 494.40625,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 111.328125,
+          "y": 494.40625,
+          "width": 97.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 212.671875,
+          "y": 494.40625,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 494.40625,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 111.328125,
+          "y": 494.40625,
+          "width": 97.34375,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 212.671875,
+          "y": 494.40625,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 497.234375,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 111.328125,
+          "y": 497.234375,
+          "width": 97.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 212.671875,
+          "y": 497.234375,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 494.40625,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 111.328125,
+          "y": 494.40625,
+          "width": 97.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 212.671875,
+          "y": 494.40625,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 497.234375,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 111.328125,
+          "y": 497.234375,
+          "width": 97.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 212.671875,
+          "y": 497.234375,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 494.40625,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 111.328125,
+          "y": 494.40625,
+          "width": 97.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 212.671875,
+          "y": 494.40625,
+          "width": 97.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ]
+    ],
+    "checks": [
+      "eligible-ineligible",
+      "normal-discard",
+      "deposit",
+      "riichi-label",
+      "concealed-disabled",
+      "physical-tsumogiri",
+      "riichi-tsumo",
+      "riichi-only-ron",
+      "declaration-ron-no-deposit",
+      "deposit-settlement",
+      "modal",
+      "table-result-toggle",
+      "next-round-clear",
+      "confirmed-reset",
+      "conservation",
+      "one-row-hand",
+      "no-horizontal-scroll",
+      "dora-3+2",
+      "touch-44",
+      "cpu-hidden"
+    ]
+  },
+  {
+    "width": 375,
+    "height": 667,
+    "result": "passed",
+    "measurements": [
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 535.953125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 130.328125,
+          "y": 535.953125,
+          "width": 114.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 250.671875,
+          "y": 535.953125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 539.3125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 130.328125,
+          "y": 539.3125,
+          "width": 114.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 250.671875,
+          "y": 539.3125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 535.953125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 130.328125,
+          "y": 535.953125,
+          "width": 114.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 250.671875,
+          "y": 535.953125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 535.953125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 130.328125,
+          "y": 535.953125,
+          "width": 114.34375,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 250.671875,
+          "y": 535.953125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 539.3125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 130.328125,
+          "y": 539.3125,
+          "width": 114.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 250.671875,
+          "y": 539.3125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 535.953125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 130.328125,
+          "y": 535.953125,
+          "width": 114.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 250.671875,
+          "y": 535.953125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 539.3125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 130.328125,
+          "y": 539.3125,
+          "width": 114.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 250.671875,
+          "y": 539.3125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 535.953125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 130.328125,
+          "y": 535.953125,
+          "width": 114.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 250.671875,
+          "y": 535.953125,
+          "width": 114.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ]
+    ],
+    "checks": [
+      "eligible-ineligible",
+      "normal-discard",
+      "deposit",
+      "riichi-label",
+      "concealed-disabled",
+      "physical-tsumogiri",
+      "riichi-tsumo",
+      "riichi-only-ron",
+      "declaration-ron-no-deposit",
+      "deposit-settlement",
+      "modal",
+      "table-result-toggle",
+      "next-round-clear",
+      "confirmed-reset",
+      "conservation",
+      "one-row-hand",
+      "no-horizontal-scroll",
+      "dora-3+2",
+      "touch-44",
+      "cpu-hidden"
+    ]
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "result": "passed",
+    "measurements": [
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 549.46875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 552.96875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 552.96875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 552.96875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 549.46875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 549.46875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 552.96875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 552.96875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 552.96875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 549.46875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 552.96875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 552.96875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 552.96875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 549.46875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ]
+    ],
+    "checks": [
+      "eligible-ineligible",
+      "normal-discard",
+      "deposit",
+      "riichi-label",
+      "concealed-disabled",
+      "physical-tsumogiri",
+      "riichi-tsumo",
+      "riichi-only-ron",
+      "declaration-ron-no-deposit",
+      "deposit-settlement",
+      "modal",
+      "table-result-toggle",
+      "next-round-clear",
+      "confirmed-reset",
+      "conservation",
+      "one-row-hand",
+      "no-horizontal-scroll",
+      "dora-3+2",
+      "touch-44",
+      "cpu-hidden"
+    ]
+  },
+  {
+    "width": 414,
+    "height": 896,
+    "result": "passed",
+    "measurements": [
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 571.390625,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 143.328125,
+          "y": 571.390625,
+          "width": 127.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 276.671875,
+          "y": 571.390625,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 575.109375,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 143.328125,
+          "y": 575.109375,
+          "width": 127.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 276.671875,
+          "y": 575.109375,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 571.390625,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 143.328125,
+          "y": 571.390625,
+          "width": 127.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 276.671875,
+          "y": 571.390625,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 571.390625,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 143.328125,
+          "y": 571.390625,
+          "width": 127.34375,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 276.671875,
+          "y": 571.390625,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 575.109375,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 143.328125,
+          "y": 575.109375,
+          "width": 127.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 276.671875,
+          "y": 575.109375,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 571.390625,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 143.328125,
+          "y": 571.390625,
+          "width": 127.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 276.671875,
+          "y": 571.390625,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 575.109375,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 143.328125,
+          "y": 575.109375,
+          "width": 127.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 276.671875,
+          "y": 575.109375,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 571.390625,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 143.328125,
+          "y": 571.390625,
+          "width": 127.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 276.671875,
+          "y": 571.390625,
+          "width": 127.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ]
+    ],
+    "checks": [
+      "eligible-ineligible",
+      "normal-discard",
+      "deposit",
+      "riichi-label",
+      "concealed-disabled",
+      "physical-tsumogiri",
+      "riichi-tsumo",
+      "riichi-only-ron",
+      "declaration-ron-no-deposit",
+      "deposit-settlement",
+      "modal",
+      "table-result-toggle",
+      "next-round-clear",
+      "confirmed-reset",
+      "conservation",
+      "one-row-hand",
+      "no-horizontal-scroll",
+      "dora-3+2",
+      "touch-44",
+      "cpu-hidden"
+    ]
+  },
+  {
+    "width": 1280,
+    "height": 800,
+    "result": "passed",
+    "measurements": [
+      [
+        {
+          "id": "discard",
+          "x": 270,
+          "y": 637.390625,
+          "width": 242.65625,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 518.65625,
+          "y": 637.390625,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 767.328125,
+          "y": 637.390625,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 270,
+          "y": 644.359375,
+          "width": 242.65625,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 518.65625,
+          "y": 644.359375,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 767.328125,
+          "y": 644.359375,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 270,
+          "y": 637.390625,
+          "width": 242.65625,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 518.65625,
+          "y": 637.390625,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 767.328125,
+          "y": 637.390625,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 270,
+          "y": 637.390625,
+          "width": 242.65625,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 518.65625,
+          "y": 637.390625,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 767.328125,
+          "y": 637.390625,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 270,
+          "y": 644.359375,
+          "width": 242.65625,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 518.65625,
+          "y": 644.359375,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 767.328125,
+          "y": 644.359375,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 270,
+          "y": 637.390625,
+          "width": 242.65625,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 518.65625,
+          "y": 637.390625,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 767.328125,
+          "y": 637.390625,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 270,
+          "y": 644.359375,
+          "width": 242.65625,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 518.65625,
+          "y": 644.359375,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 767.328125,
+          "y": 644.359375,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 270,
+          "y": 637.390625,
+          "width": 242.65625,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 518.65625,
+          "y": 637.390625,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 767.328125,
+          "y": 637.390625,
+          "width": 242.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ]
+    ],
+    "checks": [
+      "eligible-ineligible",
+      "normal-discard",
+      "deposit",
+      "riichi-label",
+      "concealed-disabled",
+      "physical-tsumogiri",
+      "riichi-tsumo",
+      "riichi-only-ron",
+      "declaration-ron-no-deposit",
+      "deposit-settlement",
+      "modal",
+      "table-result-toggle",
+      "next-round-clear",
+      "confirmed-reset",
+      "conservation",
+      "one-row-hand",
+      "no-horizontal-scroll",
+      "dora-3+2",
+      "touch-44",
+      "cpu-hidden"
+    ]
+  },
+  {
+    "width": 375,
+    "height": 547,
+    "result": "passed",
+    "measurements": [
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 495,
+          "width": 115.65625,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 129.65625,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 249.328125,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 495,
+          "width": 115.65625,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 129.65625,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 249.328125,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 495,
+          "width": 115.65625,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 129.65625,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 249.328125,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 495,
+          "width": 115.65625,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 129.65625,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 249.328125,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 495,
+          "width": 115.65625,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 129.65625,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 249.328125,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 495,
+          "width": 115.65625,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 129.65625,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 249.328125,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 495,
+          "width": 115.65625,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 129.65625,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 249.328125,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 495,
+          "width": 115.65625,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 129.65625,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 249.328125,
+          "y": 495,
+          "width": 115.671875,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ]
+    ],
+    "checks": [
+      "eligible-ineligible",
+      "normal-discard",
+      "deposit",
+      "riichi-label",
+      "concealed-disabled",
+      "physical-tsumogiri",
+      "riichi-tsumo",
+      "riichi-only-ron",
+      "declaration-ron-no-deposit",
+      "deposit-settlement",
+      "modal",
+      "table-result-toggle",
+      "next-round-clear",
+      "confirmed-reset",
+      "conservation",
+      "one-row-hand",
+      "no-horizontal-scroll",
+      "dora-3+2",
+      "touch-44",
+      "cpu-hidden"
+    ]
+  },
+  {
+    "width": 390,
+    "height": 724,
+    "result": "passed",
+    "measurements": [
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 549.46875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 552.96875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 552.96875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 552.96875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 549.46875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 549.46875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 552.96875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 552.96875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 552.96875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 549.46875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": false,
+          "background": "rgb(255, 218, 125)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 552.96875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 552.96875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 552.96875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ],
+      [
+        {
+          "id": "discard",
+          "x": 10,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "riichi",
+          "x": 135.328125,
+          "y": 549.46875,
+          "width": 119.34375,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        },
+        {
+          "id": "tsumo",
+          "x": 260.671875,
+          "y": 549.46875,
+          "width": 119.328125,
+          "height": 44,
+          "disabled": true,
+          "background": "rgb(212, 229, 219)",
+          "color": "rgb(21, 78, 60)",
+          "opacity": "1"
+        }
+      ]
+    ],
+    "checks": [
+      "eligible-ineligible",
+      "normal-discard",
+      "deposit",
+      "riichi-label",
+      "concealed-disabled",
+      "physical-tsumogiri",
+      "riichi-tsumo",
+      "riichi-only-ron",
+      "declaration-ron-no-deposit",
+      "deposit-settlement",
+      "modal",
+      "table-result-toggle",
+      "next-round-clear",
+      "confirmed-reset",
+      "conservation",
+      "one-row-hand",
+      "no-horizontal-scroll",
+      "dora-3+2",
+      "touch-44",
+      "cpu-hidden"
+    ]
+  }
+]
