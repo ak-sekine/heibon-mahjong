@@ -1,0 +1,156 @@
+[
+  {
+    "width": 320,
+    "height": 568,
+    "result": "passed",
+    "checks": [
+      "initial",
+      "ron",
+      "points",
+      "cpu-tsumo",
+      "repeat",
+      "next-round",
+      "dealer-winds",
+      "draw",
+      "noten",
+      "honba-double",
+      "final-rank",
+      "reset",
+      "geometry",
+      "dora",
+      "cpu-hidden"
+    ]
+  },
+  {
+    "width": 375,
+    "height": 667,
+    "result": "passed",
+    "checks": [
+      "initial",
+      "ron",
+      "points",
+      "cpu-tsumo",
+      "repeat",
+      "next-round",
+      "dealer-winds",
+      "draw",
+      "noten",
+      "honba-double",
+      "final-rank",
+      "reset",
+      "geometry",
+      "dora",
+      "cpu-hidden"
+    ]
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "result": "passed",
+    "checks": [
+      "initial",
+      "ron",
+      "points",
+      "cpu-tsumo",
+      "repeat",
+      "next-round",
+      "dealer-winds",
+      "draw",
+      "noten",
+      "honba-double",
+      "final-rank",
+      "reset",
+      "geometry",
+      "dora",
+      "cpu-hidden"
+    ]
+  },
+  {
+    "width": 414,
+    "height": 896,
+    "result": "passed",
+    "checks": [
+      "initial",
+      "ron",
+      "points",
+      "cpu-tsumo",
+      "repeat",
+      "next-round",
+      "dealer-winds",
+      "draw",
+      "noten",
+      "honba-double",
+      "final-rank",
+      "reset",
+      "geometry",
+      "dora",
+      "cpu-hidden"
+    ]
+  },
+  {
+    "width": 1280,
+    "height": 800,
+    "result": "passed",
+    "checks": [
+      "initial",
+      "ron",
+      "points",
+      "cpu-tsumo",
+      "repeat",
+      "next-round",
+      "dealer-winds",
+      "draw",
+      "noten",
+      "honba-double",
+      "final-rank",
+      "reset",
+      "geometry",
+      "dora",
+      "cpu-hidden"
+    ]
+  },
+  {
+    "width": 375,
+    "height": 547,
+    "result": "passed",
+    "checks": [
+      "initial",
+      "ron",
+      "points",
+      "cpu-tsumo",
+      "repeat",
+      "next-round",
+      "dealer-winds",
+      "draw",
+      "noten",
+      "honba-double",
+      "final-rank",
+      "reset",
+      "geometry",
+      "dora",
+      "cpu-hidden"
+    ]
+  },
+  {
+    "width": 390,
+    "height": 724,
+    "result": "passed",
+    "checks": [
+      "initial",
+      "ron",
+      "points",
+      "cpu-tsumo",
+      "repeat",
+      "next-round",
+      "dealer-winds",
+      "draw",
+      "noten",
+      "honba-double",
+      "final-rank",
+      "reset",
+      "geometry",
+      "dora",
+      "cpu-hidden"
+    ]
+  }
+]

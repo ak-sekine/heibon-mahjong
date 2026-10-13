@@ -1,4 +1,6 @@
-import type { GameState } from '../model/game.ts';
+import type { MatchState } from '../model/match.ts';
+import { startMatch, updateMatchGame, nextRound } from '../game/match.ts';
+import type { GameState, PlayerId } from '../model/game.ts';
 import { canDeclareTsumo, declareTsumo } from '../game/tsumo.ts';
 import { canDeclareRon, declareRon, passRon } from '../game/ron.ts';
 import { startGame } from '../game/start.ts';
@@ -7,14 +9,16 @@ import { AutomaticTurnRunner, type AutomaticTurnOptions } from '../game/automati
 
 /** UI selection is separate from the immutable game state. */
 export class GameController {
-  game: GameState;
+  match: MatchState;
+  get game(): GameState { return this.match.game; }
+  set game(game: GameState) { this.match = updateMatchGame(this.match, game); }
   selectedTileId: string | null = null;
-  private readonly start: () => GameState;
+  private readonly start: (dealerId?: PlayerId) => GameState;
   private readonly runner: AutomaticTurnRunner;
   private readonly onChange: () => void;
-  constructor(start: () => GameState = startGame, options: AutomaticTurnOptions & { onChange?: () => void } = {}) {
+  constructor(start: (dealerId?: PlayerId) => GameState = id => startGame(Math.random, id), options: AutomaticTurnOptions & { onChange?: () => void } = {}) {
     this.start = start;
-    this.game = start();
+    this.match = startMatch(start());
     this.runner = new AutomaticTurnRunner(options);
     this.onChange = options.onChange ?? (() => {});
   }
@@ -59,9 +63,18 @@ export class GameController {
     this.onChange();
     return this.runner.run(() => this.game, game => { this.game = game; this.onChange(); }, this.onChange);
   }
+  get canNextRound(): boolean { return this.match.status === 'round-ended'; }
+  nextRound(): Promise<void> {
+    if (!this.canNextRound) return Promise.resolve();
+    this.runner.cancel();
+    this.match = nextRound(this.match, id => this.start(id));
+    this.selectedTileId = null;
+    this.onChange();
+    return this.runner.run(() => this.game, game => { this.game = game; this.onChange(); }, this.onChange);
+  }
   newGame(): void {
     this.runner.cancel();
-    this.game = this.start();
+    this.match = startMatch(this.start());
     this.selectedTileId = null;
     this.onChange();
   }

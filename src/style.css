@@ -39,7 +39,7 @@ ul { list-style:none; padding:0; margin:0; }
 .tile-choice:disabled { cursor:default; opacity:1; }
 .discard-controls { position:sticky; bottom:0; z-index:2; background:#185640; border-radius:8px; padding:8px 6px calc(12px + env(safe-area-inset-bottom, 0px)); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; }
 #selection-status { flex:1 1 100%; min-width:0; margin:0; font-size:14px; overflow-wrap:anywhere; }
-#discard, #tsumo { min-width:100px; min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; touch-action:manipulation; cursor:pointer; }
+#discard, #tsumo, #next-round { min-width:100px; min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; touch-action:manipulation; cursor:pointer; }
 #discard:disabled, #tsumo:disabled { background:#d4e5db; opacity:.6; cursor:default; }
 #discard:focus-visible, #tsumo:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
 .keyboard-help { width:100%; margin:0; font-size:11px; color:#d4e5db; }
@@ -101,3 +101,30 @@ summary { cursor:pointer; padding:4px; }
 .fu-details summary { min-height:44px; padding:10px 0; cursor:pointer; }
 .fu-details summary:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
 .fu-details ul { padding-left:20px; }
+
+/* Match information shares the existing header; scores share the seat labels. */
+#match-info { margin:2px 0 0; font-size:clamp(9px,2.5vw,12px); line-height:1.2; }
+header h1 { margin:0; }
+header > div { min-width:0; }
+#match-result { padding:12px; border:1px solid #ffda7d; border-radius:8px; overflow-wrap:anywhere; }
+#match-result h2 { font-size:1.1rem; margin:0; }
+#match-result p { margin:6px 0; }
+#next-round { margin:8px 0; }
+
+.seat-label span { white-space:nowrap; }
+@media (max-width:350px) {
+  .table { grid-template-rows:24px auto auto; }
+  .seat:not(.seat-bottom) .seat-label span { display:block; }
+}
+@media (max-height:650px) {
+  main { gap:4px; }
+  .keyboard-help { display:none; }
+  .discard-controls { padding:4px 6px calc(8px + env(safe-area-inset-bottom, 0px)); gap:4px; }
+  #selection-status { font-size:12px; }
+  .seat-bottom { gap:8px; }
+}
+@media (max-height:650px) {
+  .table { gap:2px; padding-top:2px; padding-bottom:2px; }
+  .rivers { gap:1px; padding:1px; }
+  .seat-bottom { padding-top:0; gap:6px; }
+}

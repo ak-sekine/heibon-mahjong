@@ -62,7 +62,7 @@ function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement
   return button;
 }
 
-export function renderTable(game: GameState): void {
+export function renderTable(game: GameState, points?: readonly number[]): void {
   renderWinResult(game);
   document.querySelector<HTMLElement>('#wall-count')!.className = game.winResult?.winMethod === 'ron' ? 'ron-summary' : '';
   renderDoraIndicators(document.querySelector<HTMLElement>('#dora-indicators')!, exposedDoraIndicators(game));
@@ -70,7 +70,11 @@ export function renderTable(game: GameState): void {
     const id: PlayerId = player.id;
     const count = player.hand.length + Number(player.drawnTile !== null);
     const label = document.querySelector<HTMLElement>(`#label-${id}`)!;
-    label.textContent = `${seatNames[id]} · ${winds[player.wind]} · ${count}枚${game.dealerId === id ? ' · 親' : ''}`;
+    if (points) {
+      const identity = Object.assign(document.createElement('span'), { textContent: `${seatNames[id]}（${winds[player.wind]}）${game.dealerId === id ? '親' : ''}` });
+      const balance = Object.assign(document.createElement('span'), { textContent: `${points[id].toLocaleString('ja-JP')}点`, className: 'seat-points' });
+      label.replaceChildren(identity, document.createTextNode(' '), balance);
+    } else label.textContent = `${seatNames[id]} · ${winds[player.wind]} · ${count}枚${game.dealerId === id ? ' · 親' : ''}`;
     label.dataset.active = String(game.phase !== 'wall-exhausted' && game.phase !== 'won' && game.turnPlayerId === id);
     if (id === 0) renderSelf(player, canDiscard(game, 0));
     const river = document.querySelector<HTMLElement>(`.river[data-player-id="${id}"]`)!;

@@ -9,7 +9,7 @@
 </head>
 <body>
 <main>
-  <header><h1>Quill Mahjong</h1><button id="new-game" type="button">新しい対局</button></header>
+  <header><div><h1>Quill Mahjong</h1><p id="match-info"></p></div><button id="new-game" type="button">新しい対局</button></header>
   <section class="table" aria-label="4人麻雀卓">
     <section class="seat seat-top" data-player-id="2" aria-label="CPU2の席"><p class="seat-label" id="label-2"></p></section>
     <section class="seat seat-right" data-player-id="1" aria-label="CPU1の席"><p class="seat-label" id="label-1"></p></section>
@@ -41,6 +41,8 @@
     <p class="keyboard-help">Tabで牌とボタンへ移動、Enter／Spaceで選択・確定</p>
   </section>
   <section id="win-result" role="status" aria-live="polite" hidden></section>
+  <section id="match-result" hidden aria-live="polite"></section>
+  <button id="next-round" type="button" hidden>次の局へ</button>
   <details class="catalog"><summary>開発用：全34種類と赤5を見る</summary><ul id="tile-gallery" aria-label="全牌種と赤5の一覧"></ul></details>
 </main>
 <script type="module" src="/src/main.ts"></script>

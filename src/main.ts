@@ -2,11 +2,13 @@ import './style.css';
 import { TILE_KINDS, SUITS, ordinaryTile, redFive } from './model/tile.ts';
 import { createTileElement, tileLabel } from './rendering/tile-svg.ts';
 import { renderTable, renderSelection } from './rendering/table.ts';
+import { renderMatch } from './rendering/match.ts';
 import { GameController } from './ui/controller.ts';
 
 const controller = new GameController(undefined, { onChange: render });
 function render(): void {
-  renderTable(controller.game);
+  renderTable(controller.game, controller.match.points);
+  renderMatch(controller.match);
   renderSelection(controller.game, controller.selectedTileId, controller.progressing);
 }
 function newGame(): void { controller.newGame(); }
@@ -31,6 +33,9 @@ document.querySelector<HTMLButtonElement>('#ron')!.addEventListener('click', () 
 document.querySelector<HTMLButtonElement>('#pass-ron')!.addEventListener('click', () => {
   void controller.passRon().catch(error => console.error('Turn progression failed', error));
   document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
+});
+document.querySelector<HTMLButtonElement>('#next-round')!.addEventListener('click', () => {
+  void controller.nextRound().catch(error => console.error('Next round failed', error));
 });
 render();
 

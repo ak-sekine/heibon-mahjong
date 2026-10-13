@@ -5,7 +5,7 @@ import { analyzeYaku, type YakuAnalysis, type YakuCandidate } from '../analysis/
 import { countDora, countRedDora } from '../analysis/dora.ts';
 import { exposedDoraIndicators } from './dora.ts';
 
-/** Step 8 has no round progression. Replace this context when rounds are added. */
+/** East-only match: the round wind stays east throughout all four rounds. */
 export const ROUND_WIND: SeatWind = 'east';
 
 /** Prefer yakuman, then supported han; ties use stable candidate IDs. No scoring. */
