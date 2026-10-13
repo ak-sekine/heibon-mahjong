@@ -3,6 +3,7 @@ import { startMatch, updateMatchGame, nextRound } from '../game/match.ts';
 import type { GameState, PlayerId } from '../model/game.ts';
 import { canDeclareTsumo, declareTsumo } from '../game/tsumo.ts';
 import { canDeclareRon, declareRon, passRon } from '../game/ron.ts';
+import { canDeclareRiichi, declareRiichi } from '../game/riichi.ts';
 import { startGame } from '../game/start.ts';
 import { canDiscard, discardTile } from '../game/discard.ts';
 import { AutomaticTurnRunner, type AutomaticTurnOptions } from '../game/automatic-turns.ts';
@@ -25,13 +26,25 @@ export class GameController {
   get progressing(): boolean { return this.runner.running; }
   select(tileId: string): void {
     const player = this.game.players[0];
-    if (this.progressing || !canDiscard(this.game, 0) || ![...player.hand, player.drawnTile].some(tile => tile?.id === tileId)) return;
+    if ((player.riichi && tileId !== player.drawnTile?.id) || this.progressing || !canDiscard(this.game, 0) || ![...player.hand, player.drawnTile].some(tile => tile?.id === tileId)) return;
     this.selectedTileId = this.selectedTileId === tileId ? null : tileId;
   }
-  get canConfirm(): boolean { return !this.progressing && this.selectedTileId !== null && canDiscard(this.game, 0); }
+  private get discardId(): string | null { return this.game.players[0].riichi ? this.game.players[0].drawnTile?.id ?? null : this.selectedTileId; }
+  get canConfirm(): boolean { return !this.progressing && this.discardId !== null && canDiscard(this.game, 0); }
+  get canRiichi(): boolean {
+    return this.match.status === 'playing' && !this.progressing && this.selectedTileId !== null &&
+      canDeclareRiichi(this.game, 0, this.selectedTileId, this.match.points[0]);
+  }
+  declareRiichi(): Promise<void> {
+    if (!this.canRiichi) return Promise.resolve();
+    this.match = declareRiichi(this.match, 0, this.selectedTileId!);
+    this.selectedTileId = null;
+    this.onChange();
+    return this.runner.run(() => this.game, game => { this.game = game; this.onChange(); }, this.onChange);
+  }
   confirm(): Promise<void> {
     if (!this.canConfirm) return Promise.resolve();
-    this.game = discardTile(this.game, 0, this.selectedTileId!);
+    this.game = discardTile(this.game, 0, this.discardId!);
     this.selectedTileId = null;
     this.onChange();
     return this.runner.run(() => this.game, game => { this.game = game; this.onChange(); }, this.onChange);

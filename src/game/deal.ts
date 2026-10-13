@@ -20,7 +20,7 @@ export function deal(wall: WallState, dealerId: PlayerId = 0): GameState {
   const player = (id: PlayerId): PlayerState => ({
     id, control: id === 0 ? 'human' : 'cpu',
     wind: WINDS[(id - dealerId + 4) % 4],
-    hand: hands[id], drawnTile: id === dealerId ? extra : null, drawnTileSource: id === dealerId ? 'deal' : null, river: [], temporaryFuriten: false,
+    hand: hands[id], drawnTile: id === dealerId ? extra : null, drawnTileSource: id === dealerId ? 'deal' : null, river: [], temporaryFuriten: false, riichi: null,
   });
   return {
     winResult: null, ronWindow: null, dealerId, turnPlayerId: dealerId, phase: 'awaiting-discard',

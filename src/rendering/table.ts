@@ -7,6 +7,7 @@ import { createTileElement, tileLabel } from './tile-svg.ts';
 import { canDeclareRon, getRonTile } from '../game/ron.ts';
 import { canDeclareTsumo } from '../game/tsumo.ts';
 import type { YakuId } from '../analysis/yaku.ts';
+import { canDeclareRiichi } from '../game/riichi.ts';
 import { canDiscard } from '../game/discard.ts';
 import { exposedDoraIndicators } from '../game/dora.ts';
 import { renderDoraIndicators } from './dora.ts';
@@ -34,7 +35,7 @@ function renderSelf(player: PlayerState, enabled: boolean): void {
   const items = [...player.hand].sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id)).map((physical: PhysicalTile) => {
     const item = document.createElement('li');
     item.dataset.tileId = physical.id;
-    item.append(tileButton(physical, enabled));
+    item.append(tileButton(physical, enabled && !player.riichi));
     return item;
   });
   if (player.drawnTile) {
@@ -84,10 +85,10 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
     const count = player.hand.length + Number(player.drawnTile !== null);
     const label = document.querySelector<HTMLElement>(`#label-${id}`)!;
     if (points) {
-      const identity = Object.assign(document.createElement('span'), { textContent: `${seatNames[id]}（${winds[player.wind]}）${game.dealerId === id ? '親' : ''}` });
+      const identity = Object.assign(document.createElement('span'), { textContent: `${seatNames[id]}（${winds[player.wind]}）${game.dealerId === id ? '親' : ''}${player.riichi ? ' リーチ' : ''}` });
       const balance = Object.assign(document.createElement('span'), { textContent: `${points[id].toLocaleString('ja-JP')}点`, className: 'seat-points' });
       label.replaceChildren(identity, document.createTextNode(' '), balance);
-    } else label.textContent = `${seatNames[id]} · ${winds[player.wind]} · ${count}枚${game.dealerId === id ? ' · 親' : ''}`;
+    } else label.textContent = `${seatNames[id]} · ${winds[player.wind]} · ${count}枚${game.dealerId === id ? ' · 親' : ''}${player.riichi ? ' · リーチ' : ''}`;
     label.dataset.active = String(game.phase !== 'wall-exhausted' && game.phase !== 'won' && game.turnPlayerId === id);
     if (id === 0) renderSelf(player, canDiscard(game, 0));
     const river = document.querySelector<HTMLElement>(`.river[data-player-id="${id}"]`)!;
@@ -95,6 +96,7 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
       const item = document.createElement('div');
       item.className = 'river-tile';
       item.dataset.tileId = physical.id;
+      item.dataset.riichiDeclaration = String(player.riichi?.declarationTileId === physical.id);
       // Keep DOM/data in discard order; map the seat's 6-wide rows to screen cells.
       const row = Math.floor(index / 6), column = index % 6;
       const screenRow = id === 1 ? 5 - column : id === 3 ? column : id === 2 ? 2 - row : row;
@@ -113,9 +115,10 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
 }
 
 /** Selection rendering never changes GameState or rebuilds focused tile buttons. */
-export function renderSelection(game: GameState, selectedTileId: string | null, progressing = false): void {
+export function renderSelection(game: GameState, selectedTileId: string | null, progressing = false, points = 25000): void {
   for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('#player-hand button'))) {
     button.setAttribute('aria-pressed', String(button.dataset.tileId === selectedTileId));
+    button.disabled = progressing || !canDiscard(game, 0) || Boolean(game.players[0].riichi && button.dataset.tileId !== game.players[0].drawnTile?.id);
   }
   const ron = document.querySelector<HTMLElement>('#ron-controls')!;
   const wasHidden = ron.hidden;
@@ -134,16 +137,24 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
   const player = game.players[0];
   const selected = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
     .find(tile => tile.id === selectedTileId);
-  document.querySelector<HTMLButtonElement>('#discard')!.disabled = progressing || !selected || !canDiscard(game, 0);
+  const discard = document.querySelector<HTMLButtonElement>('#discard')!;
+  discard.textContent = player.riichi ? 'ツモ切り' : '打牌する';
+  discard.disabled = progressing || (!player.riichi && !selected) || !canDiscard(game, 0);
+  const riichi = document.querySelector<HTMLButtonElement>('#riichi');
+  if (riichi) {
+    riichi.hidden = Boolean(player.riichi) || !canDiscard(game, 0) || canRon;
+    riichi.disabled = progressing || !selected || !canDeclareRiichi(game, 0, selected.id, points);
+  }
   document.querySelector<HTMLButtonElement>('#tsumo')!.disabled = progressing || game.players[0].control !== 'human' || !canDeclareTsumo(game, 0);
   document.querySelector<HTMLElement>('#selection-status')!.textContent = game.phase === 'wall-exhausted'
     ? '牌山がなくなりました'
     : !canDiscard(game, 0) ? turnLabel(game)
+    : player.riichi ? 'リーチ中：ツモ和了 または ツモ切り'
     : selected ? `選択：${tileLabel(selected.tile)}` : 'あなたの手番：牌を選択して「打牌する」で確定';
 }
 
 const yakuNames: Record<YakuId, string> = {
-  'menzen-tsumo': '門前清自摸和', tanyao: '断么九',
+  riichi: '立直', 'menzen-tsumo': '門前清自摸和', tanyao: '断么九',
   'yakuhai-white': '役牌：白', 'yakuhai-green': '役牌：發', 'yakuhai-red': '役牌：中',
   'yakuhai-seat-wind': '役牌：自風', 'yakuhai-round-wind': '役牌：場風',
   pinfu: '平和', iipeikou: '一盃口', chiitoitsu: '七対子', toitoi: '対々和', 'kokushi-musou': '国士無双',

@@ -6,6 +6,9 @@ export function discardFromPlayer(player: PlayerState, tileId: string): PlayerSt
   if (player.hand.length !== 13 || !player.drawnTile) {
     throw new RangeError('Discard requires thirteen tiles and a drawn tile');
   }
+  if (player.riichi && tileId !== player.drawnTile.id) {
+    throw new RangeError('Riichi requires discarding the drawn physical tile');
+  }
   const tile = player.drawnTile.id === tileId
     ? player.drawnTile : player.hand.find(tile => tile.id === tileId);
   if (!tile) throw new RangeError('Tile is not owned by this player');

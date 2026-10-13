@@ -23,7 +23,7 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
   try {
     const faces = tiles.map(t => t.tile);
     const analysis = analyzeYaku(faces, { winMethod, winningTile: winningTile.tile,
-      seatWind: player.wind, roundWind: ROUND_WIND });
+      seatWind: player.wind, roundWind: ROUND_WIND, riichi: player.riichi !== null });
     if (!analysis.isWinningShape || !analysis.hasSupportedYaku) return null;
     const doraCount = countDora(faces, exposedDoraIndicators(game).map(t => t.tile));
     const redDoraCount = countRedDora(faces);

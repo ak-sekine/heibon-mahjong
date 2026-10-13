@@ -11,8 +11,9 @@ export interface WinningContext {
   readonly roundWind: SeatWind;
   /** Only closed hands are supported. false is rejected, never evaluated as closed. */
   readonly isClosed?: true;
+  readonly riichi?: boolean;
 }
-export type YakuId = 'menzen-tsumo' | 'tanyao' | 'yakuhai-white' | 'yakuhai-green' |
+export type YakuId = 'riichi' | 'menzen-tsumo' | 'tanyao' | 'yakuhai-white' | 'yakuhai-green' |
   'yakuhai-red' | 'yakuhai-seat-wind' | 'yakuhai-round-wind' | 'pinfu' |
   'iipeikou' | 'chiitoitsu' | 'toitoi' | 'kokushi-musou';
 export type RecognizedYaku =
@@ -46,6 +47,7 @@ function validateContext(context: WinningContext, tiles: readonly Tile[]): void 
   if (!context || typeof context !== 'object' ||
       !['tsumo', 'ron'].includes(context.winMethod) ||
       !winds.includes(context.seatWind) || !winds.includes(context.roundWind) ||
+      (context.riichi !== undefined && typeof context.riichi !== 'boolean') ||
       (context.isClosed !== undefined && context.isClosed !== true)) {
     throw new RangeError('Invalid winning context; only closed hands are supported');
   }
@@ -85,6 +87,7 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
   const common: RecognizedYaku[] = [];
   const add = (list: RecognizedYaku[], id: Exclude<YakuId, 'kokushi-musou'>, han: 1 | 2 = 1) =>
     list.push({ id, han, yakuman: 0 });
+  if (context.riichi) add(common, 'riichi');
   if (context.winMethod === 'tsumo') add(common, 'menzen-tsumo');
   if (tiles.every(t => t.category === 'suited' && t.rank >= 2 && t.rank <= 8)) add(common, 'tanyao');
   const candidates: YakuCandidate[] = [];

@@ -165,3 +165,12 @@ header > div { min-width:0; }
 
 #public-winning-hands { padding:8px; border:1px solid #63947a; border-radius:8px; }
 #public-winning-hands h2 { margin:0; font-size:14px; }
+
+/* Three actions stay in the existing single 44px row, including at 320px. */
+#discard, #tsumo, #riichi { min-width:0; flex:1 1 0; white-space:nowrap; padding:8px 6px; }
+#riichi { min-height:44px; border:1px solid #fff5d7; border-radius:8px; background:#103e30; color:#fffdf7; font:inherit; font-weight:600; touch-action:manipulation; cursor:pointer; }
+#riichi:disabled { opacity:.6; cursor:default; }
+#riichi:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
+.ron-pending > #riichi { display:none; }
+/* Keep an unselected drawn tile clear of sticky controls on short phones. */
+@media (max-height:600px) { .seat-bottom { gap:2px; } }

@@ -12,7 +12,7 @@ const controller = new GameController(undefined, { onChange: render });
 function render(): void {
   renderTable(controller.game, controller.match.points);
   renderMatch(controller.match);
-  renderSelection(controller.game, controller.selectedTileId, controller.progressing);
+  renderSelection(controller.game, controller.selectedTileId, controller.progressing, controller.match.points[0]);
   resultDialog.update(controller.match);
 }
 function newGame(): void { controller.newGame(); window.scrollTo(0, 0); }
@@ -21,12 +21,15 @@ document.querySelector('#player-hand')!.addEventListener('click', event => {
   const button = (event.target as Element).closest<HTMLButtonElement>('button[data-tile-id]');
   if (!button) return;
   controller.select(button.dataset.tileId!);
-  renderSelection(controller.game, controller.selectedTileId, controller.progressing);
+  renderSelection(controller.game, controller.selectedTileId, controller.progressing, controller.match.points[0]);
   resultDialog.update(controller.match);
 });
 document.querySelector<HTMLButtonElement>('#discard')!.addEventListener('click', () => {
   void controller.confirm().catch(error => console.error('Turn progression failed', error));
   if (!document.querySelector<HTMLDialogElement>('#result-dialog')!.open) document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
+});
+document.querySelector<HTMLButtonElement>('#riichi')!.addEventListener('click', () => {
+  void controller.declareRiichi().catch(error => console.error('Riichi progression failed', error));
 });
 document.querySelector<HTMLButtonElement>('#tsumo')!.addEventListener('click', () => {
   controller.declareTsumo();

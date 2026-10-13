@@ -7,6 +7,9 @@ import type { Tile } from './tile.ts';
 export type PhysicalTile = Readonly<{ id: string; tile: Tile }>;
 export type PlayerId = 0 | 1 | 2 | 3;
 export type SeatWind = 'east' | 'south' | 'west' | 'north';
+export interface RiichiState {
+  readonly declarationTileId: string;
+}
 export interface PlayerState {
   readonly id: PlayerId;
   readonly control: 'human' | 'cpu';
@@ -15,6 +18,7 @@ export interface PlayerState {
   readonly drawnTile: PhysicalTile | null;
   readonly drawnTileSource: 'deal' | 'live-wall' | null;
   readonly temporaryFuriten: boolean;
+  readonly riichi: RiichiState | null;
   readonly river: readonly PhysicalTile[];
 }
 export interface WallState {
