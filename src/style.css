@@ -73,9 +73,9 @@ summary { cursor:pointer; padding:4px; }
 }
 
 /* Public winning CPU hand stays in the result panel, separate from table geometry. */
-.winning-hand { display:grid; grid-template-columns:repeat(13,minmax(0,1fr)) minmax(0,1.25fr); gap:1px; padding:0; margin:8px 0; list-style:none; width:100%; max-width:560px; }
-.winning-hand li { min-width:0; }
-.winning-hand .winning-draw { padding-left:20%; }
+.winning-hand,.public-winning-hand { display:grid; grid-template-columns:repeat(13,minmax(0,1fr)) minmax(0,1.25fr); gap:1px; padding:0; margin:8px 0; list-style:none; width:100%; max-width:560px; }
+.winning-hand li,.public-winning-hand li { min-width:0; }
+.winning-hand .winning-draw,.public-winning-hand .winning-draw { padding-left:20%; }
 
 /* The declaration replaces the usual controls, retaining their compact height. */
 #ron-controls[hidden] { display:none; }
@@ -128,3 +128,31 @@ header > div { min-width:0; }
   .rivers { gap:1px; padding:1px; }
   .seat-bottom { padding-top:0; gap:6px; }
 }
+
+/* The native top layer provides focus containment and an inert background. */
+.result-open { overflow:hidden; }
+#result-dialog {
+  --result-height:100vh;
+  --safe-top:max(12px,env(safe-area-inset-top,0px));
+  --safe-bottom:max(12px,env(safe-area-inset-bottom,0px));
+  position:fixed; inset:var(--safe-top) max(3vw,env(safe-area-inset-right,0px)) var(--safe-bottom) max(3vw,env(safe-area-inset-left,0px));
+  margin:auto; width:94%; max-width:600px; max-height:calc(var(--result-height) - var(--safe-top) - var(--safe-bottom));
+  padding:0; border:2px solid #ffda7d; border-radius:12px; color:#fffdf7; background:#185640; overflow:hidden;
+}
+@supports (height:100svh) { #result-dialog { --result-height:100svh; } }
+@supports (height:100dvh) { #result-dialog { --result-height:100dvh; } }
+#result-dialog[open] { display:flex; flex-direction:column; }
+#result-dialog::backdrop { background:rgb(0 0 0 / 60%); }
+.result-header,.result-footer { flex:none; padding:10px 12px; background:#154e3c; }
+.result-header h2 { margin:0; font-size:clamp(1rem,4vw,1.3rem); }
+#result-body { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:8px; overflow-wrap:anywhere; }
+#result-dialog button,#show-result { min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; font:inherit; font-weight:600; background:#ffda7d; color:#154e3c; touch-action:manipulation; cursor:pointer; }
+#result-dialog button:focus-visible,#result-body:focus-visible,#show-result:focus-visible { outline:3px solid #82dcff; outline-offset:-3px; }
+#next-round { margin:0; }
+.result-footer { display:flex; justify-content:flex-end; }
+[hidden] { display:none !important; }
+.discard-controls.result-available > :not(#show-result) { display:none; }
+.discard-controls.result-available { position:sticky; bottom:0; justify-content:center; padding:4px 6px max(4px,env(safe-area-inset-bottom,0px)); }
+
+#public-winning-hands { padding:8px; border:1px solid #63947a; border-radius:8px; }
+#public-winning-hands h2 { margin:0; font-size:14px; }

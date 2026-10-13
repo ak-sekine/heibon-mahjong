@@ -64,6 +64,19 @@ function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement
 
 export function renderTable(game: GameState, points?: readonly number[]): void {
   renderWinResult(game);
+  // Reuse the already rendered public winner hands without scoring again.
+  const publicHands = document.querySelector<HTMLElement>('#public-winning-hands');
+  if (publicHands) {
+    publicHands.replaceChildren();
+    const winners = game.winResult?.winMethod === 'ron' ? game.winResult.winners : game.winResult ? [game.winResult] : [];
+    for (const winner of winners.filter(w => game.players[w.winnerId].control === 'cpu')) {
+      const heading = Object.assign(document.createElement('h2'), { textContent: `${seatNames[winner.winnerId]}の和了手牌` });
+      const hand = document.querySelector<HTMLOListElement>(`#win-result [data-winner-id="${winner.winnerId}"] .winning-hand`)!.cloneNode(true) as HTMLOListElement;
+      hand.className = 'public-winning-hand';
+      publicHands.append(heading, hand);
+    }
+    publicHands.hidden = winners.every(w => game.players[w.winnerId].control !== 'cpu');
+  }
   document.querySelector<HTMLElement>('#wall-count')!.className = game.winResult?.winMethod === 'ron' ? 'ron-summary' : '';
   renderDoraIndicators(document.querySelector<HTMLElement>('#dora-indicators')!, exposedDoraIndicators(game));
   for (const player of game.players) {
@@ -135,9 +148,12 @@ const yakuNames: Record<YakuId, string> = {
   'yakuhai-seat-wind': '役牌：自風', 'yakuhai-round-wind': '役牌：場風',
   pinfu: '平和', iipeikou: '一盃口', chiitoitsu: '七対子', toitoi: '対々和', 'kokushi-musou': '国士無双',
 };
+const renderedWins = new WeakMap<HTMLElement, GameState['winResult']>();
 function renderWinResult(game: GameState): void {
   const panel = document.querySelector<HTMLElement>('#win-result')!;
   const win = game.winResult;
+  if (renderedWins.has(panel) && renderedWins.get(panel) === win) return;
+  renderedWins.set(panel, win);
   panel.hidden = !win;
   panel.replaceChildren();
   if (!win) return;
@@ -154,7 +170,7 @@ function renderWinResult(game: GameState): void {
       const discarder = game.players[result.discarderId];
       section.append(text('p', `放銃者：${seatNames[discarder.id]}（${winds[discarder.wind]}）`));
     }
-    if (player.control === 'cpu' || result.winMethod === 'ron') {
+    {
       section.append(text('p', '和了手牌：'));
       const hand = document.createElement('ol');
       hand.className = 'winning-hand';

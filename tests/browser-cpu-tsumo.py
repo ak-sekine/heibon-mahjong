@@ -96,6 +96,7 @@ with sync_playwright() as p:
             page.set_viewport_size({'width': width, 'height': height - 120})
             page.locator('.winning-hand').scroll_into_view_if_needed()
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
             page.locator('#new-game').click()
             assert page.locator('#win-result').is_hidden()
             assert page.locator('.winning-hand').count() == 0
@@ -105,6 +106,7 @@ with sync_playwright() as p:
             page.locator('.drawn-tile button').click()
             page.locator('#discard').click()
             page.clock.run_for(winner * 300 - 1)
+            if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
             page.locator('#new-game').click()
             page.clock.run_for(1000)
             assert page.locator('#win-result').is_hidden()

@@ -29,6 +29,7 @@
     </section>
     <section class="seat seat-bottom" data-player-id="0" aria-label="自分の席"><h2 class="seat-label" id="label-0"></h2><ul id="player-hand" aria-label="自分の手牌"></ul></section>
   </section>
+  <section id="public-winning-hands" aria-label="和了したCPUの公開手牌" hidden></section>
   <section class="discard-controls" aria-label="打牌操作">
     <div id="ron-controls" hidden role="group" aria-labelledby="ron-status">
       <p id="ron-status" role="status" aria-live="polite"></p>
@@ -38,11 +39,20 @@
     <p id="selection-status" role="status" aria-live="polite"></p>
     <button id="discard" type="button" disabled>打牌する</button>
     <button id="tsumo" type="button" disabled>ツモ和了</button>
+    <button id="show-result" type="button" hidden>結果を見る</button>
     <p class="keyboard-help">Tabで牌とボタンへ移動、Enter／Spaceで選択・確定</p>
   </section>
-  <section id="win-result" role="status" aria-live="polite" hidden></section>
-  <section id="match-result" hidden aria-live="polite"></section>
-  <button id="next-round" type="button" hidden>次の局へ</button>
+  <dialog id="result-dialog" aria-labelledby="result-title">
+    <header class="result-header"><h2 id="result-title"></h2><button id="view-table" type="button" autofocus>卓を見る</button></header>
+    <div id="result-body" tabindex="0" role="region" aria-label="結果の詳細">
+      <section id="win-result" hidden></section>
+      <section id="match-result" hidden></section>
+    </div>
+    <footer class="result-footer">
+      <button id="next-round" type="button" hidden>次の局へ</button>
+      <button id="result-new-game" type="button" hidden>新しい対局</button>
+    </footer>
+  </dialog>
   <details class="catalog"><summary>開発用：全34種類と赤5を見る</summary><ul id="tile-gallery" aria-label="全牌種と赤5の一覧"></ul></details>
 </main>
 <script type="module" src="/src/main.ts"></script>

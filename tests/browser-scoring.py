@@ -90,11 +90,12 @@ with sync_playwright() as p:
    if width in [375,390]:
     page.set_viewport_size({'width':width,'height':height-120})
     page.locator('.win-payments').last.scroll_into_view_if_needed()
-    assert page.evaluate('scrollY>0')
+    page.locator('#result-body').evaluate('e=>e.scrollTop=e.scrollHeight')
+    assert page.locator('#result-body').evaluate('e=>e.scrollTop>0')
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     page.screenshot(path=str(out/f'{width}-{name}-short.png'))
    assert page.locator('#discard').is_disabled() and page.locator('#tsumo').is_disabled()
-   page.locator('#new-game').click();assert page.locator('#win-result').is_hidden()
+   page.locator('#view-table').click();page.locator('#new-game').click();assert page.locator('#win-result').is_hidden()
    assert page.evaluate('scoreCheck().winResult===null')
    assert page.locator('#player-hand li').count()==14
    assert not errors,errors

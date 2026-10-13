@@ -1,7 +1,7 @@
 """Step 12 Chromium checks. Fixtures are injected only by Playwright routes."""
 import json,pathlib,re,shutil
 from playwright.sync_api import sync_playwright
-out=pathlib.Path('docs/screenshots/ui-step12');out.mkdir(parents=True,exist_ok=True)
+out=pathlib.Path('docs/screenshots/ui-step12-3');out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path=shutil.which('chromium'),args=['--no-sandbox'])
@@ -12,6 +12,7 @@ with sync_playwright() as p:
    response=route.fetch();source=response.text()
    source+='''
 window.matchCheck = () => controller.match;
+window.matchRerender = () => render();
 window.matchFixture = async (name) => {
  controller.newGame();
  if(name==='ron') { controller.match = startMatch(scoringGame('ron-parent')); }
@@ -31,6 +32,40 @@ import { cpuTsumoStart } from '/quill-mahjong/tests/cpu-tsumo-fixture.ts';
    route.fulfill(response=response,body=source)
   page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/quill-mahjong/')
   page.wait_for_function('typeof matchCheck === "function"')
+  def modal():
+   assert page.locator('#result-dialog').is_visible()
+   box=page.locator('#result-dialog').bounding_box()
+   assert box['x']>=0 and box['x']+box['width']<=width
+   assert box['y']>=12 and box['y']+box['height']<=height-12+1,box
+   assert abs(box['y']+box['height']/2-height/2)<=2,box
+   assert page.evaluate('document.activeElement.id')=='view-table'
+   for selector in ['#view-table','#next-round' if page.evaluate('matchCheck().status')=='round-ended' else '#result-new-game']:
+    b=page.locator(selector).bounding_box();assert b['height']>=44 and b['y']>=0 and b['y']+b['height']<=height
+   assert page.locator('#result-body').evaluate('e=>e.scrollHeight>e.clientHeight')
+   page.locator('#result-body').evaluate('e=>e.scrollTop=e.scrollHeight')
+   assert page.locator('#result-body').evaluate('e=>e.scrollTop>0')
+   page.locator('#result-body').evaluate('e=>e.scrollTop=0')
+   page.locator('#new-game').evaluate('e=>e.focus()')
+   assert page.evaluate('document.activeElement===document.body || document.activeElement.closest("dialog")!==null')
+   for _ in range(12):
+    page.keyboard.press('Tab');assert page.evaluate('document.activeElement===document.body || document.activeElement.closest("dialog")!==null')
+   page.locator('#view-table').focus();page.locator('#result-body').evaluate('e=>e.scrollTop=0')
+  def toggle():
+   before=page.evaluate('JSON.stringify(matchCheck())');html=page.locator('#result-body').inner_html()
+   table=page.locator('.table').inner_html()
+   for _ in range(10):
+    page.locator('#view-table').click();assert not page.locator('#result-dialog').is_visible()
+    assert page.evaluate('document.activeElement.id')=='show-result'
+    b=page.locator('#show-result').bounding_box();assert b['y']>=0 and b['y']+b['height']<=height
+    assert page.locator('#discard').is_disabled() and page.locator('#tsumo').is_disabled()
+    page.evaluate('matchRerender()');assert not page.locator('#result-dialog').is_visible()
+    assert page.locator('.table').inner_html()==table
+    page.locator('#show-result').click();assert page.locator('#result-body').inner_html()==html
+   page.keyboard.press('Escape');assert page.evaluate('document.activeElement.id')=='show-result'
+   page.screenshot(path=str(out/f'{width}x{height}-table.png'))
+   page.locator('#show-result').click()
+   page.wait_for_timeout(700)
+   assert page.evaluate('JSON.stringify(matchCheck())')==before
   def geometry(initial=False):
    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
    boxes=page.locator('#player-hand li').evaluate_all('els=>els.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})')
@@ -56,8 +91,8 @@ import { cpuTsumoStart } from '/quill-mahjong/tests/cpu-tsumo-fixture.ts';
   assert page.evaluate('matchCheck().points')==[30800,19200,25000,25000]
   assert '＋5,800点' in page.locator('#match-result').inner_text()
   assert '東1局 1本場' in page.locator('#match-result').inner_text()
-  geometry();page.screenshot(path=str(out/f'{width}x{height}-round-result.png'),full_page=True)
-  page.locator('#next-round').click();page.evaluate('scrollTo(0,0)')
+  modal();toggle();geometry();page.screenshot(path=str(out/f'{width}x{height}-round-result.png'))
+  page.locator('#next-round').click();assert not page.locator('#result-dialog').is_visible();assert page.evaluate('scrollY')==0
   assert '東1局 1本場' in page.locator('#match-info').inner_text();assert page.evaluate('matchCheck().points')==[30800,19200,25000,25000]
   geometry(True);page.screenshot(path=str(out/f'{width}x{height}-next-round.png'))
   page.evaluate("matchFixture('change')");page.locator('#next-round').click();page.evaluate('scrollTo(0,0)')
@@ -71,15 +106,15 @@ import { cpuTsumoStart } from '/quill-mahjong/tests/cpu-tsumo-fixture.ts';
   page.evaluate("matchFixture('draw')")
   assert page.evaluate('matchCheck().points')==[26500,23500,26500,23500]
   text=page.locator('#match-result').inner_text();assert '流局！' in text and '自分：テンパイ' in text and 'CPU1：ノーテン' in text and '＋1,500点' in text
-  geometry();page.screenshot(path=str(out/f'{width}x{height}-draw.png'),full_page=True)
+  modal();toggle();geometry();page.screenshot(path=str(out/f'{width}x{height}-draw.png'))
   page.evaluate("matchFixture('honba')");assert page.evaluate('matchCheck().lastSettlement.payments.reduce((s,p)=>s+p.honbaPoints,0)')==600
   page.evaluate("matchFixture('end')");assert page.evaluate('matchCheck().status')=='match-ended';assert not page.locator('#next-round').is_visible();assert '東風戦終了' in page.locator('#match-result').inner_text()
   ranking=page.evaluate('matchCheck().points.map((points,playerId)=>({points,playerId})).sort((a,b)=>b.points-a.points||a.playerId-b.playerId)')
   for rank,player in enumerate(ranking,1):assert f'{rank}位' in page.locator('#match-result ol').inner_text()
-  geometry();page.screenshot(path=str(out/f'{width}x{height}-match-result.png'),full_page=True)
-  page.locator('#new-game').click();page.evaluate('scrollTo(0,0)');assert page.evaluate('matchCheck().points')==[25000]*4;assert page.evaluate('matchCheck().lastSettlement') is None
+  modal();toggle();geometry();page.screenshot(path=str(out/f'{width}x{height}-match-result.png'))
+  page.locator('#result-new-game').click();page.evaluate('scrollTo(0,0)');assert page.evaluate('matchCheck().points')==[25000]*4;assert page.evaluate('matchCheck().lastSettlement') is None
   geometry(True);assert not errors,errors
-  reports.append({'width':width,'height':height,'result':'passed','checks':['initial','ron','points','cpu-tsumo','repeat','next-round','dealer-winds','draw','noten','honba-double','final-rank','reset','geometry','dora','cpu-hidden']})
+  reports.append({'width':width,'height':height,'result':'passed','checks':['initial','ron','points','cpu-tsumo','repeat','next-round','dealer-winds','draw','noten','honba-double','final-rank','reset','geometry','dora','cpu-hidden','modal-center','internal-scroll','touch-44','background-inert','focus','escape','toggle-10','state-unchanged','rerender-stays-closed']})
   page.close()
  browser.close()
 (out/'report.json').write_text(json.dumps(reports,ensure_ascii=False,indent=2))

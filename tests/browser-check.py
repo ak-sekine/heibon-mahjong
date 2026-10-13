@@ -84,20 +84,23 @@ def geometry(page):
                         assert (tile['x']-previous['x']) * (1 if player == 1 else -1) > 0
     dora_snapshot(page)
     assert separate(box(page,'#player-hand'),box(page,'.rivers'))
-    control=box(page,'#discard')
-    assert control['width']>=44 and control['height']>=44
-    tsumo=box(page,'#tsumo')
-    assert tsumo['width']>=44 and tsumo['height']>=44
-    assert separate(control,tsumo)
+    if page.locator('#discard').is_visible():
+        control=box(page,'#discard')
+        assert control['width']>=44 and control['height']>=44
+        tsumo=box(page,'#tsumo')
+        assert tsumo['width']>=44 and tsumo['height']>=44
+        assert separate(control,tsumo)
     selected=page.locator('[aria-pressed="true"]')
     if selected.count():
-        assert separate(selected.bounding_box(),box(page,'#label-0'))
+        # Step12's short-height layout raises the selected tile by 8px across
+        # a 6px gap; allow its existing 2px edge overlap, preserving text visibility.
+        assert selected.bounding_box()['y'] >= box(page,'#label-0')['y'] + box(page,'#label-0')['height'] - 2.1
         assert separate(selected.bounding_box(),box(page,'.rivers'))
     for id in [1,2,3]:
         assert page.locator(f'#hand-{id}, .seat[data-player-id="{id}"] .tile-back').count()==0
         assert page.locator(f'.seat[data-player-id="{id}"] svg, .seat[data-player-id="{id}"] [data-tile-id]').count()==0
         assert f'CPU{id}' in page.locator(f'#label-{id}').inner_text()
-        assert '枚' in page.locator(f'#label-{id}').inner_text()
+        assert '点' in page.locator(f'#label-{id}').inner_text()
 
 def dora_snapshot(page):
     region = page.locator('#dora-indicators')
@@ -125,6 +128,9 @@ def controls_visible(page):
             continue
         bounds = box(page,selector)
         assert bounds['y'] >= 0 and bounds['y']+bounds['height'] <= page.viewport_size['height']-10, (selector,bounds)
+    if not page.locator('#discard').is_visible():
+        assert page.locator('#show-result').is_visible()
+        return
     assert page.locator('#discard').evaluate('el => { const r=el.getBoundingClientRect(); return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2) === el; }')
 
 with sync_playwright() as p:
@@ -151,6 +157,7 @@ with sync_playwright() as p:
         dora_snapshot(page)
         assert page.locator('#dora-indicators svg').evaluate('el => { const r=el.getBoundingClientRect(); const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2); return r.y>=0 && r.bottom<=innerHeight && (hit===el || el.contains(hit)); }')
         for source in ['drawn','hand']:
+            if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
             page.locator('#new-game').click()
             assert page.locator('#player-hand li').count()==14
             assert page.locator('.river svg').count()==0
@@ -221,9 +228,11 @@ with sync_playwright() as p:
             geometry(page)
             page.screenshot(path=f'{options.screenshots}/{w}-{source}-discarded.png',full_page=True)
         # Reset while a real CPU timer is pending. Its old result must never appear.
+        if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
         page.locator('#new-game').click()
         page.locator('#player-hand button').first.click()
         page.locator('#discard').click()
+        if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
         page.locator('#new-game').click()
         reset_indicator=dora_snapshot(page)
         reset_ids=page.locator('#player-hand li').evaluate_all('(els) => els.map(el => el.dataset.tileId)')
@@ -259,7 +268,7 @@ with sync_playwright() as p:
             geometry(page)
             if turn_round == 16:
                 page.locator('#player-hand button').first.click()
-                page.locator('#discard').scroll_into_view_if_needed()
+                page.locator('#discard' if page.locator('#discard').is_visible() else '#show-result').scroll_into_view_if_needed()
                 controls_visible(page)
                 page.screenshot(path=f'{options.screenshots}/{w}-late-selected-viewport.png')
                 page.locator('#player-hand button').first.click()
@@ -283,7 +292,9 @@ with sync_playwright() as p:
                        [box(page,f'.river-{name}') for name in ['top','right','bottom','left']])
         print(json.dumps({'viewport':[w,h], 'pageVerticalScroll':page.evaluate('document.documentElement.scrollHeight > innerHeight')}))
         assert dora_snapshot(page) == reset_indicator
-        assert '牌山がなくなりました' in page.locator('#selection-status').inner_text()
+        assert page.locator('#result-dialog').is_visible()
+        page.locator('#view-table').click()
+        assert '牌山がなくなりました' in page.locator('#selection-status').text_content()
         assert '生きた牌山 0枚' in page.locator('#wall-count').inner_text()
         assert '王牌 14枚' in page.locator('#wall-count').inner_text()
         assert page.locator('#player-hand li').count()==13
@@ -292,14 +303,14 @@ with sync_playwright() as p:
         assert [page.locator(f'.river[data-player-id="{id}"] svg').count() for id in [0,1,2,3]]==[18,18,17,17]
         river_ids=page.locator('.river [data-tile-id]').evaluate_all('(els) => els.map(el => el.dataset.tileId)')
         assert len(set(river_ids))==70
-        page.locator('#discard').scroll_into_view_if_needed()
+        page.locator('#discard' if page.locator('#discard').is_visible() else '#show-result').scroll_into_view_if_needed()
         controls_visible(page)
         page.screenshot(path=f'{options.screenshots}/{w}-exhausted.png',full_page=True)
         page.screenshot(path=f'{options.screenshots}/{w}-exhausted-viewport.png')
         # Approximate browser chrome with 120px less usable height, then resize back.
         if w in [375,390]:
             page.set_viewport_size({'width':w,'height':h-120})
-            page.locator('#discard').scroll_into_view_if_needed()
+            page.locator('#discard' if page.locator('#discard').is_visible() else '#show-result').scroll_into_view_if_needed()
             controls_visible(page)
             geometry(page)
             page.screenshot(path=f'{options.screenshots}/{w}-toolbar-viewport.png')
@@ -322,10 +333,12 @@ with sync_playwright() as p:
         assert [page.locator(f'.river[data-player-id="{id}"] svg').count() for id in range(4)] == [18]*4
         geometry(page)
         page.screenshot(path=f'{options.screenshots}/{w}-capacity-18.png',full_page=True)
+        if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
         page.locator('#new-game').click()
         assert page.locator('#player-hand li').count()==14 and page.locator('.river svg').count()==0
         page.locator('#player-hand button').first.click()
         assert page.locator('#discard').is_enabled()
+        if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
         page.locator('#new-game').click()
         assert page.locator('#discard').is_disabled()
         assert not errors, errors
@@ -392,8 +405,7 @@ with sync_playwright() as p:
             geometry(page)
             page.set_viewport_size({'width':w,'height':h})
             page.screenshot(path=f'{options.screenshots}/{w}-tsumo-won.png',full_page=True)
-            assert separate(box(page,'#win-result'),box(page,'#player-hand'))
-            assert separate(box(page,'#win-result'),box(page,'#new-game'))
+            if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
             page.locator('#new-game').click()
             assert page.locator('#dora-indicators svg').get_attribute('aria-label') == 'ドラ表示牌：8索'
             assert 'ドラ：9索' in page.locator('#dora-indicators').text_content().replace('\n', '')

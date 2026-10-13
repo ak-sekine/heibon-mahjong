@@ -182,6 +182,7 @@ with sync_playwright() as p:
             assert page.locator('.rivers').bounding_box()['height'] == river_height, (name,width,river_height,page.locator('.rivers').bounding_box()['height'],page.locator('.center-info').inner_text())
             page.screenshot(path=f'{args.screenshots}/{width}-{name}-result.png',full_page=True)
             page.set_viewport_size({'width':width,'height':height-120})
+            if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
             page.locator('#new-game').click()
             assert page.locator('#player-hand li').count() == 14
             assert page.locator('#ron').is_hidden() and page.locator('#win-result').is_hidden()
@@ -192,6 +193,7 @@ with sync_playwright() as p:
             page.locator('#discard').click()
             if discarder:
                 page.clock.run_for(discarder*300 if pending else discarder*300-1)
+            if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
             page.locator('#new-game').click()
             page.clock.run_for(1200)
             assert page.evaluate('ronCheck().phase') == 'awaiting-discard'

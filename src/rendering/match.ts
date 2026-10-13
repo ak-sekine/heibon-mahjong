@@ -2,12 +2,15 @@ import type { MatchState } from '../model/match.ts';
 import { rankPlayers } from '../game/match.ts';
 import { createTileElement } from './tile-svg.ts';
 const names = ['自分','CPU1','CPU2','CPU3'];
+const renderedSettlements = new WeakMap<HTMLElement, MatchState['lastSettlement']>();
 export function renderMatch(match: MatchState): void {
   document.querySelector('#match-info')!.textContent = `東${match.roundNumber}局 ${match.honba}本場 · 親：${names[match.dealerId]} · 供託：${match.depositSticks}本`;
   const panel = document.querySelector<HTMLElement>('#match-result')!;
   const button = document.querySelector<HTMLButtonElement>('#next-round')!;
   button.hidden = match.status !== 'round-ended';
   button.disabled = button.hidden;
+  if (renderedSettlements.has(panel) && renderedSettlements.get(panel) === match.lastSettlement) return;
+  renderedSettlements.set(panel, match.lastSettlement);
   panel.hidden = !match.lastSettlement;
   panel.replaceChildren();
   const result = match.lastSettlement;

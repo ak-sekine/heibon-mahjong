@@ -1,0 +1,21 @@
+{
+  "base": "a1a7d9b3ca7e3921ea34645414d919ac448bd792",
+  "npm_ci": "passed",
+  "npm_test": {
+    "existing": 555,
+    "added": 8,
+    "total": 563,
+    "failed": 0,
+    "skipped": 0
+  },
+  "build": "passed",
+  "chromium": {
+    "match_viewports": 7,
+    "scoring": 90,
+    "ron": 55,
+    "cpu_tsumo": 15,
+    "normal_game": 5,
+    "human_tsumo": 5
+  },
+  "safari_device": "not run; see README for device checklist"
+}

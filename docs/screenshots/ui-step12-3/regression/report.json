@@ -1,0 +1,177 @@
+[
+  {
+    "viewport": [
+      320,
+      568
+    ],
+    "pageVerticalScroll": true
+  },
+  {
+    "viewport": [
+      320,
+      568
+    ],
+    "drawn": "pass",
+    "hand": "pass",
+    "resetDuringCPU": "pass",
+    "keyboard": "pass",
+    "geometry": "pass",
+    "cpuOrder": "pass",
+    "multipleRounds": "pass",
+    "wallExhaustion": "pass",
+    "concealment": "pass",
+    "pageErrors": []
+  },
+  {
+    "viewport": [
+      375,
+      667
+    ],
+    "pageVerticalScroll": false
+  },
+  {
+    "viewport": [
+      375,
+      667
+    ],
+    "drawn": "pass",
+    "hand": "pass",
+    "resetDuringCPU": "pass",
+    "keyboard": "pass",
+    "geometry": "pass",
+    "cpuOrder": "pass",
+    "multipleRounds": "pass",
+    "wallExhaustion": "pass",
+    "concealment": "pass",
+    "pageErrors": []
+  },
+  {
+    "viewport": [
+      390,
+      844
+    ],
+    "pageVerticalScroll": false
+  },
+  {
+    "viewport": [
+      390,
+      844
+    ],
+    "drawn": "pass",
+    "hand": "pass",
+    "resetDuringCPU": "pass",
+    "keyboard": "pass",
+    "geometry": "pass",
+    "cpuOrder": "pass",
+    "multipleRounds": "pass",
+    "wallExhaustion": "pass",
+    "concealment": "pass",
+    "pageErrors": []
+  },
+  {
+    "viewport": [
+      414,
+      896
+    ],
+    "pageVerticalScroll": false
+  },
+  {
+    "viewport": [
+      414,
+      896
+    ],
+    "drawn": "pass",
+    "hand": "pass",
+    "resetDuringCPU": "pass",
+    "keyboard": "pass",
+    "geometry": "pass",
+    "cpuOrder": "pass",
+    "multipleRounds": "pass",
+    "wallExhaustion": "pass",
+    "concealment": "pass",
+    "pageErrors": []
+  },
+  {
+    "viewport": [
+      1280,
+      800
+    ],
+    "pageVerticalScroll": false
+  },
+  {
+    "viewport": [
+      1280,
+      800
+    ],
+    "drawn": "pass",
+    "hand": "pass",
+    "resetDuringCPU": "pass",
+    "keyboard": "pass",
+    "geometry": "pass",
+    "cpuOrder": "pass",
+    "multipleRounds": "pass",
+    "wallExhaustion": "pass",
+    "concealment": "pass",
+    "pageErrors": []
+  },
+  {
+    "viewport": [
+      320,
+      568
+    ],
+    "tsumoUI": "pass",
+    "selectionIndependent": "pass",
+    "wonStops": "pass",
+    "reset": "pass",
+    "toolbar": "pass",
+    "optionalDiscard": "pass"
+  },
+  {
+    "viewport": [
+      375,
+      667
+    ],
+    "tsumoUI": "pass",
+    "selectionIndependent": "pass",
+    "wonStops": "pass",
+    "reset": "pass",
+    "toolbar": "pass",
+    "optionalDiscard": "pass"
+  },
+  {
+    "viewport": [
+      390,
+      844
+    ],
+    "tsumoUI": "pass",
+    "selectionIndependent": "pass",
+    "wonStops": "pass",
+    "reset": "pass",
+    "toolbar": "pass",
+    "optionalDiscard": "pass"
+  },
+  {
+    "viewport": [
+      414,
+      896
+    ],
+    "tsumoUI": "pass",
+    "selectionIndependent": "pass",
+    "wonStops": "pass",
+    "reset": "pass",
+    "toolbar": "pass",
+    "optionalDiscard": "pass"
+  },
+  {
+    "viewport": [
+      1280,
+      800
+    ],
+    "tsumoUI": "pass",
+    "selectionIndependent": "pass",
+    "wonStops": "pass",
+    "reset": "pass",
+    "toolbar": "pass",
+    "optionalDiscard": "pass"
+  }
+]
