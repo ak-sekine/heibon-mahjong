@@ -2,10 +2,14 @@ import type { MatchState } from '../model/match.ts';
 
 /** Visibility belongs to the UI; opening never advances or settles the game. */
 export class ResultDialog {
+  private pendingOpen = false;
   private result: MatchState['lastSettlement'] = null;
   private readonly dialog = document.querySelector<HTMLDialogElement>('#result-dialog')!;
   private readonly reopen = document.querySelector<HTMLButtonElement>('#show-result')!;
   constructor() {
+    document.querySelector('#new-game-dialog')?.addEventListener('close', () => {
+      if (this.pendingOpen) this.open();
+    });
     document.querySelector('#view-table')!.addEventListener('click', () => this.close());
     this.reopen.addEventListener('click', () => this.open());
     this.dialog.addEventListener('cancel', event => { event.preventDefault(); this.close(); });
@@ -29,11 +33,17 @@ export class ResultDialog {
   }
   open(): void {
     if (!this.result || this.dialog.open) return;
+    if (document.querySelector<HTMLDialogElement>('#new-game-dialog')?.open) {
+      this.pendingOpen = true;
+      return;
+    }
+    this.pendingOpen = false;
     this.dialog.showModal();
     document.documentElement.classList.add('result-open');
     document.querySelector<HTMLButtonElement>('#view-table')!.focus({ preventScroll: true });
   }
   close(): void {
+    this.pendingOpen = false;
     if (this.dialog.open) this.dialog.close();
     document.documentElement.classList.remove('result-open');
     if (this.result) this.reopen.focus({ preventScroll: true });

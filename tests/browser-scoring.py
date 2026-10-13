@@ -95,7 +95,7 @@ with sync_playwright() as p:
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     page.screenshot(path=str(out/f'{width}-{name}-short.png'))
    assert page.locator('#discard').is_disabled() and page.locator('#tsumo').is_disabled()
-   page.locator('#view-table').click();page.locator('#new-game').click();assert page.locator('#win-result').is_hidden()
+   page.locator('#view-table').click();page.locator('#new-game').click();page.locator('#confirm-new-game').click();assert page.locator('#win-result').is_hidden()
    assert page.evaluate('scoreCheck().winResult===null')
    assert page.locator('#player-hand li').count()==14
    assert not errors,errors

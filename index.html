@@ -43,15 +43,23 @@
     <p class="keyboard-help">Tabで牌とボタンへ移動、Enter／Spaceで選択・確定</p>
   </section>
   <dialog id="result-dialog" aria-labelledby="result-title">
-    <header class="result-header"><h2 id="result-title"></h2><button id="view-table" type="button" autofocus>卓を見る</button></header>
+    <header class="result-header"><h2 id="result-title"></h2></header>
     <div id="result-body" tabindex="0" role="region" aria-label="結果の詳細">
       <section id="win-result" hidden></section>
       <section id="match-result" hidden></section>
     </div>
     <footer class="result-footer">
+      <button id="view-table" type="button" autofocus>卓を見る</button>
       <button id="next-round" type="button" hidden>次の局へ</button>
       <button id="result-new-game" type="button" hidden>新しい対局</button>
     </footer>
+  </dialog>
+  <dialog id="new-game-dialog" aria-labelledby="new-game-question">
+    <p id="new-game-question">現在の対局を終了して、最初から始めますか？</p>
+    <div class="new-game-actions">
+      <button id="cancel-new-game" type="button" autofocus>キャンセル</button>
+      <button id="confirm-new-game" type="button">新しい対局を開始</button>
+    </div>
   </dialog>
   <details class="catalog"><summary>開発用：全34種類と赤5を見る</summary><ul id="tile-gallery" aria-label="全牌種と赤5の一覧"></ul></details>
 </main>

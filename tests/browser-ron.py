@@ -183,7 +183,7 @@ with sync_playwright() as p:
             page.screenshot(path=f'{args.screenshots}/{width}-{name}-result.png',full_page=True)
             page.set_viewport_size({'width':width,'height':height-120})
             if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
-            page.locator('#new-game').click()
+            page.locator('#new-game').click();page.locator('#confirm-new-game').click()
             assert page.locator('#player-hand li').count() == 14
             assert page.locator('#ron').is_hidden() and page.locator('#win-result').is_hidden()
             page.clock.run_for(1200)
@@ -194,7 +194,7 @@ with sync_playwright() as p:
             if discarder:
                 page.clock.run_for(discarder*300 if pending else discarder*300-1)
             if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
-            page.locator('#new-game').click()
+            page.locator('#new-game').click();page.locator('#confirm-new-game').click()
             page.clock.run_for(1200)
             assert page.evaluate('ronCheck().phase') == 'awaiting-discard'
             assert page.locator('#win-result').is_hidden() and page.locator('#ron').is_hidden()

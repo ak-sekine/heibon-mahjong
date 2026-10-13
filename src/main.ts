@@ -4,6 +4,7 @@ import { createTileElement, tileLabel } from './rendering/tile-svg.ts';
 import { renderTable, renderSelection } from './rendering/table.ts';
 import { renderMatch } from './rendering/match.ts';
 import { ResultDialog } from './ui/result-dialog.ts';
+import { NewGameDialog } from './ui/new-game-dialog.ts';
 import { GameController } from './ui/controller.ts';
 
 const resultDialog = new ResultDialog();
@@ -15,8 +16,7 @@ function render(): void {
   resultDialog.update(controller.match);
 }
 function newGame(): void { controller.newGame(); window.scrollTo(0, 0); }
-document.querySelector('#result-new-game')!.addEventListener('click', newGame);
-document.querySelector<HTMLButtonElement>('#new-game')!.addEventListener('click', newGame);
+new NewGameDialog(newGame);
 document.querySelector('#player-hand')!.addEventListener('click', event => {
   const button = (event.target as Element).closest<HTMLButtonElement>('button[data-tile-id]');
   if (!button) return;

@@ -158,7 +158,7 @@ with sync_playwright() as p:
         assert page.locator('#dora-indicators svg').evaluate('el => { const r=el.getBoundingClientRect(); const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2); return r.y>=0 && r.bottom<=innerHeight && (hit===el || el.contains(hit)); }')
         for source in ['drawn','hand']:
             if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
-            page.locator('#new-game').click()
+            page.locator('#new-game').click();page.locator('#confirm-new-game').click()
             assert page.locator('#player-hand li').count()==14
             assert page.locator('.river svg').count()==0
             assert page.locator('#discard').is_disabled()
@@ -229,11 +229,11 @@ with sync_playwright() as p:
             page.screenshot(path=f'{options.screenshots}/{w}-{source}-discarded.png',full_page=True)
         # Reset while a real CPU timer is pending. Its old result must never appear.
         if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
-        page.locator('#new-game').click()
+        page.locator('#new-game').click();page.locator('#confirm-new-game').click()
         page.locator('#player-hand button').first.click()
         page.locator('#discard').click()
         if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
-        page.locator('#new-game').click()
+        page.locator('#new-game').click();page.locator('#confirm-new-game').click()
         reset_indicator=dora_snapshot(page)
         reset_ids=page.locator('#player-hand li').evaluate_all('(els) => els.map(el => el.dataset.tileId)')
         page.clock.run_for(1100)
@@ -334,12 +334,12 @@ with sync_playwright() as p:
         geometry(page)
         page.screenshot(path=f'{options.screenshots}/{w}-capacity-18.png',full_page=True)
         if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
-        page.locator('#new-game').click()
+        page.locator('#new-game').click();page.locator('#confirm-new-game').click()
         assert page.locator('#player-hand li').count()==14 and page.locator('.river svg').count()==0
         page.locator('#player-hand button').first.click()
         assert page.locator('#discard').is_enabled()
         if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
-        page.locator('#new-game').click()
+        page.locator('#new-game').click();page.locator('#confirm-new-game').click()
         assert page.locator('#discard').is_disabled()
         assert not errors, errors
         print(json.dumps({'viewport':[w,h],'drawn':'pass','hand':'pass','resetDuringCPU':'pass','keyboard':'pass','geometry':'pass','cpuOrder':'pass','multipleRounds':'pass','wallExhaustion':'pass','concealment':'pass','pageErrors':errors}))
@@ -406,7 +406,7 @@ with sync_playwright() as p:
             page.set_viewport_size({'width':w,'height':h})
             page.screenshot(path=f'{options.screenshots}/{w}-tsumo-won.png',full_page=True)
             if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()
-            page.locator('#new-game').click()
+            page.locator('#new-game').click();page.locator('#confirm-new-game').click()
             assert page.locator('#dora-indicators svg').get_attribute('aria-label') == 'ドラ表示牌：8索'
             assert 'ドラ：9索' in page.locator('#dora-indicators').text_content().replace('\n', '')
             assert dora_snapshot(page) != initial_indicator
