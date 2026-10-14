@@ -1,6 +1,7 @@
 import type { GameState, PlayerId } from '../model/game.ts';
 import type { MatchState, Points, RoundSettlement, SettlementPayment } from '../model/match.ts';
 import { getWaitingTileKinds } from './ron.ts';
+import { resolvePendingRiichi } from './riichi.ts';
 import { startGame } from './start.ts';
 const ids = [0, 1, 2, 3] as const;
 export function startMatch(game: GameState = startGame()): MatchState {
@@ -69,7 +70,9 @@ export function settleRound(match: MatchState): MatchState {
 }
 export function updateMatchGame(match: MatchState, game: GameState): MatchState {
   if (match.status !== 'playing') return match;
-  return settleRound({...match,game});
+  // A declaration resolution belongs to the current window, never an old event.
+  if (game.pendingRiichi && game.pendingRiichi !== match.game.pendingRiichi) return match;
+  return settleRound(resolvePendingRiichi({...match,game}));
 }
 export function nextRound(match: MatchState, create: (dealerId: PlayerId)=>GameState = id=>startGame(Math.random,id)): MatchState {
   if (match.status !== 'round-ended' || !match.lastSettlement?.next) return match;

@@ -16,6 +16,9 @@ export function isDiscardFuriten(player: PlayerState): boolean {
   const waits = new Set(getWaitingTileKinds(player.hand.map(t => t.tile)).map(tileKindKey));
   return player.river.some(t => waits.has(tileKindKey(t.tile)));
 }
+export function isFuriten(player: PlayerState): boolean {
+  return player.temporaryFuriten || Boolean(player.riichi?.passedRon) || isDiscardFuriten(player);
+}
 /** The window must still point at the discarder seat's latest physical discard. */
 export function getRonTile(game: GameState): PhysicalTile | null {
   const window = game.ronWindow;
@@ -35,9 +38,9 @@ export function getRonCandidates(game: GameState): readonly RonCandidate[] {
   for (let offset = 1; offset <= 3; offset++) {
     const id = ((discarderId + offset) % 4) as PlayerId;
     const player = game.players[id];
-    if (player.id !== id || player.hand.length !== 13 || player.drawnTile || player.temporaryFuriten) continue;
+    if (player.id !== id || player.hand.length !== 13 || player.drawnTile) continue;
     try {
-      if (isDiscardFuriten(player)) continue;
+      if (isFuriten(player)) continue;
       const result = evaluateWin(game, id, tile, 'ron');
       if (result) candidates.push({ ...result, winMethod: 'ron', discarderId });
     } catch (error) {
@@ -52,7 +55,7 @@ export function canDeclareRon(game: GameState, playerId: PlayerId): boolean {
 function resolve(game: GameState, winners: readonly RonCandidate[]): GameState {
   if (!getRonTile(game)) throw new RangeError('No current ron window');
   const { discarderId, tileId } = game.ronWindow!;
-  if (winners.length) return { ...game, phase: 'won', ronWindow: null,
+  if (winners.length) return { ...game, phase: 'won', ronWindow: null, pendingRiichi: null,
     winResult: { winMethod: 'ron', discarderId, winningTileId: tileId, winners } };
   return { ...game, phase: 'awaiting-draw', turnPlayerId: nextPlayerId(discarderId), ronWindow: null };
 }
@@ -77,7 +80,9 @@ export function passRon(game: GameState, playerId: PlayerId): GameState {
     throw new RangeError('Passing ron is not allowed now');
   }
   const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
-  players[playerId] = { ...players[playerId], temporaryFuriten: true };
+  const player = players[playerId];
+  players[playerId] = { ...player, temporaryFuriten: true,
+    riichi: player.riichi ? { ...player.riichi, passedRon: true } : null };
   const passed = { ...game, players };
   return resolve(passed, getRonCandidates(passed));
 }

@@ -103,7 +103,13 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
       const screenColumn = id === 1 ? row : id === 3 ? 2 - row : id === 2 ? 5 - column : column;
       item.style.gridRow = String(screenRow + 1);
       item.style.gridColumn = String(screenColumn + 1);
-      item.append(createTileElement(physical.tile));
+      const tile = createTileElement(physical.tile);
+      if (item.dataset.riichiDeclaration === 'true') {
+        const description = `${tileLabel(physical.tile)} リーチ宣言牌`;
+        tile.setAttribute('aria-label', description);
+        tile.querySelector('title')!.textContent = description;
+      }
+      item.append(tile);
       return item;
     }));
   }

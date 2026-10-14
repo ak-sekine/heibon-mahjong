@@ -26,6 +26,12 @@ ul { list-style:none; padding:0; margin:0; }
 .river-right .tile-svg { transform:translate(-50%,-50%) rotate(270deg); }
 .river-left .tile-svg { transform:translate(-50%,-50%) rotate(90deg); }
 .river-left .river-tile,.river-right .river-tile { width:var(--river-tile-height); height:var(--river-tile-width); }
+/* A 90-degree declaration fits its original cell (84/60 aspect ratio).
+   Center and scale the SVG, preserving river grids and preventing row overlap. */
+.river-tile[data-riichi-declaration="true"] .tile-svg { position:absolute; width:var(--river-tile-width); height:var(--river-tile-height); left:50%; top:50%; transform:translate(-50%,-50%) rotate(90deg) scale(.7142857); }
+.river-top .river-tile[data-riichi-declaration="true"] .tile-svg { transform:translate(-50%,-50%) rotate(270deg) scale(.7142857); }
+.river-right .river-tile[data-riichi-declaration="true"] .tile-svg { transform:translate(-50%,-50%) rotate(360deg) scale(.7142857); }
+.river-left .river-tile[data-riichi-declaration="true"] .tile-svg { transform:translate(-50%,-50%) rotate(180deg) scale(.7142857); }
 .river-top { grid-area:top; }.river-right { grid-area:right; }.river-bottom { grid-area:bottom; }.river-left { grid-area:left; }
 .river-left,.river-right { grid-template-columns:repeat(3,var(--river-tile-height)); grid-template-rows:repeat(6,var(--river-tile-width)); }
 .center-info { grid-area:info; min-width:0; padding:2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; border-radius:8px; background:#154e3c; color:#fff5d7; font-size:10px; line-height:12px; font-weight:600; text-align:center; }

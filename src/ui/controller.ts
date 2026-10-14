@@ -40,14 +40,14 @@ export class GameController {
     this.match = declareRiichi(this.match, 0, this.selectedTileId!);
     this.selectedTileId = null;
     this.onChange();
-    return this.runner.run(() => this.game, game => { this.game = game; this.onChange(); }, this.onChange);
+    return this.runner.runMatch(() => this.match, match => { this.match = match; this.onChange(); }, this.onChange);
   }
   confirm(): Promise<void> {
     if (!this.canConfirm) return Promise.resolve();
     this.game = discardTile(this.game, 0, this.discardId!);
     this.selectedTileId = null;
     this.onChange();
-    return this.runner.run(() => this.game, game => { this.game = game; this.onChange(); }, this.onChange);
+    return this.runner.runMatch(() => this.match, match => { this.match = match; this.onChange(); }, this.onChange);
   }
   get canTsumo(): boolean { return this.game.players[0].control === 'human' && !this.progressing && canDeclareTsumo(this.game, 0); }
   declareTsumo(): void {
@@ -74,7 +74,7 @@ export class GameController {
     this.game = passed;
     this.selectedTileId = null;
     this.onChange();
-    return this.runner.run(() => this.game, game => { this.game = game; this.onChange(); }, this.onChange);
+    return this.runner.runMatch(() => this.match, match => { this.match = match; this.onChange(); }, this.onChange);
   }
   get canNextRound(): boolean { return this.match.status === 'round-ended'; }
   nextRound(): Promise<void> {
@@ -83,7 +83,7 @@ export class GameController {
     this.match = nextRound(this.match, id => this.start(id));
     this.selectedTileId = null;
     this.onChange();
-    return this.runner.run(() => this.game, game => { this.game = game; this.onChange(); }, this.onChange);
+    return this.runner.runMatch(() => this.match, match => { this.match = match; this.onChange(); }, this.onChange);
   }
   newGame(): void {
     this.runner.cancel();

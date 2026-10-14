@@ -20,7 +20,7 @@ export function discardFromPlayer(player: PlayerState, tileId: string): PlayerSt
 /** The same rules apply to every seat, on every turn. */
 export function canDiscard(game: GameState, playerId: PlayerId): boolean {
   const player = game.players[playerId];
-  return game.phase === 'awaiting-discard' && game.winResult === null && game.ronWindow === null && game.turnPlayerId === playerId
+  return !game.pendingRiichi && game.phase === 'awaiting-discard' && game.winResult === null && game.ronWindow === null && game.turnPlayerId === playerId
     && player?.id === playerId && player.hand.length === 13 && player.drawnTile !== null;
 }
 

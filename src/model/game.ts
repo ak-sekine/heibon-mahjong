@@ -9,6 +9,8 @@ export type PlayerId = 0 | 1 | 2 | 3;
 export type SeatWind = 'east' | 'south' | 'west' | 'north';
 export interface RiichiState {
   readonly declarationTileId: string;
+  /** Omitted legacy states mean false; never cleared by drawing. */
+  readonly passedRon?: boolean;
 }
 export interface PlayerState {
   readonly id: PlayerId;
@@ -60,7 +62,12 @@ export interface RonWindow {
   readonly discarderId: PlayerId;
   readonly tileId: string;
 }
+export interface PendingRiichi {
+  readonly playerId: PlayerId;
+  readonly declarationTileId: string;
+}
 export interface GameState extends WallState {
+  readonly pendingRiichi: PendingRiichi | null;
   readonly ronWindow: RonWindow | null;
   readonly winResult: TsumoResult | RonResult | null;
   readonly dealerId: PlayerId;
