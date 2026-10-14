@@ -24,13 +24,13 @@ window.matchFixture = async (name) => {
  render();
 };
 '''
-   source='''import { startMatch, settleRound } from '/quill-mahjong/src/game/match.ts';
-import { fixedRound, fixedRon } from '/quill-mahjong/tests/match-fixture.ts';
-import { scoringGame } from '/quill-mahjong/tests/scoring-fixture.ts';
-import { cpuTsumoStart } from '/quill-mahjong/tests/cpu-tsumo-fixture.ts';
+   source='''import { startMatch, settleRound } from '/heibon-mahjong/src/game/match.ts';
+import { fixedRound, fixedRon } from '/heibon-mahjong/tests/match-fixture.ts';
+import { scoringGame } from '/heibon-mahjong/tests/scoring-fixture.ts';
+import { cpuTsumoStart } from '/heibon-mahjong/tests/cpu-tsumo-fixture.ts';
 '''+source
    route.fulfill(response=response,body=source)
-  page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/quill-mahjong/')
+  page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/heibon-mahjong/')
   page.wait_for_function('typeof matchCheck === "function"')
   def modal():
    assert page.locator('#result-dialog').is_visible()

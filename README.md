@@ -1,4 +1,6 @@
-# Quill Mahjong
+# Heibon Mahjong
+
+リポジトリ: https://github.com/ak-sekine/heibon-mahjong
 
 日本式リーチ麻雀のStep 12（点棒管理・局進行）。4人が25,000点で東1局を開始し、和了・流局の精算から連荘・親交代、東風戦の最終順位まで進めます。Step 11の符・点数計算、ロン／見逃す、CPU自動和了、ダブロン・トリプルロンを維持しています。以下の過去Step節は当時の実装・実機確認の記録で、現在の仕様は末尾のStep 12を参照してください。
 
@@ -293,13 +295,13 @@ Step 5・Step 8のiPhone Safari実機確認済み記録は維持しています�
 
 将来のリーチ和了結果では、結果画面内に「表ドラ表示牌：最大5枚」「裏ドラ表示牌：最大5枚」の2行を設け、それぞれ5列と対応ドラ牌種用2行の領域を確保する仕様です。今回、その結果行・裏ドラの公開・判定、リーチ、カン・槓ドラ公開、点数計算、CPU和了は実装していません。対局中の卓上に裏ドラは表示しません。
 
-検証（2026-10-12）：`npm ci --cache /tmp/quill-npm-cache`、`npm test`（14ファイル）、`node --test --test-isolation=none tests/*.test.ts`（既存224件＋追加8件＝232件、失敗0）、`npm run build`。この環境の通常テスト実行はファイル単位で件数を表示するため、個別テストの件数はisolation=noneでも確認しています。
+検証（2026-10-12）：`npm ci --cache /tmp/heibon-npm-cache`、`npm test`（14ファイル）、`node --test --test-isolation=none tests/*.test.ts`（既存224件＋追加8件＝232件、失敗0）、`npm run build`。この環境の通常テスト実行はファイル単位で件数を表示するため、個別テストの件数はisolation=noneでも確認しています。
 
 Chromium検証の再実行（Python PlaywrightとChromiumが必要）：
 
 ```sh
 npm run dev -- --host 0.0.0.0 --port 4173
-python tests/browser-check.py --tsumo-fixture --screenshots /tmp/quill-step83-game
+python tests/browser-check.py --tsumo-fixture --screenshots /tmp/heibon-step83-game
 python tests/dora-layout-check.py
 ```
 
@@ -325,7 +327,7 @@ node --test --test-isolation=none tests/*.test.ts
 npm run build
 npm run dev -- --host 0.0.0.0 --port 4173
 python tests/dora-layout-check.py
-python tests/browser-check.py --tsumo-fixture --screenshots /tmp/quill-gameplay
+python tests/browser-check.py --tsumo-fixture --screenshots /tmp/heibon-gameplay
 ```
 
 既存232件（14ファイル）を維持し、失敗0。ビルド成功。Chromiumの配置検証は以下の全サイズで成功しました。
@@ -346,9 +348,9 @@ python tests/browser-check.py --tsumo-fixture --screenshots /tmp/quill-gameplay
 
 ## GitHub Pages
 
-既存のVite base `/quill-mahjong/` と`.github/workflows/deploy.yml`を維持します。mainへのpushでnpm ci → npm test → npm run build → Pagesデプロイを実行します。PagesのSourceはGitHub Actionsです。
+Vite baseは `/heibon-mahjong/` に設定し、既存の`.github/workflows/deploy.yml`を維持します。mainへのpushでnpm ci → npm test → npm run build → Pagesデプロイを実行します。PagesのSourceはGitHub Actionsです。
 
-公開URL: https://ak-sekine.github.io/quill-mahjong/
+公開URL: https://ak-sekine.github.io/heibon-mahjong/
 
 ## 未実装とiPhone実機確認
 
@@ -451,7 +453,7 @@ npm run dev -- --host 127.0.0.1 --port 4173
 # 別端末で実行
 python tests/browser-ron.py
 python tests/browser-cpu-tsumo.py --screenshots docs/screenshots/ui-step10/cpu-tsumo
-python tests/browser-check.py --url http://127.0.0.1:4173/quill-mahjong/ --tsumo-fixture --screenshots docs/screenshots/ui-step10/regression
+python tests/browser-check.py --url http://127.0.0.1:4173/heibon-mahjong/ --tsumo-fixture --screenshots docs/screenshots/ui-step10/regression
 ```
 
 [検証結果JSON](docs/screenshots/ui-step10/report.json) と [スクリーンショット](docs/screenshots/ui-step10/) を保存しました。375pxのトリプルロン・見逃し後、390pxの高さ縮小ロン待ち・CPU和了等の画像を開いて確認しました。検証用サーバーは終了時に停止します。
@@ -729,7 +731,7 @@ SVGは外部画像を使わず、牌と同じアイボリー（#fffdf7）と薄�
 - `npm test`：既存607件＋表示用21件＝628件。供託0/1/4/5/6/10/12/17/25本、金額一致、不正値、不変データ、MatchState非変更、リーチ・自己/他家回収・持越し・リセット、100,000点保存則を検証します。個別件数は `node --test --test-isolation=none tests/*.test.ts` でも確認できます。
 - `npm run build`：TypeScriptとViteの本番ビルド。
 - `tests/browser-deposit-sticks.mjs`：Chromiumの320×568、375×667、390×844、414×896、1280×800、375×547、390×724で0/1,000/5,000/6,000/10,000/17,000点を検証。全河18枚を表示し、重なり、卓寸法不変、手牌14枚横1行、操作欄との重なり、ボタンの可視性、横スクロール、CPU手牌・未公開王牌の非公開を確認します。42枚の画像と `chromium-results.json` を `docs/screenshots/step13.1.1/` に保存します。
-- 実行例：別ターミナルで `npm run dev -- --host 127.0.0.1`、Playwrightを利用できる環境で `node tests/browser-deposit-sticks.mjs`。外部のPlaywrightを使う場合は `QUILL_PLAYWRIGHT=/tmp/quill-browser/node_modules/playwright/index.mjs` を指定できます。
+- 実行例：別ターミナルで `npm run dev -- --host 127.0.0.1`、Playwrightを利用できる環境で `node tests/browser-deposit-sticks.mjs`。外部のPlaywrightを使う場合は `QUILL_PLAYWRIGHT=/tmp/heibon-browser/node_modules/playwright/index.mjs` を指定できます。
 - `python3 tests/browser-deposit-lifecycle.py`：既存Step 13.1の実操作回帰に供託表示額の一致検証を追加。7サイズでリーチ、ツモ切り、自己和了、宣言牌CPUロン、結果/卓切替、次局、新対局を確認し、`lifecycle/` に画像・結果を保存します。
 - iPhone Safari実機は未確認です。点の配置の見分けやすさ、VoiceOverの総額読み上げ、アドレスバー伸縮、セーフエリア、短画面での手牌と操作欄を実機で確認してください。
 
@@ -851,3 +853,7 @@ Chromium **320×568 / 375×667 / 390×844 / 414×896 / 1280×800 / 375×547 / 39
 **iPhone Safari実機は未確認です。** 実機では、通常打牌後にCPUが自然にリーチすること、CPU思考中のタッチとアニメーション、リーチ後ツモ切り、宣言牌の横向き・河の行境界、供託本数と持ち点、アドレスバー伸縮時の14枚横1行と3ボタン、セーフエリア、横スクロールなし、結果本文スクロール・卓切替・次局・新対局、VoiceOverの席/宣言牌/供託/操作読み上げを確認してください。固定シードの再現には上記テスト通信差し替えを使えるローカル検証環境が必要です。通常の公開ゲームにシード注入やCPUリーチ強制機能はありません。
 
 今回の対象は **Step 13.2.1のみ** です。Step 13.3以降には進んでいません。
+
+### 名称変更時の互換性と履歴
+
+テスト用の環境変数 `QUILL_PLAYWRIGHT` は既存の外部Playwright指定との互換性のため維持しています。`docs/screenshots/ui-step11/unit-tests.txt` と `build.txt` の旧パッケージ名は過去の実行ログをそのまま保存したものです。PWA manifest、Service Worker、永続保存データのキーは現在ありません。

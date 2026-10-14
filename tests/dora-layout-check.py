@@ -6,7 +6,7 @@ import pathlib
 import shutil
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--url', default='http://localhost:4173/quill-mahjong/')
+parser.add_argument('--url', default='http://localhost:4173/heibon-mahjong/')
 parser.add_argument('--screenshots', default='docs/screenshots/ui-step831')
 options = parser.parse_args()
 out = pathlib.Path(options.screenshots)
@@ -20,9 +20,9 @@ with sync_playwright() as p:
         page.goto(options.url)
         # Test-only fixture uses synthetic public tile IDs, never hidden wall tiles.
         page.evaluate('''async () => {
-          const { renderDoraIndicators } = await import('/quill-mahjong/src/rendering/dora.ts');
-          const { renderTable } = await import('/quill-mahjong/src/rendering/table.ts');
-          const { startGame } = await import('/quill-mahjong/src/game/start.ts');
+          const { renderDoraIndicators } = await import('/heibon-mahjong/src/rendering/dora.ts');
+          const { renderTable } = await import('/heibon-mahjong/src/rendering/table.ts');
+          const { startGame } = await import('/heibon-mahjong/src/game/start.ts');
           const game = startGame();
           renderTable(game);
           window.privateIds = [...game.deadWall.filter((_,i)=>i!==4),
@@ -78,7 +78,7 @@ with sync_playwright() as p:
             page.screenshot(path=str(out / f'{width}-{count}-indicators.png'))
             # Fill each river to capacity using only synthetic public tiles.
             page.evaluate('''async () => {
-              const {createTileElement}=await import('/quill-mahjong/src/rendering/tile-svg.ts');
+              const {createTileElement}=await import('/heibon-mahjong/src/rendering/tile-svg.ts');
               for(const river of document.querySelectorAll('.river')) {
                 river.replaceChildren(); const id=Number(river.dataset.playerId);
                 for(let i=0;i<18;i++) {

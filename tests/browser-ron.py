@@ -7,7 +7,7 @@ import shutil
 from playwright.sync_api import sync_playwright
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--url', default='http://127.0.0.1:4173/quill-mahjong/')
+parser.add_argument('--url', default='http://127.0.0.1:4173/heibon-mahjong/')
 parser.add_argument('--screenshots', default='docs/screenshots/ui-step10')
 args = parser.parse_args()
 pathlib.Path(args.screenshots).mkdir(parents=True, exist_ok=True)
@@ -66,7 +66,7 @@ with sync_playwright() as p:
                     fixture = f"withRiverTile({fixture},0,'sou-2')"
                 source,count = re.subn(r'new GameController\((?:undefined|void 0),',f'new GameController(() => {fixture},',response.text())
                 assert count == 1
-                source = 'import { ronStart, withRiverTile } from "/quill-mahjong/tests/ron-fixture.ts";\n' + source
+                source = 'import { ronStart, withRiverTile } from "/heibon-mahjong/tests/ron-fixture.ts";\n' + source
                 source = source.replace('onChange: render','chooseDiscard: p => p.drawnTile.id, onChange: render')
                 source += '''\nwindow.ronCheck = () => ({phase:controller.game.phase, running:controller.progressing,
                   temporary:controller.game.players[0].temporaryFuriten, live:controller.game.liveWall.length,

@@ -6,14 +6,14 @@ const results=[];
 for (const [width,height] of [[320,568],[375,667],[390,844],[414,896],[1280,800],[375,547],[390,724]]) {
  const page=await browser.newPage({viewport:{width,height}});
  page.setDefaultTimeout(120000);
- await page.goto('http://127.0.0.1:5173/quill-mahjong/',{waitUntil:'domcontentloaded'});
+ await page.goto('http://127.0.0.1:5173/heibon-mahjong/',{waitUntil:'domcontentloaded'});
  await page.waitForSelector('#player-hand li');
  let base;
  for (const units of [0,1,5,6,10,17]) {
   await page.evaluate(async units=>{
-   const {renderMatch}=await import('/quill-mahjong/src/rendering/match.ts');
-   const {renderTable}=await import('/quill-mahjong/src/rendering/table.ts');
-   const {startMatch}=await import('/quill-mahjong/src/game/match.ts');
+   const {renderMatch}=await import('/heibon-mahjong/src/rendering/match.ts');
+   const {renderTable}=await import('/heibon-mahjong/src/rendering/table.ts');
+   const {startMatch}=await import('/heibon-mahjong/src/game/match.ts');
    const original=startMatch();
    const m={...original,points:[25000-units*1000,25000,25000,25000]};
    // Filled public rivers make overlap visible; no concealed tiles are exposed.

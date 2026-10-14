@@ -7,8 +7,8 @@ import shutil
 import tempfile
 
 parser = argparse.ArgumentParser(description="Optional Chromium check (requires Python Playwright and Chromium)")
-parser.add_argument("--url", default="http://localhost:4173/quill-mahjong/")
-parser.add_argument("--screenshots", default=str(pathlib.Path(tempfile.gettempdir()) / "quill-screenshots"))
+parser.add_argument("--url", default="http://localhost:4173/heibon-mahjong/")
+parser.add_argument("--screenshots", default=str(pathlib.Path(tempfile.gettempdir()) / "heibon-screenshots"))
 parser.add_argument("--tsumo-fixture", action="store_true", help="Also test tsumo with a fixed legal wall (requires Vite dev server)")
 options = parser.parse_args()
 pathlib.Path(options.screenshots).mkdir(parents=True, exist_ok=True)
@@ -146,7 +146,7 @@ with sync_playwright() as p:
                 'new GameController(() => { discardRandom = seeded(5); return startGame(seeded(4)); },', response.text())
             assert count == 1
             source = source.replace('onChange: render', 'random: () => discardRandom(), onChange: render')
-            source = ('import { startGame } from "/quill-mahjong/src/game/start.ts";\n'
+            source = ('import { startGame } from "/heibon-mahjong/src/game/start.ts";\n'
                 'const seeded = seed => () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);\n'
                 'let discardRandom = seeded(5);\n' + source)
             route.fulfill(response=response, body=source)
@@ -354,7 +354,7 @@ with sync_playwright() as p:
             assert count == 1
             # Match tsumoGame(): deterministic real discards avoid an earlier human ron.
             source = source.replace('onChange: render', 'chooseDiscard: p => p.drawnTile.id, onChange: render')
-            source = 'let fixtureStarts = 0;\nimport { tsumoStart, RED_PINFU } from "/quill-mahjong/tests/tsumo-fixture.ts";\n' + source
+            source = 'let fixtureStarts = 0;\nimport { tsumoStart, RED_PINFU } from "/heibon-mahjong/tests/tsumo-fixture.ts";\n' + source
             route.fulfill(response=response, body=source)
         for w,h in [(320,568),(375,667),(390,844),(414,896),(1280,800)]:
             page=browser.new_page(viewport={'width':w,'height':h})

@@ -7,7 +7,7 @@ import shutil
 from playwright.sync_api import sync_playwright
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--url', default='http://127.0.0.1:4173/quill-mahjong/')
+parser.add_argument('--url', default='http://127.0.0.1:4173/heibon-mahjong/')
 parser.add_argument('--screenshots', default='docs/screenshots/ui-step9')
 options = parser.parse_args()
 pathlib.Path(options.screenshots).mkdir(parents=True, exist_ok=True)
@@ -24,14 +24,14 @@ with sync_playwright() as p:
                 source, count = re.subn(r'new GameController\((?:undefined|void 0),',
                     f'new GameController(() => cpuTsumoStart({winner}),', response.text())
                 assert count == 1
-                source = 'import { cpuTsumoStart } from "/quill-mahjong/tests/cpu-tsumo-fixture.ts";\n' + source
+                source = 'import { cpuTsumoStart } from "/heibon-mahjong/tests/cpu-tsumo-fixture.ts";\n' + source
                 # Earlier CPUs discard their draw, using a real existing strategy option.
                 source = source.replace('onChange: render', 'chooseDiscard: p => p.drawnTile.id, onChange: render')
                 route.fulfill(response=response, body=source)
             page.route('**/src/main.ts', inject)
             page.goto(options.url)
             fixture = page.evaluate(f'''async () => {{
-                const {{ cpuTsumoStart }} = await import('/quill-mahjong/tests/cpu-tsumo-fixture.ts');
+                const {{ cpuTsumoStart }} = await import('/heibon-mahjong/tests/cpu-tsumo-fixture.ts');
                 const g = cpuTsumoStart({winner});
                 return {{ hidden: g.players.slice(1).map(p => p.hand.map(t => t.id)),
                     draw: g.liveWall[{winner - 1}].id, live: g.liveWall.length }};

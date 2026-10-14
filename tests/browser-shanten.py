@@ -10,9 +10,9 @@ with sync_playwright() as p:
   page.on('pageerror',lambda e:errors.append(str(e)))
   def inject(route):
    response=route.fetch()
-   source="""import { startGame } from '/quill-mahjong/src/game/start.ts';
-import { seeded } from '/quill-mahjong/tests/helpers.ts';
-import { calculateShanten } from '/quill-mahjong/src/analysis/shanten.ts';
+   source="""import { startGame } from '/heibon-mahjong/src/game/start.ts';
+import { seeded } from '/heibon-mahjong/tests/helpers.ts';
+import { calculateShanten } from '/heibon-mahjong/src/analysis/shanten.ts';
 """+response.text().replace('new GameController(void 0, { onChange: render })','new GameController(() => startGame(seeded(0)), { onChange: render })')+"""
 window.stepCheck=()=>controller.match;
 window.stepPlay=async()=>{if(controller.canRon){await controller.passRon();return;}const p=controller.game.players[0];controller.select(p.drawnTile.id);await controller.confirm();};
@@ -21,7 +21,7 @@ window.stepLongTasks=[];new PerformanceObserver(list=>stepLongTasks.push(...list
 window.stepFrames=[];let last=performance.now();const frame=t=>{stepFrames.push(t-last);last=t;requestAnimationFrame(frame);};requestAnimationFrame(frame);
 """
    route.fulfill(response=response,body=source)
-  page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/quill-mahjong/');page.wait_for_function('typeof stepCheck === "function"')
+  page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/heibon-mahjong/');page.wait_for_function('typeof stepCheck === "function"')
   def geometry():
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
    boxes=page.locator('#player-hand li').evaluate_all('es=>es.map(e=>{let r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width}})')
@@ -57,7 +57,7 @@ window.stepFrames=[];let last=performance.now();const frame=t=>{stepFrames.push(
   print(f'{width}x{height}: passed',flush=True)
   if width==1280:
    bench=page.evaluate('''async()=>{
-    const {startGame}=await import('/quill-mahjong/src/game/start.ts');const {seeded}=await import('/quill-mahjong/tests/helpers.ts');const {calculateShanten}=await import('/quill-mahjong/src/analysis/shanten.ts');const {evaluateShantenDiscards}=await import('/quill-mahjong/src/game/cpu.ts');
+    const {startGame}=await import('/heibon-mahjong/src/game/start.ts');const {seeded}=await import('/heibon-mahjong/tests/helpers.ts');const {calculateShanten}=await import('/heibon-mahjong/src/analysis/shanten.ts');const {evaluateShantenDiscards}=await import('/heibon-mahjong/src/game/cpu.ts');
     const times=[],shanten=[],cache=[];for(let i=-20;i<120;i++){let g=startGame(seeded(i+20),1),p=g.players[1];let t=performance.now();calculateShanten(p.hand.map(t=>t.tile));let a=performance.now()-t;t=performance.now();evaluateShantenDiscards({tiles:[...p.hand,p.drawnTile],visibleTiles:[g.deadWall[4]]},n=>{if(i>=0)cache.push(n)});if(i>=0){times.push(performance.now()-t);shanten.push(a);}await new Promise(r=>setTimeout(r,0));}
     const stats=a=>({mean:a.reduce((x,y)=>x+y,0)/a.length,median:[...a].sort((x,y)=>x-y)[60],max:Math.max(...a)});return {hands:120,warmup:20,unit:'ms',shanten:stats(shanten),selection:stats(times),cacheEntries:stats(cache)};
    }''')

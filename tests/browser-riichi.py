@@ -10,10 +10,10 @@ with sync_playwright() as p:
   page.on('pageerror',lambda e: errors.append(str(e)))
   def inject(route):
    response=route.fetch()
-   source="""import { riichiStart } from '/quill-mahjong/tests/riichi-fixture.ts';
-import { startMatch, updateMatchGame } from '/quill-mahjong/src/game/match.ts';
-import { discardTile } from '/quill-mahjong/src/game/discard.ts';
-import { drawTile } from '/quill-mahjong/src/game/draw.ts';
+   source="""import { riichiStart } from '/heibon-mahjong/tests/riichi-fixture.ts';
+import { startMatch, updateMatchGame } from '/heibon-mahjong/src/game/match.ts';
+import { discardTile } from '/heibon-mahjong/src/game/discard.ts';
+import { drawTile } from '/heibon-mahjong/src/game/draw.ts';
 """+response.text()+"""
 window.riichiCheck = () => controller.match;
 window.riichiRestore = (match) => {controller.newGame();controller.match=match;render();};
@@ -24,7 +24,7 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
    # Hold the CPU loop until reset; test controls advance the same pure APIs.
    source=source.replace('new GameController(void 0, { onChange: render })', 'new GameController(undefined, { onChange: render, wait: (_ms, signal) => new Promise(resolve => signal.addEventListener("abort", resolve, {once:true})) })')
    route.fulfill(response=response,body=source)
-  page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/quill-mahjong/');page.wait_for_function('typeof riichiCheck === "function"')
+  page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/heibon-mahjong/');page.wait_for_function('typeof riichiCheck === "function"')
   def conservation(): assert page.evaluate('riichiCheck().points.reduce((a,b)=>a+b,0)+riichiCheck().depositSticks*1000')==100000
   def shot(name): page.screenshot(path=str(out/f'{width}x{height}-{name}.png'))
   def geometry():

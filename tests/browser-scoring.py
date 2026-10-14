@@ -2,7 +2,7 @@
 import argparse, json, pathlib, re, shutil
 from playwright.sync_api import sync_playwright
 parser=argparse.ArgumentParser()
-parser.add_argument('--url',default='http://127.0.0.1:4173/quill-mahjong/')
+parser.add_argument('--url',default='http://127.0.0.1:4173/heibon-mahjong/')
 parser.add_argument('--screenshots',default='docs/screenshots/ui-step11/scoring')
 args=parser.parse_args()
 out=pathlib.Path(args.screenshots);out.mkdir(parents=True,exist_ok=True)
@@ -26,7 +26,7 @@ with sync_playwright() as p:
    page.on('pageerror',lambda e:errors.append(str(e)))
    def inject(route):
     response=route.fetch();source,count=re.subn(r'new GameController\((?:undefined|void 0),',f'new GameController(() => starts++ === 0 ? scoringGame("{name}") : scoringGame("reset"),',response.text());assert count==1
-    source='import { scoringGame } from "/quill-mahjong/tests/scoring-fixture.ts"; let starts=0;\n'+source
+    source='import { scoringGame } from "/heibon-mahjong/tests/scoring-fixture.ts"; let starts=0;\n'+source
     source+='\nwindow.scoreCheck = () => controller.game;'
     route.fulfill(response=response,body=source)
    page.route('**/src/main.ts',inject);page.goto(args.url)
