@@ -1,0 +1,1296 @@
+[
+  {
+    "width": 320,
+    "height": 568,
+    "seed": 0,
+    "initialShanten": [
+      3,
+      3,
+      5
+    ],
+    "records": [
+      {
+        "turn": 1,
+        "shanten": [
+          2,
+          2,
+          5
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 2,
+        "shanten": [
+          2,
+          2,
+          4
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 3,
+        "shanten": [
+          2,
+          2,
+          3
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 4,
+        "shanten": [
+          2,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 5,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 6,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 7,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 8,
+        "shanten": [
+          0,
+          1,
+          2
+        ],
+        "deposits": 1,
+        "riichi": [
+          false,
+          true,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 9,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 2,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      },
+      {
+        "turn": 10,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      }
+    ],
+    "humanToHumanMs": [
+      993.3022400000482,
+      956.9491720000087,
+      959.1725070000621,
+      959.3866090000347,
+      970.2022809999562,
+      968.5705360000156,
+      1080.1915360000294,
+      980.654512000001,
+      976.971547000062,
+      76.96225500001219
+    ],
+    "frames": {
+      "count": 586,
+      "max": 83.29999999999927,
+      "over50": 2
+    },
+    "longTasksMs": [
+      51,
+      59
+    ],
+    "result": "passed"
+  },
+  {
+    "width": 375,
+    "height": 667,
+    "seed": 0,
+    "initialShanten": [
+      3,
+      3,
+      5
+    ],
+    "records": [
+      {
+        "turn": 1,
+        "shanten": [
+          2,
+          2,
+          5
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 2,
+        "shanten": [
+          2,
+          2,
+          4
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 3,
+        "shanten": [
+          2,
+          2,
+          3
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 4,
+        "shanten": [
+          2,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 5,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 6,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 7,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 8,
+        "shanten": [
+          0,
+          1,
+          2
+        ],
+        "deposits": 1,
+        "riichi": [
+          false,
+          true,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 9,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 2,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      },
+      {
+        "turn": 10,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      }
+    ],
+    "humanToHumanMs": [
+      1108.2230629999685,
+      969.7286580000082,
+      1073.1413569999404,
+      1079.2598489999818,
+      1038.2722209999429,
+      1015.2019359999258,
+      1237.3949980000134,
+      1034.139458000027,
+      1008.8012030000755,
+      108.62708099989504
+    ],
+    "frames": {
+      "count": 617,
+      "max": 116.69999999999891,
+      "over50": 7
+    },
+    "longTasksMs": [
+      77,
+      57,
+      60,
+      50,
+      55,
+      69
+    ],
+    "result": "passed"
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "seed": 0,
+    "initialShanten": [
+      3,
+      3,
+      5
+    ],
+    "records": [
+      {
+        "turn": 1,
+        "shanten": [
+          2,
+          2,
+          5
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 2,
+        "shanten": [
+          2,
+          2,
+          4
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 3,
+        "shanten": [
+          2,
+          2,
+          3
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 4,
+        "shanten": [
+          2,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 5,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 6,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 7,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 8,
+        "shanten": [
+          0,
+          1,
+          2
+        ],
+        "deposits": 1,
+        "riichi": [
+          false,
+          true,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 9,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 2,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      },
+      {
+        "turn": 10,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      }
+    ],
+    "humanToHumanMs": [
+      1196.1801859999923,
+      1117.1332750000147,
+      1076.9233130000657,
+      1027.1430530000316,
+      1074.9700860000075,
+      1143.0003159999842,
+      990.8512460000338,
+      1015.4284819999475,
+      1057.5476649999018,
+      145.73829599999044
+    ],
+    "frames": {
+      "count": 620,
+      "max": 133.29999999999927,
+      "over50": 7
+    },
+    "longTasksMs": [
+      77,
+      98,
+      58,
+      62,
+      73
+    ],
+    "result": "passed"
+  },
+  {
+    "width": 414,
+    "height": 896,
+    "seed": 0,
+    "initialShanten": [
+      3,
+      3,
+      5
+    ],
+    "records": [
+      {
+        "turn": 1,
+        "shanten": [
+          2,
+          2,
+          5
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 2,
+        "shanten": [
+          2,
+          2,
+          4
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 3,
+        "shanten": [
+          2,
+          2,
+          3
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 4,
+        "shanten": [
+          2,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 5,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 6,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 7,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 8,
+        "shanten": [
+          0,
+          1,
+          2
+        ],
+        "deposits": 1,
+        "riichi": [
+          false,
+          true,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 9,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 2,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      },
+      {
+        "turn": 10,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      }
+    ],
+    "humanToHumanMs": [
+      1008.8758769999231,
+      979.3332469999996,
+      970.9002319999627,
+      975.7661090000056,
+      972.5299780000114,
+      974.0966909999997,
+      968.5617149999644,
+      973.9544459999934,
+      952.9576369999404,
+      41.856095999946774
+    ],
+    "frames": {
+      "count": 588,
+      "max": 66.678,
+      "over50": 1
+    },
+    "longTasksMs": [
+      68,
+      63
+    ],
+    "result": "passed"
+  },
+  {
+    "width": 1280,
+    "height": 800,
+    "seed": 0,
+    "initialShanten": [
+      3,
+      3,
+      5
+    ],
+    "records": [
+      {
+        "turn": 1,
+        "shanten": [
+          2,
+          2,
+          5
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 2,
+        "shanten": [
+          2,
+          2,
+          4
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 3,
+        "shanten": [
+          2,
+          2,
+          3
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 4,
+        "shanten": [
+          2,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 5,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 6,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 7,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 8,
+        "shanten": [
+          0,
+          1,
+          2
+        ],
+        "deposits": 1,
+        "riichi": [
+          false,
+          true,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 9,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 2,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      },
+      {
+        "turn": 10,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      }
+    ],
+    "humanToHumanMs": [
+      968.983924999975,
+      952.4911969999721,
+      959.8271410000052,
+      966.8864499999472,
+      966.2559619999911,
+      969.0306180000334,
+      960.78349600009,
+      964.1373279999925,
+      956.3531899999589,
+      46.54067699993902
+    ],
+    "frames": {
+      "count": 577,
+      "max": 66.70800000000003,
+      "over50": 1
+    },
+    "longTasksMs": [
+      60,
+      54
+    ],
+    "result": "passed"
+  },
+  {
+    "width": 375,
+    "height": 547,
+    "seed": 0,
+    "initialShanten": [
+      3,
+      3,
+      5
+    ],
+    "records": [
+      {
+        "turn": 1,
+        "shanten": [
+          2,
+          2,
+          5
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 2,
+        "shanten": [
+          2,
+          2,
+          4
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 3,
+        "shanten": [
+          2,
+          2,
+          3
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 4,
+        "shanten": [
+          2,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 5,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 6,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 7,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 8,
+        "shanten": [
+          0,
+          1,
+          2
+        ],
+        "deposits": 1,
+        "riichi": [
+          false,
+          true,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 9,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 2,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      },
+      {
+        "turn": 10,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      }
+    ],
+    "humanToHumanMs": [
+      986.6782729999386,
+      957.9661690000876,
+      959.5161359999338,
+      970.6758020000734,
+      967.1279650000315,
+      957.7337149999039,
+      965.5834709999453,
+      990.4073839999228,
+      961.9005929999958,
+      52.294071000005715
+    ],
+    "frames": {
+      "count": 577,
+      "max": 50.100000000000364,
+      "over50": 1
+    },
+    "longTasksMs": [
+      55
+    ],
+    "result": "passed"
+  },
+  {
+    "width": 390,
+    "height": 724,
+    "seed": 0,
+    "initialShanten": [
+      3,
+      3,
+      5
+    ],
+    "records": [
+      {
+        "turn": 1,
+        "shanten": [
+          2,
+          2,
+          5
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 2,
+        "shanten": [
+          2,
+          2,
+          4
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 3,
+        "shanten": [
+          2,
+          2,
+          3
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 4,
+        "shanten": [
+          2,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 5,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 6,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 7,
+        "shanten": [
+          1,
+          1,
+          2
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 8,
+        "shanten": [
+          0,
+          1,
+          2
+        ],
+        "deposits": 1,
+        "riichi": [
+          false,
+          true,
+          false,
+          false
+        ]
+      },
+      {
+        "turn": 9,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 2,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      },
+      {
+        "turn": 10,
+        "shanten": [
+          0,
+          0,
+          1
+        ],
+        "deposits": 0,
+        "riichi": [
+          false,
+          true,
+          true,
+          false
+        ]
+      }
+    ],
+    "humanToHumanMs": [
+      1002.0631739999999,
+      956.2804700000243,
+      972.6748950000683,
+      1002.4809070000629,
+      985.3074879999895,
+      977.7597650000871,
+      975.2876459999698,
+      1022.2301810000545,
+      973.8096730000052,
+      73.12867900009223
+    ],
+    "frames": {
+      "count": 598,
+      "max": 83.24799999999999,
+      "over50": 2
+    },
+    "longTasksMs": [
+      76,
+      81
+    ],
+    "result": "passed"
+  }
+]

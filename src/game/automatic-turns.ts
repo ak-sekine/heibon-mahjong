@@ -5,7 +5,7 @@ import type { GameState } from '../model/game.ts';
 import { canDeclareTsumo, declareTsumo } from './tsumo.ts';
 import { drawOrStop } from './draw.ts';
 import { discardTile } from './discard.ts';
-import { chooseCpuRiichiDiscard, chooseRandomDiscard, type DiscardStrategy } from './cpu.ts';
+import { chooseCpuRiichiDiscard, chooseShantenDiscardAsync, type DiscardStrategy } from './cpu.ts';
 import type { RandomSource } from './shuffle.ts';
 
 export type Wait = (milliseconds: number, signal: AbortSignal) => Promise<void>;
@@ -82,7 +82,8 @@ export class AutomaticTurnRunner {
             continue;
           }
         }
-        const id = currentPlayer.riichi ? currentPlayer.drawnTile!.id : (this.options.chooseDiscard ?? chooseRandomDiscard)(game.players[player.id], this.options.random ?? Math.random);
+        const id = currentPlayer.riichi ? currentPlayer.drawnTile!.id : this.options.chooseDiscard ? this.options.chooseDiscard(currentPlayer, this.options.random ?? Math.random) : await chooseShantenDiscardAsync(game, player.id, abort.signal);
+        if (id === null || !current() || read() !== game || (matchAccess && matchAccess.read().status !== 'playing')) return;
         write(discardTile(game, player.id, id));
       }
     } finally {

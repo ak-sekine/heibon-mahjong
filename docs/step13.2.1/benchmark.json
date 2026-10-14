@@ -1,0 +1,5071 @@
+{
+  "environment": {
+    "node": "v24.19.0",
+    "platform": "linux"
+  },
+  "hands": 120,
+  "unit": "ms",
+  "shanten": {
+    "mean": 0.03848019166666366,
+    "median": 0.029134000000112792,
+    "max": 0.4621149999998124
+  },
+  "fourteenCandidates": {
+    "mean": 0.10082428333334169,
+    "median": 0.0779579999998532,
+    "max": 1.204923000000008
+  },
+  "selectionIncludingEffectiveTiles": {
+    "mean": 8.967499266666668,
+    "median": 7.518550000000005,
+    "max": 44.781241000000136
+  },
+  "cacheEntries": {
+    "mean": 1661.0166666666667,
+    "median": 1659,
+    "max": 3121
+  },
+  "comparisons": [
+    {
+      "seed": 0,
+      "random": false,
+      "initialShanten": [
+        3,
+        3,
+        5
+      ],
+      "riichiSeats": [
+        1,
+        2
+      ],
+      "tenpaiSeats": [
+        1,
+        2
+      ],
+      "bestShanten": [
+        0,
+        0,
+        1
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 3,
+          "turn": 9,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 2
+        }
+      ]
+    },
+    {
+      "seed": 0,
+      "random": true,
+      "initialShanten": [
+        3,
+        3,
+        5
+      ],
+      "riichiSeats": [],
+      "tenpaiSeats": [],
+      "bestShanten": [
+        2,
+        3,
+        3
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 6,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 9,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 10,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 10,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 10,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 11,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 11,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 11,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 12,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 12,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 12,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 13,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 13,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 13,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 14,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 14,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 14,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 15,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 15,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 15,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 16,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 16,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 16,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 17,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 17,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 17,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 18,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "random": false,
+      "initialShanten": [
+        5,
+        4,
+        5
+      ],
+      "riichiSeats": [
+        3,
+        2
+      ],
+      "tenpaiSeats": [
+        3,
+        2
+      ],
+      "bestShanten": [
+        1,
+        0,
+        0
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 9,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 10,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 10,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 10,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 11,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 11,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 11,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 12,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 12,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 12,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 13,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 13,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 3,
+          "turn": 13,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 1,
+          "turn": 14,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 2
+        },
+        {
+          "seat": 2,
+          "turn": 14,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 3,
+          "turn": 14,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 1,
+          "turn": 15,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 2
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "random": true,
+      "initialShanten": [
+        5,
+        4,
+        5
+      ],
+      "riichiSeats": [],
+      "tenpaiSeats": [],
+      "bestShanten": [
+        4,
+        2,
+        2
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 6,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 9,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 10,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 10,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 10,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 11,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 11,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 11,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 12,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 12,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 12,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 13,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 13,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 13,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 14,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 14,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 14,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 15,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 15,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 15,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 16,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 16,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 16,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 17,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 17,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 17,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 18,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "random": false,
+      "initialShanten": [
+        4,
+        3,
+        3
+      ],
+      "riichiSeats": [
+        1,
+        2
+      ],
+      "tenpaiSeats": [
+        1,
+        2
+      ],
+      "bestShanten": [
+        0,
+        0,
+        2
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 9,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 10,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 10,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 10,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 11,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 11,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 3,
+          "turn": 11,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 2
+        },
+        {
+          "seat": 1,
+          "turn": 12,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 2,
+          "turn": 12,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 3,
+          "turn": 12,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 2
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "random": true,
+      "initialShanten": [
+        4,
+        3,
+        3
+      ],
+      "riichiSeats": [],
+      "tenpaiSeats": [],
+      "bestShanten": [
+        3,
+        3,
+        3
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 9,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 10,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 10,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 10,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 11,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 11,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 11,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 12,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 12,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 12,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 13,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 13,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 13,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 14,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 14,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 14,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 15,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 15,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 15,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 16,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 16,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 16,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 17,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 17,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 17,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 18,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "random": false,
+      "initialShanten": [
+        4,
+        2,
+        4
+      ],
+      "riichiSeats": [
+        2,
+        3
+      ],
+      "tenpaiSeats": [
+        2,
+        3
+      ],
+      "bestShanten": [
+        2,
+        0,
+        0
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 2
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 2
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 0
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "random": true,
+      "initialShanten": [
+        4,
+        2,
+        4
+      ],
+      "riichiSeats": [],
+      "tenpaiSeats": [],
+      "bestShanten": [
+        3,
+        2,
+        2
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 9,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 10,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 10,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 10,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 11,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 11,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 11,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 12,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 12,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 12,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 13,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 13,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 13,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 14,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 14,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 14,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 15,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 15,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 15,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 16,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 16,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 16,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 17,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 17,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 17,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 18,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        }
+      ]
+    },
+    {
+      "seed": 4,
+      "random": false,
+      "initialShanten": [
+        5,
+        3,
+        3
+      ],
+      "riichiSeats": [
+        2,
+        3
+      ],
+      "tenpaiSeats": [
+        2,
+        3
+      ],
+      "bestShanten": [
+        2,
+        0,
+        0
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 9,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 10,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 10,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 10,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 11,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 11,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 11,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 12,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 12,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 12,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 13,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 13,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 13,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 14,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 14,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 14,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 15,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 15,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 15,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 1,
+          "turn": 16,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 2
+        },
+        {
+          "seat": 2,
+          "turn": 16,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 3,
+          "turn": 16,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 1,
+          "turn": 17,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 2
+        },
+        {
+          "seat": 2,
+          "turn": 17,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 3,
+          "turn": 17,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 2
+        },
+        {
+          "seat": 1,
+          "turn": 18,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 2
+        }
+      ]
+    },
+    {
+      "seed": 4,
+      "random": true,
+      "initialShanten": [
+        5,
+        3,
+        3
+      ],
+      "riichiSeats": [],
+      "tenpaiSeats": [],
+      "bestShanten": [
+        3,
+        3,
+        3
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 6,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 6,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 9,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 10,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 10,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 10,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 11,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 11,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 11,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 12,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 12,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 12,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 13,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 13,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 13,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 14,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 14,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 14,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 15,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 15,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 15,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 16,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 16,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 16,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 17,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 17,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 17,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 18,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        }
+      ]
+    },
+    {
+      "seed": 5,
+      "random": false,
+      "initialShanten": [
+        4,
+        4,
+        5
+      ],
+      "riichiSeats": [
+        1
+      ],
+      "tenpaiSeats": [
+        1
+      ],
+      "bestShanten": [
+        0,
+        2,
+        1
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        }
+      ]
+    },
+    {
+      "seed": 5,
+      "random": true,
+      "initialShanten": [
+        4,
+        4,
+        5
+      ],
+      "riichiSeats": [],
+      "tenpaiSeats": [],
+      "bestShanten": [
+        1,
+        4,
+        3
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 6,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 6,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 9,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 10,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 10,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 10,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 11,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 11,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 11,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 12,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 12,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 12,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 13,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 13,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 13,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 14,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 14,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 14,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 15,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 15,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 15,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 16,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 16,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 16,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 17,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 17,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 17,
+          "shanten": 6,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 18,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        }
+      ]
+    },
+    {
+      "seed": 6,
+      "random": false,
+      "initialShanten": [
+        3,
+        4,
+        4
+      ],
+      "riichiSeats": [
+        1
+      ],
+      "tenpaiSeats": [
+        1
+      ],
+      "bestShanten": [
+        0,
+        1,
+        1
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 1
+        }
+      ]
+    },
+    {
+      "seed": 6,
+      "random": true,
+      "initialShanten": [
+        3,
+        4,
+        4
+      ],
+      "riichiSeats": [],
+      "tenpaiSeats": [],
+      "bestShanten": [
+        2,
+        3,
+        3
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 9,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 10,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 10,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 10,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 11,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 11,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 11,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 12,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 12,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 12,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 13,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 13,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 13,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 14,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 14,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 14,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 15,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 15,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 15,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 16,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 16,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 16,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 17,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 17,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 17,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 18,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        }
+      ]
+    },
+    {
+      "seed": 7,
+      "random": false,
+      "initialShanten": [
+        3,
+        4,
+        4
+      ],
+      "riichiSeats": [
+        3
+      ],
+      "tenpaiSeats": [
+        3
+      ],
+      "bestShanten": [
+        2,
+        2,
+        0
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 9,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 10,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 10,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 3,
+          "turn": 10,
+          "shanten": 0,
+          "riichi": true,
+          "deposits": 1
+        },
+        {
+          "seat": 1,
+          "turn": 11,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        },
+        {
+          "seat": 2,
+          "turn": 11,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 1
+        }
+      ]
+    },
+    {
+      "seed": 7,
+      "random": true,
+      "initialShanten": [
+        3,
+        4,
+        4
+      ],
+      "riichiSeats": [],
+      "tenpaiSeats": [],
+      "bestShanten": [
+        2,
+        3,
+        1
+      ],
+      "records": [
+        {
+          "seat": 1,
+          "turn": 1,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 1,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 1,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 2,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 2,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 3,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 3,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 4,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 4,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 4,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 5,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 5,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 6,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 6,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 7,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 7,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 7,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 8,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 8,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 9,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 9,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 9,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 10,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 10,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 10,
+          "shanten": 1,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 11,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 11,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 11,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 12,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 12,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 12,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 13,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 13,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 13,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 14,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 14,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 14,
+          "shanten": 2,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 15,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 15,
+          "shanten": 5,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 15,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 16,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 16,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 16,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 17,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 2,
+          "turn": 17,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 3,
+          "turn": 17,
+          "shanten": 3,
+          "riichi": false,
+          "deposits": 0
+        },
+        {
+          "seat": 1,
+          "turn": 18,
+          "shanten": 4,
+          "riichi": false,
+          "deposits": 0
+        }
+      ]
+    }
+  ]
+}

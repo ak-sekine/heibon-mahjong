@@ -1,3 +1,4 @@
+import { chooseRandomDiscard } from '../src/game/cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameController } from '../src/ui/controller.ts';
@@ -22,7 +23,7 @@ test('CPU1, CPU2, CPU3 act once in order, return fourteen tiles to human and blo
   const { wait, pending } = manualWait();
   const initial = startGame(seeded(2));
   const states: GameState[] = [];
-  const ui = new GameController(() => initial, { wait, random: () => 0, onChange: () => states.push(ui.game) });
+  const ui = new GameController(() => initial, { wait, chooseDiscard: chooseRandomDiscard, random: () => 0, onChange: () => states.push(ui.game) });
   ui.select(ui.game.players[0].drawnTile!.id);
   const running = ui.confirm();
   assert.equal(ui.progressing, true);
@@ -56,7 +57,7 @@ test('CPU1, CPU2, CPU3 act once in order, return fourteen tiles to human and blo
 test('old waits and old finally blocks cannot change a new game or duplicate its runner', async () => {
   const { wait, pending } = manualWait();
   let seed = 0;
-  const ui = new GameController(() => startGame(seeded(seed++)), { wait });
+  const ui = new GameController(() => startGame(seeded(seed++)), { wait, chooseDiscard: chooseRandomDiscard });
   ui.select(ui.game.players[0].drawnTile!.id);
   const oldRun = ui.confirm();
   const old = pending.shift()!;
@@ -91,7 +92,7 @@ test('old waits and old finally blocks cannot change a new game or duplicate its
 
 test('runner rejects overlapping starts and does no work after wall exhaustion', async () => {
   const { wait, pending } = manualWait();
-  const runner = new AutomaticTurnRunner({ wait, random: () => 0.999 });
+  const runner = new AutomaticTurnRunner({ wait, chooseDiscard: chooseRandomDiscard, random: () => 0.999 });
   const initial = startGame(seeded(3));
   let game = discardTile(initial, 0, initial.players[0].drawnTile!.id);
   const read = () => game, write = (next: GameState) => { game = next; };
@@ -111,7 +112,7 @@ test('runner rejects overlapping starts and does no work after wall exhaustion',
 test('injected no-wait scheduling runs an entire game, stops after the final discard and resets', async () => {
   const initial = startGame(seeded(4));
   const states: GameState[] = [];
-  const ui = new GameController(() => initial, { wait: async () => {}, random: seeded(5), onChange: () => states.push(ui.game) });
+  const ui = new GameController(() => initial, { wait: async () => {}, chooseDiscard: chooseRandomDiscard, random: seeded(5), onChange: () => states.push(ui.game) });
   let rounds = 0;
   while (ui.game.phase !== 'wall-exhausted') {
     ui.select(ui.game.players[0].drawnTile!.id);
