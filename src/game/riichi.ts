@@ -48,7 +48,7 @@ export function resolvePendingRiichi(match: MatchState): MatchState {
   }
   assertPointConservation(match);
   const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
-  players[playerId] = { ...player, riichi: { declarationTileId, passedRon: false } };
+  players[playerId] = { ...player, riichi: { declarationTileId, passedRon: false, ippatsuEligible: true, doubleRiichi: pending.doubleRiichi ?? false } };
   const points = match.points.map((value,id) => value - (id === playerId ? 1000 : 0)) as unknown as Points;
   const established = { ...match, game: { ...game, players, pendingRiichi: null }, points, depositSticks: match.depositSticks + 1 };
   assertPointConservation(established);
@@ -62,7 +62,8 @@ export function declareRiichi(match: MatchState, playerId: PlayerId, tileId: str
     throw new RangeError('Riichi is not allowed now');
   }
   assertPointConservation(match);
+  const doubleRiichi = match.game.players[playerId].river.length === 0 && isClosedForRiichi(match.game.players[playerId]);
   const discarded = discardTile(match.game, playerId, tileId);
-  const game = { ...discarded, pendingRiichi: discarded.phase === 'won' ? null : { playerId, declarationTileId: tileId } };
+  const game = { ...discarded, pendingRiichi: discarded.phase === 'won' ? null : { playerId, declarationTileId: tileId, doubleRiichi } };
   return settleRound(resolvePendingRiichi({ ...match, game }));
 }

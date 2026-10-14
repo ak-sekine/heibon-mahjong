@@ -16,7 +16,7 @@ for(const rank of ['1','2','3','4','5','6','7']) test(`riichi scores every real 
  const result=getRonCandidates(game).find(w=>w.winnerId===0)!;assert.ok(result);inventory(game,original);
  const scored=result.analysis.candidates.map(candidate=>{
   assert.ok(candidate.yaku.some(y=>y.id==='riichi'));const fu=calculateFu(candidate,{winMethod:'ron',seatWind:'north',roundWind:'east'});
-  const totalHanIncludingDora=candidate.totalHan+result.doraHan+result.redDoraHan;
+  const totalHanIncludingDora=candidate.totalHan+result.doraHan+result.uraDoraHan+result.redDoraHan;
   return {...result,candidate,yakuHan:candidate.totalHan,totalHan:candidate.totalHan,totalHanIncludingDora,...fu,
    ...calculateScore({totalHanIncludingDora,fu:fu.fu,yakumanCount:candidate.yakumanCount,winnerId:0,dealerId:1,discarderId:1,winMethod:'ron'})};
  });freeze(scored);assert.equal(result.totalPoints,Math.max(...scored.map(s=>s.totalPoints)));

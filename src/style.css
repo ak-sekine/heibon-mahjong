@@ -182,3 +182,7 @@ header > div { min-width:0; }
 .ron-pending > #riichi { display:none; }
 /* Keep an unselected drawn tile clear of sticky controls on short phones. */
 @media (max-height:600px) { .seat-bottom { gap:2px; } }
+
+.ura-dora-result { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.ura-dora-result svg { width: 32px; height: 44px; flex: 0 0 32px; }
+.ura-dora-result p { min-width: 0; overflow-wrap: anywhere; }

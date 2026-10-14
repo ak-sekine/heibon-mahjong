@@ -82,7 +82,7 @@ test('fixed 136-tile wall: no-yaku tenpai, riichi-only ron, deposits and dealer 
   assert.equal(evaluateWin(change(g,{riichi:null}),0,winning,'ron'),null);
   const won=declareRon(g,0); match=updateMatchGame(match,won);inventory(won,initial);
   const result=won.winResult!;assert.equal(result.winMethod,'ron');if(result.winMethod!=='ron') return;
-  assert.deepEqual(result.winners[0].candidate.yaku.map(y=>y.id),['riichi']);assert.equal(result.winners[0].yakuHan,1);
+  assert.deepEqual(result.winners[0].candidate.yaku.map(y=>y.id),['double-riichi','ippatsu']);assert.equal(result.winners[0].yakuHan,3);
   assert.equal(match.lastSettlement?.deposits?.points,1000);assert.equal(match.depositSticks,0);assertPointConservation(match);
   assert.equal(match.points[0],25000+result.winners[0].totalPoints);
   assert.equal(settleRound(match),match);assert.equal(match.lastSettlement?.next?.dealerId,0);assert.equal(match.lastSettlement?.next?.honba,1);
@@ -114,8 +114,8 @@ test('normal discard never declares riichi',()=>{
 test('riichi tsumo adds menzen tsumo, red dora and ordinary dora through existing scoring',()=>{
   const initial=riichiStart('tsumo');const m=humanDraw('tsumo',initial);const g=m.game;assert.ok(canDeclareTsumo(g,0));assert.ok(g.players[0].riichi);
   const won=declareTsumo(g,0);const result=won.winResult!;assert.equal(result.winMethod,'tsumo');if(result.winMethod!=='tsumo')return;
-  assert.deepEqual(result.candidate.yaku.map(y=>y.id),['riichi','menzen-tsumo']);assert.equal(result.yakuHan,2);assert.equal(result.redDoraCount,1);
-  assert.equal(result.totalHanIncludingDora,result.yakuHan+result.doraCount+result.redDoraCount);
+  assert.deepEqual(result.candidate.yaku.map(y=>y.id),['double-riichi','ippatsu','menzen-tsumo']);assert.equal(result.yakuHan,4);assert.equal(result.redDoraCount,1);
+  assert.equal(result.totalHanIncludingDora,result.yakuHan+result.doraCount+result.uraDoraHan+result.redDoraCount);
   const settled=updateMatchGame(m,won);assert.equal(settled.lastSettlement?.deposits?.points,1000);assertPointConservation(settled);inventory(won,initial);
 });
 test('direct APIs forbid hand replacement; only current physical draw may be discarded',()=>{
@@ -125,12 +125,12 @@ test('direct APIs forbid hand replacement; only current physical draw may be dis
   const snapshot=structuredClone(g);freeze(g);
   assert.throws(()=>discardTile(g,0,normal.id),RangeError);assert.throws(()=>discardFromPlayer(p,normal.id),RangeError);
   assert.deepEqual(g,snapshot);const next=discardTile(g,0,p.drawnTile!.id);assert.equal(next.players[0].river.at(-1)?.id,p.drawnTile!.id);
-  assert.deepEqual(next.players[0].hand,p.hand);assert.equal(next.players[0].riichi,p.riichi);inventory(next,initial);
+  assert.deepEqual(next.players[0].hand,p.hand);assert.deepEqual(next.players[0].riichi,{...p.riichi,ippatsuEligible:false});inventory(next,initial);
 });
 test('draw/discard preserve riichi and existing temporary furiten draw reset',()=>{
-  const g=humanDraw().game;const next=discardTile(g,0,g.players[0].drawnTile!.id);assert.equal(next.players[0].riichi,g.players[0].riichi);
+  const g=humanDraw().game;const next=discardTile(g,0,g.players[0].drawnTile!.id);assert.deepEqual(next.players[0].riichi,{...g.players[0].riichi,ippatsuEligible:false});
   let current=next;for(let i=0;i<3;i++){current=drawTile(current,current.turnPlayerId);current=discardTile(current,current.turnPlayerId,current.players[current.turnPlayerId].drawnTile!.id);}
-  current=drawTile(change(current,{temporaryFuriten:true}),0);assert.equal(current.players[0].temporaryFuriten,false);assert.equal(current.players[0].riichi,g.players[0].riichi);
+  current=drawTile(change(current,{temporaryFuriten:true}),0);assert.equal(current.players[0].temporaryFuriten,false);assert.equal(current.players[0].riichi,next.players[0].riichi);
 });
 test('self-discard furiten blocks riichi ron but not riichi tsumo; temporary pass still works',()=>{
   let g=established().game;g=withRiverTile(g,0,'man-5');g=drawTile(g,1);g=discardTile(g,1,g.players[1].drawnTile!.id);assert.equal(canDeclareRon(g,0),false);
@@ -147,7 +147,7 @@ test('draw carries deposits, next round clears riichi, new match resets all bala
 test('yakuman ignores riichi han and dora; non-riichi scoring unchanged',()=>{
   const g=tsumoGame(['19m','19p','19s','12345677z']);const plain=evaluateWin(g,0,g.players[0].drawnTile!,'tsumo')!;
   const withRiichi=evaluateWin(change(g,{riichi:{declarationTileId:'past'}}),0,g.players[0].drawnTile!,'tsumo')!;
-  assert.deepEqual(withRiichi,plain);assert.equal(withRiichi.totalPoints,48000);assert.equal(withRiichi.totalHanIncludingDora,0);
+  assert.deepEqual({...withRiichi,uraDoraCount:0},plain);assert.equal(withRiichi.totalPoints,48000);assert.equal(withRiichi.totalHanIncludingDora,0);
 });
 test('riichi can move a hand to mangan through the existing scoring API',()=>{
   const g=tsumoGame(['234m','345p','678s','222p','66m'],false,[],'man-5');

@@ -10,3 +10,9 @@ export function exposedDoraIndicators(wall: WallState): readonly PhysicalTile[] 
   if (wall.deadWall.length !== 14) throw new RangeError('Dead wall must contain 14 tiles');
   return [wall.deadWall[DORA_INDICATOR_INDICES[0]]];
 }
+
+/** Hidden partners of the exposed indicators. Only win results may render these. */
+export function uraDoraIndicators(wall: WallState): readonly PhysicalTile[] {
+  if (wall.deadWall.length !== 14) throw new RangeError('Dead wall must contain 14 tiles');
+  return DORA_INDICATOR_INDICES.slice(0, 1).map(index => wall.deadWall[index + 1]);
+}

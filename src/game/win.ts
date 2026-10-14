@@ -3,7 +3,7 @@ import { calculateScore } from '../analysis/score.ts';
 import type { GameState, PhysicalTile, PlayerId, SeatWind, WinDetails } from '../model/game.ts';
 import { analyzeYaku, type YakuAnalysis, type YakuCandidate } from '../analysis/yaku.ts';
 import { countDora, countRedDora } from '../analysis/dora.ts';
-import { exposedDoraIndicators } from './dora.ts';
+import { exposedDoraIndicators, uraDoraIndicators } from './dora.ts';
 
 /** East-only match: the round wind stays east throughout all four rounds. */
 export const ROUND_WIND: SeatWind = 'east';
@@ -23,21 +23,24 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
   try {
     const faces = tiles.map(t => t.tile);
     const analysis = analyzeYaku(faces, { winMethod, winningTile: winningTile.tile,
-      seatWind: player.wind, roundWind: ROUND_WIND, riichi: player.riichi !== null });
+      seatWind: player.wind, roundWind: ROUND_WIND, riichi: player.riichi !== null,
+      ippatsuEligible: player.riichi?.ippatsuEligible, doubleRiichi: player.riichi?.doubleRiichi });
     if (!analysis.isWinningShape || !analysis.hasSupportedYaku) return null;
     const doraCount = countDora(faces, exposedDoraIndicators(game).map(t => t.tile));
+    const uraDoraCount = player.riichi ? countDora(faces, uraDoraIndicators(game).map(t => t.tile)) : 0;
     const redDoraCount = countRedDora(faces);
     const evaluated = analysis.candidates.filter(c => c.yaku.length > 0).map(candidate => {
       const doraHan = candidate.yakumanCount > 0 ? 0 : doraCount;
+      const uraDoraHan = candidate.yakumanCount > 0 ? 0 : uraDoraCount;
       const redDoraHan = candidate.yakumanCount > 0 ? 0 : redDoraCount;
-      const totalHanIncludingDora = candidate.yakumanCount > 0 ? 0 : candidate.totalHan + doraHan + redDoraHan;
+      const totalHanIncludingDora = candidate.yakumanCount > 0 ? 0 : candidate.totalHan + doraHan + uraDoraHan + redDoraHan;
       const fu = calculateFu(candidate, { winMethod, seatWind: player.wind, roundWind: ROUND_WIND });
       const score = calculateScore({ totalHanIncludingDora, fu: fu.fu, yakumanCount: candidate.yakumanCount,
         winnerId: playerId, dealerId: game.dealerId, winMethod,
         discarderId: winMethod === 'ron' ? game.ronWindow?.discarderId : undefined });
       return { winnerId: playerId, winningTileId: winningTile.id, analysis, candidate,
         totalHan: candidate.totalHan, yakuHan: candidate.totalHan, yakumanCount: candidate.yakumanCount,
-        doraCount, doraHan, redDoraCount, redDoraHan, totalHanIncludingDora, ...fu, ...score };
+        doraCount, doraHan, uraDoraCount, uraDoraHan, redDoraCount, redDoraHan, totalHanIncludingDora, ...fu, ...score };
     });
     return selectScoredWinCandidate(evaluated);
   } catch (error) {

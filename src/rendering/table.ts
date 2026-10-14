@@ -1,3 +1,5 @@
+import { uraDoraIndicators } from '../game/dora.ts';
+import { doraKindFromIndicator } from '../analysis/dora.ts';
 import { ordinaryTile } from '../model/tile.ts';
 import type { FuEntry } from '../analysis/fu.ts';
 import type { ScoreTier } from '../analysis/score.ts';
@@ -159,7 +161,7 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
 }
 
 const yakuNames: Record<YakuId, string> = {
-  riichi: '立直', 'menzen-tsumo': '門前清自摸和', tanyao: '断么九',
+  riichi: '立直', ippatsu: '一発', 'double-riichi': 'ダブル立直', 'menzen-tsumo': '門前清自摸和', tanyao: '断么九',
   'yakuhai-white': '役牌：白', 'yakuhai-green': '役牌：發', 'yakuhai-red': '役牌：中',
   'yakuhai-seat-wind': '役牌：自風', 'yakuhai-round-wind': '役牌：場風',
   pinfu: '平和', iipeikou: '一盃口', chiitoitsu: '七対子', toitoi: '対々和', 'kokushi-musou': '国士無双',
@@ -215,9 +217,23 @@ function renderWinResult(game: GameState): void {
       const bonuses = document.createElement('div');
       bonuses.className = 'win-bonuses';
       bonuses.append(text('p', `通常ドラ：${result.doraCount}枚（${result.doraHan}翻）`));
+      bonuses.append(text('p', `裏ドラ：${result.uraDoraCount}枚（${result.uraDoraHan}翻）`));
       bonuses.append(text('p', `赤ドラ：${result.redDoraCount}枚（${result.redDoraHan}翻）`));
       section.append(bonuses);
       section.append(text('p', `合計：${result.totalHanIncludingDora}翻`));
+    }
+    if (player.riichi) {
+      const ura = document.createElement('div');
+      ura.className = 'ura-dora-result';
+      for (const indicator of uraDoraIndicators(game)) {
+        const indicatorName = tileLabel(indicator.tile);
+        const doraName = tileLabel(ordinaryTile(doraKindFromIndicator(indicator.tile)));
+        const description = `裏ドラ表示牌：${indicatorName}、裏ドラ：${doraName}、和了手牌に${result.uraDoraCount}枚（${result.uraDoraHan}翻）`;
+        const svg = createTileElement(indicator.tile);
+        svg.setAttribute('aria-label', description);
+        ura.append(svg, text('p', description));
+      }
+      section.append(ura);
     }
     if (result.fu !== null) section.append(text('p', `符：${result.fu}符`));
     const tier = scoreTierNames[result.scoreTier];

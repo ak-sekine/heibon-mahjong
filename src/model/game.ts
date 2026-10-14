@@ -11,6 +11,8 @@ export interface RiichiState {
   readonly declarationTileId: string;
   /** Omitted legacy states mean false; never cleared by drawing. */
   readonly passedRon?: boolean;
+  readonly ippatsuEligible?: boolean;
+  readonly doubleRiichi?: boolean;
 }
 export interface PlayerState {
   readonly id: PlayerId;
@@ -35,6 +37,8 @@ export interface WinDetails extends FuResult, ScoreResult {
   /** Supported yaku han only, preserved for Step 8 callers. */
   readonly totalHan: number;
   readonly yakuHan: number;
+  readonly uraDoraCount: number;
+  readonly uraDoraHan: number;
   readonly doraCount: number;
   /** Zero for yakuman. */
   readonly doraHan: number;
@@ -63,6 +67,7 @@ export interface RonWindow {
   readonly tileId: string;
 }
 export interface PendingRiichi {
+  readonly doubleRiichi?: boolean;
   readonly playerId: PlayerId;
   readonly declarationTileId: string;
 }

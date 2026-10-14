@@ -1,0 +1,47 @@
+
+> heibon-mahjong@0.1.0 test
+> node --test tests/*.test.ts
+
+✔ tests/action-controls.test.ts (182.552959ms)
+✔ tests/automatic-turns.test.ts (399.140074ms)
+✔ tests/controller.test.ts (137.456742ms)
+✔ tests/cpu-riichi.test.ts (369.649829ms)
+✔ tests/cpu-shanten.test.ts (1780.376927ms)
+✔ tests/cpu-tsumo.test.ts (255.358537ms)
+✔ tests/cpu.test.ts (138.159962ms)
+✔ tests/deposit-sticks.test.ts (200.59712ms)
+✔ tests/discard.test.ts (1174.232133ms)
+✔ tests/dora-layout.test.ts (125.347293ms)
+✔ tests/dora.test.ts (105.604907ms)
+✔ tests/fu.test.ts (131.410284ms)
+✔ tests/game.test.ts (132.992111ms)
+✔ tests/match-points.test.ts (266.695825ms)
+✔ tests/match-progression.test.ts (275.213359ms)
+✔ tests/new-game-dialog.test.ts (162.025922ms)
+✔ tests/normal-dora.test.ts (357.673995ms)
+✔ tests/result-dialog.test.ts (284.227302ms)
+✔ tests/riichi-furiten.test.ts (340.794358ms)
+✔ tests/riichi-river.test.ts (716.98048ms)
+✔ tests/riichi-scoring.test.ts (317.4158ms)
+✔ tests/riichi.test.ts (599.327099ms)
+✔ tests/ron.test.ts (471.156703ms)
+✔ tests/score.test.ts (154.374057ms)
+✔ tests/scoring-integration.test.ts (328.193375ms)
+✔ tests/shanten-async.test.ts (219.595887ms)
+✔ tests/shanten-progression.test.ts (397.915103ms)
+✔ tests/shanten.test.ts (162.85278ms)
+✔ tests/step13-3.test.ts (479.422695ms)
+✔ tests/table.test.ts (398.159496ms)
+✔ tests/tiles.test.ts (249.20948ms)
+✔ tests/tsumo.test.ts (965.681972ms)
+✔ tests/turns.test.ts (2212.724453ms)
+✔ tests/winning-shape.test.ts (723.266438ms)
+✔ tests/yaku.test.ts (244.095932ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15484.120449

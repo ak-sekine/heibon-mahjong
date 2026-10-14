@@ -52,13 +52,13 @@ test('fixed wall scenario A: CPU draw, declaration, forced tsumogiri, riichi tsu
   for(let i=0;i<3;i++)match=move(match);g=drawTile(match.game,1);assert.ok(canDeclareTsumo(g,1));
   const settled=updateMatchGame(match,declareTsumo(g,1));const result=settled.game.winResult!;
   assert.equal(result.winMethod,'tsumo');if(result.winMethod!=='tsumo')return;
-  assert.equal(result.candidate.yaku.find(y=>y.id==='riichi')?.han,1);assert.equal(settled.lastSettlement?.deposits?.recipientId,1);
+  assert.equal(result.candidate.yaku.find(y=>y.id==='double-riichi')?.han,2);assert.equal(settled.lastSettlement?.deposits?.recipientId,1);
   assert.equal(settled.lastSettlement?.deposits?.points,1000);assert.equal(settled.depositSticks,0);assertPointConservation(settled);inventory(settled.game,initial);assert.equal(settleRound(settled),settled);
 });
 for(const winners of [[0],[2],[0,2],[0,2,3]] as const) test(`declaration ron rejects riichi and deposit: winners ${winners}`,()=>{
   const initial=cpuRiichiStart(1,winners);const pending=declare(initial);
   if(winners.includes(0 as never)) {
-    assert.equal(pending.game.phase,'awaiting-ron');assert.deepEqual(pending.game.pendingRiichi,{playerId:1,declarationTileId:declaration(initial)});
+    assert.equal(pending.game.phase,'awaiting-ron');assert.deepEqual(pending.game.pendingRiichi,{playerId:1,declarationTileId:declaration(initial),doubleRiichi:true});
     assert.equal(pending.points[1],25000);assert.equal(pending.depositSticks,0);assert.equal(pending.game.players[1].riichi,null);
     assert.equal(resolvePendingRiichi(pending),pending);assert.throws(()=>drawTile(pending.game,1),RangeError);
   }
@@ -144,7 +144,7 @@ test('CPU riichi ron gains one han through shared scoring',()=>{
   players[2]={...players[2],drawnTile:winning};g={...g,players,liveWall:g.liveWall.map(t=>t.id===winning.id?old:t)};
   const won=discardTile(g,2,winning.id);assert.equal(won.phase,'won');match=updateMatchGame(match,won);
   const result=won.winResult!;if(result.winMethod!=='ron')assert.fail('Expected ron');
-  assert.equal(result.winners[0].candidate.yaku.find(y=>y.id==='riichi')?.han,1);assert.equal(match.lastSettlement?.deposits?.recipientId,1);assertPointConservation(match);inventory(won,initial);
+  assert.equal(result.winners[0].candidate.yaku.find(y=>y.id==='double-riichi')?.han,2);assert.equal(match.lastSettlement?.deposits?.recipientId,1);assertPointConservation(match);inventory(won,initial);
 });
 test('human ron receives an established CPU deposit with no second settlement',()=>{
   const g=cpuRiichiStart(1,[0]);const before={...startMatch(g),points:[25000,24000,25000,25000] as const,depositSticks:1};
