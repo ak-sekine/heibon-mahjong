@@ -1,3 +1,4 @@
+import { setupDiscard } from './setup-discard.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { countDora, countRedDora, doraKindFromIndicator } from '../src/analysis/dora.ts';
@@ -66,7 +67,7 @@ test('exactly deadWall[4] is public from deal through exhaustion with physical i
   assert.deepEqual(exposedDoraIndicators(initial),[indicator]);
   let game = initial;
   for (let i=0; i<70; i++) {
-    game = discardTile(game,game.turnPlayerId,game.players[game.turnPlayerId].drawnTile!.id);
+    game = setupDiscard(game,game.turnPlayerId,game.players[game.turnPlayerId].drawnTile!.id);
     game = drawOrStop(game);
     assert.equal(exposedDoraIndicators(game)[0],indicator);
     inventory(game,initial);

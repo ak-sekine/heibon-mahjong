@@ -1,3 +1,5 @@
+import { getCallOptions } from '../game/calls.ts';
+import { isForbiddenDiscard } from '../game/melds.ts';
 import { uraDoraIndicators } from '../game/dora.ts';
 import { ordinaryTile } from '../model/tile.ts';
 import type { FuEntry } from '../analysis/fu.ts';
@@ -22,6 +24,7 @@ function turnLabel(game: GameState): string {
       ? `${result.winners.map(w => seatNames[w.winnerId]).join('・')}がロン和了！ 放銃：${seatNames[result.discarderId]}`
       : `${seatNames[result.winnerId]}がツモ和了！`;
   }
+  if (game.phase === 'awaiting-call') return 'ポン・チー宣言待ち';
   if (game.phase === 'awaiting-ron') return 'ロン宣言待ち';
   if (game.phase === 'wall-exhausted') return '牌山がなくなりました';
   return `${game.turnPlayerId === 0 ? 'あなた' : seatNames[game.turnPlayerId]}の手番`;
@@ -47,6 +50,7 @@ function renderSelf(player: PlayerState, enabled: boolean): void {
     items.push(item);
   }
   hand.replaceChildren(...items);
+  hand.style.gridTemplateColumns = `repeat(${Math.max(1,items.length)},minmax(0,1fr))`;
   hand.dataset.hasDrawn = String(player.drawnTile !== null);
 }
 
@@ -92,6 +96,8 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
     } else label.textContent = `${seatNames[id]} · ${winds[player.wind]} · ${count}枚${game.dealerId === id ? ' · 親' : ''}${player.riichi ? ' · リーチ' : ''}`;
     label.dataset.active = String(game.phase !== 'wall-exhausted' && game.phase !== 'won' && game.turnPlayerId === id);
     if (id === 0) renderSelf(player, canDiscard(game, 0));
+    const melds = document.querySelector<HTMLElement>(`.open-melds[data-player-id="${id}"]`);
+    if (melds) renderMelds(melds, player);
     const river = document.querySelector<HTMLElement>(`.river[data-player-id="${id}"]`)!;
     river.replaceChildren(...player.river.map((physical, index) => {
       const item = document.createElement('div');
@@ -125,7 +131,21 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
 export function renderSelection(game: GameState, selectedTileId: string | null, progressing = false, points = 25000): void {
   for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('#player-hand button'))) {
     button.setAttribute('aria-pressed', String(button.dataset.tileId === selectedTileId));
-    button.disabled = progressing || !canDiscard(game, 0) || Boolean(game.players[0].riichi && button.dataset.tileId !== game.players[0].drawnTile?.id);
+    button.disabled = isForbiddenDiscard(game.players[0],button.dataset.tileId!) || progressing || !canDiscard(game, 0) || Boolean(game.players[0].riichi && button.dataset.tileId !== game.players[0].drawnTile?.id);
+  }
+  const calls = document.querySelector<HTMLElement>('#call-controls');
+  if (calls) {
+    const options = game.phase === 'awaiting-call' ? getCallOptions(game,0) : [];
+    calls.hidden = !options.length;
+    const choices = document.querySelector<HTMLElement>('#call-options')!;
+    choices.replaceChildren(...options.map(option => {
+      const button = document.createElement('button'); button.type='button'; button.dataset.callId=option.id;
+      const name = option.type==='pon' ? 'ポン' : 'チー';
+      button.setAttribute('aria-label', `${name}：${option.tiles.map(t=>tileLabel(t.tile)).join('・')}（${option.handTileIds.join('、')}）`);
+      button.append(document.createTextNode(name));
+      for (const tile of option.tiles) button.append(createTileElement(tile.tile));
+      return button;
+    }));
   }
   const ron = document.querySelector<HTMLElement>('#ron-controls')!;
   const wasHidden = ron.hidden;
@@ -203,6 +223,10 @@ function renderWinResult(game: GameState): void {
         hand.append(item);
       }
       section.append(hand);
+      if(player.melds?.length) {
+        section.append(text('p','公開副露面子：'));
+        const open=document.createElement('div');open.className='result-melds';renderMelds(open,player);section.append(open);
+      }
     }
     section.append(text('p', '今回対応している役の判定結果'));
     const list = document.createElement('ul');
@@ -255,6 +279,7 @@ const scoreTierNames: Record<ScoreTier, string> = {
 };
 function fuEntryLabel(entry: FuEntry): string {
   switch (entry.type) {
+    case 'open-ron-minimum': return '副露ロン最低符';
     case 'base': return '基本符';
     case 'menzen-ron': return '門前ロン';
     case 'tsumo': return 'ツモ';
@@ -264,4 +289,24 @@ function fuEntryLabel(entry: FuEntry): string {
     case 'pair': return `雀頭（${tileLabel(ordinaryTile(entry.tile))}${entry.dragon ? '・三元牌' : ''}${entry.seatWind ? '・自風' : ''}${entry.roundWind ? '・場風' : ''}）`;
     case 'wait': return `${({ ryanmen: '両面', shanpon: 'シャンポン', kanchan: '嵌張', penchan: '辺張', tanki: '単騎' })[entry.wait]}待ち`;
   }
+}
+
+function renderMelds(container: HTMLElement, player: PlayerState): void {
+  container.setAttribute('aria-label', `${seatNames[player.id]}の公開副露面子`);
+  container.replaceChildren(...(player.melds ?? []).map(meld => {
+    const group=document.createElement('div');group.className='open-meld';
+    const direction=(meld.fromPlayerId-player.id+4)%4;
+    group.dataset.fromDirection=String(direction);
+    group.setAttribute('aria-label',`${meld.type==='pon'?'ポン':'チー'}・${seatNames[meld.fromPlayerId]}から`);
+    // Source-relative called tile position: shimocha right, toimen middle, kamicha left.
+    const own=meld.tiles.filter(t=>t.id!==meld.calledTileId);
+    const called=meld.tiles.find(t=>t.id===meld.calledTileId)!;
+    const arranged=[...own];arranged.splice(direction===3?0:direction===2?1:2,0,called);
+    for(const physical of arranged) {
+      const item=document.createElement('span');item.dataset.tileId=physical.id;
+      item.className=physical.id===meld.calledTileId?'called-tile':'';
+      item.append(createTileElement(physical.tile));group.append(item);
+    }
+    return group;
+  }));
 }

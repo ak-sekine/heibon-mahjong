@@ -1,3 +1,4 @@
+import { concealedSize, winningMelds } from './melds.ts';
 import { calculateFu } from '../analysis/fu.ts';
 import { calculateScore } from '../analysis/score.ts';
 import type { GameState, PhysicalTile, PlayerId, SeatWind, WinDetails } from '../model/game.ts';
@@ -19,22 +20,26 @@ export function selectWinCandidate(analysis: YakuAnalysis): YakuCandidate | null
 export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: PhysicalTile, winMethod: 'tsumo' | 'ron'): WinDetails | null {
   const player = game.players[playerId];
   const tiles = [...player.hand, winningTile];
-  if (player.hand.length !== 13 || new Set(tiles.map(t => t.id)).size !== 14) return null;
+  const allPhysical = [...tiles, ...(player.melds ?? []).flatMap(m=>m.tiles)];
+  if (new Set(allPhysical.map(t=>t.id)).size !== 14 || player.hand.length !== concealedSize(player) || new Set(tiles.map(t => t.id)).size !== 14 - (player.melds?.length ?? 0)*3) return null;
   try {
     const faces = tiles.map(t => t.tile);
-    const analysis = analyzeYaku(faces, { winMethod, winningTile: winningTile.tile,
+    const openMelds = winningMelds(player.melds);
+    const isClosed = openMelds.length === 0;
+    const allFaces = [...faces, ...(player.melds ?? []).flatMap(m=>m.tiles.map(t=>t.tile))];
+    const analysis = analyzeYaku(faces, { isClosed, openMelds, winMethod, winningTile: winningTile.tile,
       seatWind: player.wind, roundWind: ROUND_WIND, riichi: player.riichi !== null,
       ippatsuEligible: player.riichi?.ippatsuEligible, doubleRiichi: player.riichi?.doubleRiichi });
     if (!analysis.isWinningShape || !analysis.hasSupportedYaku) return null;
-    const doraCount = countDora(faces, exposedDoraIndicators(game).map(t => t.tile));
-    const uraDoraCount = player.riichi ? countDora(faces, uraDoraIndicators(game).map(t => t.tile)) : 0;
-    const redDoraCount = countRedDora(faces);
+    const doraCount = countDora(allFaces, exposedDoraIndicators(game).map(t => t.tile));
+    const uraDoraCount = player.riichi ? countDora(allFaces, uraDoraIndicators(game).map(t => t.tile)) : 0;
+    const redDoraCount = countRedDora(allFaces);
     const evaluated = analysis.candidates.filter(c => c.yaku.length > 0).map(candidate => {
       const doraHan = candidate.yakumanCount > 0 ? 0 : doraCount;
       const uraDoraHan = candidate.yakumanCount > 0 ? 0 : uraDoraCount;
       const redDoraHan = candidate.yakumanCount > 0 ? 0 : redDoraCount;
       const totalHanIncludingDora = candidate.yakumanCount > 0 ? 0 : candidate.totalHan + doraHan + uraDoraHan + redDoraHan;
-      const fu = calculateFu(candidate, { winMethod, seatWind: player.wind, roundWind: ROUND_WIND });
+      const fu = calculateFu(candidate, { isClosed, openMelds, winMethod, seatWind: player.wind, roundWind: ROUND_WIND });
       const score = calculateScore({ totalHanIncludingDora, fu: fu.fu, yakumanCount: candidate.yakumanCount,
         winnerId: playerId, dealerId: game.dealerId, winMethod,
         discarderId: winMethod === 'ron' ? game.ronWindow?.discarderId : undefined });

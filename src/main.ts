@@ -59,3 +59,11 @@ for (const tile of [...TILE_KINDS.map(ordinaryTile), ...SUITS.map(redFive)]) {
   item.append(createTileElement(tile), label);
   gallery.append(item);
 }
+
+document.querySelector('#call-options')!.addEventListener('click', event => {
+  const button = (event.target as Element).closest<HTMLButtonElement>('button[data-call-id]');
+  if (button) void controller.call(button.dataset.callId!).catch(error => console.error('Call failed', error));
+});
+document.querySelector('#pass-calls')!.addEventListener('click', () => {
+  void controller.passCalls().catch(error => console.error('Call pass failed', error));
+});

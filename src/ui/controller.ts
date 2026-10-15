@@ -1,3 +1,5 @@
+import { declareCall, passCalls } from '../game/calls.ts';
+import { isForbiddenDiscard } from '../game/melds.ts';
 import type { MatchState } from '../model/match.ts';
 import { startMatch, updateMatchGame, nextRound } from '../game/match.ts';
 import type { GameState, PlayerId } from '../model/game.ts';
@@ -26,6 +28,7 @@ export class GameController {
   get progressing(): boolean { return this.runner.running; }
   select(tileId: string): void {
     const player = this.game.players[0];
+    if (isForbiddenDiscard(player,tileId)) return;
     if ((player.riichi && tileId !== player.drawnTile?.id) || this.progressing || !canDiscard(this.game, 0) || ![...player.hand, player.drawnTile].some(tile => tile?.id === tileId)) return;
     this.selectedTileId = this.selectedTileId === tileId ? null : tileId;
   }
@@ -72,6 +75,20 @@ export class GameController {
     const passed = passRon(this.game, 0);
     this.runner.cancel();
     this.game = passed;
+    this.selectedTileId = null;
+    this.onChange();
+    return this.runner.runMatch(() => this.match, match => { this.match = match; this.onChange(); }, this.onChange);
+  }
+  call(optionId: string): Promise<void> {
+    this.runner.cancel();
+    this.game = declareCall(this.game, 0, optionId);
+    this.selectedTileId = null;
+    this.onChange();
+    return this.runner.runMatch(() => this.match, match => { this.match = match; this.onChange(); }, this.onChange);
+  }
+  passCalls(): Promise<void> {
+    this.runner.cancel();
+    this.game = passCalls(this.game, 0);
     this.selectedTileId = null;
     this.onChange();
     return this.runner.runMatch(() => this.match, match => { this.match = match; this.onChange(); }, this.onChange);

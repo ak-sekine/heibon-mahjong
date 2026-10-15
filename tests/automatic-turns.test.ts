@@ -1,3 +1,4 @@
+import { setupDiscard } from './setup-discard.ts';
 import { chooseRandomDiscard } from '../src/game/cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -114,17 +115,19 @@ test('injected no-wait scheduling runs an entire game, stops after the final dis
   const states: GameState[] = [];
   const ui = new GameController(() => initial, { wait: async () => {}, chooseDiscard: chooseRandomDiscard, random: seeded(5), onChange: () => states.push(ui.game) });
   let rounds = 0;
-  while (ui.game.phase !== 'wall-exhausted') {
+  while (ui.game.phase !== 'wall-exhausted' && ui.game.phase !== 'won') {
+    if(ui.game.phase==='awaiting-call') {await ui.passCalls();continue;}
+    if(ui.canRon) {await ui.passRon();continue;}
     ui.select(ui.game.players[0].drawnTile!.id);
     await ui.confirm();
     rounds++;
-    assert.ok(rounds <= 18);
+    assert.ok(rounds <= 30);
   }
-  assert.equal(rounds, 18);
+  assert.ok(rounds >= 18);
   assert.equal(ui.progressing, false);
   assert.equal(ui.game.liveWall.length, 0);
   assert.equal(ui.canConfirm, false);
-  assert.deepEqual(ui.game.players.map(p => p.river.length), [18, 18, 17, 17]);
+  assert.equal(ui.game.players.reduce((n,p)=>n+p.river.length,0),70);
   for (const state of states) inventory(state, initial);
   const stopped = ui.game;
   ui.select(ui.game.players[0].hand[0].id);
@@ -140,7 +143,7 @@ test('final draw and final discard are also supported when the human consumes th
   let game = initial;
   // The existing dealer parameter permits a real position with human's last draw.
   for (let discards = 0; discards < 69; discards++) {
-    game = discardTile(game, game.turnPlayerId, game.players[game.turnPlayerId].drawnTile!.id);
+    game = setupDiscard(game, game.turnPlayerId, game.players[game.turnPlayerId].drawnTile!.id);
     if (discards < 68) game = drawOrStop(game);
   }
   assert.equal(game.turnPlayerId, 0);

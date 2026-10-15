@@ -1,3 +1,4 @@
+import { passCalls } from '../src/game/calls.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { canDeclareRon, declareRon, passRon, getRonCandidates, getRonTile, getWaitingTileKinds, isDiscardFuriten } from '../src/game/ron.ts';
@@ -144,6 +145,7 @@ test('temporary furiten persists through other seats; own normal live draw clear
   for (const id of [2,3] as const) {
     game = drawTile(game,id); assert.equal(game.players[0].temporaryFuriten,true);
     game = discardTile(game,id,game.players[id].drawnTile!.id);
+    if(game.phase==='awaiting-call') game=passCalls(game,0);
     assert.equal(game.players[0].temporaryFuriten,true);
   }
   game = riverTile(game,0,'sou-5');
@@ -218,6 +220,7 @@ test('runner pauses at human ron, consumes no next draw and resumes after pass',
 test('controller pass restarts CPU turns and returns to human', async () => {
   const start = ronStart(); const ui = new GameController(()=>start,{wait:async()=>{},chooseDiscard:p=>p.drawnTile!.id});
   ui.game = ronGame(); await ui.passRon();
+  while(ui.game.phase==='awaiting-call') await ui.passCalls();
   assert.equal(ui.progressing,false); assert.equal(ui.game.phase,'awaiting-discard');
   assert.equal(ui.game.turnPlayerId,0); assert.equal(ui.game.players[0].temporaryFuriten,false);
 });

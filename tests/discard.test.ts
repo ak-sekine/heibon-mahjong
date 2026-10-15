@@ -13,7 +13,7 @@ function freeze(value: object): void {
 }
 function inventory(game: GameState): void {
   const tiles = [...game.liveWall, ...game.deadWall, ...game.players.flatMap(p =>
-    [...p.hand, ...p.river, ...(p.drawnTile ? [p.drawnTile] : [])])];
+    [...p.hand, ...p.river, ...(p.melds ?? []).flatMap(m=>m.tiles), ...(p.drawnTile ? [p.drawnTile] : [])])];
   assert.equal(tiles.length, 136);
   assert.equal(new Set(tiles.map(t => t.id)).size, 136);
   const counts = new Map<string, number>();
@@ -22,10 +22,10 @@ function inventory(game: GameState): void {
   assert.ok([...counts.values()].every(n => n === 4));
   assert.equal(game.liveWall.length, 69);
   assert.equal(game.deadWall.length, 14);
-  assert.deepEqual(game.players.map(p => p.hand.length), [13, 13, 13, 13]);
-  assert.deepEqual(game.players.map(p => p.river.length), [1, 0, 0, 0]);
+  for (const p of game.players) assert.equal(p.hand.length,13-3*(p.melds?.length ?? 0)+Number(Boolean(p.callDiscard)));
+  assert.equal(game.players[0].river.length + game.players.reduce((n,p)=>n+(p.melds?.length ?? 0),0),1);
   assert.ok(game.players.every(p => p.drawnTile === null));
-  assert.ok(game.phase === 'awaiting-draw' || (game.phase === 'won' && game.winResult?.winMethod === 'ron'));
+  assert.ok(game.phase === 'awaiting-call' || game.phase === 'awaiting-discard' || game.phase === 'awaiting-draw' || (game.phase === 'won' && game.winResult?.winMethod === 'ron'));
   if (game.phase === 'awaiting-draw') assert.equal(game.turnPlayerId, 1);
 }
 
@@ -41,7 +41,7 @@ test('drawn and hand discards preserve inventory, identities and frozen source o
     for (const tile of [player.drawnTile!, ...player.hand]) {
       const result = discardTile(game, 0, tile.id);
       inventory(result);
-      assert.equal(result.players[0].river[0], tile);
+      assert.ok(result.players[0].river.includes(tile) || result.players.some(p=>p.melds?.some(m=>m.calledTileId===tile.id)));
       assert.equal(result.players[0].drawnTile, null);
       if (tile === player.drawnTile) assert.equal(result.players[0].hand, player.hand);
       else {
@@ -65,7 +65,7 @@ test('red five and same-kind copies retain exact physical identity', () => {
   const game = deal(reserveDeadWall(ordered));
   for (const tile of copies) {
     const result = discardTile(game, 0, tile.id);
-    assert.equal(result.players[0].river[0], tile);
+    assert.ok(result.players[0].river.includes(tile) || result.players.some(p=>p.melds?.some(m=>m.calledTileId===tile.id)));
     assert.equal(result.players[0].river[0].tile.isRed, tile.tile.isRed);
     assert.ok(copies.filter(t => t !== tile).every(t => result.players[0].hand.includes(t)));
     inventory(result);
@@ -73,7 +73,7 @@ test('red five and same-kind copies retain exact physical identity', () => {
 });
 
 test('invalid ownership, turn, phase and malformed hands are rejected without changes', () => {
-  const game = startGame();
+  const game = startGame((()=>{let n=1;return ()=>((n=(Math.imul(n,1664525)+1013904223)>>>0)/4294967296);})());
   const snapshot = structuredClone(game);
   const id = game.players[0].drawnTile!.id;
   assert.throws(() => discardTile(game, 0, 'missing'), RangeError);
@@ -85,7 +85,7 @@ test('invalid ownership, turn, phase and malformed hands are rejected without ch
   assert.throws(() => discardTile({ ...game, turnPlayerId: 1 }, 0, id), RangeError);
   assert.throws(() => discardTile({ ...game, phase: 'wall-exhausted' }, 0, id), RangeError);
   assert.throws(() => discardTile({ ...game, phase: 'awaiting-draw' }, 0, id), RangeError);
-  const cpuDealer = startGame(undefined, 1);
+  const cpuDealer = startGame((()=>{let n=1;return ()=>((n=(Math.imul(n,1664525)+1013904223)>>>0)/4294967296);})(), 1);
   assert.equal(discardTile(cpuDealer, 1, cpuDealer.players[1].drawnTile!.id).turnPlayerId, 2);
   assert.throws(() => discardTile(cpuDealer, 0, cpuDealer.players[0].hand[0].id), RangeError);
   assert.throws(() => discardFromPlayer({ ...game.players[0], drawnTile: null }, id), RangeError);

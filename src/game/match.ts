@@ -1,3 +1,4 @@
+import { winningMelds } from './melds.ts';
 import type { GameState, PlayerId } from '../model/game.ts';
 import type { MatchState, Points, RoundSettlement, SettlementPayment } from '../model/match.ts';
 import { getWaitingTileKinds } from './ron.ts';
@@ -21,7 +22,7 @@ export function settleRound(match: MatchState): MatchState {
   if (!Number.isSafeInteger(match.honba) || match.honba < 0 || match.game.dealerId !== match.dealerId) throw new RangeError('Invalid round');
   const win = match.game.winResult;
   if (match.game.phase === 'won' && !win) throw new RangeError('Missing win result');
-  const tenpai = win ? null : match.game.players.map(p => getWaitingTileKinds(p.hand.map(t => t.tile)).length > 0);
+  const tenpai = win ? null : match.game.players.map(p => getWaitingTileKinds(p.hand.map(t => t.tile), winningMelds(p.melds)).length > 0);
   const payments: SettlementPayment[] = [];
   const after = [...match.points] as [number,number,number,number];
   const transfer = (payerId: PlayerId, recipientId: PlayerId, basePoints: number, honbaPoints: number, notenPoints = 0) => {

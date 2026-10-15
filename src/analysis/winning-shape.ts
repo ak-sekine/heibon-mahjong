@@ -26,8 +26,8 @@ const orphanIndices = TILE_KINDS.flatMap((kind, index) =>
   kind.category === 'honor' || kind.rank === 1 || kind.rank === 9 ? [index] : []);
 
 /** Runtime validation also protects callers using JavaScript or unchecked casts. */
-function countsOf(tiles: readonly Tile[]): number[] {
-  if (!Array.isArray(tiles) || tiles.length !== 14) {
+function countsOf(tiles: readonly Tile[], size = 14): number[] {
+  if (!Array.isArray(tiles) || tiles.length !== size) {
     throw new RangeError('Winning shape analysis requires exactly 14 tiles');
   }
   const counts = Array<number>(TILE_KINDS.length).fill(0);
@@ -55,14 +55,14 @@ function meldKey(meld: WinningMeld): string {
   return `${String(kindIndices.get(tileKindKey(kind))).padStart(2, '0')}:${meld.type}`;
 }
 
-function standardDecompositions(counts: number[]): StandardDecomposition[] {
+function standardDecompositions(counts: number[], fixed: readonly WinningMeld[] = []): StandardDecomposition[] {
   const results = new Map<string, StandardDecomposition>();
-  const melds: WinningMeld[] = [];
+  const melds: WinningMeld[] = [...fixed];
   function search(pairIndex: number): void {
     const index = counts.findIndex(count => count > 0);
     if (index === -1) {
       if (melds.length !== 4) return;
-      const ordered = [...melds].sort((a, b) => meldKey(a).localeCompare(meldKey(b)));
+      const ordered = [...fixed, ...melds.slice(fixed.length).sort((a, b) => meldKey(a).localeCompare(meldKey(b)))];
       const key = `${String(pairIndex).padStart(2, '0')}|${ordered.map(meldKey).join('|')}`;
       results.set(key, {
         pair: TILE_KINDS[pairIndex],
@@ -102,14 +102,16 @@ function standardDecompositions(counts: number[]): StandardDecomposition[] {
 }
 
 /** Shape validity only: no yaku, scoring, winning-tile provenance or game state. */
-export function analyzeWinningShapes(tiles: readonly Tile[]): WinningShapeAnalysis {
-  const counts = countsOf(tiles);
-  const decompositions = standardDecompositions(counts);
+export function analyzeWinningShapes(tiles: readonly Tile[], fixed: readonly WinningMeld[] = []): WinningShapeAnalysis {
+  if (fixed.length > 4) throw new RangeError('Too many melds');
+  const counts = countsOf(tiles, 14 - fixed.length * 3);
+  countsOf([...tiles, ...fixed.flatMap(m => m.type === 'triplet' ? [m.tile,m.tile,m.tile].map(k => ({...k,isRed:false} as Tile)) : m.tiles.map(k => ({...k,isRed:false} as Tile)))]);
+  const decompositions = standardDecompositions(counts, fixed);
   const pairs = TILE_KINDS.filter((_, index) => counts[index] === 2);
-  const sevenPairs: SevenPairsResult = pairs.length === 7
+  const sevenPairs: SevenPairsResult = fixed.length === 0 && pairs.length === 7
     ? { isWinning: true, pairs: pairs as unknown as Extract<SevenPairsResult, { isWinning: true }>['pairs'] }
     : { isWinning: false, pairs: null };
-  const orphansWin = orphanIndices.every(index => counts[index] >= 1) &&
+  const orphansWin = fixed.length === 0 && orphanIndices.every(index => counts[index] >= 1) &&
     counts.every((count, index) => count === 0 || orphanIndices.includes(index));
   const thirteenOrphans: ThirteenOrphansResult = orphansWin
     ? { isWinning: true, duplicate: TILE_KINDS[orphanIndices.find(index => counts[index] === 2)!] }
@@ -122,6 +124,6 @@ export function analyzeWinningShapes(tiles: readonly Tile[]): WinningShapeAnalys
   };
 }
 
-export function isWinningShape(tiles: readonly Tile[]): boolean {
-  return analyzeWinningShapes(tiles).isWinning;
+export function isWinningShape(tiles: readonly Tile[], fixed: readonly WinningMeld[] = []): boolean {
+  return analyzeWinningShapes(tiles, fixed).isWinning;
 }

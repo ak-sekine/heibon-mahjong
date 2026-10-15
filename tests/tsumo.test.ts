@@ -214,6 +214,7 @@ test('winning opportunity is optional; discard ends it and next draw checks anew
   assert.equal(ui.canTsumo, false);
   assert.equal(canDeclareTsumo(ui.game, 0), false);
   await promise;
+  while(ui.game.phase==='awaiting-call') await ui.passCalls();
   assert.equal(ui.canTsumo, true);
   assert.deepEqual(ui.game.players.map(p => p.river.length), [2, 2, 2, 2]);
 });
@@ -246,6 +247,7 @@ test('completion notification sees idle runner and enables tsumo immediately aft
   assert.equal(ui.game, during);
   for (let i = 0; i < 3; i++) { pending.shift()!(); await Promise.resolve(); await Promise.resolve(); }
   await promise;
+  while(ui.game.phase==='awaiting-call') await ui.passCalls();
   assert.deepEqual(notifications.at(-1), { phase: 'awaiting-discard', progressing: false, eligible: true });
   ui.declareTsumo(); ui.declareTsumo();
   assert.equal(ui.game.phase, 'won');

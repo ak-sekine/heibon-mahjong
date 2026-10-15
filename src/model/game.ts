@@ -14,11 +14,22 @@ export interface RiichiState {
   readonly ippatsuEligible?: boolean;
   readonly doubleRiichi?: boolean;
 }
+export interface OpenMeld {
+  readonly type: 'pon' | 'chi';
+  /** Sequence order for chi; owned, called, owned for pon. */
+  readonly tiles: readonly [PhysicalTile, PhysicalTile, PhysicalTile];
+  readonly calledTileId: string;
+  readonly fromPlayerId: PlayerId;
+}
 export interface PlayerState {
   readonly id: PlayerId;
   readonly control: 'human' | 'cpu';
   readonly wind: SeatWind;
   readonly hand: readonly PhysicalTile[];
+  /** Missing on legacy serialized closed states means empty. */
+  readonly melds?: readonly OpenMeld[];
+  readonly discardHistory?: readonly PhysicalTile[];
+  readonly callDiscard?: Readonly<{ forbiddenKinds: readonly string[] }> | null;
   readonly drawnTile: PhysicalTile | null;
   readonly drawnTileSource: 'deal' | 'live-wall' | null;
   readonly temporaryFuriten: boolean;
@@ -72,11 +83,12 @@ export interface PendingRiichi {
   readonly declarationTileId: string;
 }
 export interface GameState extends WallState {
+  readonly callsMade?: boolean;
   readonly pendingRiichi: PendingRiichi | null;
   readonly ronWindow: RonWindow | null;
   readonly winResult: TsumoResult | RonResult | null;
   readonly dealerId: PlayerId;
   readonly turnPlayerId: PlayerId;
-  readonly phase: 'awaiting-draw' | 'awaiting-ron' | 'awaiting-discard' | 'wall-exhausted' | 'won';
+  readonly phase: 'awaiting-draw' | 'awaiting-call' | 'awaiting-ron' | 'awaiting-discard' | 'wall-exhausted' | 'won';
   readonly players: readonly [PlayerState, PlayerState, PlayerState, PlayerState];
 }

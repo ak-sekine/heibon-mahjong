@@ -1,3 +1,4 @@
+import { passCalls } from '../src/game/calls.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { riichiStart } from './riichi-fixture.ts';
@@ -24,7 +25,7 @@ function window(mode: 'ron' | 'furiten' = 'ron') {
 test('pre-riichi pass sets only temporary furiten and draw clears it',()=>{
   const game=ronGame();const passed=passRon(game,0);
   assert.equal(passed.players[0].temporaryFuriten,true);assert.equal(passed.players[0].riichi,null);
-  let g=passed;for(let i=0;i<2;i++){g=drawTile(g,g.turnPlayerId);g=discardTile(g,g.turnPlayerId,g.players[g.turnPlayerId].drawnTile!.id);}
+  let g=passed;for(let i=0;i<2;i++){g=drawTile(g,g.turnPlayerId);g=discardTile(g,g.turnPlayerId,g.players[g.turnPlayerId].drawnTile!.id);if(g.phase==='awaiting-call')g=passCalls(g,0);}
   g=drawTile(g,0);assert.equal(g.players[0].temporaryFuriten,false);
 });
 test('riichi pass records permanent player-level furiten and engine rejects ron',()=>{
@@ -35,7 +36,7 @@ test('riichi pass records permanent player-level furiten and engine rejects ron'
 });
 test('fixed wall scenario D: own draw preserves furiten, later CPU2 winning discard is blocked, tsumo remains legal',()=>{
   const {initial,game}=window('furiten');let g=passRon(game,0);
-  for(let i=0;i<2;i++){g=drawTile(g,g.turnPlayerId);g=discardTile(g,g.turnPlayerId,g.players[g.turnPlayerId].drawnTile!.id);}
+  for(let i=0;i<2;i++){g=drawTile(g,g.turnPlayerId);g=discardTile(g,g.turnPlayerId,g.players[g.turnPlayerId].drawnTile!.id);if(g.phase==='awaiting-call')g=passCalls(g,0);}
   g=drawTile(g,0);assert.equal(g.players[0].temporaryFuriten,false);assert.equal(g.players[0].riichi?.passedRon,true);
   g=discardTile(g,0,g.players[0].drawnTile!.id);g=drawTile(g,1);g=discardTile(g,1,g.players[1].drawnTile!.id);
   g=drawTile(g,2);const tile=g.players[2].drawnTile!;assert.ok(tile.id.startsWith('man-5'));

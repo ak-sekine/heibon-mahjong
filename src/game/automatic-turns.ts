@@ -55,7 +55,7 @@ export class AutomaticTurnRunner {
       while (current()) {
         if (matchAccess && matchAccess.read().status !== 'playing') return;
         let game = read();
-        if (game.phase === 'wall-exhausted' || game.phase === 'won' || game.phase === 'awaiting-ron' || game.pendingRiichi) return;
+        if (game.phase === 'wall-exhausted' || game.phase === 'won' || (game.phase === 'awaiting-ron' || game.phase === 'awaiting-call') || game.pendingRiichi) return;
         if (game.phase === 'awaiting-draw') {
           game = drawOrStop(game);
           write(game);

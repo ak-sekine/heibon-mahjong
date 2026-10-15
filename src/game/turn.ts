@@ -1,3 +1,4 @@
+import { concealedSize } from './melds.ts';
 import type { GameState, PlayerId, PlayerState } from '../model/game.ts';
 
 export function nextPlayerId(id: PlayerId): PlayerId {
@@ -8,7 +9,7 @@ export function nextPlayerId(id: PlayerId): PlayerId {
 export function requireDrawTurn(game: GameState, id: PlayerId): PlayerState {
   const player = game.players[id];
   if (game.pendingRiichi || game.phase !== 'awaiting-draw' || game.winResult !== null || game.ronWindow !== null || game.turnPlayerId !== id || player?.id !== id
-    || player.hand.length !== 13 || player.drawnTile !== null) {
+    || player.hand.length !== concealedSize(player) || player.drawnTile !== null || player.drawnTileSource !== null || Boolean(player.callDiscard)) {
     throw new RangeError('Draw is not allowed now');
   }
   return player;

@@ -9,8 +9,9 @@ export interface WinningContext {
   readonly winningTile: TileKind;
   readonly seatWind: SeatWind;
   readonly roundWind: SeatWind;
-  /** Only closed hands are supported. false is rejected, never evaluated as closed. */
-  readonly isClosed?: true;
+  /** An open hand requires explicit fixed melds. */
+  readonly isClosed?: boolean;
+  readonly openMelds?: readonly WinningMeld[];
   readonly riichi?: boolean;
   readonly ippatsuEligible?: boolean;
   readonly doubleRiichi?: boolean;
@@ -51,7 +52,7 @@ function validateContext(context: WinningContext, tiles: readonly Tile[]): void 
       !winds.includes(context.seatWind) || !winds.includes(context.roundWind) ||
       (['ippatsuEligible', 'doubleRiichi'] as const).some(key => context[key] !== undefined && typeof context[key] !== 'boolean') ||
       (context.riichi !== undefined && typeof context.riichi !== 'boolean') ||
-      (context.isClosed !== undefined && context.isClosed !== true)) {
+      (context.isClosed !== undefined && context.isClosed !== true && !(context.isClosed === false && context.openMelds?.length))) {
     throw new RangeError('Invalid winning context; only closed hands are supported');
   }
   const kind = context.winningTile;
@@ -83,19 +84,23 @@ function totals(yaku: readonly RecognizedYaku[]) {
   return { yaku, totalHan: yaku.reduce((n, y) => n + y.han, 0),
     yakumanCount: yaku.reduce((n, y) => n + y.yakuman, 0) };
 }
-/** Pure, closed 14-tile evaluation. Reuses Step 6 validation and all shape decompositions. */
+/** Fixed public melds precede concealed melds in every decomposition. */
 export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): YakuAnalysis {
-  const shapes = analyzeWinningShapes(tiles);
+  if (!context) throw new RangeError('Invalid winning context');
+  const fixed = context.openMelds ?? [];
+  const closed = context.isClosed !== false && fixed.length === 0;
+  const shapes = analyzeWinningShapes(tiles, fixed);
+  const allTiles = [...tiles, ...fixed.flatMap(m => m.type === 'triplet' ? [m.tile,m.tile,m.tile] : m.tiles)];
   validateContext(context, tiles);
   const common: RecognizedYaku[] = [];
   const add = (list: RecognizedYaku[], id: Exclude<YakuId, 'kokushi-musou'>, han: 1 | 2 = 1) =>
     list.push({ id, han, yakuman: 0 });
-  if (context.riichi) {
+  if (closed && context.riichi) {
     add(common, context.doubleRiichi ? 'double-riichi' : 'riichi', context.doubleRiichi ? 2 : 1);
     if (context.ippatsuEligible) add(common, 'ippatsu');
   }
-  if (context.winMethod === 'tsumo') add(common, 'menzen-tsumo');
-  if (tiles.every(t => t.category === 'suited' && t.rank >= 2 && t.rank <= 8)) add(common, 'tanyao');
+  if (closed && context.winMethod === 'tsumo') add(common, 'menzen-tsumo');
+  if (allTiles.every(t => t.category === 'suited' && t.rank >= 2 && t.rank <= 8)) add(common, 'tanyao');
   const candidates: YakuCandidate[] = [];
   for (const decomposition of shapes.standard.decompositions) {
     const { pair, melds } = decomposition;
@@ -115,8 +120,8 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
     const toitoi = melds.every(m => m.type === 'triplet');
     const emit = (assignment: WinningTileAssignment, wait: WaitType, position: string) => {
       const yaku = [...base];
-      if (melds.every(m => m.type === 'sequence') && !valuePair(pair, context) && wait === 'ryanmen') add(yaku, 'pinfu');
-      if (iipeikou) add(yaku, 'iipeikou');
+      if (closed && melds.every(m => m.type === 'sequence') && !valuePair(pair, context) && wait === 'ryanmen') add(yaku, 'pinfu');
+      if (closed && iipeikou) add(yaku, 'iipeikou');
       if (toitoi) add(yaku, 'toitoi', 2);
       candidates.push({ shape: 'standard', id: `standard:${decompositionId}:${position}`,
         decompositionId, decomposition, assignment, wait, ...totals(yaku) });
@@ -126,6 +131,7 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
     const seen = new Set<string>();
     melds.forEach((meld, meldIndex) => {
       const key = meldKey(meld);
+      if (meldIndex < fixed.length) return;
       if (seen.has(key)) return;
       seen.add(key);
       if (meld.type === 'triplet') {

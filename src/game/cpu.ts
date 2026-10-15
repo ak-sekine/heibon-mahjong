@@ -1,3 +1,5 @@
+import { concealedSize, winningMelds, isForbiddenDiscard } from './melds.ts';
+import type { WinningMeld } from '../analysis/winning-shape.ts';
 import { ShantenCalculator, tileCounts } from '../analysis/shanten.ts';
 import { isWinningShape } from '../analysis/winning-shape.ts';
 import { TILE_KINDS, ordinaryTile, tileKindKey } from '../model/tile.ts';
@@ -10,14 +12,14 @@ import type { RandomSource } from './shuffle.ts';
 export type DiscardStrategy = (player: PlayerState, random: RandomSource) => string;
 
 export const chooseRandomDiscard: DiscardStrategy = (player, random = Math.random) => {
-  if (player.hand.length !== 13 || player.drawnTile === null) {
+  if (player.hand.length + Number(Boolean(player.drawnTile)) !== concealedSize(player)+1) {
     throw new RangeError('CPU selection requires fourteen tiles');
   }
   const value = random();
   if (!Number.isFinite(value) || value < 0 || value >= 1) {
     throw new RangeError('Random source must return a value in [0, 1)');
   }
-  const candidates = [...player.hand, player.drawnTile];
+  const candidates = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])].filter(t=>!isForbiddenDiscard(player,t.id));
   return candidates[Math.floor(value * candidates.length)].id;
 };
 
@@ -31,6 +33,8 @@ export function chooseCpuRiichiDiscard(game: GameState, playerId: PlayerId, poin
 /** Only own tiles and public tiles cross the strategy boundary. */
 export interface ShantenDiscardInput {
   readonly tiles: readonly import('../model/game.ts').PhysicalTile[];
+  readonly openMelds?: readonly WinningMeld[];
+  readonly forbiddenKinds?: readonly string[];
   readonly visibleTiles: readonly import('../model/game.ts').PhysicalTile[];
 }
 export interface DiscardEvaluation {
@@ -48,9 +52,13 @@ export function compareDiscardEvaluations(a: DiscardEvaluation, b: DiscardEvalua
 }
 
 function* evaluationSteps(input: ShantenDiscardInput, reportCache?: (entries: number) => void): Generator<void, readonly DiscardEvaluation[]> {
-  const counts = tileCounts(input.tiles.map(t=>t.tile),14);
-  if (new Set(input.tiles.map(t=>t.id)).size !== 14) throw new RangeError('Duplicate physical ID');
+  const open=input.openMelds ?? [];
+  const size=14-3*open.length;
+  const counts = tileCounts(input.tiles.map(t=>t.tile),size);
+  if (new Set(input.tiles.map(t=>t.id)).size !== size) throw new RangeError('Duplicate physical ID');
   const calculator = new ShantenCalculator();
+  const openCounts = Array<number>(34).fill(0);
+  for (const meld of open) for (const tile of meld.type==='triplet'?[meld.tile,meld.tile,meld.tile]:meld.tiles) openCounts[TILE_KINDS.findIndex(k=>tileKindKey(k)===tileKindKey(tile))]++;
   const kindIndex = new Map(TILE_KINDS.map((k,i)=>[tileKindKey(k),i]));
   const visible = Array<number>(34).fill(0);
   // Own discard remains visible in the river, so availability is identical for all candidates.
@@ -64,9 +72,9 @@ function* evaluationSteps(input: ShantenDiscardInput, reportCache?: (entries: nu
   const candidates = new Map<number, Omit<DiscardEvaluation,'tileId'|'isRed'>>();
   let minimum=8;
   for (let discard=0;discard<34;discard++) {
-    if (!counts[discard]) continue;
+    if (!counts[discard] || input.forbiddenKinds?.includes(tileKindKey(TILE_KINDS[discard]))) continue;
     counts[discard]--;
-    const shanten=calculator.calculate(counts).minimum;
+    const shanten=calculator.calculate(counts,open.length).minimum;
     counts[discard]++;
     minimum=Math.min(minimum,shanten);
     candidates.set(discard,{shanten,effectiveTileCount:0,effectiveKindCount:0});
@@ -77,17 +85,17 @@ function* evaluationSteps(input: ShantenDiscardInput, reportCache?: (entries: nu
     counts[discard]--;
     let effectiveTileCount=0, effectiveKindCount=0;
     for (let draw=0;draw<34;draw++) {
-      if (counts[draw]>=4) continue;
+      if (counts[draw]+openCounts[draw]>=4) continue;
       counts[draw]++;
       let improves=false;
       if (minimum===0) {
         const tiles=counts.flatMap((n,i)=>Array.from({length:n},()=>ordinaryTile(TILE_KINDS[i])));
-        improves=isWinningShape(tiles);
+        improves=isWinningShape(tiles,open);
       } else {
         for (let next=0;next<34;next++) {
           if (!counts[next] || next===draw) continue;
           counts[next]--;
-          improves=calculator.calculate(counts).minimum<minimum;
+          improves=calculator.calculate(counts,open.length).minimum<minimum;
           counts[next]++;
           if (improves) break;
         }
@@ -100,7 +108,7 @@ function* evaluationSteps(input: ShantenDiscardInput, reportCache?: (entries: nu
     candidates.set(discard,{...candidate,effectiveTileCount,effectiveKindCount});
   }
   reportCache?.(calculator.cacheSize);
-  return input.tiles.map(tile=>({tileId:tile.id,isRed:tile.tile.isRed,...candidates.get(kindIndex.get(tileKindKey(tile.tile))!)!}));
+  return input.tiles.filter(t=>!input.forbiddenKinds?.includes(tileKindKey(t.tile))).map(tile=>({tileId:tile.id,isRed:tile.tile.isRed,...candidates.get(kindIndex.get(tileKindKey(tile.tile))!)!}));
 }
 
 export function evaluateShantenDiscards(input: ShantenDiscardInput, reportCache?: (entries: number) => void): readonly DiscardEvaluation[] {
@@ -112,9 +120,9 @@ export function evaluateShantenDiscards(input: ShantenDiscardInput, reportCache?
 
 export async function chooseShantenDiscardAsync(game: GameState, playerId: PlayerId, signal: AbortSignal): Promise<string | null> {
   const player=game.players[playerId];
-  if (player.riichi || !player.drawnTile || player.hand.length!==13) throw new RangeError('Invalid normal discard');
-  const steps=evaluationSteps({tiles:[...player.hand,player.drawnTile],
-    visibleTiles:[...game.players.flatMap(p=>p.river),...exposedDoraIndicators(game)]});
+  if (player.riichi || player.hand.length+Number(Boolean(player.drawnTile))!==concealedSize(player)+1) throw new RangeError('Invalid normal discard');
+  const steps=evaluationSteps({tiles:[...player.hand,...(player.drawnTile?[player.drawnTile]:[])], openMelds:winningMelds(player.melds), forbiddenKinds:player.callDiscard?.forbiddenKinds,
+    visibleTiles:[...game.players.flatMap(p=>[...p.river,...(p.melds ?? []).flatMap(m=>m.tiles)]),...exposedDoraIndicators(game)]});
   let deadline=performance.now()+6;
   for (;;) {
     if (signal.aborted) return null;
@@ -134,7 +142,7 @@ export function chooseShantenDiscardFromPublic(input: ShantenDiscardInput): stri
 export function chooseShantenDiscard(game: GameState, playerId: PlayerId): string {
   const player=game.players[playerId];
   if (player.riichi) throw new RangeError('Shanten strategy cannot bypass riichi tsumogiri');
-  if (!player.drawnTile || player.hand.length!==13) throw new RangeError('CPU selection requires fourteen tiles');
-  return chooseShantenDiscardFromPublic({tiles:[...player.hand,player.drawnTile],
-    visibleTiles:[...game.players.flatMap(p=>p.river),...exposedDoraIndicators(game)]});
+  if (player.hand.length+Number(Boolean(player.drawnTile))!==concealedSize(player)+1) throw new RangeError('CPU selection requires fourteen tiles');
+  return chooseShantenDiscardFromPublic({tiles:[...player.hand,...(player.drawnTile?[player.drawnTile]:[])], openMelds:winningMelds(player.melds), forbiddenKinds:player.callDiscard?.forbiddenKinds,
+    visibleTiles:[...game.players.flatMap(p=>[...p.river,...(p.melds ?? []).flatMap(m=>m.tiles)]),...exposedDoraIndicators(game)]});
 }

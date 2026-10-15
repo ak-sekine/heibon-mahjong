@@ -1,3 +1,5 @@
+import { passCalls } from '../src/game/calls.ts';
+import { isForbiddenDiscard } from '../src/game/melds.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { startGame } from '../src/game/start.ts';
@@ -52,6 +54,7 @@ test('seeded games preserve inventory through exhaustion or early ron; seed zero
     inventory(game, initial);
     while (game.phase !== 'wall-exhausted' && game.phase !== 'won') {
       if (game.phase === 'awaiting-ron') game = transition(game, initial, g => passRon(g, 0));
+      if (game.phase === 'awaiting-call') game = transition(game, initial, g => passCalls(g,0));
       if (game.phase === 'won') break;
       if (game.phase === 'awaiting-draw') {
         const remaining = game.liveWall.length;
@@ -60,18 +63,19 @@ test('seeded games preserve inventory through exhaustion or early ron; seed zero
         else break;
       }
       const id = game.turnPlayerId;
-      assert.equal(id, discards % 4);
+      assert.ok([0,1,2,3].includes(id));
       const player = game.players[id];
-      const tile = [...player.hand, player.drawnTile!][Math.floor(random() * 14)];
-      assert.equal(player.hand.length, 13);
-      assert.ok(player.drawnTile);
+      const candidates = [...player.hand,...(player.drawnTile?[player.drawnTile]:[])].filter(t=>!isForbiddenDiscard(player,t.id));
+      const tile = candidates[Math.floor(random()*candidates.length)];
+      assert.equal(player.hand.length,13-3*(player.melds?.length ?? 0)+Number(Boolean(player.callDiscard)));
+      assert.ok(player.drawnTile || player.callDiscard);
       // Zero live tiles still permit the final discard.
       if (draws === 69) assert.equal(game.liveWall.length, 0);
       game = transition(game, initial, state => discardTile(state, id, tile.id));
-      assert.equal(game.players[id].river.at(-1), tile);
+      assert.ok(game.players[id].river.includes(tile) || game.players.some(p=>p.melds?.some(m=>m.calledTileId===tile.id)));
       assert.equal(game.players[id].drawnTile, null);
       if (game.phase === 'awaiting-draw') assert.equal(game.turnPlayerId, (id + 1) % 4);
-      else assert.ok(game.phase === 'awaiting-ron' || game.phase === 'won');
+      else assert.ok(['awaiting-call','awaiting-discard','awaiting-ron','won'].includes(game.phase));
       assert.throws(() => discardTile(game, id, game.players[id].hand[0].id), RangeError);
       discards++;
     }
@@ -81,9 +85,8 @@ test('seeded games preserve inventory through exhaustion or early ron; seed zero
       continue;
     }
     assert.equal(draws, 69);
-    assert.equal(discards, 70);
-    assert.equal(game.turnPlayerId, 2);
-    assert.deepEqual(game.players.map(p => p.river.length), [18, 18, 17, 17]);
+    assert.equal(discards,70+game.players.reduce((n,p)=>n+(p.melds?.length ?? 0),0));
+    assert.equal(game.players.reduce((n,p)=>n+(p.discardHistory?.length ?? p.river.length),0),discards);
     assert.equal(game.liveWall.length, 0);
     for (const player of game.players) {
       assert.throws(() => drawTile(game, player.id), RangeError);

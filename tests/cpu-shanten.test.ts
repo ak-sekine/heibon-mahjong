@@ -74,9 +74,9 @@ test('riichi rejects evaluation and abort interrupts sliced evaluation',async()=
  const abort=new AbortController();const pending=chooseShantenDiscardAsync(g,1,abort.signal);abort.abort();assert.equal(await pending,null);
  assert.ok([...p.hand,p.drawnTile!].some(t=>t.id===chooseRandomDiscard(p,()=>0)));
 });
-for(const seed of [0,1,2]) test(`normal legal seed ${seed}: non-tenpai CPUs naturally riichi and conserve points`,async()=>{
+for(const seed of [0,1,2]) test(`normal legal seed ${seed}: non-tenpai CPUs improve through riichi or calls and conserve points`,async()=>{
  const result=await simulate(seed);assert.ok(result.initialShanten.every(n=>n>0));
- assert.ok(result.records.some(r=>r.riichi));assert.ok(result.records.some(r=>r.shanten<result.initialShanten[r.seat-1]));
+ assert.ok(result.records.some(r=>r.riichi) || result.final.game.players.some(p=>p.melds?.length));assert.ok(result.records.some(r=>r.shanten<result.initialShanten[r.seat-1]));
  assert.equal(result.final.points.reduce((a,b)=>a+b,0)+result.final.depositSticks*1000,100000);
  inventory(result.final.game,result.initial);
 });

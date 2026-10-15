@@ -11,8 +11,8 @@ export interface RiichiDiscardOption {
   readonly waitKindCount: number;
 }
 
-/** All current hands are closed. Replace this policy when exposed melds exist. */
-export function isClosedForRiichi(_player: PlayerState): boolean { return true; }
+/** Pon/chi expose a hand permanently for this round. */
+export function isClosedForRiichi(player: PlayerState): boolean { return !player.melds?.length; }
 
 /** Pure, deterministic physical-ID options; shape waits do not require a yaku. */
 export function getRiichiDiscardOptions(game: GameState, playerId: PlayerId, points: number): readonly RiichiDiscardOption[] {
@@ -41,14 +41,15 @@ export function resolvePendingRiichi(match: MatchState): MatchState {
   }
   const { playerId, declarationTileId } = pending;
   const player = game.players[playerId];
-  if (game.phase !== 'awaiting-draw' || game.ronWindow || game.winResult ||
-      game.turnPlayerId !== (playerId + 1) % 4 || player.riichi ||
-      player.river.at(-1)?.id !== declarationTileId || match.points[playerId] < 1000) {
+  const callWindow = game.phase === 'awaiting-call' && game.ronWindow?.discarderId === playerId && game.ronWindow.tileId === declarationTileId;
+  if ((!['awaiting-draw','awaiting-discard'].includes(game.phase) && !callWindow) || (game.ronWindow && !callWindow) || game.winResult ||
+      player.riichi ||
+      !(player.discardHistory ?? player.river).some(t=>t.id===declarationTileId) || match.points[playerId] < 1000) {
     throw new RangeError('Invalid pending riichi resolution');
   }
   assertPointConservation(match);
   const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
-  players[playerId] = { ...player, riichi: { declarationTileId, passedRon: false, ippatsuEligible: true, doubleRiichi: pending.doubleRiichi ?? false } };
+  players[playerId] = { ...player, riichi: { declarationTileId, passedRon: false, ippatsuEligible: player.river.some(t=>t.id===declarationTileId), doubleRiichi: pending.doubleRiichi ?? false } };
   const points = match.points.map((value,id) => value - (id === playerId ? 1000 : 0)) as unknown as Points;
   const established = { ...match, game: { ...game, players, pendingRiichi: null }, points, depositSticks: match.depositSticks + 1 };
   assertPointConservation(established);
@@ -62,7 +63,7 @@ export function declareRiichi(match: MatchState, playerId: PlayerId, tileId: str
     throw new RangeError('Riichi is not allowed now');
   }
   assertPointConservation(match);
-  const doubleRiichi = match.game.players[playerId].river.length === 0 && isClosedForRiichi(match.game.players[playerId]);
+  const doubleRiichi = !match.game.callsMade && !match.game.players.some(p=>p.melds?.length) && match.game.players[playerId].river.length === 0 && isClosedForRiichi(match.game.players[playerId]);
   const discarded = discardTile(match.game, playerId, tileId);
   const game = { ...discarded, pendingRiichi: discarded.phase === 'won' ? null : { playerId, declarationTileId: tileId, doubleRiichi } };
   return settleRound(resolvePendingRiichi({ ...match, game }));

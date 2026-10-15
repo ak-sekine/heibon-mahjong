@@ -61,11 +61,11 @@ export class ShantenCalculator {
     return value;
   }
   /** Internal count API: callers supply a valid 13-tile composition. Never mutated. */
-  calculate(counts: readonly number[]): ShantenResult {
-    const key = counts.join('');
+  calculate(counts: readonly number[], openMeldCount = 0): ShantenResult {
+    const key = `${openMeldCount}:${counts.join('')}`;
     const cached = this.hands.get(key);
     if (cached) return cached;
-    let combined: readonly Profile[] = [[0,0,0]];
+    let combined: readonly Profile[] = [[openMeldCount,0,0]];
     for (let group = 0; group < 4; group++) {
       const profiles = this.profiles(counts.slice(group*9, group === 3 ? 34 : group*9+9), group < 3);
       const next = new Map<number, Profile>();
@@ -78,14 +78,15 @@ export class ShantenCalculator {
     const standard = Math.min(...combined.map(([m,t,p]) => 8-2*m-t-p));
     const distinct = counts.filter(n => n>0).length;
     const pairs = counts.filter(n => n>=2).length;
-    const sevenPairs = 6-pairs+Math.max(0,7-distinct);
-    const thirteenOrphans = 13-orphans.filter(i => counts[i]>0).length-(orphans.some(i=>counts[i]>=2)?1:0);
+    const sevenPairs = openMeldCount ? Infinity : 6-pairs+Math.max(0,7-distinct);
+    const thirteenOrphans = openMeldCount ? Infinity : 13-orphans.filter(i => counts[i]>0).length-(orphans.some(i=>counts[i]>=2)?1:0);
     const value = Object.freeze({standard,sevenPairs,thirteenOrphans,minimum:Math.min(standard,sevenPairs,thirteenOrphans)});
     this.hands.set(key,value);
     return value;
   }
 }
 
-export function calculateShanten(tiles: readonly Tile[]): ShantenResult {
-  return new ShantenCalculator().calculate(tileCounts(tiles,13));
+export function calculateShanten(tiles: readonly Tile[], openMeldCount = 0): ShantenResult {
+  if (!Number.isInteger(openMeldCount) || openMeldCount<0 || openMeldCount>4) throw new RangeError('Invalid meld count');
+  return new ShantenCalculator().calculate(tileCounts(tiles,13-3*openMeldCount),openMeldCount);
 }

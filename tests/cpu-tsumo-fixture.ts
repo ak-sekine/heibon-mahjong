@@ -1,6 +1,6 @@
 import { createWall, reserveDeadWall } from '../src/game/wall.ts';
 import { deal } from '../src/game/deal.ts';
-import { discardTile } from '../src/game/discard.ts';
+import { setupDiscard as discardTile } from './setup-discard.ts';
 import { drawTile } from '../src/game/draw.ts';
 import { getWaitingTileKinds } from '../src/game/ron.ts';
 import { shuffle } from '../src/game/shuffle.ts';

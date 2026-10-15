@@ -6,7 +6,7 @@ export function endIppatsu(player: PlayerState): PlayerState {
     ? { ...player, riichi: { ...player.riichi, ippatsuEligible: false } } : player;
 }
 
-/** Extension point for future calls/kan; no such actions exist in Step 13.3. */
+/** Every established call cancels all current ippatsu rights. */
 export function cancelAllIppatsu(game: GameState): GameState {
   return { ...game, players: game.players.map(endIppatsu) as unknown as GameState['players'] };
 }

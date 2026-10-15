@@ -1,20 +1,21 @@
+import { resolveDiscardCalls } from './calls.ts';
+import { concealedSize, winningMelds } from './melds.ts';
 import type { GameState, PhysicalTile, PlayerId, PlayerState, RonCandidate } from '../model/game.ts';
 import { TILE_KINDS, ordinaryTile, tileKindKey, type Tile, type TileKind } from '../model/tile.ts';
 import { isWinningShape } from '../analysis/winning-shape.ts';
 import { evaluateWin } from './win.ts';
-import { nextPlayerId } from './turn.ts';
 
 /** Shape waits deliberately ignore yaku; an impossible fifth copy is excluded. */
-export function getWaitingTileKinds(hand: readonly Tile[]): readonly TileKind[] {
-  if (hand.length !== 13) throw new RangeError('Waiting tiles require thirteen tiles');
+export function getWaitingTileKinds(hand: readonly Tile[], fixed: readonly import('../analysis/winning-shape.ts').WinningMeld[] = []): readonly TileKind[] {
+  if (hand.length !== 13 - fixed.length*3) throw new RangeError('Waiting tiles require thirteen tiles');
   return TILE_KINDS.filter(kind => {
-    if (hand.filter(t => tileKindKey(t) === tileKindKey(kind)).length >= 4) return false;
-    return isWinningShape([...hand, ordinaryTile(kind)]);
+    if ([...hand,...fixed.flatMap(m=>m.type==='triplet'?[m.tile,m.tile,m.tile]:m.tiles)].filter(t => tileKindKey(t) === tileKindKey(kind)).length >= 4) return false;
+    return isWinningShape([...hand, ordinaryTile(kind)], fixed);
   });
 }
 export function isDiscardFuriten(player: PlayerState): boolean {
-  const waits = new Set(getWaitingTileKinds(player.hand.map(t => t.tile)).map(tileKindKey));
-  return player.river.some(t => waits.has(tileKindKey(t.tile)));
+  const waits = new Set(getWaitingTileKinds(player.hand.map(t => t.tile), winningMelds(player.melds)).map(tileKindKey));
+  return [...(player.discardHistory ?? []), ...player.river].some(t => waits.has(tileKindKey(t.tile)));
 }
 export function isFuriten(player: PlayerState): boolean {
   return player.temporaryFuriten || Boolean(player.riichi?.passedRon) || isDiscardFuriten(player);
@@ -25,7 +26,7 @@ export function getRonTile(game: GameState): PhysicalTile | null {
   if (game.phase !== 'awaiting-ron' || game.winResult !== null || !window ||
       game.turnPlayerId !== window.discarderId) return null;
   const player = game.players[window.discarderId];
-  if (!player || player.id !== window.discarderId || player.hand.length !== 13 ||
+  if (!player || player.id !== window.discarderId || player.hand.length !== concealedSize(player) ||
       player.drawnTile !== null || player.drawnTileSource !== null) return null;
   const tile = player.river.at(-1);
   return tile?.id === window.tileId ? tile : null;
@@ -38,7 +39,7 @@ export function getRonCandidates(game: GameState): readonly RonCandidate[] {
   for (let offset = 1; offset <= 3; offset++) {
     const id = ((discarderId + offset) % 4) as PlayerId;
     const player = game.players[id];
-    if (player.id !== id || player.hand.length !== 13 || player.drawnTile) continue;
+    if (player.id !== id || player.hand.length !== concealedSize(player) || player.drawnTile) continue;
     try {
       if (isFuriten(player)) continue;
       const result = evaluateWin(game, id, tile, 'ron');
@@ -57,7 +58,7 @@ function resolve(game: GameState, winners: readonly RonCandidate[]): GameState {
   const { discarderId, tileId } = game.ronWindow!;
   if (winners.length) return { ...game, phase: 'won', ronWindow: null, pendingRiichi: null,
     winResult: { winMethod: 'ron', discarderId, winningTileId: tileId, winners } };
-  return { ...game, phase: 'awaiting-draw', turnPlayerId: nextPlayerId(discarderId), ronWindow: null };
+  return resolveDiscardCalls(game);
 }
 /** Called after every legal discard. CPU declarations wait for the human decision. */
 export function resolveDiscardRon(game: GameState): GameState {

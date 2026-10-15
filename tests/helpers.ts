@@ -11,7 +11,7 @@ export function freeze(value: object): void {
 }
 export function allTiles(game: GameState) {
   return [...game.liveWall, ...game.deadWall, ...game.players.flatMap(p =>
-    [...p.hand, ...p.river, ...(p.drawnTile ? [p.drawnTile] : [])])];
+    [...p.hand, ...p.river, ...(p.melds ?? []).flatMap(m=>m.tiles), ...(p.drawnTile ? [p.drawnTile] : [])])];
 }
 export function inventory(game: GameState, initial: GameState): void {
   const tiles = allTiles(game);
@@ -32,9 +32,9 @@ export function inventory(game: GameState, initial: GameState): void {
   assert.equal(game.deadWall.length, 14);
   assert.deepEqual(game.deadWall, initial.deadWall);
   for (const p of game.players) {
-    assert.equal(p.hand.length, 13);
+    assert.equal(p.hand.length, 13 - (p.melds?.length ?? 0)*3 + Number(Boolean(p.callDiscard)));
     assert.equal(p.drawnTileSource === null, p.drawnTile === null);
-    assert.equal(p.drawnTile !== null, (game.phase === 'awaiting-discard' || (game.phase === 'won' && game.winResult?.winMethod === 'tsumo')) && game.turnPlayerId === p.id);
+    assert.equal(p.drawnTile !== null, (game.phase === 'awaiting-discard' || (game.phase === 'won' && game.winResult?.winMethod === 'tsumo')) && game.turnPlayerId === p.id && !p.callDiscard);
   }
 }
 

@@ -1,6 +1,6 @@
 import { createWall, reserveDeadWall } from '../src/game/wall.ts';
 import { deal } from '../src/game/deal.ts';
-import { discardTile } from '../src/game/discard.ts';
+import { setupDiscard as discardTile } from './setup-discard.ts';
 import { drawTile } from '../src/game/draw.ts';
 import { TILE_KINDS, tileKindKey } from '../src/model/tile.ts';
 import type { GameState, PhysicalTile } from '../src/model/game.ts';
