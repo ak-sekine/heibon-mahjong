@@ -1,4 +1,5 @@
-import { concealedSize, winningMelds } from './melds.ts';
+import { tileKindKey } from '../model/tile.ts';
+import { concealedSize, winningMelds, isClosedHand, kanMeldCount } from './melds.ts';
 import { calculateFu } from '../analysis/fu.ts';
 import { calculateScore } from '../analysis/score.ts';
 import type { GameState, PhysicalTile, PlayerId, SeatWind, WinDetails } from '../model/game.ts';
@@ -21,13 +22,17 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
   const player = game.players[playerId];
   const tiles = [...player.hand, winningTile];
   const allPhysical = [...tiles, ...(player.melds ?? []).flatMap(m=>m.tiles)];
-  if (new Set(allPhysical.map(t=>t.id)).size !== 14 || player.hand.length !== concealedSize(player) || new Set(tiles.map(t => t.id)).size !== 14 - (player.melds?.length ?? 0)*3) return null;
+  if((player.melds ?? []).some(m=>m.tiles.length!==(m.type==='chi'||m.type==='pon'?3:4) || (m.type!=='chi' && m.tiles.some(t=>tileKindKey(t.tile)!==tileKindKey(m.tiles[0].tile))))) return null;
+  if(allPhysical.length!==14+kanMeldCount(player)) return null;
+  if (new Set(allPhysical.map(t=>t.id)).size !== 14 + kanMeldCount(player) || player.hand.length !== concealedSize(player) || new Set(tiles.map(t => t.id)).size !== 14 - (player.melds?.length ?? 0)*3) return null;
   try {
     const faces = tiles.map(t => t.tile);
     const openMelds = winningMelds(player.melds);
-    const isClosed = openMelds.length === 0;
+    const isClosed = isClosedHand(player);
     const allFaces = [...faces, ...(player.melds ?? []).flatMap(m=>m.tiles.map(t=>t.tile))];
     const analysis = analyzeYaku(faces, { isClosed, openMelds, winMethod, winningTile: winningTile.tile,
+      rinshan: winMethod==='tsumo' && player.drawnTileSource==='rinshan',
+      chankan: winMethod==='ron' && Boolean(game.ronWindow?.kan),
       seatWind: player.wind, roundWind: ROUND_WIND, riichi: player.riichi !== null,
       ippatsuEligible: player.riichi?.ippatsuEligible, doubleRiichi: player.riichi?.doubleRiichi });
     if (!analysis.isWinningShape || !analysis.hasSupportedYaku) return null;

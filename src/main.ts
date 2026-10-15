@@ -69,3 +69,13 @@ document.querySelector('#call-options')!.addEventListener('click', event => {
 document.querySelector('#pass-calls')!.addEventListener('click', () => {
   void controller.passCalls().catch(error => console.error('Call pass failed', error));
 });
+
+document.querySelector('#kan')!.addEventListener('click',()=>{
+  document.querySelector<HTMLElement>('#kan-controls')!.hidden=false;
+  document.querySelector('#kan-controls')!.scrollIntoView({block:'nearest'});
+});
+document.querySelector('#cancel-kan')!.addEventListener('click',()=>{document.querySelector<HTMLElement>('#kan-controls')!.hidden=true;});
+document.querySelector('#kan-options')!.addEventListener('click',event=>{
+  const button=(event.target as Element).closest<HTMLButtonElement>('button[data-kan-id]');
+  if(button) { document.querySelector<HTMLElement>('#kan-controls')!.hidden=true; void controller.kan(button.dataset.kanId!).catch(e=>console.error('Kan failed',e)); }
+});

@@ -1,0 +1,4 @@
+320px: candidates/pass visible on entry and viewport resize; no overlap; selection passed
+375px: candidates/pass visible on entry and viewport resize; no overlap; selection passed
+390px: candidates/pass visible on entry and viewport resize; no overlap; selection passed
+430px: candidates/pass visible on entry and viewport resize; no overlap; selection passed

@@ -23,7 +23,7 @@ export function deal(wall: WallState, dealerId: PlayerId = 0): GameState {
     melds: [], discardHistory: [], callDiscard: null, hand: hands[id], drawnTile: id === dealerId ? extra : null, drawnTileSource: id === dealerId ? 'deal' : null, river: [], temporaryFuriten: false, riichi: null,
   });
   return {
-    callsMade: false, winResult: null, ronWindow: null, pendingRiichi: null, dealerId, turnPlayerId: dealerId, phase: 'awaiting-discard',
+    kanCount:0, callsMade: false, winResult: null, ronWindow: null, pendingRiichi: null, dealerId, turnPlayerId: dealerId, phase: 'awaiting-discard',
     players: [player(0), player(1), player(2), player(3)],
     liveWall: wall.liveWall.slice(cursor), deadWall: [...wall.deadWall],
   };

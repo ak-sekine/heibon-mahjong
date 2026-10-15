@@ -38,7 +38,7 @@ window.callState=()=>controller.game;
    assert page.evaluate('''()=>document.querySelector('.discard-controls').getBoundingClientRect().top>=document.querySelector('.table').getBoundingClientRect().bottom''')
   for height in [844,564,448]:
    page.set_viewport_size({'width':width,'height':height})
-   for mode,count in [('chi',3),('red',2),('pon',1)]:
+   for mode,count in [('chi',3),('red',2),('pon',2)]:
     page.evaluate('window.scrollTo(0,0)')
     page.evaluate('loadCalls',mode)
     visible()

@@ -27,7 +27,7 @@ export class ResultDialog {
     this.result = result;
     if (!result) { this.close(); return; }
     document.querySelector('#result-title')!.textContent = match.status === 'match-ended'
-      ? '東風戦終了' : result.reason === 'draw' ? '流局' : match.game.winResult?.winMethod === 'ron' ? 'ロン和了' : 'ツモ和了';
+      ? '東風戦終了' : result.reason === 'four-kans' ? '四開槓・途中流局' : result.reason === 'draw' ? '流局' : match.game.winResult?.winMethod === 'ron' ? 'ロン和了' : 'ツモ和了';
     document.querySelector('#result-body')!.scrollTop = 0;
     this.open();
   }

@@ -84,8 +84,8 @@ test('seeded games preserve inventory through exhaustion or early ron; seed zero
       inventory(game, initial);
       continue;
     }
-    assert.equal(draws, 69);
-    assert.equal(discards,70+game.players.reduce((n,p)=>n+(p.melds?.length ?? 0),0));
+    assert.equal(draws+(game.kanCount ?? 0), 69);
+    assert.equal(discards,70-(game.kanCount ?? 0)+game.players.reduce((n,p)=>n+(p.melds?.length ?? 0),0));
     assert.equal(game.players.reduce((n,p)=>n+(p.discardHistory?.length ?? p.river.length),0),discards);
     assert.equal(game.liveWall.length, 0);
     for (const player of game.players) {

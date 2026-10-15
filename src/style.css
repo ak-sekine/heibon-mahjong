@@ -226,3 +226,17 @@ header > div { min-width:0; }
 
 /* Extra scroll range only while Safari occludes the layout viewport. */
 main { padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px) + var(--call-viewport-inset, 0px)); }
+
+/* Step 13.5: choices stay in document flow and retain 44px touch targets. */
+#kan { min-height:44px; min-width:44px; flex:1 1 0; padding:8px 6px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; }
+#kan-controls { width:100%; }
+#kan-options { display:flex; flex-wrap:wrap; gap:4px; }
+#kan-options button, #cancel-kan { min-height:44px; min-width:44px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; }
+#kan-options button { display:flex; align-items:center; justify-content:center; flex:1 1 150px; }
+#kan-options .tile-svg { width:22px; height:31px; }
+#cancel-kan { width:100%; margin-top:4px; }
+.open-meld .concealed-kan-back { background:#426e9b; border:2px solid #eee5ca; border-radius:2px; }
+.open-meld .added-kan-tile { margin-left:2px; transform:translateY(-4px); border-bottom:2px solid #ffda7d; }
+
+/* The result reopen action also stays below the table in narrow viewports. */
+.discard-controls.result-available { position:relative; bottom:auto; }

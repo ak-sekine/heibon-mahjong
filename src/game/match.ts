@@ -22,7 +22,8 @@ export function settleRound(match: MatchState): MatchState {
   if (!Number.isSafeInteger(match.honba) || match.honba < 0 || match.game.dealerId !== match.dealerId) throw new RangeError('Invalid round');
   const win = match.game.winResult;
   if (match.game.phase === 'won' && !win) throw new RangeError('Missing win result');
-  const tenpai = win ? null : match.game.players.map(p => getWaitingTileKinds(p.hand.map(t => t.tile), winningMelds(p.melds)).length > 0);
+  const abortive=match.game.abortiveDraw==='four-kans';
+  const tenpai = win || abortive ? null : match.game.players.map(p => getWaitingTileKinds(p.hand.map(t => t.tile), winningMelds(p.melds)).length > 0);
   const payments: SettlementPayment[] = [];
   const after = [...match.points] as [number,number,number,number];
   const transfer = (payerId: PlayerId, recipientId: PlayerId, basePoints: number, honbaPoints: number, notenPoints = 0) => {
@@ -44,7 +45,7 @@ export function settleRound(match: MatchState): MatchState {
       }
       if (payers.size !== (win.winMethod === 'ron' ? 1 : 3) || winner.payments.reduce((sum,p)=>sum+p.points,0) !== winner.totalPoints) throw new RangeError('Incomplete payments');
     }
-  } else {
+  } else if(!abortive) {
     const ready = ids.filter(id=>tenpai![id]), notReady = ids.filter(id=>!tenpai![id]);
     if (ready.length && notReady.length) for (const payer of notReady) for (const recipient of ready) transfer(payer,recipient,0,0,3000/(ready.length*notReady.length));
   }
@@ -54,13 +55,13 @@ export function settleRound(match: MatchState): MatchState {
       (a.winnerId-win.discarderId+4)%4-(b.winnerId-win.discarderId+4)%4)[0].winnerId;
     deposits = {recipientId,points:match.depositSticks*1000}; after[recipientId] += deposits.points;
   }
-  const repeat = win ? winners.some(w=>w.winnerId===match.dealerId) : tenpai![match.dealerId];
+  const repeat = win ? winners.some(w=>w.winnerId===match.dealerId) : abortive || tenpai![match.dealerId];
   const matchEnded = !repeat && match.roundNumber === 4;
   const next = matchEnded ? null : { roundNumber: match.roundNumber + Number(!repeat),
     dealerId: repeat ? match.dealerId : ((match.dealerId+1)%4) as PlayerId,
     honba: !win || repeat ? match.honba+1 : 0 };
   const freeze = <T extends object>(value: T): T => Object.freeze(value);
-  const settlement: RoundSettlement = freeze({reason: win?.winMethod ?? 'draw', roundNumber:match.roundNumber,
+  const settlement: RoundSettlement = freeze({reason: win?.winMethod ?? (abortive?'four-kans':'draw'), roundNumber:match.roundNumber,
     dealerId:match.dealerId,honba:match.honba,before:freeze([...match.points]) as Points,
     payments:freeze(payments.map(freeze)),deposits:deposits && freeze(deposits),tenpai:tenpai && freeze(tenpai),
     deltas:freeze(after.map((p,id)=>p-match.points[id])) as unknown as Points,after:freeze(after),next:next && freeze(next),matchEnded});

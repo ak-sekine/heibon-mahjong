@@ -20,11 +20,11 @@ function inventory(game: GameState): void {
   for (const t of tiles) counts.set(tileKindKey(t.tile), (counts.get(tileKindKey(t.tile)) ?? 0) + 1);
   assert.equal(counts.size, 34);
   assert.ok([...counts.values()].every(n => n === 4));
-  assert.equal(game.liveWall.length, 69);
+  assert.equal(game.liveWall.length, 69-(game.kanCount ?? 0));
   assert.equal(game.deadWall.length, 14);
   for (const p of game.players) assert.equal(p.hand.length,13-3*(p.melds?.length ?? 0)+Number(Boolean(p.callDiscard)));
   assert.equal(game.players[0].river.length + game.players.reduce((n,p)=>n+(p.melds?.length ?? 0),0),1);
-  assert.ok(game.players.every(p => p.drawnTile === null));
+  assert.ok(game.players.every(p => p.drawnTile === null || p.drawnTileSource==='rinshan'));
   assert.ok(game.phase === 'awaiting-call' || game.phase === 'awaiting-discard' || game.phase === 'awaiting-draw' || (game.phase === 'won' && game.winResult?.winMethod === 'ron'));
   if (game.phase === 'awaiting-draw') assert.equal(game.turnPlayerId, 1);
 }

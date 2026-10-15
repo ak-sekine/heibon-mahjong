@@ -1,13 +1,14 @@
+import { canTakeRinshan, completeKan } from './kan.ts';
 import type { GameState, OpenMeld, PhysicalTile, PlayerId, PlayerState } from '../model/game.ts';
 import { tileKindKey } from '../model/tile.ts';
 import { concealedSize, winningMelds } from './melds.ts';
 import { cancelAllIppatsu } from './ippatsu.ts';
 import { calculateShanten } from '../analysis/shanten.ts';
 
-export interface CallOption extends OpenMeld {
+export type CallOption = OpenMeld & {
   readonly playerId: PlayerId;
   readonly id: string;
-  readonly handTileIds: readonly [string,string];
+  readonly handTileIds: readonly string[];
   readonly forbiddenKinds: readonly string[];
 }
 /** Called kind is always forbidden. Chi also forbids the alternative end of the
@@ -24,7 +25,7 @@ function forbidden(type: 'pon'|'chi', called: PhysicalTile, owned: readonly Phys
 }
 export function getCallOptions(game: GameState, playerId: PlayerId): readonly CallOption[] {
   const w=game.ronWindow, p=game.players[playerId];
-  if (!w || !['awaiting-ron','awaiting-call'].includes(game.phase) || game.winResult ||
+  if (!w || w.kan || !['awaiting-ron','awaiting-call'].includes(game.phase) || game.winResult ||
       game.turnPlayerId!==w.discarderId || !game.liveWall.length || !p || p.id!==playerId || p.riichi ||
       p.drawnTile || p.callDiscard || p.hand.length!==concealedSize(p) || playerId===w.discarderId) return [];
   const source=game.players[w.discarderId];
@@ -56,6 +57,8 @@ export function getCallOptions(game: GameState, playerId: PlayerId): readonly Ca
       id:`${type}:${playerId}:${called.id}:${owned.map(t=>t.id).join(':')}`,
       handTileIds:[owned[0].id,owned[1].id],forbiddenKinds});
   }
+  const three=sorted.filter(t=>tileKindKey(t.tile)===tileKindKey(called.tile));
+  if(three.length===3 && canTakeRinshan(game)) options.push({type:'daiminkan',tiles:[three[0],called,three[1],three[2]],calledTileId:called.id,fromPlayerId:w.discarderId,playerId,id:`daiminkan:${playerId}:${called.id}`,handTileIds:three.map(t=>t.id),forbiddenKinds:[]});
   return options;
 }
 /** Own hand/melds and the public discard only; no wall/opponent hand access. */
@@ -69,9 +72,9 @@ export function chooseCpuCall(player: PlayerState, options: readonly CallOption[
       (['white','green','red','east',player.wind].includes(m.tile.honor)));
     const all=[...remaining,...melds.flatMap(m=>m.tiles)];
     const tanyao=all.every(t=>t.tile.category==='suited' && t.tile.rank>=2 && t.tile.rank<=8);
-    const toitoi=melds.every(m=>m.type==='pon') && new Set(remaining.map(t=>tileKindKey(t.tile))).size<=5;
+    const toitoi=melds.every(m=>m.type!=='chi') && new Set(remaining.map(t=>tileKindKey(t.tile))).size<=5;
     if(!value && !tanyao && !toitoi) return [];
-    const best=Math.min(...remaining.filter(t=>!option.forbiddenKinds.includes(tileKindKey(t.tile))).map(t=>
+    const best=option.type==='daiminkan' ? calculateShanten(remaining.map(t=>t.tile),melds.length).minimum : Math.min(...remaining.filter(t=>!option.forbiddenKinds.includes(tileKindKey(t.tile))).map(t=>
       calculateShanten(remaining.filter(x=>x.id!==t.id).map(x=>x.tile),melds.length).minimum));
     return best<before || (value && best===before) ? [{option,best}] : [];
   });
@@ -89,9 +92,10 @@ function apply(game:GameState,option:CallOption):GameState {
   const players=[...game.players] as [PlayerState,PlayerState,PlayerState,PlayerState];
   players[source.id]={...source,discardHistory:source.discardHistory ?? source.river,
     river:source.river.filter(t=>t.id!==option.calledTileId)};
-  const {type,tiles,calledTileId,fromPlayerId}=option;
+  if(option.type==='daiminkan') return completeKan({...game,players}, {playerId:p.id,meld:option,handTileIds:option.handTileIds,meldIndex:null,tile:option.tiles.find(t=>t.id===option.calledTileId)!});
+  const meld:OpenMeld=option;
   players[p.id]={...p,hand:p.hand.filter(t=>!option.handTileIds.includes(t.id)),
-    melds:[...(p.melds ?? []),{type,tiles,calledTileId,fromPlayerId}],
+    melds:[...(p.melds ?? []),meld],
     callDiscard:{forbiddenKinds:option.forbiddenKinds}};
   return cancelAllIppatsu({...game,players,callsMade:true,phase:'awaiting-discard',turnPlayerId:p.id,ronWindow:null});
 }

@@ -14,7 +14,7 @@ export interface SettlementPayment {
   readonly points: number;
 }
 export interface RoundSettlement extends RoundInfo {
-  readonly reason: 'tsumo' | 'ron' | 'draw';
+  readonly reason: 'tsumo' | 'ron' | 'draw' | 'four-kans';
   readonly before: Points;
   readonly payments: readonly SettlementPayment[];
   readonly deposits: Readonly<{ recipientId: PlayerId; points: number }> | null;

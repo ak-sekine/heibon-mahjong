@@ -6,7 +6,7 @@ function analyzeTsumo(game: GameState, playerId: PlayerId): WinDetails | null {
   const player = game.players[playerId];
   if (player?.id !== playerId || game.turnPlayerId !== playerId ||
       game.phase !== 'awaiting-discard' || game.winResult !== null || game.ronWindow !== null ||
-      !player.drawnTile || player.drawnTileSource !== 'live-wall') return null;
+      !player.drawnTile || !['live-wall','rinshan'].includes(player.drawnTileSource ?? '')) return null;
   return evaluateWin(game, playerId, player.drawnTile, 'tsumo');
 }
 export function canDeclareTsumo(game: GameState, playerId: PlayerId): boolean {

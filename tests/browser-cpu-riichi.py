@@ -45,6 +45,8 @@ window.stepRows=(position)=>{controller.newGame();const g=riichiStart('tsumo');c
    shot_states.append({'name':name,**state})
    page.screenshot(path=str(out/f'{width}x{height}-{name}.png'))
   def geometry():
+   # Step 13.4 uses document flow; short phones may need ordinary scrolling.
+   page.locator('.discard-controls').scroll_into_view_if_needed()
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
    boxes=page.locator('#player-hand li').evaluate_all('els=>els.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})')
    assert len(set(round(b['y'],1) for b in boxes))==1
@@ -106,7 +108,7 @@ window.stepRows=(position)=>{controller.newGame();const g=riichiStart('tsumo');c
   page.evaluate('stepDraw()');draw=page.evaluate('stepCheck().game.players[1].drawnTile.id');page.evaluate('stepDiscard()')
   assert page.evaluate('stepCheck().game.players[1].river.at(-1).id')==draw
   for _ in range(3):page.evaluate('stepDraw();stepDiscard()')
-  page.evaluate('stepDraw();stepTsumo()');assert page.locator('#result-dialog').is_visible();assert '立直 1翻' in page.locator('#win-result').inner_text();assert page.evaluate('stepCheck().lastSettlement.deposits.recipientId')==1
+  page.evaluate('stepDraw();stepTsumo()');assert page.locator('#result-dialog').is_visible();assert 'ダブル立直 2翻' in page.locator('#win-result').inner_text();assert page.evaluate('stepCheck().lastSettlement.deposits.recipientId')==1
   conservation();shot('cpu-riichi-result');before=page.evaluate('JSON.stringify(stepCheck())');page.locator('#view-table').click();shot('cpu-result-table');page.locator('#show-result').click();assert page.evaluate('JSON.stringify(stepCheck())')==before
   # Human riichi pass: permanent furiten survives draw and still permits tsumo.
   page.evaluate("stepLoad('human');stepDeclare();stepDraw();stepDiscard()")

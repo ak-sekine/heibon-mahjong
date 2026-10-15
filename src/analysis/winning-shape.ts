@@ -3,7 +3,7 @@ import type { Tile, TileKind } from '../model/tile.ts';
 
 export type WinningMeld =
   | Readonly<{ type: 'sequence'; tiles: readonly [TileKind, TileKind, TileKind] }>
-  | Readonly<{ type: 'triplet'; tile: TileKind }>;
+  | Readonly<{ type: 'triplet'; tile: TileKind; kan?: boolean; concealed?: boolean }>;
 export interface StandardDecomposition {
   readonly pair: TileKind;
   readonly melds: readonly [WinningMeld, WinningMeld, WinningMeld, WinningMeld];
@@ -106,6 +106,8 @@ export function analyzeWinningShapes(tiles: readonly Tile[], fixed: readonly Win
   if (fixed.length > 4) throw new RangeError('Too many melds');
   const counts = countsOf(tiles, 14 - fixed.length * 3);
   countsOf([...tiles, ...fixed.flatMap(m => m.type === 'triplet' ? [m.tile,m.tile,m.tile].map(k => ({...k,isRed:false} as Tile)) : m.tiles.map(k => ({...k,isRed:false} as Tile)))]);
+  const physical = [...tiles, ...fixed.flatMap(m=>m.type==='triplet' ? Array.from({length:m.kan?4:3},()=>({...m.tile,isRed:false} as Tile)) : m.tiles.map(k=>({...k,isRed:false} as Tile)))];
+  countsOf(physical,14+fixed.filter(m=>m.type==='triplet' && m.kan).length);
   const decompositions = standardDecompositions(counts, fixed);
   const pairs = TILE_KINDS.filter((_, index) => counts[index] === 2);
   const sevenPairs: SevenPairsResult = fixed.length === 0 && pairs.length === 7

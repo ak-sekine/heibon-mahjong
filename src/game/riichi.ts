@@ -1,3 +1,4 @@
+import { isClosedHand, winningMelds } from './melds.ts';
 import type { GameState, PlayerId, PlayerState } from '../model/game.ts';
 import type { MatchState, Points } from '../model/match.ts';
 import type { TileKind } from '../model/tile.ts';
@@ -12,7 +13,7 @@ export interface RiichiDiscardOption {
 }
 
 /** Pon/chi expose a hand permanently for this round. */
-export function isClosedForRiichi(player: PlayerState): boolean { return !player.melds?.length; }
+export function isClosedForRiichi(player: PlayerState): boolean { return isClosedHand(player); }
 
 /** Pure, deterministic physical-ID options; shape waits do not require a yaku. */
 export function getRiichiDiscardOptions(game: GameState, playerId: PlayerId, points: number): readonly RiichiDiscardOption[] {
@@ -20,9 +21,9 @@ export function getRiichiDiscardOptions(game: GameState, playerId: PlayerId, poi
   const player = game.players[playerId];
   if (player.riichi || !isClosedForRiichi(player)) return [];
   const tiles = [...player.hand, player.drawnTile!];
-  if (new Set(tiles.map(t => t.id)).size !== 14) return [];
+  if (new Set(tiles.map(t => t.id)).size !== 14 - 3*(player.melds?.length ?? 0)) return [];
   return [...tiles].sort((a,b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0).flatMap(tile => {
-    const waitingTileKinds = getWaitingTileKinds(tiles.filter(t => t.id !== tile.id).map(t => t.tile));
+    const waitingTileKinds = getWaitingTileKinds(tiles.filter(t => t.id !== tile.id).map(t => t.tile),winningMelds(player.melds));
     return waitingTileKinds.length ? [{ tileId: tile.id, waitingTileKinds, waitKindCount: waitingTileKinds.length }] : [];
   });
 }

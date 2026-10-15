@@ -1,3 +1,4 @@
+import { completeKan } from './kan.ts';
 import { resolveDiscardCalls } from './calls.ts';
 import { concealedSize, winningMelds } from './melds.ts';
 import type { GameState, PhysicalTile, PlayerId, PlayerState, RonCandidate } from '../model/game.ts';
@@ -9,7 +10,7 @@ import { evaluateWin } from './win.ts';
 export function getWaitingTileKinds(hand: readonly Tile[], fixed: readonly import('../analysis/winning-shape.ts').WinningMeld[] = []): readonly TileKind[] {
   if (hand.length !== 13 - fixed.length*3) throw new RangeError('Waiting tiles require thirteen tiles');
   return TILE_KINDS.filter(kind => {
-    if ([...hand,...fixed.flatMap(m=>m.type==='triplet'?[m.tile,m.tile,m.tile]:m.tiles)].filter(t => tileKindKey(t) === tileKindKey(kind)).length >= 4) return false;
+    if ([...hand,...fixed.flatMap(m=>m.type==='triplet'?Array.from({length:m.kan?4:3},()=>m.tile):m.tiles)].filter(t => tileKindKey(t) === tileKindKey(kind)).length >= 4) return false;
     return isWinningShape([...hand, ordinaryTile(kind)], fixed);
   });
 }
@@ -25,6 +26,7 @@ export function getRonTile(game: GameState): PhysicalTile | null {
   const window = game.ronWindow;
   if (game.phase !== 'awaiting-ron' || game.winResult !== null || !window ||
       game.turnPlayerId !== window.discarderId) return null;
+  if(window.kan) return window.kan.tile;
   const player = game.players[window.discarderId];
   if (!player || player.id !== window.discarderId || player.hand.length !== concealedSize(player) ||
       player.drawnTile !== null || player.drawnTileSource !== null) return null;
@@ -43,7 +45,7 @@ export function getRonCandidates(game: GameState): readonly RonCandidate[] {
     try {
       if (isFuriten(player)) continue;
       const result = evaluateWin(game, id, tile, 'ron');
-      if (result) candidates.push({ ...result, winMethod: 'ron', discarderId });
+      if (result && (game.ronWindow?.kind!=='ankan' || result.candidate.shape==='thirteen-orphans')) candidates.push({ ...result, winMethod: 'ron', discarderId });
     } catch (error) {
       if (!(error instanceof RangeError)) throw error;
     }
@@ -57,8 +59,8 @@ function resolve(game: GameState, winners: readonly RonCandidate[]): GameState {
   if (!getRonTile(game)) throw new RangeError('No current ron window');
   const { discarderId, tileId } = game.ronWindow!;
   if (winners.length) return { ...game, phase: 'won', ronWindow: null, pendingRiichi: null,
-    winResult: { winMethod: 'ron', discarderId, winningTileId: tileId, winners } };
-  return resolveDiscardCalls(game);
+    winResult: { winMethod: 'ron', winningTile:getRonTile(game)!, discarderId, winningTileId: tileId, winners } };
+  return game.ronWindow?.kan ? completeKan(game,game.ronWindow.kan) : resolveDiscardCalls(game);
 }
 /** Called after every legal discard. CPU declarations wait for the human decision. */
 export function resolveDiscardRon(game: GameState): GameState {

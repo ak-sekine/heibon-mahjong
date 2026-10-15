@@ -30,11 +30,13 @@ export function inventory(game: GameState, initial: GameState): void {
     assert.equal(tiles.filter(t => t.tile.isRed && t.tile.category === 'suited' && t.tile.suit === suit).length, 1);
   }
   assert.equal(game.deadWall.length, 14);
-  assert.deepEqual(game.deadWall, initial.deadWall);
+  const used=(game.kanCount ?? 0)-(initial.kanCount ?? 0);
+  assert.deepEqual(game.deadWall.slice((game.kanCount ?? 0)),initial.deadWall.slice((game.kanCount ?? 0)));
+  if(!used) assert.deepEqual(game.deadWall, initial.deadWall);
   for (const p of game.players) {
     assert.equal(p.hand.length, 13 - (p.melds?.length ?? 0)*3 + Number(Boolean(p.callDiscard)));
     assert.equal(p.drawnTileSource === null, p.drawnTile === null);
-    assert.equal(p.drawnTile !== null, (game.phase === 'awaiting-discard' || (game.phase === 'won' && game.winResult?.winMethod === 'tsumo')) && game.turnPlayerId === p.id && !p.callDiscard);
+    assert.equal(p.drawnTile !== null, (Boolean(game.abortiveDraw) || Boolean(game.ronWindow?.kan) || game.phase === 'awaiting-discard' || (game.phase === 'won' && game.winResult?.winMethod === 'tsumo')) && game.turnPlayerId === p.id && !p.callDiscard);
   }
 }
 

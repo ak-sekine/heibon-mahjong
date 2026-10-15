@@ -19,7 +19,7 @@ export function renderMatch(match: MatchState): void {
   const result = match.lastSettlement;
   if (!result) return;
   const text = (tag: string, textContent: string) => Object.assign(document.createElement(tag),{textContent});
-  panel.append(text('h2',`東${result.roundNumber}局 ${result.honba}本場 ${result.reason === 'draw' ? '流局！' : '点棒精算'}`));
+  panel.append(text('h2',`東${result.roundNumber}局 ${result.honba}本場 ${result.reason === 'four-kans' ? '四開槓・途中流局（罰符なし）' : result.reason === 'draw' ? '流局！' : '点棒精算'}`));
   if (result.tenpai) {
     for (const player of match.game.players) {
       panel.append(text('p',`${names[player.id]}：${result.tenpai[player.id] ? 'テンパイ' : 'ノーテン'}`));

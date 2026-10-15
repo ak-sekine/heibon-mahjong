@@ -1,0 +1,12 @@
+✔ CPU1, CPU2, CPU3 act once in order, return fourteen tiles to human and block rapid input (39.705057ms)
+✔ CPU chankan: uncommitted pon, no new dora/rinshan, dedicated winning reference and payer (5.260088ms)
+✔ CPU kan cancellation does not write stale state (6.102394ms)
+✔ CPU kakan uses only own/public information and progresses with 300ms boundaries (3.948734ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 354.801782

@@ -36,6 +36,7 @@
       <p>副露する組み合わせを選択</p><div id="call-options"></div>
       <button id="pass-calls" type="button">見送る</button>
     </div>
+    <div id="kan-controls" hidden role="group" aria-label="暗カン・加カンの選択"><p>カンする面子を選択</p><div id="kan-options"></div><button id="cancel-kan" type="button">キャンセル</button></div>
     <div id="ron-controls" hidden role="group" aria-labelledby="ron-status">
       <p id="ron-status" role="status" aria-live="polite"></p>
       <button id="ron" type="button" aria-describedby="ron-status">ロン和了</button>
@@ -44,6 +45,7 @@
     <p id="selection-status" role="status" aria-live="polite"></p>
     <button id="discard" type="button" disabled>打牌する</button>
     <button id="riichi" type="button" disabled>リーチ</button>
+    <button id="kan" type="button" hidden>カン</button>
     <button id="tsumo" type="button" disabled>ツモ和了</button>
     <button id="show-result" type="button" hidden>結果を見る</button>
     <p class="keyboard-help">Tabで牌とボタンへ移動、Enter／Spaceで選択・確定</p>

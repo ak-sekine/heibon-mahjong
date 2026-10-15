@@ -1,3 +1,4 @@
+import { declareKan, getKanOptions } from '../game/kan.ts';
 import { declareCall, passCalls } from '../game/calls.ts';
 import { isForbiddenDiscard } from '../game/melds.ts';
 import type { MatchState } from '../model/match.ts';
@@ -92,6 +93,13 @@ export class GameController {
     this.selectedTileId = null;
     this.onChange();
     return this.runner.runMatch(() => this.match, match => { this.match = match; this.onChange(); }, this.onChange);
+  }
+  kan(optionId:string): Promise<void> {
+    if(this.progressing || !getKanOptions(this.game,0).some(o=>o.id===optionId)) throw new RangeError('Invalid human kan');
+    this.runner.cancel();
+    this.game=declareKan(this.game,0,optionId);
+    this.selectedTileId=null;this.onChange();
+    return this.runner.runMatch(()=>this.match,match=>{this.match=match;this.onChange();},this.onChange);
   }
   get canNextRound(): boolean { return this.match.status === 'round-ended'; }
   nextRound(): Promise<void> {

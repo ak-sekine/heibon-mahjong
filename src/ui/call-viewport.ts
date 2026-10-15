@@ -1,10 +1,12 @@
 /** Keep the in-flow call panel inside Safari's visual viewport, without overlays.
  * Observe entry separately so ordinary renders never move the user's scroll. */
 export function installCallViewport(): void {
-  const panel = document.querySelector<HTMLElement>('#call-controls')!;
+  const panels = [document.querySelector<HTMLElement>('#call-controls')!,document.querySelector<HTMLElement>('#kan-controls')!].filter(Boolean);
+  const panel=panels[0];
   const main = panel.closest('main')!;
   let pending = false;
   const reveal = () => {
+    const panel=panels.find(p=>!p.hidden) ?? panels[0];
     const viewport = window.visualViewport;
     // Safari may shrink only the visual viewport. Reserve enough document tail
     // to let the entire panel scroll above the browser chrome.
@@ -27,7 +29,7 @@ export function installCallViewport(): void {
       if (Math.abs(delta) > 1) window.scrollBy({ top: delta, behavior: 'instant' });
     });
   };
-  new MutationObserver(reveal).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
+  for(const panel of panels) new MutationObserver(reveal).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
   window.visualViewport?.addEventListener('resize', reveal);
   window.visualViewport?.addEventListener('scroll', reveal);
   window.addEventListener('resize', reveal);

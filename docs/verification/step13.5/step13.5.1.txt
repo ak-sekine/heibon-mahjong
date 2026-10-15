@@ -1,0 +1,22 @@
+✔ ankan: atomic tile transfer, rinshan, indicators, discard and source metadata (16.069874ms)
+✔ kakan: atomic tile transfer, rinshan, indicators, discard and source metadata (3.325528ms)
+✔ two own choices use unique physical IDs and stale/forged requests are immutable (5.793018ms)
+✔ illegal kan {"liveWall":[]} (0.331526ms)
+✔ illegal kan {"deadWall":[]} (0.281643ms)
+✔ illegal kan {"kanCount":4} (0.202988ms)
+✔ illegal kan {"phase":"awaiting-draw"} (0.249446ms)
+✔ illegal kan {"pendingRiichi":{"playerId":0,"declarationTileId":"x"}} (0.232221ms)
+✔ daiminkan from 1, pon priority and history (2.380812ms)
+✔ daiminkan from 2, pon priority and history (2.258042ms)
+✔ daiminkan from 3, pon priority and history (1.795814ms)
+✔ consecutive kans take original slots 0 then 1 and reveal dora immediately (3.321843ms)
+✔ kakan adds the exact red:man-5 ID and preserves the original called tile (2.552194ms)
+✔ kakan adds the exact man-5 ID and preserves the original called tile (1.262382ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 129.113351

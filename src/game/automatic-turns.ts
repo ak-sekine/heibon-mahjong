@@ -1,3 +1,4 @@
+import { chooseCpuKan, declareKan } from './kan.ts';
 import type { MatchState } from '../model/match.ts';
 import { updateMatchGame } from './match.ts';
 import { declareRiichi } from './riichi.ts';
@@ -73,6 +74,8 @@ export class AutomaticTurnRunner {
           write(declareTsumo(game, player.id));
           return;
         }
+        const kan=chooseCpuKan(game,player.id);
+        if(kan) { write(declareKan(game,player.id,kan.id)); continue; }
         const currentPlayer = game.players[player.id];
         if (!currentPlayer.riichi && matchAccess) {
           const match = matchAccess.read();

@@ -58,7 +58,7 @@ function* evaluationSteps(input: ShantenDiscardInput, reportCache?: (entries: nu
   if (new Set(input.tiles.map(t=>t.id)).size !== size) throw new RangeError('Duplicate physical ID');
   const calculator = new ShantenCalculator();
   const openCounts = Array<number>(34).fill(0);
-  for (const meld of open) for (const tile of meld.type==='triplet'?[meld.tile,meld.tile,meld.tile]:meld.tiles) openCounts[TILE_KINDS.findIndex(k=>tileKindKey(k)===tileKindKey(tile))]++;
+  for (const meld of open) for (const tile of meld.type==='triplet'?Array.from({length:meld.kan?4:3},()=>meld.tile):meld.tiles) openCounts[TILE_KINDS.findIndex(k=>tileKindKey(k)===tileKindKey(tile))]++;
   const kindIndex = new Map(TILE_KINDS.map((k,i)=>[tileKindKey(k),i]));
   const visible = Array<number>(34).fill(0);
   // Own discard remains visible in the river, so availability is identical for all candidates.

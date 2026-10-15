@@ -14,7 +14,7 @@ for (const [name, hand, called, count] of [
 ] as const) test(`display ${name} retains executable physical options`, () => {
   const initial = callStart(3, {0: hand}, called);
   const game = discardTile(initial,3,initial.players[3].drawnTile!.id);
-  const raw = getCallOptions(game,0);
+  const raw = getCallOptions(game,0).filter(o=>o.type!=='daiminkan');
   const options = uniqueCallOptions(raw);
   assert.equal(options.length,count);
   assert.ok(raw.length > options.length);

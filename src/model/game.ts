@@ -14,13 +14,19 @@ export interface RiichiState {
   readonly ippatsuEligible?: boolean;
   readonly doubleRiichi?: boolean;
 }
-export interface OpenMeld {
-  readonly type: 'pon' | 'chi';
-  /** Sequence order for chi; owned, called, owned for pon. */
-  readonly tiles: readonly [PhysicalTile, PhysicalTile, PhysicalTile];
-  readonly calledTileId: string;
-  readonly fromPlayerId: PlayerId;
-}
+export type OpenMeld = Readonly<{
+  type: 'pon' | 'chi';
+  tiles: readonly [PhysicalTile, PhysicalTile, PhysicalTile];
+  calledTileId: string;
+  fromPlayerId: PlayerId;
+}> | Readonly<{
+  type: 'ankan' | 'daiminkan' | 'kakan';
+  tiles: readonly [PhysicalTile, PhysicalTile, PhysicalTile, PhysicalTile];
+  /** Ankan uses its owner's seat and an empty called ID. */
+  calledTileId: string;
+  fromPlayerId: PlayerId;
+  addedTileId?: string;
+}>;
 export interface PlayerState {
   readonly id: PlayerId;
   readonly control: 'human' | 'cpu';
@@ -31,12 +37,13 @@ export interface PlayerState {
   readonly discardHistory?: readonly PhysicalTile[];
   readonly callDiscard?: Readonly<{ forbiddenKinds: readonly string[] }> | null;
   readonly drawnTile: PhysicalTile | null;
-  readonly drawnTileSource: 'deal' | 'live-wall' | null;
+  readonly drawnTileSource: 'deal' | 'live-wall' | 'rinshan' | null;
   readonly temporaryFuriten: boolean;
   readonly riichi: RiichiState | null;
   readonly river: readonly PhysicalTile[];
 }
 export interface WallState {
+  readonly kanCount?: number;
   readonly liveWall: readonly PhysicalTile[];
   readonly deadWall: readonly PhysicalTile[];
 }
@@ -67,6 +74,7 @@ export interface RonCandidate extends WinDetails {
   readonly discarderId: PlayerId;
 }
 export interface RonResult {
+  readonly winningTile?: PhysicalTile;
   readonly winMethod: 'ron';
   readonly discarderId: PlayerId;
   readonly winningTileId: string;
@@ -74,6 +82,8 @@ export interface RonResult {
 }
 /** Exists only for the current discard, never survives a draw or a reset. */
 export interface RonWindow {
+  readonly kind?: 'discard' | 'ankan' | 'kakan';
+  readonly kan?: Readonly<{ playerId: PlayerId; meld: OpenMeld; handTileIds: readonly string[]; meldIndex: number | null; tile: PhysicalTile }>;
   readonly discarderId: PlayerId;
   readonly tileId: string;
 }
@@ -83,6 +93,7 @@ export interface PendingRiichi {
   readonly declarationTileId: string;
 }
 export interface GameState extends WallState {
+  readonly abortiveDraw?: 'four-kans';
   readonly callsMade?: boolean;
   readonly pendingRiichi: PendingRiichi | null;
   readonly ronWindow: RonWindow | null;

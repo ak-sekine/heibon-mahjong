@@ -5,6 +5,8 @@ import { analyzeWinningShapes } from './winning-shape.ts';
 import type { StandardDecomposition, WinningMeld } from './winning-shape.ts';
 
 export interface WinningContext {
+  readonly rinshan?: boolean;
+  readonly chankan?: boolean;
   readonly winMethod: 'tsumo' | 'ron';
   readonly winningTile: TileKind;
   readonly seatWind: SeatWind;
@@ -16,12 +18,12 @@ export interface WinningContext {
   readonly ippatsuEligible?: boolean;
   readonly doubleRiichi?: boolean;
 }
-export type YakuId = 'ippatsu' | 'double-riichi' | 'riichi' | 'menzen-tsumo' | 'tanyao' | 'yakuhai-white' | 'yakuhai-green' |
+export type YakuId = 'rinshan' | 'chankan' | 'sankantsu' | 'suukantsu' | 'ippatsu' | 'double-riichi' | 'riichi' | 'menzen-tsumo' | 'tanyao' | 'yakuhai-white' | 'yakuhai-green' |
   'yakuhai-red' | 'yakuhai-seat-wind' | 'yakuhai-round-wind' | 'pinfu' |
   'iipeikou' | 'chiitoitsu' | 'toitoi' | 'kokushi-musou';
 export type RecognizedYaku =
-  | Readonly<{ id: Exclude<YakuId, 'kokushi-musou'>; han: 1 | 2; yakuman: 0 }>
-  | Readonly<{ id: 'kokushi-musou'; han: 0; yakuman: 1 }>;
+  | Readonly<{ id: Exclude<YakuId, 'kokushi-musou' | 'suukantsu'>; han: 1 | 2; yakuman: 0 }>
+  | Readonly<{ id: 'kokushi-musou' | 'suukantsu'; han: 0; yakuman: 1 }>;
 export type WaitType = 'ryanmen' | 'kanchan' | 'penchan' | 'tanki' | 'shanpon';
 export type WinningTileAssignment =
   | Readonly<{ type: 'pair' }>
@@ -88,13 +90,17 @@ function totals(yaku: readonly RecognizedYaku[]) {
 export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): YakuAnalysis {
   if (!context) throw new RangeError('Invalid winning context');
   const fixed = context.openMelds ?? [];
-  const closed = context.isClosed !== false && fixed.length === 0;
+  const closed = context.isClosed !== false && fixed.every(m=>m.type==='triplet' && m.concealed);
   const shapes = analyzeWinningShapes(tiles, fixed);
   const allTiles = [...tiles, ...fixed.flatMap(m => m.type === 'triplet' ? [m.tile,m.tile,m.tile] : m.tiles)];
   validateContext(context, tiles);
   const common: RecognizedYaku[] = [];
-  const add = (list: RecognizedYaku[], id: Exclude<YakuId, 'kokushi-musou'>, han: 1 | 2 = 1) =>
+  const add = (list: RecognizedYaku[], id: Exclude<YakuId, 'kokushi-musou' | 'suukantsu'>, han: 1 | 2 = 1) =>
     list.push({ id, han, yakuman: 0 });
+  if (context.rinshan && context.winMethod==='tsumo') add(common,'rinshan');
+  if (context.chankan && context.winMethod==='ron') add(common,'chankan');
+  const kans=fixed.filter(m=>m.type==='triplet' && m.kan).length;
+  if(kans===3) add(common,'sankantsu',2);
   if (closed && context.riichi) {
     add(common, context.doubleRiichi ? 'double-riichi' : 'riichi', context.doubleRiichi ? 2 : 1);
     if (context.ippatsuEligible) add(common, 'ippatsu');
@@ -119,10 +125,10 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
     const iipeikou = new Set(sequences).size < sequences.length;
     const toitoi = melds.every(m => m.type === 'triplet');
     const emit = (assignment: WinningTileAssignment, wait: WaitType, position: string) => {
-      const yaku = [...base];
+      const yaku: RecognizedYaku[] = kans===4 ? [{id:'suukantsu',han:0,yakuman:1}] : [...base];
       if (closed && melds.every(m => m.type === 'sequence') && !valuePair(pair, context) && wait === 'ryanmen') add(yaku, 'pinfu');
-      if (closed && iipeikou) add(yaku, 'iipeikou');
-      if (toitoi) add(yaku, 'toitoi', 2);
+      if (kans!==4 && closed && iipeikou) add(yaku, 'iipeikou');
+      if (kans!==4 && toitoi) add(yaku, 'toitoi', 2);
       candidates.push({ shape: 'standard', id: `standard:${decompositionId}:${position}`,
         decompositionId, decomposition, assignment, wait, ...totals(yaku) });
     };

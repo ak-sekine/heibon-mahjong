@@ -1,3 +1,4 @@
+import { getKanOptions } from '../game/kan.ts';
 import { uniqueCallOptions } from '../ui/call-options.ts';
 import { getCallOptions } from '../game/calls.ts';
 import { isForbiddenDiscard } from '../game/melds.ts';
@@ -27,7 +28,7 @@ function turnLabel(game: GameState): string {
   }
   if (game.phase === 'awaiting-call') return 'ポン・チー宣言待ち';
   if (game.phase === 'awaiting-ron') return 'ロン宣言待ち';
-  if (game.phase === 'wall-exhausted') return '牌山がなくなりました';
+  if (game.phase === 'wall-exhausted') return game.abortiveDraw?'四開槓・途中流局':'牌山がなくなりました';
   return `${game.turnPlayerId === 0 ? 'あなた' : seatNames[game.turnPlayerId]}の手番`;
 }
 
@@ -134,6 +135,19 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
     button.setAttribute('aria-pressed', String(button.dataset.tileId === selectedTileId));
     button.disabled = isForbiddenDiscard(game.players[0],button.dataset.tileId!) || progressing || !canDiscard(game, 0) || Boolean(game.players[0].riichi && button.dataset.tileId !== game.players[0].drawnTile?.id);
   }
+  const kanOptions=progressing?[]:getKanOptions(game,0);
+  const kanButton=document.querySelector<HTMLButtonElement>('#kan');
+  if(kanButton) {kanButton.hidden=!kanOptions.length;kanButton.disabled=!kanOptions.length;}
+  const kanPanel=document.querySelector<HTMLElement>('#kan-controls');
+  if(kanPanel) {
+    if(!kanOptions.length) kanPanel.hidden=true;
+    document.querySelector('#kan-options')!.replaceChildren(...kanOptions.map(option=>{
+      const b=document.createElement('button');b.type='button';b.dataset.kanId=option.id;
+      b.append(document.createTextNode(option.meld.type==='ankan'?'暗カン':'加カン'));
+      for(const t of option.meld.tiles) b.append(createTileElement(t.tile));
+      return b;
+    }));
+  }
   const calls = document.querySelector<HTMLElement>('#call-controls');
   if (calls) {
     const options = game.phase === 'awaiting-call' ? uniqueCallOptions(getCallOptions(game,0)) : [];
@@ -141,7 +155,7 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
     const choices = document.querySelector<HTMLElement>('#call-options')!;
     choices.replaceChildren(...options.map(option => {
       const button = document.createElement('button'); button.type='button'; button.dataset.callId=option.id;
-      const name = option.type==='pon' ? 'ポン' : 'チー';
+      const name = option.type==='pon' ? 'ポン' : option.type==='daiminkan'?'大明カン':'チー';
       button.setAttribute('aria-label', `${name}：${option.tiles.map(t=>tileLabel(t.tile)).join('・')}（${option.handTileIds.join('、')}）`);
       button.append(document.createTextNode(name));
       for (const tile of option.tiles) button.append(createTileElement(tile.tile));
@@ -155,7 +169,7 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
   const tile = getRonTile(game);
   if (canRon && tile) {
     document.querySelector<HTMLElement>('#ron-status')!.textContent =
-      `${seatNames[game.ronWindow!.discarderId]}の捨て牌：${tileLabel(tile.tile)}。ロンできます`;
+      `${seatNames[game.ronWindow!.discarderId]}の${game.ronWindow?.kan?'カン宣言牌':'捨て牌'}：${tileLabel(tile.tile)}。ロンできます`;
   }
   document.querySelector<HTMLButtonElement>('#ron')!.disabled = !canRon;
   document.querySelector<HTMLButtonElement>('#pass-ron')!.disabled = !canRon;
@@ -181,6 +195,7 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
 }
 
 const yakuNames: Record<YakuId, string> = {
+  rinshan:'嶺上開花', chankan:'槍槓', sankantsu:'三槓子', suukantsu:'四槓子',
   riichi: '立直', ippatsu: '一発', 'double-riichi': 'ダブル立直', 'menzen-tsumo': '門前清自摸和', tanyao: '断么九',
   'yakuhai-white': '役牌：白', 'yakuhai-green': '役牌：發', 'yakuhai-red': '役牌：中',
   'yakuhai-seat-wind': '役牌：自風', 'yakuhai-round-wind': '役牌：場風',
@@ -215,7 +230,7 @@ function renderWinResult(game: GameState): void {
       hand.setAttribute('aria-label', '和了手牌');
       const tiles = [...player.hand].sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
       const winningTile = result.winMethod === 'ron'
-        ? game.players[result.discarderId].river.find(t => t.id === result.winningTileId)! : player.drawnTile!;
+        ? (win.winMethod==='ron' ? win.winningTile : undefined) ?? game.players[result.discarderId].river.find(t => t.id === result.winningTileId)! : player.drawnTile!;
       for (const physical of [...tiles, winningTile]) {
         const item = document.createElement('li');
         item.dataset.tileId = physical.id;
@@ -286,6 +301,7 @@ function fuEntryLabel(entry: FuEntry): string {
     case 'tsumo': return 'ツモ';
     case 'pinfu-tsumo': return '平和ツモ（20符固定）';
     case 'seven-pairs': return '七対子（25符固定）';
+    case 'kan': return `${entry.concealed?'暗カン':'明カン'}（${tileLabel(ordinaryTile(entry.tile))}）`;
     case 'triplet': return `${entry.concealed ? '暗刻' : '明刻'}（${tileLabel(ordinaryTile(entry.tile))}・${entry.terminalOrHonor ? '么九牌・字牌' : '中張牌'}）`;
     case 'pair': return `雀頭（${tileLabel(ordinaryTile(entry.tile))}${entry.dragon ? '・三元牌' : ''}${entry.seatWind ? '・自風' : ''}${entry.roundWind ? '・場風' : ''}）`;
     case 'wait': return `${({ ryanmen: '両面', shanpon: 'シャンポン', kanchan: '嵌張', penchan: '辺張', tanki: '単騎' })[entry.wait]}待ち`;
@@ -298,14 +314,27 @@ function renderMelds(container: HTMLElement, player: PlayerState): void {
     const group=document.createElement('div');group.className='open-meld';
     const direction=(meld.fromPlayerId-player.id+4)%4;
     group.dataset.fromDirection=String(direction);
-    group.setAttribute('aria-label',`${meld.type==='pon'?'ポン':'チー'}・${seatNames[meld.fromPlayerId]}から`);
+    group.setAttribute('aria-label',`${({pon:'ポン',chi:'チー',ankan:'暗カン',daiminkan:'大明カン',kakan:'加カン'})[meld.type]}・${seatNames[meld.fromPlayerId]}から`);
     // Source-relative called tile position: shimocha right, toimen middle, kamicha left.
+    group.dataset.meldType=meld.type;
+    if(meld.type==='ankan') {
+      const concealedTiles=[...meld.tiles];
+      const red=concealedTiles.findIndex(t=>t.tile.isRed);
+      if(red!==-1) [concealedTiles[1],concealedTiles[red]]=[concealedTiles[red],concealedTiles[1]];
+      concealedTiles.forEach((physical,index)=>{
+        const item=document.createElement('span');
+        if(index===0 || index===3) {item.className='concealed-kan-back';item.setAttribute('aria-label','裏向き牌');}
+        else {item.dataset.tileId=physical.id;item.append(createTileElement(physical.tile));}
+        group.append(item);
+      });return group;
+    }
     const own=meld.tiles.filter(t=>t.id!==meld.calledTileId);
     const called=meld.tiles.find(t=>t.id===meld.calledTileId)!;
     const arranged=[...own];arranged.splice(direction===3?0:direction===2?1:2,0,called);
     for(const physical of arranged) {
       const item=document.createElement('span');item.dataset.tileId=physical.id;
       item.className=physical.id===meld.calledTileId?'called-tile':'';
+      if(meld.type==='kakan' && physical.id===meld.addedTileId) item.classList.add('added-kan-tile');
       item.append(createTileElement(physical.tile));group.append(item);
     }
     return group;
