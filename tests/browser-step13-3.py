@@ -48,7 +48,7 @@ window.finishDraw=()=>{controller.match=updateMatchGame(controller.match,control
    assert '裏ドラ表示牌' not in page.locator('main').inner_text()
   def geometry(result=False):
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-   assert page.locator('.dora-slot').count()==5
+   assert page.locator('#dora-indicators .dora-slot').count()==5
    assert page.locator('#dora-indicators').evaluate('e=>getComputedStyle(e).gridTemplateColumns.split(" ").length')==3
    if result:
     assert page.locator('#result-dialog').is_visible()
@@ -76,7 +76,7 @@ window.finishDraw=()=>{controller.match=updateMatchGame(controller.match,control
    if mode=='double':assert '立直 1翻' not in text
    for term in ['一発 1翻','門前清自摸和 1翻','通常ドラ：','裏ドラ：1枚（1翻）','赤ドラ：1枚（1翻）','合計：','獲得点数：','支払い：']:assert term in text,term
    assert page.locator('.ura-dora-result svg').count()==1
-   assert '裏ドラ表示牌' in page.locator('.ura-dora-result svg').get_attribute('aria-label')
+   assert '裏ドラ表示牌1' in page.locator('.ura-dora-result .result-dora-slot').first.get_attribute('aria-label')
    assert '裏ドラ：' in page.locator('.ura-dora-result').inner_text()
    r=page.evaluate('check().game.winResult');results.append({'mode':mode,'yakuHan':r['yakuHan'],'dora':r['doraCount'],'ura':r['uraDoraCount'],'red':r['redDoraCount'],'totalHan':r['totalHanIncludingDora'],'points':r['totalPoints'],'payments':r['payments'],'scroll':page.locator('#result-body').evaluate('e=>({client:e.clientHeight,scroll:e.scrollHeight})')})
    shot(mode+'-result');page.locator('.ura-dora-result').scroll_into_view_if_needed();geometry(True);shot(mode+'-ura');page.locator('#result-body').evaluate('e=>e.scrollTop=e.scrollHeight');geometry(True);shot(mode+'-result-bottom')

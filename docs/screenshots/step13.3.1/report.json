@@ -1,0 +1,695 @@
+[
+  {
+    "width": 320,
+    "height": 568,
+    "result": "passed",
+    "results": [
+      {
+        "mode": "ordinary",
+        "yakuHan": 3,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 5,
+        "points": 12000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 4000
+          },
+          {
+            "playerId": 2,
+            "points": 4000
+          },
+          {
+            "playerId": 3,
+            "points": 4000
+          }
+        ],
+        "scroll": {
+          "client": 432,
+          "scroll": 1422
+        }
+      },
+      {
+        "mode": "double",
+        "yakuHan": 4,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 6,
+        "points": 18000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 6000
+          },
+          {
+            "playerId": 2,
+            "points": 6000
+          },
+          {
+            "playerId": 3,
+            "points": 6000
+          }
+        ],
+        "scroll": {
+          "client": 432,
+          "scroll": 1422
+        }
+      },
+      {
+        "mode": "mixed-triple-ron",
+        "winners": [
+          {
+            "id": 2,
+            "ura": 0,
+            "han": 2,
+            "points": 2000
+          },
+          {
+            "id": 3,
+            "ura": 0,
+            "han": 3,
+            "points": 3900
+          },
+          {
+            "id": 0,
+            "ura": 1,
+            "han": 5,
+            "points": 8000
+          }
+        ]
+      }
+    ],
+    "checks": [
+      "ordinary/double/ippatsu-yaku",
+      "bonuses-and-payments",
+      "ura-svg-accessibility",
+      "pending/pass/declaration-ron",
+      "mixed-triple-ron",
+      "draw-private",
+      "private-live-DOM",
+      "result-scroll/buttons/width",
+      "one-row-hand/equal-44px-controls",
+      "dora-3+2",
+      "view-table-central-private",
+      "100000-point-conservation"
+    ],
+    "errors": []
+  },
+  {
+    "width": 375,
+    "height": 667,
+    "result": "passed",
+    "results": [
+      {
+        "mode": "ordinary",
+        "yakuHan": 3,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 5,
+        "points": 12000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 4000
+          },
+          {
+            "playerId": 2,
+            "points": 4000
+          },
+          {
+            "playerId": 3,
+            "points": 4000
+          }
+        ],
+        "scroll": {
+          "client": 531,
+          "scroll": 1403
+        }
+      },
+      {
+        "mode": "double",
+        "yakuHan": 4,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 6,
+        "points": 18000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 6000
+          },
+          {
+            "playerId": 2,
+            "points": 6000
+          },
+          {
+            "playerId": 3,
+            "points": 6000
+          }
+        ],
+        "scroll": {
+          "client": 531,
+          "scroll": 1403
+        }
+      },
+      {
+        "mode": "mixed-triple-ron",
+        "winners": [
+          {
+            "id": 2,
+            "ura": 0,
+            "han": 2,
+            "points": 2000
+          },
+          {
+            "id": 3,
+            "ura": 0,
+            "han": 3,
+            "points": 3900
+          },
+          {
+            "id": 0,
+            "ura": 1,
+            "han": 5,
+            "points": 8000
+          }
+        ]
+      }
+    ],
+    "checks": [
+      "ordinary/double/ippatsu-yaku",
+      "bonuses-and-payments",
+      "ura-svg-accessibility",
+      "pending/pass/declaration-ron",
+      "mixed-triple-ron",
+      "draw-private",
+      "private-live-DOM",
+      "result-scroll/buttons/width",
+      "one-row-hand/equal-44px-controls",
+      "dora-3+2",
+      "view-table-central-private",
+      "100000-point-conservation"
+    ],
+    "errors": []
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "result": "passed",
+    "results": [
+      {
+        "mode": "ordinary",
+        "yakuHan": 3,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 5,
+        "points": 12000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 4000
+          },
+          {
+            "playerId": 2,
+            "points": 4000
+          },
+          {
+            "playerId": 3,
+            "points": 4000
+          }
+        ],
+        "scroll": {
+          "client": 708,
+          "scroll": 1405
+        }
+      },
+      {
+        "mode": "double",
+        "yakuHan": 4,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 6,
+        "points": 18000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 6000
+          },
+          {
+            "playerId": 2,
+            "points": 6000
+          },
+          {
+            "playerId": 3,
+            "points": 6000
+          }
+        ],
+        "scroll": {
+          "client": 708,
+          "scroll": 1405
+        }
+      },
+      {
+        "mode": "mixed-triple-ron",
+        "winners": [
+          {
+            "id": 2,
+            "ura": 0,
+            "han": 2,
+            "points": 2000
+          },
+          {
+            "id": 3,
+            "ura": 0,
+            "han": 3,
+            "points": 3900
+          },
+          {
+            "id": 0,
+            "ura": 1,
+            "han": 5,
+            "points": 8000
+          }
+        ]
+      }
+    ],
+    "checks": [
+      "ordinary/double/ippatsu-yaku",
+      "bonuses-and-payments",
+      "ura-svg-accessibility",
+      "pending/pass/declaration-ron",
+      "mixed-triple-ron",
+      "draw-private",
+      "private-live-DOM",
+      "result-scroll/buttons/width",
+      "one-row-hand/equal-44px-controls",
+      "dora-3+2",
+      "view-table-central-private",
+      "100000-point-conservation"
+    ],
+    "errors": []
+  },
+  {
+    "width": 414,
+    "height": 896,
+    "result": "passed",
+    "results": [
+      {
+        "mode": "ordinary",
+        "yakuHan": 3,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 5,
+        "points": 12000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 4000
+          },
+          {
+            "playerId": 2,
+            "points": 4000
+          },
+          {
+            "playerId": 3,
+            "points": 4000
+          }
+        ],
+        "scroll": {
+          "client": 760,
+          "scroll": 1407
+        }
+      },
+      {
+        "mode": "double",
+        "yakuHan": 4,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 6,
+        "points": 18000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 6000
+          },
+          {
+            "playerId": 2,
+            "points": 6000
+          },
+          {
+            "playerId": 3,
+            "points": 6000
+          }
+        ],
+        "scroll": {
+          "client": 760,
+          "scroll": 1407
+        }
+      },
+      {
+        "mode": "mixed-triple-ron",
+        "winners": [
+          {
+            "id": 2,
+            "ura": 0,
+            "han": 2,
+            "points": 2000
+          },
+          {
+            "id": 3,
+            "ura": 0,
+            "han": 3,
+            "points": 3900
+          },
+          {
+            "id": 0,
+            "ura": 1,
+            "han": 5,
+            "points": 8000
+          }
+        ]
+      }
+    ],
+    "checks": [
+      "ordinary/double/ippatsu-yaku",
+      "bonuses-and-payments",
+      "ura-svg-accessibility",
+      "pending/pass/declaration-ron",
+      "mixed-triple-ron",
+      "draw-private",
+      "private-live-DOM",
+      "result-scroll/buttons/width",
+      "one-row-hand/equal-44px-controls",
+      "dora-3+2",
+      "view-table-central-private",
+      "100000-point-conservation"
+    ],
+    "errors": []
+  },
+  {
+    "width": 1280,
+    "height": 800,
+    "result": "passed",
+    "results": [
+      {
+        "mode": "ordinary",
+        "yakuHan": 3,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 5,
+        "points": 12000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 4000
+          },
+          {
+            "playerId": 2,
+            "points": 4000
+          },
+          {
+            "playerId": 3,
+            "points": 4000
+          }
+        ],
+        "scroll": {
+          "client": 658,
+          "scroll": 1356
+        }
+      },
+      {
+        "mode": "double",
+        "yakuHan": 4,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 6,
+        "points": 18000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 6000
+          },
+          {
+            "playerId": 2,
+            "points": 6000
+          },
+          {
+            "playerId": 3,
+            "points": 6000
+          }
+        ],
+        "scroll": {
+          "client": 658,
+          "scroll": 1356
+        }
+      },
+      {
+        "mode": "mixed-triple-ron",
+        "winners": [
+          {
+            "id": 2,
+            "ura": 0,
+            "han": 2,
+            "points": 2000
+          },
+          {
+            "id": 3,
+            "ura": 0,
+            "han": 3,
+            "points": 3900
+          },
+          {
+            "id": 0,
+            "ura": 1,
+            "han": 5,
+            "points": 8000
+          }
+        ]
+      }
+    ],
+    "checks": [
+      "ordinary/double/ippatsu-yaku",
+      "bonuses-and-payments",
+      "ura-svg-accessibility",
+      "pending/pass/declaration-ron",
+      "mixed-triple-ron",
+      "draw-private",
+      "private-live-DOM",
+      "result-scroll/buttons/width",
+      "one-row-hand/equal-44px-controls",
+      "dora-3+2",
+      "view-table-central-private",
+      "100000-point-conservation"
+    ],
+    "errors": []
+  },
+  {
+    "width": 375,
+    "height": 547,
+    "result": "passed",
+    "results": [
+      {
+        "mode": "ordinary",
+        "yakuHan": 3,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 5,
+        "points": 12000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 4000
+          },
+          {
+            "playerId": 2,
+            "points": 4000
+          },
+          {
+            "playerId": 3,
+            "points": 4000
+          }
+        ],
+        "scroll": {
+          "client": 411,
+          "scroll": 1403
+        }
+      },
+      {
+        "mode": "double",
+        "yakuHan": 4,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 6,
+        "points": 18000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 6000
+          },
+          {
+            "playerId": 2,
+            "points": 6000
+          },
+          {
+            "playerId": 3,
+            "points": 6000
+          }
+        ],
+        "scroll": {
+          "client": 411,
+          "scroll": 1403
+        }
+      },
+      {
+        "mode": "mixed-triple-ron",
+        "winners": [
+          {
+            "id": 2,
+            "ura": 0,
+            "han": 2,
+            "points": 2000
+          },
+          {
+            "id": 3,
+            "ura": 0,
+            "han": 3,
+            "points": 3900
+          },
+          {
+            "id": 0,
+            "ura": 1,
+            "han": 5,
+            "points": 8000
+          }
+        ]
+      }
+    ],
+    "checks": [
+      "ordinary/double/ippatsu-yaku",
+      "bonuses-and-payments",
+      "ura-svg-accessibility",
+      "pending/pass/declaration-ron",
+      "mixed-triple-ron",
+      "draw-private",
+      "private-live-DOM",
+      "result-scroll/buttons/width",
+      "one-row-hand/equal-44px-controls",
+      "dora-3+2",
+      "view-table-central-private",
+      "100000-point-conservation"
+    ],
+    "errors": []
+  },
+  {
+    "width": 390,
+    "height": 724,
+    "result": "passed",
+    "results": [
+      {
+        "mode": "ordinary",
+        "yakuHan": 3,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 5,
+        "points": 12000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 4000
+          },
+          {
+            "playerId": 2,
+            "points": 4000
+          },
+          {
+            "playerId": 3,
+            "points": 4000
+          }
+        ],
+        "scroll": {
+          "client": 588,
+          "scroll": 1405
+        }
+      },
+      {
+        "mode": "double",
+        "yakuHan": 4,
+        "dora": 0,
+        "ura": 1,
+        "red": 1,
+        "totalHan": 6,
+        "points": 18000,
+        "payments": [
+          {
+            "playerId": 1,
+            "points": 6000
+          },
+          {
+            "playerId": 2,
+            "points": 6000
+          },
+          {
+            "playerId": 3,
+            "points": 6000
+          }
+        ],
+        "scroll": {
+          "client": 588,
+          "scroll": 1405
+        }
+      },
+      {
+        "mode": "mixed-triple-ron",
+        "winners": [
+          {
+            "id": 2,
+            "ura": 0,
+            "han": 2,
+            "points": 2000
+          },
+          {
+            "id": 3,
+            "ura": 0,
+            "han": 3,
+            "points": 3900
+          },
+          {
+            "id": 0,
+            "ura": 1,
+            "han": 5,
+            "points": 8000
+          }
+        ]
+      }
+    ],
+    "checks": [
+      "ordinary/double/ippatsu-yaku",
+      "bonuses-and-payments",
+      "ura-svg-accessibility",
+      "pending/pass/declaration-ron",
+      "mixed-triple-ron",
+      "draw-private",
+      "private-live-DOM",
+      "result-scroll/buttons/width",
+      "one-row-hand/equal-44px-controls",
+      "dora-3+2",
+      "view-table-central-private",
+      "100000-point-conservation"
+    ],
+    "errors": []
+  }
+]

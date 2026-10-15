@@ -1,5 +1,4 @@
 import { uraDoraIndicators } from '../game/dora.ts';
-import { doraKindFromIndicator } from '../analysis/dora.ts';
 import { ordinaryTile } from '../model/tile.ts';
 import type { FuEntry } from '../analysis/fu.ts';
 import type { ScoreTier } from '../analysis/score.ts';
@@ -12,7 +11,7 @@ import type { YakuId } from '../analysis/yaku.ts';
 import { canDeclareRiichi } from '../game/riichi.ts';
 import { canDiscard } from '../game/discard.ts';
 import { exposedDoraIndicators } from '../game/dora.ts';
-import { renderDoraIndicators } from './dora.ts';
+import { renderDoraIndicators, createResultDoraRow } from './dora.ts';
 
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
 const seatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
@@ -222,18 +221,10 @@ function renderWinResult(game: GameState): void {
       section.append(bonuses);
       section.append(text('p', `合計：${result.totalHanIncludingDora}翻`));
     }
-    if (player.riichi) {
-      const ura = document.createElement('div');
-      ura.className = 'ura-dora-result';
-      for (const indicator of uraDoraIndicators(game)) {
-        const indicatorName = tileLabel(indicator.tile);
-        const doraName = tileLabel(ordinaryTile(doraKindFromIndicator(indicator.tile)));
-        const description = `裏ドラ表示牌：${indicatorName}、裏ドラ：${doraName}、和了手牌に${result.uraDoraCount}枚（${result.uraDoraHan}翻）`;
-        const svg = createTileElement(indicator.tile);
-        svg.setAttribute('aria-label', description);
-        ura.append(svg, text('p', description));
-      }
-      section.append(ura);
+    section.append(createResultDoraRow(exposedDoraIndicators(game), false));
+    // Read hidden indicators only for a confirmed winner with established riichi.
+    if (game.phase === 'won' && player.riichi) {
+      section.append(createResultDoraRow(uraDoraIndicators(game), true));
     }
     if (result.fu !== null) section.append(text('p', `符：${result.fu}符`));
     const tier = scoreTierNames[result.scoreTier];

@@ -183,6 +183,11 @@ header > div { min-width:0; }
 /* Keep an unselected drawn tile clear of sticky controls on short phones. */
 @media (max-height:600px) { .seat-bottom { gap:2px; } }
 
-.ura-dora-result { display: flex; align-items: center; gap: .5rem; min-width: 0; }
-.ura-dora-result svg { width: 32px; height: 44px; flex: 0 0 32px; }
-.ura-dora-result p { min-width: 0; overflow-wrap: anywhere; }
+/* Result-only rows: central dora keeps its existing 3+2 layout. */
+.result-dora { margin: 12px 0; min-width: 0; }
+.result-dora h3 { margin: 0 0 6px; font-size: .95rem; }
+.result-dora-slots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; width: min(100%, 240px); }
+.result-dora-slot { min-width: 0; aspect-ratio: 60 / 84; }
+.result-dora-slot svg { display: block; width: 100%; height: 100%; }
+.result-dora-placeholder { box-sizing: border-box; border: 1px dashed #9dc5b2; border-radius: 5px; background: rgb(255 253 247 / 5%); }
+.result-dora-description { margin: 5px 0 0; font-size: .8rem; overflow-wrap: anywhere; }

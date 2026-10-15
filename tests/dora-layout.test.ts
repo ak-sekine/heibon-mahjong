@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderDoraIndicators } from '../src/rendering/dora.ts';
+import { createResultDoraRow, renderDoraIndicators } from '../src/rendering/dora.ts';
 import { startGame } from '../src/game/start.ts';
 import { exposedDoraIndicators } from '../src/game/dora.ts';
 import { TILE_KINDS, ordinaryTile, redFive } from '../src/model/tile.ts';
@@ -60,4 +60,31 @@ test('all indicator kinds and red fives distinguish indicator names from actual 
 test('more than five indicators rejects data before changing the DOM', () => withDOM(region => {
   assert.throws(() => renderDoraIndicators(region as unknown as HTMLElement, startGame().liveWall.slice(0, 6)), RangeError);
   assert.deepEqual(region.children, []);
+}));
+
+for (const ura of [false, true]) for (const count of [0, 1, 2, 3, 4, 5]) test(`result dora row: ura=${ura}, ${count} indicators`, () => withDOM(() => {
+  const indicators = startGame().liveWall.slice(0, count);
+  const snapshot = structuredClone(indicators);
+  const row = createResultDoraRow(indicators, ura) as unknown as Node;
+  const name = ura ? '裏ドラ表示牌' : 'ドラ表示牌';
+  assert.equal(row.children[0].textContent, name);
+  const slots = row.children[1].children;
+  assert.equal(slots.length, 5);
+  for (const [i, slot] of slots.entries()) {
+    if (i < count) {
+      assert.equal(slot.dataset.tileId, indicators[i].id);
+      assert.equal(slot.children[0].innerHTML, tileSvgMarkup(indicators[i].tile));
+      assert.equal(slot.children[0].attributes['aria-hidden'], 'true');
+      assert.equal(slot.attributes['aria-label'], `${name}${i + 1}：${tileLabel(indicators[i].tile)}、${ura ? '裏ドラ' : 'ドラ'}：${tileLabel(ordinaryTile(doraKindFromIndicator(indicators[i].tile)))}`);
+    } else {
+      assert.deepEqual(slot.dataset, {});
+      assert.deepEqual(slot.children, []);
+      assert.equal(slot.attributes['aria-label'], `${name}${i + 1}：未使用枠`);
+    }
+  }
+  assert.equal(row.children[2].attributes['aria-hidden'], 'true');
+  assert.deepEqual(indicators, snapshot);
+}));
+test('result row rejects more than five indicators', () => withDOM(() => {
+  assert.throws(() => createResultDoraRow(startGame().liveWall.slice(0, 6), false), RangeError);
 }));

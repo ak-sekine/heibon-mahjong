@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { ronStart, withRiverTile } from './ron-fixture.ts';
+import { declareRon } from '../src/game/ron.ts';
 import { tsumoGame } from './tsumo-fixture.ts';
 import { declareTsumo } from '../src/game/tsumo.ts';
 import { startGame } from '../src/game/start.ts';
@@ -24,6 +26,7 @@ class ElementStub {
   content = { firstElementChild: this };
   innerHTML = '';
   focused = false;
+  querySelector() { return { textContent: '' }; }
   focus() { assert.equal(this.disabled, false); this.focused = true; }
   classList = { toggle() {} };
   attributes: Record<string, string> = {};
@@ -326,3 +329,48 @@ for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','f
     } finally { globalThis.document = original; }
   });
 }
+
+for (const mode of ['plain', 'riichi', 'double', 'double-ron', 'triple-ron'] as const) test(`result indicator visibility and reset: ${mode}`, () => {
+  const nodes = new Map<string, ElementStub>();
+  for (const id of [0, 1, 2, 3]) {
+    nodes.set(`#label-${id}`, new ElementStub());
+    nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
+  }
+  for (const key of ['#player-hand', '#wall-count', '#win-result', '#dora-indicators', '#ron-controls', '#ron-status', '#ron', '#pass-ron', '.discard-controls']) nodes.set(key, new ElementStub());
+  const original = globalThis.document;
+  globalThis.document = { querySelector: (s: string) => nodes.get(s), createElement: (t: string) => new ElementStub(t) } as unknown as Document;
+  try {
+    const multi = mode.endsWith('-ron');
+    let game = multi ? ronStart(1, mode === 'double-ron' ? [0,2] : [0,2,3]) : tsumoGame();
+    if (mode !== 'plain') {
+      game = withRiverTile(game, 0, 'north');
+      game = {...game, players: game.players.map(p => p.id === 0 ? {...p, riichi: {declarationTileId: p.river.at(-1)!.id, ippatsuEligible: false, doubleRiichi: mode === 'double'}} : p)};
+    }
+    renderTable(game);
+    const walk = (n: ElementStub): ElementStub[] => [n, ...n.children.flatMap(walk)];
+    const panel = nodes.get('#win-result')!;
+    assert.equal(walk(panel).filter(n => n.className.includes('result-dora')).length, 0);
+    const won = multi ? declareRon(discardTile(game, 1, game.players[1].drawnTile!.id), 0) : declareTsumo(game, 0);
+    const snapshot = structuredClone(won);
+    renderTable(won);
+    assert.ok(panel.children.length > 0);
+    for (const section of panel.children) {
+      const rows = section.children.filter(n => n.className.startsWith('result-dora '));
+      const entitled = mode !== 'plain' && section.dataset.winnerId === '0';
+      assert.equal(rows.length, entitled ? 2 : 1);
+      for (const [i, row] of rows.entries()) {
+        const slots = row.children[1].children;
+        assert.equal(slots.length, 5);
+        const tile = game.deadWall[i === 0 ? 4 : 5];
+        assert.equal(slots[0].dataset.tileId, tile.id);
+        assert.equal(slots[0].children[0].innerHTML, tileSvgMarkup(tile.tile));
+        assert.ok(slots.slice(1).every(n => !n.children.length && !Object.keys(n.dataset).length));
+      }
+      if (!entitled) assert.ok(!JSON.stringify(walk(section).map(n => [n.dataset, n.attributes, n.textContent, n.innerHTML])).includes(game.deadWall[5].id));
+    }
+    assert.deepEqual(won, snapshot);
+    renderTable(startGame());
+    assert.deepEqual(panel.children, []);
+    assert.ok(!JSON.stringify(walk(nodes.get('#dora-indicators')!).map(n => [n.dataset, n.attributes])).includes(game.deadWall[5].id));
+  } finally { globalThis.document = original; }
+});
