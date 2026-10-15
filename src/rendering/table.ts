@@ -1,3 +1,4 @@
+import { uniqueCallOptions } from '../ui/call-options.ts';
 import { getCallOptions } from '../game/calls.ts';
 import { isForbiddenDiscard } from '../game/melds.ts';
 import { uraDoraIndicators } from '../game/dora.ts';
@@ -135,7 +136,7 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
   }
   const calls = document.querySelector<HTMLElement>('#call-controls');
   if (calls) {
-    const options = game.phase === 'awaiting-call' ? getCallOptions(game,0) : [];
+    const options = game.phase === 'awaiting-call' ? uniqueCallOptions(getCallOptions(game,0)) : [];
     calls.hidden = !options.length;
     const choices = document.querySelector<HTMLElement>('#call-options')!;
     choices.replaceChildren(...options.map(option => {

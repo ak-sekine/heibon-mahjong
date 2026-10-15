@@ -223,3 +223,6 @@ header > div { min-width:0; }
 .discard-controls { position:relative; bottom:auto; }
 #call-options button, #pass-calls { border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; touch-action:manipulation; cursor:pointer; }
 #call-options button:focus-visible, #pass-calls:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
+
+/* Extra scroll range only while Safari occludes the layout viewport. */
+main { padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px) + var(--call-viewport-inset, 0px)); }

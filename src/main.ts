@@ -1,3 +1,4 @@
+import { installCallViewport } from './ui/call-viewport.ts';
 import './style.css';
 import { TILE_KINDS, SUITS, ordinaryTile, redFive } from './model/tile.ts';
 import { createTileElement, tileLabel } from './rendering/tile-svg.ts';
@@ -7,6 +8,7 @@ import { ResultDialog } from './ui/result-dialog.ts';
 import { NewGameDialog } from './ui/new-game-dialog.ts';
 import { GameController } from './ui/controller.ts';
 
+installCallViewport();
 const resultDialog = new ResultDialog();
 const controller = new GameController(undefined, { onChange: render });
 function render(): void {
