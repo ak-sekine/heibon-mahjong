@@ -79,3 +79,6 @@ document.querySelector('#kan-options')!.addEventListener('click',event=>{
   const button=(event.target as Element).closest<HTMLButtonElement>('button[data-kan-id]');
   if(button) { document.querySelector<HTMLElement>('#kan-controls')!.hidden=true; void controller.kan(button.dataset.kanId!).catch(e=>console.error('Kan failed',e)); }
 });
+
+// Shared UI entry for the isolated verification page.
+export { controller, render };

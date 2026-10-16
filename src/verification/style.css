@@ -1,0 +1,6 @@
+.kan-lab { padding: 12px; border: 1px solid #749e8b; border-radius: 8px; margin-bottom: 12px; overflow-wrap: anywhere; }
+.kan-lab h2 { margin-top: 0; }
+.kan-lab label, .kan-lab a { display: block; margin: 8px 0; }
+.kan-lab select { font: inherit; font-size: 16px; min-height: 44px; width: 100%; max-width: 100%; margin-bottom: 8px; }
+.kan-lab button { min-height: 44px; max-width: 100%; white-space: normal; touch-action: manipulation; }
+.kan-lab a { min-height: 44px; display: flex; align-items: center; color: inherit; }
