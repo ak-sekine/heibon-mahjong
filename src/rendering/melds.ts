@@ -27,7 +27,7 @@ export function renderMelds(container: HTMLElement, player: PlayerState, game?: 
     const calledIndex = meld.type==='chi' ? meld.tiles.findIndex(t=>t.id===called.id) : direction===3?0:direction===2?1:own.length;
     // Sequence tiles arrive in numeric order from GameState; preserve it.
     arranged.splice(calledIndex,0,called);
-    group.style.setProperty('--called-offset', `${calledIndex * 15}px`);
+    group.style.setProperty('--called-offset', `calc(${calledIndex} * (var(--table-tile-width) + 1px))`);
     if(meld.type==='kakan') arranged.push(meld.tiles.find(t=>t.id===meld.addedTileId)!);
     for(const physical of arranged) {
       const item=document.createElement('span');item.dataset.tileId=physical.id;

@@ -1,7 +1,7 @@
 """UI-only geometry fixtures; game rules are exercised by the existing suites."""
-import pathlib, shutil, json
+import pathlib, shutil, json, os
 from playwright.sync_api import sync_playwright
-out=pathlib.Path('docs/verification/step13.5.2/screenshots/layout');out.mkdir(parents=True,exist_ok=True)
+out=pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS','docs/verification/step13.5.2/screenshots'))/'layout';out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path=shutil.which('chromium'),args=['--no-sandbox'])

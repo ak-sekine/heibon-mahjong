@@ -30,7 +30,7 @@ def geometry(page, pending=False):
     assert page.locator('.dora-slot').count() == 5
     assert page.locator('.dora-slot svg').count() == 1
     assert page.locator('#dora-indicators').evaluate('el => getComputedStyle(el).gridTemplateColumns.split(" ").length') == 3
-    assert page.locator('.river-tile').evaluate_all('els=>els.every(e=>e.getBoundingClientRect().width>=20 && e.getBoundingClientRect().height>=20)')
+    assert page.locator('.river-tile').evaluate_all('els=>els.every(e=>e.getBoundingClientRect().width>=18.9 && e.getBoundingClientRect().height>=18.9)')
     if pending:
         for selector in ['#ron','#pass-ron']:
             assert page.locator(selector).bounding_box()['height'] >= 44
@@ -83,7 +83,7 @@ with sync_playwright() as p:
             privacy(page,initial,[])
             geometry(page)
             indicator = page.locator('#dora-indicators').inner_html()
-            river_height = page.locator('.rivers').bounding_box()['height']
+            river_height = page.locator('.river-top').bounding_box()['height']
             page.clock.install()
             page.clock.pause_at(page.evaluate('Date.now()'))
             page.locator('.drawn-tile button').click()
@@ -100,7 +100,8 @@ with sync_playwright() as p:
                 assert page.locator('#ron').is_enabled() and page.locator('#pass-ron').is_enabled()
                 assert 'CPU1' in page.locator('#ron-status').inner_text()
                 assert '赤5索' in page.locator('#ron-status').inner_text()
-                assert page.locator('#ron').get_attribute('aria-describedby') == 'ron-status'
+                assert page.locator('#ron-controls').get_attribute('aria-labelledby') == 'ron-status'
+                assert page.locator('#ron-target svg').count() == 1
                 assert page.evaluate('document.activeElement.id') == 'ron'
                 assert page.locator('#discard').is_disabled() and page.locator('#tsumo').is_disabled()
                 assert page.locator('#player-hand button:enabled').count() == 0
@@ -179,7 +180,7 @@ with sync_playwright() as p:
             page.evaluate('window.scrollTo(0,0)')
             geometry(page)
             assert page.locator('#dora-indicators').inner_html() == indicator
-            assert page.locator('.rivers').bounding_box()['height'] == river_height, (name,width,river_height,page.locator('.rivers').bounding_box()['height'],page.locator('.center-info').inner_text())
+            assert page.locator('.river-top').bounding_box()['height'] == river_height, (name,width,river_height,page.locator('.river-top').bounding_box()['height'],page.locator('.center-info').inner_text())
             page.screenshot(path=f'{args.screenshots}/{width}-{name}-result.png',full_page=True)
             page.set_viewport_size({'width':width,'height':height-120})
             if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()

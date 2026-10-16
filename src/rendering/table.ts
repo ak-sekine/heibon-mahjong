@@ -95,7 +95,12 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
     const count = player.hand.length + Number(player.drawnTile !== null);
     const label = document.querySelector<HTMLElement>(`#label-${id}`)!;
     if (points) {
-      const identity = Object.assign(document.createElement('span'), { textContent: `${seatNames[id]}（${winds[player.wind]}）${game.dealerId === id ? '親' : ''}${player.riichi ? ' リーチ' : ''}` });
+      const identity = Object.assign(document.createElement('span'), { textContent: `${seatNames[id]}（${winds[player.wind]}）${game.dealerId === id ? '親' : ''}` });
+      if (player.riichi) {
+        const status = previewText('span', ' リーチ');
+        status.className = 'seat-status';
+        identity.append(status);
+      }
       const balance = Object.assign(document.createElement('span'), { textContent: `${points[id].toLocaleString('ja-JP')}点`, className: 'seat-points' });
       label.replaceChildren(identity, document.createTextNode(' '), balance);
     } else label.textContent = `${seatNames[id]} · ${winds[player.wind]} · ${count}枚${game.dealerId === id ? ' · 親' : ''}${player.riichi ? ' · リーチ' : ''}`;

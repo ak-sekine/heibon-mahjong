@@ -42,7 +42,7 @@ with sync_playwright() as p:
             assert page.locator('#win-result').is_hidden()
             own_ids = page.locator('#player-hand li').evaluate_all('els => els.map(el => el.dataset.tileId)')[:-1]
             indicator = page.locator('#dora-indicators').inner_html()
-            table_height = page.locator('.rivers').bounding_box()['height']
+            table_height = page.locator('.river-top').bounding_box()['height']
             page.clock.install()
             page.clock.pause_at(page.evaluate('Date.now()'))
             page.locator('.drawn-tile button').click()
@@ -77,7 +77,7 @@ with sync_playwright() as p:
             assert page.locator('#discard').is_disabled() and page.locator('#tsumo').is_disabled()
             assert page.locator('#new-game').is_enabled()
             assert page.locator('#dora-indicators').inner_html() == indicator
-            assert page.locator('.rivers').bounding_box()['height'] == table_height
+            assert page.locator('.river-top').bounding_box()['height'] == table_height
             assert f'生きた牌山 {fixture["live"] - winner}枚' in page.locator('#wall-count').inner_text()
             assert '王牌 14枚' in page.locator('#wall-count').inner_text()
             page.locator('.winning-hand').scroll_into_view_if_needed()

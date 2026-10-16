@@ -57,7 +57,12 @@ with sync_playwright() as p:
             }''')
             assert not metrics['overflow'] and metrics['childrenContained']
             assert page.locator('.center-info #dora-indicators').count() == 1
-            assert all(page.locator('#dora-indicators svg').nth(i).bounding_box()['width'] >= 26 for i in range(count))
+            # Step 13.5.3 uses the same physical scale for dora and all table tiles.
+            for i in range(count):
+                tile=page.locator('#dora-indicators svg').nth(i).bounding_box()
+                cpu=page.locator('.seat-top .tile-back').first.bounding_box()
+                assert 13.5 <= tile['width'] <= 18 and abs(tile['height']/tile['width']-1.4)<.003
+                assert tile['width']==cpu['width'] and tile['height']==cpu['height']
             hand = page.locator('#player-hand').bounding_box()
             controls = page.locator('.discard-controls').bounding_box()
             assert hand['y'] >= 0 and hand['y'] + hand['height'] <= controls['y']

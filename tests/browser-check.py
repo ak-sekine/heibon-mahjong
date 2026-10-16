@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser(description="Optional Chromium check (requires 
 parser.add_argument("--url", default="http://localhost:4173/heibon-mahjong/")
 parser.add_argument("--screenshots", default=str(pathlib.Path(tempfile.gettempdir()) / "heibon-screenshots"))
 parser.add_argument("--tsumo-fixture", action="store_true", help="Also test tsumo with a fixed legal wall (requires Vite dev server)")
+parser.add_argument("--only-tsumo-fixture", action="store_true", help="Run only the optional tsumo fixture")
 options = parser.parse_args()
 pathlib.Path(options.screenshots).mkdir(parents=True, exist_ok=True)
 
@@ -146,7 +147,7 @@ def controls_visible(page):
 
 with sync_playwright() as p:
     browser=p.chromium.launch(executable_path=shutil.which('chromium') or shutil.which('chromium-browser'),args=['--no-sandbox'])
-    for w,h in [(320,568),(375,667),(390,844),(414,896),(1280,800)]:
+    for w,h in ([] if options.only_tsumo_fixture else [(320,568),(375,667),(390,844),(414,896),(1280,800)]):
         page=browser.new_page(viewport={'width':w,'height':h})
         errors=[]
         page.on('pageerror',lambda err:errors.append(str(err)))
@@ -356,17 +357,33 @@ with sync_playwright() as p:
         assert not errors, errors
         print(json.dumps({'viewport':[w,h],'drawn':'pass','hand':'pass','resetDuringCPU':'pass','keyboard':'pass','geometry':'pass','cpuOrder':'pass','multipleRounds':'pass','wallExhaustion':'pass','concealment':'pass','pageErrors':errors}))
         page.close()
-    if options.tsumo_fixture:
+    if options.tsumo_fixture or options.only_tsumo_fixture:
         # Replace the module's injected start factory in the test browser only.
         # Production source/bundle has no fixture import, globals or cheat controls.
         def inject(route):
             response = route.fetch()
             source = response.text()
-            source, count = re.subn(r'new GameController\((?:undefined|void 0),', 'new GameController(() => tsumoStart(RED_PINFU, false, undefined, fixtureStarts++ % 2 ? \"sou-8\" : \"man-4\"),', source)
+            source, count = re.subn(r'new GameController\((?:undefined|void 0),', 'new GameController(() => fixtureStart(),', source)
             assert count == 1
-            # Match tsumoGame(): deterministic real discards avoid an earlier human ron.
+            # Deterministic tsumogiri preserves the two intended human winning draws.
             source = source.replace('onChange: render', 'chooseDiscard: p => p.drawnTile.id, onChange: render')
-            source = 'let fixtureStarts = 0;\nimport { tsumoStart, RED_PINFU } from "/heibon-mahjong/tests/tsumo-fixture.ts";\n' + source
+            source = '''let fixtureStarts = 0;
+import { tsumoStart, RED_PINFU } from "/heibon-mahjong/tests/tsumo-fixture.ts";
+// Keep the human's next winning draw and indicators, but distribute the other
+// physical tiles deterministically. The old sorted CPU hands could ron each
+// other before the human draw after automatic CPU ron was introduced.
+function fixtureStart() {
+ const g=tsumoStart(RED_PINFU,false,undefined,fixtureStarts++ % 2 ? "sou-8" : "man-4");
+ const winning=g.liveWall[3], repeatWinning=g.liveWall[7];
+ const pool=[...g.players.slice(1).flatMap(p=>p.hand),...g.liveWall.filter((_,i)=>i!==3&&i!==7)];
+ let seed=1;
+ for(let i=pool.length-1;i>0;i--){seed=(Math.imul(seed,1664525)+1013904223)>>>0;const j=Math.floor(seed/4294967296*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+ const players=g.players.map((p,i)=>i?{...p,hand:pool.splice(0,13)}:p);
+ pool.splice(3,0,winning);
+ pool.splice(7,0,repeatWinning);
+ return {...g,players,liveWall:pool};
+}
+''' + source
             route.fulfill(response=response, body=source)
         for w,h in [(320,568),(375,667),(390,844),(414,896),(1280,800)]:
             page=browser.new_page(viewport={'width':w,'height':h})

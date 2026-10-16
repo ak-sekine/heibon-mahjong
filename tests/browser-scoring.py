@@ -32,7 +32,7 @@ with sync_playwright() as p:
    page.route('**/src/main.ts',inject);page.goto(args.url)
    page.wait_for_function('typeof scoreCheck === "function"')
    original=page.evaluate('scoreCheck()')
-   river_height=page.locator('.rivers').bounding_box()['height'];indicator=page.locator('#dora-indicators').inner_html()
+   river_height=page.locator('.river-top').bounding_box()['height'];indicator=page.locator('#dora-indicators').inner_html()
    if original['phase']!='won':
     button='#ron' if original['phase']=='awaiting-ron' else '#tsumo'
     assert page.locator(button).is_enabled();page.locator(button).click()
@@ -52,7 +52,7 @@ with sync_playwright() as p:
      assert f'{payment["points"]}点' in section.locator('.win-payments').inner_text()
     if fu is None:
      assert '符：' not in text and section.locator('details').count()==0
-     assert '役満' in text and 'ドラ' not in text
+     assert '役満' in text and section.locator('.win-bonuses').count()==0
     else:
      assert f'符：{fu}符' in text
      details=section.locator('details');assert details.get_attribute('open') is None
@@ -76,7 +76,7 @@ with sync_playwright() as p:
      for tile in player['hand']:assert tile['id'] not in html
    for tile in game['deadWall']:
     if tile['id']!=game['deadWall'][4]['id']:assert tile['id'] not in html
-   assert page.locator('.rivers').bounding_box()['height']==river_height
+   assert page.locator('.river-top').bounding_box()['height']==river_height
    assert page.locator('#dora-indicators').inner_html()==indicator
    assert page.locator('.dora-slot').count()==5
    assert page.locator('#dora-indicators').evaluate('el=>getComputedStyle(el).gridTemplateColumns.split(" ").length')==3

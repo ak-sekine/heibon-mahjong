@@ -1,0 +1,408 @@
+[
+  {
+    "entry": "index.html",
+    "viewport": [
+      320,
+      568
+    ],
+    "hand14": [
+      20,
+      28
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      13.96875,
+      19.5625
+    ],
+    "cpuTop": [
+      13.96875,
+      19.5625
+    ],
+    "cpuRight": [
+      19.5625,
+      13.96875
+    ],
+    "scenes": 6,
+    "passed": true
+  },
+  {
+    "entry": "index.html",
+    "viewport": [
+      375,
+      547
+    ],
+    "hand14": [
+      24,
+      33.59375
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      14,
+      19.59375
+    ],
+    "cpuTop": [
+      14,
+      19.59375
+    ],
+    "cpuRight": [
+      19.59375,
+      14
+    ],
+    "scenes": 6,
+    "passed": true
+  },
+  {
+    "entry": "index.html",
+    "viewport": [
+      375,
+      667
+    ],
+    "hand14": [
+      24,
+      33.59375
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      16.640625,
+      23.296875
+    ],
+    "cpuTop": [
+      16.640625,
+      23.296875
+    ],
+    "cpuRight": [
+      23.296875,
+      16.640625
+    ],
+    "scenes": 6,
+    "passed": true
+  },
+  {
+    "entry": "index.html",
+    "viewport": [
+      390,
+      844
+    ],
+    "hand14": [
+      25,
+      35
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      17.375,
+      24.328125
+    ],
+    "cpuTop": [
+      17.375,
+      24.328125
+    ],
+    "cpuRight": [
+      24.328125,
+      17.375
+    ],
+    "scenes": 6,
+    "passed": true
+  },
+  {
+    "entry": "index.html",
+    "viewport": [
+      414,
+      896
+    ],
+    "hand14": [
+      27,
+      37.796875
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      18,
+      25.1875
+    ],
+    "cpuTop": [
+      18,
+      25.1875
+    ],
+    "cpuRight": [
+      25.1875,
+      18
+    ],
+    "scenes": 6,
+    "passed": true
+  },
+  {
+    "entry": "index.html",
+    "viewport": [
+      430,
+      844
+    ],
+    "hand14": [
+      28,
+      39.1875
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      18,
+      25.1875
+    ],
+    "cpuTop": [
+      18,
+      25.1875
+    ],
+    "cpuRight": [
+      25.1875,
+      18
+    ],
+    "scenes": 6,
+    "passed": true
+  },
+  {
+    "entry": "index.html",
+    "viewport": [
+      1280,
+      800
+    ],
+    "hand14": [
+      42,
+      58.796875
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      18,
+      25.1875
+    ],
+    "cpuTop": [
+      18,
+      25.1875
+    ],
+    "cpuRight": [
+      25.1875,
+      18
+    ],
+    "scenes": 6,
+    "passed": true
+  },
+  {
+    "entry": "kan-test.html",
+    "viewport": [
+      320,
+      568
+    ],
+    "hand14": [
+      20,
+      28
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      13.96875,
+      19.5625
+    ],
+    "cpuTop": [
+      13.96875,
+      19.5625
+    ],
+    "cpuRight": [
+      19.5625,
+      13.96875
+    ],
+    "scenes": 6,
+    "passed": true
+  },
+  {
+    "entry": "kan-test.html",
+    "viewport": [
+      375,
+      547
+    ],
+    "hand14": [
+      24,
+      33.59375
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      14,
+      19.59375
+    ],
+    "cpuTop": [
+      14,
+      19.59375
+    ],
+    "cpuRight": [
+      19.59375,
+      14
+    ],
+    "scenes": 6,
+    "passed": true
+  },
+  {
+    "entry": "kan-test.html",
+    "viewport": [
+      375,
+      667
+    ],
+    "hand14": [
+      24,
+      33.59375
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      16.640625,
+      23.296875
+    ],
+    "cpuTop": [
+      16.640625,
+      23.296875
+    ],
+    "cpuRight": [
+      23.296875,
+      16.640625
+    ],
+    "scenes": 6,
+    "passed": true
+  },
+  {
+    "entry": "kan-test.html",
+    "viewport": [
+      390,
+      844
+    ],
+    "hand14": [
+      25,
+      35
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      17.375,
+      24.328125
+    ],
+    "cpuTop": [
+      17.375,
+      24.328125
+    ],
+    "cpuRight": [
+      24.328125,
+      17.375
+    ],
+    "scenes": 6,
+    "passed": true
+  },
+  {
+    "entry": "kan-test.html",
+    "viewport": [
+      414,
+      896
+    ],
+    "hand14": [
+      27,
+      37.796875
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      18,
+      25.1875
+    ],
+    "cpuTop": [
+      18,
+      25.1875
+    ],
+    "cpuRight": [
+      25.1875,
+      18
+    ],
+    "scenes": 6,
+    "passed": true
+  },
+  {
+    "entry": "kan-test.html",
+    "viewport": [
+      430,
+      844
+    ],
+    "hand14": [
+      28,
+      39.1875
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      18,
+      25.1875
+    ],
+    "cpuTop": [
+      18,
+      25.1875
+    ],
+    "cpuRight": [
+      25.1875,
+      18
+    ],
+    "scenes": 6,
+    "passed": true
+  },
+  {
+    "entry": "kan-test.html",
+    "viewport": [
+      1280,
+      800
+    ],
+    "hand14": [
+      42,
+      58.796875
+    ],
+    "handAfterCalls": [
+      42,
+      58.796875
+    ],
+    "dora": [
+      18,
+      25.1875
+    ],
+    "cpuTop": [
+      18,
+      25.1875
+    ],
+    "cpuRight": [
+      25.1875,
+      18
+    ],
+    "scenes": 6,
+    "passed": true
+  }
+]

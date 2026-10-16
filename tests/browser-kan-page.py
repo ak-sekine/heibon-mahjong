@@ -9,7 +9,7 @@ with sync_playwright() as p:
         page = browser.new_page(viewport={'width':width,'height':height}, has_touch=True)
         errors=[]
         page.on('pageerror', lambda e: errors.append(str(e)))
-        page.goto('http://127.0.0.1:4173/heibon-mahjong/kan-test.html')
+        page.goto(os.environ.get('HEIBON_BASE_URL', 'http://127.0.0.1:4173/heibon-mahjong/') + 'kan-test.html')
         page.wait_for_selector('#scenario-help:not(:empty)')
         # Read state for assertions only. Every action uses the page's public UI.
         page.evaluate("async()=>{window.readGame=()=>window.testController.game;window.testController=(await import('/heibon-mahjong/src/main.ts')).controller;}")
