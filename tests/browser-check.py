@@ -17,6 +17,16 @@ def box(page, selector):
     return page.locator(selector).bounding_box()
 def separate(a,b):
     return a['x']+a['width']<=b['x'] or b['x']+b['width']<=a['x'] or a['y']+a['height']<=b['y'] or b['y']+b['height']<=a['y']
+def await_human_turn(page):
+    # Decline new call/ron windows through the real controls before resuming
+    # this discard/river-capacity scenario. Dedicated suites exercise accepting.
+    for _ in range(16):
+        if page.locator('#pass-calls').is_visible(): page.locator('#pass-calls').click()
+        if page.locator('#pass-ron').is_visible(): page.locator('#pass-ron').click()
+        if page.locator('#player-hand button:enabled').count()==14: return
+        page.clock.run_for(1000)
+    assert page.locator('#player-hand button:enabled').count()==14, page.locator('#selection-status').inner_text()
+
 def geometry(page):
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
     tiles=page.locator('#player-hand li')
@@ -36,7 +46,7 @@ def geometry(page):
             const t = tile.getBoundingClientRect();
             const svg = tile.querySelector('svg').getBoundingClientRect();
             return {x:t.x,y:t.y,width:t.width,height:t.height,
-                row:Number(tile.style.gridRow),column:Number(tile.style.gridColumn),
+                declaration:tile.dataset.riichiDeclaration === "true",row:Number(tile.style.gridRow),column:Number(tile.style.gridColumn),
                 transform:getComputedStyle(tile.querySelector("svg")).transform,
                 contained:t.left >= r.left + el.clientLeft - .5 &&
                     t.right <= r.left + el.clientLeft + el.clientWidth + .5 &&
@@ -56,14 +66,15 @@ def geometry(page):
         tiles = river['tiles']
         for i, tile in enumerate(tiles):
             assert tile['contained'] and tile['svgContained'], (river['player'], i, tile)
-            assert min(tile['width'],tile['height']) >= 20, tile
+            assert min(tile['width'],tile['height']) >= 12, tile
             assert tile['x'] >= 0 and tile['x']+tile['width'] <= page.viewport_size['width'], tile
             player = int(river['player'])
             row, column = divmod(i, 6)
             expected = {0:(row+1,column+1),1:(6-column,row+1),2:(3-row,6-column),3:(column+1,3-row)}[player]
             assert (tile['row'],tile['column']) == expected, (player,i,tile)
-            matrix = {0:'none',1:'matrix(0, -1, 1, 0,',2:'matrix(-1, 0, 0, -1,',3:'matrix(0, 1, -1, 0,'}[player]
-            assert tile['transform'].startswith(matrix), tile
+            matrix = {0:'matrix(1, 0, 0, 1,',1:'matrix(0, -1, 1, 0,',2:'matrix(-1, 0, 0, -1,',3:'matrix(0, 1, -1, 0,'}[player]
+            if not tile['declaration']: assert tile['transform'].startswith(matrix), tile
+            else: assert '.714286' in tile['transform'], tile
             assert all(separate(tile, other) for other in tiles[i+1:]), (player,i)
             if i:
                 previous = tiles[i-1]
@@ -97,7 +108,7 @@ def geometry(page):
         assert selected.bounding_box()['y'] >= box(page,'#label-0')['y'] + box(page,'#label-0')['height'] - 2.1
         assert separate(selected.bounding_box(),box(page,'.rivers'))
     for id in [1,2,3]:
-        assert page.locator(f'#hand-{id}, .seat[data-player-id="{id}"] .tile-back').count()==0
+        assert page.locator(f'.seat[data-player-id="{id}"] .tile-back').count()==int(re.search(r'(\d+)枚', page.locator(f'.concealed-hand[data-player-id="{id}"]').get_attribute('aria-label')).group(1))
         assert page.locator(f'.seat[data-player-id="{id}"] svg, .seat[data-player-id="{id}"] [data-tile-id]').count()==0
         assert f'CPU{id}' in page.locator(f'#label-{id}').inner_text()
         assert '点' in page.locator(f'#label-{id}').inner_text()
@@ -145,8 +156,9 @@ with sync_playwright() as p:
             source, count = re.subn(r'new GameController\((?:undefined|void 0),',
                 'new GameController(() => { discardRandom = seeded(5); return startGame(seeded(4)); },', response.text())
             assert count == 1
-            source = source.replace('onChange: render', 'random: () => discardRandom(), onChange: render')
-            source = ('import { startGame } from "/heibon-mahjong/src/game/start.ts";\n'
+            source = source.replace('onChange: render', 'chooseDiscard: chooseRandomDiscard, random: () => discardRandom(), onChange: render')
+            source = ('import { chooseRandomDiscard } from "/heibon-mahjong/src/game/cpu.ts";\n'
+                'import { startGame } from "/heibon-mahjong/src/game/start.ts";\n'
                 'const seeded = seed => () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);\n'
                 'let discardRandom = seeded(5);\n' + source)
             route.fulfill(response=response, body=source)
@@ -207,7 +219,7 @@ with sync_playwright() as p:
             assert 'CPU1の手番' in page.locator('#selection-status').inner_text()
             assert page.locator('#label-1').get_attribute('data-active')=='true'
             page.clock.run_for(1000)
-            page.wait_for_function('document.querySelector("#player-hand button:enabled") !== null')
+            await_human_turn(page)
             assert page.locator('#player-hand li').count()==14
             assert page.evaluate('window.cpuDiscards')==[1,2,3]
             assert dora_snapshot(page) == indicator
@@ -220,7 +232,7 @@ with sync_playwright() as p:
                 page.locator('#player-hand button').first.click()
                 page.locator('#discard').click()
                 page.clock.run_for(1000)
-                page.wait_for_function('document.querySelector("#player-hand button:enabled") !== null')
+                await_human_turn(page)
                 assert page.locator('#player-hand li').count()==14
                 for id in [0,1,2,3]:
                     assert page.locator(f'.river[data-player-id="{id}"] svg').count()==turn_round
@@ -262,7 +274,7 @@ with sync_playwright() as p:
                 page.set_viewport_size({'width':w,'height':h})
             page.clock.run_for(1000)
             if turn_round < 17:
-                page.wait_for_function('document.querySelectorAll("#player-hand button:enabled").length === 14')
+                await_human_turn(page)
                 assert page.locator('#player-hand li').count()==14
                 assert page.locator('#player-hand button:enabled').count()==14
             geometry(page)

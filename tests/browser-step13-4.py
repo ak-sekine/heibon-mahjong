@@ -1,7 +1,8 @@
+import os
 """Step 13.4 Chromium acceptance: complete legal physical-wall fixtures."""
 import json,pathlib,shutil
 from playwright.sync_api import sync_playwright
-out=pathlib.Path('docs/screenshots/step13.4');out.mkdir(parents=True,exist_ok=True)
+out=pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', 'docs/verification/step13.5.2/screenshots')) / 'browser-step13-4';out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path=shutil.which('chromium'),args=['--no-sandbox'])
@@ -52,7 +53,7 @@ g={...g,players,deadWall:pool.splice(-14),liveWall:pool,phase:'awaiting-discard'
   def inventory():
    assert page.evaluate('''()=>{const g=check().game;const all=[...g.liveWall,...g.deadWall,...g.players.flatMap(p=>[...p.hand,...p.river,...(p.melds||[]).flatMap(m=>m.tiles),...(p.drawnTile?[p.drawnTile]:[])])];return all.length===136&&new Set(all.map(t=>t.id)).size===136;}''')
   def private():
-   g=page.evaluate('check().game');html=page.locator('main').inner_html()
+   snapshot=page.evaluate('({g:check().game,html:document.querySelector("main").innerHTML})');g=snapshot['g'];html=snapshot['html']
    for seat in [1,2,3]:
     for t in g['players'][seat]['hand']:assert t['id'] not in html
    for i,t in enumerate(g['deadWall']):

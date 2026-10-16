@@ -1,6 +1,7 @@
+import os
 """Real public-page controls; no routed source or synthetic win results."""
 import shutil, pathlib
-out=pathlib.Path("docs/screenshots/step13.5.1/public-page");out.mkdir(parents=True,exist_ok=True)
+out=pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', 'docs/verification/step13.5.2/screenshots')) / 'browser-kan-page';out.mkdir(parents=True,exist_ok=True)
 from playwright.sync_api import sync_playwright
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=shutil.which('chromium'), args=['--no-sandbox'])

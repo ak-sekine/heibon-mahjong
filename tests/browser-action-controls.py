@@ -1,7 +1,8 @@
+import os
 """Step 13.1.2 Chromium verification. Test injection never ships in the app."""
 import json,pathlib,shutil
 from playwright.sync_api import sync_playwright
-out=pathlib.Path('docs/screenshots/step13.1.2');out.mkdir(parents=True,exist_ok=True)
+out=pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', 'docs/verification/step13.5.2/screenshots')) / 'browser-action-controls';out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path=shutil.which('chromium'),args=['--no-sandbox'])

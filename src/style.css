@@ -1,54 +1,20 @@
 :root { font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:#fffdf7; background:#185640; -webkit-text-size-adjust:100%; }
 * { box-sizing:border-box; }
 body { margin:0; }
-main { width:min(100%,760px); min-height:100vh; min-height:100svh; margin:auto; padding:max(8px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom, 0px)) max(4px,env(safe-area-inset-left)); display:flex; flex-direction:column; gap:8px; }
+main { width:min(100%,620px); min-height:100vh; min-height:100svh; margin:auto; padding:max(8px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom, 0px) + var(--call-viewport-inset, 0px)) max(4px,env(safe-area-inset-left)); display:flex; flex-direction:column; gap:8px; }
 header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 6px; }
 h1 { margin:0; font-size:clamp(1rem,5vw,1.5rem); white-space:nowrap; }
 #new-game { min-width:108px; min-height:44px; padding:8px 12px; border:1px solid #d4e5db; border-radius:8px; background:#fffdf7; color:#185640; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
 #new-game:focus-visible { outline:3px solid #ffda7d; outline-offset:2px; }
 ul { list-style:none; padding:0; margin:0; }
-.table { flex:none;  width:100%; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); grid-template-rows:18px auto auto; grid-template-areas:"left top right" "rivers rivers rivers" "bottom bottom bottom"; gap:4px; border:2px solid #39765e; border-radius:18px; background:#216b50; padding:4px 3px 4px; }
-.seat { min-width:0; min-height:0; display:flex; align-items:center; justify-content:center; gap:4px; }
-.seat-label { margin:0; color:#f2e9c9; font-size:clamp(10px,2.8vw,14px); line-height:1.2; font-weight:600; text-align:center; }
-.seat-label[data-active="true"] { color:#ffda7d; background:#154e3c; outline:1px solid #ffda7d; border-radius:4px; }
-.seat-top { grid-area:top; flex-direction:column; }
-.seat-bottom { grid-area:bottom; flex-direction:column; align-items:stretch; padding-top:2px; gap:10px; }
-.seat-left { grid-area:left; flex-direction:column; }
-.seat-right { grid-area:right; flex-direction:column; }
-.seat-left .seat-label,.seat-right .seat-label { overflow-wrap:anywhere; }
-/* Reserve all 18 discards, including empty cells, without a nested scroller.
-   Top/bottom span the central width; the middle row separates side rivers/info. */
-.rivers { --river-tile-width:clamp(20px,5.4vw,24px); --river-tile-height:calc(var(--river-tile-width) * 1.4); grid-area:rivers; display:grid; min-width:0; grid-template-columns:calc(var(--river-tile-height) * 3 + 10px) minmax(0,1fr) calc(var(--river-tile-height) * 3 + 10px); grid-template-rows:auto auto auto; grid-template-areas:"top top top" "left info right" "bottom bottom bottom"; gap:2px; padding:2px; border:1px solid #488269; border-radius:12px; background:#1c6048; }
-.river { min-width:0; border:1px dashed #63947a; border-radius:5px; display:grid; grid-template-columns:repeat(6,var(--river-tile-width)); grid-template-rows:repeat(3,var(--river-tile-height)); justify-content:center; align-content:start; gap:2px; padding:2px; overflow:visible; }
-.river-tile { position:relative; width:var(--river-tile-width); height:var(--river-tile-height); }
-.river-top .tile-svg { transform:rotate(180deg); }
-.river-right .tile-svg,.river-left .tile-svg { position:absolute; width:var(--river-tile-width); height:var(--river-tile-height); left:50%; top:50%; }
-.river-right .tile-svg { transform:translate(-50%,-50%) rotate(270deg); }
-.river-left .tile-svg { transform:translate(-50%,-50%) rotate(90deg); }
-.river-left .river-tile,.river-right .river-tile { width:var(--river-tile-height); height:var(--river-tile-width); }
-/* A 90-degree declaration fits its original cell (84/60 aspect ratio).
-   Center and scale the SVG, preserving river grids and preventing row overlap. */
-.river-tile[data-riichi-declaration="true"] .tile-svg { position:absolute; width:var(--river-tile-width); height:var(--river-tile-height); left:50%; top:50%; transform:translate(-50%,-50%) rotate(90deg) scale(.7142857); }
-.river-top .river-tile[data-riichi-declaration="true"] .tile-svg { transform:translate(-50%,-50%) rotate(270deg) scale(.7142857); }
-.river-right .river-tile[data-riichi-declaration="true"] .tile-svg { transform:translate(-50%,-50%) rotate(360deg) scale(.7142857); }
-.river-left .river-tile[data-riichi-declaration="true"] .tile-svg { transform:translate(-50%,-50%) rotate(180deg) scale(.7142857); }
-.river-top { grid-area:top; }.river-right { grid-area:right; }.river-bottom { grid-area:bottom; }.river-left { grid-area:left; }
-.river-left,.river-right { grid-template-columns:repeat(3,var(--river-tile-height)); grid-template-rows:repeat(6,var(--river-tile-width)); }
-.center-info { grid-area:info; min-width:0; padding:2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; border-radius:8px; background:#154e3c; color:#fff5d7; font-size:10px; line-height:12px; font-weight:600; text-align:center; }
-/* The unused sixth cell of the public 3 + 2 dora grid is central table space.
-   Four exchanged sticks fit without changing any table/river/hand dimensions. */
-#deposit-sticks { position:absolute; left:calc(50% + 15px); bottom:0; display:flex; flex-wrap:wrap; justify-content:center; align-content:start; gap:1px; width:26px; max-height:36.4px; overflow-y:auto; overflow-x:hidden; }
-.deposit-stick { display:block; width:26px; height:8px; flex:none; }
-.deposit-stick svg { display:block; width:100%; height:100%; }
-#player-hand { width:100%; display:grid; grid-template-columns:repeat(13,minmax(0,1fr)) minmax(0,1.25fr); gap:1px; }
+#player-hand { width:100%; display:grid; grid-template-columns:repeat(14,minmax(0,1fr)); gap:1px; margin:0; padding:0; }
 #player-hand li { min-width:0; }
 #player-hand .drawn-tile { padding-left:20%; }
-#player-hand[data-has-drawn="false"] { grid-template-columns:repeat(13,minmax(0,1fr)); }
 .tile-choice { display:block; width:100%; padding:0; border:0; border-radius:3px; background:transparent; cursor:pointer; touch-action:manipulation; }
 .tile-choice[aria-pressed="true"] { transform:translateY(-8px); outline:2px solid #ffda7d; outline-offset:0; background:#ffda7d; }
 .tile-choice:focus-visible { outline:2px solid #82dcff; outline-offset:0; }
 .tile-choice:disabled { cursor:default; opacity:1; }
-.discard-controls { position:sticky; bottom:0; z-index:2; background:#185640; border-radius:8px; padding:8px 6px calc(12px + env(safe-area-inset-bottom, 0px)); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; }
+.discard-controls { position:relative; bottom:auto; z-index:2; background:#123f32; border:1px solid #39765e; border-radius:8px; padding:8px 6px calc(12px + env(safe-area-inset-bottom, 0px)); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; }
 #selection-status { flex:1 1 100%; min-width:0; margin:0; font-size:14px; overflow-wrap:anywhere; }
 #discard, #riichi, #tsumo, #next-round { min-width:100px; min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; touch-action:manipulation; cursor:pointer; }
 #discard:disabled, #riichi:disabled, #tsumo:disabled { background:#d4e5db; color:#154e3c; opacity:1; cursor:default; }
@@ -61,59 +27,30 @@ summary { cursor:pointer; padding:4px; }
 #tile-gallery li { text-align:center; }
 #tile-gallery .tile-svg { max-width:60px; margin:auto; }
 #tile-gallery span { display:block; margin-top:3px; }
-@media (max-height:650px) { .seat-top { gap:1px; } }
-
 #win-result { padding:12px; border:1px solid #ffda7d; border-radius:8px; overflow-wrap:anywhere; }
 #win-result h2 { margin:0; font-size:1.2rem; }
 #win-result p { margin:8px 0; }
-#wall-count { display:flex; flex-direction:column; gap:0; }
-/* Fixed 3 + 2 slots: public count never changes the table geometry. */
-.dora-area { width:100%; position:relative; }
-.dora-area h2 { margin:0 0 3px; font-size:10px; line-height:14px; font-weight:600; }
-#dora-indicators { display:grid; grid-template-columns:repeat(3,26px); grid-template-rows:repeat(2,36.4px); justify-content:center; gap:3px 2px; }
-.dora-slot { position:relative; width:26px; height:36.4px; }
-#dora-indicators .tile-svg { width:26px; height:36.4px; }
-/* Names remain available to assistive technology; faces take priority on a phone. */
-.dora-slot span { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-/* Empty slots contain no tile markup, IDs or hidden tile data. */
-.dora-placeholder::before { content:""; display:block; width:26px; height:36.4px; border:1px dashed #82ac97; border-radius:4px; background:repeating-linear-gradient(135deg,#285f49 0 4px,#326d55 4px 8px); }
 @media (max-width:350px) {
   .discard-controls { padding:4px 6px calc(10px + env(safe-area-inset-bottom, 0px)); gap:4px; }
   #selection-status { font-size:12px; }
   .keyboard-help { display:none; }
 }
-
-/* Public winning CPU hand stays in the result panel, separate from table geometry. */
 .winning-hand,.public-winning-hand { display:grid; grid-template-columns:repeat(13,minmax(0,1fr)) minmax(0,1.25fr); gap:1px; padding:0; margin:8px 0; list-style:none; width:100%; max-width:560px; }
 .winning-hand li,.public-winning-hand li { min-width:0; }
 .winning-hand .winning-draw,.public-winning-hand .winning-draw { padding-left:20%; }
-
-/* The declaration replaces the usual controls, retaining their compact height. */
 #ron-controls[hidden] { display:none; }
 #ron-controls { width:100%; display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px; }
 #ron-status { width:100%; margin:0; font-size:14px; }
 #ron, #pass-ron { min-width:100px; min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
 #ron:focus-visible, #pass-ron:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
 .ron-pending > #selection-status, .ron-pending > #discard, .ron-pending > #tsumo, .ron-pending > .keyboard-help { display:none; }
-/* Normal document flow keeps the hand clear even when the viewport is short. */
-.discard-controls.ron-pending, .discard-controls.game-ended { position:relative; bottom:auto; }
 .winner-result + .winner-result { border-top:1px solid #63947a; margin-top:16px; padding-top:16px; }
-
-/* A compact final message uses the existing three-line status area. Counts
-   remain available to VoiceOver; the dora grid and river geometry stay fixed. */
-#wall-count.ron-summary { min-height:36px; justify-content:center; }
-#wall-count.ron-summary span:not(:last-child) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-#wall-count.ron-summary span:last-child { font-size:9px; line-height:9px; }
-
-/* Scoring belongs to the result panel and never reserves space on the table. */
 .win-score { font-weight:700; }
 .win-payments { padding-left:20px; overflow-wrap:anywhere; }
 .fu-details { margin:12px 0; }
 .fu-details summary { min-height:44px; padding:10px 0; cursor:pointer; }
 .fu-details summary:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
 .fu-details ul { padding-left:20px; }
-
-/* Match information shares the existing header; scores share the seat labels. */
 #match-info { margin:2px 0 0; font-size:clamp(9px,2.5vw,12px); line-height:1.2; }
 header h1 { margin:0; }
 header > div { min-width:0; }
@@ -121,26 +58,12 @@ header > div { min-width:0; }
 #match-result h2 { font-size:1.1rem; margin:0; }
 #match-result p { margin:6px 0; }
 #next-round { margin:8px 0; }
-
-.seat-label span { white-space:nowrap; }
-@media (max-width:350px) {
-  .table { grid-template-rows:24px auto auto; }
-  .seat:not(.seat-bottom) .seat-label span { display:block; }
-}
 @media (max-height:650px) {
   main { gap:4px; }
   .keyboard-help { display:none; }
   .discard-controls { padding:4px 6px calc(8px + env(safe-area-inset-bottom, 0px)); gap:4px; }
   #selection-status { font-size:12px; }
-  .seat-bottom { gap:8px; }
 }
-@media (max-height:650px) {
-  .table { gap:2px; padding-top:2px; padding-bottom:2px; }
-  .rivers { gap:1px; padding:1px; }
-  .seat-bottom { padding-top:0; gap:6px; }
-}
-
-/* The native top layer provides focus containment and an inert background. */
 .result-open { overflow:hidden; }
 #result-dialog {
   --result-height:100vh;
@@ -172,18 +95,11 @@ header > div { min-width:0; }
 #new-game-dialog button:focus-visible { outline:3px solid #82dcff; outline-offset:-3px; }
 [hidden] { display:none !important; }
 .discard-controls.result-available > :not(#show-result) { display:none; }
-.discard-controls.result-available { position:sticky; bottom:0; justify-content:center; padding:4px 6px max(4px,env(safe-area-inset-bottom,0px)); }
-
+.discard-controls.result-available { position:relative; bottom:auto; justify-content:center; padding:4px 6px max(4px,env(safe-area-inset-bottom,0px)); }
 #public-winning-hands { padding:8px; border:1px solid #63947a; border-radius:8px; }
 #public-winning-hands h2 { margin:0; font-size:14px; }
-
-/* Three actions stay in the existing single 44px row, including at 320px. */
 #discard, #tsumo, #riichi { min-width:0; flex:1 1 0; white-space:nowrap; padding:8px 6px; }
 .ron-pending > #riichi { display:none; }
-/* Keep an unselected drawn tile clear of sticky controls on short phones. */
-@media (max-height:600px) { .seat-bottom { gap:2px; } }
-
-/* Result-only rows: central dora keeps its existing 3+2 layout. */
 .result-dora { margin: 12px 0; min-width: 0; }
 .result-dora h3 { margin: 0 0 6px; font-size: .95rem; }
 .result-dora-slots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; width: min(100%, 240px); }
@@ -191,22 +107,6 @@ header > div { min-width:0; }
 .result-dora-slot svg { display: block; width: 100%; height: 100%; }
 .result-dora-placeholder { box-sizing: border-box; border: 1px dashed #9dc5b2; border-radius: 5px; background: rgb(255 253 247 / 5%); }
 .result-dora-description { margin: 5px 0 0; font-size: .8rem; overflow-wrap: anywhere; }
-
-/* Step 13.4: public melds occupy their own rows, outside the river grid. */
-.table { grid-template-rows:auto auto auto; }
-.open-melds { display:flex; flex-wrap:wrap; justify-content:center; gap:3px; max-width:100%; }
-.open-melds:empty { display:none; }
-.open-meld { display:flex; align-items:center; gap:1px; padding:2px; background:#123f32; border-radius:3px; }
-.open-meld span { display:block; width:14px; height:20px; position:relative; }
-.open-meld .tile-svg { width:14px; height:20px; }
-.open-meld .called-tile { width:20px; }
-.open-meld .called-tile .tile-svg { position:absolute; left:3px; transform:rotate(90deg); }
-.seat-top .open-meld { transform:rotate(180deg); }
-.seat-right .open-meld .tile-svg { transform:rotate(270deg) scale(.8); }
-.seat-left .open-meld .tile-svg { transform:rotate(90deg) scale(.8); }
-.seat-right .open-meld .called-tile .tile-svg { transform:rotate(0deg) scale(.8); }
-.seat-left .open-meld .called-tile .tile-svg { transform:rotate(180deg) scale(.8); }
-#player-hand, #player-hand[data-has-drawn="false"] { grid-template-columns:repeat(var(--hand-count,14),minmax(0,1fr)); }
 #player-hand .tile-choice { max-width:42px; margin:auto; }
 #call-controls { width:100%; }
 #call-controls p { margin:2px; }
@@ -214,20 +114,8 @@ header > div { min-width:0; }
 #call-options button { display:flex; align-items:center; justify-content:center; gap:2px; min-height:48px; flex:1 1 130px; }
 #call-options .tile-svg { width:22px; height:31px; }
 #pass-calls { width:100%; min-height:44px; margin-top:4px; }
-.result-melds { display:flex; flex-wrap:wrap; gap:6px; }
-.result-melds .open-meld span { width:22px; height:31px; }
-.result-melds .open-meld .tile-svg { width:22px; height:31px; }
-.result-melds .called-tile { margin:0 5px; }
-/* Extra meld/choice rows can exceed a short viewport; retain document flow so
-   the hand and river are never covered by the operation panel. */
-.discard-controls { position:relative; bottom:auto; }
 #call-options button, #pass-calls { border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; touch-action:manipulation; cursor:pointer; }
 #call-options button:focus-visible, #pass-calls:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
-
-/* Extra scroll range only while Safari occludes the layout viewport. */
-main { padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px) + var(--call-viewport-inset, 0px)); }
-
-/* Step 13.5: choices stay in document flow and retain 44px touch targets. */
 #kan { min-height:44px; min-width:44px; flex:1 1 0; padding:8px 6px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; }
 #kan-controls { width:100%; }
 #kan-options { display:flex; flex-wrap:wrap; gap:4px; }
@@ -235,19 +123,84 @@ main { padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px) + var(--call-
 #kan-options button { display:flex; align-items:center; justify-content:center; flex:1 1 150px; }
 #kan-options .tile-svg { width:22px; height:31px; }
 #cancel-kan { width:100%; margin-top:4px; }
-.open-meld .concealed-kan-back { background:#426e9b; border:2px solid #eee5ca; border-radius:2px; }
-.open-meld .added-kan-tile { margin-left:2px; transform:translateY(-4px); border-bottom:2px solid #ffda7d; }
-
-/* The result reopen action also stays below the table in narrow viewports. */
-.discard-controls.result-available { position:relative; bottom:auto; }
-
-/* Step 13.5.1: public declaration previews stay within each seat. */
-.open-meld[data-kan-pending] { flex-wrap:wrap; border:1px dashed #ffda7d; max-width:100%; }
-.open-meld .pending-kan-tile { background:#80551b; outline:2px dashed #ffda7d; transform:none; }
-.open-meld small { flex-basis:100%; font-size:9px; line-height:1.3; color:#ffe6a5; text-align:center; }
 #ron-status { flex-basis:100%; margin:0; overflow-wrap:anywhere; }
 #ron-target { flex-basis:100%; display:flex; align-items:center; justify-content:center; gap:12px; min-width:0; }
 #ron-target > .tile-svg { width:48px; height:67.2px; flex-shrink:0; }
 #ron-target p { margin:0; overflow-wrap:anywhere; }
 #ron-controls button { min-width:44px; min-height:44px; }
-.seat-top .open-meld small { transform:rotate(180deg); }
+
+/* Four seats surround a compact, stable public table. Geometry scales with its
+   container, while the human hand always retains the full available width. */
+.table { container-type:inline-size; position:relative; display:grid; grid-template-columns:50px minmax(0,1fr) 50px; grid-template-rows:minmax(84px,auto) auto auto; grid-template-areas:'. top .' 'left rivers right' 'bottom bottom bottom'; gap:3px; padding:6px 2px; border:2px solid #39765e; border-radius:16px; background:radial-gradient(ellipse at center,#287a5a,#1c6048); }
+.seat { min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; }
+.seat-top { grid-area:top; }
+.seat-left { grid-area:left; }
+.seat-right { grid-area:right; }
+.seat-bottom { grid-area:bottom; align-items:stretch; gap:10px; padding-top:8px; }
+.seat-label { margin:0; padding:3px 2px; border:1px solid transparent; border-radius:5px; font-size:11px; line-height:1.35; text-align:center; color:#fff1cc; }
+.seat-label span { display:block; white-space:nowrap; }
+.seat-left .seat-label,.seat-right .seat-label { width:100%; font-size:10px; }
+.seat-left .seat-label span,.seat-right .seat-label span { white-space:normal; overflow-wrap:anywhere; }
+.seat-label[data-active='true'] { border-color:#ffda7d; background:#103e30; color:#ffda7d; }
+.seat-bottom .seat-label span,.seat-top .seat-label span { display:inline; }
+.seat-points { font-variant-numeric:tabular-nums; }
+.concealed-hand { display:flex; gap:1px; justify-content:center; max-width:100%; }
+.tile-back { display:block; flex:none; width:9px; height:14px; border:1px solid #e5dfc5; border-radius:2px; background:linear-gradient(#658ab1,#315877); box-shadow:0 1px #ddd4b9; }
+.seat-left .concealed-hand,.seat-right .concealed-hand { flex-direction:column; gap:1px; }
+.seat-left .tile-back,.seat-right .tile-back { width:14px; height:7px; }
+.rivers { --river-tile-width:clamp(12px,4cqw,20px); --river-tile-height:calc(var(--river-tile-width)*1.4); grid-area:rivers; width:100%; max-width:360px; justify-self:center; display:grid; grid-template-columns:auto minmax(76px,1fr) auto; grid-template-rows:calc(var(--river-tile-height)*3 + 4px) minmax(116px,auto) calc(var(--river-tile-height)*3 + 4px); grid-template-areas:'. top .' 'left info right' '. bottom .'; gap:3px 0; align-items:center; justify-items:center; min-width:0; }
+.river { display:grid; grid-template-columns:repeat(6,var(--river-tile-width)); grid-template-rows:repeat(3,var(--river-tile-height)); gap:1px; min-width:0; }
+.river-top { grid-area:top; }.river-bottom { grid-area:bottom; }.river-left { grid-area:left; }.river-right { grid-area:right; }
+.river-left,.river-right { grid-template-columns:repeat(3,var(--river-tile-height)); grid-template-rows:repeat(6,var(--river-tile-width)); }
+.river-tile { position:relative; width:var(--river-tile-width); height:var(--river-tile-height); }
+.river-left .river-tile,.river-right .river-tile { width:var(--river-tile-height); height:var(--river-tile-width); }
+.river-tile .tile-svg { position:absolute; width:var(--river-tile-width); height:var(--river-tile-height); left:50%; top:50%; transform:translate(-50%,-50%) rotate(var(--face-angle,0deg)); }
+.river-top { --face-angle:180deg; }.river-left { --face-angle:90deg; }.river-right { --face-angle:270deg; }
+.river-tile[data-riichi-declaration='true'] .tile-svg { transform:translate(-50%,-50%) rotate(calc(var(--face-angle,0deg) + 90deg)) scale(.7142857); }
+.center-info { grid-area:info; align-self:stretch; width:min(100%,120px); min-width:0; display:flex; flex-direction:column; justify-content:center; gap:4px; padding:3px 1px; border-radius:6px; background:#123f32; font-size:9px; line-height:1.35; text-align:center; }
+#table-round { font-weight:700; }
+#wall-count { display:flex; flex-direction:column; gap:1px; }
+#wall-count span:last-child { color:#ffda7d; }
+.dora-area h2 { margin:0 0 3px; font-size:9px; }
+#dora-indicators { display:grid; grid-template-columns:repeat(3,18px); grid-template-rows:repeat(2,25.2px); justify-content:center; gap:2px; }
+.dora-slot,.dora-slot .tile-svg { width:18px; height:25.2px; }
+.dora-slot span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.dora-placeholder { border:1px solid #39765e; border-radius:2px; }
+#deposit-sticks { display:flex; flex-wrap:wrap; justify-content:center; gap:2px; margin-top:4px; }
+.deposit-stick { width:26px; height:8px; }.deposit-stick svg { width:100%; height:100%; display:block; }
+.open-melds,.result-melds { display:flex; flex-wrap:wrap; justify-content:center; gap:5px; max-width:100%; }
+.open-melds:empty { display:none; }
+.open-meld { position:relative; display:flex; align-items:flex-end; gap:1px; padding:15px 0 0; isolation:isolate; }
+.open-meld > span { position:relative; display:block; flex:none; width:14px; height:19.6px; }
+.open-meld .tile-svg { width:14px; height:19.6px; }
+.open-meld .called-tile { width:19.6px; height:14px; }
+.open-meld .called-tile .tile-svg { position:absolute; left:2.8px; top:-2.8px; transform:rotate(90deg); }
+.open-meld .added-kan-tile { position:absolute; width:19.6px; height:14px; left:var(--called-offset); bottom:15px; z-index:2; }
+.open-meld .added-kan-tile .tile-svg { position:absolute; left:2.8px; top:-2.8px; transform:rotate(90deg); }
+.open-meld .pending-kan-tile { outline:2px dashed #ffda7d; background:#80551b; }
+.open-meld small { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.seat-declaration { color:#ffda7d; }
+.open-meld .concealed-kan-back { border:1px solid #eee5ca; border-radius:2px; background:#426e9b; }
+.seat-top .open-meld { transform:rotate(180deg); }
+.seat-left,.seat-right { display:grid; grid-template-columns:14px 34px; grid-template-rows:auto minmax(0,1fr); align-items:start; justify-content:center; padding-top:8px; gap:6px 2px; }
+.seat-right { grid-template-columns:34px 14px; }
+.seat-left .seat-label,.seat-right .seat-label { grid-column:1 / -1; }
+.seat-left .concealed-hand,.seat-right .concealed-hand { grid-row:2; margin-top:6px; }
+.seat-left .concealed-hand { grid-column:1; }.seat-right .concealed-hand { grid-column:2; }
+.seat-left .open-melds,.seat-right .open-melds { grid-row:2; display:grid; grid-auto-rows:54px; gap:2px; width:34px; padding:4px 0; align-self:start; }
+.seat-left .open-melds { grid-column:2; }.seat-right .open-melds { grid-column:1; }
+.seat-left .open-meld,.seat-right .open-meld { transform:rotate(90deg); transform-origin:center; margin:auto -8px; }
+.seat-right .open-meld { transform:rotate(270deg); }
+.seat-bottom .open-melds { justify-content:flex-end; min-height:0; }
+.discard-controls > button { font-size:14px; }
+.discard-controls button:disabled { opacity:.55; }
+.ron-pending > #kan { display:none; }
+@media (min-width:600px) { .table { grid-template-columns:80px minmax(0,1fr) 80px; grid-template-rows:minmax(90px,auto) auto auto; } .seat-label { font-size:14px; } .center-info { font-size:12px; } }
+@media (max-height:650px) and (max-width:599px) {
+  .table { grid-template-rows:minmax(76px,auto) auto auto; }
+  .rivers { --river-tile-width:12px; grid-template-rows:54.4px 116px 54.4px; }
+  .center-info { font-size:8px; gap:2px; }
+  .seat-bottom { gap:8px; padding-top:4px; }
+  .discard-controls { padding:4px 6px calc(8px + env(safe-area-inset-bottom,0px)); }
+}
+#wall-count span:nth-child(2) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }

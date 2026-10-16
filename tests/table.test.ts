@@ -19,7 +19,7 @@ class ElementStub {
   children: ElementStub[] = [];
   dataset: Record<string, string> = {};
   className = '';
-  style: Record<string, string> = {};
+  style = Object.assign({} as Record<string, string>, { setProperty(name: string, value: string) { this[name] = value; } });
   textContent = '';
   disabled = false;
   hidden = false;
@@ -95,7 +95,7 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
   for (const id of [0, 1, 2, 3]) {
     nodes.set(`#label-${id}`, new ElementStub());
     nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
-    if (id) nodes.set(`#hand-${id}`, new ElementStub());
+    if (id) nodes.set(`.concealed-hand[data-player-id="${id}"]`, new ElementStub());
   }
   nodes.set('#player-hand', new ElementStub());
   nodes.set('#wall-count', new ElementStub());
@@ -136,8 +136,8 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       }).map(tile => tile.id).concat(game.players[0].drawnTile!.id));
       assert.match(nodes.get('#label-0')!.textContent, /^自分 · 東 · 14枚 · 親$/);
       for (const id of [1, 2, 3]) {
-        const backs = nodes.get(`#hand-${id}`)!.children;
-        assert.equal(backs.length, 0);
+        const backs = nodes.get(`.concealed-hand[data-player-id="${id}"]`)!.children;
+        assert.equal(backs.length, 13);
         assert.ok(backs.every(item => item.className === 'tile-back' && item.children.length === 0 && Object.keys(item.dataset).length === 0));
         assert.match(nodes.get(`#label-${id}`)!.textContent, new RegExp(`^CPU${id} · ${['', '南', '西', '北'][id]} · 13枚$`));
       }
@@ -437,5 +437,49 @@ for (const mode of ['discard', 'red', 'pending', 'ron', 'pass', 'reset', 'new-ma
         assert.equal(new Set(allTiles(game).map(t=>t.id)).size,136);
       } else inventory(game,['reset','new-match','reload'].includes(mode)?game:initial);
     }
+  } finally {globalThis.document=original;}
+});
+
+for (const source of [1,2,3] as const) test(`Step 13.5.2 added kan preserves pon footprint from seat ${source}`, async()=>{
+  const {renderMelds}=await import('../src/rendering/melds.ts');
+  const {scenarioGame}=await import('../src/verification/scenarios.ts');
+  const {declareKan,getKanOptions}=await import('../src/game/kan.ts');
+  const {passRon}=await import('../src/game/ron.ts');
+  const initial=scenarioGame('chankan');
+  const pending=declareKan(initial,1,getKanOptions(initial,1)[0].id);
+  const confirmed=passRon(pending,0);
+  const player=confirmed.players[1];
+  const meld=player.melds![0];
+  const original=globalThis.document;
+  globalThis.document={createElement:(tag:string)=>new ElementStub(tag)} as unknown as Document;
+  try {
+    const container=new ElementStub();
+    renderMelds(container as unknown as HTMLElement,{...player,id:0,melds:[{...meld,fromPlayerId:source}]});
+    const group=container.children[0];
+    assert.equal(group.children.length,4);
+    const calledIndex=source===3?0:source===2?1:2;
+    assert.equal(group.children[calledIndex].className,'called-tile');
+    assert.equal(group.style['--called-offset'],`${calledIndex*15}px`);
+    assert.match(group.children[3].className,/added-kan-tile/);
+    assert.equal(group.children[3].dataset.tileId, meld.type==='kakan'?meld.addedTileId:undefined);
+  } finally {globalThis.document=original;}
+});
+
+test('Step 13.5.2 chi retains numeric order and marks the acquired tile',async()=>{
+  const {renderMelds}=await import('../src/rendering/melds.ts');
+  const {callStart}=await import('./calls-fixture.ts');
+  const {getCallOptions,declareCall}=await import('../src/game/calls.ts');
+  let game=callStart(3,{0:['3467m','234p','678s','19p','1z']},'man-5');
+  game=discardTile(game,3,game.players[3].drawnTile!.id);
+  const option=getCallOptions(game,0).find(o=>o.type==='chi')!;
+  game=declareCall(game,0,option.id);
+  const original=globalThis.document;
+  globalThis.document={createElement:(tag:string)=>new ElementStub(tag)} as unknown as Document;
+  try {
+    const container=new ElementStub();renderMelds(container as unknown as HTMLElement,game.players[0]);
+    const meld=game.players[0].melds![0], group=container.children[0];
+    assert.deepEqual(group.children.map(n=>n.dataset.tileId),meld.tiles.map(t=>t.id));
+    assert.equal(group.children.find(n=>n.className==='called-tile')!.dataset.tileId,meld.calledTileId);
+    assert.equal(group.dataset.fromDirection,'3');
   } finally {globalThis.document=original;}
 });

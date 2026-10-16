@@ -1,9 +1,10 @@
+import os
 """Step 13.2: deterministic legal-wall scenarios, seven Chromium viewports.
 The module route adds test controls only; no test hooks ship in the application.
 """
 import json,pathlib,shutil
 from playwright.sync_api import sync_playwright
-out=pathlib.Path('docs/screenshots/step13.2');out.mkdir(parents=True,exist_ok=True)
+out=pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', 'docs/verification/step13.5.2/screenshots')) / 'browser-cpu-riichi';out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path=shutil.which('chromium'),args=['--no-sandbox'])

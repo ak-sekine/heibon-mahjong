@@ -1,0 +1,107 @@
+[
+  {
+    "width": 320,
+    "height": 568,
+    "passed": true,
+    "jsErrors": [],
+    "scenes": [
+      "chi-options",
+      "red-choice",
+      "pon",
+      "after-call-discard-cpu",
+      "four-seats",
+      "open-ron",
+      "open-tsumo"
+    ]
+  },
+  {
+    "width": 375,
+    "height": 667,
+    "passed": true,
+    "jsErrors": [],
+    "scenes": [
+      "chi-options",
+      "red-choice",
+      "pon",
+      "after-call-discard-cpu",
+      "four-seats",
+      "open-ron",
+      "open-tsumo"
+    ]
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "passed": true,
+    "jsErrors": [],
+    "scenes": [
+      "chi-options",
+      "red-choice",
+      "pon",
+      "after-call-discard-cpu",
+      "four-seats",
+      "open-ron",
+      "open-tsumo"
+    ]
+  },
+  {
+    "width": 414,
+    "height": 896,
+    "passed": true,
+    "jsErrors": [],
+    "scenes": [
+      "chi-options",
+      "red-choice",
+      "pon",
+      "after-call-discard-cpu",
+      "four-seats",
+      "open-ron",
+      "open-tsumo"
+    ]
+  },
+  {
+    "width": 1280,
+    "height": 800,
+    "passed": true,
+    "jsErrors": [],
+    "scenes": [
+      "chi-options",
+      "red-choice",
+      "pon",
+      "after-call-discard-cpu",
+      "four-seats",
+      "open-ron",
+      "open-tsumo"
+    ]
+  },
+  {
+    "width": 375,
+    "height": 547,
+    "passed": true,
+    "jsErrors": [],
+    "scenes": [
+      "chi-options",
+      "red-choice",
+      "pon",
+      "after-call-discard-cpu",
+      "four-seats",
+      "open-ron",
+      "open-tsumo"
+    ]
+  },
+  {
+    "width": 390,
+    "height": 724,
+    "passed": true,
+    "jsErrors": [],
+    "scenes": [
+      "chi-options",
+      "red-choice",
+      "pon",
+      "after-call-discard-cpu",
+      "four-seats",
+      "open-ron",
+      "open-tsumo"
+    ]
+  }
+]

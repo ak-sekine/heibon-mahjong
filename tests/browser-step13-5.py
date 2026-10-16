@@ -1,7 +1,8 @@
+import os
 """Kan acceptance using full 136-tile fixtures, routed only in the test browser."""
 import json,pathlib,shutil
 from playwright.sync_api import sync_playwright
-out=pathlib.Path('docs/screenshots/step13.5.1/kan');out.mkdir(parents=True,exist_ok=True)
+out=pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', 'docs/verification/step13.5.2/screenshots')) / 'browser-step13-5';out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path=shutil.which('chromium'),args=['--no-sandbox'])
