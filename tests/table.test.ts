@@ -369,9 +369,12 @@ for (const mode of ['plain', 'riichi', 'double', 'double-ron', 'triple-ron'] as 
       if (!entitled) assert.ok(!JSON.stringify(walk(section).map(n => [n.dataset, n.attributes, n.textContent, n.innerHTML])).includes(game.deadWall[5].id));
     }
     assert.deepEqual(won, snapshot);
-    renderTable(startGame());
+    const reset = startGame();
+    renderTable(reset);
     assert.deepEqual(panel.children, []);
-    assert.ok(!JSON.stringify(walk(nodes.get('#dora-indicators')!).map(n => [n.dataset, n.attributes])).includes(game.deadWall[5].id));
+    // Physical IDs are reused across games: compare against the new ura tile,
+    // since the previous game's ura can legitimately be the new public indicator.
+    assert.ok(!JSON.stringify(walk(nodes.get('#dora-indicators')!).map(n => [n.dataset, n.attributes])).includes(reset.deadWall[5].id));
   } finally { globalThis.document = original; }
 });
 

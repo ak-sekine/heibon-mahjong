@@ -1001,3 +1001,5 @@ CPUは合法候補だけを自分の手牌と公開牌で決定的に評価し�
 - 再現：4173番でViteを起動し、`python tests/browser-kan-page.py` と `python tests/browser-step13-5.py`。ログは [docs/verification/step13.5.1/](docs/verification/step13.5.1/)、画像は [docs/screenshots/step13.5.1/](docs/screenshots/step13.5.1/) に新規保存。320pxの公開ページ・通常ロン・CPU2/3宣言を目視確認。
 
 **iPhone Safari実機は未検証**です。実機では `/heibon-mahjong/kan-test.html` の「槍槓」から、元のポンと追加牌、ロン／見逃し後の消去、アドレスバー伸縮・セーフエリア・ホームインジケータ、VoiceOverの宣言説明・フォーカス・重複読み上げを確認してください。ルール追加はありません。Actions・Pagesの対象コミット結果はpush後の完了報告に記載します。
+
+初回CIでは既存のランダムな新局リセットテストが、前局の裏ドラ物理IDと新局の公開ドラIDの偶然の一致で失敗しました。新局の非公開裏ドラIDと比較するようテストを修正し、再検証しました（牌IDは局をまたいで再利用されます）。

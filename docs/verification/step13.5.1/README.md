@@ -15,3 +15,5 @@ Screenshots: ../../screenshots/step13.5.1/. Visually inspected 320px normal ron,
 Run the public-page browser check against a fresh Vite dev server (port 4173). During development, HMR module timestamps can cause a plain dynamic import of main.ts in the read-only test helper to refer to a separate controller from the public page. Restarting Vite removes that test-observation mismatch. Privacy state and DOM are captured together to avoid CPU-turn timing races.
 
 No GameState, kan resolution, scoring, ron conditions or physical inventory implementation changed. iPhone Safari hardware and VoiceOver remain untested; check address-bar resizing, safe-area/home indicator, announcement/focus and both public chankan choices on device.
+
+Initial CI run 38911263277 failed an existing randomized reset test: it compared the old game's hidden ura ID against a new game's public indicator, although physical IDs legitimately recur across games. The check now compares with the new game's hidden ura ID. No production behavior changed. Local full tests were rerun after this correction.
