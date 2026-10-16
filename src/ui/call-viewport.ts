@@ -1,7 +1,7 @@
 /** Keep the in-flow call panel inside Safari's visual viewport, without overlays.
  * Observe entry separately so ordinary renders never move the user's scroll. */
 export function installCallViewport(): void {
-  const panels = [document.querySelector<HTMLElement>('#call-controls')!,document.querySelector<HTMLElement>('#kan-controls')!].filter(Boolean);
+  const panels = [document.querySelector<HTMLElement>('#ron-controls')!,document.querySelector<HTMLElement>('#call-controls')!,document.querySelector<HTMLElement>('#kan-controls')!].filter(Boolean);
   const panel=panels[0];
   const main = panel.closest('main')!;
   let pending = false;

@@ -1,7 +1,7 @@
 """Kan acceptance using full 136-tile fixtures, routed only in the test browser."""
 import json,pathlib,shutil
 from playwright.sync_api import sync_playwright
-out=pathlib.Path('docs/screenshots/step13.5/kan');out.mkdir(parents=True,exist_ok=True)
+out=pathlib.Path('docs/screenshots/step13.5.1/kan');out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path=shutil.which('chromium'),args=['--no-sandbox'])
@@ -10,19 +10,21 @@ with sync_playwright() as p:
   page.on('pageerror',lambda e:errors.append(str(e)))
   def inject(route):
    response=route.fetch()
-   source="""import {kanGame,ankanGame,kakanGame} from '/heibon-mahjong/tests/kan-fixture.ts';
+   source="""import {ronGame} from '/heibon-mahjong/tests/ron-fixture.ts';
+import {kanGame,ankanGame,kakanGame} from '/heibon-mahjong/tests/kan-fixture.ts';
 import {startMatch} from '/heibon-mahjong/src/game/match.ts';
 import {discardTile} from '/heibon-mahjong/src/game/discard.ts';
 import {declareKan,getKanOptions} from '/heibon-mahjong/src/game/kan.ts';
 """+response.text()+"""
 window.kanCheck=()=>controller.match;
-window.startRobbery=()=>{controller.game=declareKan(controller.game,1,getKanOptions(controller.game,1)[0].id);render();};
+window.startRobbery=()=>{controller.game=declareKan(controller.game,controller.game.turnPlayerId,getKanOptions(controller.game,controller.game.turnPlayerId)[0].id);render();};
 window.loadKan=(mode)=>{controller.newGame();let g;
+if(mode==='ron')g=ronGame(1,[0]);
 if(mode==='ankan')g=ankanGame();
 if(mode==='kakan')g=kakanGame();
 if(mode==='choices')g=kanGame({hands:{0:['1111z','5550m','234p','67s']},draw:'sou-8',rinshan:['west']});
 if(mode==='daiminkan'){g=kanGame({hands:{0:['111z','234m','456p','678s','2z']},turn:3,draw:'east',rinshan:['south']});g=discardTile(g,3,g.players[3].drawnTile.id);}
-if(mode==='robbery')g=kanGame({turn:1,draw:'man-1',melds:{1:[{type:'pon',group:'111m'}]},hands:{1:['234p','678s','22z','45s'],0:['23m','456p','789s','333z','66s']}});
+if(mode.startsWith('robbery')){const id=Number(mode.at(-1))||1;g=kanGame({turn:id,draw:'man-1',melds:{[id]:[{type:'pon',group:'111m'}]},hands:{[id]:['234p','678s','22z','45s'],0:['23m','456p','789s','333z','66s']}});}
 if(mode==='seats')g=kanGame({hands:{0:['234m','456p','678s','2z']},draw:'south',melds:{0:[{type:'ankan',group:'1111z'}],1:[{type:'daiminkan',group:'3333z'}],2:[{type:'kakan',group:'4444z'}],3:[{type:'ankan',group:'5555z'}]}});
 if(mode==='seats')g={...g,phase:'wall-exhausted',abortiveDraw:'four-kans'};
 controller.match=startMatch(g);render();};
@@ -64,10 +66,23 @@ controller.match=startMatch(g);render();};
    assert page.locator('.result-dora-slot').count()>=5
    assert page.locator('#result-body').evaluate('e=>e.scrollHeight>=e.clientHeight')
    page.locator('#next-round').click();assert page.evaluate('kanCheck().game.kanCount')==0
-  page.evaluate("loadKan('robbery');startRobbery()");assert page.locator('#ron').is_enabled();check();shot('chankan-pending')
+  page.evaluate("loadKan('ron')");assert page.locator('#ron-target svg').count()==1
+  assert page.locator('#ron-target svg').get_attribute('aria-hidden')=='true'
+  assert page.locator('#ron-status').inner_text()=='CPU1が赤5索を捨てました'
+  assert page.locator('#ron-target svg title').text_content()=='赤5索'
+  check();shot('normal-ron');page.locator('#pass-ron').click();assert page.locator('#ron-target svg').count()==0
+  page.evaluate("loadKan('ron')");page.locator('#ron').click();assert page.evaluate('kanCheck().game.phase')=='won'
+  page.locator('#view-table').click()
+  page.evaluate("loadKan('robbery');startRobbery()");assert page.locator('#ron').is_enabled();assert page.locator('#ron-target svg').count()==1;assert page.locator('.pending-kan-tile svg').count()==1;check();shot('chankan-pending')
   page.locator('#pass-ron').click();assert page.evaluate('kanCheck().game.players[1].melds[0].type')=='kakan'
   page.evaluate("loadKan('robbery');startRobbery()");page.locator('#ron').click();assert '槍槓 1翻' in page.locator('#win-result').inner_text();check();shot('chankan-result')
   page.locator('#view-table').click()
+  for seat in [2,3]:
+   page.evaluate(f"loadKan('robbery{seat}');startRobbery()")
+   preview=page.locator('.pending-kan-tile');box=preview.bounding_box();seatbox=preview.locator('xpath=ancestor::*[contains(@class,"seat-")]').first.bounding_box()
+   assert box['x']>=seatbox['x']-1 and box['x']+box['width']<=seatbox['x']+seatbox['width']+1
+   check();shot(f'chankan-seat{seat}')
+   page.locator('#pass-ron').click();assert page.locator('.pending-kan-tile').count()==0
   page.evaluate("loadKan('seats')");page.locator('#view-table').click();check();assert page.locator('.open-meld').count()==4;assert page.locator('.dora-slot[data-tile-id]').count()==5;shot('four-seats')
   page.evaluate("loadKan('choices')");page.locator('#kan').click()
   page.evaluate("""()=>{window.nativeViewport=window.visualViewport;window.testViewport=new EventTarget();Object.assign(testViewport,{height:380,offsetTop:24});Object.defineProperty(window,'visualViewport',{configurable:true,get:()=>testViewport});nativeViewport.dispatchEvent(new Event('resize'));}""")

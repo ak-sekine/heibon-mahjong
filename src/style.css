@@ -240,3 +240,14 @@ main { padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px) + var(--call-
 
 /* The result reopen action also stays below the table in narrow viewports. */
 .discard-controls.result-available { position:relative; bottom:auto; }
+
+/* Step 13.5.1: public declaration previews stay within each seat. */
+.open-meld[data-kan-pending] { flex-wrap:wrap; border:1px dashed #ffda7d; max-width:100%; }
+.open-meld .pending-kan-tile { background:#80551b; outline:2px dashed #ffda7d; transform:none; }
+.open-meld small { flex-basis:100%; font-size:9px; line-height:1.3; color:#ffe6a5; text-align:center; }
+#ron-status { flex-basis:100%; margin:0; overflow-wrap:anywhere; }
+#ron-target { flex-basis:100%; display:flex; align-items:center; justify-content:center; gap:12px; min-width:0; }
+#ron-target > .tile-svg { width:48px; height:67.2px; flex-shrink:0; }
+#ron-target p { margin:0; overflow-wrap:anywhere; }
+#ron-controls button { min-width:44px; min-height:44px; }
+.seat-top .open-meld small { transform:rotate(180deg); }

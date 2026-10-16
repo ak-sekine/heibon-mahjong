@@ -99,7 +99,7 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
     label.dataset.active = String(game.phase !== 'wall-exhausted' && game.phase !== 'won' && game.turnPlayerId === id);
     if (id === 0) renderSelf(player, canDiscard(game, 0));
     const melds = document.querySelector<HTMLElement>(`.open-melds[data-player-id="${id}"]`);
-    if (melds) renderMelds(melds, player);
+    if (melds) renderMelds(melds, player, game);
     const river = document.querySelector<HTMLElement>(`.river[data-player-id="${id}"]`)!;
     river.replaceChildren(...player.river.map((physical, index) => {
       const item = document.createElement('div');
@@ -167,9 +167,26 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
   const canRon = game.players[0].control === 'human' && canDeclareRon(game, 0);
   ron.hidden = !canRon;
   const tile = getRonTile(game);
+  const status = document.querySelector<HTMLElement>('#ron-status')!;
+  const target = document.querySelector<HTMLElement>('#ron-target');
   if (canRon && tile) {
-    document.querySelector<HTMLElement>('#ron-status')!.textContent =
-      `${seatNames[game.ronWindow!.discarderId]}の${game.ronWindow?.kan?'カン宣言牌':'捨て牌'}：${tileLabel(tile.tile)}。ロンできます`;
+    const kind = game.ronWindow?.kind;
+    const action = kind === 'kakan' ? 'を加カンしようとしています'
+      : kind === 'ankan' ? 'で暗カンを宣言しました' : 'を捨てました';
+    status.textContent = `${seatNames[game.ronWindow!.discarderId]}が${tileLabel(tile.tile)}${action}`;
+    if (target) {
+      const svg = createTileElement(tile.tile);
+      // The status already names the exact (including red) face once.
+      svg.setAttribute('aria-hidden', 'true');
+      target.replaceChildren(svg, previewText('p', kind === 'kakan' ? '追加する牌・この牌で槍槓できます'
+        : kind === 'ankan' ? 'この牌で槍槓できます' : 'この牌でロンできます'));
+    }
+  } else {
+    status.textContent = '';
+    target?.replaceChildren();
+    if (document.activeElement === document.querySelector('#ron') || document.activeElement === document.querySelector('#pass-ron')) {
+      (document.activeElement as HTMLElement).blur();
+    }
   }
   document.querySelector<HTMLButtonElement>('#ron')!.disabled = !canRon;
   document.querySelector<HTMLButtonElement>('#pass-ron')!.disabled = !canRon;
@@ -308,9 +325,9 @@ function fuEntryLabel(entry: FuEntry): string {
   }
 }
 
-function renderMelds(container: HTMLElement, player: PlayerState): void {
+function renderMelds(container: HTMLElement, player: PlayerState, game?: GameState): void {
   container.setAttribute('aria-label', `${seatNames[player.id]}の公開副露面子`);
-  container.replaceChildren(...(player.melds ?? []).map(meld => {
+  container.replaceChildren(...(player.melds ?? []).map((meld, index) => {
     const group=document.createElement('div');group.className='open-meld';
     const direction=(meld.fromPlayerId-player.id+4)%4;
     group.dataset.fromDirection=String(direction);
@@ -337,6 +354,27 @@ function renderMelds(container: HTMLElement, player: PlayerState): void {
       if(meld.type==='kakan' && physical.id===meld.addedTileId) item.classList.add('added-kan-tile');
       item.append(createTileElement(physical.tile));group.append(item);
     }
+    const pending = game?.phase === 'awaiting-ron' && game.ronWindow?.kind === 'kakan'
+      ? game.ronWindow.kan : null;
+    if (meld.type === 'pon' && pending?.playerId === player.id && pending.meldIndex === index) {
+      group.dataset.kanPending = 'true';
+      const preview = document.createElement('span');
+      preview.setAttribute('role', 'img');
+      preview.className = 'added-kan-tile pending-kan-tile';
+      // Preview only: never expose a concealed physical ID or mutate the meld.
+      preview.setAttribute('aria-label', `加カン宣言中：${tileLabel(pending.tile.tile)}`);
+      const svg = createTileElement(pending.tile.tile);
+      svg.setAttribute('aria-hidden', 'true');
+      preview.append(svg);
+      group.append(preview);
+      group.append(previewText('small', '加カン宣言中'));
+    }
     return group;
   }));
+}
+
+function previewText(tag: string, value: string): HTMLElement {
+  const node = document.createElement(tag);
+  node.textContent = value;
+  return node;
 }

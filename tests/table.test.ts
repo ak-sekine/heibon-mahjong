@@ -28,7 +28,7 @@ class ElementStub {
   focused = false;
   querySelector() { return { textContent: '' }; }
   focus() { assert.equal(this.disabled, false); this.focused = true; }
-  classList = { toggle() {} };
+  classList = { toggle() {}, add: (name: string) => { this.className += ` ${name}`; } };
   attributes: Record<string, string> = {};
   setAttribute(name: string, value: string) { this.attributes[name] = value; }
   replaceChildren(...children: ElementStub[]) { this.children = children; }
@@ -305,7 +305,7 @@ for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','f
       assert.equal(nodes.get('#pass-ron')!.disabled,!pending);
       if (pending) {
         assert.equal(nodes.get('#ron')!.focused,true);
-        assert.match(nodes.get('#ron-status')!.textContent,/CPU1の捨て牌：赤5索/);
+        assert.match(nodes.get('#ron-status')!.textContent,/CPU1が赤5索を捨てました/);
       }
       assert.equal(nodes.get('#discard')!.disabled,true); assert.equal(nodes.get('#tsumo')!.disabled,true);
       assert.ok(nodes.get('#player-hand')!.children.every(c=>c.children[0].disabled));
@@ -373,4 +373,66 @@ for (const mode of ['plain', 'riichi', 'double', 'double-ron', 'triple-ron'] as 
     assert.deepEqual(panel.children, []);
     assert.ok(!JSON.stringify(walk(nodes.get('#dora-indicators')!).map(n => [n.dataset, n.attributes])).includes(game.deadWall[5].id));
   } finally { globalThis.document = original; }
+});
+
+for (const mode of ['discard', 'red', 'pending', 'ron', 'pass', 'reset', 'new-match', 'reload', 'seat0', 'seat1', 'seat2', 'seat3'] as const) test(`Step 13.5.1 public ron preview: ${mode}`, async () => {
+  const { scenarioGame } = await import('../src/verification/scenarios.ts');
+  const { declareKan, getKanOptions } = await import('../src/game/kan.ts');
+  const { passRon } = await import('../src/game/ron.ts');
+  const { ronGame } = await import('./ron-fixture.ts');
+  const nodes = new Map<string, ElementStub>();
+  for (const id of [0,1,2,3]) {
+    nodes.set(`#label-${id}`, new ElementStub());
+    nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
+    nodes.set(`.open-melds[data-player-id="${id}"]`, new ElementStub());
+  }
+  for (const key of ['#player-hand','#wall-count','#win-result','#dora-indicators','#discard','#tsumo','#selection-status','#ron-controls','#ron-status','#ron-target','#ron','#pass-ron','.discard-controls']) nodes.set(key,new ElementStub());
+  nodes.get('#ron-controls')!.hidden=true;
+  const original=globalThis.document;
+  globalThis.document={querySelector:(s:string)=>nodes.get(s), querySelectorAll:()=>nodes.get('#player-hand')!.children.map(c=>c.children[0]), createElement:(tag:string)=>new ElementStub(tag)} as unknown as Document;
+  const walk=(n:ElementStub):ElementStub[]=>[n,...n.children.flatMap(walk)];
+  try {
+    const initial=scenarioGame('chankan');
+    const pending=declareKan(initial,1,getKanOptions(initial,1)[0].id);
+    let game=mode==='discard'||mode==='red'?ronGame(1,[0]):pending;
+    const snapshot=structuredClone(game);
+    renderTable(game);renderSelection(game,null);
+    assert.deepEqual(game,snapshot);
+    const target=nodes.get('#ron-target')!;
+    const physical=game.ronWindow!.kan?.tile ?? game.players[1].river.at(-1)!;
+    assert.equal(target.children[0].innerHTML,tileSvgMarkup(physical.tile));
+    assert.equal(target.children[0].attributes['aria-hidden'],'true');
+    assert.equal(target.children[0].dataset.tileId,undefined);
+    if(mode==='red') assert.match(target.children[0].innerHTML,/赤5索/);
+    if(game===pending) {
+      const group=nodes.get('.open-melds[data-player-id="1"]')!.children[0];
+      assert.equal(group.dataset.meldType,'pon');assert.equal(group.dataset.kanPending,'true');
+      assert.equal(group.children.filter(n=>n.children.length).length,4);
+      assert.equal(group.children[3].dataset.tileId,undefined);
+      assert.match(group.children[3].className,/pending-kan-tile/);
+      assert.equal(group.children[3].children[0].innerHTML,tileSvgMarkup(physical.tile));
+      assert.match(nodes.get('#ron-status')!.textContent,/CPU1が1萬を加カン/);
+    }
+    for(const p of game.players.slice(1)) for(const t of p.hand) assert.ok(![...nodes.values()].flatMap(walk).some(n=>n.dataset.tileId===t.id));
+    inventory(game,mode==='discard'||mode==='red'?game:initial);
+    if(mode==='ron') {game=declareRon(game,0);assert.equal(game.players[1].melds![0].type,'pon');}
+    if(mode==='pass') {game=passRon(game,0);assert.equal(game.players[1].melds![0].type,'kakan');assert.equal(game.players[0].temporaryFuriten,true);}
+    if(['reset','new-match','reload'].includes(mode)) game=scenarioGame('chankan');
+    if(mode.startsWith('seat')) {
+      const id=Number(mode.at(-1));
+      game={...pending,players:pending.players.map(p=>({...p,melds:initial.players[1].melds})),ronWindow:{...pending.ronWindow!,kan:{...pending.ronWindow!.kan!,playerId:id as 0|1|2|3}}};
+      renderTable(game);
+      for(const seat of [0,1,2,3]) assert.equal(nodes.get(`.open-melds[data-player-id="${seat}"]`)!.children[0].dataset.kanPending,seat===id?'true':undefined);
+    } else if(game!==pending && !['discard','red'].includes(mode)) {
+      renderTable(game);renderSelection(game,null);
+      assert.equal(target.children.length,0);
+      assert.equal(nodes.get('#ron-status')!.textContent,'');
+      assert.ok(![...nodes.values()].flatMap(walk).some(n=>n.dataset.kanPending==='true'));
+      if(mode==='ron') {
+        const { allTiles }=await import('./helpers.ts');
+        assert.deepEqual(allTiles(game).map(t=>t.id).sort(),allTiles(initial).map(t=>t.id).sort());
+        assert.equal(new Set(allTiles(game).map(t=>t.id)).size,136);
+      } else inventory(game,['reset','new-match','reload'].includes(mode)?game:initial);
+    }
+  } finally {globalThis.document=original;}
 });
