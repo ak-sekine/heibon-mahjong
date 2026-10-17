@@ -146,6 +146,24 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
       const heightVar=side?(declaration?'--river-tile-height':'--river-tile-width'):(declaration?'--river-tile-width':'--river-tile-height');
       return {physical,index,row:screenRow,column:screenColumn,declaration,widthVar,heightVar};
     });
+    // All 18 slots have a fixed position, including slots not discarded into yet.
+    // Without their reserved size, rotated seats collapse toward the screen's
+    // top-left instead of starting at the top-left of each player's viewpoint.
+    const rowCount = side ? 6 : 3;
+    const columnCount = side ? 3 : 6;
+    const cellWidths = Array.from({ length: rowCount }, () =>
+      Array<string>(columnCount).fill(side ? '--river-tile-height' : '--river-tile-width'));
+    const cellHeights = Array.from({ length: rowCount }, () =>
+      Array<string>(columnCount).fill(side ? '--river-tile-width' : '--river-tile-height'));
+    for (const position of positions) {
+      cellWidths[position.row][position.column] = position.widthVar;
+      cellHeights[position.row][position.column] = position.heightVar;
+    }
+    const offset = (variables: readonly string[]) => {
+      const widthTiles = variables.filter(value => value === '--river-tile-width').length;
+      const heightTiles = variables.length - widthTiles;
+      return `calc(var(--river-tile-width) * ${widthTiles} + var(--river-tile-height) * ${heightTiles} + ${variables.length * gap}px)`;
+    };
     river.replaceChildren(...player.river.map((physical, index) => {
       const position=positions[index];
       const item = document.createElement('div');
@@ -157,15 +175,8 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
       item.style.position='absolute';
       item.style.width=`var(${position.widthVar})`;
       item.style.height=`var(${position.heightVar})`;
-      const beforeRow=positions.filter(other=>other.row===position.row&&other.column<position.column);
-      const beforeColumn=positions.filter(other=>other.column===position.column&&other.row<position.row);
-      const offset=(others:typeof positions,dimension:'widthVar'|'heightVar')=>{
-        const widthTiles=others.filter(other=>other[dimension]==='--river-tile-width').length;
-        const heightTiles=others.length-widthTiles;
-        return `calc(var(--river-tile-width) * ${widthTiles} + var(--river-tile-height) * ${heightTiles} + ${others.length*gap}px)`;
-      };
-      item.style.left=offset(beforeRow,'widthVar');
-      item.style.top=offset(beforeColumn,'heightVar');
+      item.style.left = offset(cellWidths[position.row].slice(0, position.column));
+      item.style.top = offset(cellHeights.slice(0, position.row).map(row => row[position.column]));
       const tile = createTileElement(physical.tile);
       if (item.dataset.riichiDeclaration === 'true') {
         const description = `${tileLabel(physical.tile)} リーチ宣言牌`;
