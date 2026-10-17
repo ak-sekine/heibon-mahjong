@@ -2,8 +2,10 @@
 import json, os, pathlib, shutil
 from playwright.sync_api import sync_playwright
 out = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
-out.mkdir(exist_ok=True)
+out.mkdir(parents=True, exist_ok=True)
 reports = []
+diagnostics = []
+(out / 'diagnostics.json').write_text('[]\n', encoding='utf-8')
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'), args=['--no-sandbox'])
     for entry in ['', 'kan-test.html']:
@@ -96,6 +98,25 @@ with sync_playwright() as p:
                         order:[...document.querySelectorAll('.river')].every(e=>[...e.children].every((tile,i)=>tile.dataset.tileId===shown.players[+e.dataset.playerId].river[i].id)),
                       };
                     }''')
+                    passed=all(result.values())
+                    diagnostic_case=entry=='' and width==320 and scene=='multiple' and riichi==-1
+                    if diagnostic_case or not passed:
+                        detail=page.evaluate('''()=>{
+                          const q=s=>document.querySelector(s),r=e=>e.getBoundingClientRect();
+                          const box=e=>{if(!e)return null;const b=r(e);return {left:+b.left.toFixed(2),top:+b.top.toFixed(2),right:+b.right.toFixed(2),bottom:+b.bottom.toFixed(2),width:+b.width.toFixed(2),height:+b.height.toFixed(2)}};
+                          const selector=e=>e.id?'#'+e.id:e.tagName.toLowerCase()+[...e.classList].map(c=>'.'+c).join('');
+                          const table=q('.table'),t=r(table),hand=q('.seat-bottom #player-hand'),melds=q('.seat-bottom .open-melds');
+                          const overflow=[table,...table.querySelectorAll('*')].filter(e=>{const b=r(e);return b.width>0&&b.height>0&&(b.left<t.left-.5||b.top<t.top-.5||b.right>t.right+.5||b.bottom>t.bottom+.5)}).slice(0,120).map(e=>{
+                            const b=r(e);return {selector:selector(e),rect:box(e),overflow:{left:+Math.max(0,t.left-b.left).toFixed(2),top:+Math.max(0,t.top-b.top).toFixed(2),right:+Math.max(0,b.right-t.right).toFixed(2),bottom:+Math.max(0,b.bottom-t.bottom).toFixed(2)}};
+                          });
+                          const handBox=box(hand),meldBox=box(melds),groups=[...(melds?.children||[])].map(e=>({selector:selector(e),rect:box(e),tiles:[...e.querySelectorAll('svg')].map(box)}));
+                          return {viewport:{innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth},table:box(table),seatBottom:box(q('.seat-bottom')),hand:handBox,melds:meldBox,meldGapPx:handBox&&groups.length?+(r(melds.children[0]).left-r(hand).right).toFixed(2):null,meldGroups:groups,overflow};
+                        }''')
+                        image_name=f'diagnostic-{"normal" if not entry else "kan"}-{width}-{scene}-riichi-{riichi}.png'
+                        image_path=out/image_name
+                        page.screenshot(path=str(image_path),full_page=True)
+                        diagnostics.append({'entry':entry or 'index.html','width':width,'height':height,'scene':scene,'riichi':riichi,'passed':passed,'checks':result,'geometry':detail,'screenshot':image_name})
+                        (out/'diagnostics.json').write_text(json.dumps(diagnostics,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
                     assert all(result.values()), (entry,width,scene,riichi,result)
                     reports.append({'entry':entry or 'index.html','width':width,'scene':scene,'riichi':riichi,**result})
                 if scene in ['normal','pon','four-melds']:
