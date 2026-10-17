@@ -2,7 +2,7 @@ name: Browser UI verification
 
 on:
   push:
-    branches: [ui-river-spacing]
+    branches: [ui-river-spacing, main]
   workflow_dispatch:
 
 permissions:
