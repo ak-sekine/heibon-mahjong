@@ -23,6 +23,7 @@ window.stepFrames=[];let last=performance.now();const frame=t=>{stepFrames.push(
    route.fulfill(response=response,body=source)
   page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/heibon-mahjong/');page.wait_for_function('typeof stepCheck === "function"')
   def geometry():
+   page.locator('.discard-controls').scroll_into_view_if_needed()
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
    boxes=page.locator('#player-hand li').evaluate_all('es=>es.map(e=>{let r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width}})')
    assert len(set(round(b['y'],1) for b in boxes))==1

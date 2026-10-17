@@ -49,7 +49,7 @@ window.finishDraw=()=>{controller.match=updateMatchGame(controller.match,control
   def geometry(result=False):
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
    assert page.locator('#dora-indicators .dora-slot').count()==5
-   assert page.locator('#dora-indicators').evaluate('e=>getComputedStyle(e).gridTemplateColumns.split(" ").length')==3
+   assert page.locator('#dora-indicators').evaluate('e=>getComputedStyle(e).gridTemplateColumns.split(" ").length')==(3 if width>=960 else 5)
    if result:
     assert page.locator('#result-dialog').is_visible()
     assert page.locator('#result-body').evaluate('e=>["auto","scroll"].includes(getComputedStyle(e).overflowY)')

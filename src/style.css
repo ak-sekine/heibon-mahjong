@@ -130,20 +130,19 @@ header > div { min-width:0; }
 #ron-target p { margin:0; overflow-wrap:anywhere; }
 #ron-controls button { min-width:44px; min-height:44px; }
 
-/* Shared table geometry: 18 × 25.2px (60:84). Below 394.8px of main
-   content width the complete table tile set scales together to fit both side
-   seats, both side rivers and the center. Labels and controls do not scale.
-   Square river cells reserve the full footprint of sideways riichi tiles. */
-.table { container-type:normal; position:relative; display:grid; grid-template-columns:calc(var(--table-tile-height) + var(--table-tile-width) * 2.5 + 3px) minmax(0,1fr) calc(var(--table-tile-height) + var(--table-tile-width) * 2.5 + 3px); grid-template-rows:auto auto auto; grid-template-areas:'. top .' 'left rivers right' 'bottom bottom bottom'; gap:3px; padding:6px 2px; border:2px solid #39765e; border-radius:16px; background:radial-gradient(ellipse at center,#287a5a,#1c6048); --table-tile-width:clamp(13.5px,calc((100cqw - 24px) / 20.6),18px); --table-tile-height:calc(var(--table-tile-width) * 1.4); --meld-headroom:calc(var(--table-tile-width) + 2px); }
+/* Match the unchanged 14-column hand: main content minus table borders
+   and padding (8px), then thirteen 1px gaps, rounded down. Height never
+   changes tile size. Side seats stack hands and melds vertically. */
+.table { container-type:normal; position:relative; display:grid; grid-template-columns:calc(var(--table-tile-width) * 2.5 + 2px) minmax(0,1fr) calc(var(--table-tile-width) * 2.5 + 2px); grid-template-rows:auto auto auto; grid-template-areas:'. top .' 'left rivers right' 'bottom bottom bottom'; gap:3px; padding:6px 2px; border:2px solid #39765e; border-radius:16px; background:radial-gradient(ellipse at center,#287a5a,#1c6048); --table-tile-width:min(42px,round(down,calc((100cqw - 21px) / 14),1px)); --table-tile-height:calc(var(--table-tile-width) * 1.4); --meld-headroom:calc(var(--table-tile-width) + 2px); }
 .seat { min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; }
 .seat-top { grid-area:top; grid-column:1 / -1; padding-bottom:4px; }
-.seat-left { grid-area:left; display:grid; grid-template-columns:var(--table-tile-height) calc(var(--table-tile-width) * 2.5); grid-template-rows:minmax(54px,auto) 1fr; align-items:start; justify-content:center; padding-top:0; gap:5px 3px; align-self:stretch; }
-.seat-right { grid-area:right; display:grid; grid-template-columns:calc(var(--table-tile-width) * 2.5) var(--table-tile-height); grid-template-rows:minmax(54px,auto) 1fr; align-items:start; justify-content:center; padding-top:0; gap:5px 3px; align-self:stretch; }
+.seat-left { grid-area:left; display:flex; flex-direction:column; justify-content:flex-start; align-items:center; gap:8px; align-self:stretch; }
+.seat-right { grid-area:right; display:flex; flex-direction:column; justify-content:flex-start; align-items:center; gap:8px; align-self:stretch; }
 .seat-bottom { grid-area:bottom; align-items:stretch; gap:10px; padding-top:8px; }
 .seat-label { margin:0; padding:3px 2px; border:1px solid transparent; border-radius:5px; font-size:11px; line-height:1.35; text-align:center; color:#fff1cc; }
 .seat-label span { display:block; white-space:nowrap; }
-.seat-left .seat-label { width:100%; font-size:11px; grid-column:1 / -1; align-self:start; line-height:1.4; padding:3px 0; }
-.seat-right .seat-label { width:100%; font-size:11px; grid-column:1 / -1; align-self:start; line-height:1.4; padding:3px 0; }
+.seat-left .seat-label { width:100%; font-size:11px; align-self:start; line-height:1.4; padding:3px 0; }
+.seat-right .seat-label { width:100%; font-size:11px; align-self:start; line-height:1.4; padding:3px 0; }
 .seat-left .seat-label span { white-space:normal; overflow-wrap:anywhere; }
 .seat-right .seat-label span { white-space:normal; overflow-wrap:anywhere; }
 .seat-label[data-active='true'] { border-color:#ffda7d; background:#103e30; color:#ffda7d; }
@@ -152,11 +151,11 @@ header > div { min-width:0; }
 .seat-points { font-variant-numeric:tabular-nums; }
 .concealed-hand { display:flex; gap:1px; justify-content:center; max-width:100%; }
 .tile-back { display:block; flex:none; width:var(--table-tile-width); height:var(--table-tile-height); border:1px solid #e5dfc5; border-radius:2px; background:linear-gradient(#658ab1,#315877); box-shadow:0 1px #ddd4b9; }
-.seat-left .concealed-hand { flex-direction:column; gap:1px; grid-row:2; margin-top:0; grid-column:1; }
-.seat-right .concealed-hand { flex-direction:column; gap:1px; grid-row:2; margin-top:0; grid-column:2; }
+.seat-left .concealed-hand { flex-direction:column; gap:1px; }
+.seat-right .concealed-hand { flex-direction:column; gap:1px; }
 .seat-left .tile-back { width:var(--table-tile-height); height:var(--table-tile-width); }
 .seat-right .tile-back { width:var(--table-tile-height); height:var(--table-tile-width); }
-.rivers { --river-tile-width:var(--table-tile-width); --river-tile-height:var(--table-tile-height); grid-area:rivers; width:100%; max-width:none; justify-self:center; display:grid; grid-template-columns:calc(var(--table-tile-height)*3 + 2px) minmax(0,1fr) calc(var(--table-tile-height)*3 + 2px); grid-template-rows:calc(var(--table-tile-height)*3 + 2px) minmax(160px,auto) calc(var(--table-tile-height)*3 + 2px); grid-template-areas:'. top .' 'left info right' '. bottom .'; gap:4px 0; align-items:center; justify-items:center; min-width:0; }
+.rivers { --river-tile-width:var(--table-tile-width); --river-tile-height:var(--table-tile-height); grid-area:rivers; width:100%; justify-self:center; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(4,auto); grid-template-areas:'top top' 'info info' 'left right' 'bottom bottom'; gap:8px 4px; align-content:start; align-items:center; justify-items:center; min-width:0; }
 .river { display:grid; grid-template-columns:repeat(6,var(--table-tile-height)); grid-template-rows:repeat(3,var(--table-tile-height)); gap:1px; min-width:0; }
 .river-top { grid-area:top; --face-angle:180deg; }
 .river-bottom { grid-area:bottom; }
@@ -167,12 +166,12 @@ header > div { min-width:0; }
 .river-right .river-tile { width:var(--table-tile-height); height:var(--table-tile-height); }
 .river-tile .tile-svg { position:absolute; width:var(--river-tile-width); height:var(--river-tile-height); left:50%; top:50%; transform:translate(-50%,-50%) rotate(var(--face-angle,0deg)); }
 .river-tile[data-riichi-declaration='true'] .tile-svg { transform:translate(-50%,-50%) rotate(calc(var(--face-angle,0deg) + 90deg)); }
-.center-info { grid-area:info; align-self:stretch; width:min(100%,120px); min-width:0; display:flex; flex-direction:column; justify-content:center; gap:4px; padding:3px 0; border-radius:6px; background:#123f32; font-size:10px; line-height:1.35; text-align:center; overflow-wrap:anywhere; }
+.center-info { grid-area:info; align-self:stretch; width:100%; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:4px; padding:3px 0; border-radius:6px; background:#123f32; font-size:12px; line-height:1.35; text-align:center; overflow-wrap:anywhere; }
 #table-round { font-weight:700; }
 #wall-count { display:flex; flex-direction:column; gap:1px; }
 #wall-count span:last-child { color:#ffda7d; }
 .dora-area h2 { margin:0 0 3px; font-size:9px; }
-#dora-indicators { display:grid; grid-template-columns:repeat(3,var(--table-tile-width)); grid-template-rows:repeat(2,var(--table-tile-height)); justify-content:center; gap:1px; }
+#dora-indicators { display:grid; grid-template-columns:repeat(5,var(--table-tile-width)); grid-template-rows:var(--table-tile-height); justify-content:center; gap:1px; }
 .dora-slot { width:var(--table-tile-width); height:var(--table-tile-height); }
 .dora-slot .tile-svg { width:var(--table-tile-width); height:var(--table-tile-height); }
 .dora-slot span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
@@ -195,8 +194,8 @@ header > div { min-width:0; }
 .seat-declaration { color:#ffda7d; }
 .open-meld .concealed-kan-back { border:1px solid #eee5ca; border-radius:2px; background:#426e9b; }
 .seat-top .open-meld { transform:rotate(180deg); }
-.seat-left .open-melds { grid-row:2; display:grid; grid-auto-rows:calc(var(--table-tile-width)*4.4 + 6px); gap:2px; width:calc(var(--table-tile-width)*2.5); padding:0; align-self:start; grid-column:2; }
-.seat-right .open-melds { grid-row:2; display:grid; grid-auto-rows:calc(var(--table-tile-width)*4.4 + 6px); gap:2px; width:calc(var(--table-tile-width)*2.5); padding:0; align-self:start; grid-column:1; }
+.seat-left .open-melds { display:grid; grid-auto-rows:calc(var(--table-tile-width)*4.4 + 6px); gap:4px; width:100%; padding:0; align-self:center; }
+.seat-right .open-melds { display:grid; grid-auto-rows:calc(var(--table-tile-width)*4.4 + 6px); gap:4px; width:100%; padding:0; align-self:center; }
 .seat-left .open-meld { transform:rotate(90deg); transform-origin:center; margin:auto; width:max-content; }
 .seat-right .open-meld { transform:rotate(270deg); transform-origin:center; margin:auto; width:max-content; }
 .seat-bottom .open-melds { justify-content:flex-end; min-height:0; }
@@ -208,10 +207,20 @@ header > div { min-width:0; }
 #player-hand .tile-choice { width:round(down,100%,1px); }
 
 .seat-label .seat-status { white-space:nowrap; overflow-wrap:normal; }
-/* Short phone viewports keep the action row visible without changing the
-   relative scale of any table tile. Full rivers/melds may scroll vertically. */
-@media (max-height:650px) and (max-width:599px) {
-  .table { --table-tile-width:min(14px,clamp(13.5px,calc((100cqw - 24px) / 20.6),18px)); }
-  .rivers { grid-template-rows:calc(var(--table-tile-height)*3 + 2px) minmax(130px,auto) calc(var(--table-tile-height)*3 + 2px); }
-  .seat-bottom { gap:8px; padding-top:4px; }
+/* Wide tables can keep the round information between the side rivers and
+   put each side hand beside its melds. The player's tiles remain capped at 42px. */
+@media (min-width:960px) {
+  main { width:min(100%,1000px); }
+  #player-hand { max-width:604px; align-self:center; }
+  .table { grid-template-columns:calc(var(--table-tile-height) + var(--table-tile-width)*2.5 + 5px) minmax(0,1fr) calc(var(--table-tile-height) + var(--table-tile-width)*2.5 + 5px); }
+  .seat-left,.seat-right { display:grid; grid-template-rows:auto 1fr; gap:8px 5px; align-items:start; }
+  .seat-left { grid-template-columns:var(--table-tile-height) calc(var(--table-tile-width)*2.5); }
+  .seat-right { grid-template-columns:calc(var(--table-tile-width)*2.5) var(--table-tile-height); }
+  .seat-left .seat-label,.seat-right .seat-label { grid-column:1 / -1; }
+  .seat-left .concealed-hand { grid-column:1; grid-row:2; }
+  .seat-right .concealed-hand { grid-column:2; grid-row:2; }
+  .seat-left .open-melds { grid-column:2; grid-row:2; align-self:start; }
+  .seat-right .open-melds { grid-column:1; grid-row:2; align-self:start; }
+  .rivers { grid-template-columns:calc(var(--table-tile-height)*3 + 2px) minmax(0,1fr) calc(var(--table-tile-height)*3 + 2px); grid-template-rows:auto minmax(calc(var(--table-tile-height)*6 + 5px),auto) auto; grid-template-areas:'. top .' 'left info right' '. bottom .'; }
+  #dora-indicators { grid-template-columns:repeat(3,var(--table-tile-width)); grid-template-rows:repeat(2,var(--table-tile-height)); }
 }

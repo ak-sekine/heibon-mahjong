@@ -29,6 +29,8 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
   def conservation(): assert page.evaluate('riichiCheck().points.reduce((a,b)=>a+b,0)+riichiCheck().depositSticks*1000')==100000
   def shot(name): page.screenshot(path=str(out/f'{width}x{height}-{name}.png'))
   def geometry():
+   # Enlarged tiles use normal vertical scrolling.
+   page.locator('.discard-controls').scroll_into_view_if_needed()
    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
    boxes=page.locator('#player-hand li').evaluate_all('els=>els.map(e=>{let r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})')
    assert len(set(round(b['y'],1) for b in boxes))==1
@@ -36,7 +38,7 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
    controls=page.locator('.discard-controls').bounding_box()
    assert all(b['y']+b['h']<=controls['y'] for b in boxes),(width,height,boxes[-1],controls)
    assert page.locator('.dora-slot').count()==5
-   assert page.locator('#dora-indicators').evaluate('e=>getComputedStyle(e).gridTemplateColumns.split(" ").length')==3
+   assert page.locator('#dora-indicators').evaluate('e=>getComputedStyle(e).gridTemplateColumns.split(" ").length')==(3 if width>=960 else 5)
    for selector in ['#discard','#tsumo','#riichi']:
     if page.locator(selector).is_visible():
      box=page.locator(selector).bounding_box();assert box['height']>=44 and box['y']+box['height']<=height and box['width']>=44,(selector,box)

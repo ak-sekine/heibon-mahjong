@@ -44,6 +44,7 @@ with sync_playwright() as p:
             assert page.locator('#dora-indicators svg').count() == count
             assert page.locator('.dora-placeholder').count() == 5-count
             assert page.locator('.dora-placeholder').evaluate_all('''els=>els.every(el=>el.children.length===0 && el.textContent==='' && Object.keys(el.dataset).length===0)''')
+            page.locator('.discard-controls').scroll_into_view_if_needed()
             metrics = page.evaluate('''() => {
               const rect = el => { const r=el.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height}; };
               const region=document.querySelector('#dora-indicators');
@@ -57,21 +58,22 @@ with sync_playwright() as p:
             }''')
             assert not metrics['overflow'] and metrics['childrenContained']
             assert page.locator('.center-info #dora-indicators').count() == 1
-            # Step 13.5.3 uses the same physical scale for dora and all table tiles.
+            # Step 13.5.4 uses the same physical scale for dora and all table tiles.
             for i in range(count):
                 tile=page.locator('#dora-indicators svg').nth(i).bounding_box()
                 cpu=page.locator('.seat-top .tile-back').first.bounding_box()
-                assert 13.5 <= tile['width'] <= 18 and abs(tile['height']/tile['width']-1.4)<.003
+                hand_tile=page.locator('#player-hand svg').first.bounding_box()
+                assert abs(tile['width']/hand_tile['width']-1)<.001 and abs(tile['height']/tile['width']-1.4)<.003
                 assert tile['width']==cpu['width'] and tile['height']==cpu['height']
             hand = page.locator('#player-hand').bounding_box()
             controls = page.locator('.discard-controls').bounding_box()
             assert hand['y'] >= 0 and hand['y'] + hand['height'] <= controls['y']
             assert all(page.locator(s).bounding_box()['y'] + page.locator(s).bounding_box()['height'] <= height for s in ['#discard','#tsumo'])
             slots = metrics['slots']
-            assert len(slots) == 5 and len({round(s['y'],2) for s in slots}) == 2
+            assert len(slots) == 5 and len({round(s['y'],2) for s in slots}) == (2 if width>=960 else 1)
             for i, slot in enumerate(slots):
                 assert slot['x'] >= 0 and slot['x']+slot['width'] <= width
-                if i and i != 3: assert slots[i-1]['x']+slots[i-1]['width'] <= slot['x']
+                if i and (width<960 or i != 3): assert slots[i-1]['x']+slots[i-1]['width'] <= slot['x']
             # Derived names are accessible text; the central grid prioritizes tile faces.
             assert len(metrics['hand']) == 14 and len({round(s['y'],2) for s in metrics['hand']}) == 1
             assert page.locator('.seat[data-player-id="1"] svg,.seat[data-player-id="2"] svg,.seat[data-player-id="3"] svg').count() == 0
@@ -108,8 +110,9 @@ with sync_playwright() as p:
             page.set_viewport_size({'width':width,'height':height-120})
             for selector in ['#discard','#tsumo']:
                 button=page.locator(selector)
-                button.scroll_into_view_if_needed()
-                assert button.evaluate('''el=>{const r=el.getBoundingClientRect();return r.width>=44 && r.height>=44 && r.top>=0 && r.bottom<=innerHeight && document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===el;}''')
+                # Center the button instead of relying on nearest-edge scroll rounding.
+                button.evaluate('el=>el.scrollIntoView({block:"center",behavior:"instant"})')
+                assert button.evaluate('''el=>{const r=el.getBoundingClientRect();return r.width>=44 && r.height>=44 && r.top>=0 && r.bottom<=innerHeight && document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===el;}'''), (width,height,selector,button.bounding_box(),page.evaluate('({height:innerHeight,scrollY})'))
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
             page.set_viewport_size({'width':width,'height':height})
             page.evaluate('window.scrollTo(0,0)')

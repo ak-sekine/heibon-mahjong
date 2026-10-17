@@ -84,6 +84,7 @@ import { cpuTsumoStart } from '/heibon-mahjong/tests/cpu-tsumo-fixture.ts';
    for _ in range(10):
     page.locator('#view-table').click();assert not page.locator('#result-dialog').is_visible()
     assert page.evaluate('document.activeElement.id')=='show-result'
+    page.locator('#show-result').evaluate('el=>el.scrollIntoView({block:"center",behavior:"instant"})')
     b=page.locator('#show-result').bounding_box();assert b['y']>=0 and b['y']+b['height']<=height
     assert page.locator('#discard').is_disabled() and page.locator('#tsumo').is_disabled()
     page.evaluate('matchRerender()');assert not page.locator('#result-dialog').is_visible()
@@ -95,12 +96,13 @@ import { cpuTsumoStart } from '/heibon-mahjong/tests/cpu-tsumo-fixture.ts';
    page.wait_for_timeout(700)
    assert page.evaluate('JSON.stringify(matchCheck())')==before
   def geometry(initial=False):
+   if initial: page.locator('.discard-controls').scroll_into_view_if_needed()
    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
    boxes=page.locator('#player-hand li').evaluate_all('els=>els.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})')
    assert len(set(round(b['y'],1) for b in boxes))==1
    assert all(b['x']>=0 and b['x']+b['w']<=width for b in boxes)
    assert page.locator('.dora-slot').count()==5
-   assert page.locator('#dora-indicators').evaluate('el=>getComputedStyle(el).gridTemplateColumns.split(" ").length')==3
+   assert page.locator('#dora-indicators').evaluate('el=>getComputedStyle(el).gridTemplateColumns.split(" ").length')==(3 if page.viewport_size['width']>=960 else 5)
    if initial:
     assert len(boxes)==14
     controls=page.locator('.discard-controls').bounding_box()

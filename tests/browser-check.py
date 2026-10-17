@@ -296,13 +296,13 @@ with sync_playwright() as p:
             if turn_round == 7:
                 assert [page.locator(f'.river[data-player-id="{id}"] svg').count() for id in range(4)] == [8]*4
                 page.screenshot(path=f'{options.screenshots}/{w}-midgame-8.png',full_page=True)
-        # All rivers must be simultaneously in view on the requested larger screens.
+        # Enlarged rivers may scroll vertically, but must remain inside the table.
         page.evaluate('window.scrollTo(0,0)')
         if w != 320:
             controls_visible(page)
-        if w != 320:
-            assert all(b['y'] >= 0 and b['y']+b['height'] <= h for b in
-                       [box(page,f'.river-{name}') for name in ['top','right','bottom','left']])
+        table_box=box(page,'.table')
+        assert all(b['y'] >= table_box['y'] and b['y']+b['height'] <= table_box['y']+table_box['height'] for b in
+                   [box(page,f'.river-{name}') for name in ['top','right','bottom','left']])
         print(json.dumps({'viewport':[w,h], 'pageVerticalScroll':page.evaluate('document.documentElement.scrollHeight > innerHeight')}))
         assert dora_snapshot(page) == reset_indicator
         assert page.locator('#result-dialog').is_visible()

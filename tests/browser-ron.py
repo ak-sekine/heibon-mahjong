@@ -29,7 +29,7 @@ def geometry(page, pending=False):
     assert max(b['y']+b['h'] for b in boxes) <= control['y'] + .5, (page.viewport_size, boxes, control, page.evaluate('ronCheck()'))
     assert page.locator('.dora-slot').count() == 5
     assert page.locator('.dora-slot svg').count() == 1
-    assert page.locator('#dora-indicators').evaluate('el => getComputedStyle(el).gridTemplateColumns.split(" ").length') == 3
+    assert page.locator('#dora-indicators').evaluate('el => getComputedStyle(el).gridTemplateColumns.split(" ").length') == (3 if page.viewport_size['width']>=960 else 5)
     assert page.locator('.river-tile').evaluate_all('els=>els.every(e=>e.getBoundingClientRect().width>=18.9 && e.getBoundingClientRect().height>=18.9)')
     if pending:
         for selector in ['#ron','#pass-ron']:
