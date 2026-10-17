@@ -52,7 +52,7 @@ with sync_playwright() as p:
             assert page.locator(f'#label-{winner}').get_attribute('data-active') == 'true'
             page.clock.run_for(1)
             page.wait_for_function('!document.querySelector("#win-result").hidden')
-            assert f'CPU{winner}がツモ和了！' in page.locator('#wall-count').inner_text()
+            assert f'CPU{winner}がツモ和了！' in page.locator('#selection-status').inner_text()
             panel = page.locator('#win-result')
             result = panel.inner_text()
             for text in [f'CPU{winner}（{["", "南", "西", "北"][winner]}）', '門前清自摸和 1翻', '平和 1翻',

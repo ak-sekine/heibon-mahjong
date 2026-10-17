@@ -150,8 +150,8 @@ with sync_playwright() as p:
                 assert final_winners == expected
                 assert not state['running']
                 assert page.locator('.winner-result').count() == len(expected)
-                assert 'ロン和了！' in page.locator('#wall-count').inner_text()
-                assert f'放銃：{["自分","CPU1","CPU2","CPU3"][discarder]}' in page.locator('#wall-count').inner_text()
+                assert 'ロン和了！' in page.locator('#selection-status').inner_text()
+                assert f'放銃：{["自分","CPU1","CPU2","CPU3"][discarder]}' in page.locator('#selection-status').inner_text()
                 for winner in expected:
                     section = page.locator(f'.winner-result[data-winner-id="{winner}"]')
                     tiles = section.locator('.winning-hand li')

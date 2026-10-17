@@ -141,7 +141,7 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
         assert.ok(backs.every(item => item.className === 'tile-back' && item.children.length === 0 && Object.keys(item.dataset).length === 0));
         assert.match(nodes.get(`#label-${id}`)!.textContent, new RegExp(`^CPU${id} · ${['', '南', '西', '北'][id]} · 13枚$`));
       }
-      assert.deepEqual(nodes.get('#wall-count')!.children.map(item => item.textContent), ['生きた牌山 69枚', '王牌 14枚', 'あなたの手番']);
+      assert.deepEqual(nodes.get('#wall-count')!.children.map(item => item.textContent), ['生きた牌山 69枚', '王牌 14枚']);
       assert.equal(nodes.get('#label-0')!.dataset.active, 'true');
       assert.ok([0, 1, 2, 3].every(id => nodes.get(`.river[data-player-id="${id}"]`)!.children.length === 0));
       const selected = game.players[0].drawnTile!;
@@ -259,7 +259,7 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     const text = descend(panel).map(n => n.textContent);
     assert.ok(text.includes(`CPU${id}（${['', '南','西','北'][id]}）`));
     for (const s of ['平和 1翻', '門前清自摸和 1翻', '通常ドラ：1枚（1翻）', '赤ドラ：2枚（2翻）', '合計：5翻']) assert.ok(text.includes(s));
-    assert.ok(nodes.get('#wall-count')!.children.some(n => n.textContent === `CPU${id}がツモ和了！`));
+    assert.equal(nodes.get('#selection-status')!.textContent, `CPU${id}がツモ和了！`);
     inventory(won, game);
     renderTable(cpuTsumoStart(id));
     assert.equal(panel.hidden, true); assert.equal(panel.children.length, 0);

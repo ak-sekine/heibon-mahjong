@@ -9,8 +9,7 @@ h1 { margin:0; font-size:clamp(1rem,5vw,1.5rem); white-space:nowrap; }
 ul { list-style:none; padding:0; margin:0; }
 #player-hand { container-type:inline-size; width:100%; display:grid; grid-template-columns:repeat(14,minmax(0,1fr)); gap:1px; margin:0; padding:0; }
 #player-hand li { min-width:0; }
-#player-hand .drawn-tile { position:relative; }
-#player-hand .drawn-tile::before { content:""; position:absolute; left:-1px; top:15%; height:70%; border-left:1px solid #ffda7d; }
+#player-hand .drawn-tile { margin-left:4px; }
 .tile-choice { display:block; width:100%; padding:0; border:0; border-radius:3px; background:transparent; cursor:pointer; touch-action:manipulation; }
 .tile-choice[aria-pressed="true"] { transform:translateY(-8px); outline:2px solid #ffda7d; outline-offset:0; background:#ffda7d; }
 .tile-choice:focus-visible { outline:2px solid #82dcff; outline-offset:0; }
@@ -52,7 +51,6 @@ summary { cursor:pointer; padding:4px; }
 .fu-details summary { min-height:44px; padding:10px 0; cursor:pointer; }
 .fu-details summary:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
 .fu-details ul { padding-left:20px; }
-#match-info { margin:2px 0 0; font-size:clamp(9px,2.5vw,12px); line-height:1.2; }
 header h1 { margin:0; }
 header > div { min-width:0; }
 #match-result { padding:12px; border:1px solid #ffda7d; border-radius:8px; overflow-wrap:anywhere; }
@@ -265,7 +263,9 @@ header > div { min-width:0; }
 .table .river-left { left:0; bottom:0; }
 .table .center-info { position:absolute; left:calc(var(--cell)*3); top:calc(var(--cell)*3); width:calc(var(--cell)*3 - 1px); height:calc(var(--cell)*3 - 1px); padding:2px; gap:2px; font-size:9px; }
 .table #wall-count { gap:2px; }
-.table #player-hand { width:calc(var(--table-tile-width)*14 + 13px); max-width:100%; align-self:center; }
+.table #player-hand { display:flex; width:auto; max-width:100%; align-self:center; container-type:normal; }
+.table #player-hand li { flex:0 0 var(--table-tile-width); width:var(--table-tile-width); }
+.table #player-hand .tile-choice { max-width:none; margin:0; }
 .table #player-hand .tile-choice { width:100%; }
 
 /* Four-meld stress layouts use the clear middle strip on each table edge.
@@ -334,3 +334,24 @@ main:has(.table .open-meld:nth-child(4)) .table-summary {
  .table { width:min(100%,calc(100svh - 102px)); margin-inline:0; align-self:center; }
  .table-summary { --table-tile-width:min(42px,round(down,calc((100svh - 132px) / 15.8),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
 }
+
+/* Compact faces retain discard order; only the riichi track expands. */
+.table .river-tile { width:var(--river-tile-width); height:var(--river-tile-height); justify-self:center; align-self:center; }
+.table .river-left .river-tile,.table .river-right .river-tile { width:var(--river-tile-height); height:var(--river-tile-width); }
+.table .river-tile[data-riichi-declaration='true'] { width:var(--river-tile-height); height:var(--river-tile-width); }
+.table :is(.river-left,.river-right) .river-tile[data-riichi-declaration='true'] { width:var(--river-tile-width); height:var(--river-tile-height); }
+/* Five indicators occupy a dedicated row above the compact round summary. */
+.table .center-info { justify-content:center; gap:2px; font-size:clamp(8px,1.8cqw,11px); line-height:1.25; }
+.table #table-round { white-space:pre-line; }
+.table .center-info .dora-area { --dora-width:calc(var(--cell)*.48); flex:none; }
+.table .center-info #dora-indicators { grid-template-columns:repeat(5,var(--dora-width)); grid-template-rows:calc(var(--dora-width)*1.4); }
+.table .center-info .dora-slot,.table .center-info .dora-slot .tile-svg { width:var(--dora-width); height:calc(var(--dora-width)*1.4); }
+.table .center-info #deposit-sticks { margin-top:1px; }
+.table #wall-count span:last-child { color:inherit; }
+
+.table .center-info .dora-area h2 { font-size:8px; margin-bottom:1px; }
+.table .center-info .deposit-stick { width:12px; height:3px; }
+/* Two kans add physical tiles; spend the inter-group spacing before changing
+   the shared tile size or leaving a concealed tile outside the square. */
+.table .seat-bottom:has(.open-meld:nth-child(2)) { gap:0; }
+.table .seat-bottom:has(.open-meld:nth-child(2)) .open-melds { gap:1px; }

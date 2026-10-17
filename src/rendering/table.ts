@@ -55,7 +55,6 @@ function renderSelf(player: PlayerState, enabled: boolean): void {
     items.push(item);
   }
   hand.replaceChildren(...items);
-  hand.style.gridTemplateColumns = `repeat(${Math.max(1,items.length)},minmax(0,1fr))`;
   hand.dataset.hasDrawn = String(player.drawnTile !== null);
 }
 
@@ -88,7 +87,6 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
     }
     publicHands.hidden = winners.every(w => game.players[w.winnerId].control !== 'cpu');
   }
-  document.querySelector<HTMLElement>('#wall-count')!.className = game.winResult?.winMethod === 'ron' ? 'ron-summary' : '';
   renderDoraIndicators(document.querySelector<HTMLElement>('#dora-indicators')!, exposedDoraIndicators(game));
   for (const player of game.players) {
     const id: PlayerId = player.id;
@@ -122,6 +120,14 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
     const melds = document.querySelector<HTMLElement>(`.open-melds[data-player-id="${id}"]`);
     if (melds) renderMelds(melds, player, game);
     const river = document.querySelector<HTMLElement>(`.river[data-player-id="${id}"]`)!;
+    // Reserve the extra width only in the track containing a sideways riichi tile.
+    const riichiIndex = player.river.findIndex(tile => tile.id === player.riichi?.declarationTileId);
+    const side = id === 1 || id === 3;
+    const riichiTrack = riichiIndex < 0 ? -1 : id === 1 || id === 2 ? 5 - riichiIndex % 6 : riichiIndex % 6;
+    const tracks = Array.from({ length: 6 }, (_, index) =>
+      index === riichiTrack ? 'var(--river-tile-height)' : 'var(--river-tile-width)').join(' ');
+    river.style.gridTemplateColumns = side ? 'repeat(3,var(--river-tile-height))' : tracks;
+    river.style.gridTemplateRows = side ? tracks : 'repeat(3,var(--river-tile-height))';
     river.replaceChildren(...player.river.map((physical, index) => {
       const item = document.createElement('div');
       item.className = 'river-tile';
@@ -146,7 +152,6 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
   document.querySelector<HTMLElement>('#wall-count')!.replaceChildren(
     Object.assign(document.createElement('span'), { textContent: `生きた牌山 ${game.liveWall.length}枚` }),
     Object.assign(document.createElement('span'), { textContent: `王牌 ${game.deadWall.length}枚` }),
-    Object.assign(document.createElement('span'), { textContent: turnLabel(game) }),
   );
 }
 
