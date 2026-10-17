@@ -186,6 +186,32 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       }
     }
     assert.deepEqual(fullRivers, snapshot);
+    // Every seat's visible tiles must stay at the same physical coordinates as
+    // the completed 18-tile river. Empty earlier slots must not collapse.
+    for (const isRiichi of [false, true]) {
+      const displayGame = {
+        ...fullRivers,
+        players: fullRivers.players.map(player => ({
+          ...player,
+          riichi: isRiichi ? { declarationTileId: tiles[0].id } : player.riichi,
+        })),
+      };
+      renderTable(displayGame);
+      const completeOffsets = [0, 1, 2, 3].map(id =>
+        nodes.get(`.river[data-player-id="${id}"]`)!.children.map(item => [item.style.left, item.style.top]));
+      for (const count of [1, 5, 6, 7, 12, 13, 17]) {
+        renderTable({
+          ...displayGame,
+          players: displayGame.players.map(player => ({ ...player, river: player.river.slice(0, count) })),
+        });
+        for (const id of [0, 1, 2, 3]) {
+          const items = nodes.get(`.river[data-player-id="${id}"]`)!.children;
+          assert.deepEqual(items.map(item => [item.style.left, item.style.top]),
+            completeOffsets[id].slice(0, count),
+            `seat ${id}, ${count} river tiles, riichi=${isRiichi}`);
+        }
+      }
+    }
     const eligible = tsumoGame();
     renderTable(eligible);
     renderSelection(eligible, eligible.players[0].hand[0].id);
