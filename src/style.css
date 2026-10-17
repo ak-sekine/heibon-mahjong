@@ -290,7 +290,7 @@ main:has(.table .open-meld:nth-child(4)) .table-summary {
 .table .seat-bottom:has(.open-meld:nth-child(4)) .open-melds { position:absolute; top:0; width:max-content; gap:0; }
 .table .seat-top:has(.open-meld:nth-child(4)) .open-melds { top:calc(var(--table-tile-width)*.6); left:auto; right:calc(var(--table-tile-height) - 3px); }
 .table .seat-bottom:has(.open-meld:nth-child(4)) { height:var(--table-tile-height); }
-.table .seat-bottom:has(.open-meld:nth-child(4)) .open-melds { left:auto; right:calc(var(--table-tile-height) - 5px); }
+.table .seat-bottom:has(.open-meld:nth-child(4)) .open-melds { left:auto; right:calc(var(--table-tile-height) - 13px); }
 .table .seat-top:has(.open-meld:nth-child(4)) .concealed-hand { position:absolute; left:auto; right:0; }
 .table .seat-bottom:has(.open-meld:nth-child(4)) #player-hand { position:absolute; left:calc(50% - var(--table-tile-width)*8.17); right:auto; bottom:0; container-type:normal; display:flex; gap:1px; width:auto; }
 .table .seat-bottom:has(.open-meld:nth-child(4)) #player-hand li { flex:0 0 var(--table-tile-width); width:var(--table-tile-width); }
