@@ -60,6 +60,14 @@ with sync_playwright() as p:
                       const separate=(a,b)=>a.right<=b.left+.15||b.right<=a.left+.15||a.bottom<=b.top+.15||b.bottom<=a.top+.15;
                       const inside=(a,b)=>a.left>=b.left-.1&&a.right<=b.right+.1&&a.top>=b.top-.1&&a.bottom<=b.bottom+.1;
                       const t=r(q('.table')),c=r(q('.center-info')),d=r(q('.dora-area'));
+                      const riverRects=Object.fromEntries([...document.querySelectorAll('.river')].map(e=>[e.dataset.playerId,r(e)]));
+                      const seats=Object.fromEntries([...document.querySelectorAll('.table .seat')].map(e=>[e.dataset.playerId,r(e)]));
+                      const meldDirection=[0,1,2,3].every(id=>{
+                        const meld=q(`.seat[data-player-id="${id}"] .open-meld`),hand=id===0?q('#player-hand'):q(`.seat[data-player-id="${id}"] .concealed-hand`);
+                        if(!meld||!hand)return true;
+                        const m=r(meld),h=r(hand);
+                        return id===0?h.right<=m.left+.2:id===2?m.right<=h.left+.2:id===3?m.top>=h.bottom-.2:m.bottom<=h.top+.2;
+                      });
                       const hand=[...document.querySelectorAll('#player-hand svg')].map(r);
                       const items=[...document.querySelectorAll('#player-hand li')];
                       const tiles=[...document.querySelectorAll('.river svg,#player-hand svg,.concealed-hand,.open-meld')];
@@ -76,6 +84,9 @@ with sync_playwright() as p:
                         clear:tiles.every((e,i)=>tiles.slice(i+1).every(x=>separate(r(e),r(x))))&&[...document.querySelectorAll('.river svg')].every(e=>separate(r(e),c)),
                         contained:tiles.every(e=>inside(r(e),t)),
                         riverCount:[...document.querySelectorAll('.river')].every(e=>e.children.length===18),
+                        riversFacing:Math.abs((riverRects[2].left+riverRects[2].right-seats[2].left-seats[2].right))<1&&Math.abs((riverRects[0].left+riverRects[0].right-seats[0].left-seats[0].right))<1&&Math.abs((riverRects[3].top+riverRects[3].bottom-seats[3].top-seats[3].bottom))<1&&Math.abs((riverRects[1].top+riverRects[1].bottom-seats[1].top-seats[1].bottom))<1,
+                        meldDirection,
+                        selfMeldRight:!document.querySelector('.seat-bottom .open-meld')||r(q('.seat-bottom #player-hand')).right<=r(q('.seat-bottom .open-meld')).left+.1,
                         privateIds:privateTiles.every(t=>!publicIds.has(t.id)&&!q('main').innerHTML.includes(t.id)),
                         order:[...document.querySelectorAll('.river')].every(e=>[...e.children].every((tile,i)=>tile.dataset.tileId===shown.players[+e.dataset.playerId].river[i].id)),
                       };

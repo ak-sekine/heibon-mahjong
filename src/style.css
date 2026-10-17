@@ -251,54 +251,57 @@ header > div { min-width:0; }
 .table .seat .open-melds { display:flex; flex-direction:row; flex-wrap:nowrap; gap:4px; width:auto; padding:0; align-self:auto; max-width:none; }
 .table .seat .open-meld { transform:none; margin:0; padding:0; }
 .table .seat-bottom { left:5px; right:5px; bottom:2px; flex-direction:row; gap:5px; align-items:flex-end; justify-content:center; }
-.table .seat-bottom .open-melds { justify-content:center; padding-top:0; }
+.table .seat-bottom #player-hand { order:1; }
+.table .seat-bottom .open-melds { order:2; justify-content:center; padding-top:0; }
 .table .seat-bottom .open-melds:empty { display:none; }
 .table .seat-top .pending-kan-tile { transform:translateY(calc(var(--table-tile-width)*.6)); }
 .table .seat-left .pending-kan-tile,.table .seat-right .pending-kan-tile { transform:translateY(calc(var(--table-tile-width)*.2)); }
-.table .rivers { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:calc(var(--cell)*9); height:calc(var(--cell)*9); display:block; }
+/* Four six-by-three rivers occupy a cross. A fixed .76 scale clears their
+   corners, the center panel and the seat hands. */
+.table .rivers { --river-tile-width:calc(var(--table-tile-width)*.76); --river-tile-height:calc(var(--table-tile-height)*.76); position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:calc(var(--cell)*11.65); height:calc(var(--cell)*11.65); display:block; }
 .table .river { position:absolute; gap:1px; }
-.table .river-top { left:0; top:0; }
-.table .river-right { right:0; top:0; }
-.table .river-bottom { right:0; bottom:0; }
-.table .river-left { left:0; bottom:0; }
-.table .center-info { position:absolute; left:calc(var(--cell)*3); top:calc(var(--cell)*3); width:calc(var(--cell)*3 - 1px); height:calc(var(--cell)*3 - 1px); padding:2px; gap:2px; font-size:9px; }
+.table .river-top { left:50%; top:calc(var(--cell)*1.8); transform:translateX(-50%); }
+.table .river-right { right:calc(var(--cell)*1.2); top:50%; transform:translateY(-50%); }
+.table .river-bottom { left:50%; bottom:calc(var(--cell)*1.8); right:auto; transform:translateX(-50%); }
+.table .river-left { left:calc(var(--cell)*1.2); top:50%; bottom:auto; transform:translateY(-50%); }
+.table .center-info { position:absolute; left:calc(var(--cell)*4.325); top:calc(var(--cell)*4.25); width:calc(var(--cell)*3 - 1px); height:calc(var(--cell)*3 - 1px); padding:2px; gap:2px; font-size:9px; }
 .table #wall-count { gap:2px; }
 .table #player-hand { display:flex; width:auto; max-width:100%; align-self:center; container-type:normal; }
 .table #player-hand li { flex:0 0 var(--table-tile-width); width:var(--table-tile-width); }
 .table #player-hand .tile-choice { max-width:none; margin:0; }
 .table #player-hand .tile-choice { width:100%; }
 
-/* Four-meld stress layouts use the clear middle strip on each table edge.
+/* Four-meld layouts use the clear middle strip on each table edge.
    The corner tiles stay in the adjacent edge bands, so no meld box crosses
    another seat or the reserved river cells.  Kan rows need slightly more
-   room than three-tile rows, so the whole table shares an 11% compact scale
+   room than three-tile rows, so the whole table shares a 14% compact scale
    only while a fourth meld is present. */
 main:has(.table .open-meld:nth-child(4)) .table-summary {
-  --table-tile-width:calc(min(42px,round(down,calc((100cqw - 18px) / 15.8),.1px))* .89);
+  --table-tile-width:calc(min(42px,round(down,calc((100cqw - 18px) / 15.8),.1px))* .86);
   --table-tile-height:calc(var(--table-tile-width)*1.4);
 }
 .table:has(.open-meld:nth-child(4)) .seat,
 .table:has(.open-meld:nth-child(4)) .rivers {
-  --table-tile-width:calc(min(42px,round(down,calc((100cqw - 22px) / 15.8),.1px))* .89);
+  --table-tile-width:calc(min(42px,round(down,calc((100cqw - 22px) / 15.8),.1px))* .86);
   --table-tile-height:calc(var(--table-tile-width)*1.4);
   --cell:calc(var(--table-tile-height) + 1px);
 }
 .table .seat-top:has(.open-meld:nth-child(4)) .open-melds,
 .table .seat-bottom:has(.open-meld:nth-child(4)) .open-melds { position:absolute; top:0; width:max-content; gap:0; }
-.table .seat-top:has(.open-meld:nth-child(4)) .open-melds { top:calc(var(--table-tile-width)*.6); left:calc(var(--table-tile-height) - 6px); }
+.table .seat-top:has(.open-meld:nth-child(4)) .open-melds { top:calc(var(--table-tile-width)*.6); left:auto; right:calc(var(--table-tile-height) - 3px); }
 .table .seat-bottom:has(.open-meld:nth-child(4)) { height:var(--table-tile-height); }
-.table .seat-bottom:has(.open-meld:nth-child(4)) .open-melds { left:calc(var(--table-tile-height) - 3px); }
-.table .seat-top:has(.open-meld:nth-child(4)) .concealed-hand { position:absolute; left:0; }
-.table .seat-bottom:has(.open-meld:nth-child(4)) #player-hand { position:absolute; right:0; bottom:0; container-type:normal; display:flex; gap:1px; width:auto; }
+.table .seat-bottom:has(.open-meld:nth-child(4)) .open-melds { left:auto; right:calc(var(--table-tile-height) - 5px); }
+.table .seat-top:has(.open-meld:nth-child(4)) .concealed-hand { position:absolute; left:auto; right:0; }
+.table .seat-bottom:has(.open-meld:nth-child(4)) #player-hand { position:absolute; left:calc(50% - var(--table-tile-width)*8.17); right:auto; bottom:0; container-type:normal; display:flex; gap:1px; width:auto; }
 .table .seat-bottom:has(.open-meld:nth-child(4)) #player-hand li { flex:0 0 var(--table-tile-width); width:var(--table-tile-width); }
 .table .seat-left:has(.open-meld:nth-child(4)),
 .table .seat-right:has(.open-meld:nth-child(4)) { width:calc(100% - 4px); }
 .table .seat-left:has(.open-meld:nth-child(4)) .open-melds,
 .table .seat-right:has(.open-meld:nth-child(4)) .open-melds { position:absolute; top:0; width:max-content; gap:0; }
-.table .seat-left:has(.open-meld:nth-child(4)) .open-melds { left:var(--table-tile-height); }
-.table .seat-right:has(.open-meld:nth-child(4)) .open-melds { right:var(--table-tile-height); }
-.table .seat-left:has(.open-meld:nth-child(4)) .concealed-hand { position:absolute; right:0; }
-.table .seat-right:has(.open-meld:nth-child(4)) .concealed-hand { position:absolute; right:0; }
+.table .seat-left:has(.open-meld:nth-child(4)) .open-melds,
+.table .seat-right:has(.open-meld:nth-child(4)) .open-melds { left:auto; right:var(--table-tile-height); }
+.table .seat-left:has(.open-meld:nth-child(4)) .concealed-hand,
+.table .seat-right:has(.open-meld:nth-child(4)) .concealed-hand { position:absolute; left:0; right:auto; }
 
 /* Four daiminkan stress rows use two columns. The rotated side seats use the
    adjacent edge strip as a second lane; tile dimensions remain at the normal
