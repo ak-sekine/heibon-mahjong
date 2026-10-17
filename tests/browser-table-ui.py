@@ -1,11 +1,11 @@
 """UI regressions; run against Vite on port 4173 (no game rules changed)."""
-import json, pathlib, shutil
+import json, os, pathlib, shutil
 from playwright.sync_api import sync_playwright
-out = pathlib.Path('/tmp/heibon-table-ui')
+out = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 out.mkdir(exist_ok=True)
 reports = []
 with sync_playwright() as p:
-    browser = p.chromium.launch(executable_path=shutil.which('chromium'), args=['--no-sandbox'])
+    browser = p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'), args=['--no-sandbox'])
     for entry in ['', 'kan-test.html']:
         for width, height in [(320,568),(390,844),(1280,800)]:
             page = browser.new_page(viewport={'width':width,'height':height})
@@ -84,9 +84,14 @@ with sync_playwright() as p:
                         clear:tiles.every((e,i)=>tiles.slice(i+1).every(x=>separate(r(e),r(x))))&&[...document.querySelectorAll('.river svg')].every(e=>separate(r(e),c)),
                         contained:tiles.every(e=>inside(r(e),t)),
                         riverCount:[...document.querySelectorAll('.river')].every(e=>e.children.length===18),
+                        riverCellsStable:[...document.querySelectorAll('.river')].every(e=>{
+                          const cells=[...e.children].map(r),first=cells[0];
+                          return cells.length===18&&cells.every(a=>Math.abs(a.width-first.width)<.1&&Math.abs(a.height-first.height)<.1);
+                        }),
                         riversFacing:Math.abs((riverRects[2].left+riverRects[2].right-seats[2].left-seats[2].right))<1&&Math.abs((riverRects[0].left+riverRects[0].right-seats[0].left-seats[0].right))<1&&Math.abs((riverRects[3].top+riverRects[3].bottom-seats[3].top-seats[3].bottom))<1&&Math.abs((riverRects[1].top+riverRects[1].bottom-seats[1].top-seats[1].bottom))<1,
                         meldDirection,
                         selfMeldRight:!document.querySelector('.seat-bottom .open-meld')||r(q('.seat-bottom #player-hand')).right<=r(q('.seat-bottom .open-meld')).left+.1,
+                        selfMeldGap:!document.querySelector('.seat-bottom .open-meld')||r(q('.seat-bottom #player-hand')).right+7.9<=r(q('.seat-bottom .open-meld')).left,
                         privateIds:privateTiles.every(t=>!publicIds.has(t.id)&&!q('main').innerHTML.includes(t.id)),
                         order:[...document.querySelectorAll('.river')].every(e=>[...e.children].every((tile,i)=>tile.dataset.tileId===shown.players[+e.dataset.playerId].river[i].id)),
                       };

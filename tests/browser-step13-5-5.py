@@ -1,12 +1,12 @@
 """Square-table geometry and directional discard order on both entry points.
 Run against Vite on :4173. Screenshots are also reviewed manually.
 """
-import json, pathlib, shutil
+import json, os, pathlib, shutil
 from playwright.sync_api import sync_playwright
 out=pathlib.Path('docs/verification/step13.5.5');out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
- b=p.chromium.launch(executable_path=shutil.which('chromium'),args=['--no-sandbox'])
+ b=p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'),args=['--no-sandbox'])
  for entry in ['', 'kan-test.html']:
   for w,h in [(320,568),(375,547),(375,667),(390,844),(414,896),(430,844),(1280,800)]:
    page=b.new_page(viewport={'width':w,'height':h});errors=[]

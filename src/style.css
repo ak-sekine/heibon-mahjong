@@ -250,7 +250,7 @@ header > div { min-width:0; }
 .table .seat .tile-back { width:var(--table-tile-width); height:var(--table-tile-height); }
 .table .seat .open-melds { display:flex; flex-direction:row; flex-wrap:nowrap; gap:4px; width:auto; padding:0; align-self:auto; max-width:none; }
 .table .seat .open-meld { transform:none; margin:0; padding:0; }
-.table .seat-bottom { left:5px; right:5px; bottom:2px; flex-direction:row; gap:5px; align-items:flex-end; justify-content:center; }
+.table .seat-bottom { left:5px; right:5px; bottom:2px; flex-direction:row; gap:8px; align-items:flex-end; justify-content:center; }
 .table .seat-bottom #player-hand { order:1; }
 .table .seat-bottom .open-melds { order:2; justify-content:center; padding-top:0; }
 .table .seat-bottom .open-melds:empty { display:none; }
@@ -331,18 +331,17 @@ main:has(.table .open-meld:nth-child(4)) .table-summary {
   flex-wrap:wrap;
 }
 @media (max-height:650px) and (max-width:599px) {
- .table .seat-bottom { gap:2px; padding:0; }
+ .table .seat-bottom { gap:8px; padding:0; }
 }
 @media (min-width:600px) and (max-height:850px) {
  .table { width:min(100%,calc(100svh - 102px)); margin-inline:0; align-self:center; }
  .table-summary { --table-tile-width:min(42px,round(down,calc((100svh - 132px) / 15.8),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
 }
 
-/* Compact faces retain discard order; only the riichi track expands. */
+/* Every discard occupies the same fixed cell. Rotate the face inside the cell,
+   so a riichi declaration never changes track sizing or leaves a blank slot. */
 .table .river-tile { width:var(--river-tile-width); height:var(--river-tile-height); justify-self:center; align-self:center; }
 .table .river-left .river-tile,.table .river-right .river-tile { width:var(--river-tile-height); height:var(--river-tile-width); }
-.table .river-tile[data-riichi-declaration='true'] { width:var(--river-tile-height); height:var(--river-tile-width); }
-.table :is(.river-left,.river-right) .river-tile[data-riichi-declaration='true'] { width:var(--river-tile-width); height:var(--river-tile-height); }
 /* Five indicators occupy a dedicated row above the compact round summary. */
 .table .center-info { justify-content:center; gap:2px; font-size:clamp(8px,1.8cqw,11px); line-height:1.25; }
 .table #table-round { white-space:pre-line; }
@@ -356,5 +355,5 @@ main:has(.table .open-meld:nth-child(4)) .table-summary {
 .table .center-info .deposit-stick { width:12px; height:3px; }
 /* Two kans add physical tiles; spend the inter-group spacing before changing
    the shared tile size or leaving a concealed tile outside the square. */
-.table .seat-bottom:has(.open-meld:nth-child(2)) { gap:0; }
+.table .seat-bottom:has(.open-meld:nth-child(2)) { gap:8px; }
 .table .seat-bottom:has(.open-meld:nth-child(2)) .open-melds { gap:1px; }

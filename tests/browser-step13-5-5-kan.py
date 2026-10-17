@@ -1,8 +1,8 @@
 from playwright.sync_api import sync_playwright
-import shutil,pathlib
+import os,shutil,pathlib
 out=pathlib.Path('docs/verification/step13.5.5/actions');out.mkdir(exist_ok=True)
 with sync_playwright() as p:
- b=p.chromium.launch(executable_path=shutil.which('chromium'),args=['--no-sandbox'])
+ b=p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'),args=['--no-sandbox'])
  for width in [320,390]:
   page=b.new_page(viewport={'width':width,'height':844})
   page.goto('http://localhost:4173/heibon-mahjong/kan-test.html')
