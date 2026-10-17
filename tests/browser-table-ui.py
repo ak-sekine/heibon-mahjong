@@ -85,7 +85,7 @@ with sync_playwright() as p:
                         equalSize:hand.every(a=>Math.abs(a.width-hand[0].width)<.1),
                         drawn:items.filter(e=>e.classList.contains('drawn-tile')).length===Number(shown.players[0].drawnTile!==null),
                         noDuplicate:!q('#match-info')&&!q('#wall-count').textContent.includes('あなた'),
-                        centralDora:inside(d,c)&&d.bottom<=r(q('#table-round')).top+.1&&inside(r(q('#wall-count')),c),
+                        centralDora:inside(d,c)&&r(q('#table-round')).bottom<=d.top+.1&&inside(r(q('#wall-count')),c),
                         clear:tiles.every((e,i)=>tiles.slice(i+1).every(x=>separate(r(e),r(x))))&&[...document.querySelectorAll('.river svg')].every(e=>separate(r(e),c)),
                         contained:tiles.every(e=>inside(r(e),t)),
                         riverCount:[...document.querySelectorAll('.river')].every(e=>e.children.length===18),

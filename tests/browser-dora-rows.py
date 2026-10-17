@@ -28,15 +28,21 @@ with sync_playwright() as p:
                       const q=s=>document.querySelector(s), box=e=>e.getBoundingClientRect().toJSON();
                       const inside=(a,b)=>a.left>=b.left-.1&&a.right<=b.right+.1&&a.top>=b.top-.1&&a.bottom<=b.bottom+.1;
                       const separate=(a,b)=>a.right<=b.left+.1||b.right<=a.left+.1||a.bottom<=b.top+.1||b.bottom<=a.top+.1;
-                      mr.renderMatch({...match,game,depositSticks:deposits,honba:10});
+                      const honba=[0,1,2,10][count%4];
+                      mr.renderMatch({...match,game,depositSticks:deposits,honba});
+                      tr.renderTable({...game,liveWall:game.liveWall.slice(count)},match.points);
                       const wall={...game,kanCount:Math.max(0,count-1)}, omote=dg.exposedDoraIndicators(wall), ura=count?dg.uraDoraIndicators(wall):[];
                       dr.renderDoraIndicators(q('#dora-indicators'),omote,ura);
                       const selectors=['.center-info','.dora-area','#table-round','#wall-count','#deposit-sticks'];
                       const boxes=Object.fromEntries(selectors.map(s=>[s,box(q(s))]));
                       const c=boxes['.center-info'],d=boxes['.dora-area'],r=boxes['#table-round'],w=boxes['#wall-count'];
                       const slots=[...q('#dora-indicators').children], sticks=[...q('#deposit-sticks').children], t=box(q('.table'));
-                      return {boxes,checks:{doraInside:inside(d,c),roundClear:d.bottom<=r.top+.1,wallInside:inside(w,c),roundInside:inside(r,c),
-                        sticks:sticks.every(e=>inside(box(e),c)&&box(e).width>=18&&box(e).height>=6),
+                      return {boxes,checks:{doraInside:inside(d,c),roundClear:r.bottom<=d.top+.1,wallInside:inside(w,c),roundInside:inside(r,c),
+                        summary:q('#table-round').textContent===`東1局${honba?` ${honba}本場`:''}`&&q('#wall-count span').textContent===`山${game.liveWall.length-count}枚`&&Math.abs(r.top-w.top)<.1,
+                        summarySize:parseFloat(getComputedStyle(q('.round-summary')).fontSize)>=12,
+                        depositClear:sticks.every(e=>box(e).top>=d.bottom&&slots.every(t=>separate(box(e),box(t)))),
+                        hiddenDeposits:q('#deposit-sticks').hidden===(deposits===0),
+                        sticks:sticks.every(e=>inside(box(e),c)&&box(e).width>=36&&box(e).height>=9.5),
                         rows:slots.length===(count?10:5)&&slots.every((e,i)=>i<5?Math.abs(box(e).top-box(slots[0]).top)<.1:box(e).top>=box(slots[0]).bottom),
                         order:slots.every((e,i)=>e.dataset.tileId===(i<5?omote[i]?.id:ura[i-5]?.id)),
                         faces:slots.every((e,i)=>{const tile=i<5?omote[i]:ura[i-5];return !tile||e.querySelector('svg').getAttribute('aria-label').endsWith(e.getAttribute('aria-label').split('：')[1].split('、')[0])}),

@@ -141,7 +141,7 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
         assert.ok(backs.every(item => item.className === 'tile-back' && item.children.length === 0 && Object.keys(item.dataset).length === 0));
         assert.match(nodes.get(`#label-${id}`)!.textContent, new RegExp(`^CPU${id} · ${['', '南', '西', '北'][id]} · 13枚$`));
       }
-      assert.deepEqual(nodes.get('#wall-count')!.children.map(item => item.textContent), ['生きた牌山 69枚', '王牌 14枚']);
+      assert.deepEqual(nodes.get('#wall-count')!.children.map(item => item.textContent), ['山69枚', '王牌 14枚']);
       assert.equal(nodes.get('#label-0')!.dataset.active, 'true');
       assert.ok([0, 1, 2, 3].every(id => nodes.get(`.river[data-player-id="${id}"]`)!.children.length === 0));
       const selected = game.players[0].drawnTile!;

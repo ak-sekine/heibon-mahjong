@@ -24,10 +24,10 @@ export function getDepositDisplaySticks(depositSticks: number): readonly Deposit
 export function depositSvgMarkup(points: DepositDenomination): string {
   const dot = (x: number, y: number, radius: number, color: string) =>
     `<circle cx="${x}" cy="${y}" r="${radius}" fill="${color}"/>`;
-  const marks = points === 1000 ? dot(30, 6, 2.3, '#bc2532')
-    : points === 5000 ? [24, 30, 36].map(x => dot(x, 6, 1.7, '#bc2532')).join('')
-    : [24, 30, 36].flatMap(x => [3.8, 8.2].map(y => dot(x, y, 1.3, '#172b64'))).join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 12" aria-hidden="true" focusable="false"><rect x=".5" y=".5" width="59" height="11" rx="2" fill="#fffdf7" stroke="#d6caa4"/><path d="M3 9.5h54" stroke="#e8dfc7"/>${marks}</svg>`;
+  const marks = points === 1000 ? dot(30, 8, 3, '#bc2532')
+    : points === 5000 ? [24, 30, 36].map(x => dot(x, 8, 2.1, '#bc2532')).join('')
+    : [24, 30, 36].flatMap(x => [5, 11].map(y => dot(x, y, 1.8, '#172b64'))).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 16" aria-hidden="true" focusable="false"><rect x=".5" y=".5" width="59" height="15" rx="2" fill="#fffdf7" stroke="#d6caa4"/><path d="M3 13.5h54" stroke="#e8dfc7"/>${marks}</svg>`;
 }
 
 export function renderDepositSticks(element: HTMLElement, depositSticks: number): void {

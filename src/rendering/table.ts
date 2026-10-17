@@ -191,7 +191,7 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
     }));
   }
   document.querySelector<HTMLElement>('#wall-count')!.replaceChildren(
-    Object.assign(document.createElement('span'), { textContent: `生きた牌山 ${game.liveWall.length}枚` }),
+    Object.assign(document.createElement('span'), { textContent: `山${game.liveWall.length}枚` }),
     Object.assign(document.createElement('span'), { textContent: `王牌 ${game.deadWall.length}枚` }),
   );
 }

@@ -28,7 +28,7 @@ test('exchange preserves every amount through 100000 points', () => {
 test('SVG denominations have equal dimensions and distinct dot patterns without external assets', () => {
   for (const [points,count] of [[1000,1],[5000,3],[10000,6]] as const) {
     const svg=depositSvgMarkup(points); assert.equal((svg.match(/<circle /g)||[]).length,count);
-    assert.match(svg,/viewBox="0 0 60 12"/); assert.match(svg,/aria-hidden="true"/); assert.doesNotMatch(svg,/<image|<use|<script/);
+    assert.match(svg,/viewBox="0 0 60 16"/); assert.match(svg,/aria-hidden="true"/); assert.doesNotMatch(svg,/<image|<use|<script/);
   }
 });
 class Node {
