@@ -90,8 +90,10 @@ with sync_playwright() as p:
                         contained:tiles.every(e=>inside(r(e),t)),
                         riverCount:[...document.querySelectorAll('.river')].every(e=>e.children.length===18),
                         riverCellsStable:[...document.querySelectorAll('.river')].every(e=>{
-                          const cells=[...e.children].map(r),first=cells[0];
-                          return cells.length===18&&cells.every(a=>Math.abs(a.width-first.width)<.1&&Math.abs(a.height-first.height)<.1);
+                          const cells=[...e.children],normal=cells.filter(a=>a.dataset.riichiDeclaration!=='true').map(r),first=normal[0];
+                          const declaration=cells.find(a=>a.dataset.riichiDeclaration==='true');
+                          const d=declaration&&r(declaration);
+                          return cells.length===18&&normal.every(a=>Math.abs(a.width-first.width)<.1&&Math.abs(a.height-first.height)<.1)&&(!declaration||Math.abs(d.width-first.height)<.1&&Math.abs(d.height-first.width)<.1);
                         }),
                         riversFacing:Math.abs((riverRects[2].left+riverRects[2].right-seats[2].left-seats[2].right))<1&&Math.abs((riverRects[0].left+riverRects[0].right-seats[0].left-seats[0].right))<1&&Math.abs((riverRects[3].top+riverRects[3].bottom-seats[3].top-seats[3].bottom))<1&&Math.abs((riverRects[1].top+riverRects[1].bottom-seats[1].top-seats[1].bottom))<1,
                         meldDirection,

@@ -121,21 +121,51 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
     if (melds) renderMelds(melds, player, game);
     const river = document.querySelector<HTMLElement>(`.river[data-player-id="${id}"]`)!;
     const side = id === 1 || id === 3;
-    // Fixed portrait cells accommodate sideways riichi tiles without changing
-    // any row or column size when the declaration appears.
-    river.style.gridTemplateColumns = side ? 'repeat(3,var(--river-tile-height))' : 'repeat(6,var(--river-tile-width))';
-    river.style.gridTemplateRows = side ? 'repeat(6,var(--river-tile-width))' : 'repeat(3,var(--river-tile-height))';
+    const declarationIndex = player.riichi
+      ? player.river.findIndex(tile => tile.id === player.riichi!.declarationTileId)
+      : -1;
+    // Lay out face-sized cells independently: the sideways declaration has
+    // the same tile dimensions as every other face after its rotation.
+    river.style.display = 'block';
+    river.style.gridTemplateColumns = '';
+    river.style.gridTemplateRows = '';
+    const gap = 1;
+    const extra = declarationIndex >= 0 ? '(var(--river-tile-height) - var(--river-tile-width))' : '0px';
+    river.style.width = side
+      ? 'calc(var(--river-tile-height) * 3 + 2px)'
+      : `calc(var(--river-tile-width) * 6 + 5px + ${extra})`;
+    river.style.height = side
+      ? `calc(var(--river-tile-width) * 6 + 5px + ${extra})`
+      : 'calc(var(--river-tile-height) * 3 + 2px)';
+    const positions = player.river.map((physical,index)=>{
+      const row=Math.floor(index/6),column=index%6;
+      const screenRow=id===1?5-column:id===3?column:id===2?2-row:row;
+      const screenColumn=id===1?row:id===3?2-row:id===2?5-column:column;
+      const declaration=index===declarationIndex;
+      const widthVar=side?(declaration?'--river-tile-width':'--river-tile-height'):(declaration?'--river-tile-height':'--river-tile-width');
+      const heightVar=side?(declaration?'--river-tile-height':'--river-tile-width'):(declaration?'--river-tile-width':'--river-tile-height');
+      return {physical,index,row:screenRow,column:screenColumn,declaration,widthVar,heightVar};
+    });
     river.replaceChildren(...player.river.map((physical, index) => {
+      const position=positions[index];
       const item = document.createElement('div');
       item.className = 'river-tile';
       item.dataset.tileId = physical.id;
       item.dataset.riichiDeclaration = String(player.riichi?.declarationTileId === physical.id);
-      // Keep DOM/data in discard order; map the seat's 6-wide rows to screen cells.
-      const row = Math.floor(index / 6), column = index % 6;
-      const screenRow = id === 1 ? 5 - column : id === 3 ? column : id === 2 ? 2 - row : row;
-      const screenColumn = id === 1 ? row : id === 3 ? 2 - row : id === 2 ? 5 - column : column;
-      item.style.gridRow = String(screenRow + 1);
-      item.style.gridColumn = String(screenColumn + 1);
+      item.style.gridRow=String(position.row+1);
+      item.style.gridColumn=String(position.column+1);
+      item.style.position='absolute';
+      item.style.width=`var(${position.widthVar})`;
+      item.style.height=`var(${position.heightVar})`;
+      const beforeRow=positions.filter(other=>other.row===position.row&&other.column<position.column);
+      const beforeColumn=positions.filter(other=>other.column===position.column&&other.row<position.row);
+      const offset=(others:typeof positions,dimension:'widthVar'|'heightVar')=>{
+        const widthTiles=others.filter(other=>other[dimension]==='--river-tile-width').length;
+        const heightTiles=others.length-widthTiles;
+        return `calc(var(--river-tile-width) * ${widthTiles} + var(--river-tile-height) * ${heightTiles} + ${others.length*gap}px)`;
+      };
+      item.style.left=offset(beforeRow,'widthVar');
+      item.style.top=offset(beforeColumn,'heightVar');
       const tile = createTileElement(physical.tile);
       if (item.dataset.riichiDeclaration === 'true') {
         const description = `${tileLabel(physical.tile)} リーチ宣言牌`;

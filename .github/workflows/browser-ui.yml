@@ -2,7 +2,7 @@ name: Browser UI verification
 
 on:
   push:
-    branches: [fix-mobile-table-layout, ui-river-spacing, main]
+    branches: [fix-mobile-table-layout, ui-river-spacing, fix-riichi-discard-layout, main]
   workflow_dispatch:
 
 permissions:
@@ -40,6 +40,7 @@ jobs:
           curl --fail --silent http://127.0.0.1:4173/heibon-mahjong/ > /dev/null
           export HEIBON_CHROMIUM="$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
           export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
+          python tests/browser-riichi-discard-layout.py
           python tests/browser-table-ui.py
           python tests/browser-mobile-table-layout.py
           python tests/browser-step13-5-5.py
