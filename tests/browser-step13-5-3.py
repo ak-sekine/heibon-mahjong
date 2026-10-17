@@ -1,9 +1,9 @@
 """Rendering-only stress fixtures, measured in Chromium on both entry points.
 Rules and real actions are covered by browser-step13-4/5 and browser-kan-page.
 """
-import json, pathlib, shutil
+import json, pathlib, shutil, os
 from playwright.sync_api import sync_playwright
-out = pathlib.Path('docs/verification/step13.5.3')
+out = pathlib.Path(os.environ.get('HEIBON_LAYOUT_OUT','docs/verification/step13.5.3'))
 shots = out / 'screenshots/sizes'
 shots.mkdir(parents=True, exist_ok=True)
 reports = []
@@ -43,11 +43,14 @@ with sync_playwright() as p:
             assert measurements['cpuRight']==[h,w]
             for kind in ['pon','chi','daiminkan','kakan','ankan','pending']:
                 page.evaluate('''kind=>{
-                  const pool=[...base.liveWall,...base.deadWall];
+                  const pool=[...base.players.flatMap(p=>[...p.hand,...(p.drawnTile?[p.drawnTile]:[])]),...base.liveWall,...base.deadWall];
                   const players=base.players.map((p,id)=>{
-                    const tiles=pool.slice(0,kind==='pon'||kind==='chi'||kind==='pending'?3:4);
-                    const meld={type:kind==='pending'?'pon':kind,tiles,calledTileId:tiles[0].id,fromPlayerId:(id+3)%4,addedTileId:tiles[3]?.id};
-                    return {...p,river:pool.slice(id*18,id*18+18),melds:Array.from({length:4},()=>({...meld})),riichi:{declarationTileId:pool[id*18+5].id}};
+                    const melds=Array.from({length:4},(_,index)=>{
+                      const type=index===0?(kind==='pending'?'pon':kind):'pon';
+                      const start=72+id*16+index*4,tiles=pool.slice(start,start+(type==='pon'||type==='chi'?3:4));
+                      return {type,tiles,calledTileId:tiles[0].id,fromPlayerId:(id+3)%4,addedTileId:type==='kakan'?tiles[3].id:undefined};
+                    });
+                    return {...p,hand:p.hand.slice(0,1),river:pool.slice(id*18,id*18+18),melds,riichi:{declarationTileId:pool[id*18+5].id}};
                   });
                   window.stress={...base,players};
                   if(kind==='pending') stress={...stress,phase:'awaiting-ron',ronWindow:{kind:'kakan',kan:{playerId:1,meldIndex:0,tile:pool[3]}}};

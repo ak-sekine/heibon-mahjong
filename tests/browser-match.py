@@ -102,7 +102,7 @@ import { cpuTsumoStart } from '/heibon-mahjong/tests/cpu-tsumo-fixture.ts';
    assert len(set(round(b['y'],1) for b in boxes))==1
    assert all(b['x']>=0 and b['x']+b['w']<=width for b in boxes)
    assert page.locator('.dora-slot').count()==5
-   assert page.locator('#dora-indicators').evaluate('el=>getComputedStyle(el).gridTemplateColumns.split(" ").length')==(3 if page.viewport_size['width']>=960 else 5)
+   assert page.locator('#dora-indicators').evaluate('el=>getComputedStyle(el).gridTemplateColumns.split(" ").length')==5
    if initial:
     assert len(boxes)==14
     controls=page.locator('.discard-controls').bounding_box()

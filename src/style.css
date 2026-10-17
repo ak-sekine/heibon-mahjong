@@ -7,7 +7,7 @@ h1 { margin:0; font-size:clamp(1rem,5vw,1.5rem); white-space:nowrap; }
 #new-game { min-width:108px; min-height:44px; padding:8px 12px; border:1px solid #d4e5db; border-radius:8px; background:#fffdf7; color:#185640; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
 #new-game:focus-visible { outline:3px solid #ffda7d; outline-offset:2px; }
 ul { list-style:none; padding:0; margin:0; }
-#player-hand { width:100%; display:grid; grid-template-columns:repeat(14,minmax(0,1fr)); gap:1px; margin:0; padding:0; }
+#player-hand { container-type:inline-size; width:100%; display:grid; grid-template-columns:repeat(14,minmax(0,1fr)); gap:1px; margin:0; padding:0; }
 #player-hand li { min-width:0; }
 #player-hand .drawn-tile { position:relative; }
 #player-hand .drawn-tile::before { content:""; position:absolute; left:-1px; top:15%; height:70%; border-left:1px solid #ffda7d; }
@@ -205,6 +205,9 @@ header > div { min-width:0; }
 #wall-count span:nth-child(2) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 .seat-top .open-melds { flex-wrap:wrap; }
 #player-hand .tile-choice { width:round(down,100%,1px); }
+/* Keep the self tiles at the dealt-hand scale after calls as well. A fixed
+   per-tile cap prevents a 2–5 tile hand from expanding into the bottom river. */
+#player-hand .tile-choice { max-width:min(42px,calc((100cqw - 13px) / 14)); }
 
 .seat-label .seat-status { white-space:nowrap; overflow-wrap:normal; }
 /* Wide tables can keep the round information between the side rivers and
@@ -223,4 +226,111 @@ header > div { min-width:0; }
   .seat-right .open-melds { grid-column:1; grid-row:2; align-self:start; }
   .rivers { grid-template-columns:calc(var(--table-tile-height)*3 + 2px) minmax(0,1fr) calc(var(--table-tile-height)*3 + 2px); grid-template-rows:auto minmax(calc(var(--table-tile-height)*6 + 5px),auto) auto; grid-template-areas:'. top .' 'left info right' '. bottom .'; }
   #dora-indicators { grid-template-columns:repeat(3,var(--table-tile-width)); grid-template-rows:repeat(2,var(--table-tile-height)); }
+}
+
+/* Step 13.5.5: fixed square, perimeter hands and a pinwheel of four rivers.
+   Nine square river cells across fit inside the hands even at 320px.
+   Absolute seats never contribute their concealed count to table height. */
+.table-summary { --table-tile-width:min(42px,round(down,calc((100cqw - 18px) / 15.8),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); display:flex; align-items:center; gap:6px; min-width:0; }
+.score-strip { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); flex:1; gap:1px 4px; }
+.score-strip .seat-label { padding:1px; font-size:10px; line-height:1.3; }
+.score-strip .seat-label span { display:inline; }
+.table-summary .dora-area { flex:none; text-align:center; }
+.table-summary #dora-indicators { grid-template-columns:repeat(5,var(--table-tile-width)); grid-template-rows:var(--table-tile-height); }
+.table-summary #deposit-sticks { margin-top:1px; }
+.table { container-type:inline-size; display:block; width:calc(100% + 8px); margin-inline:-4px; aspect-ratio:1 / 1; padding:0; flex:none;
+ --table-tile-width:min(42px,round(down,calc((100cqw - 18px) / 15.8),.1px));
+ --cell:calc(var(--table-tile-height) + 1px); }
+.table .seat,.table .rivers { --table-tile-width:min(42px,round(down,calc((100cqw - 22px) / 15.8),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); --cell:calc(var(--table-tile-height) + 1px); }
+.table .seat { position:absolute; display:flex; flex-direction:row; gap:5px; padding:0; align-items:center; justify-content:center; }
+.seat-top { top:2px; left:8px; right:8px; height:calc(var(--table-tile-height) + var(--meld-headroom)); }
+.table .seat-top { align-items:flex-start; }
+.table .seat-left,.table .seat-right { top:50%; left:50%; width:calc(100% - 60px); height:var(--table-tile-height); }
+.table .seat-left { transform:translate(-50%,-50%) translateX(calc(-50cqw + var(--table-tile-height)*.5)) rotate(90deg); }
+.table .seat-right { transform:translate(-50%,-50%) translateX(calc(50cqw - var(--table-tile-height)*.5)) rotate(270deg); }
+.table .seat .concealed-hand { display:flex; flex-direction:row; gap:1px; margin:0; max-width:none; }
+.table .seat .tile-back { width:var(--table-tile-width); height:var(--table-tile-height); }
+.table .seat .open-melds { display:flex; flex-direction:row; flex-wrap:nowrap; gap:4px; width:auto; padding:0; align-self:auto; max-width:none; }
+.table .seat .open-meld { transform:none; margin:0; padding:0; }
+.table .seat-bottom { left:5px; right:5px; bottom:2px; flex-direction:row; gap:5px; align-items:flex-end; justify-content:center; }
+.table .seat-bottom .open-melds { justify-content:center; padding-top:0; }
+.table .seat-bottom .open-melds:empty { display:none; }
+.table .seat-top .pending-kan-tile { transform:translateY(calc(var(--table-tile-width)*.6)); }
+.table .seat-left .pending-kan-tile,.table .seat-right .pending-kan-tile { transform:translateY(calc(var(--table-tile-width)*.2)); }
+.table .rivers { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:calc(var(--cell)*9); height:calc(var(--cell)*9); display:block; }
+.table .river { position:absolute; gap:1px; }
+.table .river-top { left:0; top:0; }
+.table .river-right { right:0; top:0; }
+.table .river-bottom { right:0; bottom:0; }
+.table .river-left { left:0; bottom:0; }
+.table .center-info { position:absolute; left:calc(var(--cell)*3); top:calc(var(--cell)*3); width:calc(var(--cell)*3 - 1px); height:calc(var(--cell)*3 - 1px); padding:2px; gap:2px; font-size:9px; }
+.table #wall-count { gap:2px; }
+.table #player-hand { width:calc(var(--table-tile-width)*14 + 13px); max-width:100%; align-self:center; }
+.table #player-hand .tile-choice { width:100%; }
+
+/* Four-meld stress layouts use the clear middle strip on each table edge.
+   The corner tiles stay in the adjacent edge bands, so no meld box crosses
+   another seat or the reserved river cells.  Kan rows need slightly more
+   room than three-tile rows, so the whole table shares an 11% compact scale
+   only while a fourth meld is present. */
+main:has(.table .open-meld:nth-child(4)) .table-summary {
+  --table-tile-width:calc(min(42px,round(down,calc((100cqw - 18px) / 15.8),.1px))* .89);
+  --table-tile-height:calc(var(--table-tile-width)*1.4);
+}
+.table:has(.open-meld:nth-child(4)) .seat,
+.table:has(.open-meld:nth-child(4)) .rivers {
+  --table-tile-width:calc(min(42px,round(down,calc((100cqw - 22px) / 15.8),.1px))* .89);
+  --table-tile-height:calc(var(--table-tile-width)*1.4);
+  --cell:calc(var(--table-tile-height) + 1px);
+}
+.table .seat-top:has(.open-meld:nth-child(4)) .open-melds,
+.table .seat-bottom:has(.open-meld:nth-child(4)) .open-melds { position:absolute; top:0; width:max-content; gap:0; }
+.table .seat-top:has(.open-meld:nth-child(4)) .open-melds { top:calc(var(--table-tile-width)*.6); left:calc(var(--table-tile-height) - 6px); }
+.table .seat-bottom:has(.open-meld:nth-child(4)) { height:var(--table-tile-height); }
+.table .seat-bottom:has(.open-meld:nth-child(4)) .open-melds { left:calc(var(--table-tile-height) - 3px); }
+.table .seat-top:has(.open-meld:nth-child(4)) .concealed-hand { position:absolute; left:0; }
+.table .seat-bottom:has(.open-meld:nth-child(4)) #player-hand { position:absolute; right:0; bottom:0; container-type:normal; display:flex; gap:1px; width:auto; }
+.table .seat-bottom:has(.open-meld:nth-child(4)) #player-hand li { flex:0 0 var(--table-tile-width); width:var(--table-tile-width); }
+.table .seat-left:has(.open-meld:nth-child(4)),
+.table .seat-right:has(.open-meld:nth-child(4)) { width:calc(100% - 4px); }
+.table .seat-left:has(.open-meld:nth-child(4)) .open-melds,
+.table .seat-right:has(.open-meld:nth-child(4)) .open-melds { position:absolute; top:0; width:max-content; gap:0; }
+.table .seat-left:has(.open-meld:nth-child(4)) .open-melds { left:var(--table-tile-height); }
+.table .seat-right:has(.open-meld:nth-child(4)) .open-melds { right:var(--table-tile-height); }
+.table .seat-left:has(.open-meld:nth-child(4)) .concealed-hand { position:absolute; right:0; }
+.table .seat-right:has(.open-meld:nth-child(4)) .concealed-hand { position:absolute; right:0; }
+
+/* Four daiminkan stress rows use two columns. The rotated side seats use the
+   adjacent edge strip as a second lane; tile dimensions remain at the normal
+   four-meld compact scale. */
+.table .seat-top:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])),
+.table .seat-bottom:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) { height:calc(var(--table-tile-height)*2); }
+.table .seat-top:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) .open-melds,
+.table .seat-bottom:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) .open-melds {
+  top:0;
+  left:50%;
+  right:auto;
+  transform:translateX(-50%);
+  width:calc((var(--table-tile-width)*4.4 + 3px)*2);
+  flex-wrap:wrap;
+}
+.table .seat-left:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])),
+.table .seat-right:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) { height:calc(var(--table-tile-height)*2); }
+.table .seat-left:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) { transform:translate(-50%,-50%) translateX(calc(-50cqw + var(--table-tile-height))) rotate(90deg); }
+.table .seat-right:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) { transform:translate(-50%,-50%) translateX(calc(50cqw - var(--table-tile-height))) rotate(270deg); }
+.table .seat-left:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) .open-melds,
+.table .seat-right:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) .open-melds {
+  top:0;
+  left:50%;
+  right:auto;
+  transform:translateX(-50%);
+  width:calc((var(--table-tile-width)*4.4 + 3px)*2);
+  flex-wrap:wrap;
+}
+@media (max-height:650px) and (max-width:599px) {
+ .table .seat-bottom { gap:2px; padding:0; }
+}
+@media (min-width:600px) and (max-height:850px) {
+ .table { width:min(100%,calc(100svh - 102px)); margin-inline:0; align-self:center; }
+ .table-summary { --table-tile-width:min(42px,round(down,calc((100svh - 132px) / 15.8),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
 }

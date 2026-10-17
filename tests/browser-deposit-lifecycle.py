@@ -37,7 +37,7 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
    controls=page.locator('.discard-controls').bounding_box()
    assert all(b['y']+b['h']<=controls['y'] for b in boxes),(width,height,boxes[-1],controls)
    assert page.locator('.dora-slot').count()==5
-   assert page.locator('#dora-indicators').evaluate('e=>getComputedStyle(e).gridTemplateColumns.split(" ").length')==3
+   assert page.locator('#dora-indicators').evaluate('e=>getComputedStyle(e).gridTemplateColumns.split(" ").length')==5
    for selector in ['#discard','#tsumo','#riichi']:
     if page.locator(selector).is_visible():
      box=page.locator(selector).bounding_box();assert box['height']>=44 and box['y']+box['height']<=height and box['width']>=44,(selector,box)

@@ -53,7 +53,7 @@ window.stepRows=(position)=>{controller.newGame();const g=riichiStart('tsumo');c
    assert len(set(round(b['y'],1) for b in boxes))==1
    assert all(b['x']>=0 and b['x']+b['w']<=width for b in boxes)
    assert page.locator('.dora-slot').count()==5
-   assert page.locator('#dora-indicators').evaluate('e=>getComputedStyle(e).gridTemplateColumns.split(" ").length')==(3 if width>=960 else 5)
+   assert page.locator('#dora-indicators').evaluate('e=>getComputedStyle(e).gridTemplateColumns.split(" ").length')==5
    if not page.locator('#ron').is_visible() and not page.locator('#show-result').is_visible():
     actions=page.locator('#discard,#riichi,#tsumo').evaluate_all('els=>els.map(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {x:r.x,y:r.y,w:r.width,h:r.height,bg:s.backgroundColor,disabled:e.disabled}})')
     assert max(a['w'] for a in actions)-min(a['w'] for a in actions)<.1

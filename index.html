@@ -10,10 +10,15 @@
 <body>
 <main>
   <header><div><h1>Heibon Mahjong</h1><p id="match-info"></p></div><button id="new-game" type="button">新しい対局</button></header>
+  <section class="table-summary" aria-label="点数とドラ表示牌"><div class="score-strip"><p class="seat-label" id="label-2"></p><p class="seat-label" id="label-1"></p><p class="seat-label" id="label-0"></p><p class="seat-label" id="label-3"></p></div>        <section class="dora-area" aria-labelledby="dora-heading">
+          <h2 id="dora-heading">ドラ表示牌</h2>
+          <div id="dora-indicators" role="group" aria-label="ドラ表示牌と対応するドラ牌種"></div>
+          <div id="deposit-sticks" hidden></div>
+        </section></section>
   <section class="table" aria-label="4人麻雀卓">
-    <section class="seat seat-top" data-player-id="2" aria-label="CPU2の席"><p class="seat-label" id="label-2"></p><div class="concealed-hand" data-player-id="2" role="img"></div><div class="open-melds" data-player-id="2"></div></section>
-    <section class="seat seat-right" data-player-id="1" aria-label="CPU1の席"><p class="seat-label" id="label-1"></p><div class="concealed-hand" data-player-id="1" role="img"></div><div class="open-melds" data-player-id="1"></div></section>
-    <section class="seat seat-left" data-player-id="3" aria-label="CPU3の席"><p class="seat-label" id="label-3"></p><div class="concealed-hand" data-player-id="3" role="img"></div><div class="open-melds" data-player-id="3"></div></section>
+    <section class="seat seat-top" data-player-id="2" aria-label="CPU2の席"><div class="concealed-hand" data-player-id="2" role="img"></div><div class="open-melds" data-player-id="2"></div></section>
+    <section class="seat seat-right" data-player-id="1" aria-label="CPU1の席"><div class="concealed-hand" data-player-id="1" role="img"></div><div class="open-melds" data-player-id="1"></div></section>
+    <section class="seat seat-left" data-player-id="3" aria-label="CPU3の席"><div class="concealed-hand" data-player-id="3" role="img"></div><div class="open-melds" data-player-id="3"></div></section>
     <section class="rivers" aria-label="4人の河">
       <div class="river river-top" data-player-id="2" aria-label="CPU2の河"></div>
       <div class="river river-right" data-player-id="1" aria-label="CPU1の河"></div>
@@ -21,14 +26,10 @@
       <div class="river river-left" data-player-id="3" aria-label="CPU3の河"></div>
       <div class="center-info"><div id="table-round"></div>
         <div id="wall-count" role="status" aria-live="polite"></div>
-        <section class="dora-area" aria-labelledby="dora-heading">
-          <h2 id="dora-heading">ドラ表示牌</h2>
-          <div id="dora-indicators" role="group" aria-label="ドラ表示牌と対応するドラ牌種"></div>
-          <div id="deposit-sticks" hidden></div>
-        </section>
+
       </div>
     </section>
-    <section class="seat seat-bottom" data-player-id="0" aria-label="自分の席"><h2 class="seat-label" id="label-0"></h2><div class="open-melds" data-player-id="0"></div><ul id="player-hand" aria-label="自分の手牌"></ul></section>
+    <section class="seat seat-bottom" data-player-id="0" aria-label="自分の席"><div class="open-melds" data-player-id="0"></div><ul id="player-hand" aria-label="自分の手牌"></ul></section>
   </section>
   <section id="public-winning-hands" aria-label="和了したCPUの公開手牌" hidden></section>
   <section class="discard-controls" aria-label="打牌操作">

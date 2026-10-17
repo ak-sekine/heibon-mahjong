@@ -9,21 +9,49 @@ with sync_playwright() as p:
         page = browser.new_page(viewport={'width':width,'height':height}, has_touch=True)
         errors=[]
         page.on('pageerror', lambda e: errors.append(str(e)))
+        # Expose the controller used by the page module itself. Importing
+        # /heibon-mahjong/src/main.ts separately creates another Vite module
+        # instance (the page imports main.ts with a transformed URL query).
+        def expose_page_controller(route):
+            response=route.fetch()
+            route.fulfill(response=response,body=response.text()+"\nwindow.testController = controller;\n")
+        page.route('**/src/verification/page.ts',expose_page_controller)
         page.goto(os.environ.get('HEIBON_BASE_URL', 'http://127.0.0.1:4173/heibon-mahjong/') + 'kan-test.html')
         page.wait_for_selector('#scenario-help:not(:empty)')
-        # Read state for assertions only. Every action uses the page's public UI.
-        page.evaluate("async()=>{window.readGame=()=>window.testController.game;window.testController=(await import('/heibon-mahjong/src/main.ts')).controller;}")
+        # Read this page's state for assertions only. Every action uses the UI.
+        page.evaluate("window.readGame=()=>window.testController.game")
         def check():
-            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-            assert page.evaluate('''()=>{const g=readGame();const ts=[...g.liveWall,...g.deadWall,...g.players.flatMap(p=>[...p.hand,...p.river,...p.melds.flatMap(m=>m.tiles),...(p.drawnTile?[p.drawnTile]:[])])];return ts.length===136&&new Set(ts.map(t=>t.id)).size===136}''')
-            snapshot=page.evaluate("()=>({g:readGame(),html:document.querySelector('main').innerHTML})")
-            g=snapshot['g']
-            if g['phase']!='won':
-                html=snapshot['html']
-                for player in g['players'][1:]:
-                    for tile in player['hand']+([player['drawnTile']] if player['drawnTile'] else []): assert tile['id'] not in html
-                for i,t in enumerate(g['deadWall']):
-                    if i in [5,7,9,11,13] or i>4+2*g['kanCount']: assert t['id'] not in html
+            snapshot=page.evaluate('''()=>{
+              const g=readGame(),m=window.testController.match;
+              const ts=[...g.liveWall,...g.deadWall,...g.players.flatMap(p=>[...p.hand,...p.river,...p.melds.flatMap(x=>x.tiles),...(p.drawnTile?[p.drawnTile]:[])])];
+              const html=document.querySelector('main').innerHTML, hidden=[],revealed=new Set();
+              const winnerIds=g.winResult?.winMethod==='ron'?g.winResult.winners.map(w=>w.winnerId):g.winResult?[g.winResult.winnerId]:[];
+              for(const id of winnerIds) {
+                const p=g.players[id];for(const t of [...p.hand,...(p.drawnTile?[p.drawnTile]:[])]) revealed.add(t.id);
+                if(p.riichi) for(let i=0;i<=g.kanCount;i++) revealed.add(g.deadWall[5+2*i].id);
+              }
+              for(const p of g.players.slice(1)) if(!winnerIds.includes(p.id)) hidden.push(...p.hand,...(p.drawnTile?[p.drawnTile]:[]));
+              for(const t of g.liveWall) hidden.push(t);
+              for(let i=0;i<g.deadWall.length;i++) {
+                const exposed=i>=4 && i%2===0 && i<=4+2*g.kanCount;
+                if(!exposed && !revealed.has(g.deadWall[i].id)) hidden.push(g.deadWall[i]);
+              }
+              const leaks=[];
+              for(const tile of hidden) {
+                const id=tile.id;
+                for(const e of document.querySelectorAll('*')) for(const a of e.attributes)
+                  if(a.value.includes(id)) leaks.push({id,tag:e.tagName,attribute:a.name,value:a.value});
+                const w=document.createTreeWalker(document.querySelector('main'),NodeFilter.SHOW_TEXT);
+                while(w.nextNode()) if(w.currentNode.nodeValue.includes(id)) leaks.push({id,text:w.currentNode.nodeValue});
+              }
+              return {game:g,html,leaks,integrity:ts.length===136&&new Set(ts.map(t=>t.id)).size===136,
+                points:m.points.reduce((a,b)=>a+b,0)+m.depositSticks*1000,
+                noOverflow:document.documentElement.scrollWidth<=innerWidth};
+            }''')
+            assert snapshot['noOverflow']
+            assert snapshot['integrity']
+            assert snapshot['points']==100000
+            assert not snapshot['leaks'],snapshot['leaks']
         def load(mode):
             page.select_option('#scenario',mode)
             page.locator('#load-scenario').tap()

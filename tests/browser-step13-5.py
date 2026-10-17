@@ -36,17 +36,39 @@ controller.match=startMatch(g);render();};
   page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/heibon-mahjong/');page.wait_for_function('typeof loadKan === "function"')
   def shot(name):page.screenshot(path=str(out/f'{width}x{height}-{name}.png'),full_page=True)
   def check():
-   assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-   assert page.evaluate('kanCheck().points.reduce((a,b)=>a+b,0)+kanCheck().depositSticks*1000')==100000
-   assert page.evaluate("(()=>{const s=kanCheck().game;const tiles=[...s.liveWall,...s.deadWall,...s.players.flatMap(p=>[...p.hand,...p.river,...p.melds.flatMap(m=>m.tiles),...(p.drawnTile?[p.drawnTile]:[])])];return tiles.length===136&&new Set(tiles.map(t=>t.id)).size===136;})()")
+   snapshot=page.evaluate('''()=>{
+    const m=kanCheck(),s=m.game,html=document.querySelector('main').innerHTML;
+    const tiles=[...s.liveWall,...s.deadWall,...s.players.flatMap(p=>[...p.hand,...p.river,...p.melds.flatMap(x=>x.tiles),...(p.drawnTile?[p.drawnTile]:[])])];
+    const hidden=[],revealed=new Set();
+    const winnerIds=s.winResult?.winMethod==='ron'?s.winResult.winners.map(w=>w.winnerId):s.winResult?[s.winResult.winnerId]:[];
+    for(const id of winnerIds) {
+     const p=s.players[id];for(const t of [...p.hand,...(p.drawnTile?[p.drawnTile]:[])]) revealed.add(t.id);
+     if(p.riichi) for(let i=0;i<=s.kanCount;i++) revealed.add(s.deadWall[5+2*i].id);
+    }
+    // A robbed-kan tile becomes public when ron succeeds and is displayed in
+    // the winning hand. Keep checking it before that legal reveal point.
+    if(s.winResult?.winMethod==='ron') revealed.add(s.winResult.winningTileId);
+    for(const p of s.players.slice(1)) if(!winnerIds.includes(p.id)) hidden.push(...[...p.hand,...(p.drawnTile?[p.drawnTile]:[])].filter(t=>!revealed.has(t.id)));
+    for(const t of s.liveWall) if(!revealed.has(t.id)) hidden.push(t);
+    for(let i=0;i<s.deadWall.length;i++) {
+     const exposed=i>=4&&i%2===0&&i<=4+2*s.kanCount;
+     if(!exposed&&!revealed.has(s.deadWall[i].id)) hidden.push(s.deadWall[i]);
+    }
+    const leaks=[];
+    for(const t of hidden) {
+     for(const e of document.querySelectorAll('*')) for(const a of e.attributes)
+      if(a.value.includes(t.id)) leaks.push({id:t.id,tag:e.tagName,attribute:a.name,value:a.value});
+     const w=document.createTreeWalker(document.querySelector('main'),NodeFilter.SHOW_TEXT);
+     while(w.nextNode()) if(w.currentNode.nodeValue.includes(t.id)) leaks.push({id:t.id,text:w.currentNode.nodeValue});
+    }
+    return {m,s,html,leaks,integrity:tiles.length===136&&new Set(tiles.map(t=>t.id)).size===136,
+     noOverflow:document.documentElement.scrollWidth<=innerWidth};
+   }''')
+   assert snapshot['noOverflow']
+   assert snapshot['integrity']
+   assert sum(snapshot['m']['points'])+snapshot['m']['depositSticks']*1000==100000
+   assert not snapshot['leaks'],snapshot['leaks']
    assert page.evaluate("document.querySelector('.discard-controls').getBoundingClientRect().top>=document.querySelector('.table').getBoundingClientRect().bottom")
-   if page.evaluate('kanCheck().game.phase')!='won':
-    html=page.locator('main').inner_html()
-    for player in page.evaluate('kanCheck().game.players.slice(1)'):
-     for tile in player['hand']: assert tile['id'] not in html
-    state=page.evaluate('kanCheck().game')
-    for i,t in enumerate(state['deadWall']):
-     if i in [5,7,9,11,13] or i>4+2*state['kanCount']:assert t['id'] not in html
    for sel in ['#kan','#kan-options button','#cancel-kan','#call-options button','#ron','#pass-ron']:
     for e in page.locator(sel).all():
      if e.is_visible():assert e.bounding_box()['height']>=44 and e.bounding_box()['width']>=44
@@ -81,8 +103,11 @@ controller.match=startMatch(g);render();};
   page.locator('#view-table').click()
   for seat in [2,3]:
    page.evaluate(f"loadKan('robbery{seat}');startRobbery()")
-   preview=page.locator('.pending-kan-tile');box=preview.bounding_box();seatbox=preview.locator('xpath=ancestor::*[contains(@class,"seat-")]').first.bounding_box()
-   assert box['x']>=seatbox['x']-1 and box['x']+box['width']<=seatbox['x']+seatbox['width']+1
+   preview=page.locator('.pending-kan-tile');box=preview.bounding_box();tablebox=page.locator('.table').bounding_box()
+   assert box['x']>=tablebox['x']-1 and box['y']>=tablebox['y']-1 and box['x']+box['width']<=tablebox['x']+tablebox['width']+1 and box['y']+box['height']<=tablebox['y']+tablebox['height']+1
+   for occupied in page.locator('.concealed-hand,.river').all():
+    r=occupied.bounding_box()
+    assert box['x']+box['width']<=r['x']+.1 or r['x']+r['width']<=box['x']+.1 or box['y']+box['height']<=r['y']+.1 or r['y']+r['height']<=box['y']+.1
    check();shot(f'chankan-seat{seat}')
    page.locator('#pass-ron').click();assert page.locator('.pending-kan-tile').count()==0
   page.evaluate("loadKan('seats')");page.locator('#view-table').click();check();assert page.locator('.open-meld').count()==4;assert page.locator('.dora-slot[data-tile-id]').count()==5;shot('four-seats')

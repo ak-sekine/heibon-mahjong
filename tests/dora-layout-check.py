@@ -57,8 +57,8 @@ with sync_playwright() as p:
                 positions:[...document.querySelectorAll('.seat,.river,.center-info,#discard,#tsumo')].map(rect)};
             }''')
             assert not metrics['overflow'] and metrics['childrenContained']
-            assert page.locator('.center-info #dora-indicators').count() == 1
-            # Step 13.5.4 uses the same physical scale for dora and all table tiles.
+            assert page.locator('.table-summary #dora-indicators').count() == 1
+            # Keep Step 13.5.4's shared physical scale through the square-table layout.
             for i in range(count):
                 tile=page.locator('#dora-indicators svg').nth(i).bounding_box()
                 cpu=page.locator('.seat-top .tile-back').first.bounding_box()
@@ -68,12 +68,12 @@ with sync_playwright() as p:
             hand = page.locator('#player-hand').bounding_box()
             controls = page.locator('.discard-controls').bounding_box()
             assert hand['y'] >= 0 and hand['y'] + hand['height'] <= controls['y']
-            assert all(page.locator(s).bounding_box()['y'] + page.locator(s).bounding_box()['height'] <= height for s in ['#discard','#tsumo'])
+            assert all(page.locator(s).evaluate('''e=>{const r=e.getBoundingClientRect();return r.height>=44&&r.width>=44&&r.top>=0&&r.bottom<=document.documentElement.scrollHeight}''') for s in ['#discard','#tsumo'])
             slots = metrics['slots']
-            assert len(slots) == 5 and len({round(s['y'],2) for s in slots}) == (2 if width>=960 else 1)
+            assert len(slots) == 5 and len({round(s['y'],2) for s in slots}) == 1
             for i, slot in enumerate(slots):
                 assert slot['x'] >= 0 and slot['x']+slot['width'] <= width
-                if i and (width<960 or i != 3): assert slots[i-1]['x']+slots[i-1]['width'] <= slot['x']
+                if i: assert slots[i-1]['x']+slots[i-1]['width'] <= slot['x']
             # Derived names are accessible text; the central grid prioritizes tile faces.
             assert len(metrics['hand']) == 14 and len({round(s['y'],2) for s in metrics['hand']}) == 1
             assert page.locator('.seat[data-player-id="1"] svg,.seat[data-player-id="2"] svg,.seat[data-player-id="3"] svg').count() == 0
@@ -111,8 +111,8 @@ with sync_playwright() as p:
             for selector in ['#discard','#tsumo']:
                 button=page.locator(selector)
                 # Center the button instead of relying on nearest-edge scroll rounding.
-                button.evaluate('el=>el.scrollIntoView({block:"center",behavior:"instant"})')
-                assert button.evaluate('''el=>{const r=el.getBoundingClientRect();return r.width>=44 && r.height>=44 && r.top>=0 && r.bottom<=innerHeight && document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===el;}'''), (width,height,selector,button.bounding_box(),page.evaluate('({height:innerHeight,scrollY})'))
+                button.scroll_into_view_if_needed()
+                assert button.evaluate('''el=>{const r=el.getBoundingClientRect();return r.width>=44 && r.height>=44 && r.top>=0 && r.bottom<=innerHeight && document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===el;}''')
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
             page.set_viewport_size({'width':width,'height':height})
             page.evaluate('window.scrollTo(0,0)')

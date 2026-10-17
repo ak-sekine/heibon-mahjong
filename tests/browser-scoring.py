@@ -79,7 +79,7 @@ with sync_playwright() as p:
    assert page.locator('.river-top').bounding_box()['height']==river_height
    assert page.locator('#dora-indicators').inner_html()==indicator
    assert page.locator('.dora-slot').count()==5
-   assert page.locator('#dora-indicators').evaluate('el=>getComputedStyle(el).gridTemplateColumns.split(" ").length')==(3 if page.viewport_size['width']>=960 else 5)
+   assert page.locator('#dora-indicators').evaluate('el=>getComputedStyle(el).gridTemplateColumns.split(" ").length')==5
    for selector in ['#player-hand','.winning-hand']:
     for hand in page.locator(selector).all():
      boxes=hand.locator('li').evaluate_all('els=>els.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width}})')
