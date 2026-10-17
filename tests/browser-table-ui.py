@@ -104,19 +104,28 @@ with sync_playwright() as p:
                         detail=page.evaluate('''()=>{
                           const q=s=>document.querySelector(s),r=e=>e.getBoundingClientRect();
                           const box=e=>{if(!e)return null;const b=r(e);return {left:+b.left.toFixed(2),top:+b.top.toFixed(2),right:+b.right.toFixed(2),bottom:+b.bottom.toFixed(2),width:+b.width.toFixed(2),height:+b.height.toFixed(2)}};
-                          const selector=e=>e.id?'#'+e.id:e.tagName.toLowerCase()+[...e.classList].map(c=>'.'+c).join('');
+                          const selector=e=>{const parts=[];for(let n=e;n&&n.matches;n=n.parentElement){let part=n.tagName.toLowerCase()+[...n.classList].map(c=>'.'+c).join('');if(n.parentElement){const same=[...n.parentElement.children].filter(s=>s.tagName===n.tagName);if(same.length>1)part+=`:nth-of-type(${same.indexOf(n)+1})`;}parts.unshift(part);if(n.matches('.table'))break;}return parts.join(' > ')};
+                          const separate=(a,b)=>a.right<=b.left+.15||b.right<=a.left+.15||a.bottom<=b.top+.15||b.bottom<=a.top+.15;
+                          const owner=e=>e.closest('.seat')?.dataset.playerId??e.closest('.river')?.dataset.playerId??null;
+                          const overlap=(a,b,kind)=>{const x=r(a),y=r(b);return {kind,left:{selector:selector(a),playerId:owner(a),box:box(a)},right:{selector:selector(b),playerId:owner(b),box:box(b)},overlapX:+Math.max(0,Math.min(x.right,y.right)-Math.max(x.left,y.left)).toFixed(2),overlapY:+Math.max(0,Math.min(x.bottom,y.bottom)-Math.max(x.top,y.top)).toFixed(2)}};
                           const table=q('.table'),t=r(table),hand=q('.seat-bottom #player-hand'),melds=q('.seat-bottom .open-melds');
+                          const clearElements=[...document.querySelectorAll('.river svg,#player-hand svg,.concealed-hand,.open-meld')],clearOverlaps=[];
+                          for(let i=0;i<clearElements.length;i++)for(let j=i+1;j<clearElements.length;j++)if(!separate(r(clearElements[i]),r(clearElements[j])))clearOverlaps.push(overlap(clearElements[i],clearElements[j],'tile-to-tile'));
+                          const center=q('.center-info');
+                          for(const tile of document.querySelectorAll('.river svg'))if(!separate(r(tile),r(center)))clearOverlaps.push(overlap(tile,center,'river-center-panel'));
                           const overflow=[table,...table.querySelectorAll('*')].filter(e=>{const b=r(e);return b.width>0&&b.height>0&&(b.left<t.left-.5||b.top<t.top-.5||b.right>t.right+.5||b.bottom>t.bottom+.5)}).slice(0,120).map(e=>{
                             const b=r(e);return {selector:selector(e),rect:box(e),overflow:{left:+Math.max(0,t.left-b.left).toFixed(2),top:+Math.max(0,t.top-b.top).toFixed(2),right:+Math.max(0,b.right-t.right).toFixed(2),bottom:+Math.max(0,b.bottom-t.bottom).toFixed(2)}};
                           });
                           const handBox=box(hand),meldBox=box(melds),groups=[...(melds?.children||[])].map(e=>({selector:selector(e),rect:box(e),tiles:[...e.querySelectorAll('svg')].map(box)}));
-                          return {viewport:{innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth},table:box(table),seatBottom:box(q('.seat-bottom')),hand:handBox,melds:meldBox,meldGapPx:handBox&&groups.length?+(r(melds.children[0]).left-r(hand).right).toFixed(2):null,meldGroups:groups,overflow};
+                          return {viewport:{innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth},table:box(table),seatBottom:box(q('.seat-bottom')),hand:handBox,melds:meldBox,meldGapPx:handBox&&groups.length?+(r(melds.children[0]).left-r(hand).right).toFixed(2):null,meldGroups:groups,overflow,clearOverlaps};
                         }''')
                         image_name=f'diagnostic-{"normal" if not entry else "kan"}-{width}-{scene}-riichi-{riichi}.png'
                         image_path=out/image_name
                         page.screenshot(path=str(image_path),full_page=True)
                         diagnostics.append({'entry':entry or 'index.html','width':width,'height':height,'scene':scene,'riichi':riichi,'passed':passed,'checks':result,'geometry':detail,'screenshot':image_name})
                         (out/'diagnostics.json').write_text(json.dumps(diagnostics,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+                        if not passed:
+                            print(f'UI failure: entry={entry or "index.html"} width={width} scene={scene} riichi={riichi} checks={result} clearOverlaps={detail["clearOverlaps"]}',flush=True)
                     assert all(result.values()), (entry,width,scene,riichi,result)
                     reports.append({'entry':entry or 'index.html','width':width,'scene':scene,'riichi':riichi,**result})
                 if scene in ['normal','pon','four-melds']:
