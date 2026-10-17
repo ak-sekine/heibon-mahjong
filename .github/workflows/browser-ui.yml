@@ -2,7 +2,7 @@ name: Browser UI verification
 
 on:
   push:
-    branches: [ui-river-spacing, main]
+    branches: [fix-mobile-table-layout, ui-river-spacing, main]
   workflow_dispatch:
 
 permissions:
@@ -41,6 +41,7 @@ jobs:
           export HEIBON_CHROMIUM="$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
           export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
           python tests/browser-table-ui.py
+          python tests/browser-mobile-table-layout.py
           python tests/browser-step13-5-5.py
           python tests/browser-step13-5-5-kan.py
       - name: Save browser results and screenshots

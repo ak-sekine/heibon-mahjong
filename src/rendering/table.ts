@@ -123,8 +123,8 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
     const side = id === 1 || id === 3;
     // Fixed portrait cells accommodate sideways riichi tiles without changing
     // any row or column size when the declaration appears.
-    river.style.gridTemplateColumns = side ? 'repeat(3,var(--river-tile-height))' : 'repeat(6,var(--river-tile-height))';
-    river.style.gridTemplateRows = side ? 'repeat(6,var(--river-tile-height))' : 'repeat(3,var(--river-tile-height))';
+    river.style.gridTemplateColumns = side ? 'repeat(3,var(--river-tile-height))' : 'repeat(6,var(--river-tile-width))';
+    river.style.gridTemplateRows = side ? 'repeat(6,var(--river-tile-width))' : 'repeat(3,var(--river-tile-height))';
     river.replaceChildren(...player.river.map((physical, index) => {
       const item = document.createElement('div');
       item.className = 'river-tile';
