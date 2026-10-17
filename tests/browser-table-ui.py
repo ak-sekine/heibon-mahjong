@@ -9,7 +9,7 @@ diagnostics = []
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'), args=['--no-sandbox'])
     for entry in ['', 'kan-test.html']:
-        for width, height in [(320,568),(390,844),(1280,800)]:
+        for width, height in [(320,568),(375,812),(390,844),(414,896),(430,932),(1280,800)]:
             page = browser.new_page(viewport={'width':width,'height':height})
             errors = []
             page.on('pageerror', lambda e: errors.append(str(e)))
@@ -27,7 +27,10 @@ with sync_playwright() as p:
               window.scenarios=await import('/heibon-mahjong/src/verification/scenarios.ts');
               window.base=(await import('/heibon-mahjong/src/game/start.ts')).startGame();
             }''')
-            for scene in ['normal','chi','pon','daiminkan','ankan','kakan','no-draw','multiple','four-melds']:
+            scenes=['normal','chi','pon','daiminkan','ankan','kakan','no-draw','multiple','four-melds']
+            if width in (375,414,430):
+                scenes=['multiple']
+            for scene in scenes:
                 page.evaluate('''scene=>{
                   let game=base;
                   if(scene==='chi'||scene==='pon') {

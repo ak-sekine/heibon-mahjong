@@ -361,9 +361,9 @@ main:has(.table .open-meld:nth-child(4)) .table-summary {
    the shared tile size or leaving a concealed tile outside the square. */
 .table .seat-bottom:has(.open-meld:nth-child(2)) { gap:8px; }
 .table .seat-bottom:has(.open-meld:nth-child(2)) .open-melds { gap:1px; }
-/* Two kans plus the fixed 8px hand gap exceed a 320px table by 3.5px.
+/* Two kans plus the fixed 8px hand gap exceed narrow tables.
    Scale only their physical meld tiles by 2.7%; leave four-meld layouts alone. */
-@media (max-width:340px) {
+@media (max-width:430px) {
  .table .seat-bottom:has(.open-meld:nth-child(1):is([data-meld-type="ankan"],[data-meld-type="daiminkan"],[data-meld-type="kakan"])):has(.open-meld:nth-child(2):is([data-meld-type="ankan"],[data-meld-type="daiminkan"],[data-meld-type="kakan"])):not(:has(.open-meld:nth-child(3))) .open-melds {
   --table-tile-width:calc(var(--meld-source-tile-width)*.973);
   --table-tile-height:calc(var(--meld-source-tile-height)*.973);
