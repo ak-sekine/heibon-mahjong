@@ -36,17 +36,28 @@ for (const count of [0, 1, 2, 3, 4, 5]) test(`dora layout: ${count} public tiles
       assert.equal(slot.children[1].innerHTML, tileSvgMarkup(exposed[index].tile));
       assert.equal(slot.children[1].attributes['aria-label'], `ドラ表示牌：${tileLabel(exposed[index].tile)}`);
     } else {
-      assert.equal(slot.className, 'dora-slot dora-placeholder');
+      assert.equal(slot.className, 'dora-slot tile-back');
       assert.deepEqual(slot.dataset, {});
-      assert.equal(slot.innerHTML, '');
+      assert.ok(slot.innerHTML.includes('<svg'));
       assert.equal(slot.textContent, '');
       assert.deepEqual(slot.children, []);
       assert.equal(slot.attributes['aria-label'], `未公開のドラ表示牌${index + 1}`);
+      assert.equal(slot.attributes['aria-hidden'], 'true');
     }
   }
   assert.deepEqual(exposed, snapshot);
   renderDoraIndicators(region as unknown as HTMLElement, exposedDoraIndicators(game));
   assert.equal(region.children.filter(slot => slot.dataset.tileId).length, 1);
+}));
+test('riichi ura indicators fill slots after exposed indicators without exposing their ids on backs', () => withDOM(region => {
+  const game = startGame();
+  const exposed = exposedDoraIndicators(game);
+  const ura = game.deadWall.slice(5, 6);
+  renderDoraIndicators(region as unknown as HTMLElement, exposed, ura);
+  assert.equal(region.children[1].dataset.tileId, ura[0].id);
+  assert.equal(region.children[1].className, 'dora-slot ura-indicator');
+  assert.equal(region.children[2].className, 'dora-slot tile-back');
+  assert.deepEqual(region.children[2].dataset, {});
 }));
 test('all indicator kinds and red fives distinguish indicator names from actual dora', () => withDOM(region => {
   for (const tile of [...TILE_KINDS.map(ordinaryTile), redFive('man'), redFive('pin'), redFive('sou')]) {

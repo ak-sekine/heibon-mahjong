@@ -87,7 +87,10 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
     }
     publicHands.hidden = winners.every(w => game.players[w.winnerId].control !== 'cpu');
   }
-  renderDoraIndicators(document.querySelector<HTMLElement>('#dora-indicators')!, exposedDoraIndicators(game));
+  const revealUra = game.phase === 'won' && (game.winResult?.winMethod === 'ron'
+    ? game.winResult.winners.some(winner => Boolean(game.players[winner.winnerId].riichi))
+    : Boolean(game.winResult && game.players[game.winResult.winnerId].riichi));
+  renderDoraIndicators(document.querySelector<HTMLElement>('#dora-indicators')!, exposedDoraIndicators(game), revealUra ? uraDoraIndicators(game) : []);
   for (const player of game.players) {
     const id: PlayerId = player.id;
     const count = player.hand.length + Number(player.drawnTile !== null);

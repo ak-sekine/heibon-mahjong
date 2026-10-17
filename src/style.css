@@ -172,6 +172,9 @@ header > div { min-width:0; }
 #dora-indicators { display:grid; grid-template-columns:repeat(5,var(--table-tile-width)); grid-template-rows:var(--table-tile-height); justify-content:center; gap:1px; }
 .dora-slot { width:var(--table-tile-width); height:var(--table-tile-height); }
 .dora-slot .tile-svg { width:var(--table-tile-width); height:var(--table-tile-height); }
+.dora-slot.tile-back { box-sizing:border-box; border:1px solid #e5dfc5; border-radius:2px; background:linear-gradient(#658ab1,#315877); }
+.dora-slot.tile-back svg { display:block; width:100%; height:100%; }
+.dora-slot.ura-indicator { outline:1px solid #ffda7d; outline-offset:1px; }
 .dora-slot span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 .dora-placeholder { border:1px solid #39765e; border-radius:2px; }
 #deposit-sticks { display:flex; flex-wrap:wrap; justify-content:center; gap:2px; margin-top:4px; }
@@ -357,11 +360,10 @@ main:has(.table .open-meld:nth-child(4)) .table-summary {
 .table .center-info .dora-area { --dora-width:calc(var(--cell)*.48); flex:none; }
 .table .center-info #dora-indicators { grid-template-columns:repeat(5,var(--dora-width)); grid-template-rows:calc(var(--dora-width)*1.4); }
 .table .center-info .dora-slot,.table .center-info .dora-slot .tile-svg { width:var(--dora-width); height:calc(var(--dora-width)*1.4); }
-.table .center-info #deposit-sticks { margin-top:1px; }
+.table .center-info #deposit-sticks { margin-top:3px; gap:3px; }
 .table #wall-count span:last-child { color:inherit; }
 
-.table .center-info .dora-area h2 { font-size:8px; margin-bottom:1px; }
-.table .center-info .deposit-stick { width:12px; height:3px; }
+.table .center-info .deposit-stick { width:clamp(18px,calc(var(--cell)*.48),30px); height:clamp(6px,calc(var(--cell)*.16),10px); }
 /* Two kans add physical tiles; spend the inter-group spacing before changing
    the shared tile size or leaving a concealed tile outside the square. */
 .table .seat-bottom:has(.open-meld:nth-child(2)) { gap:8px; }

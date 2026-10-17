@@ -6,7 +6,7 @@ const names = ['自分','CPU1','CPU2','CPU3'];
 const renderedSettlements = new WeakMap<HTMLElement, MatchState['lastSettlement']>();
 export function renderMatch(match: MatchState): void {
   const round=document.querySelector('#table-round');
-  if(round) round.textContent=`東${match.roundNumber}局 ${match.honba}本場\n供託${match.depositSticks}本`;
+  if(round) round.textContent=`東${match.roundNumber}局 ${match.honba}本場`;
   const deposits = document.querySelector<HTMLElement>('#deposit-sticks');
   if (deposits) renderDepositSticks(deposits, match.depositSticks);
   const panel = document.querySelector<HTMLElement>('#match-result')!;
