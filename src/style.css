@@ -250,7 +250,7 @@ header > div { min-width:0; }
 .table .seat .tile-back { width:var(--table-tile-width); height:var(--table-tile-height); }
 .table .seat .open-melds { display:flex; flex-direction:row; flex-wrap:nowrap; gap:4px; width:auto; padding:0; align-self:auto; max-width:none; }
 .table .seat .open-meld { transform:none; margin:0; padding:0; }
-.table .seat-bottom { left:5px; right:5px; bottom:2px; flex-direction:row; gap:8px; align-items:flex-end; justify-content:center; }
+.table .seat-bottom { --meld-source-tile-width:var(--table-tile-width); --meld-source-tile-height:var(--table-tile-height); left:5px; right:5px; bottom:2px; flex-direction:row; gap:8px; align-items:flex-end; justify-content:center; }
 .table .seat-bottom #player-hand { order:1; }
 .table .seat-bottom .open-melds { order:2; justify-content:center; padding-top:0; }
 .table .seat-bottom .open-melds:empty { display:none; }
@@ -357,3 +357,11 @@ main:has(.table .open-meld:nth-child(4)) .table-summary {
    the shared tile size or leaving a concealed tile outside the square. */
 .table .seat-bottom:has(.open-meld:nth-child(2)) { gap:8px; }
 .table .seat-bottom:has(.open-meld:nth-child(2)) .open-melds { gap:1px; }
+/* Two kans plus the fixed 8px hand gap exceed a 320px table by 3.5px.
+   Scale only their physical meld tiles by 2.7%; leave four-meld layouts alone. */
+@media (max-width:340px) {
+ .table .seat-bottom:has(.open-meld:nth-child(1):is([data-meld-type="ankan"],[data-meld-type="daiminkan"],[data-meld-type="kakan"])):has(.open-meld:nth-child(2):is([data-meld-type="ankan"],[data-meld-type="daiminkan"],[data-meld-type="kakan"])):not(:has(.open-meld:nth-child(3))) .open-melds {
+  --table-tile-width:calc(var(--meld-source-tile-width)*.973);
+  --table-tile-height:calc(var(--meld-source-tile-height)*.973);
+ }
+}
