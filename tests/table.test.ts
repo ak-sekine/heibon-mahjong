@@ -199,7 +199,7 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       renderTable(displayGame);
       const completeOffsets = [0, 1, 2, 3].map(id =>
         nodes.get(`.river[data-player-id="${id}"]`)!.children.map(item => [item.style.left, item.style.top]));
-      for (const count of [1, 5, 6, 7, 12, 13, 17]) {
+      for (const count of [1, 6, 7, 12, 13, 18]) {
         renderTable({
           ...displayGame,
           players: displayGame.players.map(player => ({ ...player, river: player.river.slice(0, count) })),
