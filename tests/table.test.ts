@@ -63,7 +63,7 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'yakuman'] as const) test(`resul
     assert.ok(!strings(list).some(s => s.includes('ドラ')));
     const exposed = nodes.get('#dora-indicators')!.children;
     assert.equal(exposed.length, 5);
-    assert.ok(exposed.slice(1).every(slot => slot.className === 'dora-slot tile-back' && slot.innerHTML.includes('<svg') && Object.keys(slot.dataset).length === 0));
+    assert.ok(exposed.slice(1).every(slot => slot.className === 'dora-slot tile-back' && slot.innerHTML === '' && Object.keys(slot.dataset).length === 0));
     assert.equal(exposed[0].dataset.tileId, game.deadWall[4].id);
     assert.equal(exposed[0].children[1].innerHTML, tileSvgMarkup(game.deadWall[4].tile));
     assert.equal(exposed[0].children[2].textContent, `ドラ：\n${tileLabel(ordinaryTile(doraKindFromIndicator(game.deadWall[4].tile)))}`);
@@ -119,7 +119,7 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       renderTable(game);
       const exposed = nodes.get('#dora-indicators')!.children;
       assert.equal(exposed.length, 5);
-      assert.ok(exposed.slice(1).every(slot => slot.className === 'dora-slot tile-back' && slot.innerHTML.includes('<svg') && Object.keys(slot.dataset).length === 0));
+      assert.ok(exposed.slice(1).every(slot => slot.className === 'dora-slot tile-back' && slot.innerHTML === '' && Object.keys(slot.dataset).length === 0));
       assert.equal(exposed[0].dataset.tileId, game.deadWall[4].id);
       assert.equal(exposed[0].children[1].innerHTML, tileSvgMarkup(game.deadWall[4].tile));
       const publicIds = [...nodes.values()].flatMap(node => node.children.flatMap(child => child.dataset.tileId ? [child.dataset.tileId] : []));
@@ -356,7 +356,7 @@ for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','f
   });
 }
 
-for (const mode of ['plain', 'riichi', 'double', 'double-ron', 'triple-ron'] as const) test(`result indicator visibility and reset: ${mode}`, () => {
+for (const mode of ['plain', 'riichi', 'double', 'double-ron', 'triple-ron', 'plain-double-ron', 'plain-triple-ron'] as const) test(`result indicator visibility and reset: ${mode}`, () => {
   const nodes = new Map<string, ElementStub>();
   for (const id of [0, 1, 2, 3]) {
     nodes.set(`#label-${id}`, new ElementStub());
@@ -367,8 +367,8 @@ for (const mode of ['plain', 'riichi', 'double', 'double-ron', 'triple-ron'] as 
   globalThis.document = { querySelector: (s: string) => nodes.get(s), createElement: (t: string) => new ElementStub(t) } as unknown as Document;
   try {
     const multi = mode.endsWith('-ron');
-    let game = multi ? ronStart(1, mode === 'double-ron' ? [0,2] : [0,2,3]) : tsumoGame();
-    if (mode !== 'plain') {
+    let game = multi ? ronStart(1, mode.includes('double-ron') ? [0,2] : [0,2,3]) : tsumoGame();
+    if (!mode.startsWith('plain')) {
       game = withRiverTile(game, 0, 'north');
       game = {...game, players: game.players.map(p => p.id === 0 ? {...p, riichi: {declarationTileId: p.river.at(-1)!.id, ippatsuEligible: false, doubleRiichi: mode === 'double'}} : p)};
     }
@@ -382,7 +382,7 @@ for (const mode of ['plain', 'riichi', 'double', 'double-ron', 'triple-ron'] as 
     assert.ok(panel.children.length > 0);
     for (const section of panel.children) {
       const rows = section.children.filter(n => n.className.startsWith('result-dora '));
-      const entitled = mode !== 'plain' && section.dataset.winnerId === '0';
+      const entitled = !mode.startsWith('plain') && section.dataset.winnerId === '0';
       assert.equal(rows.length, entitled ? 2 : 1);
       for (const [i, row] of rows.entries()) {
         const slots = row.children[1].children;
@@ -393,6 +393,17 @@ for (const mode of ['plain', 'riichi', 'double', 'double-ron', 'triple-ron'] as 
         assert.ok(slots.slice(1).every(n => !n.children.length && !Object.keys(n.dataset).length));
       }
       if (!entitled) assert.ok(!JSON.stringify(walk(section).map(n => [n.dataset, n.attributes, n.textContent, n.innerHTML])).includes(game.deadWall[5].id));
+    }
+    const central = nodes.get('#dora-indicators')!;
+    for (const kanCount of [0,1,2,3,4]) {
+      renderTable({...game, kanCount});
+      assert.equal(central.children.length, 5);
+      renderTable({...won, kanCount});
+      assert.equal(central.children.length, mode.startsWith('plain') ? 5 : 10);
+      for (let i=0; i<5; i++) {
+        assert.equal(central.children[i].dataset.tileId, i<=kanCount ? game.deadWall[4+i*2].id : undefined);
+        assert.equal(central.children[5+i]?.dataset.tileId, !mode.startsWith('plain') && i<=kanCount ? game.deadWall[5+i*2].id : undefined);
+      }
     }
     assert.deepEqual(won, snapshot);
     const reset = startGame();

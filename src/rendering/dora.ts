@@ -3,7 +3,6 @@ import { ordinaryTile } from '../model/tile.ts';
 import { doraKindFromIndicator } from '../analysis/dora.ts';
 import { createTileElement, tileLabel } from './tile-svg.ts';
 
-const BACK_TILE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 84" aria-hidden="true"><rect x="1" y="1" width="58" height="82" rx="4" fill="#315877" stroke="#e5dfc5" stroke-width="2"/><rect x="5" y="5" width="50" height="74" rx="3" fill="none" stroke="#91abc0" stroke-width="2"/></svg>';
 
 /** Result-only row. Callers must supply only indicators this winner may see. */
 export function createResultDoraRow(indicators: readonly PhysicalTile[], ura: boolean): HTMLElement {
@@ -46,37 +45,36 @@ export function createResultDoraRow(indicators: readonly PhysicalTile[], ura: bo
   return row;
 }
 
-/** Accept only public indicators, never the dead wall or hidden ura tiles. */
+/** Two independent five-slot rows. Callers supply only public indicators;
+ * an empty ura list omits its row entirely, including on round reset. */
 export function renderDoraIndicators(region: HTMLElement, exposed: readonly PhysicalTile[], ura: readonly PhysicalTile[] = []): void {
   if (exposed.length > 5) throw new RangeError('At most five dora indicators');
   if (ura.length > 5) throw new RangeError('At most five ura indicators');
   const uraCount = Math.min(ura.length, exposed.length);
-  region.replaceChildren(...Array.from({ length: 5 }, (_, index) => {
+  region.replaceChildren(...Array.from({ length: uraCount ? 10 : 5 }, (_, position) => {
+    const index = position % 5;
     const item = document.createElement('div');
-    const isUra = index >= exposed.length && index < exposed.length + uraCount;
-    const physical = isUra ? ura[index - exposed.length] : exposed[index];
-    item.className = 'dora-slot';
+    const isUra = position >= 5;
+    const physical = isUra ? (index < uraCount ? ura[index] : undefined) : exposed[index];
+    item.className = isUra ? 'dora-slot ura-indicator' : 'dora-slot';
     if (!physical) {
       item.className += ' tile-back';
       item.setAttribute('role', 'img');
-      item.setAttribute('aria-label', `未公開のドラ表示牌${index + 1}`);
-      item.setAttribute('aria-hidden', 'true');
-      item.innerHTML = BACK_TILE;
+      item.setAttribute('aria-label', `未公開の${isUra ? '裏ドラ' : 'ドラ'}表示牌${index + 1}`);
       return item;
     }
     const indicatorName = tileLabel(physical.tile);
     const doraName = tileLabel(ordinaryTile(doraKindFromIndicator(physical.tile)));
     item.dataset.tileId = physical.id;
     item.setAttribute('role', 'group');
-    item.setAttribute('aria-label', isUra ? `裏ドラ表示牌${index - exposed.length + 1}：${indicatorName}` : `ドラ表示牌${index + 1}：${indicatorName}、ドラ：${doraName}`);
+    item.setAttribute('aria-label', isUra ? `裏ドラ表示牌${index + 1}：${indicatorName}` : `ドラ表示牌${index + 1}：${indicatorName}、ドラ：${doraName}`);
     const label = document.createElement('span');
-    label.textContent = `表示牌${index + 1}`;
+    label.textContent = `${isUra ? '裏' : '表'}表示牌${index + 1}`;
     const svg = createTileElement(physical.tile);
     svg.setAttribute('aria-label', `ドラ表示牌：${indicatorName}`);
     const dora = document.createElement('span');
     dora.className = 'dora-kind';
     dora.textContent = isUra ? '裏ドラ' : `ドラ：\n${doraName}`;
-    if (isUra) item.className += ' ura-indicator';
     item.append(label, svg, dora);
     return item;
   }));

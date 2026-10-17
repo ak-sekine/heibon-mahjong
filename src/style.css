@@ -358,9 +358,15 @@ main:has(.table .open-meld:nth-child(4)) .table-summary {
 .table .center-info { justify-content:center; gap:2px; font-size:clamp(8px,1.8cqw,11px); line-height:1.25; }
 .table #table-round { white-space:pre-line; }
 .table .center-info .dora-area { --dora-width:calc(var(--cell)*.48); flex:none; }
-.table .center-info #dora-indicators { grid-template-columns:repeat(5,var(--dora-width)); grid-template-rows:calc(var(--dora-width)*1.4); }
+.table .center-info #dora-indicators { grid-template-columns:repeat(5,var(--dora-width)); grid-template-rows:none; grid-auto-rows:calc(var(--dora-width)*1.4); }
 .table .center-info .dora-slot,.table .center-info .dora-slot .tile-svg { width:var(--dora-width); height:calc(var(--dora-width)*1.4); }
-.table .center-info #deposit-sticks { margin-top:3px; gap:3px; }
+.table .center-info #deposit-sticks { margin-top:1px; gap:1px; }
+.table .center-info:has(.ura-indicator) { gap:1px; }
+.table .center-info:has(.ura-indicator) .dora-area { --dora-width:calc(var(--cell)*.42); }
+.table .center-info > div { flex-shrink:0; }
+.dora-slot { position:relative; }
+.dora-slot.ura-indicator { outline-offset:0; }
+.dora-slot.ura-indicator:nth-child(6)::after { content:"裏"; position:absolute; left:0; bottom:0; background:#ffda7d; color:#123f32; font-size:6px; line-height:1; }
 .table #wall-count span:last-child { color:inherit; }
 
 .table .center-info .deposit-stick { width:clamp(18px,calc(var(--cell)*.48),30px); height:clamp(6px,calc(var(--cell)*.16),10px); }

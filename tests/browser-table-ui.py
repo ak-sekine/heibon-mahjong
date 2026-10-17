@@ -122,7 +122,7 @@ with sync_playwright() as p:
                             const b=r(e);return {selector:selector(e),rect:box(e),overflow:{left:+Math.max(0,t.left-b.left).toFixed(2),top:+Math.max(0,t.top-b.top).toFixed(2),right:+Math.max(0,b.right-t.right).toFixed(2),bottom:+Math.max(0,b.bottom-t.bottom).toFixed(2)}};
                           });
                           const handBox=box(hand),meldBox=box(melds),groups=[...(melds?.children||[])].map(e=>({selector:selector(e),rect:box(e),tiles:[...e.querySelectorAll('svg')].map(box)}));
-                          return {viewport:{innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth},table:box(table),seatBottom:box(q('.seat-bottom')),hand:handBox,melds:meldBox,meldGapPx:handBox&&groups.length?+(r(melds.children[0]).left-r(hand).right).toFixed(2):null,meldGroups:groups,overflow,clearOverlaps};
+                          return {central: Object.fromEntries([".center-info",".dora-area","#table-round","#wall-count","#deposit-sticks"].map(s=>[s,box(q(s))])), depositSticks:[...document.querySelectorAll(".deposit-stick")].map(box), viewport:{innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth},table:box(table),seatBottom:box(q('.seat-bottom')),hand:handBox,melds:meldBox,meldGapPx:handBox&&groups.length?+(r(melds.children[0]).left-r(hand).right).toFixed(2):null,meldGroups:groups,overflow,clearOverlaps};
                         }''')
                         image_name=f'diagnostic-{"normal" if not entry else "kan"}-{width}-{scene}-riichi-{riichi}.png'
                         image_path=out/image_name

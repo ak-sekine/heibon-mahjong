@@ -42,6 +42,7 @@ jobs:
           export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
           python tests/browser-riichi-discard-layout.py
           python tests/browser-table-ui.py
+          python tests/browser-dora-rows.py
           python tests/browser-mobile-table-layout.py
           python tests/browser-step13-5-5.py
           python tests/browser-step13-5-5-kan.py
