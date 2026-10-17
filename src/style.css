@@ -295,6 +295,11 @@ main:has(.table .open-meld:nth-child(4)) .table-summary {
   --table-tile-width:calc(var(--meld-source-tile-width)*.96);
   --table-tile-height:calc(var(--meld-source-tile-height)*.96);
 }
+@media (min-width:960px) {
+  .table .seat-bottom:has(.open-meld:nth-child(4)):not(:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"]))) .open-melds {
+    right:calc(var(--table-tile-height) - 1.5px);
+  }
+}
 .table .seat-top:has(.open-meld:nth-child(4)) .concealed-hand { position:absolute; left:auto; right:0; }
 .table .seat-bottom:has(.open-meld:nth-child(4)) #player-hand { position:absolute; left:calc(50% - var(--table-tile-width)*8.17); right:auto; bottom:0; container-type:normal; display:flex; gap:1px; width:auto; }
 .table .seat-bottom:has(.open-meld:nth-child(4)) #player-hand li { flex:0 0 var(--table-tile-width); width:var(--table-tile-width); }
