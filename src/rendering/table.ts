@@ -133,12 +133,11 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
     river.style.gridTemplateColumns = '';
     river.style.gridTemplateRows = '';
     const gap = 1;
-    const extra = declarationIndex >= 0 ? '(var(--river-tile-height) - var(--river-tile-width))' : '0px';
     river.style.width = side
       ? 'calc(var(--river-tile-height) * 3 + 2px)'
-      : `calc(var(--river-tile-width) * 6 + 5px + ${extra})`;
+      : 'calc(var(--river-tile-width) * 6 + 5px)';
     river.style.height = side
-      ? `calc(var(--river-tile-width) * 6 + 5px + ${extra})`
+      ? 'calc(var(--river-tile-width) * 6 + 5px)'
       : 'calc(var(--river-tile-height) * 3 + 2px)';
     const positions = player.river.map((physical,index)=>{
       const row=Math.floor(index/6),column=index%6;
@@ -154,24 +153,38 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
     // top-left instead of starting at the top-left of each player's viewpoint.
     const rowCount = side ? 6 : 3;
     const columnCount = side ? 3 : 6;
-    // Reserve all 18 slots, including empty positions. Width can vary within
-    // a row to fit the wider sideways face; height belongs to the whole row so
-    // a short declaration face cannot pull one column's later tiles upward.
+    // Reserve all 18 slots, including empty positions. Expand only the track
+    // along a player's six-discard line; other rows and columns keep their
+    // regular tile spacing.
     const cellWidths = Array.from({ length: rowCount }, () =>
       Array<string>(columnCount).fill(side ? '--river-tile-height' : '--river-tile-width'));
-    const rowHeights = Array<string>(rowCount).fill(side ? '--river-tile-width' : '--river-tile-height');
+    const cellHeights = Array.from({ length: rowCount }, () =>
+      Array<string>(columnCount).fill(side ? '--river-tile-width' : '--river-tile-height'));
     for (const position of positions) {
-      // Reserve the largest face dimension for each fixed grid track. A
-      // horizontal declaration in a top/bottom river is shorter than its row,
-      // while a side-seat declaration is taller than its row.
+      // The rotated declaration needs a wider track in top/bottom rivers or a
+      // taller track in side rivers. Keep that correction in its own line.
       if (position.widthVar === '--river-tile-height') cellWidths[position.row][position.column] = position.widthVar;
-      if (position.heightVar === '--river-tile-height') rowHeights[position.row] = position.heightVar;
+      if (position.heightVar === '--river-tile-height') cellHeights[position.row][position.column] = position.heightVar;
     }
     const offset = (variables: readonly string[]) => {
       const widthTiles = variables.filter(value => value === '--river-tile-width').length;
       const heightTiles = variables.length - widthTiles;
       return `calc(var(--river-tile-width) * ${widthTiles} + var(--river-tile-height) * ${heightTiles} + ${variables.length * gap}px)`;
     };
+    const trackSize = (variables: readonly string[]) => {
+      const widthTiles = variables.filter(value => value === '--river-tile-width').length;
+      const heightTiles = variables.length - widthTiles;
+      return `calc(var(--river-tile-width) * ${widthTiles} + var(--river-tile-height) * ${heightTiles} + ${Math.max(0, variables.length - 1) * gap}px)`;
+    };
+    const centerLine = (tracks: readonly string[], base: string) =>
+      `calc((${base} - ${trackSize(tracks)}) * .5)`;
+    const horizontalLineOffsets = side
+      ? Array<string>(rowCount).fill('0px')
+      : cellWidths.map(row => centerLine(row, 'calc(var(--river-tile-width) * 6 + 5px)'));
+    const verticalLineOffsets = side
+      ? Array.from({ length: columnCount }, (_, column) =>
+        centerLine(cellHeights.map(row => row[column]), 'calc(var(--river-tile-width) * 6 + 5px)'))
+      : Array<string>(columnCount).fill('0px');
     const centerInTrack = (track: string, face: string) => track === face
       ? '0px'
       : `calc((var(${track}) - var(${face})) * .5)`;
@@ -186,8 +199,8 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
       item.style.position='absolute';
       item.style.width=`var(${position.widthVar})`;
       item.style.height=`var(${position.heightVar})`;
-      item.style.left = `calc(${offset(cellWidths[position.row].slice(0, position.column))} + ${centerInTrack(cellWidths[position.row][position.column], position.widthVar)})`;
-      item.style.top = `calc(${offset(rowHeights.slice(0, position.row))} + ${centerInTrack(rowHeights[position.row], position.heightVar)})`;
+      item.style.left = `calc(${horizontalLineOffsets[position.row]} + ${offset(cellWidths[position.row].slice(0, position.column))} + ${centerInTrack(cellWidths[position.row][position.column], position.widthVar)})`;
+      item.style.top = `calc(${verticalLineOffsets[position.column]} + ${offset(cellHeights.slice(0, position.row).map(row => row[position.column]))} + ${centerInTrack(cellHeights[position.row][position.column], position.heightVar)})`;
       const tile = createTileElement(physical.tile);
       if (item.dataset.riichiDeclaration === 'true') {
         const description = `${tileLabel(physical.tile)} リーチ宣言牌`;
