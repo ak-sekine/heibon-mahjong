@@ -34,5 +34,6 @@ READMEから移した各Stepの本文と、本文にあった検証資料・ス�
 | 13.5.4 | 卓上牌を手牌の基準サイズへ拡大 | 2026-10-17 | [記録](step-13.5.4.md) · [commit](https://github.com/ak-sekine/heibon-mahjong/commit/070e0e9) |
 | 13.5.5 | 正方形卓、河・副露の重なり修正、自動・ブラウザー検証 | 2026-10-17〜18 | [開発記録](step-13.5.5.md) · [詳細検証](../verification/step13.5.5/README.md) · [基盤commit](https://github.com/ak-sekine/heibon-mahjong/commit/4393318) · [最終実装commit](https://github.com/ak-sekine/heibon-mahjong/commit/f15501867220670173b73e647996c7ef60de86b4) |
 | 13.7 | 残りの一般役7種類 | 2026-10-18 | [開発記録](step-13.7.md) · [検証記録](../verification/step13.7/README.md) |
+| 13.7.1 | 自動ターン処理テストの安定化 | 2026-10-18 | [開発記録](step-13.7.1.md) · [検証記録](../verification/step13.7.1/README.md) |
 
 Step 13.5のiPhone Safari実機確認は[2026-10-18の検証記録](../verification/kan-safari-2026-10-18.md)を参照してください。

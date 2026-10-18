@@ -10,25 +10,30 @@ import { drawOrStop } from '../src/game/draw.ts';
 import type { GameState } from '../src/model/game.ts';
 import { seeded, inventory } from './helpers.ts';
 
+type PendingWait = { resolve: () => void; signal: AbortSignal };
+
 function manualWait() {
-  const pending: { resolve: () => void; signal: AbortSignal }[] = [];
+  const pending: PendingWait[] = [];
+  const nextWaitListeners: ((wait: PendingWait) => void)[] = [];
   const wait: Wait = (ms, signal) => {
     assert.equal(ms, 300);
-    return new Promise(resolve => pending.push({ resolve, signal }));
+    return new Promise(resolve => {
+      const scheduled = { resolve, signal };
+      const listener = nextWaitListeners.shift();
+      if (listener) listener(scheduled);
+      else pending.push(scheduled);
+    });
   };
-  return { wait, pending };
-}
-const flush = async () => { await Promise.resolve(); await Promise.resolve(); };
-async function nextPending(pending: { resolve: () => void; signal: AbortSignal }[]) {
-  for (let attempt = 0; pending.length === 0 && attempt < 10; attempt++) {
-    await new Promise<void>(resolve => setImmediate(resolve));
-  }
-  assert.ok(pending.length > 0, 'the next CPU wait was not scheduled');
-  return pending.shift()!;
+  const nextPending = (): Promise<PendingWait> => {
+    const scheduled = pending.shift();
+    if (scheduled) return Promise.resolve(scheduled);
+    return new Promise(resolve => nextWaitListeners.push(resolve));
+  };
+  return { wait, pending, nextPending };
 }
 
-test('CPU1, CPU2, CPU3 act once in order, return fourteen tiles to human and block rapid input', async () => {
-  const { wait, pending } = manualWait();
+test('CPU1, CPU2, CPU3 act once in order, return fourteen tiles to human and block rapid input', { timeout: 5_000 }, async () => {
+  const { wait, pending, nextPending } = manualWait();
   const initial = startGame(seeded(2));
   const states: GameState[] = [];
   const ui = new GameController(() => initial, { wait, chooseDiscard: chooseRandomDiscard, random: () => 0, onChange: () => states.push(ui.game) });
@@ -42,15 +47,16 @@ test('CPU1, CPU2, CPU3 act once in order, return fourteen tiles to human and blo
   ui.select(ui.game.players[0].hand[0].id);
   await ui.confirm();
   assert.equal(ui.game, snapshot);
-  assert.equal(pending.length, 1);
-  for (const id of [1, 2, 3]) {
+  let cpuWait = await nextPending();
+  assert.equal(pending.length, 0);
+  for (const [index, id] of [1, 2, 3].entries()) {
     assert.equal(ui.game.turnPlayerId, id);
     assert.equal(ui.game.players[id].river.length, 0);
-    pending.shift()!.resolve();
-    await flush();
+    cpuWait.resolve();
+    if (index < 2) cpuWait = await nextPending();
+    else await running;
     assert.equal(ui.game.players[id].river.length, 1);
   }
-  await running;
   assert.equal(ui.progressing, false);
   assert.equal(ui.game.turnPlayerId, 0);
   assert.equal(ui.game.phase, 'awaiting-discard');
@@ -62,13 +68,13 @@ test('CPU1, CPU2, CPU3 act once in order, return fourteen tiles to human and blo
   assert.equal(ui.canConfirm, true);
 });
 
-test('old waits and old finally blocks cannot change a new game or duplicate its runner', async () => {
-  const { wait, pending } = manualWait();
+test('old waits and old finally blocks cannot change a new game or duplicate its runner', { timeout: 5_000 }, async () => {
+  const { wait, pending, nextPending } = manualWait();
   let seed = 0;
-  const ui = new GameController(() => startGame(seeded(seed++)), { wait, chooseDiscard: chooseRandomDiscard });
+  const ui = new GameController(() => startGame(seeded(seed++)), { wait, chooseDiscard: chooseRandomDiscard, random: () => 0 });
   ui.select(ui.game.players[0].drawnTile!.id);
   const oldRun = ui.confirm();
-  const old = pending.shift()!;
+  const old = await nextPending();
   ui.newGame();
   assert.equal(old.signal.aborted, true);
   assert.equal(ui.progressing, false);
@@ -82,37 +88,42 @@ test('old waits and old finally blocks cannot change a new game or duplicate its
   assert.equal(ui.game, fresh);
   ui.select(ui.game.players[0].drawnTile!.id);
   const secondRun = ui.confirm();
-  const second = pending.shift()!;
+  const second = await nextPending();
   ui.newGame();
   ui.select(ui.game.players[0].drawnTile!.id);
   const thirdRun = ui.confirm();
+  const thirdWait = await nextPending();
   const snapshot = ui.game;
   second.resolve();
   await secondRun;
   assert.equal(ui.game, snapshot);
   assert.equal(ui.progressing, true);
   await ui.confirm();
-  assert.equal(pending.length, 1);
-  let cpuWait = pending.shift()!;
+  assert.equal(pending.length, 0);
+  let cpuWait = thirdWait;
   for (let i = 0; i < 3; i++) {
     cpuWait.resolve();
-    if (i < 2) cpuWait = await nextPending(pending);
+    if (i < 2) cpuWait = await nextPending();
+    else await thirdRun;
   }
-  await thirdRun;
   assert.deepEqual(ui.game.players.map(p => p.river.length), [1, 1, 1, 1]);
 });
 
-test('runner rejects overlapping starts and does no work after wall exhaustion', async () => {
-  const { wait, pending } = manualWait();
+test('runner rejects overlapping starts and does no work after wall exhaustion', { timeout: 5_000 }, async () => {
+  const { wait, pending, nextPending } = manualWait();
   const runner = new AutomaticTurnRunner({ wait, chooseDiscard: chooseRandomDiscard, random: () => 0.999 });
   const initial = startGame(seeded(3));
   let game = discardTile(initial, 0, initial.players[0].drawnTile!.id);
   const read = () => game, write = (next: GameState) => { game = next; };
   const first = runner.run(read, write);
+  let cpuWait = await nextPending();
   await runner.run(read, write);
-  assert.equal(pending.length, 1);
-  for (let i = 0; i < 3; i++) { pending.shift()!.resolve(); await flush(); }
-  await first;
+  assert.equal(pending.length, 0);
+  for (let i = 0; i < 3; i++) {
+    cpuWait.resolve();
+    if (i < 2) cpuWait = await nextPending();
+    else await first;
+  }
   assert.deepEqual(game.players.map(p => p.river.length), [1, 1, 1, 1]);
   const stopped = { ...game, phase: 'wall-exhausted' as const };
   game = stopped;
