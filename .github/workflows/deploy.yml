@@ -22,7 +22,21 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm test
+      - name: Run npm test
+        shell: bash
+        run: |
+          if npm test > /tmp/heibon-npm-test.log 2>&1; then
+            cat /tmp/heibon-npm-test.log
+          else
+            test_status=$?
+            cat /tmp/heibon-npm-test.log
+            test_failure="$(tail -n 30 /tmp/heibon-npm-test.log | tr '\n' ' ' | cut -c1-4000)"
+            test_failure="${test_failure//'%'/'%25'}"
+            test_failure="${test_failure//$'\r'/'%0D'}"
+            test_failure="${test_failure//$'\n'/'%0A'}"
+            echo "::error title=npm test failed::${test_failure}"
+            exit "$test_status"
+          fi
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
