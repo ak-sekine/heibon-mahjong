@@ -56,6 +56,9 @@ with sync_playwright() as p:
                   const allRiverSvgs=[...document.querySelectorAll('.table .river svg')].map(rect);
                   const ratio=Math.max(n.width,n.height)/Math.min(n.width,n.height);
                   const rotatedRatio=Math.max(d.width,d.height)/Math.min(d.width,d.height);
+                  const outsideViewport=[...document.querySelectorAll('body *')].map(e=>({e,r:rect(e)}))
+                    .filter(({e,r})=>r.width>0&&r.height>0&&(r.left<-.5||r.right>innerWidth+.5))
+                    .slice(0,12).map(({e,r})=>({tag:e.tagName,cls:e.getAttribute('class'),left:+r.left.toFixed(2),right:+r.right.toFixed(2),width:+r.width.toFixed(2)}));
                   return {
                     count:items.length,cols:river.classList.contains('river-left')||river.classList.contains('river-right')?3:6,
                     widthEqual:close(n.width,d.height),heightEqual:close(n.height,d.width),
@@ -66,12 +69,13 @@ with sync_playwright() as p:
                     order:items.every((e,i)=>e.dataset.tileId===shown.players[seat].river[i].id),
                     cellsSixByThree:items.length===18&&items.every(e=>+e.style.gridRow<=6&&+e.style.gridColumn<=6),
                     noScroll:document.documentElement.scrollWidth<=innerWidth,
+                    viewport:{scrollWidth:document.documentElement.scrollWidth,innerWidth,outsideViewport},
                     inTable:allRiverSvgs.every(a=>a.left>=table.left-.2&&a.right<=table.right+.2&&a.top>=table.top-.2&&a.bottom<=table.bottom+.2),
                     privateIds:privateTiles.every(t=>!publicIds.has(t.id)&&!q('main').innerHTML.includes(t.id)),
                     decBox:{x:d.x,y:d.y,width:d.width,height:d.height},normalBox:{x:n.x,y:n.y,width:n.width,height:n.height}
                   };
                 }''', {'seat':seat,'position':actual_position})
-                checks = {k:v for k,v in metrics.items() if k not in ('decBox','normalBox','sameLineGaps')}
+                checks = {k:v for k,v in metrics.items() if k not in ('decBox','normalBox','sameLineGaps','viewport')}
                 assert all(checks.values()), f'{width}px seat {seat} riichi {position+1}: {metrics}'
                 assert all(abs(g['gap']-1)<.35 for g in metrics['sameLineGaps']), f'{width}px seat {seat} riichi {position+1} spacing: {metrics}'
                 if width == 390 and seat == 2 and position == 4:
