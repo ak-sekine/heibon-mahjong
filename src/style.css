@@ -93,10 +93,15 @@ header > div { min-width:0; }
 #new-game-dialog #confirm-new-game { background:#ffda7d; color:#154e3c; }
 #new-game-dialog button:focus-visible { outline:3px solid #82dcff; outline-offset:-3px; }
 [hidden] { display:none !important; }
-.discard-controls.result-available > :not(#show-result) { display:none; }
+.discard-controls.result-available > :not(#round-result-actions) { display:none; }
 .discard-controls.result-available { position:relative; bottom:auto; justify-content:center; padding:4px 6px max(4px,env(safe-area-inset-bottom,0px)); }
-#public-winning-hands { padding:8px; border:1px solid #63947a; border-radius:8px; }
-#public-winning-hands h2 { margin:0; font-size:14px; }
+#round-result-summary { width:100%; padding:8px 10px; border:1px solid #63947a; border-radius:8px; background:#123f32; font-size:14px; line-height:1.4; overflow-wrap:anywhere; }
+#round-result-summary p { margin:2px 0; }
+.round-summary-winner,.round-summary-total { font-weight:700; }
+.round-summary-yaku { color:#fff1cc; }
+.round-win-summary + .round-win-summary { border-top:1px solid #39765e; margin-top:6px; padding-top:6px; }
+#round-result-actions { display:flex; align-items:stretch; justify-content:center; width:100%; gap:8px; }
+#round-result-actions button { flex:1 1 0; min-width:0; min-height:48px; padding:8px 10px; }
 #discard, #tsumo, #riichi { min-width:0; flex:1 1 0; white-space:nowrap; padding:8px 6px; }
 .ron-pending > #riichi { display:none; }
 .result-dora { margin: 12px 0; min-width: 0; }
@@ -285,6 +290,9 @@ header > div { min-width:0; }
 .table #player-hand li { flex:0 0 var(--table-tile-width); width:var(--table-tile-width); }
 .table #player-hand .tile-choice { max-width:none; margin:0; }
 .table #player-hand .tile-choice { width:100%; }
+.table .seat .revealed-tile { display:block; flex:none; width:var(--river-tile-width); height:var(--river-tile-height); }
+.table .seat .revealed-tile .tile-svg { width:100%; height:100%; }
+.table .seat .revealed-tile.winning-tile { margin-left:4px; }
 
 @media (max-height:650px) and (max-width:599px) {
  .table .seat-bottom { gap:8px; padding:0; }

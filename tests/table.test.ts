@@ -101,6 +101,7 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
   nodes.set('#wall-count', new ElementStub());
   nodes.set('#dora-indicators', new ElementStub());
   nodes.set('#win-result', new ElementStub());
+  nodes.set('#round-result-summary', new ElementStub());
   nodes.set('#tsumo', new ElementStub());
   nodes.set('#discard', new ElementStub());
   nodes.set('#selection-status', new ElementStub());
@@ -169,6 +170,17 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       assert.equal(nodes.get('#selection-status')!.textContent, '牌山がなくなりました');
       // Next loop renders a new game and proves old river and selection are cleared.
     }
+    const summary = nodes.get('#round-result-summary')!;
+    const exhausted = { ...startGame(seeded(91)), phase: 'wall-exhausted' as const };
+    renderTable(exhausted);
+    assert.equal(summary.hidden, false);
+    assert.equal(summary.children[0].textContent, '流局');
+    assert.ok(!summary.children.map(node => node.textContent).join('').includes('翻'));
+    renderTable({ ...exhausted, abortiveDraw: 'four-kans' });
+    assert.equal(summary.children[0].textContent, '途中流局（四開槓）');
+    renderTable(startGame(seeded(92)));
+    assert.equal(summary.hidden, true);
+    assert.equal(summary.children.length, 0);
     // Render all 18 entries for every seat, preserving state and DOM discard order.
     const game = startGame(seeded(42));
     const tiles = game.liveWall.slice(0, 18);
@@ -239,8 +251,9 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
   for (const seat of [0, 1, 2, 3]) {
     nodes.set(`#label-${seat}`, new ElementStub());
     nodes.set(`.river[data-player-id="${seat}"]`, new ElementStub());
+    if (seat) nodes.set(`.concealed-hand[data-player-id="${seat}"]`, new ElementStub());
   }
-  for (const key of ['#player-hand', '#wall-count', '#win-result', '#dora-indicators', '#discard', '#tsumo', '#selection-status']) nodes.set(key, new ElementStub());
+  for (const key of ['#player-hand', '#wall-count', '#win-result', '#round-result-summary', '#dora-indicators', '#discard', '#tsumo', '#selection-status']) nodes.set(key, new ElementStub());
   for (const key of ['#ron-controls', '#ron-status', '#ron', '#pass-ron', '.discard-controls']) {
     const node = new ElementStub(); node.hidden = true; nodes.set(key, node);
   }
@@ -275,7 +288,23 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     assert.equal(hand.children[13].className, 'winning-draw');
     assert.equal(hand.children[13].children[0].innerHTML, tileSvgMarkup(player.drawnTile!.tile));
     assert.match(hand.children[13].children[0].innerHTML, /aria-label="赤5索"/);
+    const publicHand = nodes.get(`.concealed-hand[data-player-id="${id}"]`)!;
+    assert.equal(publicHand.children.length, 14);
+    assert.ok(publicHand.children.every(n => n.className.startsWith('revealed-tile')));
+    assert.ok(publicHand.children.every(n => n.dataset.tileId === undefined));
+    assert.equal(publicHand.children.at(-1)!.className, 'revealed-tile winning-tile');
+    assert.equal(publicHand.children.at(-1)!.children[0].innerHTML, tileSvgMarkup(player.drawnTile!.tile));
+    const summary = nodes.get('#round-result-summary')!;
+    assert.equal(summary.hidden, false);
+    const summaryText = descend(summary).map(n => n.textContent).join(' ');
+    assert.ok(summaryText.includes(`CPU${id} ツモ`));
+    assert.ok(summaryText.includes(`合計${won.winResult!.totalHanIncludingDora}翻（ドラ込み）`));
+    assert.ok(summaryText.includes('門前清自摸和') && summaryText.includes('平和'));
     assert.ok(!descend(hand).some(n => n.tagName === 'button'));
+    for (const other of [1, 2, 3].filter(seat => seat !== id)) {
+      const concealed = nodes.get(`.concealed-hand[data-player-id="${other}"]`)!;
+      assert.ok(concealed.children.every(n => n.className === 'tile-back' && n.children.length === 0 && Object.keys(n.dataset).length === 0));
+    }
     for (const p of game.players.slice(1).filter(p => p.id !== id)) for (const t of p.hand) {
       assert.ok(!rendered().some(n => n.dataset.tileId === t.id));
     }
@@ -289,6 +318,8 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     inventory(won, game);
     renderTable(cpuTsumoStart(id));
     assert.equal(panel.hidden, true); assert.equal(panel.children.length, 0);
+    assert.equal(summary.hidden, true);
+    assert.ok(publicHand.children.every(n => n.className === 'tile-back' && n.children.length === 0 && Object.keys(n.dataset).length === 0));
   } finally { globalThis.document = original; }
 });
 
@@ -300,8 +331,9 @@ for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','f
     for (const id of [0,1,2,3]) {
       nodes.set(`#label-${id}`,new ElementStub());
       nodes.set(`.river[data-player-id="${id}"]`,new ElementStub());
+      if (id) nodes.set(`.concealed-hand[data-player-id="${id}"]`,new ElementStub());
     }
-    for (const key of ['#player-hand','#wall-count','#win-result','#dora-indicators','#discard','#tsumo','#selection-status','#ron-controls','#ron-status','#ron','#pass-ron','.discard-controls']) nodes.set(key,new ElementStub());
+    for (const key of ['#player-hand','#wall-count','#win-result','#round-result-summary','#dora-indicators','#discard','#tsumo','#selection-status','#ron-controls','#ron-status','#ron','#pass-ron','.discard-controls']) nodes.set(key,new ElementStub());
     nodes.get('#ron-controls')!.hidden = true;
     nodes.get('#ron')!.disabled = true;
     const original = globalThis.document;
@@ -339,6 +371,22 @@ for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','f
       assert.equal(panel.hidden,game.phase!=='won');
       const actualWinners = game.winResult?.winMethod==='ron' ? game.winResult.winners.map(w=>w.winnerId) : [];
       assert.deepEqual(panel.children.map(c=>Number(c.dataset.winnerId)),actualWinners);
+      const summary = nodes.get('#round-result-summary')!;
+      assert.equal(summary.hidden, game.phase !== 'won');
+      assert.equal(summary.children.length, actualWinners.length);
+      const ronResult = game.winResult?.winMethod === 'ron' ? game.winResult : null;
+      for (const id of [1,2,3]) {
+        const concealed = nodes.get(`.concealed-hand[data-player-id="${id}"]`)!;
+        if (actualWinners.includes(id)) {
+          const player = game.players[id];
+          assert.equal(concealed.children.length, player.hand.length + 1);
+          assert.ok(concealed.children.every(n => n.className.startsWith('revealed-tile')));
+          assert.ok(concealed.children.every(n => n.dataset.tileId === undefined));
+          assert.equal(concealed.children.at(-1)!.children[0].innerHTML, tileSvgMarkup(ronResult!.winningTile!.tile));
+        } else {
+          assert.ok(concealed.children.every(n => n.className === 'tile-back' && n.children.length === 0 && Object.keys(n.dataset).length === 0));
+        }
+      }
       for (const section of panel.children) {
         const list = section.children.find(c=>c.className==='winning-hand')!;
         assert.equal(list.children.length,14);

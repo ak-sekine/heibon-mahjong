@@ -2,14 +2,10 @@ import type { MatchState } from '../model/match.ts';
 
 /** Visibility belongs to the UI; opening never advances or settles the game. */
 export class ResultDialog {
-  private pendingOpen = false;
   private result: MatchState['lastSettlement'] = null;
   private readonly dialog = document.querySelector<HTMLDialogElement>('#result-dialog')!;
   private readonly reopen = document.querySelector<HTMLButtonElement>('#show-result')!;
   constructor() {
-    document.querySelector('#new-game-dialog')?.addEventListener('close', () => {
-      if (this.pendingOpen) this.open();
-    });
     document.querySelector('#view-table')!.addEventListener('click', () => this.close());
     this.reopen.addEventListener('click', () => this.open());
     this.dialog.addEventListener('cancel', event => { event.preventDefault(); this.close(); });
@@ -21,6 +17,7 @@ export class ResultDialog {
   update(match: MatchState): void {
     const result = match.lastSettlement;
     this.reopen.hidden = !result;
+    document.querySelector<HTMLElement>('#round-result-actions')!.hidden = !result;
     document.querySelector('.discard-controls')!.classList.toggle('result-available', !!result);
     document.querySelector<HTMLButtonElement>('#result-new-game')!.hidden = match.status !== 'match-ended';
     if (result === this.result) return;
@@ -29,21 +26,15 @@ export class ResultDialog {
     document.querySelector('#result-title')!.textContent = match.status === 'match-ended'
       ? '東風戦終了' : result.reason === 'four-kans' ? '四開槓・途中流局' : result.reason === 'draw' ? '流局' : match.game.winResult?.winMethod === 'ron' ? 'ロン和了' : 'ツモ和了';
     document.querySelector('#result-body')!.scrollTop = 0;
-    this.open();
   }
   open(): void {
     if (!this.result || this.dialog.open) return;
-    if (document.querySelector<HTMLDialogElement>('#new-game-dialog')?.open) {
-      this.pendingOpen = true;
-      return;
-    }
-    this.pendingOpen = false;
+    if (document.querySelector<HTMLDialogElement>('#new-game-dialog')?.open) return;
     this.dialog.showModal();
     document.documentElement.classList.add('result-open');
     document.querySelector<HTMLButtonElement>('#view-table')!.focus({ preventScroll: true });
   }
   close(): void {
-    this.pendingOpen = false;
     if (this.dialog.open) this.dialog.close();
     document.documentElement.classList.remove('result-open');
     if (this.result) this.reopen.focus({ preventScroll: true });

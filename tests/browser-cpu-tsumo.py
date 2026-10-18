@@ -53,7 +53,15 @@ with sync_playwright() as p:
             page.clock.run_for(1)
             page.wait_for_function('!document.querySelector("#win-result").hidden')
             assert f'CPU{winner}がツモ和了！' in page.locator('#selection-status').inner_text()
+            assert not page.locator('#result-dialog').is_visible()
+            assert page.locator('#round-result-summary').is_visible()
+            assert f'CPU{winner} ツモ' in page.locator('#round-result-summary').inner_text()
+            assert f'合計5翻（ドラ込み）' in page.locator('#round-result-summary').inner_text()
+            assert page.locator(f'.seat[data-player-id="{winner}"] .concealed-hand .revealed-tile').count() == 14
+            assert page.locator(f'.seat[data-player-id="{winner}"] .concealed-hand svg[aria-label^="赤"]').count() == 2
             panel = page.locator('#win-result')
+            page.locator('#show-result').click()
+            assert page.locator('#result-dialog').is_visible()
             result = panel.inner_text()
             for text in [f'CPU{winner}（{["", "南", "西", "北"][winner]}）', '門前清自摸和 1翻', '平和 1翻',
                          '役合計：2翻', '通常ドラ：1枚（1翻）', '赤ドラ：2枚（2翻）', '合計：5翻', '獲得点数：']:
@@ -71,14 +79,14 @@ with sync_playwright() as p:
             for other in [1, 2, 3]:
                 if other != winner:
                     assert all(tile not in public_ids() for tile in fixture['hidden'][other - 1])
-                assert page.locator(f'.seat[data-player-id="{other}"] svg').count() == 0
+                    assert page.locator(f'.seat[data-player-id="{other}"] svg').count() == 0
             assert page.locator('#player-hand li').evaluate_all('els => els.map(el => el.dataset.tileId)') == own_ids
             assert page.locator('#player-hand button:enabled').count() == 0
             assert page.locator('#discard').is_disabled() and page.locator('#tsumo').is_disabled()
             assert page.locator('#new-game').is_enabled()
             assert page.locator('#dora-indicators').inner_html() == indicator
             assert page.locator('.river-top').bounding_box()['height'] == table_height
-            assert f'生きた牌山 {fixture["live"] - winner}枚' in page.locator('#wall-count').inner_text()
+            assert f'山{fixture["live"] - winner}枚' in page.locator('#wall-count').inner_text()
             assert '王牌 14枚' in page.locator('#wall-count').inner_text()
             page.locator('.winning-hand').scroll_into_view_if_needed()
             bounds = [hand.nth(i).bounding_box() for i in range(14)]

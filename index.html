@@ -30,7 +30,7 @@
     </section>
     <section class="seat seat-bottom" data-player-id="0" aria-label="自分の席"><div class="open-melds" data-player-id="0"></div><ul id="player-hand" aria-label="自分の手牌"></ul></section>
   </section>
-  <section id="public-winning-hands" aria-label="和了したCPUの公開手牌" hidden></section>
+  <section id="round-result-summary" aria-label="局結果の概要" aria-live="polite" hidden></section>
   <section class="discard-controls" aria-label="打牌操作">
     <div id="call-controls" hidden role="group" aria-label="ポン・チーの選択">
       <p>副露する組み合わせを選択</p><div id="call-options"></div>
@@ -48,7 +48,10 @@
     <button id="riichi" type="button" disabled>リーチ</button>
     <button id="kan" type="button" hidden>カン</button>
     <button id="tsumo" type="button" disabled>ツモ和了</button>
-    <button id="show-result" type="button" hidden>結果を見る</button>
+    <div id="round-result-actions" role="group" aria-label="局終了後の操作" hidden>
+      <button id="show-result" type="button" hidden>結果を見る</button>
+      <button id="next-round" type="button" hidden>次の局へ</button>
+    </div>
     <p class="keyboard-help">Tabで牌とボタンへ移動、Enter／Spaceで選択・確定</p>
   </section>
   <dialog id="result-dialog" aria-labelledby="result-title">
@@ -59,7 +62,6 @@
     </div>
     <footer class="result-footer">
       <button id="view-table" type="button" autofocus>卓を見る</button>
-      <button id="next-round" type="button" hidden>次の局へ</button>
       <button id="result-new-game" type="button" hidden>新しい対局</button>
     </footer>
   </dialog>

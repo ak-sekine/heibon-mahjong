@@ -41,6 +41,9 @@ with sync_playwright() as p:
    assert len(results)==expected_count
    assert page.locator('.winner-result').count()==expected_count
    assert game['phase']=='won'
+   assert not page.locator('#result-dialog').is_visible()
+   assert page.locator('#round-result-summary').is_visible()
+   page.locator('#show-result').click();assert page.locator('#result-dialog').is_visible()
    for result in results:
     assert (result['fu'],result['scoreTier'],result['totalPoints'])==(fu,tier,points),(name,result)
     assert sum(pay['points'] for pay in result['payments'])==points

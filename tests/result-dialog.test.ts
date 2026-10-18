@@ -18,7 +18,7 @@ for (const scenario of ['human-ron','human-tsumo','cpu-ron','cpu-tsumo','draw','
     close() { this.open = false; this.listeners.close?.({ preventDefault() {} }); }
     click() { this.listeners.click?.({ preventDefault() {} }); }
   }
-  const nodes = new Map(['#result-dialog','#show-result','#view-table','#result-new-game','#result-title','#result-body','.discard-controls'].map(id => [id,new Node()]));
+  const nodes = new Map(['#result-dialog','#show-result','#round-result-actions','#view-table','#result-new-game','#result-title','#result-body','.discard-controls'].map(id => [id,new Node()]));
   const original = globalThis.document;
   globalThis.document = { querySelector: (s: string) => nodes.get(s), documentElement: new Node() } as unknown as Document;
   try {
@@ -33,24 +33,32 @@ for (const scenario of ['human-ron','human-tsumo','cpu-ron','cpu-tsumo','draw','
     const match = settleRound({...initial,game, ...(scenario === 'end' ? {roundNumber:4,dealerId:3 as const} : {})});
     const snapshot = structuredClone(match);
     ui.update(match);
-    assert.equal(nodes.get('#result-dialog')!.open,true);
-    assert.equal(nodes.get('#view-table')!.focused,true);
+    assert.equal(nodes.get('#result-dialog')!.open,false);
+    assert.equal(nodes.get('#round-result-actions')!.hidden,false);
+    assert.equal(nodes.get('#show-result')!.hidden,false);
     assert.equal(nodes.get('#result-body')!.scrollTop,0);
     assert.equal(nodes.get('#result-new-game')!.hidden,scenario !== 'end');
     for (let i=0;i<10;i++) {
+      nodes.get('#show-result')!.click();
+      assert.equal(nodes.get('#result-dialog')!.open,true);
+      assert.equal(nodes.get('#view-table')!.focused,true);
+      assert.equal(nodes.get('#result-dialog')!.opens,i+1);
+      nodes.get('#show-result')!.click();
+      assert.equal(nodes.get('#result-dialog')!.opens,i+1);
       nodes.get('#view-table')!.click();
       assert.equal(nodes.get('#result-dialog')!.open,false);
       assert.equal(nodes.get('#show-result')!.focused,true);
       ui.update({...match});
       assert.equal(nodes.get('#result-dialog')!.open,false);
-      nodes.get('#show-result')!.click();
-      assert.equal(nodes.get('#result-dialog')!.open,true);
       assert.deepEqual(match,snapshot);
     }
+    nodes.get('#show-result')!.click();
+    assert.equal(nodes.get('#result-dialog')!.open,true);
     let prevented=false;
     nodes.get('#result-dialog')!.listeners.cancel({preventDefault(){prevented=true;}});
     assert.equal(prevented,true); assert.equal(nodes.get('#result-dialog')!.open,false);
     ui.update(startMatch()); assert.equal(nodes.get('#show-result')!.hidden,true);
+    assert.equal(nodes.get('#round-result-actions')!.hidden,true);
     assert.equal(nodes.get('#result-dialog')!.open,false);
   } finally { globalThis.document = original; }
 });

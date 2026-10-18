@@ -7,7 +7,7 @@ import { uraDoraIndicators } from '../game/dora.ts';
 import { ordinaryTile } from '../model/tile.ts';
 import type { FuEntry } from '../analysis/fu.ts';
 import type { ScoreTier } from '../analysis/score.ts';
-import type { GameState, PlayerId, PlayerState, PhysicalTile, SeatWind } from '../model/game.ts';
+import type { GameState, PlayerId, PlayerState, PhysicalTile, SeatWind, TsumoResult, RonCandidate } from '../model/game.ts';
 import { HONORS, SUITS, type Tile } from '../model/tile.ts';
 import { createTileElement, tileLabel } from './tile-svg.ts';
 import { canDeclareRon, getRonTile } from '../game/ron.ts';
@@ -74,26 +74,20 @@ function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement
 
 export function renderTable(game: GameState, points?: readonly number[]): void {
   renderWinResult(game);
-  // Reuse the already rendered public winner hands without scoring again.
-  const publicHands = document.querySelector<HTMLElement>('#public-winning-hands');
-  if (publicHands) {
-    publicHands.replaceChildren();
-    const winners = game.winResult?.winMethod === 'ron' ? game.winResult.winners : game.winResult ? [game.winResult] : [];
-    for (const winner of winners.filter(w => game.players[w.winnerId].control === 'cpu')) {
-      const heading = Object.assign(document.createElement('h2'), { textContent: `${seatNames[winner.winnerId]}の和了手牌` });
-      const hand = document.querySelector<HTMLOListElement>(`#win-result [data-winner-id="${winner.winnerId}"] .winning-hand`)!.cloneNode(true) as HTMLOListElement;
-      hand.className = 'public-winning-hand';
-      publicHands.append(heading, hand);
-    }
-    publicHands.hidden = winners.every(w => game.players[w.winnerId].control !== 'cpu');
-  }
+  renderRoundSummary(game);
+  const winningResults = game.winResult
+    ? game.winResult.winMethod === 'ron' ? game.winResult.winners : [game.winResult]
+    : [];
+  const winnersById = new Map(winningResults.map(result => [result.winnerId, result]));
   const revealUra = game.phase === 'won' && (game.winResult?.winMethod === 'ron'
     ? game.winResult.winners.some(winner => Boolean(game.players[winner.winnerId].riichi))
     : Boolean(game.winResult && game.players[game.winResult.winnerId].riichi));
   renderDoraIndicators(document.querySelector<HTMLElement>('#dora-indicators')!, exposedDoraIndicators(game), revealUra ? uraDoraIndicators(game) : []);
   for (const player of game.players) {
     const id: PlayerId = player.id;
-    const count = player.hand.length + Number(player.drawnTile !== null);
+    const winningResult = winnersById.get(id);
+    const publicRonTileCount = player.control === 'cpu' && winningResult?.winMethod === 'ron' ? 1 : 0;
+    const count = player.hand.length + Number(player.drawnTile !== null) + publicRonTileCount;
     const label = document.querySelector<HTMLElement>(`#label-${id}`)!;
     if (points) {
       const identity = Object.assign(document.createElement('span'), { textContent: `${seatNames[id]}（${winds[player.wind]}）${game.dealerId === id ? '親' : ''}` });
@@ -113,11 +107,14 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
     else {
       const backHand = document.querySelector<HTMLElement>(`.concealed-hand[data-player-id="${id}"]`);
       if (backHand) {
-        backHand.setAttribute('aria-label', `${seatNames[id]}の非公開手牌 ${count}枚`);
-        backHand.replaceChildren(...Array.from({length:count},()=>{
-          const back=document.createElement('span'); back.className='tile-back';
-          back.setAttribute('aria-hidden','true'); return back;
-        }));
+        if (winningResult && player.control === 'cpu') renderPublicCpuHand(backHand, game, winningResult);
+        else {
+          backHand.setAttribute('aria-label', `${seatNames[id]}の非公開手牌 ${count}枚`);
+          backHand.replaceChildren(...Array.from({length:count},()=>{
+            const back=document.createElement('span'); back.className='tile-back';
+            back.setAttribute('aria-hidden','true'); return back;
+          }));
+        }
       }
     }
     const melds = document.querySelector<HTMLElement>(`.open-melds[data-player-id="${id}"]`);
@@ -285,6 +282,73 @@ const yakuNames: Record<YakuId, string> = {
   'yakuhai-seat-wind': '役牌：自風', 'yakuhai-round-wind': '役牌：場風',
   pinfu: '平和', iipeikou: '一盃口', chiitoitsu: '七対子', toitoi: '対々和', 'kokushi-musou': '国士無双',
 };
+
+function renderRoundSummary(game: GameState): void {
+  const summary = document.querySelector<HTMLElement>('#round-result-summary');
+  if (!summary) return;
+  summary.replaceChildren();
+  const text = (tag: string, textContent: string, className?: string) => {
+    const node = Object.assign(document.createElement(tag), { textContent });
+    if (className) node.className = className;
+    return node;
+  };
+  if (game.phase === 'won' && game.winResult) {
+    summary.hidden = false;
+    const winners = game.winResult.winMethod === 'ron' ? game.winResult.winners : [game.winResult];
+    for (const result of winners) {
+      const section = document.createElement('section');
+      section.className = 'round-win-summary';
+      const player = game.players[result.winnerId];
+      const heading = result.winMethod === 'ron'
+        ? `${seatNames[player.id]} ロン（${seatNames[result.discarderId]}から）`
+        : `${seatNames[player.id]} ツモ`;
+      section.append(text('p', heading, 'round-summary-winner'));
+      section.append(text('p', result.candidate.yaku.map(yaku => yakuNames[yaku.id]).join('・'), 'round-summary-yaku'));
+      section.append(text('p', result.yakumanCount > 0
+        ? `${result.yakumanCount}役満`
+        : `合計${result.totalHanIncludingDora}翻（ドラ込み）`, 'round-summary-total'));
+      summary.append(section);
+    }
+    return;
+  }
+  if (game.phase === 'wall-exhausted') {
+    summary.hidden = false;
+    summary.append(text('p', game.abortiveDraw === 'four-kans' ? '途中流局（四開槓）' : '流局', 'round-summary-winner'));
+    return;
+  }
+  summary.hidden = true;
+}
+
+function winningPhysicalTile(game: GameState, result: TsumoResult | RonCandidate): PhysicalTile {
+  if (result.winMethod === 'tsumo') {
+    const tile = game.players[result.winnerId].drawnTile;
+    if (tile?.id === result.winningTileId) return tile;
+  } else if (game.winResult?.winMethod === 'ron') {
+    if (game.winResult.winningTile?.id === result.winningTileId) return game.winResult.winningTile;
+    const tile = game.players[result.discarderId].river.find(candidate => candidate.id === result.winningTileId);
+    if (tile) return tile;
+  }
+  throw new RangeError('Missing physical winning tile');
+}
+
+function renderPublicCpuHand(container: HTMLElement, game: GameState, result: TsumoResult | RonCandidate): void {
+  const player = game.players[result.winnerId];
+  const winningTile = winningPhysicalTile(game, result);
+  const concealedTiles = [...player.hand]
+    .sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
+  // The confirmed winning tile is a current draw for tsumo, or the existing
+  // physical discard for ron. Rendering adds no tile to GameState.
+  const tiles = [...concealedTiles, winningTile];
+  container.setAttribute('aria-label', `${seatNames[player.id]}の公開手牌 ${tiles.map(tile => tileLabel(tile.tile)).join('・')}`);
+  container.replaceChildren(...tiles.map(physical => {
+    const tile = document.createElement('span');
+    tile.className = physical.id === result.winningTileId ? 'revealed-tile winning-tile' : 'revealed-tile';
+    tile.setAttribute('aria-hidden', 'true');
+    tile.append(createTileElement(physical.tile));
+    return tile;
+  }));
+}
+
 const renderedWins = new WeakMap<HTMLElement, GameState['winResult']>();
 function renderWinResult(game: GameState): void {
   const panel = document.querySelector<HTMLElement>('#win-result')!;
@@ -313,8 +377,7 @@ function renderWinResult(game: GameState): void {
       hand.className = 'winning-hand';
       hand.setAttribute('aria-label', '和了手牌');
       const tiles = [...player.hand].sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
-      const winningTile = result.winMethod === 'ron'
-        ? (win.winMethod==='ron' ? win.winningTile : undefined) ?? game.players[result.discarderId].river.find(t => t.id === result.winningTileId)! : player.drawnTile!;
+      const winningTile = winningPhysicalTile(game, result);
       for (const physical of [...tiles, winningTile]) {
         const item = document.createElement('li');
         item.dataset.tileId = physical.id;
