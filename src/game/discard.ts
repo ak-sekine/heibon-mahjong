@@ -30,9 +30,11 @@ export function canDiscard(game: GameState, playerId: PlayerId): boolean {
 /** Invalid operations throw, leaving the input state untouched. */
 export function discardTile(game: GameState, playerId: PlayerId, tileId: string): GameState {
   if (!canDiscard(game, playerId)) throw new RangeError('Discard is not allowed now');
-  const player = discardFromPlayer(game.players[playerId], tileId);
+  const beforeDiscard = game.players[playerId];
+  const lastLiveWallDiscard = beforeDiscard.drawnTileSource === 'live-wall' && game.liveWall.length === 0;
+  const player = discardFromPlayer(beforeDiscard, tileId);
   const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
   players[playerId] = player;
   return resolveDiscardRon({ ...game, players, phase: 'awaiting-ron',
-    ronWindow: { discarderId: playerId, tileId: player.river.at(-1)!.id } });
+    ronWindow: { discarderId: playerId, tileId: player.river.at(-1)!.id, lastLiveWallDiscard } });
 }

@@ -30,9 +30,14 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
     const openMelds = winningMelds(player.melds);
     const isClosed = isClosedHand(player);
     const allFaces = [...faces, ...(player.melds ?? []).flatMap(m=>m.tiles.map(t=>t.tile))];
+    const ronWindow = game.ronWindow;
+    const houtei = winMethod === 'ron' && Boolean(ronWindow && !ronWindow.kan &&
+      (ronWindow.kind === undefined || ronWindow.kind === 'discard') && ronWindow.lastLiveWallDiscard === true);
     const analysis = analyzeYaku(faces, { isClosed, openMelds, winMethod, winningTile: winningTile.tile,
       rinshan: winMethod==='tsumo' && player.drawnTileSource==='rinshan',
-      chankan: winMethod==='ron' && Boolean(game.ronWindow?.kan),
+      chankan: winMethod==='ron' && Boolean(ronWindow?.kan),
+      haitei: winMethod==='tsumo' && player.drawnTileSource==='live-wall' && game.liveWall.length===0,
+      houtei,
       seatWind: player.wind, roundWind: ROUND_WIND, riichi: player.riichi !== null,
       ippatsuEligible: player.riichi?.ippatsuEligible, doubleRiichi: player.riichi?.doubleRiichi });
     if (!analysis.isWinningShape || !analysis.hasSupportedYaku) return null;

@@ -44,6 +44,7 @@ for (const [name, groups, last] of [
   assert.equal(result.winningTileId, game.players[0].drawnTile!.id);
   assert.deepEqual(result.analysis, analyzeYaku([...game.players[0].hand, game.players[0].drawnTile!].map(t => t.tile), {
     winMethod: 'tsumo', winningTile: game.players[0].drawnTile!.tile, seatWind: game.players[0].wind, roundWind: 'east',
+    haitei: last && game.players[0].drawnTileSource === 'live-wall' && game.liveWall.length === 0,
   }));
   if (name === 'thirteen orphans') {
     assert.equal(result.totalHan, 0); assert.equal(result.yakumanCount, 1);

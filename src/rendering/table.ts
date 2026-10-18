@@ -301,6 +301,7 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
 
 const yakuNames: Record<YakuId, string> = {
   rinshan:'嶺上開花', chankan:'槍槓', sankantsu:'三槓子', suukantsu:'四槓子',
+  haitei:'海底摸月', houtei:'河底撈魚',
   riichi: '立直', ippatsu: '一発', 'double-riichi': 'ダブル立直', 'menzen-tsumo': '門前清自摸和', tanyao: '断么九',
   'yakuhai-white': '役牌：白', 'yakuhai-green': '役牌：發', 'yakuhai-red': '役牌：中',
   'yakuhai-seat-wind': '役牌：自風', 'yakuhai-round-wind': '役牌：場風',

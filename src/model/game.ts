@@ -86,6 +86,8 @@ export interface RonWindow {
   readonly kan?: Readonly<{ playerId: PlayerId; meld: OpenMeld; handTileIds: readonly string[]; meldIndex: number | null; tile: PhysicalTile }>;
   readonly discarderId: PlayerId;
   readonly tileId: string;
+  /** Set at discard time only when it follows the final live-wall draw. */
+  readonly lastLiveWallDiscard?: boolean;
 }
 export interface PendingRiichi {
   readonly doubleRiichi?: boolean;

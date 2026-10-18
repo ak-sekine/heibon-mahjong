@@ -7,6 +7,10 @@ import type { StandardDecomposition, WinningMeld } from './winning-shape.ts';
 export interface WinningContext {
   readonly rinshan?: boolean;
   readonly chankan?: boolean;
+  /** Tsumo from the last live-wall tile, after it has left the wall. */
+  readonly haitei?: boolean;
+  /** Ron on a discard marked when it followed the last live-wall draw. */
+  readonly houtei?: boolean;
   readonly winMethod: 'tsumo' | 'ron';
   readonly winningTile: TileKind;
   readonly seatWind: SeatWind;
@@ -22,7 +26,7 @@ export type YakuId = 'rinshan' | 'chankan' | 'sankantsu' | 'suukantsu' | 'ippats
   'yakuhai-red' | 'yakuhai-seat-wind' | 'yakuhai-round-wind' | 'pinfu' |
   'iipeikou' | 'ryanpeikou' | 'sanankou' | 'chiitoitsu' | 'toitoi' | 'shousangen' | 'honroutou' |
   'chanta' | 'junchan' | 'sanshoku-doukou' | 'sanshoku-doujun' | 'ittsu' | 'honitsu' | 'chinitsu' |
-  'kokushi-musou' | 'suuankou' | 'daisangen' | 'tsuuiisou' | 'ryuuiisou' | 'chinroutou' |
+  'kokushi-musou' | 'suuankou' | 'daisangen' | 'tsuuiisou' | 'ryuuiisou' | 'chinroutou' | 'haitei' | 'houtei' |
   'shousuushii' | 'daisuushii' | 'chuuren-poutou';
 type YakumanYakuId = Extract<YakuId, 'kokushi-musou' | 'suukantsu' | 'suuankou' | 'daisangen' |
   'tsuuiisou' | 'ryuuiisou' | 'chinroutou' | 'shousuushii' | 'daisuushii' | 'chuuren-poutou'>;
@@ -59,7 +63,8 @@ function validateContext(context: WinningContext, tiles: readonly Tile[]): void 
   if (!context || typeof context !== 'object' ||
       !['tsumo', 'ron'].includes(context.winMethod) ||
       !winds.includes(context.seatWind) || !winds.includes(context.roundWind) ||
-      (['ippatsuEligible', 'doubleRiichi'] as const).some(key => context[key] !== undefined && typeof context[key] !== 'boolean') ||
+      (['rinshan', 'chankan', 'haitei', 'houtei', 'ippatsuEligible', 'doubleRiichi'] as const)
+        .some(key => context[key] !== undefined && typeof context[key] !== 'boolean') ||
       (context.riichi !== undefined && typeof context.riichi !== 'boolean') ||
       (context.isClosed !== undefined && context.isClosed !== true && !(context.isClosed === false && context.openMelds?.length))) {
     throw new RangeError('Invalid winning context; only closed hands are supported');
@@ -136,6 +141,8 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
     list.push({ id, han, yakuman: 0 });
   if (context.rinshan && context.winMethod==='tsumo') add(common,'rinshan');
   if (context.chankan && context.winMethod==='ron') add(common,'chankan');
+  if (context.haitei && context.winMethod==='tsumo' && !context.rinshan) add(common,'haitei');
+  if (context.houtei && context.winMethod==='ron' && !context.chankan) add(common,'houtei');
   const kans=fixed.filter(m=>m.type==='triplet' && m.kan).length;
   if(kans===3) add(common,'sankantsu',2);
   if (closed && context.riichi) {
