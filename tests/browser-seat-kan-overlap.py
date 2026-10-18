@@ -9,7 +9,7 @@ scenes = [
     ('pon', ['pon'], 3),
     ('daiminkan', ['daiminkan'], 3),
     ('ankan', ['ankan'], 3),
-    ('kakan', ['kakan'], 3),
+    ('kakan-from-direction-3', ['kakan'], 3),
     ('chi-pon', ['chi','pon'], 3),
     ('ankan-kakan', ['ankan','kakan'], 3),
     ('three-meld-mix', ['chi','pon','daiminkan'], 3),
@@ -99,7 +99,7 @@ with sync_playwright() as p:
                       return {width:innerWidth,player:3,scene:'chi',count,maximum};
                     }''')
                     legacy_style.evaluate('(style)=>style.remove()')
-                result = page.evaluate('''({player,types,baseline})=>{
+                result = page.evaluate('''({player,types,direction,baseline})=>{
                   const rawRect=e=>{const r=e.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
                   const rect=e=>{const r=rawRect(e);return {
                     left:+r.left.toFixed(2),top:+r.top.toFixed(2),right:+r.right.toFixed(2),bottom:+r.bottom.toFixed(2),
@@ -125,6 +125,23 @@ with sync_playwright() as p:
                   const meldTile=meldFaces.find(e=>!e.closest('.called-tile,.added-kan-tile'));
                   const calledTile=playerMeld?.querySelector('.called-tile .tile-svg')||null;
                   const addedKanTile=playerMeld?.querySelector('.added-kan-tile:not(.pending-kan-tile) .tile-svg')||null;
+                  const addedKanNode=addedKanTile?.closest('.added-kan-tile')||null;
+                  const calledNode=calledTile?.closest('.called-tile')||null;
+                  const kakanGeometry=calledTile&&addedKanTile?(()=>{
+                    const called=rawRect(calledTile),added=rawRect(addedKanTile),shortSide=Math.min(called.width,called.height);
+                    const expectedDelta=player===1?{x:-shortSide/2,y:0}:player===3?{x:shortSide/2,y:0}:{x:0,y:-shortSide/2};
+                    const delta={x:added.left-called.left,y:added.top-called.top};
+                    const intersection=overlap(called,added);
+                    const overlapRatio=intersection.x*intersection.y/(added.width*added.height);
+                    const calledIndex=direction===3?0:direction===2?1:2;
+                    const calledIndexOK=[...playerMeld.children].indexOf(calledNode)===calledIndex;
+                    return {expectedDelta,delta,overlapRatio,parentIsCalled:addedKanNode?.parentElement===calledNode,
+                      calledIndexOK,
+                      onTop:addedKanNode?getComputedStyle(addedKanNode).zIndex==='2':false,
+                      geometryOK:Math.abs(delta.x-expectedDelta.x)<=.25&&Math.abs(delta.y-expectedDelta.y)<=.25&&
+                        Math.abs(overlapRatio-.5)<=.025&&addedKanNode?.parentElement===calledNode&&
+                        calledIndexOK&&getComputedStyle(addedKanNode).zIndex==='2'};
+                  })():null;
                   const dimensions=faceTiles.map(e=>{
                     const r=rect(e),actual=[r.width,r.height].sort((a,b)=>a-b);
                     return Math.max(Math.abs(actual[0]-expected[0]),Math.abs(actual[1]-expected[1]));
@@ -173,9 +190,11 @@ with sync_playwright() as p:
                   const compositionOK=groups.every((group,index)=>{
                     const type=types[index],backCount=group.querySelectorAll('.concealed-kan-back').length;
                     const faceCount=group.querySelectorAll('svg').length,expected=type==='chi'||type==='pon'?3:4;
-                    return group.children.length===expected&&(type==='ankan'?backCount===2&&faceCount===2:
-                      backCount===0&&faceCount===expected&&(type!=='kakan'||
-                        group.querySelectorAll('.called-tile').length===1&&group.querySelectorAll('.added-kan-tile:not(.pending-kan-tile)').length===1));
+                    if(type==='kakan') {
+                      const called=group.querySelector('.called-tile'),added=group.querySelector('.added-kan-tile:not(.pending-kan-tile)');
+                      return group.children.length===3&&backCount===0&&faceCount===4&&called&&added&&added.parentElement===called;
+                    }
+                    return group.children.length===expected&&(type==='ankan'?backCount===2&&faceCount===2:backCount===0&&faceCount===expected);
                   });
                   const centers=groups.map(e=>{const r=rect(e);return {x:(r.left+r.right)/2,y:(r.top+r.bottom)/2};});
                   const sequenceOK=centers.every((a,i)=>i===0||(player===0?a.x>centers[i-1].x:player===1?a.y<centers[i-1].y:player===2?a.x<centers[i-1].x:a.y>centers[i-1].y));
@@ -197,6 +216,7 @@ with sync_playwright() as p:
                     riverTileBCR:riverSize,handBackBCR:handBack?rect(handBack):null,
                     meldTileBCR:meldTile?rect(meldTile):null,calledTileBCR:calledTile?rect(calledTile):null,
                     addedKanTileBCR:addedKanTile?rect(addedKanTile):null,
+                    kakanGeometry,
                     meldOrder:JSON.stringify(sequence)===JSON.stringify(types),meldVisualOrder:sequenceOK,
                     meldCompositionCorrect:compositionOK,
                     tableContainment:inside.length===0,outsideTableTiles:inside,
@@ -214,7 +234,7 @@ with sync_playwright() as p:
                     neighborCollisions:collisions.neighbors,centerCollisions:collisions.center,selfSideCollisions:collisions.selfVsSide,
                     intentionalKakanOverlap:collisions.intentionalKakan
                   };
-                }''', {'player':player,'types':types,'baseline':baseline})
+                }''', {'player':player,'types':types,'direction':direction,'baseline':baseline})
                 checks=['square','noHorizontalScroll','allTileSizesMatchRiver','allTileOrientationsMatchRiver','handSizeOK','handMeldDirection','handMeldGapOK','meldOrder','meldVisualOrder','meldCompositionCorrect','tableContainment','ownRiverClear','allRiversClear','seatTilesClear','neighborSeatsClear','centerClear','selfVsCpu1Cpu3Clear','hiddenCpuIdsProtected','selfHandSizeUnchanged','doraSizeUnchanged']
                 assert result['riverTileCount']==18, f'{width}px player {player} {scene}: expected 18 close river tiles: {result}'
                 assert all(result[name] for name in checks), f'{width}px player {player} {scene}: {result}'
@@ -223,12 +243,15 @@ with sync_playwright() as p:
                     intentional=result['intentionalKakanOverlap']
                     assert intentional, f'{width}px player {player} {scene}: added-kan tile did not overlap its stack: {result}'
                     assert result['kakanStackCorrect'], f'{width}px player {player} {scene}: added-kan tile did not stack only on the called face: {result}'
+                    assert result['kakanGeometry'] and result['kakanGeometry']['geometryOK'], f'{width}px player {player} {scene}: added-kan tile is not anchored at a readable half-overlap on the called tile: {result}'
                     for hit in intentional:
                         if hit['overlapX']*hit['overlapY']>maximum_kan_overlap['overlapX']*maximum_kan_overlap['overlapY']:
                             maximum_kan_overlap.update({'width':width,'player':player,'scene':scene,
                                 'overlapX':hit['overlapX'],'overlapY':hit['overlapY']})
                     maximum_kan_overlap['count']+=len(intentional)
-                reports.append({'width':width,'height':height,'player':player,'scene':scene,**{k:result[k] for k in ['table','expectedTile','maxTileSizeDelta','maxTileOrientationDelta','handMeldGap','riverTileBCR','handBackBCR','meldTileBCR','calledTileBCR','addedKanTileBCR','unexpectedOverlapCount','unexpectedOverlapX','unexpectedOverlapY','selfHandSizeUnchanged','doraSizeUnchanged']}})
+                reports.append({'width':width,'height':height,'player':player,'scene':scene,**{k:result[k] for k in ['table','expectedTile','maxTileSizeDelta','maxTileOrientationDelta','handMeldGap','riverTileBCR','handBackBCR','meldTileBCR','calledTileBCR','addedKanTileBCR','kakanGeometry','unexpectedOverlapCount','unexpectedOverlapX','unexpectedOverlapY','selfHandSizeUnchanged','doraSizeUnchanged']}})
+                if scene=='kakan-from-direction-3':
+                    page.screenshot(path=str(out/f'kakan-{width}-seat{player}.png'),full_page=True)
                 if width==320 and player==3 and scene=='empty':
                     page.screenshot(path=str(out/'cpu3-river-proximity-320.png'),full_page=True)
         assert not errors, f'{width}px page errors: {errors}'

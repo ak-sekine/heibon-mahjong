@@ -680,10 +680,11 @@ for (const mode of ['discard', 'red', 'pending', 'ron', 'pass', 'reset', 'new-ma
     if(game===pending) {
       const group=nodes.get('.open-melds[data-player-id="1"]')!.children[0];
       assert.equal(group.dataset.meldType,'pon');assert.equal(group.dataset.kanPending,'true');
-      assert.equal(group.children.filter(n=>n.children.length).length,4);
-      assert.equal(group.children[3].dataset.tileId,undefined);
-      assert.match(group.children[3].className,/pending-kan-tile/);
-      assert.equal(group.children[3].children[0].innerHTML,tileSvgMarkup(physical.tile));
+      const called=group.children.find(n=>n.className==='called-tile')!;
+      assert.equal(group.children.filter(n=>n.children.length).length,3);
+      const preview=called.children.find(n=>n.className.includes('pending-kan-tile'))!;
+      assert.equal(preview.dataset.tileId,undefined);
+      assert.equal(preview.children[0].innerHTML,tileSvgMarkup(physical.tile));
       assert.match(nodes.get('#ron-status')!.textContent,/CPU1が1萬を加カン/);
     }
     for(const p of game.players.slice(1)) for(const t of p.hand) assert.ok(![...nodes.values()].flatMap(walk).some(n=>n.dataset.tileId===t.id));
@@ -726,12 +727,14 @@ for (const source of [1,2,3] as const) test(`Step 13.5.2 added kan preserves pon
     const container=new ElementStub();
     renderMelds(container as unknown as HTMLElement,{...player,id:0,melds:[{...meld,fromPlayerId:source}]});
     const group=container.children[0];
-    assert.equal(group.children.length,4);
+    assert.equal(group.children.length,3);
     const calledIndex=source===3?0:source===2?1:2;
-    assert.equal(group.children[calledIndex].className,'called-tile');
-    assert.equal(group.style['--called-offset'],`calc(${calledIndex} * (var(--meld-tile-width) + var(--meld-tile-gap)))`);
-    assert.match(group.children[3].className,/added-kan-tile/);
-    assert.equal(group.children[3].dataset.tileId, meld.type==='kakan'?meld.addedTileId:undefined);
+    const called=group.children[calledIndex];
+    assert.equal(called.className,'called-tile');
+    assert.equal(group.style['--called-offset'],undefined);
+    const added=called.children.find(n=>n.className.includes('added-kan-tile'))!;
+    assert.ok(added);
+    assert.equal(added.dataset.tileId,meld.addedTileId);
   } finally {globalThis.document=original;}
 });
 

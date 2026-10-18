@@ -27,13 +27,20 @@ export function renderMelds(container: HTMLElement, player: PlayerState, game?: 
     const calledIndex = meld.type==='chi' ? meld.tiles.findIndex(t=>t.id===called.id) : direction===3?0:direction===2?1:own.length;
     // Sequence tiles arrive in numeric order from GameState; preserve it.
     arranged.splice(calledIndex,0,called);
-    group.style.setProperty('--called-offset', `calc(${calledIndex} * (var(--meld-tile-width) + var(--meld-tile-gap)))`);
-    if(meld.type==='kakan') arranged.push(meld.tiles.find(t=>t.id===meld.addedTileId)!);
+    const addedKan=meld.type==='kakan'?meld.tiles.find(t=>t.id===meld.addedTileId):null;
+    let calledItem: HTMLElement | null=null;
     for(const physical of arranged) {
       const item=document.createElement('span');item.dataset.tileId=physical.id;
       item.className=physical.id===meld.calledTileId?'called-tile':'';
-      if(meld.type==='kakan' && physical.id===meld.addedTileId) item.classList.add('added-kan-tile');
-      item.append(createTileElement(physical.tile));group.append(item);
+      item.append(createTileElement(physical.tile));
+      if(physical.id===meld.calledTileId) {
+        calledItem=item;
+        if(addedKan) {
+          const added=document.createElement('span');added.dataset.tileId=addedKan.id;added.className='added-kan-tile';
+          added.append(createTileElement(addedKan.tile));item.append(added);
+        }
+      }
+      group.append(item);
     }
     const pending = game?.phase === 'awaiting-ron' && game.ronWindow?.kind === 'kakan'
       ? game.ronWindow.kan : null;
@@ -47,7 +54,7 @@ export function renderMelds(container: HTMLElement, player: PlayerState, game?: 
       const svg = createTileElement(pending.tile.tile);
       svg.setAttribute('aria-hidden', 'true');
       preview.append(svg);
-      group.append(preview);
+      calledItem!.append(preview);
       group.append(previewText('small', '加カン宣言中'));
     }
     return group;
