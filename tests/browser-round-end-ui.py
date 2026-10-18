@@ -452,7 +452,7 @@ with sync_playwright() as p:
         final = page.evaluate('(name) => window.roundEndTest.prepare(name, "finish", false, true)', 'match-end')
         assert final['status'] == 'match-ended' and not page.locator('#result-dialog').is_visible()
         assert not page.locator('#next-round').is_visible()
-        assert page.locator('#round-result-summary').inner_text() == '流局\nテンパイ：CPU2'
+        assert page.locator('#round-result-summary').locator('p').all_inner_texts() == ['流局', 'テンパイ：CPU2']
         page.locator('#show-result').click()
         assert page.locator('#result-title').inner_text() == '東風戦終了'
         assert not page.locator('#next-round').is_visible()
