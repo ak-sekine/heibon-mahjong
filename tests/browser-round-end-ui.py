@@ -291,6 +291,22 @@ with sync_playwright() as p:
             assert not page.locator('#public-winning-hands').count(), (width, 'old CPU hand block remains')
             page.locator('#show-result').click()
             assert page.locator('#result-dialog').is_visible(), (width, scenario, 'detail did not open')
+            ron_results = [result for result in meta['winners'] if result['winMethod'] == 'ron']
+            if ron_results:
+                shared_id = ron_results[0]['winningTileId']
+                id_copies = page.evaluate('''tileId => {
+                  const game=window.roundEndTest.controller.game;
+                  const physical=[...game.liveWall,...game.deadWall,...game.players.flatMap(player=>[
+                    ...player.hand,...(player.drawnTile?[player.drawnTile]:[]),...player.river,
+                    ...(player.melds??[]).flatMap(meld=>meld.tiles)])];
+                  const count=selector=>[...document.querySelectorAll(selector)].filter(element=>element.dataset.tileId===tileId).length;
+                  return {stateCount:physical.filter(tile=>tile.id===tileId).length,
+                    stateUnique:new Set(physical.map(tile=>tile.id)).size===physical.length,
+                    river:count('.river [data-tile-id]'),details:count('#win-result .winning-hand [data-tile-id]'),
+                    cpuSeats:count('.concealed-hand [data-tile-id]'),main:count('main [data-tile-id]')};
+                }''', shared_id)
+                assert id_copies == {'stateCount':1,'stateUnique':True,'river':1,
+                    'details':len(ron_results),'cpuSeats':0,'main':1+len(ron_results)}, (width, scenario, id_copies)
             if meta['status'] == 'match-ended':
                 assert page.locator('#result-title').inner_text() == '東風戦終了'
                 assert not page.locator('#next-round').is_visible()
