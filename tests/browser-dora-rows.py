@@ -37,17 +37,28 @@ with sync_playwright() as p:
                       const boxes=Object.fromEntries(selectors.map(s=>[s,box(q(s))]));
                       const c=boxes['.center-info'],d=boxes['.dora-area'],r=boxes['#table-round'],w=boxes['#wall-count'];
                       const slots=[...q('#dora-indicators').children], sticks=[...q('#deposit-sticks').children], t=box(q('.table'));
-                      return {boxes,checks:{doraInside:inside(d,c),roundClear:r.bottom<=d.top+.1,wallInside:inside(w,c),roundInside:inside(r,c),
+                      const riverFace=box(q('.river-top .tile-svg'));
+                      const doraFaces=slots.map(e=>box(e.querySelector('svg')||e));
+                      const doraSizeMatchesRiver=doraFaces.every(e=>Math.abs(e.width-riverFace.width)<.05&&Math.abs(e.height-riverFace.height)<.05);
+                      const doraRowsEqual=doraFaces.every((e,i)=>Math.abs(e.width-doraFaces[0].width)<.05&&Math.abs(e.height-doraFaces[0].height)<.05);
+                      const seatTiles=[...document.querySelectorAll('.table .seat .tile-svg,.table .seat .tile-back')].map(box);
+                      const doraOutlineClear=slots.slice(5).every(e=>getComputedStyle(e).outlineStyle==='none');
+                      const uraMarker=slots.length===10&&getComputedStyle(slots[5],'::after').content.replaceAll('"','')==='裏';
+                      const depositsFit=sticks.every(e=>{const r=box(e);return r.width>=42&&r.width<=48&&r.height>=11&&r.height<=13;});
+                      const depositDots=sticks.every(e=>{const svg=e.querySelector('svg'),count=svg.querySelectorAll('circle').length,expected={'1000':1,'5000':3,'10000':6}[e.dataset.points];return count===expected&&[...svg.querySelectorAll('circle')].every(dot=>dot.getBoundingClientRect().width>=3);});
+                      return {boxes,measurements:{riverTile:riverFace,doraFaces,depositSticks:sticks.map(box)},checks:{doraInside:inside(d,c),doraSizeMatchesRiver,doraRowsEqual,roundClear:r.bottom<=d.top+.1,wallInside:inside(w,c),roundInside:inside(r,c),
                         summary:q('#table-round').textContent===`東1局${honba?` ${honba}本場`:''}`&&q('#wall-count span').textContent===`山${game.liveWall.length-count}枚`&&Math.abs(r.top-w.top)<.1,
                         summarySize:parseFloat(getComputedStyle(q('.round-summary')).fontSize)>=12,
                         depositClear:sticks.every(e=>box(e).top>=d.bottom&&slots.every(t=>separate(box(e),box(t)))),
                         hiddenDeposits:q('#deposit-sticks').hidden===(deposits===0),
-                        sticks:sticks.every(e=>inside(box(e),c)&&box(e).width>=36&&box(e).height>=9.5),
+                        sticks:depositsFit&&depositDots&&sticks.every(e=>inside(box(e),c)),
                         rows:slots.length===(count?10:5)&&slots.every((e,i)=>i<5?Math.abs(box(e).top-box(slots[0]).top)<.1:box(e).top>=box(slots[0]).bottom),
+                        uraStyle:doraOutlineClear&&(!count||uraMarker),
                         order:slots.every((e,i)=>e.dataset.tileId===(i<5?omote[i]?.id:ura[i-5]?.id)),
                         faces:slots.every((e,i)=>{const tile=i<5?omote[i]:ura[i-5];return !tile||e.querySelector('svg').getAttribute('aria-label').endsWith(e.getAttribute('aria-label').split('：')[1].split('、')[0])}),
                         hidden:wall.deadWall.filter(t=>![...omote,...ura].some(p=>p.id===t.id)).every(t=>!q('#dora-indicators').outerHTML.includes(t.id)),
                         riverClear:[...document.querySelectorAll('.river svg')].every(e=>separate(box(e),c)),
+                        seatClear:seatTiles.every(e=>separate(e,c)),
                         square:Math.abs(t.width-t.height)<1,noOverflow:document.documentElement.scrollWidth<=innerWidth}};
                     }''', {'deposits': deposits, 'count': count})
                     reports.append({'entry': entry or 'index.html', 'width': width, 'deposits': deposits, 'uraCount': count, **result})

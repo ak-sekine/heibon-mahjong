@@ -174,7 +174,6 @@ header > div { min-width:0; }
 .dora-slot .tile-svg { width:var(--table-tile-width); height:var(--table-tile-height); }
 .dora-slot.tile-back { box-sizing:border-box; border:1px solid #e5dfc5; border-radius:2px; background:linear-gradient(#658ab1,#315877); }
 .dora-slot.tile-back svg { display:block; width:100%; height:100%; }
-.dora-slot.ura-indicator { outline:1px solid #ffda7d; outline-offset:1px; }
 .dora-slot span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 .dora-placeholder { border:1px solid #39765e; border-radius:2px; }
 #deposit-sticks { display:flex; flex-wrap:wrap; justify-content:center; gap:2px; margin-top:4px; }
@@ -354,18 +353,15 @@ main:has(.table .open-meld:nth-child(4)) .table-summary {
    declaration face; table.ts positions each cell with a consistent 1px gap. */
 .table .river-tile { width:var(--river-tile-width); height:var(--river-tile-height); justify-self:center; align-self:center; }
 .table .river-left .river-tile,.table .river-right .river-tile { width:var(--river-tile-height); height:var(--river-tile-width); }
-/* Five indicators occupy a dedicated row above the compact round summary. */
+/* Both indicator rows use the same unrotated face size as river tiles. */
 .table .center-info { justify-content:center; gap:2px; font-size:clamp(8px,1.8cqw,11px); line-height:1.25; }
 .table #table-round { white-space:pre-line; }
-.table .center-info .dora-area { --dora-width:calc(var(--cell)*.48); flex:none; }
-.table .center-info #dora-indicators { grid-template-columns:repeat(5,var(--dora-width)); grid-template-rows:none; grid-auto-rows:calc(var(--dora-width)*1.4); }
-.table .center-info .dora-slot,.table .center-info .dora-slot .tile-svg { width:var(--dora-width); height:calc(var(--dora-width)*1.4); }
+.table .center-info .dora-area { --dora-width:var(--river-tile-width); --dora-height:var(--river-tile-height); flex:none; }
+.table .center-info #dora-indicators { grid-template-columns:repeat(5,var(--dora-width)); grid-template-rows:none; grid-auto-rows:var(--dora-height); }
+.table .center-info .dora-slot,.table .center-info .dora-slot .tile-svg { width:var(--dora-width); height:var(--dora-height); }
 .table .center-info #deposit-sticks { margin-top:1px; gap:1px; }
-.table .center-info:has(.ura-indicator) { gap:1px; }
-.table .center-info:has(.ura-indicator) .dora-area { --dora-width:calc(var(--cell)*.42); }
 .table .center-info > div { flex-shrink:0; }
 .dora-slot { position:relative; }
-.dora-slot.ura-indicator { outline-offset:0; }
 .dora-slot.ura-indicator:nth-child(6)::after { content:"裏"; position:absolute; left:0; bottom:0; background:#ffda7d; color:#123f32; font-size:6px; line-height:1; }
 .table #wall-count span:last-child { color:inherit; }
 
@@ -383,13 +379,13 @@ main:has(.table .open-meld:nth-child(4)) .table-summary {
  }
 }
 
-/* Reserve the full clear gap between the side rivers for readable round text.
-   Keep indicator sizes independent of deposits and use the SVG's 60:16 ratio. */
-.table .center-info { left:50%; transform:translateX(-50%); width:calc(var(--cell)*4.65 - 1px); padding:1px; gap:3px; }
-.table .center-info:has(.ura-indicator) { gap:2px; }
+/* Give the summary enough of the river gap for two full-size indicator rows
+   and larger, 60:16 deposit sticks while keeping its text size unchanged. */
+.table .center-info { left:50%; top:calc(var(--cell)*4.15); transform:translateX(-50%); width:calc(var(--cell)*4.65 - 1px); height:auto; min-height:calc(var(--cell)*3 - 1px); padding:0 1px; gap:1px; }
+.table .center-info:has(.ura-indicator) { gap:1px; }
 .table .round-summary { display:flex; justify-content:center; align-items:baseline; gap:2px; letter-spacing:-.95px; white-space:nowrap; overflow-wrap:normal; font-size:clamp(12px,2.4cqw,15px); line-height:1.2; }
 .table #table-round { white-space:nowrap; }
 .table #wall-count { display:block; }
 .table .center-info #deposit-sticks { margin-top:0; gap:2px; flex:none; }
-.table .center-info .deposit-stick { flex:none; width:36px; height:9.6px; }
+.table .center-info .deposit-stick { flex:none; width:44px; height:11.73px; }
 .table .round-summary #table-round { font-weight:400; }
