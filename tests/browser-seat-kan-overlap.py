@@ -1,126 +1,171 @@
-"""Check actual player tile faces against CPU backs and meld faces."""
+"""Measure rendered tile faces, backs, melds, rivers and collisions in Chromium."""
 import json, os, pathlib, shutil
 from playwright.sync_api import sync_playwright
 
 widths = [(320,568),(355,812),(375,812),(390,844),(430,932),(1280,800)]
 scenes = [
-    'cpu1-kan-pending',
-    'cpu1-kan-resolved',
-    'cpu1-pon-chi-multiple',
-    'cpu1-kan-multiple',
-    'cpu1-four-melds',
-    'self-14',
-    'self-kan',
-    'cpu2-kan',
-    'cpu3-kan',
+    ('empty', []),
+    ('chi', ['chi']),
+    ('pon', ['pon']),
+    ('daiminkan', ['daiminkan']),
+    ('ankan', ['ankan']),
+    ('kakan', ['kakan']),
+    ('chi-pon', ['chi','pon']),
+    ('ankan-kakan', ['ankan','kakan']),
+    ('three-meld-mix', ['chi','pon','daiminkan']),
+    ('four-meld-mix', ['chi','pon','ankan','kakan']),
+    ('four-kan-mix', ['daiminkan','ankan','kakan','daiminkan']),
+    ('four-daiminkan', ['daiminkan','daiminkan','daiminkan','daiminkan']),
 ]
 reports = []
+maximum_kan_overlap = {'width':None,'player':None,'scene':None,'overlapX':0,'overlapY':0,'count':0}
+out = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
+out.mkdir(parents=True, exist_ok=True)
+
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'), args=['--no-sandbox'])
     for width, height in widths:
         page = browser.new_page(viewport={'width':width,'height':height})
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto('http://localhost:4173/heibon-mahjong/')
         page.wait_for_selector('#player-hand svg')
         page.evaluate('''async()=>{
           window.renderer=await import('/heibon-mahjong/src/rendering/table.ts');
           window.base=(await import('/heibon-mahjong/src/game/start.ts')).startGame();
-          window.scenarios=await import('/heibon-mahjong/src/verification/scenarios.ts');
-          window.kan=await import('/heibon-mahjong/src/game/kan.ts');
-          window.ron=await import('/heibon-mahjong/src/game/ron.ts');
-          window.kanFixture=await import('/heibon-mahjong/src/verification/kan-fixture.ts');
         }''')
-        for scene in scenes:
-            page.evaluate('''scene=>{
-              const makeCpuMelds=(target,types,handCount)=>{
-                const pool=[...base.liveWall,...base.deadWall];let index=0;
-                const take=count=>{const result=pool.slice(index,index+count);index+=count;return result;};
-                const melds=types.map(type=>{
-                  const tiles=take(type==='pon'||type==='chi'?3:4);
-                  return {type,tiles,calledTileId:type==='ankan'?'':tiles[1].id,
-                    fromPlayerId:type==='ankan'?target:(target+3)%4,
-                    ...(type==='kakan'?{addedTileId:tiles[3].id}:{})};
-                });
-                const hand=take(handCount),drawnTile=take(1)[0];
-                const players=base.players.map(player=>player.id===target
-                  ? {...player,hand,drawnTile,drawnTileSource:'live-wall',melds,river:[]}
-                  : player);
-                return {...base,turnPlayerId:target,phase:'awaiting-discard',players};
-              };
-              let game;
-              if(scene==='cpu1-kan-pending'||scene==='cpu1-kan-resolved') {
-                game=scenarios.scenarioGame('chankan');
-                const option=kan.getKanOptions(game,1)[0];
-                if(!option)throw new Error('CPU1 kakan fixture has no kan option');
-                game=kan.declareKan(game,1,option.id);
-                if(scene==='cpu1-kan-resolved')game=ron.passRon(game,0);
-                if(game.players[1].melds[0].type!==(scene==='cpu1-kan-resolved'?'kakan':'pon'))
-                  throw new Error(`Unexpected CPU1 kan state: ${game.players[1].melds[0].type}`);
-              } else if(scene==='cpu1-pon-chi-multiple') {
-                game=makeCpuMelds(1,['pon','chi'],7);
-              } else if(scene==='cpu1-kan-multiple') {
-                game=makeCpuMelds(1,['pon','chi','kakan'],4);
-              } else if(scene==='cpu1-four-melds') {
-                game=makeCpuMelds(1,['pon','chi','pon','kakan'],1);
-              } else if(scene==='self-14') {
-                game=base;
-              } else if(scene==='self-kan') {
-                game=scenarios.scenarioGame('multiple');
-                const option=kan.getKanOptions(game,0)[0];
-                if(!option)throw new Error('Self kan fixture has no kan option');
-                game=kan.declareKan(game,0,option.id);
-                if(!game.players[0].melds.some(meld=>meld.type==='ankan'))
-                  throw new Error('Self kan did not complete');
-              } else if(scene==='cpu2-kan'||scene==='cpu3-kan') {
-                const target=scene==='cpu2-kan'?2:3;
-                game=kanFixture.kanGame({hands:{},turn:target,draw:'north',melds:{[target]:[{type:'ankan',group:'1111z'}]}});
-              }
-              window.layoutGame=game;
-              renderer.renderTable(game,[25000,25000,25000,25000]);
-            }''',scene)
-            result = page.evaluate('''()=>{
-              const rect=e=>{const b=e.getBoundingClientRect();return {
-                left:+b.left.toFixed(2),top:+b.top.toFixed(2),right:+b.right.toFixed(2),bottom:+b.bottom.toFixed(2),
-                width:+b.width.toFixed(2),height:+b.height.toFixed(2)};};
-              const owner=e=>e.closest('.seat')?.dataset.playerId;
-              const tileLabel=e=>e.closest('.open-meld')?.dataset.meldType||
-                (e.closest('.concealed-hand')?'concealed':'unknown');
-              const self=[...document.querySelectorAll('#player-hand svg')];
-              const cpu=[...document.querySelectorAll(
-                '.seat:not([data-player-id="0"]) .concealed-hand .tile-back,'+
-                '.seat:not([data-player-id="0"]) .open-melds .open-meld svg,'+
-                '.seat:not([data-player-id="0"]) .open-melds .concealed-kan-back')];
-              const intersects=[];
-              for(let i=0;i<self.length;i++)for(const other of cpu){
-                const a=self[i].getBoundingClientRect(),b=other.getBoundingClientRect();
-                const x=Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left));
-                const y=Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top));
-                if(x>.1&&y>.1)intersects.push({selfTile:i,selfDrawn:self[i].closest('li').classList.contains('drawn-tile'),
-                  cpuPlayer:owner(other),cpuTile:tileLabel(other),overlapX:+x.toFixed(2),overlapY:+y.toFixed(2),
-                  selfRect:rect(self[i]),cpuRect:rect(other)});
-              }
-              const table=rect(document.querySelector('.table'));
-              const outside=[...self,...cpu].filter(e=>{
-                const b=e.getBoundingClientRect();return b.width===0||b.height===0||b.left<table.left-.5||b.top<table.top-.5||b.right>table.right+.5||b.bottom>table.bottom+.5;
-              }).map(e=>({player:owner(e),className:e.getAttribute('class'),rect:rect(e)}));
-              const handItems=[...document.querySelectorAll('#player-hand > li')];
-              return {table,square:Math.abs(table.width-table.height)<1,
-                noHorizontalScroll:document.documentElement.scrollWidth<=innerWidth,
-                handCount:handItems.length,drawnCount:handItems.filter(e=>e.classList.contains('drawn-tile')).length,
-                cpuTileCount:cpu.length,intersects,outside};
-            }''')
-            assert result['square'], f'{width}px {scene}: table is not square: {result}'
-            assert result['noHorizontalScroll'], f'{width}px {scene}: page has horizontal overflow: {result}'
-            assert not result['outside'], f'{width}px {scene}: rendered tile face/back leaves the table: {result["outside"]}'
-            assert not result['intersects'], f'{width}px {scene}: player and CPU tile faces overlap: {result["intersects"]}'
-            if scene=='self-14':
-                assert result['handCount']==14 and result['drawnCount']==1, f'{width}px: 14-tile hand lost its drawn-tile marker: {result}'
-            if scene=='self-kan':
-                assert result['drawnCount']==1, f'{width}px: kan replacement tile lost its drawn-tile marker: {result}'
-            reports.append({'width':width,'height':height,'scene':scene,**result})
+        baseline = page.evaluate('''()=>{
+          const rect=e=>{const r=e.getBoundingClientRect();return {width:r.width,height:r.height}};
+          return {hand:rect(document.querySelector('#player-hand svg')),dora:rect(document.querySelector('.dora-slot svg'))};
+        }''')
+        for player in range(4):
+            for scene, types in scenes:
+                page.evaluate('''({player,types})=>{
+                  const pool=[...base.liveWall,...base.deadWall];let offset=0;
+                  const take=count=>{const result=pool.slice(offset,offset+count);offset+=count;return result;};
+                  const melds=types.map(type=>{
+                    const tiles=take(type==='chi'||type==='pon'?3:4);
+                    return {type,tiles,calledTileId:type==='ankan'?'':tiles[1].id,
+                      fromPlayerId:(player+3)%4,
+                      ...(type==='kakan'?{addedTileId:tiles[3].id}:{})};
+                  });
+                  const hand=take(13-3*types.length),drawnTile=take(1)[0],river=take(18);
+                  const game={...base,turnPlayerId:player,phase:'awaiting-discard',players:base.players.map(p=>p.id===player
+                    ? {...p,hand,drawnTile,drawnTileSource:'live-wall',melds,river}
+                    : {...p,river:[]})};
+                  window.layoutGame=game;
+                  renderer.renderTable(game,[25000,25000,25000,25000]);
+                }''', {'player':player,'types':types})
+                result = page.evaluate('''({player,types})=>{
+                  const rect=e=>{const r=e.getBoundingClientRect();return {
+                    left:+r.left.toFixed(2),top:+r.top.toFixed(2),right:+r.right.toFixed(2),bottom:+r.bottom.toFixed(2),
+                    width:+r.width.toFixed(2),height:+r.height.toFixed(2)};};
+                  const overlap=(a,b)=>({
+                    x:Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left)),
+                    y:Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top))});
+                  const separate=(a,b)=>{const o=overlap(a,b);return o.x===0||o.y===0;};
+                  const owner=e=>e.closest('.seat')?.dataset.playerId??(e.closest('#player-hand')?'0':null);
+                  const meld=e=>e.closest('.open-meld');
+                  const describe=e=>({player:Number(owner(e)),kind:e.classList.contains('tile-back')?'back':e.classList.contains('concealed-kan-back')?'ankan-back':'face',
+                    type:meld(e)?.dataset.meldType||null,added:Boolean(e.closest('.added-kan-tile')),called:Boolean(e.closest('.called-tile')),rect:rect(e)});
+                  const q=s=>document.querySelector(s),table=rect(q('.table')),center=rect(q('.center-info'));
+                  const river=[...document.querySelectorAll(`.river[data-player-id="${player}"] .river-tile .tile-svg`)];
+                  const riverSize=rect(river[0]);
+                  const expected=[riverSize.width,riverSize.height].sort((a,b)=>a-b);
+                  const faceTiles=[...document.querySelectorAll('.table .seat .tile-back,.table .seat .open-meld svg,.table .seat .open-meld .concealed-kan-back')];
+                  const tiles=[...faceTiles,...document.querySelectorAll('#player-hand svg')];
+                  const riverFaces=[...document.querySelectorAll('.table .river .river-tile .tile-svg')];
+                  const dimensions=faceTiles.map(e=>{
+                    const r=rect(e),actual=[r.width,r.height].sort((a,b)=>a-b);
+                    return Math.max(Math.abs(actual[0]-expected[0]),Math.abs(actual[1]-expected[1]));
+                  });
+                  const orientationDeltas=faceTiles.map(e=>{
+                    const r=rect(e),turned=Boolean(e.closest('.called-tile,.added-kan-tile'));
+                    const expectedWidth=turned?riverSize.height:riverSize.width;
+                    const expectedHeight=turned?riverSize.width:riverSize.height;
+                    return Math.max(Math.abs(r.width-expectedWidth),Math.abs(r.height-expectedHeight));
+                  });
+                  const inside=[];
+                  const collisions={tilePairs:[],sameRiver:[],anyRiver:[],center:[],neighbors:[],selfVsSide:[],intentionalKakan:[]};
+                  const record=(list,a,b,extra={})=>{const x=overlap(rect(a),rect(b));if(x.x>0&&x.y>0)list.push({a:describe(a),b:describe(b),overlapX:+x.x.toFixed(2),overlapY:+x.y.toFixed(2),...extra});};
+                  for(const e of tiles){
+                    const r=rect(e);
+                    if(r.width===0||r.height===0||r.left<table.left-.1||r.top<table.top-.1||r.right>table.right+.1||r.bottom>table.bottom+.1)inside.push(describe(e));
+                    if(!separate(r,center))record(collisions.center,e,q('.center-info'));
+                  }
+                  for(let i=0;i<tiles.length;i++)for(let j=i+1;j<tiles.length;j++){
+                    const a=tiles[i],b=tiles[j],sameMeld=meld(a)&&meld(a)===meld(b),added=sameMeld&&(a.closest('.added-kan-tile')||b.closest('.added-kan-tile'));
+                    const x=overlap(rect(a),rect(b));
+                    if(x.x===0||x.y===0)continue;
+                    if(added)record(collisions.intentionalKakan,a,b);
+                    else {
+                      record(collisions.tilePairs,a,b);
+                      if(owner(a)!==owner(b))record(collisions.neighbors,a,b);
+                      if((owner(a)==='0'&&['1','3'].includes(owner(b)))||(owner(b)==='0'&&['1','3'].includes(owner(a))))record(collisions.selfVsSide,a,b);
+                    }
+                  }
+                  for(const tile of tiles)for(const discard of riverFaces){
+                    const id=owner(tile),riverOwner=discard.closest('.river').dataset.playerId;
+                    const x=overlap(rect(tile),rect(discard));
+                    if(x.x===0||x.y===0)continue;
+                    record(collisions.anyRiver,tile,discard,{riverPlayer:Number(riverOwner)});
+                    if(id===riverOwner)record(collisions.sameRiver,tile,discard,{riverPlayer:Number(riverOwner)});
+                  }
+                  const hand=player===0?q('#player-hand'):q(`.concealed-hand[data-player-id="${player}"]`);
+                  const melds=q(`.open-melds[data-player-id="${player}"]`);
+                  const h=rect(hand),m=rect(melds),hasMeld=types.length>0;
+                  const gap=player===0?m.left-h.right:player===1?h.top-m.bottom:player===2?h.left-m.right:m.top-h.bottom;
+                  const directionOK=!hasMeld||(player===0?h.right<=m.left+.1:player===1?m.bottom<=h.top+.1:player===2?m.right<=h.left+.1:m.top>=h.bottom-.1);
+                  const gapOK=!hasMeld||gap>=(player===0?7.8:3.8);
+                  const groups=[...melds.children],sequence=groups.map(e=>e.dataset.meldType);
+                  const centers=groups.map(e=>{const r=rect(e);return {x:(r.left+r.right)/2,y:(r.top+r.bottom)/2};});
+                  const sequenceOK=centers.every((a,i)=>i===0||(player===0?a.x>centers[i-1].x:player===1?a.y<centers[i-1].y:player===2?a.x<centers[i-1].x:a.y>centers[i-1].y));
+                  const cpuHands=[...document.querySelectorAll('.concealed-hand')];
+                  const hiddenClean=cpuHands.every(hand=>[...hand.children].every(e=>e.className==='tile-back'&&!e.children.length&&!Object.keys(e.dataset).length))&&
+                    [...layoutGame.players.slice(1).flatMap(p=>[...p.hand,...(p.drawnTile?[p.drawnTile]:[])]),...layoutGame.liveWall,...layoutGame.deadWall]
+                      .filter(t=>!layoutGame.players.flatMap(p=>[...p.river,...p.melds.flatMap(m=>m.tiles)]).some(v=>v.id===t.id))
+                      .every(t=>![...document.querySelectorAll('[data-tile-id]')].some(e=>e.dataset.tileId===t.id));
+                  const handCount=player===0?q('#player-hand').children.length:q(`.concealed-hand[data-player-id="${player}"]`).children.length;
+                  const selfSizes=[...document.querySelectorAll('#player-hand svg')].map(rect);
+                  const dora=rect(q('.dora-slot svg'));
+                  return {
+                    table,square:Math.abs(table.width-table.height)<.5,noHorizontalScroll:document.documentElement.scrollWidth<=innerWidth,
+                    expectedTile:{width:+expected[0].toFixed(2),height:+expected[1].toFixed(2)},
+                    maxTileSizeDelta:+Math.max(...dimensions).toFixed(2),allTileSizesMatchRiver:dimensions.every(d=>d<=.15),
+                    maxTileOrientationDelta:+Math.max(...orientationDeltas).toFixed(2),allTileOrientationsMatchRiver:orientationDeltas.every(d=>d<=.15),
+                    handSizeOK:handCount===14-3*types.length,handMeldDirection:directionOK,handMeldGapOK:gapOK,handMeldGap:+gap.toFixed(2),
+                    meldOrder:JSON.stringify(sequence)===JSON.stringify(types),meldVisualOrder:sequenceOK,
+                    tableContainment:inside.length===0,ownRiverClear:collisions.sameRiver.length===0,allRiversClear:collisions.anyRiver.length===0,
+                    seatTilesClear:collisions.tilePairs.length===0,neighborSeatsClear:collisions.neighbors.length===0,
+                    centerClear:collisions.center.length===0,selfVsCpu1Cpu3Clear:collisions.selfVsSide.length===0,
+                    hiddenCpuIdsProtected:hiddenClean,riverTileCount:river.length,
+                    kakanStackCorrect:collisions.intentionalKakan.length===1&&collisions.intentionalKakan.every(hit=>(hit.a.added&&hit.b.called)||(hit.b.added&&hit.a.called)),
+                    selfHandSizeUnchanged:selfSizes.every(r=>Math.abs(r.width-baseline.hand.width)<.15&&Math.abs(r.height-baseline.hand.height)<.15),
+                    doraSizeUnchanged:Math.abs(dora.width-baseline.dora.width)<.15&&Math.abs(dora.height-baseline.dora.height)<.15,
+                    tilePairCollisions:collisions.tilePairs,ownRiverCollisions:collisions.sameRiver,anyRiverCollisions:collisions.anyRiver,
+                    neighborCollisions:collisions.neighbors,centerCollisions:collisions.center,selfSideCollisions:collisions.selfVsSide,
+                    intentionalKakanOverlap:collisions.intentionalKakan
+                  };
+                }''', {'player':player,'types':types})
+                checks=['square','noHorizontalScroll','allTileSizesMatchRiver','allTileOrientationsMatchRiver','handSizeOK','handMeldDirection','handMeldGapOK','meldOrder','meldVisualOrder','tableContainment','ownRiverClear','allRiversClear','seatTilesClear','neighborSeatsClear','centerClear','selfVsCpu1Cpu3Clear','hiddenCpuIdsProtected','selfHandSizeUnchanged','doraSizeUnchanged']
+                assert result['riverTileCount']==18, f'{width}px player {player} {scene}: expected 18 close river tiles: {result}'
+                assert all(result[name] for name in checks), f'{width}px player {player} {scene}: {result}'
+                if 'kakan' in types:
+                    intentional=result['intentionalKakanOverlap']
+                    assert intentional, f'{width}px player {player} {scene}: added-kan tile did not overlap its stack: {result}'
+                    assert result['kakanStackCorrect'], f'{width}px player {player} {scene}: added-kan tile did not stack only on the called face: {result}'
+                    for hit in intentional:
+                        if hit['overlapX']*hit['overlapY']>maximum_kan_overlap['overlapX']*maximum_kan_overlap['overlapY']:
+                            maximum_kan_overlap.update({'width':width,'player':player,'scene':scene,
+                                'overlapX':hit['overlapX'],'overlapY':hit['overlapY']})
+                    maximum_kan_overlap['count']+=len(intentional)
+                reports.append({'width':width,'height':height,'player':player,'scene':scene,**{k:result[k] for k in ['table','expectedTile','maxTileSizeDelta','maxTileOrientationDelta','handMeldGap','selfHandSizeUnchanged','doraSizeUnchanged']}})
+                if width==320 and player==3 and scene=='empty':
+                    page.screenshot(path=str(out/'cpu3-river-proximity-320.png'),full_page=True)
+        assert not errors, f'{width}px page errors: {errors}'
         page.close()
     browser.close()
 
-out=pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS','/tmp/heibon-table-ui'))
-out.mkdir(parents=True,exist_ok=True)
-(out/'seat-kan-overlap.json').write_text(json.dumps(reports,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-print(f'{len(reports)} seat tile-overlap layouts passed across widths {", ".join(str(w) for w,_ in widths)}; face/back rectangles had zero intersections.')
+(out/'seat-kan-overlap.json').write_text(json.dumps({'layouts':reports,'intentionalKanOverlap':maximum_kan_overlap},ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+print(f'{len(reports)} layouts passed: six widths, four seats, 0–4 melds and all requested meld types.')
+print(f'Kakan stack overlap measured separately: {maximum_kan_overlap}')

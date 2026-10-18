@@ -128,9 +128,8 @@ header > div { min-width:0; }
 #ron-target p { margin:0; overflow-wrap:anywhere; }
 #ron-controls button { min-width:44px; min-height:44px; }
 
-/* Match the unchanged 14-column hand: main content minus table borders
-   and padding (8px), then thirteen 1px gaps, rounded down. Height never
-   changes tile size. Side seats stack hands and melds vertically. */
+/* Match the unchanged 14-column hand. CPU hands and melds use the smaller
+   river-face variables below, in one player-relative row at every seat. */
 .table { container-type:normal; position:relative; display:grid; grid-template-columns:calc(var(--table-tile-width) * 2.5 + 2px) minmax(0,1fr) calc(var(--table-tile-width) * 2.5 + 2px); grid-template-rows:auto auto auto; grid-template-areas:'. top .' 'left rivers right' 'bottom bottom bottom'; gap:3px; padding:6px 2px; border:2px solid #39765e; border-radius:16px; background:radial-gradient(ellipse at center,#287a5a,#1c6048); --table-tile-width:min(42px,round(down,calc((100cqw - 21px) / 14),1px)); --table-tile-height:calc(var(--table-tile-width) * 1.4); --meld-headroom:calc(var(--table-tile-width) + 2px); }
 .seat { min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; }
 .seat-top { grid-area:top; grid-column:1 / -1; padding-bottom:4px; }
@@ -180,15 +179,15 @@ header > div { min-width:0; }
 .deposit-stick { width:26px; height:8px; }
 .deposit-stick svg { width:100%; height:100%; display:block; }
 .open-melds { display:flex; flex-wrap:wrap; justify-content:center; gap:5px; max-width:100%; }
-.result-melds { display:flex; flex-wrap:wrap; justify-content:center; gap:5px; max-width:100%; --table-tile-width:18px; --table-tile-height:25.2px; --meld-headroom:20px; }
+.result-melds { display:flex; flex-wrap:wrap; justify-content:center; gap:5px; max-width:100%; --meld-tile-width:18px; --meld-tile-height:25.2px; --meld-headroom:20px; }
 .open-melds:empty { display:none; }
 .open-meld { position:relative; display:flex; align-items:flex-end; gap:1px; padding:var(--meld-headroom) 0 0; isolation:isolate; }
-.open-meld > span { position:relative; display:block; flex:none; width:var(--table-tile-width); height:var(--table-tile-height); }
-.open-meld .tile-svg { width:var(--table-tile-width); height:var(--table-tile-height); }
-.open-meld .called-tile { width:var(--table-tile-height); height:var(--table-tile-width); }
-.open-meld .called-tile .tile-svg { position:absolute; left:calc(var(--table-tile-width) * .2); top:calc(var(--table-tile-width) * -.2); transform:rotate(90deg); }
-.open-meld .added-kan-tile { position:absolute; width:var(--table-tile-height); height:var(--table-tile-width); left:var(--called-offset); bottom:calc(var(--table-tile-width) + 1px); z-index:2; }
-.open-meld .added-kan-tile .tile-svg { position:absolute; left:calc(var(--table-tile-width) * .2); top:calc(var(--table-tile-width) * -.2); transform:rotate(90deg); }
+.open-meld > span { position:relative; display:block; flex:none; width:var(--meld-tile-width); height:var(--meld-tile-height); }
+.open-meld .tile-svg { width:var(--meld-tile-width); height:var(--meld-tile-height); }
+.open-meld .called-tile { width:var(--meld-tile-height); height:var(--meld-tile-width); }
+.open-meld .called-tile .tile-svg { position:absolute; left:calc(var(--meld-tile-width) * .2); top:calc(var(--meld-tile-width) * -.2); transform:rotate(90deg); }
+.open-meld .added-kan-tile { position:absolute; width:var(--meld-tile-height); height:var(--meld-tile-width); left:var(--called-offset); bottom:calc(var(--meld-tile-width) + 1px); z-index:2; }
+.open-meld .added-kan-tile .tile-svg { position:absolute; left:calc(var(--meld-tile-width) * .2); top:calc(var(--meld-tile-width) * -.2); transform:rotate(90deg); }
 .open-meld .pending-kan-tile { outline:2px dashed #ffda7d; background:#80551b; }
 .open-meld small { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 .seat-declaration { color:#ffda7d; }
@@ -210,8 +209,7 @@ header > div { min-width:0; }
 #player-hand .tile-choice { max-width:min(42px,calc((100cqw - 13px) / 14)); }
 
 .seat-label .seat-status { white-space:nowrap; overflow-wrap:normal; }
-/* Wide tables can keep the round information between the side rivers and
-   put each side hand beside its melds. The player's tiles remain capped at 42px. */
+/* Wide tables keep the central information between the side rivers. */
 @media (min-width:960px) {
   main { width:min(100%,1000px); }
   #player-hand { max-width:604px; align-self:center; }
@@ -241,39 +239,33 @@ header > div { min-width:0; }
 .table { container-type:inline-size; display:block; width:calc(100% + 8px); margin-inline:-4px; aspect-ratio:1 / 1; padding:0; flex:none;
  --table-tile-width:min(42px,round(down,calc((100cqw - 18px) / 15.8),.1px));
  --cell:calc(var(--table-tile-height) + 1px); }
-.table .seat,.table .rivers { --table-tile-width:min(42px,round(down,calc((100cqw - 22px) / 15.8),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); --cell:calc(var(--table-tile-height) + 1px); }
-.table .seat { position:absolute; display:flex; flex-direction:row; gap:5px; padding:0; align-items:center; justify-content:center; }
-.seat-top { top:2px; left:8px; right:8px; height:calc(var(--table-tile-height) + var(--meld-headroom)); }
-.table .seat-top { align-items:flex-start; }
-.table .seat-left,.table .seat-right { top:50%; left:50%; width:calc(100% - 60px); height:var(--table-tile-height); }
-.table .seat-left { transform:translate(-50%,-50%) translateX(calc(-50cqw + var(--table-tile-height)*.5)) rotate(90deg); }
-.table .seat-right { transform:translate(-50%,-50%) translateX(calc(50cqw - var(--table-tile-height)*.5)) rotate(270deg); }
-/* A side hand and its melds share the edge as parallel lanes. Keeping them
-   in one row and rotating that row makes even one kan run into the bottom
-   player's drawn tile at narrow widths. */
-.table .seat-left:has(.open-meld):not(:has(.open-meld:nth-child(4))),
-.table .seat-right:has(.open-meld):not(:has(.open-meld:nth-child(4))) {
- --side-seat-lane-gap:calc(var(--table-tile-width)*.6 + 5px);
- --side-seat-lane-size:calc(var(--table-tile-height)*2 + var(--side-seat-lane-gap));
- height:var(--side-seat-lane-size);
- flex-direction:column;
- gap:var(--side-seat-lane-gap);
+.table .seat,.table .rivers {
+ --table-tile-width:min(42px,round(down,calc((100cqw - 22px) / 15.8),.1px));
+ --table-tile-height:calc(var(--table-tile-width)*1.4);
+ --river-tile-width:calc(var(--table-tile-width)*.76);
+ --river-tile-height:calc(var(--table-tile-height)*.76);
+ --cell:calc(var(--table-tile-height) + 1px);
 }
-.table .seat-left:has(.open-meld):not(:has(.open-meld:nth-child(4))) { transform:translate(-50%,-50%) translateX(calc(-50cqw + var(--side-seat-lane-size)*.5)) rotate(90deg); }
-.table .seat-right:has(.open-meld):not(:has(.open-meld:nth-child(4))) { transform:translate(-50%,-50%) translateX(calc(50cqw - var(--side-seat-lane-size)*.5)) rotate(270deg); }
+.table .seat { --meld-tile-width:var(--river-tile-width); --meld-tile-height:var(--river-tile-height); position:absolute; display:flex; flex-direction:row; gap:4px; padding:0; align-items:center; justify-content:center; }
+.seat-top { top:2px; left:8px; right:8px; height:calc(var(--table-tile-height) + var(--meld-headroom)); }
+.table .seat-top { align-items:flex-start; flex-direction:row-reverse; }
+.table .seat-left,.table .seat-right { --side-seat-offset:calc(var(--river-tile-height)*.5 + 1px); top:50%; left:50%; width:calc(100% - 10px); height:var(--table-tile-height); }
+.table .seat-left { transform:translate(-50%,-50%) translateX(calc(-50cqw + var(--side-seat-offset))) rotate(90deg); }
+.table .seat-right { transform:translate(-50%,-50%) translateX(calc(50cqw - var(--side-seat-offset))) rotate(270deg); }
 .table .seat .concealed-hand { display:flex; flex-direction:row; gap:1px; margin:0; max-width:none; }
-.table .seat .tile-back { width:var(--table-tile-width); height:var(--table-tile-height); }
-.table .seat .open-melds { display:flex; flex-direction:row; flex-wrap:nowrap; gap:4px; width:auto; padding:0; align-self:auto; max-width:none; }
+.table .seat .tile-back { width:var(--river-tile-width); height:var(--river-tile-height); }
+.table .seat .open-melds { display:flex; flex-direction:row; flex-wrap:nowrap; gap:1px; width:auto; padding:0; align-self:auto; max-width:none; }
+.table .seat-top .open-melds { flex-direction:row-reverse; }
 .table .seat .open-meld { transform:none; margin:0; padding:0; }
-.table .seat-bottom { --meld-source-tile-width:var(--table-tile-width); --meld-source-tile-height:var(--table-tile-height); left:5px; right:5px; bottom:2px; flex-direction:row; gap:8px; align-items:flex-end; justify-content:center; }
+.table .seat .open-meld > span { width:var(--meld-tile-width); height:var(--meld-tile-height); }
+.table .seat .open-meld .tile-svg { width:var(--meld-tile-width); height:var(--meld-tile-height); }
+.table .seat .open-meld .called-tile,.table .seat .open-meld .added-kan-tile { width:var(--meld-tile-height); height:var(--meld-tile-width); }
+.table .seat-bottom { left:5px; right:5px; bottom:2px; flex-direction:row; gap:8px; align-items:flex-end; justify-content:center; }
 .table .seat-bottom #player-hand { order:1; }
 .table .seat-bottom .open-melds { order:2; justify-content:center; padding-top:0; }
 .table .seat-bottom .open-melds:empty { display:none; }
-.table .seat-top .pending-kan-tile { transform:translateY(calc(var(--table-tile-width)*.6)); }
-.table .seat-left .pending-kan-tile,.table .seat-right .pending-kan-tile { transform:translateY(calc(var(--table-tile-width)*.2)); }
-/* Four six-by-three rivers occupy a cross. A fixed .76 scale clears their
-   corners, the center panel and the seat hands. */
-.table .rivers { --river-tile-width:calc(var(--table-tile-width)*.76); --river-tile-height:calc(var(--table-tile-height)*.76); position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:calc(var(--cell)*11.65); height:calc(var(--cell)*11.65); display:block; }
+/* Four six-by-three rivers occupy a cross inside the fixed square table. */
+.table .rivers { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:calc(var(--cell)*11.65); height:calc(var(--cell)*11.65); display:block; }
 .table .river { position:absolute; gap:1px; }
 .table .river-top { left:50%; top:calc(var(--cell)*1.8); transform:translateX(-50%); }
 .table .river-right { right:calc(var(--cell)*1.2); top:50%; transform:translateY(-50%); }
@@ -286,74 +278,6 @@ header > div { min-width:0; }
 .table #player-hand .tile-choice { max-width:none; margin:0; }
 .table #player-hand .tile-choice { width:100%; }
 
-/* Four-meld layouts use the clear middle strip on each table edge.
-   The corner tiles stay in the adjacent edge bands, so no meld box crosses
-   another seat or the reserved river cells.  Kan rows need slightly more
-   room than three-tile rows, so the whole table shares a 14% compact scale
-   only while a fourth meld is present. */
-main:has(.table .open-meld:nth-child(4)) .table-summary {
-  --table-tile-width:calc(min(42px,round(down,calc((100cqw - 18px) / 15.8),.1px))* .86);
-  --table-tile-height:calc(var(--table-tile-width)*1.4);
-}
-.table:has(.open-meld:nth-child(4)) .seat,
-.table:has(.open-meld:nth-child(4)) .rivers {
-  --table-tile-width:calc(min(42px,round(down,calc((100cqw - 22px) / 15.8),.1px))* .86);
-  --table-tile-height:calc(var(--table-tile-width)*1.4);
-  --cell:calc(var(--table-tile-height) + 1px);
-}
-.table .seat-top:has(.open-meld:nth-child(4)) .open-melds,
-.table .seat-bottom:has(.open-meld:nth-child(4)) .open-melds { position:absolute; top:0; width:max-content; gap:0; }
-.table .seat-top:has(.open-meld:nth-child(4)) .open-melds { top:calc(var(--table-tile-width)*.6); left:auto; right:calc(var(--table-tile-height) - 3px); }
-.table .seat-bottom:has(.open-meld:nth-child(4)) { height:var(--table-tile-height); }
-.table .seat-bottom:has(.open-meld:nth-child(4)) .open-melds { left:auto; right:calc(var(--table-tile-height) - 3.5px); }
-.table .seat-bottom:has(.open-meld:nth-child(4)):not(:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"]))) .open-melds {
-  --table-tile-width:calc(var(--meld-source-tile-width)*.96);
-  --table-tile-height:calc(var(--meld-source-tile-height)*.96);
-}
-@media (min-width:960px) {
-  .table .seat-bottom:has(.open-meld:nth-child(4)):not(:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"]))) .open-melds {
-    right:calc(var(--table-tile-height) - 1.5px);
-  }
-}
-.table .seat-top:has(.open-meld:nth-child(4)) .concealed-hand { position:absolute; left:auto; right:0; }
-.table .seat-bottom:has(.open-meld:nth-child(4)) #player-hand { position:absolute; left:calc(50% - var(--table-tile-width)*8.17); right:auto; bottom:0; container-type:normal; display:flex; gap:1px; width:auto; }
-.table .seat-bottom:has(.open-meld:nth-child(4)) #player-hand li { flex:0 0 var(--table-tile-width); width:var(--table-tile-width); }
-.table .seat-left:has(.open-meld:nth-child(4)),
-.table .seat-right:has(.open-meld:nth-child(4)) { width:calc(100% - 4px); }
-.table .seat-left:has(.open-meld:nth-child(4)) .open-melds,
-.table .seat-right:has(.open-meld:nth-child(4)) .open-melds { position:absolute; top:0; width:max-content; gap:0; }
-.table .seat-left:has(.open-meld:nth-child(4)) .open-melds,
-.table .seat-right:has(.open-meld:nth-child(4)) .open-melds { left:auto; right:var(--table-tile-height); }
-.table .seat-left:has(.open-meld:nth-child(4)) .concealed-hand,
-.table .seat-right:has(.open-meld:nth-child(4)) .concealed-hand { position:absolute; left:0; right:auto; }
-
-/* Four daiminkan stress rows use two columns. The rotated side seats use the
-   adjacent edge strip as a second lane; tile dimensions remain at the normal
-   four-meld compact scale. */
-.table .seat-top:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])),
-.table .seat-bottom:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) { height:calc(var(--table-tile-height)*2); }
-.table .seat-top:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) .open-melds,
-.table .seat-bottom:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) .open-melds {
-  top:0;
-  left:50%;
-  right:auto;
-  transform:translateX(-50%);
-  width:calc((var(--table-tile-width)*4.4 + 3px)*2);
-  flex-wrap:wrap;
-}
-.table .seat-left:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])),
-.table .seat-right:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) { height:calc(var(--table-tile-height)*2); }
-.table .seat-left:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) { transform:translate(-50%,-50%) translateX(calc(-50cqw + var(--table-tile-height))) rotate(90deg); }
-.table .seat-right:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) { transform:translate(-50%,-50%) translateX(calc(50cqw - var(--table-tile-height))) rotate(270deg); }
-.table .seat-left:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) .open-melds,
-.table .seat-right:has(.open-meld:nth-child(4):is([data-meld-type="daiminkan"],[data-meld-type="ankan"])) .open-melds {
-  top:0;
-  left:50%;
-  right:auto;
-  transform:translateX(-50%);
-  width:calc((var(--table-tile-width)*4.4 + 3px)*2);
-  flex-wrap:wrap;
-}
 @media (max-height:650px) and (max-width:599px) {
  .table .seat-bottom { gap:8px; padding:0; }
 }
@@ -379,19 +303,6 @@ main:has(.table .open-meld:nth-child(4)) .table-summary {
 .table #wall-count span:last-child { color:inherit; }
 
 .table .center-info .deposit-stick { width:clamp(18px,calc(var(--cell)*.48),30px); height:clamp(6px,calc(var(--cell)*.16),10px); }
-/* Two kans add physical tiles; spend the inter-group spacing before changing
-   the shared tile size or leaving a concealed tile outside the square. */
-.table .seat-bottom:has(.open-meld:nth-child(2)) { gap:8px; }
-.table .seat-bottom:has(.open-meld:nth-child(2)) .open-melds { gap:1px; }
-/* Two kans plus the fixed 8px hand gap exceed narrow tables.
-   Scale only their physical meld tiles by 2.7%; leave four-meld layouts alone. */
-@media (max-width:430px) {
- .table .seat-bottom:has(.open-meld:nth-child(1):is([data-meld-type="ankan"],[data-meld-type="daiminkan"],[data-meld-type="kakan"])):has(.open-meld:nth-child(2):is([data-meld-type="ankan"],[data-meld-type="daiminkan"],[data-meld-type="kakan"])):not(:has(.open-meld:nth-child(3))) .open-melds {
-  --table-tile-width:calc(var(--meld-source-tile-width)*.973);
-  --table-tile-height:calc(var(--meld-source-tile-height)*.973);
- }
-}
-
 /* Give the summary enough of the river gap for two full-size indicator rows
    and larger, 60:16 deposit sticks while keeping its text size unchanged. */
 .table .center-info { left:50%; top:calc(var(--cell)*4.15); transform:translateX(-50%); width:calc(var(--cell)*4.65 - 1px); height:auto; min-height:calc(var(--cell)*3 - 1px); padding:0 1px; gap:1px; }

@@ -71,13 +71,14 @@ with sync_playwright() as p:
                         const meld=q(`.seat[data-player-id="${id}"] .open-meld`),hand=id===0?q('#player-hand'):q(`.seat[data-player-id="${id}"] .concealed-hand`);
                         if(!meld||!hand)return true;
                         const m=r(meld),h=r(hand);
-                        const fourMelds=Boolean(q(`.seat[data-player-id="${id}"] .open-meld:nth-child(4)`));
-                        // Side seats with fewer than four melds use parallel
-                        // screen-space lanes; four-meld layouts keep the
-                        // existing two-row orientation.
-                        return id===0?h.right<=m.left+.2:id===2?m.right<=h.left+.2:
-                          id===3?(fourMelds?m.top>=h.bottom-.2:m.right<=h.left+.2):
-                          (fourMelds?m.bottom<=h.top+.2:m.left>=h.right-.2);
+                        return id===0?h.right<=m.left+.2:id===1?m.bottom<=h.top+.2:
+                          id===2?m.right<=h.left+.2:m.top>=h.bottom-.2;
+                      });
+                      const meldGap=[0,1,2,3].every(id=>{
+                        const melds=q(`.seat[data-player-id="${id}"] .open-melds`),hand=id===0?q('#player-hand'):q(`.seat[data-player-id="${id}"] .concealed-hand`);
+                        if(!melds||!melds.children.length||!hand)return true;
+                        const m=r(melds),h=r(hand),gap=id===0?h.right<=m.left-7.8:id===1?m.bottom<=h.top-3.8:id===2?m.right<=h.left-3.8:m.top>=h.bottom+3.8;
+                        return gap;
                       });
                       const hand=[...document.querySelectorAll('#player-hand svg')].map(r);
                       const items=[...document.querySelectorAll('#player-hand li')];
@@ -103,6 +104,7 @@ with sync_playwright() as p:
                         }),
                         riversFacing:Math.abs((riverRects[2].left+riverRects[2].right-seats[2].left-seats[2].right))<1&&Math.abs((riverRects[0].left+riverRects[0].right-seats[0].left-seats[0].right))<1&&Math.abs((riverRects[3].top+riverRects[3].bottom-seats[3].top-seats[3].bottom))<1&&Math.abs((riverRects[1].top+riverRects[1].bottom-seats[1].top-seats[1].bottom))<1,
                         meldDirection,
+                        meldGap,
                         selfMeldRight:!document.querySelector('.seat-bottom .open-meld')||r(q('.seat-bottom #player-hand')).right<=r(q('.seat-bottom .open-meld')).left+.1,
                         selfMeldGap:!document.querySelector('.seat-bottom .open-meld')||r(q('.seat-bottom #player-hand')).right+7.9<=r(q('.seat-bottom .open-meld')).left,
                         privateIds:privateTiles.every(t=>!publicIds.has(t.id)&&!q('main').innerHTML.includes(t.id)),
