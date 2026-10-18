@@ -186,7 +186,7 @@ header > div { min-width:0; }
 .open-meld .tile-svg { width:var(--meld-tile-width); height:var(--meld-tile-height); }
 .open-meld .called-tile { width:var(--meld-tile-height); height:var(--meld-tile-width); }
 .open-meld .called-tile .tile-svg { position:absolute; left:calc(var(--meld-tile-width) * .2); top:calc(var(--meld-tile-width) * -.2); transform:rotate(90deg); }
-.open-meld .added-kan-tile { position:absolute; width:var(--meld-tile-height); height:var(--meld-tile-width); left:var(--called-offset); bottom:calc(var(--meld-tile-width) + 1px); z-index:2; }
+.open-meld .added-kan-tile { position:absolute; width:var(--meld-tile-height); height:var(--meld-tile-width); left:var(--called-offset); bottom:calc(var(--meld-tile-height) - var(--meld-tile-width)); z-index:2; }
 .open-meld .added-kan-tile .tile-svg { position:absolute; left:calc(var(--meld-tile-width) * .2); top:calc(var(--meld-tile-width) * -.2); transform:rotate(90deg); }
 .open-meld .pending-kan-tile { outline:2px dashed #ffda7d; background:#80551b; }
 .open-meld small { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }

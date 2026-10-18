@@ -40,13 +40,29 @@ jobs:
           curl --fail --silent http://127.0.0.1:4173/heibon-mahjong/ > /dev/null
           export HEIBON_CHROMIUM="$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
           export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
-          python tests/browser-riichi-discard-layout.py
-          python tests/browser-table-ui.py
-          python tests/browser-dora-rows.py
-          python tests/browser-mobile-table-layout.py
-          python tests/browser-seat-kan-overlap.py
-          python tests/browser-step13-5-5.py
-          python tests/browser-step13-5-5-kan.py
+          run_browser_test() {
+            browser_script="$1"
+            if browser_output="$(python "$browser_script" 2>&1)"; then
+              printf '%s\n' "$browser_output"
+              return 0
+            else
+              browser_status=$?
+              printf '%s\n' "$browser_output"
+              browser_failure_line="$(printf '%s\n' "$browser_output" | tail -n 1 | cut -c1-4000)"
+              browser_failure_line="${browser_failure_line//'%'/'%25'}"
+              browser_failure_line="${browser_failure_line//$'\r'/'%0D'}"
+              browser_failure_line="${browser_failure_line//$'\n'/'%0A'}"
+              echo "::error title=Browser UI failed (${browser_script})::${browser_failure_line}"
+              return "$browser_status"
+            fi
+          }
+          run_browser_test tests/browser-riichi-discard-layout.py
+          run_browser_test tests/browser-table-ui.py
+          run_browser_test tests/browser-dora-rows.py
+          run_browser_test tests/browser-mobile-table-layout.py
+          run_browser_test tests/browser-seat-kan-overlap.py
+          run_browser_test tests/browser-step13-5-5.py
+          run_browser_test tests/browser-step13-5-5-kan.py
       - name: Save browser results and screenshots
         if: always()
         uses: actions/upload-artifact@v4
