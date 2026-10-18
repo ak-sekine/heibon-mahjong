@@ -93,7 +93,7 @@ with sync_playwright() as p:
                       return {width:innerWidth,player:3,scene:'chi',count,maximum};
                     }''')
                     legacy_style.evaluate('(style)=>style.remove()')
-                result = page.evaluate('''({player,types})=>{
+                result = page.evaluate('''({player,types,baseline})=>{
                   const rawRect=e=>{const r=e.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
                   const rect=e=>{const r=rawRect(e);return {
                     left:+r.left.toFixed(2),top:+r.top.toFixed(2),right:+r.right.toFixed(2),bottom:+r.bottom.toFixed(2),
