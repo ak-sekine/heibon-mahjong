@@ -100,7 +100,10 @@ with sync_playwright() as p:
                 idsUnique: physical.length === 136 && new Set(physical.map(tile => tile.id)).size === 136 };
             }''')
             assert result['method'] == method and result['role'] == expected_id, (width, name, result)
-            assert result['roleHan'] == NAMES[expected_id][1], (width, name, result)
+            expected_role_han = NAMES[expected_id][1]
+            if name == 'chinitsu-open-tsumo':
+                expected_role_han = 5
+            assert result['roleHan'] == expected_role_han, (width, name, result)
             assert result['idsUnique'], (width, name, 'physical inventory changed')
             assert result['redHan'] == 0, (width, name, result)
             summary = page.locator('.round-summary-yaku').first.inner_text()
@@ -116,7 +119,7 @@ with sync_playwright() as p:
             assert page.locator('#result-dialog').is_visible(), (width, name, 'detail did not open')
             section = page.locator('.winner-result').first
             detail_yaku = section.locator('ul').first.locator('li').all_inner_texts()
-            assert f'{NAMES[expected_id][0]} {NAMES[expected_id][1]}翻' in detail_yaku, (width, name, detail_yaku)
+            assert f'{NAMES[expected_id][0]} {expected_role_han}翻' in detail_yaku, (width, name, detail_yaku)
             assert f'合計：{result["totalHan"]}翻' in section.inner_text(), (width, name, result)
             assert f'{result["points"]}点' in section.locator('.win-score').inner_text(), (width, name, result)
             scroll = page.locator('#result-body').evaluate('element => element.scrollHeight > element.clientHeight')
