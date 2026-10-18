@@ -81,8 +81,10 @@ with sync_playwright() as p:
                   });
                   const orientationDeltas=faceTiles.map(e=>{
                     const r=rect(e),turned=Boolean(e.closest('.called-tile,.added-kan-tile'));
-                    const expectedWidth=turned?riverSize.height:riverSize.width;
-                    const expectedHeight=turned?riverSize.width:riverSize.height;
+                    const ownRiver=q(`.river[data-player-id="${owner(e)}"] .river-tile .tile-svg`);
+                    const ownRiverSize=rect(ownRiver);
+                    const expectedWidth=turned?ownRiverSize.height:ownRiverSize.width;
+                    const expectedHeight=turned?ownRiverSize.width:ownRiverSize.height;
                     return Math.max(Math.abs(r.width-expectedWidth),Math.abs(r.height-expectedHeight));
                   });
                   const inside=[];
