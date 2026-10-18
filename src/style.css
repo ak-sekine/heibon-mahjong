@@ -193,10 +193,9 @@ header > div { min-width:0; }
 .open-meld .tile-svg { width:var(--meld-tile-width); height:var(--meld-tile-height); }
 .open-meld .called-tile { width:var(--meld-tile-height); height:var(--meld-tile-width); }
 .open-meld .called-tile .tile-svg { position:absolute; left:calc(var(--meld-tile-width) * .2); top:calc(var(--meld-tile-width) * -.2); transform:rotate(90deg); }
-/* Anchor the fourth tile to the called tile's own box, so flex gaps and seat
-   rotations cannot move it away from the tile it covers. Half overlap keeps
-   both faces legible while sharing the called tile's actual footprint. */
-.open-meld .added-kan-tile { position:absolute; width:var(--meld-tile-height); height:var(--meld-tile-width); left:0; top:calc(0px - var(--meld-tile-width) * .5); z-index:2; }
+/* Anchor the fourth face to the called tile and offset by one rotated tile
+   height plus the normal meld gap, so the two faces remain fully visible. */
+.open-meld .added-kan-tile { position:absolute; width:var(--meld-tile-height); height:var(--meld-tile-width); left:0; top:calc(0px - var(--meld-tile-width) - var(--meld-tile-gap)); z-index:2; }
 .open-meld .added-kan-tile .tile-svg { position:absolute; left:calc(var(--meld-tile-width) * .2); top:calc(var(--meld-tile-width) * -.2); transform:rotate(90deg); }
 .open-meld .pending-kan-tile { outline:2px dashed #ffda7d; background:#80551b; }
 .open-meld small { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
@@ -278,6 +277,21 @@ header > div { min-width:0; }
 .table .seat .open-meld > span { width:var(--meld-tile-width); height:var(--meld-tile-height); }
 .table .seat .open-meld .tile-svg { width:var(--meld-tile-width); height:var(--meld-tile-height); }
 .table .seat .open-meld .called-tile,.table .seat .open-meld .added-kan-tile { width:var(--meld-tile-height); height:var(--meld-tile-width); }
+/* Keep the full sideways pair inside each meld. Side-seat local vertical
+   offsets rotate to the screen's horizontal axis. */
+.table .seat .open-meld[data-meld-type='kakan'] { padding-top:calc(var(--meld-tile-width) + var(--meld-tile-gap)); }
+.table .seat .open-melds:has(.open-meld[data-meld-type='kakan']) { align-items:flex-end; }
+.table .seat-top .open-melds:has(.open-meld[data-meld-type='kakan']) { align-items:flex-start; }
+.table .seat-top .open-meld[data-meld-type='kakan'] { padding-top:0; padding-bottom:calc(var(--meld-tile-width) + var(--meld-tile-gap)); }
+.table .seat-top .open-meld[data-meld-type='kakan'] .added-kan-tile { top:calc(var(--meld-tile-width) + var(--meld-tile-gap)); }
+.table .seat-left .open-melds:has(.open-meld[data-meld-type='kakan']),.table .seat-right .open-melds:has(.open-meld[data-meld-type='kakan']) { align-items:flex-start; }
+.table .seat-left .open-meld[data-meld-type='kakan'] { padding-top:calc(var(--meld-tile-width) + var(--meld-tile-gap)); padding-bottom:0; margin-top:calc(0px - var(--meld-tile-width) - var(--meld-tile-gap)); margin-bottom:0; transform:none; }
+.table .seat-right .open-meld[data-meld-type='kakan'] { padding-top:0; padding-bottom:calc(var(--meld-tile-width) + var(--meld-tile-gap)); margin-bottom:calc(0px - var(--meld-tile-width) - var(--meld-tile-gap)); transform:translateY(calc(0px - (var(--meld-tile-width) + var(--meld-tile-gap)) * .8)); }
+.table .seat-left .open-meld[data-meld-type='kakan'] .added-kan-tile { top:calc(0px - var(--meld-tile-width) - var(--meld-tile-gap)); }
+.table .seat-right .open-meld[data-meld-type='kakan'] .added-kan-tile { top:calc(var(--meld-tile-width) + var(--meld-tile-gap)); }
+@media (min-width:960px) {
+ .table .seat-right .open-meld[data-meld-type='kakan'] { transform:translateY(calc(0px - var(--meld-tile-width) - var(--meld-tile-gap))); }
+}
 .table .seat-bottom { left:5px; right:5px; bottom:2px; flex-direction:row; gap:8px; align-items:flex-end; justify-content:center; }
 .table .seat-bottom #player-hand { order:1; }
 .table .seat-bottom .open-melds { order:2; justify-content:center; padding-top:0; }

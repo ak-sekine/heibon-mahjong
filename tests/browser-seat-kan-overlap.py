@@ -24,7 +24,7 @@ scenes = [
     ('kakan-from-direction-2', ['kakan'], 2),
 ]
 reports = []
-maximum_kan_overlap = {'width':None,'player':None,'scene':None,'overlapX':0,'overlapY':0,'count':0}
+kakan_measurements = []
 previous_layout_cpu3_overlap = None
 previous_side_layout_css = '''
 .table .seat { --meld-tile-width:var(--table-tile-width); --meld-tile-height:var(--table-tile-height); gap:5px; }
@@ -129,20 +129,45 @@ with sync_playwright() as p:
                   const addedKanNode=addedKanTile?.closest('.added-kan-tile')||null;
                   const calledNode=calledTile?.closest('.called-tile')||null;
                   const kakanGeometry=calledTile&&addedKanTile?(()=>{
-                    const called=rawRect(calledTile),added=rawRect(addedKanTile),shortSide=Math.min(called.width,called.height);
-                    const expectedDelta=player===1?{x:-shortSide/2,y:0}:player===3?{x:shortSide/2,y:0}:{x:0,y:-shortSide/2};
-                    const delta={x:added.left-called.left,y:added.top-called.top};
+                    const called=rawRect(calledTile),added=rawRect(addedKanTile);
+                    const axis=player===1||player===3?'x':'y';
+                    const sign=player===0?-1:1;
+                    const gap=axis==='x'
+                      ? sign<0?called.left-added.right:added.left-called.right
+                      : sign<0?called.top-added.bottom:added.top-called.bottom;
                     const intersection=overlap(called,added);
-                    const overlapRatio=intersection.x*intersection.y/(added.width*added.height);
+                    const overlapArea=intersection.x*intersection.y;
+                    const crossOverlap=axis==='x'?intersection.y:intersection.x;
+                    const crossSize=axis==='x'?Math.min(called.height,added.height):Math.min(called.width,added.width);
+                    const expectedMeld=layoutGame.players[player].melds.find(m=>m.type==='kakan');
                     const calledIndex=direction===3?0:direction===2?1:2;
                     const calledGroup=calledNode?.closest('.open-meld')||null;
                     const calledIndexOK=Boolean(calledGroup)&&[...calledGroup.children].indexOf(calledNode)===calledIndex;
-                    return {expectedDelta,delta,overlapRatio,parentIsCalled:addedKanNode?.parentElement===calledNode,
-                      calledIndexOK,
-                      onTop:addedKanNode?getComputedStyle(addedKanNode).zIndex==='2':false,
-                      geometryOK:Math.abs(delta.x-expectedDelta.x)<=.25&&Math.abs(delta.y-expectedDelta.y)<=.25&&
-                        Math.abs(overlapRatio-.5)<=.025&&addedKanNode?.parentElement===calledNode&&
-                        calledIndexOK&&getComputedStyle(addedKanNode).zIndex==='2'};
+                    const visible=face=>{
+                      const style=getComputedStyle(face),r=rawRect(face);
+                      if(style.display==='none'||style.visibility!=='visible'||Number(style.opacity)===0||r.width===0||r.height===0)return false;
+                      for(let parent=face.parentElement;parent&&parent!==document.body;parent=parent.parentElement){
+                        const parentStyle=getComputedStyle(parent),box=rawRect(parent);
+                        if(['hidden','clip','auto','scroll'].includes(parentStyle.overflowX)&&(r.left<box.left-.1||r.right>box.right+.1))return false;
+                        if(['hidden','clip','auto','scroll'].includes(parentStyle.overflowY)&&(r.top<box.top-.1||r.bottom>box.bottom+.1))return false;
+                      }
+                      return true;
+                    };
+                    const meldBox=rawRect(kakanMeld);
+                    const insideMeld=face=>{const r=rawRect(face);return r.left>=meldBox.left-.1&&r.top>=meldBox.top-.1&&r.right<=meldBox.right+.1&&r.bottom<=meldBox.bottom+.1;};
+                    const deltaSignOK=gap>=-.05;
+                    const areaZero=overlapArea===0;
+                    const spacingOK=deltaSignOK&&gap<=1.05;
+                    const axisOK=(player===1||player===3)?axis==='x':axis==='y';
+                    const alignedOK=Math.abs(crossOverlap-crossSize)<=.15;
+                    const sameSize=Math.abs(called.width-added.width)<=.15&&Math.abs(called.height-added.height)<=.15;
+                    const fullFaces=visible(calledTile)&&visible(addedKanTile)&&insideMeld(calledTile)&&insideMeld(addedKanTile);
+                    const correctTiles=Boolean(expectedMeld)&&calledNode?.dataset.tileId===expectedMeld.calledTileId&&addedKanNode?.dataset.tileId===expectedMeld.addedTileId;
+                    const parentIsCalled=addedKanNode?.parentElement===calledNode;
+                    const geometryOK=areaZero&&spacingOK&&axisOK&&alignedOK&&sameSize&&fullFaces&&correctTiles&&parentIsCalled&&calledIndexOK;
+                    return {axis,sign,gap:+gap.toFixed(4),overlapX:+intersection.x.toFixed(4),overlapY:+intersection.y.toFixed(4),overlapArea:+overlapArea.toFixed(4),
+                      crossOverlap:+crossOverlap.toFixed(4),crossSize:+crossSize.toFixed(4),areaZero,spacingOK,axisOK,alignedOK,sameSize,fullFaces,
+                      correctTiles,parentIsCalled,calledIndexOK,geometryOK};
                   })():null;
                   const dimensions=faceTiles.map(e=>{
                     const r=rect(e),actual=[r.width,r.height].sort((a,b)=>a-b);
@@ -157,7 +182,7 @@ with sync_playwright() as p:
                     return Math.max(Math.abs(r.width-expectedWidth),Math.abs(r.height-expectedHeight));
                   });
                   const inside=[];
-                  const collisions={tilePairs:[],sameRiver:[],anyRiver:[],center:[],neighbors:[],selfVsSide:[],intentionalKakan:[]};
+                  const collisions={tilePairs:[],sameRiver:[],anyRiver:[],center:[],neighbors:[],selfVsSide:[]};
                   const record=(list,a,b,extra={})=>{const x=overlap(rawRect(a),rawRect(b));if(x.x>0&&x.y>0)list.push({a:describe(a),b:describe(b),overlapX:+x.x.toFixed(4),overlapY:+x.y.toFixed(4),...extra});};
                   for(const e of tiles){
                     const r=rawRect(e);
@@ -165,15 +190,12 @@ with sync_playwright() as p:
                     if(!separate(r,center))record(collisions.center,e,q('.center-info'));
                   }
                   for(let i=0;i<tiles.length;i++)for(let j=i+1;j<tiles.length;j++){
-                    const a=tiles[i],b=tiles[j],sameMeld=meld(a)&&meld(a)===meld(b),added=sameMeld&&(a.closest('.added-kan-tile')||b.closest('.added-kan-tile'));
+                    const a=tiles[i],b=tiles[j];
                     const x=overlap(rawRect(a),rawRect(b));
                     if(x.x===0||x.y===0)continue;
-                    if(added)record(collisions.intentionalKakan,a,b);
-                    else {
-                      record(collisions.tilePairs,a,b);
-                      if(owner(a)!==owner(b))record(collisions.neighbors,a,b);
-                      if((owner(a)==='0'&&['1','3'].includes(owner(b)))||(owner(b)==='0'&&['1','3'].includes(owner(a))))record(collisions.selfVsSide,a,b);
-                    }
+                    record(collisions.tilePairs,a,b);
+                    if(owner(a)!==owner(b))record(collisions.neighbors,a,b);
+                    if((owner(a)==='0'&&['1','3'].includes(owner(b)))||(owner(b)==='0'&&['1','3'].includes(owner(a))))record(collisions.selfVsSide,a,b);
                   }
                   for(const tile of tiles)for(const discard of riverFaces){
                     const id=owner(tile),riverOwner=discard.closest('.river').dataset.playerId;
@@ -229,12 +251,11 @@ with sync_playwright() as p:
                     unexpectedOverlapX:+Math.max(0,...unexpectedHits.map(hit=>hit.overlapX)).toFixed(2),
                     unexpectedOverlapY:+Math.max(0,...unexpectedHits.map(hit=>hit.overlapY)).toFixed(2),
                     hiddenCpuIdsProtected:hiddenClean,riverTileCount:river.length,
-                    kakanStackCorrect:collisions.intentionalKakan.length===1&&collisions.intentionalKakan.every(hit=>(hit.a.added&&hit.b.called)||(hit.b.added&&hit.a.called)),
                     selfHandSizeUnchanged:selfSizes.every(r=>Math.abs(r.width-baseline.hand.width)<.15&&Math.abs(r.height-baseline.hand.height)<.15),
                     doraSizeUnchanged:Math.abs(dora.width-baseline.dora.width)<.15&&Math.abs(dora.height-baseline.dora.height)<.15,
                     tilePairCollisions:collisions.tilePairs,ownRiverCollisions:collisions.sameRiver,anyRiverCollisions:collisions.anyRiver,
                     neighborCollisions:collisions.neighbors,centerCollisions:collisions.center,selfSideCollisions:collisions.selfVsSide,
-                    intentionalKakanOverlap:collisions.intentionalKakan
+                    kakanMeldBCR:kakanMeld?rect(kakanMeld):null
                   };
                 }''', {'player':player,'types':types,'direction':direction,'baseline':baseline})
                 checks=['square','noHorizontalScroll','allTileSizesMatchRiver','allTileOrientationsMatchRiver','handSizeOK','handMeldDirection','handMeldGapOK','meldOrder','meldVisualOrder','meldCompositionCorrect','tableContainment','ownRiverClear','allRiversClear','seatTilesClear','neighborSeatsClear','centerClear','selfVsCpu1Cpu3Clear','hiddenCpuIdsProtected','selfHandSizeUnchanged','doraSizeUnchanged']
@@ -242,16 +263,9 @@ with sync_playwright() as p:
                 assert all(result[name] for name in checks), f'{width}px player {player} {scene}: {result}'
                 assert result['unexpectedOverlapCount']==0, f'{width}px player {player} {scene}: unexpected face overlap: {result}'
                 if 'kakan' in types:
-                    intentional=result['intentionalKakanOverlap']
-                    assert intentional, f'{width}px player {player} {scene}: added-kan tile did not overlap its stack: {result}'
-                    assert result['kakanStackCorrect'], f'{width}px player {player} {scene}: added-kan tile did not stack only on the called face: {result}'
-                    assert result['kakanGeometry'] and result['kakanGeometry']['geometryOK'], f'{width}px player {player} {scene}: added-kan tile is not anchored at a readable half-overlap on the called tile: {result}'
-                    for hit in intentional:
-                        if hit['overlapX']*hit['overlapY']>maximum_kan_overlap['overlapX']*maximum_kan_overlap['overlapY']:
-                            maximum_kan_overlap.update({'width':width,'player':player,'scene':scene,
-                                'overlapX':hit['overlapX'],'overlapY':hit['overlapY']})
-                    maximum_kan_overlap['count']+=len(intentional)
-                reports.append({'width':width,'height':height,'player':player,'scene':scene,**{k:result[k] for k in ['table','expectedTile','maxTileSizeDelta','maxTileOrientationDelta','handMeldGap','riverTileBCR','handBackBCR','meldTileBCR','calledTileBCR','addedKanTileBCR','kakanGeometry','unexpectedOverlapCount','unexpectedOverlapX','unexpectedOverlapY','selfHandSizeUnchanged','doraSizeUnchanged']}})
+                    assert result['kakanGeometry'] and result['kakanGeometry']['geometryOK'], f'{width}px player {player} {scene}: added-kan face is not fully visible and adjacent to its called face: {result}'
+                    kakan_measurements.append({'width':width,'player':player,'scene':scene,**result['kakanGeometry']})
+                reports.append({'width':width,'height':height,'player':player,'scene':scene,**{k:result[k] for k in ['table','expectedTile','maxTileSizeDelta','maxTileOrientationDelta','handMeldGap','riverTileBCR','handBackBCR','meldTileBCR','calledTileBCR','addedKanTileBCR','kakanMeldBCR','kakanGeometry','unexpectedOverlapCount','unexpectedOverlapX','unexpectedOverlapY','selfHandSizeUnchanged','doraSizeUnchanged']}})
                 if scene=='kakan-from-direction-3':
                     page.screenshot(path=str(out/f'kakan-{width}-seat{player}.png'),full_page=True)
                 if width==320 and player==3 and scene=='empty':
@@ -260,7 +274,7 @@ with sync_playwright() as p:
         page.close()
     browser.close()
 
-(out/'seat-kan-overlap.json').write_text(json.dumps({'layouts':reports,'intentionalKanOverlap':maximum_kan_overlap,'previousLayoutCpu3Overlap':previous_layout_cpu3_overlap},ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+(out/'seat-kan-overlap.json').write_text(json.dumps({'layouts':reports,'kakanGeometry':kakan_measurements,'previousLayoutCpu3Overlap':previous_layout_cpu3_overlap},ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 viewport_metrics = {}
 for layout in reports:
     key = f"{layout['width']}x{layout['height']}"
@@ -275,7 +289,14 @@ for layout in reports:
     for field, report in [('meld',layout['meldTileBCR']),('called',layout['calledTileBCR']),('addedKan',layout['addedKanTileBCR'])]:
         if report is not None and seat[field] is None:
             seat[field] = report
-measurement_notice = {'layouts':len(reports),'viewports':list(viewport_metrics.values()),'intentionalKanOverlap':maximum_kan_overlap,'previousLayoutCpu3Overlap':previous_layout_cpu3_overlap}
+measurement_notice = {'layouts':len(reports),'viewports':list(viewport_metrics.values()),'kakanGeometry':{
+    'count':len(kakan_measurements),
+    'minimumGap':min((m['gap'] for m in kakan_measurements),default=None),
+    'maximumGap':max((m['gap'] for m in kakan_measurements),default=None),
+    'maximumOverlapArea':max((m['overlapArea'] for m in kakan_measurements),default=None),
+    'allCorrectTiles':all(m['correctTiles'] for m in kakan_measurements),
+    'allFullFacesVisible':all(m['fullFaces'] for m in kakan_measurements)
+  },'previousLayoutCpu3Overlap':previous_layout_cpu3_overlap}
 print(f"::notice title=Rendered tile BCR measurements::{json.dumps(measurement_notice,separators=(',',':'))}")
 print(f'{len(reports)} layouts passed: six widths, four seats, 0–4 melds and all requested meld types.')
-print(f'Kakan stack overlap measured separately: {maximum_kan_overlap}')
+print(f"Kakan faces: {measurement_notice['kakanGeometry']['count']} pairs, {measurement_notice['kakanGeometry']['minimumGap']}–{measurement_notice['kakanGeometry']['maximumGap']}px gap, maximum overlap area {measurement_notice['kakanGeometry']['maximumOverlapArea']}px².")
