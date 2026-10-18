@@ -134,7 +134,8 @@ with sync_playwright() as p:
                     const intersection=overlap(called,added);
                     const overlapRatio=intersection.x*intersection.y/(added.width*added.height);
                     const calledIndex=direction===3?0:direction===2?1:2;
-                    const calledIndexOK=[...playerMeld.children].indexOf(calledNode)===calledIndex;
+                    const calledGroup=calledNode?.closest('.open-meld')||null;
+                    const calledIndexOK=Boolean(calledGroup)&&[...calledGroup.children].indexOf(calledNode)===calledIndex;
                     return {expectedDelta,delta,overlapRatio,parentIsCalled:addedKanNode?.parentElement===calledNode,
                       calledIndexOK,
                       onTop:addedKanNode?getComputedStyle(addedKanNode).zIndex==='2':false,
