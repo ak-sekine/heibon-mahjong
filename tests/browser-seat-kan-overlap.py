@@ -123,8 +123,9 @@ with sync_playwright() as p:
                   const playerMeld=q(`.open-melds[data-player-id="${player}"]`);
                   const meldFaces=playerMeld?[...playerMeld.querySelectorAll('svg,.concealed-kan-back')]:[];
                   const meldTile=meldFaces.find(e=>!e.closest('.called-tile,.added-kan-tile'));
-                  const calledTile=playerMeld?.querySelector('.called-tile .tile-svg')||null;
-                  const addedKanTile=playerMeld?.querySelector('.added-kan-tile:not(.pending-kan-tile) .tile-svg')||null;
+                  const kakanMeld=playerMeld?.querySelector('.open-meld[data-meld-type="kakan"]')||null;
+                  const calledTile=kakanMeld?.querySelector('.called-tile .tile-svg')||null;
+                  const addedKanTile=kakanMeld?.querySelector('.added-kan-tile:not(.pending-kan-tile) .tile-svg')||null;
                   const addedKanNode=addedKanTile?.closest('.added-kan-tile')||null;
                   const calledNode=calledTile?.closest('.called-tile')||null;
                   const kakanGeometry=calledTile&&addedKanTile?(()=>{
