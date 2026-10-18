@@ -249,7 +249,7 @@ header > div { min-width:0; }
 .table .seat { --meld-tile-width:var(--river-tile-width); --meld-tile-height:var(--river-tile-height); position:absolute; display:flex; flex-direction:row; gap:4px; padding:0; align-items:center; justify-content:center; }
 .seat-top { top:2px; left:8px; right:8px; height:calc(var(--table-tile-height) + var(--meld-headroom)); }
 .table .seat-top { align-items:flex-start; flex-direction:row-reverse; }
-.table .seat-left,.table .seat-right { --side-seat-offset:calc(var(--river-tile-height)*.5 + 1px); top:50%; left:50%; width:calc(100% - 10px); height:var(--table-tile-height); }
+.table .seat-left,.table .seat-right { --side-seat-offset:calc(var(--river-tile-height)*.5 + 2px); top:50%; left:50%; width:calc(100% - 10px); height:var(--table-tile-height); }
 .table .seat-left { transform:translate(-50%,-50%) translateX(calc(-50cqw + var(--side-seat-offset))) rotate(90deg); }
 .table .seat-right { transform:translate(-50%,-50%) translateX(calc(50cqw - var(--side-seat-offset))) rotate(270deg); }
 .table .seat .concealed-hand { display:flex; flex-direction:row; gap:1px; margin:0; max-width:none; }
