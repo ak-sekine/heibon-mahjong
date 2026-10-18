@@ -199,7 +199,7 @@ with sync_playwright() as p:
                     neighborCollisions:collisions.neighbors,centerCollisions:collisions.center,selfSideCollisions:collisions.selfVsSide,
                     intentionalKakanOverlap:collisions.intentionalKakan
                   };
-                }''', {'player':player,'types':types})
+                }''', {'player':player,'types':types,'baseline':baseline})
                 checks=['square','noHorizontalScroll','allTileSizesMatchRiver','allTileOrientationsMatchRiver','handSizeOK','handMeldDirection','handMeldGapOK','meldOrder','meldVisualOrder','tableContainment','ownRiverClear','allRiversClear','seatTilesClear','neighborSeatsClear','centerClear','selfVsCpu1Cpu3Clear','hiddenCpuIdsProtected','selfHandSizeUnchanged','doraSizeUnchanged']
                 assert result['riverTileCount']==18, f'{width}px player {player} {scene}: expected 18 close river tiles: {result}'
                 assert all(result[name] for name in checks), f'{width}px player {player} {scene}: {result}'
