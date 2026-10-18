@@ -48,7 +48,7 @@ jobs:
             else
               browser_status=$?
               printf '%s\n' "$browser_output"
-              browser_failure_line="$(printf '%s\n' "$browser_output" | tail -n 1 | cut -c1-4000)"
+              browser_failure_line="$(printf '%s\n' "$browser_output" | tail -n 6 | tr '\n' ' ' | cut -c1-4000)"
               browser_failure_line="${browser_failure_line//'%'/'%25'}"
               browser_failure_line="${browser_failure_line//$'\r'/'%0D'}"
               browser_failure_line="${browser_failure_line//$'\n'/'%0A'}"
