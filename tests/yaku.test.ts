@@ -43,10 +43,11 @@ test('double wind has independent IDs and two han', () => {
   assert.deepEqual(c.yaku.map(y => y.id), ['yakuhai-seat-wind', 'yakuhai-round-wind']);
 });
 test('other wind triplet is not yakuhai', () => check(['123m', '456p', '789s', '33344z'], '1m', 'yakuhai-seat-wind', false));
-test('multiple dragon triplets sum', () => {
+test('大三元 excludes ordinary yaku and dragon yakuhai', () => {
   const c = analyzeYaku(hand('123m', '55566677744z'), context()).candidates[0];
-  assert.equal(c.totalHan, 10);
-  assert.deepEqual(c.yaku.map(y => y.id), ['honitsu', 'yakuhai-white', 'yakuhai-green', 'yakuhai-red', 'chanta', 'sanankou']);
+  assert.equal(c.totalHan, 0);
+  assert.equal(c.yakumanCount, 1);
+  assert.deepEqual(c.yaku.map(y => y.id), ['daisangen']);
 });
 for (const [name, groups, expected] of [
   ['four triplets', ['111999m', '222p', '888s', '33z'], true],

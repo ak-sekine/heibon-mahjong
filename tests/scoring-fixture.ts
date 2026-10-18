@@ -12,8 +12,18 @@ import { declareTsumo } from '../src/game/tsumo.ts';
 import { discardTile } from '../src/game/discard.ts';
 import { drawTile } from '../src/game/draw.ts';
 import { startGame } from '../src/game/start.ts';
+import type { GameState } from '../src/model/game.ts';
 
 const PINFU = ['123m','789m','234p','66p','678s'];
+function childTsumo(groups: string[], indicator: string): GameState {
+  const game = tsumoGame(groups, false, [], indicator);
+  const dealerId = 1;
+  const winds = ['east', 'south', 'west', 'north'] as const;
+  const players = game.players.map(player => ({ ...player,
+    wind: winds[(player.id - dealerId + 4) % 4],
+  })) as unknown as typeof game.players;
+  return { ...game, dealerId, players };
+}
 export function scoringGame(name: string) {
   switch(name) {
     case 'pinfu-parent': return tsumoGame(PINFU,false,[],'sou-9');
@@ -26,6 +36,8 @@ export function scoringGame(name: string) {
     case 'mangan-child': return declareTsumo(cpuTsumoGame(1),1);
     case 'yakuman-parent': return tsumoGame(['19m','19p','19s','12345677z'],false,[],'man-9');
     case 'yakuman-child': return declareTsumo(cpuTsumoGame(1,['19m','19p','19s','12345677z'],'man-9'),1);
+    case 'step13-8-single-yakuman': return tsumoGame(['555z','666z','777z','123m','55p'],false,[],'man-4');
+    case 'step13-8-multiple-yakuman': return childTsumo(['222s','333s','444s','666s','88s'],'man-4');
     case 'ron-child': return ronGame(1,[0]);
     case 'ron-parent': {
       let game=ronStart(1,[0],undefined,'sou-5',true,'sou-4',true);
@@ -33,9 +45,9 @@ export function scoringGame(name: string) {
       game=drawTile(game,1);
       return discardTile(game,1,game.players[1].drawnTile!.id);
     }
-    case 'haneman': return limitTsumo(['555z','666z','777z','222m','33p'],false,[],'sou-9');
-    case 'baiman': return limitTsumo(['555z','666z','777z','111z','22z'],false,[],'sou-9');
-    case 'sanbaiman': return limitTsumo(['555z','666z','777z','111z','22z'],false,[],'north');
+    case 'haneman': return limitTsumo(['123m','123m','345m','678m','77m'],false,[],'man-9');
+    case 'baiman': return limitTsumo(['11223344556688m'],false,[],'man-9');
+    case 'sanbaiman': return limitTsumo(['12312312312377m'],false,[],'man-9');
     case 'seven-pairs-ron': return ronGame(1,[0],[['11m','33m','55p','77p','22s','44s','7z']],'red',false,'sou-9');
     case 'double': return ronGame(1,[0,2]);
     case 'triple': return ronGame(1,[0,2,3]);

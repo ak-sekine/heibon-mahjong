@@ -110,8 +110,8 @@ test('legacy selector remains supported and reset drops scoring',()=>{
 });
 
 for (const [name, fu, tier, points] of [
-  ['haneman',60,'baiman',24000],['baiman',60,'sanbaiman',36000],
-  ['sanbaiman',60,'kazoe-yakuman',48000],['seven-pairs-ron',25,'normal',1600],
+  ['haneman',30,'baiman',24000],['baiman',30,'sanbaiman',36000],
+  ['sanbaiman',30,'kazoe-yakuman',48000],['seven-pairs-ron',25,'normal',1600],
 ] as const) test(`browser fixed-wall scoring fixture ${name}`, () => {
   const initial = scoringGame(name); freeze(initial); inventory(initial, initial);
   const won = initial.phase === 'awaiting-ron' ? declareRon(initial,0) : declareTsumo(initial,0);

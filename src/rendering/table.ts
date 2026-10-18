@@ -308,7 +308,9 @@ const yakuNames: Record<YakuId, string> = {
   chiitoitsu: '七対子', toitoi: '対々和', shousangen: '小三元', honroutou: '混老頭',
   chanta: '混全帯么九', junchan: '純全帯么九', 'sanshoku-doukou': '三色同刻',
   'sanshoku-doujun': '三色同順', ittsu: '一気通貫', honitsu: '混一色', chinitsu: '清一色',
-  'kokushi-musou': '国士無双',
+  'kokushi-musou': '国士無双', suuankou: '四暗刻', daisangen: '大三元', tsuuiisou: '字一色',
+  ryuuiisou: '緑一色', chinroutou: '清老頭', shousuushii: '小四喜', daisuushii: '大四喜',
+  'chuuren-poutou': '九蓮宝燈',
 };
 const roundSummaryYakuOverrides: Partial<Record<YakuId, string>> = {
   'menzen-tsumo': 'ツモ',
@@ -357,6 +359,11 @@ function renderRoundSummary(game: GameState, settlement: RoundSettlement | null)
         : `合計${result.totalHanIncludingDora}翻`, 'round-summary-value'));
       total.append(text('span', `${result.totalPoints.toLocaleString('en-US')}点`, 'round-summary-points'));
       section.append(total);
+      if (result.yakumanCount > 0) {
+        const payments = result.payments.map(payment =>
+          `${seatNames[payment.playerId]}（${payment.playerId === game.dealerId ? '親' : '子'}）→${seatNames[result.winnerId]} ${payment.points.toLocaleString('en-US')}点`);
+        section.append(text('p', `支払：${payments.join('・')}`, 'round-summary-payments'));
+      }
       summary.append(section);
     }
     return;

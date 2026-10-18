@@ -16,7 +16,7 @@ export function tsumoStart(groups = STANDARD, last = false, redSuits: readonly S
   const take = (key: string, allowRed = false): PhysicalTile => {
     const index = pool.findIndex(p => tileKindKey(p.tile) === key &&
       (allowRed || !p.tile.isRed || (p.tile.category === 'suited' && redSuits.includes(p.tile.suit))));
-    if (index < 0) throw new RangeError('Invalid fixture');
+    if (index < 0) throw new RangeError(`Invalid fixture: ${key}`);
     return pool.splice(index, 1)[0];
   };
   const desired = kinds.map(k => take(tileKindKey(k)));

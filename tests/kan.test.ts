@@ -89,10 +89,10 @@ for(const distributed of [false,true])test(`four kans distributed=${distributed}
  const g=kanGame({hands:{0:distributed?['444z','234m','456p','5z']:['444z','5z']},melds:distributed?{0:[{type:'ankan',group:'1111z'}],1:[{type:'ankan',group:'2222z'},{type:'ankan',group:'3333z'}]}:{0:[{type:'ankan',group:'1111z'},{type:'ankan',group:'2222z'},{type:'ankan',group:'3333z'}]},draw:'north',rinshan:['sou-9','pin-9','man-9','white']});
  const r=kan(g);conserved(r,g);assert.equal(r.kanCount,4);assert.equal(r.players[0].drawnTile,g.deadWall[3]);assert.equal(exposedDoraIndicators(r).length,5);assert.equal(uraDoraIndicators(r).length,5);assert.equal(canTakeRinshan(r),false);
  if(distributed){assert.equal(r.abortiveDraw,'four-kans');const m=startMatch(r);assert.equal(m.lastSettlement!.reason,'four-kans');assert.equal(m.lastSettlement!.payments.length,0);assert.equal(m.lastSettlement!.next!.honba,1);assert.equal(m.lastSettlement!.next!.dealerId,m.dealerId);assertPointConservation(m);assert.equal(nextRound(m).game.kanCount,0);}
- else {assert.ok(canDeclareTsumo(r,0));const w=declareTsumo(r,0).winResult!;assert.equal(w.yakumanCount,1);assert.equal(w.doraHan,0);assert.equal(w.redDoraHan,0);}
+ else {assert.ok(canDeclareTsumo(r,0));const w=declareTsumo(r,0).winResult!;assert.equal(w.yakumanCount,4);assert.deepEqual(w.candidate.yaku.map(y=>y.id).sort(),['daisuushii','suuankou','suukantsu','tsuuiisou']);assert.equal(w.doraHan,0);assert.equal(w.redDoraHan,0);}
 });
-test('three kans gives two han and ura follows established riichi',()=>{
- const g=kanGame({hands:{0:['123m','2z']},melds:{0:[{type:'ankan',group:'1111z'},{type:'ankan',group:'3333z'},{type:'ankan',group:'4444z'}]},draw:'south'});
+test('three kans give two han and ura follows established riichi',()=>{
+ const g=kanGame({hands:{0:['123m','2z']},melds:{0:[{type:'ankan',group:'1111z'},{type:'ankan',group:'3333z'},{type:'ankan',group:'5555z'}]},draw:'south'});
  const r=declareTsumo(g,0).winResult!;assert.equal(r.winMethod,'tsumo');assert.ok(r.candidate.yaku.some(y=>y.id==='sankantsu'&&y.han===2));assert.equal(r.uraDoraHan,0);
  const ready={...g,players:g.players.map(p=>p.id===0?{...p,riichi:{declarationTileId:'past'}}:p) as unknown as GameState['players']};assert.ok(getRiichiDiscardOptions(g,0,25000).length);assert.equal(winningMelds(g.players[0].melds).length,3);assert.equal(declareTsumo(ready,0).winResult!.winMethod,'tsumo');
 });

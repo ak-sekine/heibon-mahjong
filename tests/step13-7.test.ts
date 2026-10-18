@@ -94,7 +94,7 @@ test('三暗刻 stays in its decomposition and can combine with toitoi and sansh
   assert.ok(tripletShape.yaku.some(yaku => yaku.id === 'toitoi'));
   assert.equal(sequenceShape.yaku.some(yaku => yaku.id === 'sanankou'), false);
 
-  const combination = analyzeYaku(hand('111m', '111p', '111s', '999m', '55z'), context('5z'));
+  const combination = analyzeYaku(hand('111m', '111p', '111s', '999m', '55z'), context('1m'));
   const candidate = assertRole(combination, 'sanshoku-doukou', 2)[0];
   assert.ok(candidate.yaku.some(yaku => yaku.id === 'sanankou'));
   assert.ok(candidate.yaku.some(yaku => yaku.id === 'toitoi'));
@@ -147,7 +147,9 @@ test('小三元 requires two dragon sets and the third dragon as pair; dragon ya
   assertNoRole(wrongPair, 'shousangen');
   const allThreeSets = analyzeYaku(hand('555z', '666z', '777z', '111m', '44z'), context('1m'));
   assertNoRole(allThreeSets, 'shousangen');
-  assert.equal(allThreeSets.candidates.some(entry => entry.yaku.some(yaku => yaku.yakuman > 0)), false);
+  const bigDragonCandidate = candidatesWith(allThreeSets, 'daisangen')[0];
+  assert.ok(bigDragonCandidate);
+  assert.deepEqual(bigDragonCandidate.yaku.map(yaku => yaku.id), ['daisangen']);
 });
 
 test('小三元 counts open pon and kan without changing its own han', () => {
@@ -178,7 +180,10 @@ test('混老頭 applies to terminal/honor standard and seven-pairs shapes, not m
   assertNoRole(middle, 'honroutou');
 
   const honorsOnly = analyzeYaku(hand('111z', '222z', '333z', '444z', '55z'), context('5z'));
-  assertRole(honorsOnly, 'honroutou', 2);
+  const honorsCandidate = honorsOnly.candidates.find(candidate => candidate.shape === 'standard')!;
+  assert.deepEqual(honorsCandidate.yaku.map(yaku => yaku.id).sort(), ['daisuushii', 'suuankou', 'tsuuiisou']);
+  assert.equal(honorsCandidate.yakumanCount, 3);
+  assertNoRole(honorsOnly, 'honroutou');
   assertNoRole(honorsOnly, 'honitsu');
   assertNoRole(honorsOnly, 'chinitsu');
 });
@@ -221,7 +226,7 @@ test('純全帯么九 has closed/open han, rejects honors, and excludes chiitoit
 });
 
 test('三色同刻 needs three same-rank triplets in one decomposition and accepts an open kan', () => {
-  const result = analyzeYaku(hand('111m', '111p', '111s', '999m', '55z'), context('5z'));
+  const result = analyzeYaku(hand('111m', '111p', '111s', '999m', '55z'), context('1m'));
   const candidate = assertRole(result, 'sanshoku-doukou', 2)[0];
   assert.ok(candidate.yaku.some(yaku => yaku.id === 'toitoi'));
   assert.ok(candidate.yaku.some(yaku => yaku.id === 'sanankou'));

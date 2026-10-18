@@ -80,6 +80,7 @@ jobs:
           run_browser_test tests/browser-step13-5-5-kan.py
           run_browser_test tests/browser-step13-6.py
           run_browser_test tests/browser-step13-7.py
+          run_browser_test tests/browser-step13-8.py
       - name: Save browser results and screenshots
         if: always()
         uses: actions/upload-artifact@v4
