@@ -45,8 +45,8 @@ test('double wind has independent IDs and two han', () => {
 test('other wind triplet is not yakuhai', () => check(['123m', '456p', '789s', '33344z'], '1m', 'yakuhai-seat-wind', false));
 test('multiple dragon triplets sum', () => {
   const c = analyzeYaku(hand('123m', '55566677744z'), context()).candidates[0];
-  assert.equal(c.totalHan, 3);
-  assert.deepEqual(c.yaku.map(y => y.id), ['yakuhai-white', 'yakuhai-green', 'yakuhai-red']);
+  assert.equal(c.totalHan, 6);
+  assert.deepEqual(c.yaku.map(y => y.id), ['honitsu', 'yakuhai-white', 'yakuhai-green', 'yakuhai-red']);
 });
 for (const [name, groups, expected] of [
   ['four triplets', ['111999m', '222p', '888s', '33z'], true],
@@ -112,10 +112,10 @@ for (const method of ['ron', 'tsumo'] as const) test(`seven pairs combinations $
 test('11223344556677m separates seven pairs, decompositions and waits', () => {
   const result = analyzeYaku(hand('11223344556677m'), context('4m'));
   const seven = result.candidates.find(c => c.shape === 'seven-pairs')!;
-  assert.deepEqual(seven.yaku, [{ id: 'chiitoitsu', han: 2, yakuman: 0 }]);
+  assert.deepEqual(seven.yaku, [{ id: 'chinitsu', han: 6, yakuman: 0 }, { id: 'chiitoitsu', han: 2, yakuman: 0 }]);
   const standard = result.candidates.filter(c => c.shape === 'standard');
   assert.equal(new Set(standard.map(c => c.decompositionId)).size, 3);
-  assert.deepEqual(standard.map(c => [c.wait, c.totalHan]), [['ryanmen', 2], ['tanki', 1], ['ryanmen', 2]]);
+  assert.deepEqual(standard.map(c => [c.wait, c.totalHan]), [['ryanmen', 8], ['tanki', 7], ['ryanmen', 8]]);
   assert.equal(result.candidates.length, 4);
 });
 test('different decompositions never merge iipeikou with toitoi', () => {

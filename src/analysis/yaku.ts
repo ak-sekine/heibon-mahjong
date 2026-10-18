@@ -20,9 +20,11 @@ export interface WinningContext {
 }
 export type YakuId = 'rinshan' | 'chankan' | 'sankantsu' | 'suukantsu' | 'ippatsu' | 'double-riichi' | 'riichi' | 'menzen-tsumo' | 'tanyao' | 'yakuhai-white' | 'yakuhai-green' |
   'yakuhai-red' | 'yakuhai-seat-wind' | 'yakuhai-round-wind' | 'pinfu' |
-  'iipeikou' | 'chiitoitsu' | 'toitoi' | 'kokushi-musou';
+  'iipeikou' | 'chiitoitsu' | 'toitoi' | 'sanshoku-doujun' | 'ittsu' | 'honitsu' | 'chinitsu' | 'kokushi-musou';
+type NormalYakuId = Exclude<YakuId, 'kokushi-musou' | 'suukantsu'>;
+type NormalYakuHan = 1 | 2 | 3 | 5 | 6;
 export type RecognizedYaku =
-  | Readonly<{ id: Exclude<YakuId, 'kokushi-musou' | 'suukantsu'>; han: 1 | 2; yakuman: 0 }>
+  | Readonly<{ id: NormalYakuId; han: NormalYakuHan; yakuman: 0 }>
   | Readonly<{ id: 'kokushi-musou' | 'suukantsu'; han: 0; yakuman: 1 }>;
 export type WaitType = 'ryanmen' | 'kanchan' | 'penchan' | 'tanki' | 'shanpon';
 export type WinningTileAssignment =
@@ -95,7 +97,7 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
   const allTiles = [...tiles, ...fixed.flatMap(m => m.type === 'triplet' ? [m.tile,m.tile,m.tile] : m.tiles)];
   validateContext(context, tiles);
   const common: RecognizedYaku[] = [];
-  const add = (list: RecognizedYaku[], id: Exclude<YakuId, 'kokushi-musou' | 'suukantsu'>, han: 1 | 2 = 1) =>
+  const add = (list: RecognizedYaku[], id: NormalYakuId, han: NormalYakuHan = 1) =>
     list.push({ id, han, yakuman: 0 });
   if (context.rinshan && context.winMethod==='tsumo') add(common,'rinshan');
   if (context.chankan && context.winMethod==='ron') add(common,'chankan');
@@ -107,6 +109,10 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
   }
   if (closed && context.winMethod === 'tsumo') add(common, 'menzen-tsumo');
   if (allTiles.every(t => t.category === 'suited' && t.rank >= 2 && t.rank <= 8)) add(common, 'tanyao');
+  const suits = new Set(allTiles.flatMap(tile => tile.category === 'suited' ? [tile.suit] : []));
+  const hasHonors = allTiles.some(tile => tile.category === 'honor');
+  if (suits.size === 1 && hasHonors) add(common, 'honitsu', closed ? 3 : 2);
+  else if (suits.size === 1) add(common, 'chinitsu', closed ? 6 : 5);
   const candidates: YakuCandidate[] = [];
   for (const decomposition of shapes.standard.decompositions) {
     const { pair, melds } = decomposition;
@@ -121,7 +127,17 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
       if (honor === context.seatWind) add(base, 'yakuhai-seat-wind');
       if (honor === context.roundWind) add(base, 'yakuhai-round-wind');
     }
-    const sequences = melds.filter(m => m.type === 'sequence').map(meldKey);
+    const sequenceMelds = melds.filter((m): m is Extract<WinningMeld, { type: 'sequence' }> => m.type === 'sequence');
+    const sequenceStarts = new Set(sequenceMelds.flatMap(m => {
+      const start = m.tiles[0];
+      return start.category === 'suited' ? [`${start.suit}:${start.rank}`] : [];
+    }));
+    const sanshoku = Array.from({ length: 7 }, (_, index) => index + 1).some(rank =>
+      (['man', 'pin', 'sou'] as const).every(suit => sequenceStarts.has(`${suit}:${rank}`)));
+    const ittsu = (['man', 'pin', 'sou'] as const).some(suit => [1, 4, 7].every(rank => sequenceStarts.has(`${suit}:${rank}`)));
+    if (sanshoku) add(base, 'sanshoku-doujun', closed ? 2 : 1);
+    if (ittsu) add(base, 'ittsu', closed ? 2 : 1);
+    const sequences = sequenceMelds.map(meldKey);
     const iipeikou = new Set(sequences).size < sequences.length;
     const toitoi = melds.every(m => m.type === 'triplet');
     const emit = (assignment: WinningTileAssignment, wait: WaitType, position: string) => {

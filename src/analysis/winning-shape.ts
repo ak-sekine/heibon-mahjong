@@ -50,6 +50,34 @@ function countsOf(tiles: readonly Tile[], size = 14): number[] {
   return counts;
 }
 
+function validateFixedMelds(fixed: readonly WinningMeld[]): void {
+  if (!Array.isArray(fixed) || fixed.length > 4) throw new RangeError('Too many or invalid melds');
+  for (const meld of fixed) {
+    if (!meld || typeof meld !== 'object') throw new RangeError('Invalid fixed meld');
+    if (meld.type === 'sequence') {
+      if (!Array.isArray(meld.tiles) || meld.tiles.length !== 3) throw new RangeError('Invalid fixed sequence');
+      const faces = meld.tiles.map((kind: TileKind) => {
+        if (!kind || typeof kind !== 'object') throw new RangeError('Invalid fixed sequence tile');
+        return { ...kind, isRed: false } as Tile;
+      });
+      countsOf(faces, 3);
+      const [first, second, third] = meld.tiles;
+      if (first.category !== 'suited' || second.category !== 'suited' || third.category !== 'suited' ||
+          first.suit !== second.suit || first.suit !== third.suit ||
+          second.rank !== first.rank + 1 || third.rank !== first.rank + 2) {
+        throw new RangeError('Invalid fixed sequence');
+      }
+    } else if (meld.type === 'triplet') {
+      if ((meld.kan !== undefined && typeof meld.kan !== 'boolean') ||
+          (meld.concealed !== undefined && typeof meld.concealed !== 'boolean') ||
+          !meld.tile || typeof meld.tile !== 'object') throw new RangeError('Invalid fixed triplet');
+      countsOf(Array.from({ length: 3 }, () => ({ ...meld.tile, isRed: false } as Tile)), 3);
+    } else {
+      throw new RangeError('Invalid fixed meld');
+    }
+  }
+}
+
 function meldKey(meld: WinningMeld): string {
   const kind = meld.type === 'sequence' ? meld.tiles[0] : meld.tile;
   return `${String(kindIndices.get(tileKindKey(kind))).padStart(2, '0')}:${meld.type}`;
@@ -103,7 +131,7 @@ function standardDecompositions(counts: number[], fixed: readonly WinningMeld[] 
 
 /** Shape validity only: no yaku, scoring, winning-tile provenance or game state. */
 export function analyzeWinningShapes(tiles: readonly Tile[], fixed: readonly WinningMeld[] = []): WinningShapeAnalysis {
-  if (fixed.length > 4) throw new RangeError('Too many melds');
+  validateFixedMelds(fixed);
   const counts = countsOf(tiles, 14 - fixed.length * 3);
   countsOf([...tiles, ...fixed.flatMap(m => m.type === 'triplet' ? [m.tile,m.tile,m.tile].map(k => ({...k,isRed:false} as Tile)) : m.tiles.map(k => ({...k,isRed:false} as Tile)))]);
   const physical = [...tiles, ...fixed.flatMap(m=>m.type==='triplet' ? Array.from({length:m.kan?4:3},()=>({...m.tile,isRed:false} as Tile)) : m.tiles.map(k=>({...k,isRed:false} as Tile)))];

@@ -55,6 +55,10 @@ test('round summaries abbreviate selected yaku while detail names stay official'
     { id: 'iipeikou', summary: '一盃口', detail: '一盃口' },
     { id: 'chiitoitsu', summary: '七対子', detail: '七対子' },
     { id: 'toitoi', summary: '対々和', detail: '対々和' },
+    { id: 'sanshoku-doujun', summary: '三色同順', detail: '三色同順' },
+    { id: 'ittsu', summary: '一気通貫', detail: '一気通貫' },
+    { id: 'honitsu', summary: '混一色', detail: '混一色' },
+    { id: 'chinitsu', summary: '清一色', detail: '清一色' },
     { id: 'rinshan', summary: '嶺上開花', detail: '嶺上開花' },
     { id: 'chankan', summary: '槍槓', detail: '槍槓' },
     { id: 'sankantsu', summary: '三槓子', detail: '三槓子' },
@@ -143,7 +147,7 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'normal-multiple', 'u
       assert.ok(!summary.children[0].children.find(child => child.className === 'round-summary-yaku')!.textContent.includes('ドラ'));
     } else {
       const expectedYaku = count === 'normal-multiple' || count === 'ura' ? list.children.map(c => c.textContent).sort()
-        : ['平和 1翻', '門前清自摸和 1翻'];
+        : ['三色同順 2翻', '平和 1翻', '門前清自摸和 1翻'];
       assert.deepEqual(list.children.map(c => c.textContent).sort(), expectedYaku);
       assert.ok(output.includes(`役合計：${win.yakuHan}翻`));
       const normal = count === 'zero-normal' || count === 'no-dora' ? 0
