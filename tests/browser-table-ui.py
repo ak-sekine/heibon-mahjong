@@ -71,7 +71,13 @@ with sync_playwright() as p:
                         const meld=q(`.seat[data-player-id="${id}"] .open-meld`),hand=id===0?q('#player-hand'):q(`.seat[data-player-id="${id}"] .concealed-hand`);
                         if(!meld||!hand)return true;
                         const m=r(meld),h=r(hand);
-                        return id===0?h.right<=m.left+.2:id===2?m.right<=h.left+.2:id===3?m.top>=h.bottom-.2:m.bottom<=h.top+.2;
+                        const fourMelds=Boolean(q(`.seat[data-player-id="${id}"] .open-meld:nth-child(4)`));
+                        // Side seats with fewer than four melds use parallel
+                        // screen-space lanes; four-meld layouts keep the
+                        // existing two-row orientation.
+                        return id===0?h.right<=m.left+.2:id===2?m.right<=h.left+.2:
+                          id===3?(fourMelds?m.top>=h.bottom-.2:m.right<=h.left+.2):
+                          (fourMelds?m.bottom<=h.top+.2:m.left>=h.right-.2);
                       });
                       const hand=[...document.querySelectorAll('#player-hand svg')].map(r);
                       const items=[...document.querySelectorAll('#player-hand li')];

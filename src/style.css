@@ -248,6 +248,19 @@ header > div { min-width:0; }
 .table .seat-left,.table .seat-right { top:50%; left:50%; width:calc(100% - 60px); height:var(--table-tile-height); }
 .table .seat-left { transform:translate(-50%,-50%) translateX(calc(-50cqw + var(--table-tile-height)*.5)) rotate(90deg); }
 .table .seat-right { transform:translate(-50%,-50%) translateX(calc(50cqw - var(--table-tile-height)*.5)) rotate(270deg); }
+/* A side hand and its melds share the edge as parallel lanes. Keeping them
+   in one row and rotating that row makes even one kan run into the bottom
+   player's drawn tile at narrow widths. */
+.table .seat-left:has(.open-meld):not(:has(.open-meld:nth-child(4))),
+.table .seat-right:has(.open-meld):not(:has(.open-meld:nth-child(4))) {
+ --side-seat-lane-gap:calc(var(--table-tile-width)*.6 + 5px);
+ --side-seat-lane-size:calc(var(--table-tile-height)*2 + var(--side-seat-lane-gap));
+ height:var(--side-seat-lane-size);
+ flex-direction:column;
+ gap:var(--side-seat-lane-gap);
+}
+.table .seat-left:has(.open-meld):not(:has(.open-meld:nth-child(4))) { transform:translate(-50%,-50%) translateX(calc(-50cqw + var(--side-seat-lane-size)*.5)) rotate(90deg); }
+.table .seat-right:has(.open-meld):not(:has(.open-meld:nth-child(4))) { transform:translate(-50%,-50%) translateX(calc(50cqw - var(--side-seat-lane-size)*.5)) rotate(270deg); }
 .table .seat .concealed-hand { display:flex; flex-direction:row; gap:1px; margin:0; max-width:none; }
 .table .seat .tile-back { width:var(--table-tile-width); height:var(--table-tile-height); }
 .table .seat .open-melds { display:flex; flex-direction:row; flex-wrap:nowrap; gap:4px; width:auto; padding:0; align-self:auto; max-width:none; }
