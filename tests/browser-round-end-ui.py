@@ -90,8 +90,11 @@ with sync_playwright() as p:
             }
             if (name === 'yakuman-ron') {
               const kokushi = [['1m','9m','1p','9p','1s','9s','1z','2z','3z','4z','5z','6z','7z']];
-              const pre = ronFixture.ronGame(0, [1], kokushi, 'man-1', false);
-              return { pre, win: ron.declareRon(pre, 1) };
+              const win = ronFixture.ronGame(0, [1], kokushi, 'man-1', false);
+              if (win.winResult?.winMethod !== 'ron') throw new Error('Yakuman ron fixture did not resolve');
+              const pre = { ...win, phase: 'awaiting-ron', winResult: null,
+                ronWindow: { kind: 'discard', discarderId: win.winResult.discarderId, tileId: win.winResult.winningTileId } };
+              return { pre, win };
             }
             if (name === 'ura-tsumo') {
               const pre = tsumoFixture.tsumoGame();
