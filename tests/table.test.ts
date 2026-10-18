@@ -726,7 +726,7 @@ for (const source of [1,2,3] as const) test(`Step 13.5.2 added kan preserves pon
     assert.equal(group.children.length,4);
     const calledIndex=source===3?0:source===2?1:2;
     assert.equal(group.children[calledIndex].className,'called-tile');
-    assert.equal(group.style['--called-offset'],`calc(${calledIndex} * (var(--meld-tile-width) + 1px))`);
+    assert.equal(group.style['--called-offset'],`calc(${calledIndex} * (var(--meld-tile-width) + var(--meld-tile-gap)))`);
     assert.match(group.children[3].className,/added-kan-tile/);
     assert.equal(group.children[3].dataset.tileId, meld.type==='kakan'?meld.addedTileId:undefined);
   } finally {globalThis.document=original;}

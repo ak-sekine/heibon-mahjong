@@ -4,18 +4,24 @@ from playwright.sync_api import sync_playwright
 
 widths = [(320,568),(355,812),(375,812),(390,844),(430,932),(1280,800)]
 scenes = [
-    ('empty', []),
-    ('chi', ['chi']),
-    ('pon', ['pon']),
-    ('daiminkan', ['daiminkan']),
-    ('ankan', ['ankan']),
-    ('kakan', ['kakan']),
-    ('chi-pon', ['chi','pon']),
-    ('ankan-kakan', ['ankan','kakan']),
-    ('three-meld-mix', ['chi','pon','daiminkan']),
-    ('four-meld-mix', ['chi','pon','ankan','kakan']),
-    ('four-kan-mix', ['daiminkan','ankan','kakan','daiminkan']),
-    ('four-daiminkan', ['daiminkan','daiminkan','daiminkan','daiminkan']),
+    ('empty', [], 3),
+    ('chi', ['chi'], 3),
+    ('pon', ['pon'], 3),
+    ('daiminkan', ['daiminkan'], 3),
+    ('ankan', ['ankan'], 3),
+    ('kakan', ['kakan'], 3),
+    ('chi-pon', ['chi','pon'], 3),
+    ('ankan-kakan', ['ankan','kakan'], 3),
+    ('three-meld-mix', ['chi','pon','daiminkan'], 3),
+    ('four-meld-mix', ['chi','pon','ankan','kakan'], 3),
+    ('four-kan-mix', ['daiminkan','ankan','kakan','daiminkan'], 3),
+    ('four-daiminkan', ['daiminkan','daiminkan','daiminkan','daiminkan'], 3),
+    ('pon-from-direction-1', ['pon'], 1),
+    ('pon-from-direction-2', ['pon'], 2),
+    ('daiminkan-from-direction-1', ['daiminkan'], 1),
+    ('daiminkan-from-direction-2', ['daiminkan'], 2),
+    ('kakan-from-direction-1', ['kakan'], 1),
+    ('kakan-from-direction-2', ['kakan'], 2),
 ]
 reports = []
 maximum_kan_overlap = {'width':None,'player':None,'scene':None,'overlapX':0,'overlapY':0,'count':0}
@@ -59,14 +65,14 @@ with sync_playwright() as p:
           return {hand:rect(document.querySelector('#player-hand svg')),dora:rect(document.querySelector('.dora-slot svg'))};
         }''')
         for player in range(4):
-            for scene, types in scenes:
-                page.evaluate('''({player,types})=>{
+            for scene, types, direction in scenes:
+                page.evaluate('''({player,types,direction})=>{
                   const pool=[...base.liveWall,...base.deadWall,...base.players.flatMap(p=>[...p.hand,...(p.drawnTile?[p.drawnTile]:[])])];let offset=0;
                   const take=count=>{const result=pool.slice(offset,offset+count);offset+=count;return result;};
                   const melds=types.map(type=>{
                     const tiles=take(type==='chi'||type==='pon'?3:4);
                     return {type,tiles,calledTileId:type==='ankan'?'':tiles[1].id,
-                      fromPlayerId:(player+3)%4,
+                      fromPlayerId:(player+direction)%4,
                       ...(type==='kakan'?{addedTileId:tiles[3].id}:{})};
                   });
                   const hand=take(13-3*types.length),drawnTile=take(1)[0],rivers=Array.from({length:4},()=>take(18));
@@ -75,7 +81,7 @@ with sync_playwright() as p:
                     : {...p,river:rivers[p.id]})};
                   window.layoutGame=game;
                   renderer.renderTable(game,[25000,25000,25000,25000]);
-                }''', {'player':player,'types':types})
+                }''', {'player':player,'types':types,'direction':direction})
                 if width==375 and player==3 and scene=='chi':
                     legacy_style=page.add_style_tag(content=previous_side_layout_css)
                     previous_layout_cpu3_overlap=page.evaluate('''()=>{
@@ -164,6 +170,13 @@ with sync_playwright() as p:
                   const directionOK=!hasMeld||(player===0?h.right<=m.left+.1:player===1?m.bottom<=h.top+.1:player===2?m.right<=h.left+.1:m.top>=h.bottom-.1);
                   const gapOK=!hasMeld||gap>=(player===0?7.8:3.8);
                   const groups=[...melds.children],sequence=groups.map(e=>e.dataset.meldType);
+                  const compositionOK=groups.every((group,index)=>{
+                    const type=types[index],backCount=group.querySelectorAll('.concealed-kan-back').length;
+                    const faceCount=group.querySelectorAll('svg').length,expected=type==='chi'||type==='pon'?3:4;
+                    return group.children.length===expected&&(type==='ankan'?backCount===2&&faceCount===2:
+                      backCount===0&&faceCount===expected&&(type!=='kakan'||
+                        group.querySelectorAll('.called-tile').length===1&&group.querySelectorAll('.added-kan-tile:not(.pending-kan-tile)').length===1));
+                  });
                   const centers=groups.map(e=>{const r=rect(e);return {x:(r.left+r.right)/2,y:(r.top+r.bottom)/2};});
                   const sequenceOK=centers.every((a,i)=>i===0||(player===0?a.x>centers[i-1].x:player===1?a.y<centers[i-1].y:player===2?a.x<centers[i-1].x:a.y>centers[i-1].y));
                   const cpuHands=[...document.querySelectorAll('.concealed-hand')];
@@ -185,6 +198,7 @@ with sync_playwright() as p:
                     meldTileBCR:meldTile?rect(meldTile):null,calledTileBCR:calledTile?rect(calledTile):null,
                     addedKanTileBCR:addedKanTile?rect(addedKanTile):null,
                     meldOrder:JSON.stringify(sequence)===JSON.stringify(types),meldVisualOrder:sequenceOK,
+                    meldCompositionCorrect:compositionOK,
                     tableContainment:inside.length===0,outsideTableTiles:inside,
                     ownRiverClear:collisions.sameRiver.length===0,allRiversClear:collisions.anyRiver.length===0,
                     seatTilesClear:collisions.tilePairs.length===0,neighborSeatsClear:collisions.neighbors.length===0,
@@ -201,9 +215,10 @@ with sync_playwright() as p:
                     intentionalKakanOverlap:collisions.intentionalKakan
                   };
                 }''', {'player':player,'types':types,'baseline':baseline})
-                checks=['square','noHorizontalScroll','allTileSizesMatchRiver','allTileOrientationsMatchRiver','handSizeOK','handMeldDirection','handMeldGapOK','meldOrder','meldVisualOrder','tableContainment','ownRiverClear','allRiversClear','seatTilesClear','neighborSeatsClear','centerClear','selfVsCpu1Cpu3Clear','hiddenCpuIdsProtected','selfHandSizeUnchanged','doraSizeUnchanged']
+                checks=['square','noHorizontalScroll','allTileSizesMatchRiver','allTileOrientationsMatchRiver','handSizeOK','handMeldDirection','handMeldGapOK','meldOrder','meldVisualOrder','meldCompositionCorrect','tableContainment','ownRiverClear','allRiversClear','seatTilesClear','neighborSeatsClear','centerClear','selfVsCpu1Cpu3Clear','hiddenCpuIdsProtected','selfHandSizeUnchanged','doraSizeUnchanged']
                 assert result['riverTileCount']==18, f'{width}px player {player} {scene}: expected 18 close river tiles: {result}'
                 assert all(result[name] for name in checks), f'{width}px player {player} {scene}: {result}'
+                assert result['unexpectedOverlapCount']==0, f'{width}px player {player} {scene}: unexpected face overlap: {result}'
                 if 'kakan' in types:
                     intentional=result['intentionalKakanOverlap']
                     assert intentional, f'{width}px player {player} {scene}: added-kan tile did not overlap its stack: {result}'

@@ -154,19 +154,27 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
     // top-left instead of starting at the top-left of each player's viewpoint.
     const rowCount = side ? 6 : 3;
     const columnCount = side ? 3 : 6;
+    // Reserve all 18 slots, including empty positions. Width can vary within
+    // a row to fit the wider sideways face; height belongs to the whole row so
+    // a short declaration face cannot pull one column's later tiles upward.
     const cellWidths = Array.from({ length: rowCount }, () =>
       Array<string>(columnCount).fill(side ? '--river-tile-height' : '--river-tile-width'));
-    const cellHeights = Array.from({ length: rowCount }, () =>
-      Array<string>(columnCount).fill(side ? '--river-tile-width' : '--river-tile-height'));
+    const rowHeights = Array<string>(rowCount).fill(side ? '--river-tile-width' : '--river-tile-height');
     for (const position of positions) {
-      cellWidths[position.row][position.column] = position.widthVar;
-      cellHeights[position.row][position.column] = position.heightVar;
+      // Reserve the largest face dimension for each fixed grid track. A
+      // horizontal declaration in a top/bottom river is shorter than its row,
+      // while a side-seat declaration is taller than its row.
+      if (position.widthVar === '--river-tile-height') cellWidths[position.row][position.column] = position.widthVar;
+      if (position.heightVar === '--river-tile-height') rowHeights[position.row] = position.heightVar;
     }
     const offset = (variables: readonly string[]) => {
       const widthTiles = variables.filter(value => value === '--river-tile-width').length;
       const heightTiles = variables.length - widthTiles;
       return `calc(var(--river-tile-width) * ${widthTiles} + var(--river-tile-height) * ${heightTiles} + ${variables.length * gap}px)`;
     };
+    const centerInTrack = (track: string, face: string) => track === face
+      ? '0px'
+      : `calc((var(${track}) - var(${face})) * .5)`;
     river.replaceChildren(...player.river.map((physical, index) => {
       const position=positions[index];
       const item = document.createElement('div');
@@ -178,8 +186,8 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
       item.style.position='absolute';
       item.style.width=`var(${position.widthVar})`;
       item.style.height=`var(${position.heightVar})`;
-      item.style.left = offset(cellWidths[position.row].slice(0, position.column));
-      item.style.top = offset(cellHeights.slice(0, position.row).map(row => row[position.column]));
+      item.style.left = `calc(${offset(cellWidths[position.row].slice(0, position.column))} + ${centerInTrack(cellWidths[position.row][position.column], position.widthVar)})`;
+      item.style.top = `calc(${offset(rowHeights.slice(0, position.row))} + ${centerInTrack(rowHeights[position.row], position.heightVar)})`;
       const tile = createTileElement(physical.tile);
       if (item.dataset.riichiDeclaration === 'true') {
         const description = `${tileLabel(physical.tile)} リーチ宣言牌`;

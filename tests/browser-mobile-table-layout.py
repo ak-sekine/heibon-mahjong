@@ -1,4 +1,4 @@
-"""Focused mobile regressions for human meld/CPU1 hand clearance and river spacing."""
+"""Focused mobile regressions for hand clearance and fixed river tracks."""
 import os, shutil
 from playwright.sync_api import sync_playwright
 
@@ -36,6 +36,11 @@ with sync_playwright() as p:
             const cols=river.classList.contains('river-left')||river.classList.contains('river-right')?3:6;
             const rows=18/cols;
             const gaps=[];
+            const rowCenters={};
+            for(const item of river.children){
+              const row=item.style.gridRow;(rowCenters[row]??=[]).push(rect(item).top+rect(item).height/2);
+            }
+            const rowAlignment=Math.max(0,...Object.values(rowCenters).map(values=>Math.max(...values)-Math.min(...values)));
             for(let i=0;i<cells.length;i++){
               const row=Number(river.children[i].style.gridRow)-1;
               const col=Number(river.children[i].style.gridColumn)-1;
@@ -47,7 +52,7 @@ with sync_playwright() as p:
                 if(col===otherCol&&otherRow===row+1)gaps.push(cells[j].top-cells[i].bottom);
               }
             }
-            return {count:cells.length,cols,rows,gaps};
+            return {count:cells.length,cols,rows,gaps,rowAlignment};
           });
           return {rivers,riichiTileWidth:rect(document.querySelector('.table .river [data-riichi-declaration="true"]')).width};
         }''')
@@ -66,7 +71,7 @@ with sync_playwright() as p:
             assert metrics['selfMeldGap']>=7.8, f'human hand-to-meld gap is below 8px at {width}px: {metrics}'
             assert metrics['noHorizontalScroll'], f'horizontal scroll at {width}px: {metrics}'
         assert all(r['count']==18 and ((r['rows'],r['cols']) in [(3,6),(6,3)]) for r in river_metrics['rivers']), f'river must remain 6x3, rotated for side seats, at {width}px: {river_metrics}'
-        assert all(all(abs(g-1)<.2 for g in r['gaps']) for r in river_metrics['rivers']), f'unexpected river cell gap at {width}px: {river_metrics}'
+        assert all(min(r['gaps'])>=.8 and r['rowAlignment']<.35 for r in river_metrics['rivers']), f'river tracks overlap or drift at {width}px: {river_metrics}'
         assert river_metrics['riichiTileWidth']>0, f'riichi tile should retain a cell at {width}px: {river_metrics}'
         print(f'{width}px mobile layout passed: rivers={river_metrics}')
         page.close()
