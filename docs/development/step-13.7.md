@@ -2,6 +2,8 @@
 
 実施日：2026-10-18
 
+実装コミット：`8e7e62801af9f144a47811b7aeaf278672fda674`
+
 ## 目的
 
 Step 13.6に続き、残りの一般役7種類を既存の和了分解・候補評価・符と点数計算・結果表示へ追加しました。対応範囲と現在の状態は[現行仕様](../SPEC.md)と[ロードマップ](../ROADMAP.md)に記録しています。
@@ -21,8 +23,8 @@ Step 13.6に続き、残りの一般役7種類を既存の和了分解・候補�
 
 ## 検証
 
-`npm test` は42/42テストファイル成功、Step 13.7専用テストは18件成功です。`npm run build` と `git diff --check` も成功しました。Browser UI verification とGitHub Pagesのbuild・deploy結果は[検証記録](../verification/step13.7/README.md)に追記します。
+`npm test` は42/42テストファイル・1,040件成功、Step 13.7専用テストは18件成功です。`npm run build` と `git diff --check` も成功しました。対象コミットのBrowser UI verification #65とPagesのbuild・deploy成功、およびPagesの初回テスト失敗と再実行結果は[検証記録](../verification/step13.7/README.md)を参照してください。
 
 ## 検証資料
 
-[Step 13.7 検証記録](../verification/step13.7/README.md)に単体テスト、ビルド、GitHub Actions Browser UI verification、Pagesの結果を記録します。iPhone Safari実機は別途ユーザー確認です。
+[Step 13.7 検証記録](../verification/step13.7/README.md)に単体テスト、ビルド、GitHub Actions Browser UI verification、Pagesの結果を記録しました。iPhone Safari実機は別途ユーザー確認です。
