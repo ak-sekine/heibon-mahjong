@@ -29,4 +29,11 @@ GitHub Pages初回実行の失敗メッセージは `the next CPU wait was not s
 
 ## GitHub Actions・Pages
 
-Step 13.7.1のcommit push後に既存GitHub Actionsの結果を追記します。
+Step 13.7.1の実装commit `f3286d150f2438718e373318aba76cea679db07e` で、既存workflowが成功しました。
+
+| Workflow | 結果 |
+| --- | --- |
+| [Deploy to GitHub Pages #39131956753](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39131956753) | 成功。npm testは1,040成功・0失敗、build成功、Pages deploy成功。 |
+| [Browser UI verification #39131956752](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39131956752) | 成功。npm testは1,040成功・0失敗、build成功、既存ブラウザー回帰成功。 |
+
+Browser UI検証はmain pushで起動した既存workflowです。ChromiumはGitHub Actions上で実行し、Codex Cloudでは起動していません。workflow条件・テスト実行条件の変更はありません。

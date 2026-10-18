@@ -2,6 +2,8 @@
 
 実施日：2026-10-18
 
+実装commit：`f3286d150f2438718e373318aba76cea679db07e`
+
 ## 発生していた問題
 
 Step 13.7 の GitHub Pages workflow 初回実行で、`tests/automatic-turns.test.ts` が `the next CPU wait was not scheduled` で失敗しました。既存の記録では1,040件中1件失敗し、失敗jobの再実行では成功しています。
