@@ -42,7 +42,12 @@
 
 - コード変更では内容に応じた検証を行う。基本コマンドは `npm test`、`npm run build`、`git diff --check`。
 - UI変更ではまず関連局面を確認し、既存のGitHub Actions `Browser UI verification` を利用する。麻雀卓の配置、河、副露、カン、非公開牌ID保護などの既存確認を優先する。
-- Codex CloudでChromiumを起動できないとき、同じ起動失敗の調査を繰り返さず既存Actionsによる検証を優先する。
+- Codex Cloudでは、実行サンドボックスのseccomp制限によりChromiumのCrashpad初期化中の `setsockopt(SOL_SOCKET, SO_PASSCRED)` が `EPERM` となり、ページを開く前に `SIGTRAP` で終了する既知の制限がある。診断時の実行ファイル・バージョン・起動条件と根拠は [`docs/verification/codex-cloud-chromium.md`](docs/verification/codex-cloud-chromium.md) を参照する。
+- この環境ではPlaywrightの `chromium_sandbox=True` を指定し、`--no-sandbox` を使わない最小起動も同じCrashpadエラーで失敗した。安全に使えるCodex Cloud内の起動方法は確認できていない。`--no-sandbox` の追加、Chromiumサンドボックスの無効化、`danger-full-access`、seccompやシステム権限の変更、失敗の握りつぶしは禁止する。
+- 既知の同一実行環境ではChromiumを毎回起動せず、単体テスト・TypeScript・ビルドはCodex Cloudで、ブラウザーUI検証は既存のGitHub Actions `Browser UI verification` で行う。新しいブラウザー検証は既存ワークフローに追加する。
+- GitHub Actionsの実行結果は対象コミットの実行を確認してから報告する。未実行または結果未確認は「未実施／未確認」とし、成功扱いしない。ブラウザーテスト未実行とActionsでの成功を区別する。
+- 同じ起動エラーは再調査しない。Codex Cloudの実行環境・サンドボックスが更新された場合、または新たな正規の安全な起動方法が利用可能になった場合に限り、socketpair確認と単一ページの最小起動で再検証する。
+- iPhone Safari実機確認はChromium / GitHub Actionsの結果と分けて扱う。
 - GitHub Pagesはbuild成功とdeploy成功を別々に確認する。未確認ならそのように報告する。
 
 ## ドキュメント構成と運用
@@ -79,5 +84,6 @@
 
 - 成功済みの同一テストや同じネットワーク診断を理由なく繰り返さない。必要な検証だけ実施する。
 - 原因不明の問題を推測で修正せず、テスト条件を安易に緩和しない。
+- 完了報告では、関連するGitHub Actionsのブラウザー検証がすべて成功した場合、成功した検証と実行結果を中心に簡潔に報告し、既知のChromium起動制限を毎回詳述しない。ブラウザー検証が未実施・未確認の場合、または新しい失敗が発生した場合は、その状態と理由を明確に報告する。
 - 報告では確認した事実、推測、未確認事項、実施できなかった作業を区別する。通信エラー時は失敗コマンド、宛先、失敗段階、通常実行と許可付き実行の結果を示す。
 - 詳細な共通手順と障害事例の原本は [`ak-sekine/dev-notes` の `docs/codex-cloud.md`](https://github.com/ak-sekine/dev-notes/blob/main/docs/codex-cloud.md)。このファイルが使えない場合も上記ルールに従う。
