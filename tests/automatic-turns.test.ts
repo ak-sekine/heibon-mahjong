@@ -19,6 +19,13 @@ function manualWait() {
   return { wait, pending };
 }
 const flush = async () => { await Promise.resolve(); await Promise.resolve(); };
+async function nextPending(pending: { resolve: () => void; signal: AbortSignal }[]) {
+  for (let attempt = 0; pending.length === 0 && attempt < 10; attempt++) {
+    await new Promise<void>(resolve => setImmediate(resolve));
+  }
+  assert.ok(pending.length > 0, 'the next CPU wait was not scheduled');
+  return pending.shift()!;
+}
 
 test('CPU1, CPU2, CPU3 act once in order, return fourteen tiles to human and block rapid input', async () => {
   const { wait, pending } = manualWait();
@@ -86,7 +93,11 @@ test('old waits and old finally blocks cannot change a new game or duplicate its
   assert.equal(ui.progressing, true);
   await ui.confirm();
   assert.equal(pending.length, 1);
-  for (let i = 0; i < 3; i++) { pending.shift()!.resolve(); await flush(); }
+  let cpuWait = pending.shift()!;
+  for (let i = 0; i < 3; i++) {
+    cpuWait.resolve();
+    if (i < 2) cpuWait = await nextPending(pending);
+  }
   await thirdRun;
   assert.deepEqual(ui.game.players.map(p => p.river.length), [1, 1, 1, 1]);
 });
