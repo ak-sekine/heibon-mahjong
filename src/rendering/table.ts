@@ -347,9 +347,12 @@ function renderRoundSummary(game: GameState, settlement: RoundSettlement | null)
         if (result.redDoraHan > 0) yaku.push(`赤ドラ${result.redDoraHan}`);
       }
       section.append(text('p', yaku.join('・'), 'round-summary-yaku'));
-      section.append(text('p', result.yakumanCount > 0
+      const total = text('p', '', 'round-summary-total');
+      total.append(text('span', result.yakumanCount > 0
         ? `${result.yakumanCount}役満`
-        : `合計${result.totalHanIncludingDora}翻`, 'round-summary-total'));
+        : `合計${result.totalHanIncludingDora}翻`, 'round-summary-value'));
+      total.append(text('span', `${result.totalPoints.toLocaleString('en-US')}点`, 'round-summary-points'));
+      section.append(total);
       summary.append(section);
     }
     return;

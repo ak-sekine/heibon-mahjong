@@ -98,6 +98,8 @@ header > div { min-width:0; }
 #round-result-summary { width:100%; padding:8px 10px; border:1px solid #63947a; border-radius:8px; background:#123f32; font-size:14px; line-height:1.4; overflow-wrap:anywhere; }
 #round-result-summary p { margin:2px 0; }
 .round-summary-winner,.round-summary-total { font-weight:700; }
+.round-summary-total { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.round-summary-total > span { flex:none; white-space:nowrap; }
 .round-summary-yaku { color:#fff1cc; }
 .round-win-summary + .round-win-summary { border-top:1px solid #39765e; margin-top:6px; padding-top:6px; }
 #round-result-actions { display:flex; align-items:stretch; justify-content:center; width:100%; gap:8px; }

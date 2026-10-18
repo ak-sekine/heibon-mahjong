@@ -80,6 +80,19 @@ with sync_playwright() as p:
               const pre = tsumoFixture.tsumoGame(['19m', '19p', '19s', '12345677z'], false, undefined, 'man-9');
               return { pre, win: tsumo.declareTsumo(pre, 0) };
             }
+            if (name === 'haneman-tsumo') {
+              const game = tsumoFixture.tsumoGame(['555m', '456p', '567s', '234s', '22p'], false, [], 'man-4');
+              const declaration = game.players[0].river.at(-1);
+              if (!declaration) throw new Error('Missing riichi declaration discard');
+              const pre = { ...game, players: game.players.map(player => player.id === 0
+                ? { ...player, riichi: { declarationTileId: declaration.id } } : player) };
+              return { pre, win: tsumo.declareTsumo(pre, 0) };
+            }
+            if (name === 'yakuman-ron') {
+              const kokushi = [['1m','9m','1p','9p','1s','9s','1z','2z','3z','4z','5z','6z','7z']];
+              const pre = ronFixture.ronGame(0, [1], kokushi, 'man-1', false);
+              return { pre, win: ron.declareRon(pre, 1) };
+            }
             if (name === 'ura-tsumo') {
               const pre = tsumoFixture.tsumoGame();
               const deadWall = [...pre.deadWall];
@@ -121,6 +134,9 @@ with sync_playwright() as p:
             if (name === 'triple-mixed-ron') {
               const pre = window.roundEndModules.ronGame(3, [0, 1, 2]);
               return { pre, win: ron.declareRon(pre, 0) };
+            }
+            if (name === 'adjusted-cpu1-ron') {
+              return { ...cpuRon(0, [1]), adjustment: { honba: 2, depositSticks: 3, points: [25000,24000,25000,23000] } };
             }
             if (/^cpu-meld-[0-4]$/.test(name)) {
               const meldCount = Number(name.at(-1));
@@ -169,9 +185,10 @@ with sync_playwright() as p:
             render();
             return game;
           };
-          const finish = (game, matchEnd = false, fill = false) => {
+          const finish = (game, matchEnd = false, fill = false, adjustment = null) => {
             game = fill ? fullBoard(game) : game;
             let match = matches.startMatch(game);
+            if (adjustment) match = matches.settleRound({ ...match, status: 'playing', lastSettlement: null, ...adjustment });
             if (matchEnd) match = matches.settleRound({ ...match, status: 'playing', lastSettlement: null,
               roundNumber: 4, dealerId: game.dealerId });
             controller.match = match;
@@ -185,7 +202,11 @@ with sync_playwright() as p:
                 yaku: entry.candidate.yaku.map(yaku => yaku.id),
                 doraHan: entry.doraHan, uraDoraHan: entry.uraDoraHan, redDoraHan: entry.redDoraHan,
                 totalHanIncludingDora: entry.totalHanIncludingDora, yakumanCount: entry.yakumanCount,
+                scoreTier: entry.scoreTier, totalPoints: entry.totalPoints,
                 winningTileId: entry.winningTileId })),
+              settlement: match.lastSettlement ? { honba: match.lastSettlement.honba,
+                depositPoints: match.lastSettlement.deposits?.points ?? 0,
+                paymentPoints: match.lastSettlement.payments.reduce((sum,payment) => sum + payment.points, 0) } : null,
               tenpai: match.lastSettlement?.tenpai ?? null,
               players: game.players.map(player => ({ id: player.id, control: player.control,
                 handIds: player.hand.map(tile => tile.id), drawnId: player.drawnTile?.id ?? null,
@@ -223,7 +244,7 @@ with sync_playwright() as p:
               installPlaying(game);
               return { ...report(game, 'playing'), meldCount: scenario.meldCount ?? 0 };
             }
-            return finish(scenario.win, matchEnd || scenario.matchEnd === true, fill);
+            return finish(scenario.win, matchEnd || scenario.matchEnd === true, fill, scenario.adjustment ?? null);
           };
           roundTest.renderFullGeometry = (name, mode = 'pre') => roundTest.prepare(name, mode, true);
         }''')
@@ -305,9 +326,9 @@ with sync_playwright() as p:
 
         # Result variants verify dynamic yaku totals, no automatic dialog,
         # repeatable table/detail toggling, flow labels, and match-end actions.
-        variants = ['human-tsumo','human-ron','yakuman-tsumo','ura-tsumo','cpu1-tsumo','cpu2-tsumo','cpu3-tsumo',
+        variants = ['human-tsumo','human-ron','yakuman-tsumo','yakuman-ron','haneman-tsumo','ura-tsumo','cpu1-tsumo','cpu2-tsumo','cpu3-tsumo',
             'cpu1-ron','cpu2-ron','cpu3-ron','double-cpu-ron','triple-cpu-ron',
-            'double-mixed-ron','triple-mixed-ron','draw','draw-0','draw-1','draw-2','draw-3','draw-4',
+            'double-mixed-ron','triple-mixed-ron','adjusted-cpu1-ron','draw','draw-0','draw-1','draw-2','draw-3','draw-4',
             'draw-self','draw-cpu1','draw-cpu2','draw-cpu3','draw-cpu-only','four-kans']
         variant_reports = []
         for scenario in variants:
@@ -354,12 +375,25 @@ with sync_playwright() as p:
                     assert winner_summary.locator('.round-summary-yaku').evaluate('element => element.scrollWidth <= element.clientWidth'), (width, scenario, 'yaku line overflows horizontally')
                     if scenario == 'ura-tsumo':
                         assert result['uraDoraHan'] > 0 and f'裏ドラ{result["uraDoraHan"]}' in summary_yaku, (width, scenario, result, summary_yaku)
-                    total = winner_summary.locator('.round-summary-total').inner_text()
+                    total = winner_summary.locator('.round-summary-value').inner_text()
                     if result['yakumanCount']:
                         assert total == f'{result["yakumanCount"]}役満' and '翻' not in total, (width, scenario, total)
                     else:
                         assert total == f'合計{result["totalHanIncludingDora"]}翻', (width, scenario, total)
                         assert f'合計：{result["totalHanIncludingDora"]}翻' in section.inner_text(), (width, scenario)
+                    points = f'{result["totalPoints"]:,}点'
+                    points_node = winner_summary.locator('.round-summary-points')
+                    assert points_node.inner_text() == points, (width, scenario, result, points_node.inner_text())
+                    detail_score = section.locator('.win-score').inner_text()
+                    detail_points = re.search(r'獲得点数：.*?([\d,]+)点', detail_score)
+                    assert detail_points and int(detail_points.group(1).replace(',', '')) == result['totalPoints'], (width, scenario, result, detail_score)
+                    total_layout = winner_summary.locator('.round-summary-total')
+                    assert total_layout.evaluate('element => element.scrollWidth <= element.clientWidth'), (width, scenario, 'summary total overflows horizontally')
+                    assert total_layout.evaluate('''element => {
+                      const left=element.querySelector('.round-summary-value').getBoundingClientRect();
+                      const right=element.querySelector('.round-summary-points').getBoundingClientRect();
+                      return Math.abs(left.top-right.top)<1 && left.left>=element.getBoundingClientRect().left && right.right<=element.getBoundingClientRect().right;
+                    }'''), (width, scenario, 'han/yakuman and points must share one line')
                     assert 'ドラ込み' not in winner_summary.inner_text(), (width, scenario)
                 cpu_winners = [result['winnerId'] for result in meta['winners'] if result['winnerId'] != 0]
                 for player in meta['players'][1:]:
@@ -433,6 +467,11 @@ with sync_playwright() as p:
                     for tile_id in player['handIds'] + ([player['drawnId']] if player['drawnId'] else []):
                         assert tile_id not in detail_html, (width, scenario, player['id'], 'detail leaked tile ID')
             ron_results = [result for result in meta['winners'] if result['winMethod'] == 'ron']
+            if scenario == 'adjusted-cpu1-ron':
+                assert meta['settlement']['honba'] == 2 and meta['settlement']['depositPoints'] == 3000, (width, scenario, meta['settlement'])
+                assert meta['settlement']['paymentPoints'] > meta['winners'][0]['totalPoints'], (width, scenario, meta)
+                settlement_text = page.locator('#match-result').inner_text()
+                assert '本場600点' in settlement_text and '供託：CPU1 ＋3000点' in settlement_text, (width, scenario, settlement_text)
             if ron_results:
                 shared_id = ron_results[0]['winningTileId']
                 id_copies = page.evaluate('''tileId => {
@@ -457,12 +496,20 @@ with sync_playwright() as p:
             page.locator('#show-result').click()
             assert page.locator('#result-dialog').is_visible()
             page.locator('#view-table').click()
-            variant_reports.append({'scenario': scenario, 'winners': len(meta['winners']), 'status': meta['status']})
+            variant_reports.append({'scenario': scenario, 'winners': len(meta['winners']), 'status': meta['status'],
+                'scores': [{'tier':winner['scoreTier'],'han':winner['totalHanIncludingDora'],'yakuman':winner['yakumanCount'],
+                    'points':winner['totalPoints']} for winner in meta['winners']]})
+
+        rendered_scores = [score for variant in variant_reports for score in variant['scores']]
+        assert any(score['tier'] == 'mangan' and score['han'] == 5 for score in rendered_scores), (width, 'mangan not covered', rendered_scores)
+        assert any(score['tier'] == 'haneman' and score['han'] == 6 for score in rendered_scores), (width, 'haneman not covered', rendered_scores)
+        assert any(score['tier'] == 'yakuman' and score['points'] == 32000 for score in rendered_scores), (width, 'child yakuman ron not covered', rendered_scores)
 
         # Use the real Controller button once, then dispatch a second click to
         # prove the already-started transition cannot advance the same result twice.
-        next_meta = page.evaluate('(name) => window.roundEndTest.prepare(name)', 'draw-4')
+        next_meta = page.evaluate('(name) => window.roundEndTest.prepare(name)', 'cpu1-tsumo')
         assert page.locator('#next-round').is_visible()
+        assert page.locator('#round-result-summary').inner_text().find('点') >= 0
         page.locator('#next-round').click()
         after_next = page.evaluate('''() => ({status:window.roundEndTest.controller.match.status,
           roundNumber:window.roundEndTest.controller.match.roundNumber,closed:!document.querySelector('#result-dialog').open,
@@ -471,6 +518,7 @@ with sync_playwright() as p:
           faces:document.querySelectorAll('.concealed-hand .revealed-tile').length,
           backs:[1,2,3].every(id=>document.querySelectorAll(`.concealed-hand[data-player-id="${id}"] .tile-back`).length>0)})''')
         assert after_next['status'] == 'playing' and after_next['closed'] and after_next['summaryHidden'] and after_next['showHidden'] and after_next['nextHidden'] and after_next['win'] is None and after_next['faces'] == 0 and after_next['backs'], (width, after_next)
+        assert page.locator('#round-result-summary').inner_text() == '', (width, 'previous round points remain after advancing')
         page.evaluate("document.querySelector('#next-round').dispatchEvent(new MouseEvent('click',{bubbles:true}))")
         assert page.evaluate('window.roundEndTest.controller.match.roundNumber') == after_next['roundNumber'], (width, 'double progression')
 

@@ -131,8 +131,10 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'normal-multiple', 'u
       if (win.redDoraHan > 0) yaku.push(`赤ドラ${win.redDoraHan}`);
     }
     assert.equal(summary.children[0].children.find(child => child.className === 'round-summary-yaku')!.textContent, yaku.join('・'));
-    assert.equal(summary.children[0].children.find(child => child.className === 'round-summary-total')!.textContent,
+    const summaryTotal = summary.children[0].children.find(child => child.className === 'round-summary-total')!;
+    assert.equal(summaryTotal.children[0].textContent,
       win.yakumanCount > 0 ? `${win.yakumanCount}役満` : `合計${win.totalHanIncludingDora}翻`);
+    assert.equal(summaryTotal.children[1].textContent, `${win.totalPoints.toLocaleString('en-US')}点`);
     assert.ok(!summary.children[0].textContent.includes('ドラ込み'));
     if (count === 'yakuman') {
       assert.ok(output.includes('国士無双 1役満'));
@@ -473,6 +475,7 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     const summaryText = descend(summary).map(n => n.textContent).join(' ');
     assert.ok(summaryText.includes(`CPU${id} ツモ`));
     assert.ok(summaryText.includes(`合計${won.winResult!.totalHanIncludingDora}翻`));
+    assert.ok(summaryText.includes(`${won.winResult!.totalPoints.toLocaleString('en-US')}点`));
     assert.ok(!summaryText.includes('ドラ込み'));
     const summaryYaku = summary.children[0].children.find(n => n.className === 'round-summary-yaku')!.textContent;
     assert.equal(summaryYaku, [...won.winResult!.candidate.yaku.map(entry => yakuDisplayName(entry.id, 'summary')), 'ドラ1', '赤ドラ2'].join('・'));
