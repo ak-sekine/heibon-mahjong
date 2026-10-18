@@ -253,7 +253,8 @@ header > div { min-width:0; }
 .table .seat-left { transform:translate(-50%,-50%) translateX(calc(-50cqw + var(--side-seat-offset))) rotate(90deg); }
 .table .seat-right { transform:translate(-50%,-50%) translateX(calc(50cqw - var(--side-seat-offset))) rotate(270deg); }
 @media (max-width:430px) {
- .table .seat-left,.table .seat-right { top:calc(50% - var(--river-tile-width)); }
+ .table .seat-right .concealed-hand,.table .seat-right .open-melds { transform:translateX(var(--river-tile-width)); }
+ .table .seat-left .concealed-hand,.table .seat-left .open-melds { transform:translateX(calc(0px - var(--river-tile-width))); }
 }
 .table .seat .concealed-hand { display:flex; flex-direction:row; gap:1px; margin:0; max-width:none; }
 .table .seat .tile-back { width:var(--river-tile-width); height:var(--river-tile-height); }

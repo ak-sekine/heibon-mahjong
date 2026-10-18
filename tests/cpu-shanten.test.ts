@@ -71,7 +71,16 @@ test('riichi rejects evaluation and abort interrupts sliced evaluation',async()=
  const g=startGame(seeded(0),1), p=g.players[1];
  const locked={...g,players:g.players.map(x=>x.id===1?{...x,riichi:{declarationTileId:'past'}}:x)} as typeof g;
  assert.throws(()=>chooseShantenDiscard(locked,1),RangeError);
- const abort=new AbortController();const pending=chooseShantenDiscardAsync(g,1,abort.signal);abort.abort();assert.equal(await pending,null);
+ const abort=new AbortController(), originalNow=Object.getOwnPropertyDescriptor(performance,'now');let nowCalls=0;
+ Object.defineProperty(performance,'now',{configurable:true,value:()=>nowCalls++===0?0:7});
+ try {
+  const pending=chooseShantenDiscardAsync(g,1,abort.signal);
+  assert.ok(nowCalls>=2,'evaluation yielded before the abort');
+  abort.abort();assert.equal(await pending,null);
+ } finally {
+  if(originalNow)Object.defineProperty(performance,'now',originalNow);
+  else Reflect.deleteProperty(performance,'now');
+ }
  assert.ok([...p.hand,p.drawnTile!].some(t=>t.id===chooseRandomDiscard(p,()=>0)));
 });
 for(const seed of [0,1,2]) test(`normal legal seed ${seed}: non-tenpai CPUs improve through riichi or calls and conserve points`,async()=>{
