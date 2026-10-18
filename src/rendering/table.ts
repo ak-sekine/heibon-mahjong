@@ -285,6 +285,19 @@ const yakuNames: Record<YakuId, string> = {
   'yakuhai-seat-wind': '役牌：自風', 'yakuhai-round-wind': '役牌：場風',
   pinfu: '平和', iipeikou: '一盃口', chiitoitsu: '七対子', toitoi: '対々和', 'kokushi-musou': '国士無双',
 };
+const roundSummaryYakuOverrides: Partial<Record<YakuId, string>> = {
+  'menzen-tsumo': 'ツモ',
+  'yakuhai-white': '白',
+  'yakuhai-green': '發',
+  'yakuhai-red': '中',
+  'yakuhai-seat-wind': '自風',
+  'yakuhai-round-wind': '場風',
+  tanyao: 'タンヤオ',
+};
+
+export function yakuDisplayName(id: YakuId, view: 'summary' | 'detail'): string {
+  return view === 'summary' ? roundSummaryYakuOverrides[id] ?? yakuNames[id] : yakuNames[id];
+}
 
 function renderRoundSummary(game: GameState, settlement: RoundSettlement | null): void {
   const summary = document.querySelector<HTMLElement>('#round-result-summary');
@@ -306,7 +319,7 @@ function renderRoundSummary(game: GameState, settlement: RoundSettlement | null)
         ? `${seatNames[player.id]} ロン（${seatNames[result.discarderId]}から）`
         : `${seatNames[player.id]} ツモ`;
       section.append(text('p', heading, 'round-summary-winner'));
-      const yaku = result.candidate.yaku.map(entry => yakuNames[entry.id]);
+      const yaku = result.candidate.yaku.map(entry => yakuDisplayName(entry.id, 'summary'));
       if (result.yakumanCount === 0) {
         if (result.doraHan > 0) yaku.push(`ドラ${result.doraHan}`);
         if (result.uraDoraHan > 0) yaku.push(`裏ドラ${result.uraDoraHan}`);
@@ -418,7 +431,7 @@ function renderWinResult(game: GameState): void {
     section.append(text('p', '今回対応している役の判定結果'));
     const list = document.createElement('ul');
     for (const yaku of result.candidate.yaku) list.append(text('li',
-      `${yakuNames[yaku.id]} ${yaku.yakuman > 0 ? `${yaku.yakuman}役満` : `${yaku.han}翻`}`));
+      `${yakuDisplayName(yaku.id, 'detail')} ${yaku.yakuman > 0 ? `${yaku.yakuman}役満` : `${yaku.han}翻`}`));
     section.append(list);
     if (result.yakumanCount > 0) {
       section.append(text('p', `役満：${result.yakumanCount}役満`));

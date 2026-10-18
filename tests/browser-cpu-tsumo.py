@@ -55,8 +55,10 @@ with sync_playwright() as p:
             assert f'CPU{winner}がツモ和了！' in page.locator('#selection-status').inner_text()
             assert not page.locator('#result-dialog').is_visible()
             assert page.locator('#round-result-summary').is_visible()
-            assert f'CPU{winner} ツモ' in page.locator('#round-result-summary').inner_text()
-            assert f'合計5翻（ドラ込み）' in page.locator('#round-result-summary').inner_text()
+            summary = page.locator('#round-result-summary').inner_text()
+            assert f'CPU{winner} ツモ' in summary
+            assert 'ツモ・平和・ドラ1・赤ドラ2' in summary
+            assert '合計5翻' in summary and 'ドラ込み' not in summary
             assert page.locator(f'.seat[data-player-id="{winner}"] .concealed-hand .revealed-tile').count() == 14
             assert page.locator(f'.seat[data-player-id="{winner}"] .concealed-hand svg[aria-label^="赤"]').count() == 2
             panel = page.locator('#win-result')

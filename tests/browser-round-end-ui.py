@@ -9,6 +9,27 @@ from playwright.sync_api import sync_playwright
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-round-end-ui'))
 OUT.mkdir(parents=True, exist_ok=True)
 WIDTHS = [(320, 568), (355, 700), (375, 812), (390, 844), (430, 932), (1280, 800)]
+SUMMARY_YAKU_NAMES = {
+    'menzen-tsumo': 'ツモ',
+    'yakuhai-white': '白',
+    'yakuhai-green': '發',
+    'yakuhai-red': '中',
+    'yakuhai-seat-wind': '自風',
+    'yakuhai-round-wind': '場風',
+    'double-riichi': 'ダブル立直',
+    'tanyao': 'タンヤオ',
+    'riichi': '立直', 'ippatsu': '一発', 'pinfu': '平和', 'iipeikou': '一盃口',
+    'chiitoitsu': '七対子', 'toitoi': '対々和', 'rinshan': '嶺上開花', 'chankan': '槍槓',
+    'sankantsu': '三槓子', 'suukantsu': '四槓子', 'kokushi-musou': '国士無双',
+}
+DETAIL_YAKU_NAMES = {
+    'menzen-tsumo': '門前清自摸和', 'yakuhai-white': '役牌：白', 'yakuhai-green': '役牌：發',
+    'yakuhai-red': '役牌：中', 'yakuhai-seat-wind': '役牌：自風', 'yakuhai-round-wind': '役牌：場風',
+    'double-riichi': 'ダブル立直', 'tanyao': '断么九', 'riichi': '立直', 'ippatsu': '一発',
+    'pinfu': '平和', 'iipeikou': '一盃口', 'chiitoitsu': '七対子', 'toitoi': '対々和',
+    'rinshan': '嶺上開花', 'chankan': '槍槓', 'sankantsu': '三槓子', 'suukantsu': '四槓子',
+    'kokushi-musou': '国士無双',
+}
 
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'), args=['--no-sandbox'])
@@ -310,22 +331,27 @@ with sync_playwright() as p:
             assert page.locator('#next-round').is_visible() == (meta['status'] == 'round-ended'), (width, scenario, meta)
             if meta['winners']:
                 assert page.locator('.round-win-summary').count() == len(meta['winners']), (width, scenario, meta)
+                seat_names = ['自分', 'CPU1', 'CPU2', 'CPU3']
                 for result in meta['winners']:
                     section = page.locator(f'.winner-result[data-winner-id="{result["winnerId"]}"]')
                     winner_summary = page.locator(f'.round-win-summary').nth(meta['winners'].index(result))
                     if result['winMethod'] == 'ron':
-                        assert f'ロン（' in winner_summary.locator('.round-summary-winner').inner_text(), (width, scenario)
+                        expected_heading = f'{seat_names[result["winnerId"]]} ロン（{seat_names[result["discarderId"]]}から）'
                     else:
-                        assert 'ツモ' in winner_summary.locator('.round-summary-winner').inner_text(), (width, scenario)
+                        expected_heading = f'{seat_names[result["winnerId"]]} ツモ'
+                    assert winner_summary.locator('.round-summary-winner').inner_text() == expected_heading, (width, scenario, expected_heading)
                     yaku_lines = section.locator('ul').first.locator('li').all_inner_texts()
-                    expected_yaku = [re.sub(r'\s+\d+(?:翻|役満)$', '', line) for line in yaku_lines]
+                    detail_yaku = [re.sub(r'\s+\d+(?:翻|役満)$', '', line) for line in yaku_lines]
+                    assert detail_yaku == [DETAIL_YAKU_NAMES[yaku_id] for yaku_id in result['yaku']], (width, scenario, detail_yaku, result['yaku'])
                     summary_yaku = winner_summary.locator('.round-summary-yaku').inner_text()
-                    expected_summary_parts = list(expected_yaku)
+                    expected_summary_parts = [SUMMARY_YAKU_NAMES[yaku_id] for yaku_id in result['yaku']]
                     if not result['yakumanCount']:
                         for label, han in [('ドラ',result['doraHan']),('裏ドラ',result['uraDoraHan']),('赤ドラ',result['redDoraHan'])]:
                             if han > 0:
                                 expected_summary_parts.append(f'{label}{han}')
                     assert summary_yaku == '・'.join(expected_summary_parts), (width, scenario, expected_summary_parts, summary_yaku)
+                    assert winner_summary.evaluate('element => element.scrollWidth <= element.clientWidth'), (width, scenario, 'summary overflows horizontally')
+                    assert winner_summary.locator('.round-summary-yaku').evaluate('element => element.scrollWidth <= element.clientWidth'), (width, scenario, 'yaku line overflows horizontally')
                     if scenario == 'ura-tsumo':
                         assert result['uraDoraHan'] > 0 and f'裏ドラ{result["uraDoraHan"]}' in summary_yaku, (width, scenario, result, summary_yaku)
                     total = winner_summary.locator('.round-summary-total').inner_text()

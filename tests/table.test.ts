@@ -5,7 +5,8 @@ import { declareRon } from '../src/game/ron.ts';
 import { tsumoGame } from './tsumo-fixture.ts';
 import { declareTsumo } from '../src/game/tsumo.ts';
 import { startGame } from '../src/game/start.ts';
-import { renderTable, renderSelection } from '../src/rendering/table.ts';
+import { renderTable, renderSelection, yakuDisplayName } from '../src/rendering/table.ts';
+import type { YakuId } from '../src/analysis/yaku.ts';
 import { renderMatch } from '../src/rendering/match.ts';
 import { startMatch, nextRound } from '../src/game/match.ts';
 import { fixedRound } from './match-fixture.ts';
@@ -37,6 +38,35 @@ class ElementStub {
   replaceChildren(...children: ElementStub[]) { this.children = children; }
   append(...children: ElementStub[]) { this.children.push(...children); }
 }
+
+test('round summaries abbreviate selected yaku while detail names stay official', () => {
+  const cases = [
+    { id: 'menzen-tsumo', summary: 'ツモ', detail: '門前清自摸和' },
+    { id: 'yakuhai-white', summary: '白', detail: '役牌：白' },
+    { id: 'yakuhai-green', summary: '發', detail: '役牌：發' },
+    { id: 'yakuhai-red', summary: '中', detail: '役牌：中' },
+    { id: 'yakuhai-seat-wind', summary: '自風', detail: '役牌：自風' },
+    { id: 'yakuhai-round-wind', summary: '場風', detail: '役牌：場風' },
+    { id: 'double-riichi', summary: 'ダブル立直', detail: 'ダブル立直' },
+    { id: 'tanyao', summary: 'タンヤオ', detail: '断么九' },
+    { id: 'riichi', summary: '立直', detail: '立直' },
+    { id: 'ippatsu', summary: '一発', detail: '一発' },
+    { id: 'pinfu', summary: '平和', detail: '平和' },
+    { id: 'iipeikou', summary: '一盃口', detail: '一盃口' },
+    { id: 'chiitoitsu', summary: '七対子', detail: '七対子' },
+    { id: 'toitoi', summary: '対々和', detail: '対々和' },
+    { id: 'rinshan', summary: '嶺上開花', detail: '嶺上開花' },
+    { id: 'chankan', summary: '槍槓', detail: '槍槓' },
+    { id: 'sankantsu', summary: '三槓子', detail: '三槓子' },
+    { id: 'suukantsu', summary: '四槓子', detail: '四槓子' },
+    { id: 'kokushi-musou', summary: '国士無双', detail: '国士無双' },
+  ] as const satisfies readonly { id: YakuId; summary: string; detail: string }[];
+
+  for (const { id, summary, detail } of cases) {
+    assert.equal(yakuDisplayName(id, 'summary'), summary, `${id} summary`);
+    assert.equal(yakuDisplayName(id, 'detail'), detail, `${id} detail`);
+  }
+});
 
 for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'normal-multiple', 'ura', 'yakuman'] as const) test(`result separates yaku and bonuses: ${count}`, () => {
   const nodes = new Map<string, ElementStub>();
@@ -94,7 +124,7 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'normal-multiple', 'u
     assert.equal(output.includes('符の内訳'), count !== 'yakuman');
     const summary = nodes.get('#round-result-summary')!;
     const win = won.winResult!;
-    const yaku = list.children.map(item => item.textContent.replace(/\s+\d+(?:翻|役満)$/, ''));
+    const yaku = win.candidate.yaku.map(entry => yakuDisplayName(entry.id, 'summary'));
     if (win.yakumanCount === 0) {
       if (win.doraHan > 0) yaku.push(`ドラ${win.doraHan}`);
       if (win.uraDoraHan > 0) yaku.push(`裏ドラ${win.uraDoraHan}`);
@@ -444,7 +474,10 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     assert.ok(summaryText.includes(`CPU${id} ツモ`));
     assert.ok(summaryText.includes(`合計${won.winResult!.totalHanIncludingDora}翻`));
     assert.ok(!summaryText.includes('ドラ込み'));
-    assert.ok(summaryText.includes('門前清自摸和') && summaryText.includes('平和'));
+    const summaryYaku = summary.children[0].children.find(n => n.className === 'round-summary-yaku')!.textContent;
+    assert.equal(summaryYaku, [...won.winResult!.candidate.yaku.map(entry => yakuDisplayName(entry.id, 'summary')), 'ドラ1', '赤ドラ2'].join('・'));
+    assert.ok(summaryYaku.includes('ツモ') && summaryYaku.includes('平和'));
+    assert.ok(!summaryYaku.includes('門前清自摸和'));
     assert.ok(!descend(hand).some(n => n.tagName === 'button'));
     for (const other of [1, 2, 3].filter(seat => seat !== id)) {
       const concealed = nodes.get(`.concealed-hand[data-player-id="${other}"]`)!;
