@@ -25,7 +25,8 @@ Step 13.7までの一般役に続き、通常の四人打ちリーチ麻雀で�
 | `npm test` | 成功。43/43テストファイル、0失敗、0 skip |
 | `npm run build` | 成功。TypeScript検査、Vite build |
 | `git diff --check` | 成功 |
-| Browser UI verification | main反映後のActions結果を検証記録に追記予定 |
+| Browser UI verification | 成功。対象commit [`c8f57f9`](https://github.com/ak-sekine/heibon-mahjong/commit/c8f57f9c04e1234390d663fd4eaa8807ea1e8e30)、[Actions run 39169130052](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39169130052)。390px幅の1役満・複数役満を含む全ブラウザー回帰が成功 |
+| GitHub Pages build / deploy | 成功。[Actions run 39169130007](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39169130007) のbuild・deploy両job |
 | iPhone Safari実機 | 未確認。公開後の実機確認はユーザー側で実施 |
 
-Browser UI verificationの代表画面は390px幅で、新規役満の1種類と複数役満を確認します。Codex CloudではChromiumを起動していません。
+Browser UI verificationの代表画面は390px幅で、新規役満の1種類と複数役満を確認しました。Codex CloudではChromiumを起動していません。
