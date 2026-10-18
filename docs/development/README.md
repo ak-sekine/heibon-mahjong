@@ -37,5 +37,6 @@ READMEから移した各Stepの本文と、本文にあった検証資料・ス�
 | 13.7.1 | 自動ターン処理テストの安定化 | 2026-10-18 | [開発記録](step-13.7.1.md) · [検証記録](../verification/step13.7.1/README.md) |
 | 13.8 | 主要役満8種類 | 2026-10-18 | [開発記録](step-13.8.md) · [検証記録](../verification/step13.8/README.md) |
 | 13.9 | 海底摸月・河底撈魚 | 2026-10-18 | [開発記録](step-13.9.md) · [検証記録](../verification/step13.9/README.md) |
+| 13.10 | 流し満貫・九種九牌・四風連打・四家立直 | 2026-10-18 | [開発記録](step-13.10.md) · [検証記録](../verification/step13.10/README.md) |
 
 Step 13.5のiPhone Safari実機確認は[2026-10-18の検証記録](../verification/kan-safari-2026-10-18.md)を参照してください。

@@ -10,6 +10,7 @@ import { canDeclareRiichi, declareRiichi } from '../game/riichi.ts';
 import { startGame } from '../game/start.ts';
 import { canDiscard, discardTile } from '../game/discard.ts';
 import { AutomaticTurnRunner, type AutomaticTurnOptions } from '../game/automatic-turns.ts';
+import { canDeclareKyuushuKyuuhai, declareKyuushuKyuuhai } from '../game/special-draws.ts';
 
 /** UI selection is separate from the immutable game state. */
 export class GameController {
@@ -54,6 +55,14 @@ export class GameController {
     return this.runner.runMatch(() => this.match, match => { this.match = match; this.onChange(); }, this.onChange);
   }
   get canTsumo(): boolean { return this.game.players[0].control === 'human' && !this.progressing && canDeclareTsumo(this.game, 0); }
+  get canKyuushuKyuuhai(): boolean { return this.match.status === 'playing' && !this.progressing && canDeclareKyuushuKyuuhai(this.game, 0); }
+  declareKyuushuKyuuhai(): void {
+    if (!this.canKyuushuKyuuhai) throw new RangeError('九種九牌 is not allowed now');
+    this.runner.cancel();
+    this.game = declareKyuushuKyuuhai(this.game, 0);
+    this.selectedTileId = null;
+    this.onChange();
+  }
   declareTsumo(): void {
     if (!this.canTsumo) return;
     const won = declareTsumo(this.game, 0);

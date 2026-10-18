@@ -18,6 +18,15 @@ export interface ScoreContext {
   readonly winMethod: 'ron' | 'tsumo';
   readonly discarderId?: PlayerId;
 }
+/** Standard tsumo payments for a fixed base point value, shared by ordinary
+ * scoring and special tsumo-equivalent settlements such as nagashi mangan. */
+export function calculateTsumoPayments(basePoints: number, winnerId: PlayerId, dealerId: PlayerId): readonly Payment[] {
+  const ids: readonly PlayerId[] = [0, 1, 2, 3];
+  if (!Number.isSafeInteger(basePoints) || basePoints < 0 || !ids.includes(winnerId) || !ids.includes(dealerId)) throw new RangeError('Invalid tsumo payment context');
+  const round = (multiplier: number) => Math.ceil(basePoints * multiplier / 100) * 100;
+  return ids.filter(id => id !== winnerId).map(playerId => ({ playerId,
+    points: round(winnerId === dealerId || playerId === dealerId ? 2 : 1) }));
+}
 export function calculateBasePoints(han: number, fu: number | null, yakumanCount = 0): Pick<ScoreResult, 'scoreTier' | 'basePoints'> {
   if (!Number.isInteger(yakumanCount) || yakumanCount < 0 || !Number.isInteger(han) || han < 0) throw new RangeError('Invalid han or yakuman count');
   if (yakumanCount > 0) return { scoreTier: 'yakuman', basePoints: 8000 * yakumanCount };
@@ -43,8 +52,7 @@ export function calculateScore(context: ScoreContext): ScoreResult {
     if (discarderId === undefined || !ids.includes(discarderId) || discarderId === winnerId) throw new RangeError('Ron requires a different discarder');
     payments = [{ playerId: discarderId, points: round(winnerId === dealerId ? 6 : 4) }];
   } else {
-    payments = ids.filter(id => id !== winnerId).map(playerId => ({ playerId,
-      points: round(winnerId === dealerId || playerId === dealerId ? 2 : 1) }));
+    payments = [...calculateTsumoPayments(base.basePoints, winnerId, dealerId)];
   }
   return { ...base, payments, totalPoints: payments.reduce((sum, p) => sum + p.points, 0) };
 }

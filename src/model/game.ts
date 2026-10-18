@@ -95,7 +95,7 @@ export interface PendingRiichi {
   readonly declarationTileId: string;
 }
 export interface GameState extends WallState {
-  readonly abortiveDraw?: 'four-kans';
+  readonly abortiveDraw?: 'four-kans' | 'kyuushu-kyuuhai' | 'four-winds' | 'four-riichi';
   readonly callsMade?: boolean;
   readonly pendingRiichi: PendingRiichi | null;
   readonly ronWindow: RonWindow | null;

@@ -4,6 +4,7 @@ import { tileKindKey } from '../model/tile.ts';
 import { concealedSize, winningMelds } from './melds.ts';
 import { cancelAllIppatsu } from './ippatsu.ts';
 import { calculateShanten } from '../analysis/shanten.ts';
+import { isFourWindsDraw } from './special-draws.ts';
 
 export type CallOption = OpenMeld & {
   readonly playerId: PlayerId;
@@ -106,6 +107,7 @@ function finish(game:GameState,selected:readonly CallOption[]):GameState {
 /** Entry only after all ron decisions are resolved. */
 export function resolveDiscardCalls(game:GameState):GameState {
   const pending={...game,phase:'awaiting-call' as const};
+  if (isFourWindsDraw(pending)) return { ...pending, phase:'wall-exhausted', abortiveDraw:'four-winds', ronWindow:null };
   const cpu=cpuOptions(pending);
   const human=pending.players.filter(p=>p.control==='human').flatMap(p=>getCallOptions(pending,p.id));
   // A lower-priority human choice cannot change an already selected CPU pon.

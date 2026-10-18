@@ -12,6 +12,7 @@
 | --- | --- |
 | [Step 13.8](step13.8/README.md) | 主要役満8種類、候補単位の複合、点数、結果表示。Browser UI verification はGitHub Actionsで実施。 |
 | [Step 13.9](step13.9/README.md) | 海底摸月・河底撈魚、最終通常ツモ／打牌の局進行。Browser UI verification はGitHub Actionsで実施。 |
+| [Step 13.10](step13.10/README.md) | 流し満貫、九種九牌、四風連打、四家立直と局精算。Browser UI verification はGitHub Actionsで実施。 |
 | [Step 13.7](step13.7/README.md) | 一般役7種類の候補判定、点数計算、結果表示。Browser UI verification はGitHub Actionsで実施。 |
 | [Step 13.5.5](step13.5.5/README.md) | 正方形卓、牌・河・副露の配置、実カン操作、画面サイズごとの検証。初回の未完了事項と後続修正も時系列で保存。 |
 | [Step 13.5.4](step13.5.4/README.md) | 卓上牌の寸法と画面表示。 |

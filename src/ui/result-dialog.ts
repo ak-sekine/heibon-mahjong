@@ -23,8 +23,17 @@ export class ResultDialog {
     if (result === this.result) return;
     this.result = result;
     if (!result) { this.close(); return; }
-    document.querySelector('#result-title')!.textContent = match.status === 'match-ended'
-      ? '東風戦終了' : result.reason === 'four-kans' ? '四開槓・途中流局' : result.reason === 'draw' ? '流局' : match.game.winResult?.winMethod === 'ron' ? 'ロン和了' : 'ツモ和了';
+    const abortiveNames = {
+      'four-kans': '四開槓',
+      'kyuushu-kyuuhai': '九種九牌',
+      'four-winds': '四風連打',
+      'four-riichi': '四家立直',
+    } as const;
+    document.querySelector('#result-title')!.textContent = match.status === 'match-ended' ? '東風戦終了'
+      : result.reason === 'nagashi-mangan' ? '流し満貫'
+        : result.reason in abortiveNames ? `途中流局（${abortiveNames[result.reason as keyof typeof abortiveNames]}）`
+          : result.reason === 'draw' ? '荒牌流局'
+            : match.game.winResult?.winMethod === 'ron' ? 'ロン和了' : 'ツモ和了';
     document.querySelector('#result-body')!.scrollTop = 0;
   }
   open(): void {

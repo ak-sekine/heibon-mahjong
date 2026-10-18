@@ -8,6 +8,7 @@ import { drawOrStop } from './draw.ts';
 import { discardTile } from './discard.ts';
 import { chooseCpuRiichiDiscard, chooseShantenDiscardAsync, type DiscardStrategy } from './cpu.ts';
 import type { RandomSource } from './shuffle.ts';
+import { canDeclareKyuushuKyuuhai, declareKyuushuKyuuhai } from './special-draws.ts';
 
 export type Wait = (milliseconds: number, signal: AbortSignal) => Promise<void>;
 export interface AutomaticTurnOptions {
@@ -72,6 +73,10 @@ export class AutomaticTurnRunner {
         if (!current() || game !== scheduledGame || (matchAccess && matchAccess.read().status !== 'playing') || game.turnPlayerId !== player.id || game.phase !== 'awaiting-discard') return;
         if (canDeclareTsumo(game, player.id)) {
           write(declareTsumo(game, player.id));
+          return;
+        }
+        if (canDeclareKyuushuKyuuhai(game, player.id)) {
+          write(declareKyuushuKyuuhai(game, player.id));
           return;
         }
         const kan=chooseCpuKan(game,player.id);

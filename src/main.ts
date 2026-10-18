@@ -36,6 +36,9 @@ document.querySelector<HTMLButtonElement>('#riichi')!.addEventListener('click', 
 document.querySelector<HTMLButtonElement>('#tsumo')!.addEventListener('click', () => {
   controller.declareTsumo();
 });
+document.querySelector<HTMLButtonElement>('#kyuushu-kyuuhai')!.addEventListener('click', () => {
+  controller.declareKyuushuKyuuhai();
+});
 document.querySelector<HTMLButtonElement>('#ron')!.addEventListener('click', () => {
   controller.declareRon();
   if (!document.querySelector<HTMLDialogElement>('#result-dialog')!.open) document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });

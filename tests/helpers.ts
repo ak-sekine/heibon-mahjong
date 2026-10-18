@@ -36,7 +36,8 @@ export function inventory(game: GameState, initial: GameState): void {
   for (const p of game.players) {
     assert.equal(p.hand.length, 13 - (p.melds?.length ?? 0)*3 + Number(Boolean(p.callDiscard)));
     assert.equal(p.drawnTileSource === null, p.drawnTile === null);
-    assert.equal(p.drawnTile !== null, (Boolean(game.abortiveDraw) || Boolean(game.ronWindow?.kan) || game.phase === 'awaiting-discard' || (game.phase === 'won' && game.winResult?.winMethod === 'tsumo')) && game.turnPlayerId === p.id && !p.callDiscard);
+    const abortiveRetainsDraw = game.abortiveDraw === 'four-kans' || game.abortiveDraw === 'kyuushu-kyuuhai';
+    assert.equal(p.drawnTile !== null, (abortiveRetainsDraw || Boolean(game.ronWindow?.kan) || game.phase === 'awaiting-discard' || (game.phase === 'won' && game.winResult?.winMethod === 'tsumo')) && game.turnPlayerId === p.id && !p.callDiscard);
   }
 }
 

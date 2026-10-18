@@ -14,10 +14,12 @@ export interface SettlementPayment {
   readonly points: number;
 }
 export interface RoundSettlement extends RoundInfo {
-  readonly reason: 'tsumo' | 'ron' | 'draw' | 'four-kans';
+  readonly reason: 'tsumo' | 'ron' | 'draw' | 'nagashi-mangan' | 'four-kans' | 'kyuushu-kyuuhai' | 'four-winds' | 'four-riichi';
   readonly before: Points;
   readonly payments: readonly SettlementPayment[];
   readonly deposits: Readonly<{ recipientId: PlayerId; points: number }> | null;
+  /** Present only for nagashi mangan; no conventional win hand is created. */
+  readonly nagashiManganWinners?: readonly PlayerId[];
   readonly tenpai: readonly boolean[] | null;
   readonly deltas: Points;
   readonly after: Points;

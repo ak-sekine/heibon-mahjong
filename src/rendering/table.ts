@@ -14,6 +14,7 @@ import { canDeclareRon, getRonTile } from '../game/ron.ts';
 import { canDeclareTsumo } from '../game/tsumo.ts';
 import type { YakuId } from '../analysis/yaku.ts';
 import { canDeclareRiichi } from '../game/riichi.ts';
+import { canDeclareKyuushuKyuuhai } from '../game/special-draws.ts';
 import { canDiscard } from '../game/discard.ts';
 import { exposedDoraIndicators } from '../game/dora.ts';
 import { renderDoraIndicators, createResultDoraRow } from './dora.ts';
@@ -30,7 +31,10 @@ function turnLabel(game: GameState): string {
   }
   if (game.phase === 'awaiting-call') return 'ポン・チー宣言待ち';
   if (game.phase === 'awaiting-ron') return 'ロン宣言待ち';
-  if (game.phase === 'wall-exhausted') return game.abortiveDraw?'四開槓・途中流局':'牌山がなくなりました';
+  if (game.phase === 'wall-exhausted') return game.abortiveDraw === 'four-kans' ? '四開槓・途中流局'
+    : game.abortiveDraw === 'kyuushu-kyuuhai' ? '九種九牌・途中流局'
+      : game.abortiveDraw === 'four-winds' ? '四風連打・途中流局'
+        : game.abortiveDraw === 'four-riichi' ? '四家立直・途中流局' : '牌山がなくなりました';
   return `${game.turnPlayerId === 0 ? 'あなた' : seatNames[game.turnPlayerId]}の手番`;
 }
 
@@ -226,6 +230,12 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
   const kanOptions=progressing?[]:getKanOptions(game,0);
   const kanButton=document.querySelector<HTMLButtonElement>('#kan');
   if(kanButton) {kanButton.hidden=!kanOptions.length;kanButton.disabled=!kanOptions.length;}
+  const kyuushuButton=document.querySelector<HTMLButtonElement>('#kyuushu-kyuuhai');
+  if(kyuushuButton) {
+    const available=!progressing && game.players[0].control==='human' && canDeclareKyuushuKyuuhai(game,0);
+    kyuushuButton.hidden=!available;
+    kyuushuButton.disabled=!available;
+  }
   const kanPanel=document.querySelector<HTMLElement>('#kan-controls');
   if(kanPanel) {
     if(!kanOptions.length) kanPanel.hidden=true;
@@ -376,9 +386,27 @@ function renderRoundSummary(game: GameState, settlement: RoundSettlement | null)
     summary.append(text('p', `テンパイ：${ready.length === 0 ? 'なし' : ready.length === 4 ? '全員' : ready.join('・')}`, 'round-summary-tenpai'));
     return;
   }
-  if (settlement?.reason === 'four-kans') {
+  if (settlement?.reason === 'nagashi-mangan') {
     summary.hidden = false;
-    summary.append(text('p', '途中流局（四開槓）', 'round-summary-winner'));
+    const winners = settlement.nagashiManganWinners ?? [];
+    summary.append(text('p', '流し満貫', 'round-summary-winner'));
+    summary.append(text('p', `成立：${winners.map(id => seatNames[id]).join('・')}`, 'round-summary-tenpai'));
+    summary.append(text('p', `${settlement.honba}本場 · ${settlement.deposits ? `供託 ${settlement.deposits.points.toLocaleString('ja-JP')}点は${seatNames[settlement.deposits.recipientId]}へ` : '供託なし'}`, 'round-summary-payments'));
+    for (const payment of settlement.payments) {
+      summary.append(text('p', `${seatNames[payment.payerId]} → ${seatNames[payment.recipientId]} ${payment.points.toLocaleString('ja-JP')}点（満貫${payment.basePoints}点・本場${payment.honbaPoints}点）`, 'round-summary-payments'));
+    }
+    summary.append(text('p', winners.includes(settlement.dealerId) ? '親の流し満貫：親連荘' : '親の流し満貫なし：親交代', 'round-summary-next'));
+    return;
+  }
+  const abortiveLabels = {
+    'four-kans': '途中流局（四開槓）',
+    'kyuushu-kyuuhai': '途中流局（九種九牌）',
+    'four-winds': '途中流局（四風連打）',
+    'four-riichi': '途中流局（四家立直）',
+  } as const;
+  if (settlement && settlement.reason in abortiveLabels) {
+    summary.hidden = false;
+    summary.append(text('p', abortiveLabels[settlement.reason as keyof typeof abortiveLabels], 'round-summary-winner'));
     return;
   }
   summary.hidden = true;

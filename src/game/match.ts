@@ -1,9 +1,11 @@
 import { winningMelds } from './melds.ts';
 import type { GameState, PlayerId } from '../model/game.ts';
 import type { MatchState, Points, RoundSettlement, SettlementPayment } from '../model/match.ts';
+import { calculateTsumoPayments } from '../analysis/score.ts';
 import { getWaitingTileKinds } from './ron.ts';
 import { resolvePendingRiichi } from './riichi.ts';
 import { startGame } from './start.ts';
+import { getNagashiManganWinners } from './special-draws.ts';
 const ids = [0, 1, 2, 3] as const;
 export function startMatch(game: GameState = startGame()): MatchState {
   return settleRound({ roundWind: 'east', roundNumber: 1, dealerId: game.dealerId, honba: 0,
@@ -22,8 +24,9 @@ export function settleRound(match: MatchState): MatchState {
   if (!Number.isSafeInteger(match.honba) || match.honba < 0 || match.game.dealerId !== match.dealerId) throw new RangeError('Invalid round');
   const win = match.game.winResult;
   if (match.game.phase === 'won' && !win) throw new RangeError('Missing win result');
-  const abortive=match.game.abortiveDraw==='four-kans';
-  const tenpai = win || abortive ? null : match.game.players.map(p => getWaitingTileKinds(p.hand.map(t => t.tile), winningMelds(p.melds)).length > 0);
+  const abortive = Boolean(match.game.abortiveDraw);
+  const nagashiWinners = win || abortive ? [] : getNagashiManganWinners(match.game);
+  const tenpai = win || abortive || nagashiWinners.length ? null : match.game.players.map(p => getWaitingTileKinds(p.hand.map(t => t.tile), winningMelds(p.melds)).length > 0);
   const payments: SettlementPayment[] = [];
   const after = [...match.points] as [number,number,number,number];
   const transfer = (payerId: PlayerId, recipientId: PlayerId, basePoints: number, honbaPoints: number, notenPoints = 0) => {
@@ -45,27 +48,41 @@ export function settleRound(match: MatchState): MatchState {
       }
       if (payers.size !== (win.winMethod === 'ron' ? 1 : 3) || winner.payments.reduce((sum,p)=>sum+p.points,0) !== winner.totalPoints) throw new RangeError('Incomplete payments');
     }
+  } else if (nagashiWinners.length) {
+    for (const winnerId of nagashiWinners) {
+      for (const payment of calculateTsumoPayments(2000, winnerId, match.dealerId)) {
+        transfer(payment.playerId, winnerId, payment.points, match.honba * 100);
+      }
+    }
   } else if(!abortive) {
     const ready = ids.filter(id=>tenpai![id]), notReady = ids.filter(id=>!tenpai![id]);
     if (ready.length && notReady.length) for (const payer of notReady) for (const recipient of ready) transfer(payer,recipient,0,0,3000/(ready.length*notReady.length));
   }
   let deposits: RoundSettlement['deposits'] = null;
-  if (win && match.depositSticks) {
-    const recipientId = win.winMethod === 'tsumo' ? win.winnerId : [...winners].sort((a,b)=>
-      (a.winnerId-win.discarderId+4)%4-(b.winnerId-win.discarderId+4)%4)[0].winnerId;
+  if ((win || nagashiWinners.length) && match.depositSticks) {
+    const recipientId = win
+      ? win.winMethod === 'tsumo' ? win.winnerId : [...winners].sort((a,b)=>
+        (a.winnerId-win.discarderId+4)%4-(b.winnerId-win.discarderId+4)%4)[0].winnerId
+      : [...nagashiWinners].sort((a,b)=>(a-match.dealerId+4)%4-(b-match.dealerId+4)%4)[0];
     deposits = {recipientId,points:match.depositSticks*1000}; after[recipientId] += deposits.points;
   }
-  const repeat = win ? winners.some(w=>w.winnerId===match.dealerId) : abortive || tenpai![match.dealerId];
+  const repeat = win ? winners.some(w=>w.winnerId===match.dealerId)
+    : nagashiWinners.length ? nagashiWinners.includes(match.dealerId)
+      : abortive || tenpai![match.dealerId];
   const matchEnded = !repeat && match.roundNumber === 4;
   const next = matchEnded ? null : { roundNumber: match.roundNumber + Number(!repeat),
     dealerId: repeat ? match.dealerId : ((match.dealerId+1)%4) as PlayerId,
-    honba: !win || repeat ? match.honba+1 : 0 };
+    honba: win ? (repeat ? match.honba+1 : 0)
+      : nagashiWinners.length ? (repeat ? match.honba+1 : 0)
+        : match.honba+1 };
   const freeze = <T extends object>(value: T): T => Object.freeze(value);
-  const settlement: RoundSettlement = freeze({reason: win?.winMethod ?? (abortive?'four-kans':'draw'), roundNumber:match.roundNumber,
+  const reason = win?.winMethod ?? (nagashiWinners.length ? 'nagashi-mangan' : match.game.abortiveDraw ?? 'draw');
+  const settlement: RoundSettlement = freeze({reason, roundNumber:match.roundNumber,
     dealerId:match.dealerId,honba:match.honba,before:freeze([...match.points]) as Points,
     payments:freeze(payments.map(freeze)),deposits:deposits && freeze(deposits),tenpai:tenpai && freeze(tenpai),
+    ...(nagashiWinners.length ? {nagashiManganWinners:freeze([...nagashiWinners])} : {}),
     deltas:freeze(after.map((p,id)=>p-match.points[id])) as unknown as Points,after:freeze(after),next:next && freeze(next),matchEnded});
-  const settled: MatchState = {...match,points:settlement.after,depositSticks:win ? 0 : match.depositSticks,
+  const settled: MatchState = {...match,points:settlement.after,depositSticks:win || nagashiWinners.length ? 0 : match.depositSticks,
     lastSettlement:settlement,status:matchEnded ? 'match-ended' : 'round-ended'};
   assertPointConservation(settled);
   return settled;

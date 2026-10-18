@@ -5,6 +5,7 @@ import type { TileKind } from '../model/tile.ts';
 import { canDiscard, discardTile } from './discard.ts';
 import { getWaitingTileKinds } from './ron.ts';
 import { assertPointConservation, settleRound } from './match.ts';
+import { isFourWindsDraw } from './special-draws.ts';
 
 export interface RiichiDiscardOption {
   readonly tileId: string;
@@ -40,6 +41,9 @@ export function resolvePendingRiichi(match: MatchState): MatchState {
   if (game.phase === 'won' || game.phase === 'wall-exhausted') {
     return { ...match, game: { ...game, pendingRiichi: null } };
   }
+  if (isFourWindsDraw({ ...game, pendingRiichi: null })) {
+    return { ...match, game: { ...game, phase: 'wall-exhausted', abortiveDraw: 'four-winds', ronWindow: null, pendingRiichi: null } };
+  }
   const { playerId, declarationTileId } = pending;
   const player = game.players[playerId];
   const callWindow = game.phase === 'awaiting-call' && game.ronWindow?.discarderId === playerId && game.ronWindow.tileId === declarationTileId;
@@ -52,7 +56,11 @@ export function resolvePendingRiichi(match: MatchState): MatchState {
   const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
   players[playerId] = { ...player, riichi: { declarationTileId, passedRon: false, ippatsuEligible: player.river.some(t=>t.id===declarationTileId), doubleRiichi: pending.doubleRiichi ?? false } };
   const points = match.points.map((value,id) => value - (id === playerId ? 1000 : 0)) as unknown as Points;
-  const established = { ...match, game: { ...game, players, pendingRiichi: null }, points, depositSticks: match.depositSticks + 1 };
+  const riichiGame = { ...game, players, pendingRiichi: null };
+  const allRiichi = players.every(candidate => candidate.riichi !== null);
+  const established = { ...match, game: allRiichi
+    ? { ...riichiGame, phase: 'wall-exhausted' as const, abortiveDraw: 'four-riichi' as const, ronWindow: null }
+    : riichiGame, points, depositSticks: match.depositSticks + 1 };
   assertPointConservation(established);
   return established;
 }
