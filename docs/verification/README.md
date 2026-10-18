@@ -10,6 +10,7 @@
 
 | 記録 | 主な対象 |
 | --- | --- |
+| [Step 13.7](step13.7/README.md) | 一般役7種類の候補判定、点数計算、結果表示。Browser UI verification はGitHub Actionsで実施。 |
 | [Step 13.5.5](step13.5.5/README.md) | 正方形卓、牌・河・副露の配置、実カン操作、画面サイズごとの検証。初回の未完了事項と後続修正も時系列で保存。 |
 | [Step 13.5.4](step13.5.4/README.md) | 卓上牌の寸法と画面表示。 |
 | [Step 13.5.3](step13.5.3/README.md) | 卓上牌の寸法と左右席情報。 |

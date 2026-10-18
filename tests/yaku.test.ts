@@ -45,8 +45,8 @@ test('double wind has independent IDs and two han', () => {
 test('other wind triplet is not yakuhai', () => check(['123m', '456p', '789s', '33344z'], '1m', 'yakuhai-seat-wind', false));
 test('multiple dragon triplets sum', () => {
   const c = analyzeYaku(hand('123m', '55566677744z'), context()).candidates[0];
-  assert.equal(c.totalHan, 6);
-  assert.deepEqual(c.yaku.map(y => y.id), ['honitsu', 'yakuhai-white', 'yakuhai-green', 'yakuhai-red']);
+  assert.equal(c.totalHan, 10);
+  assert.deepEqual(c.yaku.map(y => y.id), ['honitsu', 'yakuhai-white', 'yakuhai-green', 'yakuhai-red', 'chanta', 'sanankou']);
 });
 for (const [name, groups, expected] of [
   ['four triplets', ['111999m', '222p', '888s', '33z'], true],
@@ -56,10 +56,11 @@ for (const [name, groups, expected] of [
   ['same suit', ['123123m', '456p', '789s', '33z'], true],
   ['different suits', ['123m', '123456p', '789s', '33z'], false],
 ] as const) test(`iipeikou: ${name}`, () => check([...groups], '1m', 'iipeikou', expected));
-test('multiple repeated sequences still award only one han', () => {
+test('two sequence pairs award ryanpeikou instead of iipeikou', () => {
   for (const c of analyzeYaku(hand('11223344556677m'), context()).candidates.filter(c => c.shape === 'standard')) {
-    assert.equal(c.yaku.filter(y => y.id === 'iipeikou').length, 1);
-    assert.equal(c.yaku.find(y => y.id === 'iipeikou')?.han, 1);
+    assert.equal(c.yaku.filter(y => y.id === 'ryanpeikou').length, 1);
+    assert.equal(c.yaku.find(y => y.id === 'ryanpeikou')?.han, 3);
+    assert.equal(c.yaku.filter(y => y.id === 'iipeikou').length, 0);
   }
 });
 for (const [sequence, tile, wait] of [
@@ -115,7 +116,7 @@ test('11223344556677m separates seven pairs, decompositions and waits', () => {
   assert.deepEqual(seven.yaku, [{ id: 'chinitsu', han: 6, yakuman: 0 }, { id: 'chiitoitsu', han: 2, yakuman: 0 }]);
   const standard = result.candidates.filter(c => c.shape === 'standard');
   assert.equal(new Set(standard.map(c => c.decompositionId)).size, 3);
-  assert.deepEqual(standard.map(c => [c.wait, c.totalHan]), [['ryanmen', 8], ['tanki', 7], ['ryanmen', 8]]);
+  assert.deepEqual(standard.map(c => [c.wait, c.totalHan]), [['ryanmen', 10], ['tanki', 9], ['ryanmen', 10]]);
   assert.equal(result.candidates.length, 4);
 });
 test('different decompositions never merge iipeikou with toitoi', () => {

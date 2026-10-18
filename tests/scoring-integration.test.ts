@@ -86,7 +86,7 @@ for(const winning of ['man-1','man-2','man-3','man-4','man-5','man-6','man-7'])t
   assert.equal(selectScoredWinCandidate(evaluated)!.candidate.id,result.candidate.id);
   assert.equal(selectScoredWinCandidate([...evaluated].reverse())!.candidate.id,result.candidate.id);
   assert.deepEqual(result.fuBreakdown,calculateFu(result.candidate,{winMethod:'ron',seatWind:'east',roundWind:'east'}).fuBreakdown);
-  if(winning==='man-1') {assert.equal(result.fu,30);assert.equal(result.candidate.shape,'standard');assert.equal(result.yakuHan,8);}
+  if(winning==='man-1') {assert.equal(result.fu,30);assert.equal(result.candidate.shape,'standard');assert.equal(result.yakuHan,10);}
 });
 test('point selection can prefer fewer han, with deterministic tie breakers',()=>{
   const game=tsumoGame();const original=evaluateWin(game,0,game.players[0].drawnTile!,'tsumo')!;
@@ -110,8 +110,8 @@ test('legacy selector remains supported and reset drops scoring',()=>{
 });
 
 for (const [name, fu, tier, points] of [
-  ['haneman',60,'haneman',18000],['baiman',60,'baiman',24000],
-  ['sanbaiman',60,'sanbaiman',36000],['seven-pairs-ron',25,'normal',1600],
+  ['haneman',60,'baiman',24000],['baiman',60,'sanbaiman',36000],
+  ['sanbaiman',60,'kazoe-yakuman',48000],['seven-pairs-ron',25,'normal',1600],
 ] as const) test(`browser fixed-wall scoring fixture ${name}`, () => {
   const initial = scoringGame(name); freeze(initial); inventory(initial, initial);
   const won = initial.phase === 'awaiting-ron' ? declareRon(initial,0) : declareTsumo(initial,0);

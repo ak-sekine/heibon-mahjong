@@ -19,7 +19,7 @@ import type {GameState} from '../src/model/game.ts';
 for(const method of ['ron','tsumo'] as const)for(const [name,hand,open,han] of [
  ['tanyao',['345p','678s','222p','66m'],['234m'],1],
  ['yakuhai',['123m','456p','789s','66m'],['555z'],1],
- ['toitoi',['333m','777p','888s','66m'],['555z'],3],
+ ['toitoi',['333m','777p','888s','66m'],['555z'],5],
  ['two melds',['678s','222p','66m'],['234m','345p'],1],
  ['four melds',['66m'],['234m','345p','678s','222p'],1],
 ] as const)test(`open ${name} ${method}: score and tile conservation`,()=>{

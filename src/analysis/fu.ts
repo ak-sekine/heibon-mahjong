@@ -1,4 +1,5 @@
 import type { TileKind } from '../model/tile.ts';
+import { isConcealedTriplet } from './yaku.ts';
 import type { WinningContext, YakuCandidate, WaitType } from './yaku.ts';
 
 export type FuMode = 'standard' | 'pinfu-tsumo' | 'seven-pairs' | 'yakuman';
@@ -29,8 +30,7 @@ export function calculateFu(candidate: YakuCandidate, context: Pick<WinningConte
   candidate.decomposition.melds.forEach((meld, meldIndex) => {
     if (meld.type !== 'triplet') return;
     const terminalOrHonor = meld.tile.category === 'honor' || meld.tile.rank === 1 || meld.tile.rank === 9;
-    const concealed = Boolean(meld.concealed) || meldIndex >= (context.openMelds?.length ?? 0) && !(context.winMethod === 'ron' && candidate.wait === 'shanpon' &&
-      candidate.assignment.type === 'meld' && candidate.assignment.meldIndex === meldIndex);
+    const concealed = isConcealedTriplet(meld, meldIndex, candidate.assignment, candidate.wait, context);
     fuBreakdown.push({ type: meld.kan ? 'kan' : 'triplet', tile: meld.tile, meldIndex, concealed, terminalOrHonor,
       fu: (meld.kan ? 4 : 1) * (concealed ? 4 : 2) * (terminalOrHonor ? 2 : 1) });
   });

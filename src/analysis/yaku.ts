@@ -20,7 +20,8 @@ export interface WinningContext {
 }
 export type YakuId = 'rinshan' | 'chankan' | 'sankantsu' | 'suukantsu' | 'ippatsu' | 'double-riichi' | 'riichi' | 'menzen-tsumo' | 'tanyao' | 'yakuhai-white' | 'yakuhai-green' |
   'yakuhai-red' | 'yakuhai-seat-wind' | 'yakuhai-round-wind' | 'pinfu' |
-  'iipeikou' | 'chiitoitsu' | 'toitoi' | 'sanshoku-doujun' | 'ittsu' | 'honitsu' | 'chinitsu' | 'kokushi-musou';
+  'iipeikou' | 'ryanpeikou' | 'sanankou' | 'chiitoitsu' | 'toitoi' | 'shousangen' | 'honroutou' |
+  'chanta' | 'junchan' | 'sanshoku-doukou' | 'sanshoku-doujun' | 'ittsu' | 'honitsu' | 'chinitsu' | 'kokushi-musou';
 type NormalYakuId = Exclude<YakuId, 'kokushi-musou' | 'suukantsu'>;
 type NormalYakuHan = 1 | 2 | 3 | 5 | 6;
 export type RecognizedYaku =
@@ -88,6 +89,15 @@ function totals(yaku: readonly RecognizedYaku[]) {
   return { yaku, totalHan: yaku.reduce((n, y) => n + y.han, 0),
     yakumanCount: yaku.reduce((n, y) => n + y.yakuman, 0) };
 }
+/** Keep concealed-triplet yaku and fu aligned for each winning-tile assignment. */
+export function isConcealedTriplet(meld: WinningMeld, meldIndex: number,
+  assignment: WinningTileAssignment, wait: WaitType,
+  context: Pick<WinningContext, 'winMethod' | 'openMelds'>): boolean {
+  if (meld.type !== 'triplet') return false;
+  return Boolean(meld.concealed) || meldIndex >= (context.openMelds?.length ?? 0) &&
+    !(context.winMethod === 'ron' && wait === 'shanpon' &&
+      assignment.type === 'meld' && assignment.meldIndex === meldIndex);
+}
 /** Fixed public melds precede concealed melds in every decomposition. */
 export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): YakuAnalysis {
   if (!context) throw new RangeError('Invalid winning context');
@@ -109,6 +119,7 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
   }
   if (closed && context.winMethod === 'tsumo') add(common, 'menzen-tsumo');
   if (allTiles.every(t => t.category === 'suited' && t.rank >= 2 && t.rank <= 8)) add(common, 'tanyao');
+  if (allTiles.every(t => t.category === 'honor' || t.rank === 1 || t.rank === 9)) add(common, 'honroutou', 2);
   const suits = new Set(allTiles.flatMap(tile => tile.category === 'suited' ? [tile.suit] : []));
   const hasHonors = allTiles.some(tile => tile.category === 'honor');
   if (suits.size === 1 && hasHonors) add(common, 'honitsu', closed ? 3 : 2);
@@ -137,13 +148,50 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
     const ittsu = (['man', 'pin', 'sou'] as const).some(suit => [1, 4, 7].every(rank => sequenceStarts.has(`${suit}:${rank}`)));
     if (sanshoku) add(base, 'sanshoku-doujun', closed ? 2 : 1);
     if (ittsu) add(base, 'ittsu', closed ? 2 : 1);
-    const sequences = sequenceMelds.map(meldKey);
-    const iipeikou = new Set(sequences).size < sequences.length;
+    const sequenceCounts = new Map<string, number>();
+    for (const meld of sequenceMelds) {
+      const key = meldKey(meld);
+      sequenceCounts.set(key, (sequenceCounts.get(key) ?? 0) + 1);
+    }
+    const iipeikou = [...sequenceCounts.values()].some(count => count >= 2);
+    const ryanpeikou = closed && sequenceMelds.length === 4 &&
+      [...sequenceCounts.values()].reduce((pairs, count) => pairs + Math.floor(count / 2), 0) >= 2;
     const toitoi = melds.every(m => m.type === 'triplet');
+    const dragonNames = new Set<string>(['white', 'green', 'red']);
+    const dragonTriplets = new Set(melds.flatMap(m => m.type === 'triplet' && m.tile.category === 'honor' &&
+      dragonNames.has(m.tile.honor) ? [m.tile.honor] : []));
+    const shousangen = dragonTriplets.size === 2 && pair.category === 'honor' &&
+      dragonNames.has(pair.honor) && !dragonTriplets.has(pair.honor);
+    if (shousangen) add(base, 'shousangen', 2);
+
+    const hasSequence = sequenceMelds.length > 0;
+    const pairHasTerminalOrHonor = pair.category === 'honor' || pair.rank === 1 || pair.rank === 9;
+    const meldsHaveTerminals = melds.every(m => m.type === 'sequence'
+      ? m.tiles[0].category === 'suited' && [1, 7].includes(m.tiles[0].rank)
+      : m.tile.category === 'honor' || m.tile.rank === 1 || m.tile.rank === 9);
+    if (hasSequence && pairHasTerminalOrHonor && meldsHaveTerminals) {
+      if (allTiles.every(t => t.category === 'suited')) add(base, 'junchan', closed ? 3 : 2);
+      else if (allTiles.some(t => t.category === 'honor')) add(base, 'chanta', closed ? 2 : 1);
+    }
+
+    const tripletRanks = new Map<string, Set<number>>();
+    for (const meld of melds) {
+      if (meld.type !== 'triplet' || meld.tile.category !== 'suited') continue;
+      const ranks = tripletRanks.get(meld.tile.suit) ?? new Set<number>();
+      ranks.add(meld.tile.rank);
+      tripletRanks.set(meld.tile.suit, ranks);
+    }
+    const sanshokuDoukou = [...(tripletRanks.get('man') ?? [])].some(rank =>
+      tripletRanks.get('pin')?.has(rank) && tripletRanks.get('sou')?.has(rank));
+    if (sanshokuDoukou) add(base, 'sanshoku-doukou', 2);
+
     const emit = (assignment: WinningTileAssignment, wait: WaitType, position: string) => {
       const yaku: RecognizedYaku[] = kans===4 ? [{id:'suukantsu',han:0,yakuman:1}] : [...base];
       if (closed && melds.every(m => m.type === 'sequence') && !valuePair(pair, context) && wait === 'ryanmen') add(yaku, 'pinfu');
-      if (kans!==4 && closed && iipeikou) add(yaku, 'iipeikou');
+      if (kans!==4 && ryanpeikou) add(yaku, 'ryanpeikou', 3);
+      else if (kans!==4 && closed && iipeikou) add(yaku, 'iipeikou');
+      if (kans !== 4 && melds.filter((meld, meldIndex) => meld.type === 'triplet' &&
+        isConcealedTriplet(meld, meldIndex, assignment, wait, context)).length >= 3) add(yaku, 'sanankou', 2);
       if (kans!==4 && toitoi) add(yaku, 'toitoi', 2);
       candidates.push({ shape: 'standard', id: `standard:${decompositionId}:${position}`,
         decompositionId, decomposition, assignment, wait, ...totals(yaku) });
