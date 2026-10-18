@@ -17,6 +17,7 @@ import { canDeclareRiichi } from '../game/riichi.ts';
 import { canDiscard } from '../game/discard.ts';
 import { exposedDoraIndicators } from '../game/dora.ts';
 import { renderDoraIndicators, createResultDoraRow } from './dora.ts';
+import type { RoundSettlement } from '../model/match.ts';
 
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
 const seatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
@@ -72,9 +73,9 @@ function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement
   return button;
 }
 
-export function renderTable(game: GameState, points?: readonly number[]): void {
+export function renderTable(game: GameState, points?: readonly number[], settlement: RoundSettlement | null = null): void {
   renderWinResult(game);
-  renderRoundSummary(game);
+  renderRoundSummary(game, settlement);
   const winningResults = game.winResult
     ? game.winResult.winMethod === 'ron' ? game.winResult.winners : [game.winResult]
     : [];
@@ -108,7 +109,9 @@ export function renderTable(game: GameState, points?: readonly number[]): void {
       const backHand = document.querySelector<HTMLElement>(`.concealed-hand[data-player-id="${id}"]`);
       if (backHand) {
         if (winningResult && player.control === 'cpu') renderPublicCpuHand(backHand, game, winningResult);
-        else {
+        else if (player.control === 'cpu' && settlement?.reason === 'draw' && settlement.tenpai?.[id]) {
+          renderPublicCpuDrawHand(backHand, player);
+        } else {
           backHand.setAttribute('aria-label', `${seatNames[id]}の非公開手牌 ${count}枚`);
           backHand.replaceChildren(...Array.from({length:count},()=>{
             const back=document.createElement('span'); back.className='tile-back';
@@ -283,7 +286,7 @@ const yakuNames: Record<YakuId, string> = {
   pinfu: '平和', iipeikou: '一盃口', chiitoitsu: '七対子', toitoi: '対々和', 'kokushi-musou': '国士無双',
 };
 
-function renderRoundSummary(game: GameState): void {
+function renderRoundSummary(game: GameState, settlement: RoundSettlement | null): void {
   const summary = document.querySelector<HTMLElement>('#round-result-summary');
   if (!summary) return;
   summary.replaceChildren();
@@ -292,7 +295,7 @@ function renderRoundSummary(game: GameState): void {
     if (className) node.className = className;
     return node;
   };
-  if (game.phase === 'won' && game.winResult) {
+  if ((settlement?.reason === 'ron' || settlement?.reason === 'tsumo') && game.phase === 'won' && game.winResult) {
     summary.hidden = false;
     const winners = game.winResult.winMethod === 'ron' ? game.winResult.winners : [game.winResult];
     for (const result of winners) {
@@ -303,17 +306,30 @@ function renderRoundSummary(game: GameState): void {
         ? `${seatNames[player.id]} ロン（${seatNames[result.discarderId]}から）`
         : `${seatNames[player.id]} ツモ`;
       section.append(text('p', heading, 'round-summary-winner'));
-      section.append(text('p', result.candidate.yaku.map(yaku => yakuNames[yaku.id]).join('・'), 'round-summary-yaku'));
+      const yaku = result.candidate.yaku.map(entry => yakuNames[entry.id]);
+      if (result.yakumanCount === 0) {
+        if (result.doraHan > 0) yaku.push(`ドラ${result.doraHan}`);
+        if (result.uraDoraHan > 0) yaku.push(`裏ドラ${result.uraDoraHan}`);
+        if (result.redDoraHan > 0) yaku.push(`赤ドラ${result.redDoraHan}`);
+      }
+      section.append(text('p', yaku.join('・'), 'round-summary-yaku'));
       section.append(text('p', result.yakumanCount > 0
         ? `${result.yakumanCount}役満`
-        : `合計${result.totalHanIncludingDora}翻（ドラ込み）`, 'round-summary-total'));
+        : `合計${result.totalHanIncludingDora}翻`, 'round-summary-total'));
       summary.append(section);
     }
     return;
   }
-  if (game.phase === 'wall-exhausted') {
+  if (settlement?.reason === 'draw' && settlement.tenpai) {
     summary.hidden = false;
-    summary.append(text('p', game.abortiveDraw === 'four-kans' ? '途中流局（四開槓）' : '流局', 'round-summary-winner'));
+    const ready = settlement.tenpai.flatMap((isTenpai, id) => isTenpai ? [seatNames[id]] : []);
+    summary.append(text('p', '流局', 'round-summary-winner'));
+    summary.append(text('p', `テンパイ：${ready.length === 0 ? 'なし' : ready.length === 4 ? '全員' : ready.join('・')}`, 'round-summary-tenpai'));
+    return;
+  }
+  if (settlement?.reason === 'four-kans') {
+    summary.hidden = false;
+    summary.append(text('p', '途中流局（四開槓）', 'round-summary-winner'));
     return;
   }
   summary.hidden = true;
@@ -338,11 +354,20 @@ function renderPublicCpuHand(container: HTMLElement, game: GameState, result: Ts
     .sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
   // The confirmed winning tile is a current draw for tsumo, or the existing
   // physical discard for ron. Rendering adds no tile to GameState.
-  const tiles = [...concealedTiles, winningTile];
+  renderRevealedCpuHand(container, player, [...concealedTiles, winningTile], result.winningTileId);
+}
+
+function renderPublicCpuDrawHand(container: HTMLElement, player: PlayerState): void {
+  const tiles = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
+    .sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
+  renderRevealedCpuHand(container, player, tiles);
+}
+
+function renderRevealedCpuHand(container: HTMLElement, player: PlayerState, tiles: readonly PhysicalTile[], winningTileId?: string): void {
   container.setAttribute('aria-label', `${seatNames[player.id]}の公開手牌 ${tiles.map(tile => tileLabel(tile.tile)).join('・')}`);
   container.replaceChildren(...tiles.map(physical => {
     const tile = document.createElement('span');
-    tile.className = physical.id === result.winningTileId ? 'revealed-tile winning-tile' : 'revealed-tile';
+    tile.className = physical.id === winningTileId ? 'revealed-tile winning-tile' : 'revealed-tile';
     tile.setAttribute('aria-hidden', 'true');
     tile.append(createTileElement(physical.tile));
     return tile;

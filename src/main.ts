@@ -12,7 +12,7 @@ installCallViewport();
 const resultDialog = new ResultDialog();
 const controller = new GameController(undefined, { onChange: render });
 function render(): void {
-  renderTable(controller.game, controller.match.points);
+  renderTable(controller.game, controller.match.points, controller.match.lastSettlement);
   renderMatch(controller.match);
   renderSelection(controller.game, controller.selectedTileId, controller.progressing, controller.match.points[0]);
   resultDialog.update(controller.match);

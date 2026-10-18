@@ -6,8 +6,11 @@ import { tsumoGame } from './tsumo-fixture.ts';
 import { declareTsumo } from '../src/game/tsumo.ts';
 import { startGame } from '../src/game/start.ts';
 import { renderTable, renderSelection } from '../src/rendering/table.ts';
+import { renderMatch } from '../src/rendering/match.ts';
+import { startMatch, nextRound } from '../src/game/match.ts';
+import { fixedRound } from './match-fixture.ts';
 import { discardTile } from '../src/game/discard.ts';
-import { SUITS } from '../src/model/tile.ts';
+import { SUITS, tileKindKey } from '../src/model/tile.ts';
 import { tileSvgMarkup, tileLabel } from '../src/rendering/tile-svg.ts';
 import { doraKindFromIndicator } from '../src/analysis/dora.ts';
 import { ordinaryTile } from '../src/model/tile.ts';
@@ -35,13 +38,13 @@ class ElementStub {
   append(...children: ElementStub[]) { this.children.push(...children); }
 }
 
-for (const count of [0, 1, 2, 3, 'zero-normal', 'yakuman'] as const) test(`result separates yaku and bonuses: ${count}`, () => {
+for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'normal-multiple', 'ura', 'yakuman'] as const) test(`result separates yaku and bonuses: ${count}`, () => {
   const nodes = new Map<string, ElementStub>();
   for (const id of [0, 1, 2, 3]) {
     nodes.set(`#label-${id}`, new ElementStub());
     nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
   }
-  for (const key of ['#player-hand', '#wall-count', '#win-result', '#dora-indicators']) nodes.set(key, new ElementStub());
+  for (const key of ['#player-hand', '#wall-count', '#win-result', '#round-result-summary', '#dora-indicators']) nodes.set(key, new ElementStub());
   for (const key of ['#ron-controls', '#ron-status', '#ron', '#pass-ron', '.discard-controls']) {
     const node = new ElementStub(); node.hidden = true; nodes.set(key, node);
   }
@@ -51,36 +54,75 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'yakuman'] as const) test(`resul
     createElement: (tag: string) => new ElementStub(tag),
   } as unknown as Document;
   try {
-    const game = count === 'yakuman'
+    let game = count === 'yakuman'
       ? tsumoGame(['19m', '19p', '19s', '12345677z'], false, undefined, 'man-9')
-      : tsumoGame(['123m', '456m', '456p', '22p', '456s'], false, SUITS.slice(0, count === 'zero-normal' ? 2 : count), count === 'zero-normal' ? 'sou-8' : 'man-4');
+      : count === 'normal-multiple'
+        ? tsumoGame(['555m', '456p', '789s', '22p', '123s'], false, ['man'], 'man-4')
+        : tsumoGame(['123m', '456m', '456p', '22p', '456s'], false,
+          count === 'no-dora' ? [] : SUITS.slice(0, count === 'zero-normal' ? 2 : typeof count === 'number' ? count : 3),
+          count === 'zero-normal' || count === 'no-dora' ? 'sou-8' : 'man-4');
+    if (count === 'ura') {
+      const base = tsumoGame();
+      const deadWall = [...base.deadWall];
+      const source = base.players.find(player => player.id !== 0 && player.hand.some(tile => tileKindKey(tile.tile) === 'man-1'))!;
+      const sourceHand = [...source.hand];
+      const uraIndex = sourceHand.findIndex(tile => tileKindKey(tile.tile) === 'man-1');
+      [deadWall[5], sourceHand[uraIndex]] = [sourceHand[uraIndex], deadWall[5]];
+      const declaration = base.players[0].river.at(-1)!;
+      game = { ...base, deadWall, players: base.players.map(player => player.id === 0
+        ? { ...player, riichi: { declarationTileId: declaration.id } }
+        : player.id === source.id ? { ...player, hand: sourceHand } : player) };
+    }
     const won = declareTsumo(game, 0);
-    renderTable(won); inventory(won, game);
+    renderTable(won, undefined, startMatch(won).lastSettlement); inventory(won, game);
     const panel = nodes.get('#win-result')!;
     const strings = (node: ElementStub): string[] => [node.textContent, ...node.children.flatMap(strings)];
     const output = strings(panel);
     const list = panel.children[0].children.find(c => c.tagName === 'ul')!;
     assert.ok(!strings(list).some(s => s.includes('ドラ')));
     const exposed = nodes.get('#dora-indicators')!.children;
-    assert.equal(exposed.length, 5);
-    assert.ok(exposed.slice(1).every(slot => slot.className === 'dora-slot tile-back' && slot.innerHTML === '' && Object.keys(slot.dataset).length === 0));
+    assert.equal(exposed.length, count === 'ura' ? 10 : 5);
+    if (count === 'ura') {
+      assert.equal(exposed[5].dataset.tileId, game.deadWall[5].id);
+      assert.equal(exposed[5].children[2].textContent, '裏ドラ');
+    } else assert.ok(exposed.slice(1).every(slot => slot.className === 'dora-slot tile-back' && slot.innerHTML === '' && Object.keys(slot.dataset).length === 0));
     assert.equal(exposed[0].dataset.tileId, game.deadWall[4].id);
     assert.equal(exposed[0].children[1].innerHTML, tileSvgMarkup(game.deadWall[4].tile));
     assert.equal(exposed[0].children[2].textContent, `ドラ：\n${tileLabel(ordinaryTile(doraKindFromIndicator(game.deadWall[4].tile)))}`);
     assert.ok(output.some(s => s.startsWith('獲得点数：')));
     assert.ok(output.includes('支払い：'));
     assert.equal(output.includes('符の内訳'), count !== 'yakuman');
+    const summary = nodes.get('#round-result-summary')!;
+    const win = won.winResult!;
+    const yaku = list.children.map(item => item.textContent.replace(/\s+\d+(?:翻|役満)$/, ''));
+    if (win.yakumanCount === 0) {
+      if (win.doraHan > 0) yaku.push(`ドラ${win.doraHan}`);
+      if (win.uraDoraHan > 0) yaku.push(`裏ドラ${win.uraDoraHan}`);
+      if (win.redDoraHan > 0) yaku.push(`赤ドラ${win.redDoraHan}`);
+    }
+    assert.equal(summary.children[0].children.find(child => child.className === 'round-summary-yaku')!.textContent, yaku.join('・'));
+    assert.equal(summary.children[0].children.find(child => child.className === 'round-summary-total')!.textContent,
+      win.yakumanCount > 0 ? `${win.yakumanCount}役満` : `合計${win.totalHanIncludingDora}翻`);
+    assert.ok(!summary.children[0].textContent.includes('ドラ込み'));
     if (count === 'yakuman') {
       assert.ok(output.includes('国士無双 1役満'));
       assert.ok(output.includes('役満：1役満'));
       assert.ok(!output.some(s => s.includes('翻') || s.includes('合計：') || s.includes('赤ドラ')));
+      assert.ok(!summary.children[0].children.find(child => child.className === 'round-summary-yaku')!.textContent.includes('ドラ'));
     } else {
-      assert.deepEqual(list.children.map(c => c.textContent).sort(), ['平和 1翻', '門前清自摸和 1翻']);
-      assert.ok(output.includes('役合計：2翻'));
-      const normal = count === 'zero-normal' ? 0 : 1, red = count === 'zero-normal' ? 2 : count;
+      const expectedYaku = count === 'normal-multiple' || count === 'ura' ? list.children.map(c => c.textContent).sort()
+        : ['平和 1翻', '門前清自摸和 1翻'];
+      assert.deepEqual(list.children.map(c => c.textContent).sort(), expectedYaku);
+      assert.ok(output.includes(`役合計：${win.yakuHan}翻`));
+      const normal = count === 'zero-normal' || count === 'no-dora' ? 0
+        : count === 'normal-multiple' || count === 'ura' ? win.doraHan : 1;
+      const red = count === 'zero-normal' ? 2 : count === 'normal-multiple' || count === 'ura' ? win.redDoraHan : count;
+      if (count === 'normal-multiple') assert.ok(normal > 1, 'the fixture has multiple normal dora');
+      if (count === 'ura') assert.ok(win.uraDoraHan > 0, 'the fixture has ura dora');
       assert.ok(output.includes(`通常ドラ：${normal}枚（${normal}翻）`));
-      assert.ok(output.includes(`赤ドラ：${red}枚（${red}翻）`));
-      assert.ok(output.includes(`合計：${2 + normal + red}翻`));
+      if (count === 'no-dora') assert.ok(output.includes('赤ドラ：0枚（0翻）'));
+      else assert.ok(output.includes(`赤ドラ：${red}枚（${red}翻）`));
+      assert.ok(output.includes(`合計：${win.totalHanIncludingDora}翻`));
       assert.equal(panel.children[0].children.filter(c => c.className === 'win-bonuses').length, 1);
     }
   } finally { globalThis.document = original; }
@@ -173,11 +215,12 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
     const summary = nodes.get('#round-result-summary')!;
     const exhausted = { ...startGame(seeded(91)), phase: 'wall-exhausted' as const };
     renderTable(exhausted);
-    assert.equal(summary.hidden, false);
-    assert.equal(summary.children[0].textContent, '流局');
+    assert.equal(summary.hidden, true, 'an unsettled wall exhaustion must not publish a result summary');
+    assert.equal(summary.children.length, 0);
     assert.ok(!summary.children.map(node => node.textContent).join('').includes('翻'));
-    renderTable({ ...exhausted, abortiveDraw: 'four-kans' });
-    assert.equal(summary.children[0].textContent, '途中流局（四開槓）');
+    const unconfirmedFourKans = { ...exhausted, abortiveDraw: 'four-kans' as const };
+    renderTable(unconfirmedFourKans);
+    assert.equal(summary.hidden, true);
     renderTable(startGame(seeded(92)));
     assert.equal(summary.hidden, true);
     assert.equal(summary.children.length, 0);
@@ -245,6 +288,106 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
   } finally { globalThis.document = original; }
 });
 
+test('confirmed draw publishes only tenpai CPU hands, summarizes settlement and filters detailed hands', () => {
+  const nodes = new Map<string, ElementStub>();
+  for (const id of [0, 1, 2, 3]) {
+    nodes.set(`#label-${id}`, new ElementStub());
+    nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
+    if (id) nodes.set(`.concealed-hand[data-player-id="${id}"]`, new ElementStub());
+  }
+  for (const key of ['#player-hand', '#wall-count', '#win-result', '#round-result-summary', '#dora-indicators', '#selection-status',
+    '#table-round', '#deposit-sticks', '#match-result', '#next-round']) nodes.set(key, new ElementStub());
+  for (const key of ['#tsumo', '#discard', '#ron', '#pass-ron']) nodes.set(key, new ElementStub());
+  for (const key of ['#ron-controls', '#ron-status', '.discard-controls']) {
+    const node = new ElementStub(); node.hidden = true; nodes.set(key, node);
+  }
+  const original = globalThis.document;
+  globalThis.document = {
+    querySelector: (selector: string) => nodes.get(selector),
+    querySelectorAll: () => nodes.get('#player-hand')!.children.map(item => item.children[0]),
+    createElement: (tag: string) => new ElementStub(tag),
+    createTextNode: (text: string) => Object.assign(new ElementStub('#text'), { textContent: text }),
+  } as unknown as Document;
+  const descendants = (node: ElementStub): ElementStub[] => [node, ...node.children.flatMap(descendants)];
+  try {
+    const scenarios: readonly (readonly number[])[] = [[], [0], [1], [2], [3], [0, 2], [1, 2, 3], [0, 1, 2, 3]];
+    for (const ready of scenarios) {
+      const fixed = fixedRound(0, ready as (0 | 1 | 2 | 3)[]);
+      const game = { ...fixed, players: fixed.players.map(player => ({ ...player, river: [] })) };
+      renderTable(game);
+      assert.equal(nodes.get('#round-result-summary')!.hidden, true, 'hand faces stay hidden until settlement is passed');
+      for (const id of [1, 2, 3]) {
+        const hand = nodes.get(`.concealed-hand[data-player-id="${id}"]`)!;
+        assert.equal(hand.children.length, 13);
+        assert.ok(hand.children.every(tile => tile.className === 'tile-back'));
+      }
+
+      const match = startMatch(game);
+      const settlement = match.lastSettlement!;
+      assert.deepEqual(settlement.tenpai, [0, 1, 2, 3].map(id => ready.includes(id)));
+      renderTable(match.game, match.points, settlement);
+      renderMatch(match);
+
+      const expectedNames = ready.length === 0 ? 'なし' : ready.length === 4 ? '全員'
+        : ready.map(id => ['自分', 'CPU1', 'CPU2', 'CPU3'][id]).join('・');
+      const summary = nodes.get('#round-result-summary')!;
+      assert.equal(summary.hidden, false);
+      assert.deepEqual(summary.children.map(child => child.textContent), ['流局', `テンパイ：${expectedNames}`]);
+
+      for (const id of [1, 2, 3]) {
+        const hand = nodes.get(`.concealed-hand[data-player-id="${id}"]`)!;
+        const player = match.game.players[id];
+        const isTenpai = settlement.tenpai![id];
+        const tiles = isTenpai ? hand.children : [];
+        assert.equal(hand.children.length, 13);
+        assert.equal(hand.children.filter(tile => tile.className === 'revealed-tile').length, isTenpai ? player.hand.length : 0);
+        assert.equal(hand.children.filter(tile => tile.className === 'tile-back').length, isTenpai ? 0 : 13);
+        if (isTenpai) {
+          const sorted = [...player.hand].sort((a, b) => {
+            const order = (tile: typeof a.tile) => tile.category === 'suited'
+              ? ['man', 'pin', 'sou'].indexOf(tile.suit) * 9 + tile.rank - 1
+              : 27 + ['east', 'south', 'west', 'north', 'white', 'green', 'red'].indexOf(tile.honor);
+            return order(a.tile) - order(b.tile) || a.id.localeCompare(b.id);
+          });
+          assert.deepEqual(tiles.map(tile => tile.children[0].innerHTML), sorted.map(tile => tileSvgMarkup(tile.tile)));
+        }
+      }
+
+      const rendered = [...nodes.values()].flatMap(descendants);
+      for (const player of match.game.players.slice(1)) for (const tile of player.hand) {
+        assert.ok(!rendered.some(node => node.dataset.tileId === tile.id), `concealed CPU ID ${tile.id} leaked into the DOM`);
+      }
+
+      const detail = nodes.get('#match-result')!;
+      const detailNodes = descendants(detail);
+      assert.equal(detailNodes.filter(node => node.className === 'winning-hand').length, ready.length);
+      for (let id = 0; id < 4; id++) {
+        assert.ok(detail.children.some(node => node.textContent === `${['自分', 'CPU1', 'CPU2', 'CPU3'][id]}：${ready.includes(id) ? 'テンパイ' : 'ノーテン'}`));
+      }
+    }
+
+    const fixedFourKans = fixedRound(0, [1, 2]);
+    const fourKans = { ...fixedFourKans, players: fixedFourKans.players.map(player => ({ ...player, river: [] })),
+      abortiveDraw: 'four-kans' as const, kanCount: 4 };
+    const aborted = startMatch(fourKans);
+    assert.equal(aborted.lastSettlement!.reason, 'four-kans');
+    assert.equal(aborted.lastSettlement!.tenpai, null);
+    renderTable(aborted.game, aborted.points, aborted.lastSettlement);
+    renderMatch(aborted);
+    assert.deepEqual(nodes.get('#round-result-summary')!.children.map(child => child.textContent), ['途中流局（四開槓）']);
+    assert.ok([1, 2, 3].every(id => nodes.get(`.concealed-hand[data-player-id="${id}"]`)!.children.every(tile => tile.className === 'tile-back')));
+    assert.equal(descendants(nodes.get('#match-result')!).filter(node => node.className === 'winning-hand').length, 0);
+
+    const readyMatch = startMatch(fixedRound(0, [1, 2, 3]));
+    const next = nextRound(readyMatch);
+    renderTable(next.game, next.points, next.lastSettlement);
+    renderMatch(next);
+    assert.equal(nodes.get('#round-result-summary')!.hidden, true);
+    assert.equal(nodes.get('#match-result')!.hidden, true);
+    assert.ok([1, 2, 3].every(id => nodes.get(`.concealed-hand[data-player-id="${id}"]`)!.children.every(tile => tile.className === 'tile-back')));
+  } finally { globalThis.document = original; }
+});
+
 for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner, sorted thirteen plus accessible red winning draw, disables UI and resets`, async () => {
   const { cpuTsumoGame, cpuTsumoStart } = await import('./cpu-tsumo-fixture.ts');
   const nodes = new Map<string, ElementStub>();
@@ -274,7 +417,7 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     }
     const own = nodes.get('#player-hand')!.children.map(n => n.dataset.tileId);
     const won = declareTsumo(game, id);
-    renderTable(won); renderSelection(won, null);
+    renderTable(won, undefined, startMatch(won).lastSettlement); renderSelection(won, null);
     const panel = nodes.get('#win-result')!;
     assert.equal(panel.hidden, false);
     const hand = panel.children[0].children.find(n => n.className === 'winning-hand')!;
@@ -299,7 +442,8 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     assert.equal(summary.hidden, false);
     const summaryText = descend(summary).map(n => n.textContent).join(' ');
     assert.ok(summaryText.includes(`CPU${id} ツモ`));
-    assert.ok(summaryText.includes(`合計${won.winResult!.totalHanIncludingDora}翻（ドラ込み）`));
+    assert.ok(summaryText.includes(`合計${won.winResult!.totalHanIncludingDora}翻`));
+    assert.ok(!summaryText.includes('ドラ込み'));
     assert.ok(summaryText.includes('門前清自摸和') && summaryText.includes('平和'));
     assert.ok(!descend(hand).some(n => n.tagName === 'button'));
     for (const other of [1, 2, 3].filter(seat => seat !== id)) {
@@ -356,7 +500,7 @@ for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','f
       } else if (scenario === 'pass' || scenario === 'pass-cpu') game = passRon(game,0);
       else if (scenario !== 'waiting') game = declareRon(game,0);
       const snapshot = structuredClone(game);
-      renderTable(game); renderSelection(game,null,true);
+      renderTable(game, undefined, game.phase === 'won' ? startMatch(game).lastSettlement : null); renderSelection(game,null,true);
       assert.deepEqual(game,snapshot);
       const pending = scenario === 'waiting';
       assert.equal(nodes.get('#ron-controls')!.hidden,!pending);
@@ -431,7 +575,7 @@ for (const mode of ['plain', 'riichi', 'double', 'double-ron', 'triple-ron', 'pl
     assert.equal(walk(panel).filter(n => n.className.includes('result-dora')).length, 0);
     const won = multi ? declareRon(discardTile(game, 1, game.players[1].drawnTile!.id), 0) : declareTsumo(game, 0);
     const snapshot = structuredClone(won);
-    renderTable(won);
+    renderTable(won, undefined, startMatch(won).lastSettlement);
     assert.ok(panel.children.length > 0);
     for (const section of panel.children) {
       const rows = section.children.filter(n => n.className.startsWith('result-dora '));

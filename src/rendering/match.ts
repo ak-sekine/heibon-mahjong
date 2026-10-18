@@ -2,8 +2,12 @@ import type { MatchState } from '../model/match.ts';
 import { rankPlayers } from '../game/match.ts';
 import { createTileElement } from './tile-svg.ts';
 import { renderDepositSticks } from './deposit-sticks.ts';
+import { HONORS, SUITS, type Tile } from '../model/tile.ts';
 const names = ['自分','CPU1','CPU2','CPU3'];
 const renderedSettlements = new WeakMap<HTMLElement, MatchState['lastSettlement']>();
+function tileOrder(tile: Tile): number {
+  return tile.category === 'suited' ? SUITS.indexOf(tile.suit) * 9 + tile.rank - 1 : 27 + HONORS.indexOf(tile.honor);
+}
 export function renderMatch(match: MatchState): void {
   const round=document.querySelector('#table-round');
   if(round) round.textContent=`東${match.roundNumber}局${match.honba > 0 ? ` ${match.honba}本場` : ''}`;
@@ -24,9 +28,13 @@ export function renderMatch(match: MatchState): void {
   if (result.tenpai) {
     for (const player of match.game.players) {
       panel.append(text('p',`${names[player.id]}：${result.tenpai[player.id] ? 'テンパイ' : 'ノーテン'}`));
-      const hand = document.createElement('ol'); hand.className = 'winning-hand'; hand.setAttribute('aria-label',`${names[player.id]}の流局手牌`);
-      for (const tile of player.hand) { const item = document.createElement('li'); item.append(createTileElement(tile.tile)); hand.append(item); }
-      panel.append(hand);
+      if (result.tenpai[player.id]) {
+        const hand = document.createElement('ol'); hand.className = 'winning-hand'; hand.setAttribute('aria-label',`${names[player.id]}の流局手牌`);
+        const tiles = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
+          .sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
+        for (const tile of tiles) { const item = document.createElement('li'); item.append(createTileElement(tile.tile)); hand.append(item); }
+        panel.append(hand);
+      }
     }
     panel.append(text('p','ノーテン罰符（合計3,000点・0人／4人テンパイでは移動なし）'));
   }

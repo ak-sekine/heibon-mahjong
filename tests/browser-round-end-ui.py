@@ -28,7 +28,7 @@ with sync_playwright() as p:
         page.wait_for_selector('#player-hand svg')
         page.wait_for_function('typeof window.roundEndTest === "object"')
         page.evaluate('''async () => {
-          const [matches, ron, tsumo, fixed, ronFixture, cpu, red, wall, tsumoFixture] = await Promise.all([
+          const [matches, ron, tsumo, fixed, ronFixture, cpu, red, wall, tsumoFixture, tileSvg, tileModel] = await Promise.all([
             import('/heibon-mahjong/src/game/match.ts'),
             import('/heibon-mahjong/src/game/ron.ts'),
             import('/heibon-mahjong/src/game/tsumo.ts'),
@@ -38,6 +38,8 @@ with sync_playwright() as p:
             import('/heibon-mahjong/tests/cpu-reveal-fixture.ts'),
             import('/heibon-mahjong/src/game/wall.ts'),
             import('/heibon-mahjong/tests/tsumo-fixture.ts'),
+            import('/heibon-mahjong/src/rendering/tile-svg.ts'),
+            import('/heibon-mahjong/src/model/tile.ts'),
           ]);
           const roundTest = window.roundEndTest;
           const { controller, render } = roundTest;
@@ -56,6 +58,21 @@ with sync_playwright() as p:
             if (name === 'yakuman-tsumo') {
               const pre = tsumoFixture.tsumoGame(['19m', '19p', '19s', '12345677z'], false, undefined, 'man-9');
               return { pre, win: tsumo.declareTsumo(pre, 0) };
+            }
+            if (name === 'ura-tsumo') {
+              const pre = tsumoFixture.tsumoGame();
+              const deadWall = [...pre.deadWall];
+              const source = pre.players.find(player => player.id !== 0 && player.hand.some(tile => tileModel.tileKindKey(tile.tile) === 'man-1'));
+              if (!source) throw new Error('Missing fixed ura indicator');
+              const sourceHand = [...source.hand];
+              const uraIndex = sourceHand.findIndex(tile => tileModel.tileKindKey(tile.tile) === 'man-1');
+              [deadWall[5], sourceHand[uraIndex]] = [sourceHand[uraIndex], deadWall[5]];
+              const declaration = pre.players[0].river.at(-1);
+              if (!declaration) throw new Error('Missing riichi declaration discard');
+              const riichi = { ...pre, deadWall, players: pre.players.map(player => player.id === 0
+                ? { ...player, riichi: { declarationTileId: declaration.id } }
+                : player.id === source.id ? { ...player, hand: sourceHand } : player) };
+              return { pre, win: tsumo.declareTsumo(riichi, 0) };
             }
             if (name === 'human-ron') {
               const pre = window.roundEndModules.ronGame(1, [0]);
@@ -92,6 +109,14 @@ with sync_playwright() as p:
             }
             const shortRivers = game => ({ ...game, players: game.players.map(player => ({ ...player, river: [] })) });
             if (name === 'draw') return { pre: null, win: shortRivers(fixed.fixedRound(0, [0, 2])) };
+            const drawReady = {
+              'draw-0': [], 'draw-1': [3], 'draw-2': [0, 2], 'draw-3': [1, 2, 3], 'draw-4': [0, 1, 2, 3],
+              'draw-self': [0], 'draw-cpu1': [1], 'draw-cpu2': [2], 'draw-cpu3': [3], 'draw-cpu-only': [1, 2, 3],
+            };
+            if (Object.hasOwn(drawReady, name)) {
+              const game = fixed.fixedRound(0, drawReady[name]);
+              return { pre: null, win: { ...game, players: game.players.map(player => ({ ...player, river: player.river.slice(0, 18) })) } };
+            }
             if (name === 'four-kans') return { pre: null, win: { ...shortRivers(fixed.fixedRound(0, [0, 2])), abortiveDraw: 'four-kans', kanCount: 4 } };
             if (name === 'match-end') return { pre: null, win: shortRivers(fixed.fixedRound(0, [2])), matchEnd: true };
             throw new Error(`Unknown round-end scenario ${name}`);
@@ -137,11 +162,19 @@ with sync_playwright() as p:
               winners: result.map(entry => ({ winnerId: entry.winnerId, winMethod: entry.winMethod,
                 discarderId: entry.winMethod === 'ron' ? entry.discarderId : null,
                 yaku: entry.candidate.yaku.map(yaku => yaku.id),
+                doraHan: entry.doraHan, uraDoraHan: entry.uraDoraHan, redDoraHan: entry.redDoraHan,
                 totalHanIncludingDora: entry.totalHanIncludingDora, yakumanCount: entry.yakumanCount,
                 winningTileId: entry.winningTileId })),
+              tenpai: match.lastSettlement?.tenpai ?? null,
               players: game.players.map(player => ({ id: player.id, control: player.control,
                 handIds: player.hand.map(tile => tile.id), drawnId: player.drawnTile?.id ?? null,
-                handCount: player.hand.length + Number(player.drawnTile !== null), meldCount: player.melds?.length ?? 0 })),
+                handCount: player.hand.length + Number(player.drawnTile !== null), meldCount: player.melds?.length ?? 0,
+                handLabels: [...player.hand].sort((a,b) => {
+                  const order = tile => tile.tile.category === 'suited'
+                    ? ['man','pin','sou'].indexOf(tile.tile.suit)*9+tile.tile.rank-1
+                    : 27+['east','south','west','north','white','green','red'].indexOf(tile.tile.honor);
+                  return order(a)-order(b) || a.id.localeCompare(b.id);
+                }).map(tile => tileSvg.tileLabel(tile.tile)) })),
               meldCount: game.players.find(player => player.id === result[0]?.winnerId)?.melds?.length ?? 0,
             };
           };
@@ -160,6 +193,10 @@ with sync_playwright() as p:
             const scenario = make(name);
             if (mode === 'pre') {
               let game = scenario.pre;
+              if (!game && scenario.win?.phase === 'wall-exhausted') {
+                game = installPlaying(scenario.win);
+                return { ...report(game, 'playing'), tenpai: controller.match.lastSettlement?.tenpai ?? null };
+              }
               if (!game) throw new Error(`No pre-win state for ${name}`);
               game = fill ? fullBoard(game) : game;
               installPlaying(game);
@@ -175,7 +212,11 @@ with sync_playwright() as p:
           const html = document.querySelector('main').innerHTML;
           return { hidden: game.players.slice(1).flatMap(player => [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
             .map(tile => ({id: tile.id, exposed: html.includes(tile.id)}))),
-            faces: document.querySelectorAll('.concealed-hand .tile-svg').length };
+            faces: document.querySelectorAll('.concealed-hand .tile-svg').length,
+            backSizes: Object.fromEntries([1,2,3].map(id => {
+              const tile = document.querySelector(`.concealed-hand[data-player-id="${id}"] .tile-back`);
+              const r = tile.getBoundingClientRect(); return [id, {width:r.width,height:r.height}];
+            })) };
         }''')
         assert initial['faces'] == 0 and all(not tile['exposed'] for tile in initial['hidden']), initial
 
@@ -243,11 +284,22 @@ with sync_playwright() as p:
 
         # Result variants verify dynamic yaku totals, no automatic dialog,
         # repeatable table/detail toggling, flow labels, and match-end actions.
-        variants = ['human-tsumo','human-ron','yakuman-tsumo','cpu1-tsumo','cpu2-tsumo','cpu3-tsumo',
+        variants = ['human-tsumo','human-ron','yakuman-tsumo','ura-tsumo','cpu1-tsumo','cpu2-tsumo','cpu3-tsumo',
             'cpu1-ron','cpu2-ron','cpu3-ron','double-cpu-ron','triple-cpu-ron',
-            'double-mixed-ron','triple-mixed-ron','draw','four-kans']
+            'double-mixed-ron','triple-mixed-ron','draw','draw-0','draw-1','draw-2','draw-3','draw-4',
+            'draw-self','draw-cpu1','draw-cpu2','draw-cpu3','draw-cpu-only','four-kans']
         variant_reports = []
         for scenario in variants:
+            if scenario.startswith('draw-') or scenario == 'four-kans':
+                pre = page.evaluate('(name) => window.roundEndTest.prepare(name, "pre")', scenario)
+                assert pre['status'] == 'playing' and pre['tenpai'] is None, (width, scenario, pre)
+                assert page.locator('#round-result-summary').is_hidden() and page.locator('#match-result').is_hidden(), (width, scenario, 'unconfirmed result visible')
+                pre_html = page.locator('main').inner_html()
+                for player in pre['players'][1:]:
+                    seat = page.locator(f'.concealed-hand[data-player-id="{player["id"]}"]')
+                    assert seat.locator('.tile-back').count() == player['handCount'] and seat.locator('svg').count() == 0, (width, scenario, player)
+                    for tile_id in player['handIds'] + ([player['drawnId']] if player['drawnId'] else []):
+                        assert tile_id not in pre_html, (width, scenario, player['id'], 'pre-settlement private ID leaked')
             try:
                 meta = page.evaluate('(name) => window.roundEndTest.prepare(name)', scenario)
             except Exception as error:
@@ -268,13 +320,21 @@ with sync_playwright() as p:
                     yaku_lines = section.locator('ul').first.locator('li').all_inner_texts()
                     expected_yaku = [re.sub(r'\s+\d+(?:翻|役満)$', '', line) for line in yaku_lines]
                     summary_yaku = winner_summary.locator('.round-summary-yaku').inner_text()
-                    assert all(name in summary_yaku for name in expected_yaku), (width, scenario, expected_yaku, summary_yaku)
+                    expected_summary_parts = list(expected_yaku)
+                    if not result['yakumanCount']:
+                        for label, han in [('ドラ',result['doraHan']),('裏ドラ',result['uraDoraHan']),('赤ドラ',result['redDoraHan'])]:
+                            if han > 0:
+                                expected_summary_parts.append(f'{label}{han}')
+                    assert summary_yaku == '・'.join(expected_summary_parts), (width, scenario, expected_summary_parts, summary_yaku)
+                    if scenario == 'ura-tsumo':
+                        assert result['uraDoraHan'] > 0 and f'裏ドラ{result["uraDoraHan"]}' in summary_yaku, (width, scenario, result, summary_yaku)
                     total = winner_summary.locator('.round-summary-total').inner_text()
                     if result['yakumanCount']:
                         assert total == f'{result["yakumanCount"]}役満' and '翻' not in total, (width, scenario, total)
                     else:
-                        assert total == f'合計{result["totalHanIncludingDora"]}翻（ドラ込み）', (width, scenario, total)
+                        assert total == f'合計{result["totalHanIncludingDora"]}翻', (width, scenario, total)
                         assert f'合計：{result["totalHanIncludingDora"]}翻' in section.inner_text(), (width, scenario)
+                    assert 'ドラ込み' not in winner_summary.inner_text(), (width, scenario)
                 cpu_winners = [result['winnerId'] for result in meta['winners'] if result['winnerId'] != 0]
                 for player in meta['players'][1:]:
                     seat = page.locator(f'.concealed-hand[data-player-id="{player["id"]}"]')
@@ -284,13 +344,68 @@ with sync_playwright() as p:
                     else:
                         assert seat.locator('.tile-back').count() > 0 and seat.locator('svg').count() == 0, (width, scenario, player)
             else:
-                expected = '途中流局（四開槓）' if scenario == 'four-kans' else '流局'
-                assert page.locator('#round-result-summary').inner_text() == expected, (width, scenario)
+                expected = '途中流局（四開槓）' if meta['reason'] == 'four-kans' else '流局'
+                summary_lines = page.locator('#round-result-summary').locator('p').all_inner_texts()
+                if meta['reason'] == 'draw':
+                    names = ['自分','CPU1','CPU2','CPU3']
+                    ready = [names[id] for id, value in enumerate(meta['tenpai']) if value]
+                    ready_text = 'なし' if not ready else '全員' if len(ready) == 4 else '・'.join(ready)
+                    assert summary_lines == ['流局', f'テンパイ：{ready_text}'], (width, scenario, summary_lines)
+                    for player in meta['players'][1:]:
+                        seat = page.locator(f'.concealed-hand[data-player-id="{player["id"]}"]')
+                        if meta['tenpai'][player['id']]:
+                            assert seat.locator('.revealed-tile').count() == player['handCount'], (width, scenario, player)
+                            faces = seat.locator('.revealed-tile svg').evaluate_all('(tiles) => tiles.map(tile => tile.getAttribute("aria-label"))')
+                            assert faces == player['handLabels'], (width, scenario, player['id'], faces, player['handLabels'])
+                        else:
+                            assert seat.locator('.tile-back').count() == player['handCount'] and seat.locator('svg').count() == 0, (width, scenario, player)
+                        for tile_id in player['handIds'] + ([player['drawnId']] if player['drawnId'] else []):
+                            assert tile_id not in page.locator('main').inner_html(), (width, scenario, player['id'], 'private tile ID leaked')
+
+                    geometry = page.evaluate('''baseline => {
+                      const rect = e => { const r=e.getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}; };
+                      const overlaps = (a,b) => Math.min(a.right,b.right)>Math.max(a.left,b.left)+.05 && Math.min(a.bottom,b.bottom)>Math.max(a.top,b.top)+.05;
+                      const table=rect(document.querySelector('.table'));
+                      const faces=[...document.querySelectorAll('.table .concealed-hand .revealed-tile')];
+                      const rivers=[...document.querySelectorAll('.table .river .river-tile .tile-svg')];
+                      const hands=[...document.querySelectorAll('#player-hand svg,.table .concealed-hand .tile-back,.table .concealed-hand .revealed-tile')];
+                      const melds=[...document.querySelectorAll('.table .open-meld svg,.table .concealed-kan-back')];
+                      const center=rect(document.querySelector('.center-info'));
+                      const violations=[];
+                      for(const face of faces){
+                        const r=rect(face);
+                        if(r.left<table.left-.5||r.right>table.right+.5||r.top<table.top-.5||r.bottom>table.bottom+.5) violations.push({kind:'outside-table',rect:r});
+                        for(const river of rivers) if(overlaps(r,rect(river))) violations.push({kind:'river',rect:r,other:rect(river)});
+                        for(const other of hands) if(other!==face&&!face.contains(other)&&!other.contains(face)&&overlaps(r,rect(other))) violations.push({kind:'hand',rect:r,other:rect(other)});
+                        for(const meld of melds) if(overlaps(r,rect(meld))) violations.push({kind:'meld',rect:r,other:rect(meld)});
+                        if(overlaps(r,center)) violations.push({kind:'center',rect:r,other:center});
+                      }
+                      const sizes=faces.map(face=>{const r=rect(face),id=Number(face.closest('.concealed-hand').dataset.playerId),b=baseline[id];
+                        return Math.max(Math.abs(r.width-b.width),Math.abs(r.height-b.height));
+                      });
+                      return {noHorizontalScroll:document.documentElement.scrollWidth<=innerWidth,
+                        tileSizeMatchesBack:sizes.every(delta=>delta<.2),violations,faces:faces.length};
+                    }''', initial['backSizes'])
+                    assert geometry['noHorizontalScroll'] and geometry['tileSizeMatchesBack'] and not geometry['violations'], (width, scenario, geometry)
+                    assert geometry['faces'] == sum(player['handCount'] for player in meta['players'][1:] if meta['tenpai'][player['id']]), (width, scenario, geometry)
+                else:
+                    assert summary_lines == [expected], (width, scenario, summary_lines)
                 assert page.locator('#round-result-summary').locator('.round-win-summary').count() == 0
                 assert '翻' not in page.locator('#round-result-summary').inner_text()
             assert not page.locator('#public-winning-hands').count(), (width, 'old CPU hand block remains')
             page.locator('#show-result').click()
             assert page.locator('#result-dialog').is_visible(), (width, scenario, 'detail did not open')
+            if meta['reason'] == 'draw':
+                ready_names = ['自分','CPU1','CPU2','CPU3']
+                detail_hands = page.locator('#match-result .winning-hand')
+                assert detail_hands.count() == sum(meta['tenpai']), (width, scenario, 'detail hand count')
+                for id, is_tenpai in enumerate(meta['tenpai']):
+                    hand = page.locator(f'#match-result .winning-hand[aria-label="{ready_names[id]}の流局手牌"]')
+                    assert hand.count() == int(is_tenpai), (width, scenario, id, 'detail visibility')
+                detail_html = page.locator('#match-result').inner_html()
+                for player in meta['players'][1:]:
+                    for tile_id in player['handIds'] + ([player['drawnId']] if player['drawnId'] else []):
+                        assert tile_id not in detail_html, (width, scenario, player['id'], 'detail leaked tile ID')
             ron_results = [result for result in meta['winners'] if result['winMethod'] == 'ron']
             if ron_results:
                 shared_id = ron_results[0]['winningTileId']
@@ -320,14 +435,16 @@ with sync_playwright() as p:
 
         # Use the real Controller button once, then dispatch a second click to
         # prove the already-started transition cannot advance the same result twice.
-        next_meta = page.evaluate('(name) => window.roundEndTest.prepare(name)', 'human-tsumo')
+        next_meta = page.evaluate('(name) => window.roundEndTest.prepare(name)', 'draw-4')
         assert page.locator('#next-round').is_visible()
         page.locator('#next-round').click()
         after_next = page.evaluate('''() => ({status:window.roundEndTest.controller.match.status,
           roundNumber:window.roundEndTest.controller.match.roundNumber,closed:!document.querySelector('#result-dialog').open,
           summaryHidden:document.querySelector('#round-result-summary').hidden,showHidden:document.querySelector('#show-result').hidden,
-          nextHidden:document.querySelector('#next-round').hidden,win:window.roundEndTest.controller.game.winResult})''')
-        assert after_next['status'] == 'playing' and after_next['closed'] and after_next['summaryHidden'] and after_next['showHidden'] and after_next['nextHidden'] and after_next['win'] is None, (width, after_next)
+          nextHidden:document.querySelector('#next-round').hidden,win:window.roundEndTest.controller.game.winResult,
+          faces:document.querySelectorAll('.concealed-hand .revealed-tile').length,
+          backs:[1,2,3].every(id=>document.querySelectorAll(`.concealed-hand[data-player-id="${id}"] .tile-back`).length>0)})''')
+        assert after_next['status'] == 'playing' and after_next['closed'] and after_next['summaryHidden'] and after_next['showHidden'] and after_next['nextHidden'] and after_next['win'] is None and after_next['faces'] == 0 and after_next['backs'], (width, after_next)
         page.evaluate("document.querySelector('#next-round').dispatchEvent(new MouseEvent('click',{bubbles:true}))")
         assert page.evaluate('window.roundEndTest.controller.match.roundNumber') == after_next['roundNumber'], (width, 'double progression')
 
@@ -335,7 +452,7 @@ with sync_playwright() as p:
         final = page.evaluate('(name) => window.roundEndTest.prepare(name, "finish", false, true)', 'match-end')
         assert final['status'] == 'match-ended' and not page.locator('#result-dialog').is_visible()
         assert not page.locator('#next-round').is_visible()
-        assert page.locator('#round-result-summary').inner_text() == '流局'
+        assert page.locator('#round-result-summary').inner_text() == '流局\nテンパイ：CPU2'
         page.locator('#show-result').click()
         assert page.locator('#result-title').inner_text() == '東風戦終了'
         assert not page.locator('#next-round').is_visible()
