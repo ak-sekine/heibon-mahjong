@@ -380,7 +380,6 @@ function renderWinResult(game: GameState): void {
       const winningTile = winningPhysicalTile(game, result);
       for (const physical of [...tiles, winningTile]) {
         const item = document.createElement('li');
-        item.dataset.tileId = physical.id;
         if (physical.id === result.winningTileId) item.className = 'winning-draw';
         item.append(createTileElement(physical.tile));
         hand.append(item);

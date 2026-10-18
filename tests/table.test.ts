@@ -11,7 +11,7 @@ import { SUITS } from '../src/model/tile.ts';
 import { tileSvgMarkup, tileLabel } from '../src/rendering/tile-svg.ts';
 import { doraKindFromIndicator } from '../src/analysis/dora.ts';
 import { ordinaryTile } from '../src/model/tile.ts';
-import { inventory } from './helpers.ts';
+import { allTiles, inventory } from './helpers.ts';
 
 class ElementStub {
   readonly tagName: string;
@@ -284,7 +284,8 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
       ? ['man', 'pin', 'sou'].indexOf(t.tile.suit) * 9 + t.tile.rank - 1
       : 27 + ['east','south','west','north','white','green','red'].indexOf(t.tile.honor);
     const sorted = [...player.hand].sort((a,b) => order(a)-order(b) || a.id.localeCompare(b.id));
-    assert.deepEqual(hand.children.map(n => n.dataset.tileId), [...sorted, player.drawnTile!].map(t => t.id));
+    assert.ok(hand.children.every(n => n.dataset.tileId === undefined));
+    assert.deepEqual(hand.children.map(n => n.children[0].innerHTML), [...sorted, player.drawnTile!].map(t => tileSvgMarkup(t.tile)));
     assert.equal(hand.children[13].className, 'winning-draw');
     assert.equal(hand.children[13].children[0].innerHTML, tileSvgMarkup(player.drawnTile!.tile));
     assert.match(hand.children[13].children[0].innerHTML, /aria-label="赤5索"/);
@@ -390,12 +391,16 @@ for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','f
       for (const section of panel.children) {
         const list = section.children.find(c=>c.className==='winning-hand')!;
         assert.equal(list.children.length,14);
-        assert.equal(list.children[13].dataset.tileId,game.winResult!.winningTileId);
+        assert.ok(list.children.every(n=>n.dataset.tileId===undefined));
         assert.equal(list.children[13].className,'winning-draw');
         assert.match(list.children[13].children[0].innerHTML,/aria-label="赤5索"/);
         assert.ok(!descend(section).some(n=>n.textContent.includes('門前清自摸和')));
       }
       const publicNodes = [...nodes.values()].flatMap(descend);
+      if (game.winResult?.winMethod === 'ron') {
+        assert.equal(allTiles(game).filter(tile=>tile.id===game.winResult!.winningTileId).length,1);
+        assert.equal(publicNodes.filter(node=>node.dataset.tileId===game.winResult!.winningTileId).length,1);
+      }
       for (const player of game.players.slice(1).filter(p=>!actualWinners.includes(p.id))) {
         for (const tile of player.hand) assert.ok(!publicNodes.some(n=>n.dataset.tileId===tile.id));
       }

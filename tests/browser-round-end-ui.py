@@ -306,7 +306,7 @@ with sync_playwright() as p:
                     cpuSeats:count('.concealed-hand [data-tile-id]'),main:count('main [data-tile-id]')};
                 }''', shared_id)
                 assert id_copies == {'stateCount':1,'stateUnique':True,'river':1,
-                    'details':len(ron_results),'cpuSeats':0,'main':1+len(ron_results)}, (width, scenario, id_copies)
+                    'details':0,'cpuSeats':0,'main':1}, (width, scenario, id_copies)
             if meta['status'] == 'match-ended':
                 assert page.locator('#result-title').inner_text() == '東風戦終了'
                 assert not page.locator('#next-round').is_visible()

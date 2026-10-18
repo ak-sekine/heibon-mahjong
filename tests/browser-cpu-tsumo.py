@@ -69,8 +69,7 @@ with sync_playwright() as p:
             hand = page.locator('.winning-hand li')
             assert hand.count() == 14
             ids = hand.evaluate_all('els => els.map(el => el.dataset.tileId)')
-            assert set(ids) == set(fixture['hidden'][winner - 1] + [fixture['draw']])
-            assert ids[-1] == fixture['draw']
+            assert all(tile_id is None for tile_id in ids)
             assert hand.nth(13).get_attribute('class') == 'winning-draw'
             assert page.locator('.winning-hand button').count() == 0
             assert page.locator('.winning-hand svg[aria-label^="赤"]').count() == 2

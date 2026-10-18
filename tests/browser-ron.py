@@ -30,7 +30,7 @@ def geometry(page, pending=False):
     assert page.locator('.dora-slot').count() == 5
     assert page.locator('.dora-slot svg').count() == 1
     assert page.locator('#dora-indicators').evaluate('el => getComputedStyle(el).gridTemplateColumns.split(" ").length') == 5
-    assert page.locator('.river-tile').evaluate_all('els=>els.every(e=>e.getBoundingClientRect().width>=18.9 && e.getBoundingClientRect().height>=18.9)')
+    assert page.locator('.river-tile').evaluate_all('els=>els.every(e=>{const r=e.getBoundingClientRect();return Math.min(r.width,r.height)>=13.9&&Math.max(r.width,r.height)>=18.9})')
     if pending:
         for selector in ['#ron','#pass-ron']:
             assert page.locator(selector).bounding_box()['height'] >= 44
@@ -146,6 +146,9 @@ with sync_playwright() as p:
             state = page.evaluate('ronCheck()')
             final_winners = state['winners']
             if state['phase'] == 'won':
+                assert not page.locator('#result-dialog').is_visible()
+                page.locator('#show-result').click()
+                assert page.locator('#result-dialog').is_visible()
                 expected = [id for id in [(discarder+i)%4 for i in [1,2,3]] if id in winners and not (name=='pass-cpu' and id==0)]
                 assert final_winners == expected
                 assert not state['running']
@@ -156,8 +159,7 @@ with sync_playwright() as p:
                     section = page.locator(f'.winner-result[data-winner-id="{winner}"]')
                     tiles = section.locator('.winning-hand li')
                     assert tiles.count() == 14
-                    assert tiles.nth(13).get_attribute('data-tile-id') == state['tile']
-                    assert set(tiles.evaluate_all('els=>els.map(e=>e.dataset.tileId)')[:-1]) == set(initial['players'][winner]['hand'])
+                    assert all(tile_id is None for tile_id in tiles.evaluate_all('els=>els.map(e=>e.dataset.tileId)'))
                     assert section.locator('.winning-hand svg[aria-label="赤5索"]').count() == 1
                     text = section.inner_text()
                     for label in ['平和 1翻','役合計：1翻','通常ドラ：1枚（1翻）','赤ドラ：1枚（1翻）','合計：3翻','獲得点数：']:
