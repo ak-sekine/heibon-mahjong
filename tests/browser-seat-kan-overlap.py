@@ -41,7 +41,7 @@ with sync_playwright() as p:
         for player in range(4):
             for scene, types in scenes:
                 page.evaluate('''({player,types})=>{
-                  const pool=[...base.liveWall,...base.deadWall];let offset=0;
+                  const pool=[...base.liveWall,...base.deadWall,...base.players.flatMap(p=>[...p.hand,...(p.drawnTile?[p.drawnTile]:[])])];let offset=0;
                   const take=count=>{const result=pool.slice(offset,offset+count);offset+=count;return result;};
                   const melds=types.map(type=>{
                     const tiles=take(type==='chi'||type==='pon'?3:4);
