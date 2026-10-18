@@ -22,4 +22,15 @@ Codex Cloud上ではViteのloopbackサーバーを起動できましたが、Chr
 
 ## GitHub Actions・GitHub Pages
 
-push後の `Browser UI verification`、Pagesのbuild、deploy結果を確認して追記します。
+実装検証対象のmainコミット `695301d5dee01ec531e3daaeaaa5dbfbfd9ab6db` で次を確認しました。
+
+| 確認 | 結果 |
+| --- | --- |
+| [Browser UI verification #39123239277](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39123239277) | 成功。既存ブラウザ回帰とStep 13.6の局面を実行 |
+| [GitHub Pages build・deploy #39123239294](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39123239294) | build、deployとも成功 |
+
+ブラウザでは三色同順・一気通貫・混一色のロン、清一色の門前ツモ・副露ツモを確認しました。清一色は320・375・390・430・1280px、他3役は390pxで確認し、概要・詳細の役名/翻数/点数、結果画面の開閉、次局遷移、横はみ出し、CPU非公開牌IDのDOM露出を検証しました。局面ごとの牌山は136枚で、物理牌IDが一意であることも確認しました。
+
+最初のBrowser UI実行では、ブラウザ検証コードが副露清一色を6翻と期待して失敗しました。期待値を5翻へ修正して再実行し、Browser UI verification全体が成功しました。
+
+ローカルChromiumは起動時にcrashpad socketの権限エラーで終了したため起動を繰り返していません。iPhone Safari実機は未確認です。
