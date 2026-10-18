@@ -28,7 +28,7 @@ with sync_playwright() as p:
                       const q=s=>document.querySelector(s), box=e=>e.getBoundingClientRect().toJSON();
                       const inside=(a,b)=>a.left>=b.left-.1&&a.right<=b.right+.1&&a.top>=b.top-.1&&a.bottom<=b.bottom+.1;
                       const separate=(a,b)=>a.right<=b.left+.1||b.right<=a.left+.1||a.bottom<=b.top+.1||b.bottom<=a.top+.1;
-                      const honba=[0,1,2,10][count%4];
+                      const honba=[0,1,2,10,2,10][count];
                       mr.renderMatch({...match,game,depositSticks:deposits,honba});
                       tr.renderTable({...game,liveWall:game.liveWall.slice(count)},match.points);
                       const wall={...game,kanCount:Math.max(0,count-1)}, omote=dg.exposedDoraIndicators(wall), ura=count?dg.uraDoraIndicators(wall):[];

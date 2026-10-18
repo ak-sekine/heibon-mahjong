@@ -387,7 +387,7 @@ main:has(.table .open-meld:nth-child(4)) .table-summary {
    Keep indicator sizes independent of deposits and use the SVG's 60:16 ratio. */
 .table .center-info { left:50%; transform:translateX(-50%); width:calc(var(--cell)*4.65 - 1px); padding:1px; gap:3px; }
 .table .center-info:has(.ura-indicator) { gap:2px; }
-.table .round-summary { display:flex; justify-content:center; align-items:baseline; gap:2px; letter-spacing:-.6px; white-space:nowrap; overflow-wrap:normal; font-size:clamp(12px,2.4cqw,15px); line-height:1.2; }
+.table .round-summary { display:flex; justify-content:center; align-items:baseline; gap:2px; letter-spacing:-.95px; white-space:nowrap; overflow-wrap:normal; font-size:clamp(12px,2.4cqw,15px); line-height:1.2; }
 .table #table-round { white-space:nowrap; }
 .table #wall-count { display:block; }
 .table .center-info #deposit-sticks { margin-top:0; gap:2px; flex:none; }
