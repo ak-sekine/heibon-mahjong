@@ -19,6 +19,26 @@ scenes = [
 ]
 reports = []
 maximum_kan_overlap = {'width':None,'player':None,'scene':None,'overlapX':0,'overlapY':0,'count':0}
+previous_layout_cpu3_overlap = None
+previous_side_layout_css = '''
+.table .seat { --meld-tile-width:var(--table-tile-width); --meld-tile-height:var(--table-tile-height); gap:5px; }
+.table .seat .tile-back { width:var(--table-tile-width); height:var(--table-tile-height); }
+.table .seat .concealed-hand { flex-direction:row; gap:1px; }
+.table .seat .open-melds { display:flex; flex-direction:row; flex-wrap:nowrap; gap:4px; width:auto; padding:0; align-self:auto; max-width:none; }
+.table .seat-left,.table .seat-right { top:50%; left:50%; width:calc(100% - 60px); height:var(--table-tile-height); }
+.table .seat-left { transform:translate(-50%,-50%) translateX(calc(-50cqw + var(--table-tile-height)*.5)) rotate(90deg); }
+.table .seat-right { transform:translate(-50%,-50%) translateX(calc(50cqw - var(--table-tile-height)*.5)) rotate(270deg); }
+.table .seat-left:has(.open-meld):not(:has(.open-meld:nth-child(4))),
+.table .seat-right:has(.open-meld):not(:has(.open-meld:nth-child(4))) {
+  --side-seat-lane-gap:calc(var(--table-tile-width)*.6 + 5px);
+  --side-seat-lane-size:calc(var(--table-tile-height)*2 + var(--side-seat-lane-gap));
+  height:var(--side-seat-lane-size);
+  flex-direction:column;
+  gap:var(--side-seat-lane-gap);
+}
+.table .seat-left:has(.open-meld):not(:has(.open-meld:nth-child(4))) { transform:translate(-50%,-50%) translateX(calc(-50cqw + var(--side-seat-lane-size)*.5)) rotate(90deg); }
+.table .seat-right:has(.open-meld):not(:has(.open-meld:nth-child(4))) { transform:translate(-50%,-50%) translateX(calc(50cqw - var(--side-seat-lane-size)*.5)) rotate(270deg); }
+'''
 out = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 out.mkdir(parents=True, exist_ok=True)
 
@@ -56,6 +76,23 @@ with sync_playwright() as p:
                   window.layoutGame=game;
                   renderer.renderTable(game,[25000,25000,25000,25000]);
                 }''', {'player':player,'types':types})
+                if width==375 and player==3 and scene=='chi':
+                    legacy_style=page.add_style_tag(content=previous_side_layout_css)
+                    previous_layout_cpu3_overlap=page.evaluate('''()=>{
+                      const rect=e=>{const r=e.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
+                      const hands=[...document.querySelectorAll('.seat[data-player-id="3"] .concealed-hand .tile-back')];
+                      const river=[...document.querySelectorAll('.river[data-player-id="3"] .river-tile .tile-svg')];
+                      let maximum={overlapX:0,overlapY:0,area:0,handTile:null,riverTile:null};
+                      let count=0;
+                      for(const hand of hands)for(const discard of river){
+                        const h=rect(hand),d=rect(discard);
+                        const overlapX=Math.max(0,Math.min(h.right,d.right)-Math.max(h.left,d.left));
+                        const overlapY=Math.max(0,Math.min(h.bottom,d.bottom)-Math.max(h.top,d.top));
+                        if(overlapX>0&&overlapY>0){count++;if(overlapX*overlapY>maximum.area)maximum={overlapX,overlapY,area:overlapX*overlapY,handTile:h,riverTile:d};}
+                      }
+                      return {width:innerWidth,player:3,scene:'chi',count,maximum};
+                    }''')
+                    legacy_style.evaluate('(style)=>style.remove()')
                 result = page.evaluate('''({player,types})=>{
                   const rawRect=e=>{const r=e.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
                   const rect=e=>{const r=rawRect(e);return {
@@ -182,7 +219,7 @@ with sync_playwright() as p:
         page.close()
     browser.close()
 
-(out/'seat-kan-overlap.json').write_text(json.dumps({'layouts':reports,'intentionalKanOverlap':maximum_kan_overlap},ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+(out/'seat-kan-overlap.json').write_text(json.dumps({'layouts':reports,'intentionalKanOverlap':maximum_kan_overlap,'previousLayoutCpu3Overlap':previous_layout_cpu3_overlap},ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 viewport_metrics = {}
 for layout in reports:
     key = f"{layout['width']}x{layout['height']}"
@@ -197,7 +234,7 @@ for layout in reports:
     for field, report in [('meld',layout['meldTileBCR']),('called',layout['calledTileBCR']),('addedKan',layout['addedKanTileBCR'])]:
         if report is not None and seat[field] is None:
             seat[field] = report
-measurement_notice = {'layouts':len(reports),'viewports':list(viewport_metrics.values()),'intentionalKanOverlap':maximum_kan_overlap}
+measurement_notice = {'layouts':len(reports),'viewports':list(viewport_metrics.values()),'intentionalKanOverlap':maximum_kan_overlap,'previousLayoutCpu3Overlap':previous_layout_cpu3_overlap}
 print(f"::notice title=Rendered tile BCR measurements::{json.dumps(measurement_notice,separators=(',',':'))}")
 print(f'{len(reports)} layouts passed: six widths, four seats, 0–4 melds and all requested meld types.')
 print(f'Kakan stack overlap measured separately: {maximum_kan_overlap}')
