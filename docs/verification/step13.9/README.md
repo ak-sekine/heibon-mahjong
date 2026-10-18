@@ -16,7 +16,10 @@ Step 13.9の単体判定では海底摸月・河底撈魚の成立条件、役�
 
 ## GitHub Actions・Pages
 
-既存のBrowser UI verificationに390px幅の最終通常ツモと最終通常打牌のシナリオを追加しました。main反映後の対象commit、Actions、GitHub Pages build/deployの結果を確認して追記します。
+既存のBrowser UI verificationに390px幅の最終通常ツモと最終通常打牌のシナリオを追加しました。対象commitは `4dbd06392bd468b36c8717abfd27926d0fdc3758` です。
+
+- [Browser UI verification](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39173076686)：成功。既存の回帰シナリオとStep 13.9の代表2局面を実行しました。
+- [GitHub Pages build/deploy](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39173076684)：成功。
 
 ## iPhone Safari
 
