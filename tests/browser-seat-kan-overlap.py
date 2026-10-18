@@ -167,10 +167,10 @@ with sync_playwright() as p:
                   const centers=groups.map(e=>{const r=rect(e);return {x:(r.left+r.right)/2,y:(r.top+r.bottom)/2};});
                   const sequenceOK=centers.every((a,i)=>i===0||(player===0?a.x>centers[i-1].x:player===1?a.y<centers[i-1].y:player===2?a.x<centers[i-1].x:a.y>centers[i-1].y));
                   const cpuHands=[...document.querySelectorAll('.concealed-hand')];
+                  const visibleTileIds=[...document.querySelectorAll('[data-tile-id]')].map(e=>e.dataset.tileId);
+                  const hiddenCpuTiles=layoutGame.players.slice(1).flatMap(p=>[...p.hand,...(p.drawnTile?[p.drawnTile]:[])]);
                   const hiddenClean=cpuHands.every(hand=>[...hand.children].every(e=>e.className==='tile-back'&&!e.children.length&&!Object.keys(e.dataset).length))&&
-                    [...layoutGame.players.slice(1).flatMap(p=>[...p.hand,...(p.drawnTile?[p.drawnTile]:[])]),...layoutGame.liveWall,...layoutGame.deadWall]
-                      .filter(t=>!layoutGame.players.flatMap(p=>[...p.river,...p.melds.flatMap(m=>m.tiles)]).some(v=>v.id===t.id))
-                      .every(t=>![...document.querySelectorAll('[data-tile-id]')].some(e=>e.dataset.tileId===t.id));
+                    hiddenCpuTiles.every(t=>!visibleTileIds.includes(t.id));
                   const handCount=player===0?q('#player-hand').children.length:q(`.concealed-hand[data-player-id="${player}"]`).children.length;
                   const selfSizes=[...document.querySelectorAll('#player-hand svg')].map(rect);
                   const dora=rect(q('.dora-slot svg'));
