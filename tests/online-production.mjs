@@ -236,18 +236,22 @@ function currentRevision(client) {
 }
 
 async function sendAction(client, payload, prefix = 'ci') {
-  await syncState(client);
-  const requestId = nextRequestId(prefix);
-  const before = client.messages.length;
-  const beforeRevision = currentRevision(client);
-  const expectedRevision = payload.expectedRevision ?? currentRevision(client);
-  client.socket.send(JSON.stringify({ ...payload, requestId, expectedRevision }));
-  const result = await waitForMessage(client, message => message.type === 'action-result' && message.requestId === requestId,
-    before, 10000, `action-result for ${payload.type}`);
-  if (result.ok && result.revision > beforeRevision) {
-    await waitForRoomState(client, state => state.revision >= result.revision, before, 10000, `room-state after ${payload.type}`);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await syncState(client);
+    const requestId = nextRequestId(prefix);
+    const before = client.messages.length;
+    const beforeRevision = currentRevision(client);
+    const expectedRevision = payload.expectedRevision ?? beforeRevision;
+    client.socket.send(JSON.stringify({ ...payload, requestId, expectedRevision }));
+    const result = await waitForMessage(client, message => message.type === 'action-result' && message.requestId === requestId,
+      before, 10000, `action-result for ${payload.type}`);
+    if (result.code === 'revision_conflict' && payload.expectedRevision === undefined && attempt === 0) continue;
+    if (result.ok && result.revision > beforeRevision) {
+      await waitForRoomState(client, state => state.revision >= result.revision, before, 10000, `room-state after ${payload.type}`);
+    }
+    return { result, requestId, expectedRevision };
   }
-  return { result, requestId, expectedRevision };
+  throw new Error('The room action did not complete after a revision refresh.');
 }
 
 async function syncState(client) {
@@ -259,7 +263,7 @@ async function syncState(client) {
 
 async function ready(client, shouldBeReady = true) {
   const sent = await sendAction(client, { type: 'set-ready', ready: shouldBeReady }, 'ready');
-  check(sent.result.ok === true, 'A connected human could not change their own Ready state.');
+  check(sent.result.ok === true, `A connected human could not change their own Ready state (${sent.result.code ?? 'unknown'}).`);
   return sent;
 }
 
