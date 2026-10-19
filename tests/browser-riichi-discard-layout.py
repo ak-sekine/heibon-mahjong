@@ -79,7 +79,11 @@ with sync_playwright() as p:
                   const riichiMainGaps=adjacentGaps.filter(g=>g.axis===mainAxis&&g.hasDeclaration).map(g=>g.gap);
                   const riichiCrossGaps=adjacentGaps.filter(g=>g.axis!==mainAxis&&g.hasDeclaration).map(g=>g.gap);
                   const crossSizeDelta=side?Math.abs(n.width-d.width):Math.abs(n.height-d.height);
+                  const mainSizeDelta=side?Math.abs(n.height-d.height):Math.abs(n.width-d.width);
                   const riichiCrossGapExpected=1+crossSizeDelta/2;
+                  const riichiMainGapExpected=1+mainSizeDelta/2;
+                  const regularMainGapExpected=1+mainSizeDelta;
+                  const regularCrossGapExpected=1;
                   const publicIds=new Set([...document.querySelectorAll('[data-tile-id]')].map(e=>e.dataset.tileId));
                   const visibleIds=new Set([...shown.players.flatMap(p=>p.river),...shown.players.flatMap(p=>p.melds.flatMap(m=>m.tiles)),...dora.exposedDoraIndicators(shown)].map(t=>t.id));
                   const privateTiles=[...shown.players.slice(1).flatMap(p=>[...p.hand,...(p.drawnTile?[p.drawnTile]:[])]),...shown.liveWall,...shown.deadWall].filter(t=>!visibleIds.has(t.id));
@@ -95,7 +99,9 @@ with sync_playwright() as p:
                     rotatedAspect:close(ratio,rotatedRatio),
                     computedFaceEqual:close(parseFloat(getComputedStyle(normalSvg).width),parseFloat(getComputedStyle(decSvg).width))&&close(parseFloat(getComputedStyle(normalSvg).height),parseFloat(getComputedStyle(decSvg).height)),
                     noSvgOverlap:allRiverSvgs.every((a,i)=>allRiverSvgs.slice(i+1).every(b=>!overlaps(a,b))),
-                    normalMainGaps,normalCrossGaps,riichiMainGaps,riichiCrossGaps,riichiCrossGapExpected,
+                    normalMainGaps,normalCrossGaps,riichiMainGaps,riichiCrossGaps,
+                    regularMainGapExpected,regularCrossGapExpected,riichiCrossGapExpected,
+                    riichiMainGapExpected,
                     lineCenterSpread:+lineCenterSpread.toFixed(3),
                     normalRowAlignment:+normalRowAlignment.toFixed(3),
                     order:items.every((e,i)=>e.dataset.tileId===shown.players[seat].river[i].id),
@@ -109,14 +115,15 @@ with sync_playwright() as p:
                 }''', {'seat':seat,'position':position})
                 checks = {k:v for k,v in metrics.items() if k not in (
                     'decBox','normalBox','normalMainGaps','normalCrossGaps','riichiMainGaps',
-                    'riichiCrossGaps','riichiCrossGapExpected','viewport','lineCenterSpread',
+                    'riichiCrossGaps','regularMainGapExpected','regularCrossGapExpected',
+                    'riichiMainGapExpected','riichiCrossGapExpected','viewport','lineCenterSpread',
                     'normalRowAlignment'
                 )}
                 assert all(checks.values()), f'{width}px seat {seat} riichi {position+1}: {metrics}'
                 assert metrics['lineCenterSpread']<.35, f'{width}px seat {seat} riichi {position+1} six-discard line alignment: {metrics}'
-                assert metrics['normalMainGaps'] and all(abs(g-1)<.35 for g in metrics['normalMainGaps']), f'{width}px seat {seat} riichi {position+1} regular line spacing: {metrics}'
-                assert metrics['normalCrossGaps'] and all(abs(g-1)<.35 for g in metrics['normalCrossGaps']), f'{width}px seat {seat} riichi {position+1} regular cross spacing: {metrics}'
-                assert metrics['riichiMainGaps'] and all(abs(g-1)<.35 for g in metrics['riichiMainGaps']), f'{width}px seat {seat} riichi {position+1} declaration line spacing: {metrics}'
+                assert metrics['normalMainGaps'] and all(abs(g-metrics['regularMainGapExpected'])<.35 for g in metrics['normalMainGaps']), f'{width}px seat {seat} riichi {position+1} regular line spacing: {metrics}'
+                assert metrics['normalCrossGaps'] and all(abs(g-metrics['regularCrossGapExpected'])<.35 for g in metrics['normalCrossGaps']), f'{width}px seat {seat} riichi {position+1} regular cross spacing: {metrics}'
+                assert metrics['riichiMainGaps'] and all(abs(g-metrics['riichiMainGapExpected'])<.35 for g in metrics['riichiMainGaps']), f'{width}px seat {seat} riichi {position+1} declaration line spacing: {metrics}'
                 assert metrics['riichiCrossGaps'] and all(abs(g-metrics['riichiCrossGapExpected'])<.35 for g in metrics['riichiCrossGaps']), f'{width}px seat {seat} riichi {position+1} declaration cross spacing: {metrics}'
                 rowAlignmentLimit = metrics['riichiCrossGapExpected']-1+.35 if seat in (1,3) else .35
                 assert metrics['normalRowAlignment']<rowAlignmentLimit, f'{width}px seat {seat} riichi {position+1} normal tile alignment: {metrics}'
@@ -141,7 +148,7 @@ with sync_playwright() as p:
                     cpu2_line_alignment=max(cpu2_line_alignment,metrics['lineCenterSpread'])
                 if width == 390 and position in (0, 5, 6, 11, 12, 17):
                     page.screenshot(path=str(screenshots/f'riichi-seat-{seat}-position-{position+1}.png'), full_page=True)
-        print(f'{width}px CPU2 SVG gaps: normal={min(cpu2_normal_main):.2f}–{max(cpu2_normal_main):.2f}px; riichi line neighbors={min(cpu2_riichi_main):.2f}–{max(cpu2_riichi_main):.2f}px; riichi cross-axis={min(cpu2_riichi_cross):.2f}–{max(cpu2_riichi_cross):.2f}px; max line-center drift={cpu2_line_alignment:.2f}px')
+        print(f'{width}px CPU2 SVG gaps: fixed-slot normal={min(cpu2_normal_main):.2f}–{max(cpu2_normal_main):.2f}px; riichi line neighbors={min(cpu2_riichi_main):.2f}–{max(cpu2_riichi_main):.2f}px; riichi cross-axis={min(cpu2_riichi_cross):.2f}–{max(cpu2_riichi_cross):.2f}px; max line-center drift={cpu2_line_alignment:.2f}px')
         print(f'{width}px riichi layout passed for all seats and declaration positions')
         page.close()
     browser.close()

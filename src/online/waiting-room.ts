@@ -107,6 +107,7 @@ export class OnlineWaitingRoom {
   private readonly leaveButton = document.querySelector<HTMLButtonElement>('#online-leave')!;
   private readonly closeRoomButton = document.querySelector<HTMLButtonElement>('#online-close-room')!;
   private readonly startGameButton = document.querySelector<HTMLButtonElement>('#online-start-game')!;
+  private readonly roomMenuItem = document.querySelector<HTMLButtonElement>('#menu-room')!;
   private readonly apiUrl: string;
   private session: RoomSession | null = null;
   private state: RoomState | null = null;
@@ -130,20 +131,23 @@ export class OnlineWaitingRoom {
   constructor(apiUrl: string | undefined, onGameMessage: (message: Record<string, unknown>) => void = () => {}) {
     this.apiUrl = (apiUrl ?? '').replace(/\/+$/u, '');
     this.onGameMessage = onGameMessage;
-    document.querySelector<HTMLButtonElement>('#online-open')!.addEventListener('click', () => {
-      this.dialogWasClosedByUser = false;
-      this.automaticReconnectAllowed = true;
-      if (!this.dialog.open) this.dialog.showModal();
-      if (this.session && !this.isSocketOpen()) void this.connect();
-    });
+    document.querySelector<HTMLButtonElement>('#online-open')!.addEventListener('click', () => this.openDialog());
+    this.roomMenuItem.addEventListener('click', () => this.openDialog());
     document.querySelector<HTMLButtonElement>('#online-close')!.addEventListener('click', () => this.closeDialog());
-    document.querySelector<HTMLFormElement>('#online-create')!.addEventListener('submit', event => {
-      event.preventDefault();
-      void this.createRoom();
+    this.dialog.addEventListener('close', () => {
+      document.querySelector<HTMLButtonElement>('#main-menu-toggle')!.focus({ preventScroll: true });
     });
-    document.querySelector<HTMLFormElement>('#online-join')!.addEventListener('submit', event => {
+    document.querySelector<HTMLFormElement>('#online-room-form')!.addEventListener('submit', event => {
       event.preventDefault();
-      void this.joinRoom();
+      const action = (event as SubmitEvent).submitter?.getAttribute('value');
+      if (action === 'join') void this.joinRoom();
+      else void this.createRoom();
+    });
+    document.querySelector<HTMLInputElement>('#online-join-code')!.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && !event.isComposing) {
+        event.preventDefault();
+        document.querySelector<HTMLButtonElement>('#online-join')!.click();
+      }
     });
     this.reconnectButton.addEventListener('click', () => {
       this.automaticReconnectAllowed = true;
@@ -221,6 +225,28 @@ export class OnlineWaitingRoom {
     this.connection.textContent = message;
   }
 
+  private openDialog(): void {
+    this.dialogWasClosedByUser = false;
+    this.automaticReconnectAllowed = true;
+    if (!this.dialog.open) this.dialog.showModal();
+    if (this.session && !this.isSocketOpen()) void this.connect();
+  }
+
+  private validatedDisplayName(): string | null {
+    const input = document.querySelector<HTMLInputElement>('#online-name')!;
+    const name = input.value.trim();
+    if (name.length < 1 || name.length > 24) {
+      this.setStatus('表示名を1〜24文字で入力してください。');
+      input.focus({ preventScroll: true });
+      return null;
+    }
+    return name;
+  }
+
+  private syncRoomMenu(): void {
+    this.roomMenuItem.hidden = !this.session;
+  }
+
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     let response: Response;
     try {
@@ -242,7 +268,8 @@ export class OnlineWaitingRoom {
   }
 
   private async createRoom(): Promise<void> {
-    const name = document.querySelector<HTMLInputElement>('#online-name')!.value.trim();
+    const name = this.validatedDisplayName();
+    if (name === null) return;
     this.setError();
     this.setStatus('ルームを作成しています…');
     try {
@@ -259,9 +286,15 @@ export class OnlineWaitingRoom {
   }
 
   private async joinRoom(): Promise<void> {
-    const name = document.querySelector<HTMLInputElement>('#online-join-name')!.value.trim();
+    const name = this.validatedDisplayName();
+    if (name === null) return;
     const codeInput = document.querySelector<HTMLInputElement>('#online-join-code')!;
     const code = codeInput.value.trim().toUpperCase();
+    if (!ROOM_CODE_PATTERN.test(code)) {
+      this.setStatus('ルームコードを確認してください。');
+      codeInput.focus({ preventScroll: true });
+      return;
+    }
     this.setError();
     this.setStatus('ルームに参加しています…');
     try {
@@ -290,6 +323,7 @@ export class OnlineWaitingRoom {
     this.dialogWasClosedByUser = false;
     this.pendingAction = null;
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(this.session));
+    this.syncRoomMenu();
     this.forms.hidden = true;
     this.roomPanel.hidden = false;
     this.codeOutput.textContent = result.roomCode;
@@ -313,6 +347,7 @@ export class OnlineWaitingRoom {
         return;
       }
       this.session = session;
+      this.syncRoomMenu();
       this.forms.hidden = true;
       this.roomPanel.hidden = false;
       this.codeOutput.textContent = session.roomCode;
@@ -548,7 +583,6 @@ export class OnlineWaitingRoom {
     this.leaveButton.disabled = pending || !socketConnected;
     this.closeRoomButton.hidden = !self?.isHost || state?.status === 'closed' || (this.gameActive && !this.gameTerminated);
     this.closeRoomButton.disabled = pending || !socketConnected;
-    document.querySelector<HTMLButtonElement>('#online-open-room')!.hidden = !session;
     if (this.socket?.readyState === WebSocket.OPEN) this.reconnectButton.hidden = true;
   }
 
@@ -712,6 +746,7 @@ export class OnlineWaitingRoom {
     this.stopAutomaticConnection();
     if (this.dialog.open) this.dialog.close();
     this.session = null;
+    this.syncRoomMenu();
     this.state = null;
     this.pendingAction = null;
     this.pendingGameAction = null;

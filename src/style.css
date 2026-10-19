@@ -3,8 +3,17 @@
 body { margin:0; }
 main { container-type:inline-size; width:min(100%,620px); min-height:100vh; min-height:100svh; margin:auto; padding:max(8px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom, 0px) + var(--call-viewport-inset, 0px)) max(4px,env(safe-area-inset-left)); display:flex; flex-direction:column; gap:8px; }
 header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 6px; }
-header .header-actions { min-width:0; display:flex; align-items:center; gap:6px; }
+.app-header { min-height:44px; }
 h1 { margin:0; font-size:clamp(1rem,5vw,1.5rem); white-space:nowrap; }
+.main-menu-shell { position:relative; z-index:8; flex:none; }
+.main-menu-toggle { display:grid; align-content:center; justify-items:center; gap:4px; width:44px; height:44px; padding:8px; border:1px solid #63947a; border-radius:8px; background:#123f32; color:#fff1cc; cursor:pointer; touch-action:manipulation; }
+.main-menu-toggle span { display:block; width:20px; height:2px; border-radius:2px; background:#ffda7d; }
+.main-menu-toggle:focus-visible,.main-menu-items button:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
+.main-menu-items { position:absolute; top:calc(100% + 4px); right:0; display:grid; gap:4px; width:max-content; min-width:190px; padding:6px; border:1px solid #63947a; border-radius:10px; background:#123f32; box-shadow:0 6px 20px rgb(0 0 0 / 35%); }
+.main-menu-items button { width:100%; min-width:0 !important; min-height:44px; padding:8px 10px !important; border:1px solid #d4e5db; border-radius:7px; background:#fffdf7; color:#185640; font:inherit; font-weight:600; text-align:left; cursor:pointer; touch-action:manipulation; }
+.main-menu-items #online-open { background:#d4e5db; }
+.main-menu-items #menu-room { background:#ffda7d; }
+.main-menu-items button:disabled { opacity:.55; cursor:default; }
 #new-game { min-width:108px; min-height:44px; padding:8px 12px; border:1px solid #d4e5db; border-radius:8px; background:#fffdf7; color:#185640; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
 #new-game:focus-visible { outline:3px solid #ffda7d; outline-offset:2px; }
 #online-open { min-width:96px; min-height:44px; padding:8px 10px; border:1px solid #d4e5db; border-radius:8px; background:#d4e5db; color:#185640; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
@@ -19,9 +28,16 @@ ul { list-style:none; padding:0; margin:0; }
 .tile-choice:disabled { cursor:default; opacity:1; }
 .discard-controls { position:relative; bottom:auto; z-index:2; background:#123f32; border:1px solid #39765e; border-radius:8px; padding:8px 6px calc(12px + env(safe-area-inset-bottom, 0px)); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; }
 #selection-status { flex:1 1 100%; min-width:0; margin:0; font-size:14px; overflow-wrap:anywhere; }
-#discard, #riichi, #tsumo, #kyuushu-kyuuhai, #next-round { min-width:100px; min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; touch-action:manipulation; cursor:pointer; }
-#discard:disabled, #riichi:disabled, #tsumo:disabled, #kyuushu-kyuuhai:disabled { background:#d4e5db; color:#154e3c; opacity:1; cursor:default; }
-#discard:focus-visible, #riichi:focus-visible, #tsumo:focus-visible, #kyuushu-kyuuhai:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
+#discard, #riichi, #tsumo, #kyuushu-kyuuhai, #next-round,
+#online-discard, #online-riichi, #online-tsumo, #online-kyuushu, #online-next-round, #online-return-local {
+ min-width:100px; min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; touch-action:manipulation; cursor:pointer;
+}
+#discard:disabled, #riichi:disabled, #tsumo:disabled, #kyuushu-kyuuhai:disabled,
+#online-discard:disabled, #online-riichi:disabled, #online-tsumo:disabled, #online-kyuushu:disabled, #online-next-round:disabled {
+ background:#d4e5db; color:#154e3c; opacity:1; cursor:default;
+}
+#discard:focus-visible, #riichi:focus-visible, #tsumo:focus-visible, #kyuushu-kyuuhai:focus-visible,
+#online-discard:focus-visible, #online-riichi:focus-visible, #online-tsumo:focus-visible, #online-kyuushu:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
 .keyboard-help { width:100%; margin:0; font-size:11px; color:#d4e5db; }
 .tile-svg { display:block; width:100%; height:auto; aspect-ratio:60/84; }
 .catalog { width:100%; padding:0 6px; font-size:12px; }
@@ -35,18 +51,14 @@ summary { cursor:pointer; padding:4px; }
 #win-result p { margin:8px 0; }
 @media (max-width:350px) {
   header { gap:4px; padding-inline:2px; }
-  header .header-actions { gap:4px; }
   h1 { font-size:14px; }
-  #online-open { min-width:78px; padding:8px 5px; font-size:13px; }
-  #new-game { min-width:92px; padding:8px 6px; font-size:13px; }
+  .main-menu-items button { font-size:14px; }
   .discard-controls { padding:4px 6px calc(10px + env(safe-area-inset-bottom, 0px)); gap:4px; }
   #selection-status { font-size:12px; }
   .keyboard-help { display:none; }
 }
 @media (min-width:351px) and (max-width:390px) {
   h1 { font-size:16px; }
-  #online-open { min-width:86px; padding:8px 6px; font-size:14px; }
-  #new-game { min-width:100px; padding:8px; }
 }
 .winning-hand,.public-winning-hand { display:grid; grid-template-columns:repeat(13,minmax(0,1fr)) minmax(0,1.25fr); gap:1px; padding:0; margin:8px 0; list-style:none; width:100%; max-width:560px; }
 .winning-hand li,.public-winning-hand li { min-width:0; }
@@ -54,8 +66,8 @@ summary { cursor:pointer; padding:4px; }
 #ron-controls[hidden] { display:none; }
 #ron-controls { width:100%; display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px; }
 #ron-status { width:100%; margin:0; font-size:14px; }
-#ron, #pass-ron { min-width:100px; min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
-#ron:focus-visible, #pass-ron:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
+#ron, #pass-ron, #online-ron, #online-pass-ron { min-width:100px; min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
+#ron:focus-visible, #pass-ron:focus-visible, #online-ron:focus-visible, #online-pass-ron:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
 .ron-pending > #selection-status, .ron-pending > #discard, .ron-pending > #tsumo, .ron-pending > .keyboard-help { display:none; }
 .winner-result + .winner-result { border-top:1px solid #63947a; margin-top:16px; padding-top:16px; }
 .win-score { font-weight:700; }
@@ -97,18 +109,36 @@ header > div { min-width:0; }
 #online-match #online-round-result p { margin:4px 0; font-size:12px; }
 #online-match #online-game-controls > div { width:100%; }
 #online-match #online-game-controls button,
-#online-start-game { min-height:42px; padding:7px 10px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
+#online-start-game { min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
 #online-match #online-game-controls button:disabled,
 #online-start-game:disabled { opacity:.55; cursor:default; }
-#online-match #online-game-action-status,#online-ron-status { flex:1 1 100%; min-width:0; margin:0; font-size:13px; overflow-wrap:anywhere; }
+#online-match #online-game-action-status,#online-ron-status,#online-call-status { flex:1 1 100%; min-width:0; margin:0; font-size:14px; overflow-wrap:anywhere; }
 #online-match #online-call-options,#online-match #online-kan-options { display:flex; flex-wrap:wrap; gap:4px; }
 #online-match #online-call-options button,#online-match #online-kan-options button { display:flex; align-items:center; justify-content:center; gap:2px; }
-#online-match #online-call-options .tile-svg,#online-match #online-kan-options .tile-svg { width:24px; }
+#online-match #online-call-options button { min-height:48px; flex:1 1 130px; }
+#online-match #online-kan-options button { min-height:44px; min-width:44px; flex:1 1 150px; }
+#online-match #online-pass-call { width:100%; margin-top:4px; }
+#online-match #online-ron-controls { display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px; }
+#online-match #online-ron-status { width:100%; }
+#online-match #online-game-controls #online-discard:disabled,
+#online-match #online-game-controls #online-riichi:disabled,
+#online-match #online-game-controls #online-tsumo:disabled,
+#online-match #online-game-controls #online-kyuushu:disabled { opacity:1; background:#d4e5db; color:#154e3c; }
+#online-match #online-game-controls #online-discard,
+#online-match #online-game-controls #online-riichi,
+#online-match #online-game-controls #online-tsumo,
+#online-match #online-game-controls #online-kyuushu,
+#online-match #online-game-controls #online-next-round,
+#online-match #online-game-controls #online-return-local { padding:8px 12px; }
+#online-match #online-next-round { margin:8px 0; }
+#online-match #online-call-options .tile-svg,#online-match #online-kan-options .tile-svg { width:22px; height:31px; }
 #online-match .seat-label[data-online-label="top"],#online-match .seat-label[data-online-label="bottom"] { white-space:nowrap; }
 @media (max-width:390px) {
   .online-match-header { font-size:12px; }
   #online-match .online-match-header p { overflow-wrap:anywhere; }
-  #online-match #online-call-options .tile-svg,#online-match #online-kan-options .tile-svg { width:20px; }
+}
+@media (max-width:350px) {
+  #online-match #online-game-action-status,#online-ron-status,#online-call-status { font-size:12px; }
 }
 @media (max-height:650px) {
   main { gap:4px; }
@@ -154,14 +184,9 @@ header > div { min-width:0; }
 #online-dialog button:focus-visible,#online-dialog input:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
 #online-status { padding:8px; border-radius:6px; background:#123f32; }
 #online-room-forms { display:grid; gap:12px; }
-#online-room-forms form { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:6px 8px; }
-#online-room-forms label { grid-column:1 / -1; }
+#online-room-form { display:grid; gap:6px; }
+#online-room-form label { margin-top:4px; }
 #online-room-forms input { min-width:0; min-height:44px; padding:8px; border:1px solid #9dc5b2; border-radius:6px; font:inherit; }
-#online-room-forms form:first-child input { grid-column:1 / 2; }
-#online-room-forms form:first-child button { grid-column:2 / 3; grid-row:2; }
-#online-room-forms form:last-child label:nth-of-type(2) { grid-column:1 / -1; }
-#online-room-forms form:last-child input:nth-of-type(2) { grid-column:1 / 2; }
-#online-room-forms form:last-child button { grid-column:2 / 3; grid-row:4; }
 #online-room { margin-top:12px; padding-top:8px; border-top:1px solid #63947a; }
 #online-room p { margin:4px 0; }
 #online-seats { display:grid; gap:6px; padding:0; margin:10px 0; list-style:none; }
@@ -190,7 +215,10 @@ header > div { min-width:0; }
 .round-win-summary + .round-win-summary { border-top:1px solid #39765e; margin-top:6px; padding-top:6px; }
 #round-result-actions { display:flex; align-items:stretch; justify-content:center; width:100%; gap:8px; }
 #round-result-actions button { flex:1 1 0; min-width:0; min-height:48px; padding:8px 10px; }
-#discard, #tsumo, #riichi, #kyuushu-kyuuhai { min-width:0; flex:1 1 0; white-space:nowrap; padding:8px 6px; }
+#discard, #tsumo, #riichi, #kyuushu-kyuuhai, #next-round,
+#online-discard, #online-tsumo, #online-riichi, #online-kyuushu, #online-next-round, #online-return-local {
+ min-width:0; flex:1 1 0; white-space:nowrap; padding:8px 6px;
+}
 .ron-pending > #riichi { display:none; }
 .result-dora { margin: 12px 0; min-width: 0; }
 .result-dora h3 { margin: 0 0 6px; font-size: .95rem; }
@@ -206,12 +234,12 @@ header > div { min-width:0; }
 #call-options button { display:flex; align-items:center; justify-content:center; gap:2px; min-height:48px; flex:1 1 130px; }
 #call-options .tile-svg { width:22px; height:31px; }
 #pass-calls { width:100%; min-height:44px; margin-top:4px; }
-#call-options button, #pass-calls { border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; touch-action:manipulation; cursor:pointer; }
+#call-options button, #pass-calls { padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; touch-action:manipulation; cursor:pointer; }
 #call-options button:focus-visible, #pass-calls:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
 #kan { min-height:44px; min-width:44px; flex:1 1 0; padding:8px 6px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; }
 #kan-controls { width:100%; }
 #kan-options { display:flex; flex-wrap:wrap; gap:4px; }
-#kan-options button, #cancel-kan { min-height:44px; min-width:44px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; }
+#kan-options button, #cancel-kan { min-height:44px; min-width:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; }
 #kan-options button { display:flex; align-items:center; justify-content:center; flex:1 1 150px; }
 #kan-options .tile-svg { width:22px; height:31px; }
 #cancel-kan { width:100%; margin-top:4px; }
@@ -407,8 +435,8 @@ header > div { min-width:0; }
  .table-summary { --table-tile-width:min(42px,round(down,calc((100svh - 132px) / 15.8),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
 }
 
-/* River cells use the rendered face dimensions, including the sideways
-   declaration face; table.ts positions each cell with a consistent 1px gap. */
+/* River slots reserve the sideways face size so declarations never move
+   neighboring discards. The shared river-layout helper places each face. */
 .table .river-tile { width:var(--river-tile-width); height:var(--river-tile-height); justify-self:center; align-self:center; }
 .table .river-left .river-tile,.table .river-right .river-tile { width:var(--river-tile-height); height:var(--river-tile-width); }
 /* Both indicator rows use the same unrotated face size as river tiles. */

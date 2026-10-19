@@ -18,6 +18,7 @@ import { canDeclareKyuushuKyuuhai } from '../game/special-draws.ts';
 import { canDiscard } from '../game/discard.ts';
 import { exposedDoraIndicators } from '../game/dora.ts';
 import { renderDoraIndicators, createResultDoraRow } from './dora.ts';
+import { applyRiverLayout, applyRiverTilePlacement, calculateRiverLayout, riverPositionFor } from './river-layout.ts';
 import type { RoundSettlement } from '../model/match.ts';
 
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
@@ -127,84 +128,18 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
     const melds = document.querySelector<HTMLElement>(`.open-melds[data-player-id="${id}"]`);
     if (melds) renderMelds(melds, player, game);
     const river = document.querySelector<HTMLElement>(`.river[data-player-id="${id}"]`)!;
-    const side = id === 1 || id === 3;
     const declarationIndex = player.riichi
       ? player.river.findIndex(tile => tile.id === player.riichi!.declarationTileId)
       : -1;
-    // Lay out face-sized cells independently: the sideways declaration has
-    // the same tile dimensions as every other face after its rotation.
-    river.style.display = 'block';
-    river.style.gridTemplateColumns = '';
-    river.style.gridTemplateRows = '';
-    const gap = 1;
-    river.style.width = side
-      ? 'calc(var(--river-tile-height) * 3 + 2px)'
-      : 'calc(var(--river-tile-width) * 6 + 5px)';
-    river.style.height = side
-      ? 'calc(var(--river-tile-width) * 6 + 5px)'
-      : 'calc(var(--river-tile-height) * 3 + 2px)';
-    const positions = player.river.map((physical,index)=>{
-      const row=Math.floor(index/6),column=index%6;
-      const screenRow=id===1?5-column:id===3?column:id===2?2-row:row;
-      const screenColumn=id===1?row:id===3?2-row:id===2?5-column:column;
-      const declaration=index===declarationIndex;
-      const widthVar=side?(declaration?'--river-tile-width':'--river-tile-height'):(declaration?'--river-tile-height':'--river-tile-width');
-      const heightVar=side?(declaration?'--river-tile-height':'--river-tile-width'):(declaration?'--river-tile-width':'--river-tile-height');
-      return {physical,index,row:screenRow,column:screenColumn,declaration,widthVar,heightVar};
-    });
-    // All 18 slots have a fixed position, including slots not discarded into yet.
-    // Without their reserved size, rotated seats collapse toward the screen's
-    // top-left instead of starting at the top-left of each player's viewpoint.
-    const rowCount = side ? 6 : 3;
-    const columnCount = side ? 3 : 6;
-    // Reserve all 18 slots, including empty positions. Expand only the track
-    // along a player's six-discard line; other rows and columns keep their
-    // regular tile spacing.
-    const cellWidths = Array.from({ length: rowCount }, () =>
-      Array<string>(columnCount).fill(side ? '--river-tile-height' : '--river-tile-width'));
-    const cellHeights = Array.from({ length: rowCount }, () =>
-      Array<string>(columnCount).fill(side ? '--river-tile-width' : '--river-tile-height'));
-    for (const position of positions) {
-      // The rotated declaration needs a wider track in top/bottom rivers or a
-      // taller track in side rivers. Keep that correction in its own line.
-      if (position.widthVar === '--river-tile-height') cellWidths[position.row][position.column] = position.widthVar;
-      if (position.heightVar === '--river-tile-height') cellHeights[position.row][position.column] = position.heightVar;
-    }
-    const offset = (variables: readonly string[]) => {
-      const widthTiles = variables.filter(value => value === '--river-tile-width').length;
-      const heightTiles = variables.length - widthTiles;
-      return `calc(var(--river-tile-width) * ${widthTiles} + var(--river-tile-height) * ${heightTiles} + ${variables.length * gap}px)`;
-    };
-    const trackSize = (variables: readonly string[]) => {
-      const widthTiles = variables.filter(value => value === '--river-tile-width').length;
-      const heightTiles = variables.length - widthTiles;
-      return `calc(var(--river-tile-width) * ${widthTiles} + var(--river-tile-height) * ${heightTiles} + ${Math.max(0, variables.length - 1) * gap}px)`;
-    };
-    const centerLine = (tracks: readonly string[], base: string) =>
-      `calc((${base} - ${trackSize(tracks)}) * .5)`;
-    const horizontalLineOffsets = side
-      ? Array<string>(rowCount).fill('0px')
-      : cellWidths.map(row => centerLine(row, 'calc(var(--river-tile-width) * 6 + 5px)'));
-    const verticalLineOffsets = side
-      ? Array.from({ length: columnCount }, (_, column) =>
-        centerLine(cellHeights.map(row => row[column]), 'calc(var(--river-tile-width) * 6 + 5px)'))
-      : Array<string>(columnCount).fill('0px');
-    const centerInTrack = (track: string, face: string) => track === face
-      ? '0px'
-      : `calc((var(${track}) - var(${face})) * .5)`;
+    const layout = calculateRiverLayout(riverPositionFor(0, id), player.river.length, declarationIndex);
+    applyRiverLayout(river, layout);
     river.replaceChildren(...player.river.map((physical, index) => {
-      const position=positions[index];
+      const position = layout.placements[index];
       const item = document.createElement('div');
       item.className = 'river-tile';
       item.dataset.tileId = physical.id;
       item.dataset.riichiDeclaration = String(player.riichi?.declarationTileId === physical.id);
-      item.style.gridRow=String(position.row+1);
-      item.style.gridColumn=String(position.column+1);
-      item.style.position='absolute';
-      item.style.width=`var(${position.widthVar})`;
-      item.style.height=`var(${position.heightVar})`;
-      item.style.left = `calc(${horizontalLineOffsets[position.row]} + ${offset(cellWidths[position.row].slice(0, position.column))} + ${centerInTrack(cellWidths[position.row][position.column], position.widthVar)})`;
-      item.style.top = `calc(${verticalLineOffsets[position.column]} + ${offset(cellHeights.slice(0, position.row).map(row => row[position.column]))} + ${centerInTrack(cellHeights[position.row][position.column], position.heightVar)})`;
+      applyRiverTilePlacement(item, position);
       const tile = createTileElement(physical.tile);
       if (item.dataset.riichiDeclaration === 'true') {
         const description = `${tileLabel(physical.tile)} リーチ宣言牌`;

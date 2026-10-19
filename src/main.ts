@@ -9,8 +9,10 @@ import { NewGameDialog } from './ui/new-game-dialog.ts';
 import { GameController } from './ui/controller.ts';
 import { OnlineWaitingRoom } from './online/waiting-room.ts';
 import { OnlineGameController } from './online/game-controller.ts';
+import { MainMenu } from './ui/main-menu.ts';
 
 installCallViewport();
+new MainMenu();
 const resultDialog = new ResultDialog();
 const controller = new GameController(undefined, { onChange: render });
 function render(): void {

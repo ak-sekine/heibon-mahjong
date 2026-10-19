@@ -7,7 +7,11 @@ export class NewGameDialog {
       const button = document.querySelector<HTMLButtonElement>(id)!;
       button.addEventListener('click', () => {
         if (this.dialog.open) return;
-        this.trigger = button;
+        // The header action now lives in a menu that becomes hidden as soon as
+        // it is selected, so restore focus to the menu button after dismissal.
+        this.trigger = id === '#new-game'
+          ? document.querySelector<HTMLButtonElement>('#main-menu-toggle')!
+          : button;
         this.dialog.showModal();
         document.querySelector<HTMLButtonElement>('#cancel-new-game')!.focus({ preventScroll: true });
       });
@@ -23,7 +27,7 @@ export class NewGameDialog {
       this.trigger = null;
       this.dialog.close();
       start();
-      document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
+      document.querySelector<HTMLButtonElement>('#main-menu-toggle')!.focus({ preventScroll: true });
     });
   }
   private cancel(): void {

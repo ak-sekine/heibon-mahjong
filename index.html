@@ -9,13 +9,28 @@
 </head>
 <body>
 <main>
-  <header><div><h1>Heibon Mahjong</h1></div><div class="header-actions"><button id="online-open" type="button" aria-haspopup="dialog">オンライン待機</button><button id="new-game" type="button">新しい対局</button></div></header>
+  <header class="app-header"><h1>Heibon Mahjong</h1><div class="main-menu-shell">
+    <button id="main-menu-toggle" class="main-menu-toggle" type="button" aria-label="メニューを開く" aria-expanded="false" aria-controls="main-menu-items">
+      <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+    </button>
+    <nav id="main-menu-items" class="main-menu-items" aria-label="ゲームメニュー" hidden>
+      <button id="new-game" type="button">新しい対局</button>
+      <button id="online-open" type="button" aria-haspopup="dialog" aria-controls="online-dialog">オンライン待機</button>
+      <button id="menu-room" type="button" aria-haspopup="dialog" aria-controls="online-dialog" hidden>ルーム操作</button>
+    </nav>
+  </div></header>
   <dialog id="online-dialog" aria-labelledby="online-title">
     <header class="online-dialog-header"><h2 id="online-title">オンライン待機</h2><button id="online-close" type="button" aria-label="オンライン待機を閉じる">閉じる</button></header>
     <p id="online-status" role="status" aria-live="polite">オンライン接続を準備しています。</p>
     <section id="online-room-forms" aria-label="ルームの作成と参加">
-      <form id="online-create"><label for="online-name">表示名</label><input id="online-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" required><button type="submit">ルームを作成</button></form>
-      <form id="online-join"><label for="online-join-name">表示名</label><input id="online-join-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" required><label for="online-join-code">ルームコードで参加</label><input id="online-join-code" name="roomCode" type="text" maxlength="6" pattern="[A-HJ-NP-Z2-9]{6}" autocapitalize="characters" autocomplete="off" required><button type="submit">参加する</button></form>
+      <form id="online-room-form" novalidate>
+        <label for="online-name">表示名</label>
+        <input id="online-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" required>
+        <button id="online-create" type="submit" name="roomAction" value="create" formnovalidate>ルームを作成</button>
+        <label for="online-join-code">ルームコードで参加</label>
+        <input id="online-join-code" name="roomCode" type="text" maxlength="6" pattern="[A-HJ-NP-Z2-9]{6}" autocapitalize="characters" autocomplete="off" required>
+        <button id="online-join" type="submit" name="roomAction" value="join">参加する</button>
+      </form>
     </section>
     <section id="online-room" aria-label="ルームの座席" hidden>
       <p>ルームコード：<strong id="online-room-code">—</strong> <button id="online-copy-code" type="button">コードをコピー</button></p>
@@ -60,28 +75,28 @@
     </section>
     <section id="online-round-result" aria-live="polite" hidden></section>
     <section id="online-game-controls" class="online-discard-controls" aria-label="オンライン対局の操作">
-      <div id="online-ron-controls" role="group" aria-label="ロン判断" hidden>
-        <p id="online-ron-status"></p>
-        <button id="online-ron" type="button">ロン</button>
-        <button id="online-pass-ron" type="button">見逃す</button>
-      </div>
       <div id="online-call-controls" role="group" aria-label="鳴き判断" hidden>
         <p id="online-call-status"></p>
         <div id="online-call-options"></div>
-        <button id="online-pass-call" type="button">鳴かない</button>
+        <button id="online-pass-call" type="button">見送る</button>
       </div>
       <div id="online-kan-controls" role="group" aria-label="カンの選択" hidden>
         <p>カンする面子を選んでください。</p>
         <div id="online-kan-options"></div>
+      </div>
+      <div id="online-ron-controls" role="group" aria-label="ロン判断" hidden>
+        <p id="online-ron-status"></p>
+        <button id="online-ron" type="button">ロン和了</button>
+        <button id="online-pass-ron" type="button">見逃す</button>
       </div>
       <p id="online-game-action-status" role="status" aria-live="polite"></p>
       <button id="online-discard" type="button" disabled>打牌する</button>
       <button id="online-riichi" type="button" hidden>リーチ</button>
       <button id="online-tsumo" type="button" hidden>ツモ和了</button>
       <button id="online-kyuushu" type="button" hidden>九種九牌</button>
-      <button id="online-next-round" type="button" hidden>次局へ</button>
-      <button id="online-open-room" type="button">ルーム操作</button>
+      <button id="online-next-round" type="button" hidden>次の局へ</button>
       <button id="online-return-local" type="button" hidden>ローカル卓へ戻る</button>
+      <p class="keyboard-help">Tabで牌とボタンへ移動、Enter／Spaceで選択・確定</p>
     </section>
   </section>
   <section class="table-summary" aria-label="点数と席情報"><div class="score-strip"><p class="seat-label" id="label-2"></p><p class="seat-label" id="label-1"></p><p class="seat-label" id="label-0"></p><p class="seat-label" id="label-3"></p></div></section>

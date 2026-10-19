@@ -34,6 +34,7 @@ MOCK = r"""
   let decision = null;
   let roundResult = null;
   let viewerOverride = null;
+  let declarationIndexes = [-1, -1, -1, -1];
   let hands = [0, 1, 2, 3].map(seat => Array.from({ length: 13 }, (_, i) => makeTile(`online-${seat}-${i}`, seat + i)));
   let drawnTiles = [makeTile('online-0-draw', 7), null, null, null];
   let rivers = [[], [], [], []];
@@ -47,7 +48,8 @@ MOCK = r"""
       wind: wind[(seat + 4) % 4],
       isDealer: seat === 0,
       points: 25000,
-      riichi: false,
+      riichi: declarationIndexes[seat] >= 0,
+      ...(declarationIndexes[seat] >= 0 ? { riichiDeclarationTileId: rivers[seat][declarationIndexes[seat]]?.id } : {}),
       concealedCount: hands[seat].length + Number(Boolean(drawnTiles[seat])),
       ...(seat === viewerSeat ? { hand: hands[seat], drawnTile: drawnTiles[seat] } : {}),
       river: rivers[seat],
@@ -246,6 +248,7 @@ MOCK = r"""
   }
 
   window.WebSocket = MockWebSocket;
+  const requests = [];
   window.onlineMock = {
     addGuest() {
       state.seats[1] = { seat: 1, kind: 'human', name: 'テスト参加者', connected: true, ready: false, isHost: false };
@@ -312,6 +315,21 @@ MOCK = r"""
       };
       broadcastGame('game-state');
     },
+    showRiverScenario(viewerSeat, count, declarationIndex = -1) {
+      viewerOverride = viewerSeat;
+      declarationIndexes = [0, 1, 2, 3].map(() => declarationIndex);
+      rivers = [0, 1, 2, 3].map(seat => Array.from({ length: count }, (_, index) =>
+        makeTile(`online-river-fixture-${viewerSeat}-${seat}-${index}`, index + seat)));
+      gameRevision++;
+      broadcastGame('game-state');
+    },
+    resetRivers() {
+      viewerOverride = 0;
+      declarationIndexes = [-1, -1, -1, -1];
+      rivers = [[], [], [], []];
+      gameRevision++;
+      broadcastGame('game-state');
+    },
     privateTileIds(viewerSeat) {
       return hands.flatMap((hand, seat) => seat === viewerSeat ? [] : [
         ...hand.map(tile => tile.id), ...(drawnTiles[seat] ? [drawnTiles[seat].id] : []),
@@ -319,12 +337,14 @@ MOCK = r"""
     },
     forceDisconnect() { sockets.filter(socket => socket.readyState === MockWebSocket.OPEN).at(-1)?.forceDisconnect(); },
     get ticketRequests() { return tickets; },
+    get requests() { return requests; },
     get copied() { return copied; },
   };
   const nativeFetch = window.fetch.bind(window);
   window.fetch = async (url, init = {}) => {
     const requestUrl = new URL(String(url), location.href);
     if (requestUrl.origin !== 'https://online-mock.invalid') return nativeFetch(url, init);
+    requests.push({ path: requestUrl.pathname, body: init.body ? JSON.parse(init.body) : null });
     let value;
     if (requestUrl.pathname === '/api/rooms' && init.method === 'POST') {
       value = { roomCode: code, participantToken: hostToken, playerSeat: 0, createdAt: state.createdAt, expiresAt: state.expiresAt, seats: state.seats };
@@ -366,6 +386,11 @@ with sync_playwright() as p:
         except Exception as error:
             raise AssertionError(f'online browser UI wait timed out: {expression}') from error
 
+    def select_menu_item(selector):
+        if page.locator('#main-menu-items').is_hidden():
+            page.locator('#main-menu-toggle').click()
+        page.locator(selector).click()
+
     page.wait_for_selector('#player-hand svg')
     wait_for('typeof window.onlineUiTest === "object"')
     private_ids = page.evaluate('''() => window.onlineUiTest.controller.game.players.slice(1).flatMap(player => [
@@ -374,10 +399,39 @@ with sync_playwright() as p:
     assert page.locator('.table').is_visible() and page.locator('#player-hand svg').count() > 0, 'the existing mahjong table did not render'
     assert all(tile_id not in page.locator('main').inner_html() for tile_id in private_ids), 'CPU private tile IDs leaked before opening the room'
 
-    page.locator('#online-open').click()
+    assert page.locator('#main-menu-toggle').is_visible(), 'the shared hamburger menu was not rendered'
+    page.locator('#main-menu-toggle').click()
+    assert page.locator('#main-menu-items').is_visible(), 'the hamburger menu did not open'
+    assert page.locator('#main-menu-toggle').get_attribute('aria-expanded') == 'true', 'menu expanded state was not announced'
+    page.locator('#main-menu-toggle').click()
+    assert page.locator('#main-menu-items').is_hidden(), 'the hamburger menu did not close on a second press'
+    page.locator('#main-menu-toggle').press('Enter')
+    assert page.locator('#new-game').evaluate('element => document.activeElement === element'), 'keyboard open did not focus the first menu item'
+    page.keyboard.press('ArrowDown')
+    assert page.locator('#online-open').evaluate('element => document.activeElement === element'), 'arrow navigation did not move through menu items'
+    page.keyboard.press('Escape')
+    assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'Escape did not return focus to the menu button'
+    page.locator('#main-menu-toggle').click()
+    page.locator('h1').click()
+    assert page.locator('#main-menu-items').is_hidden(), 'clicking outside did not close the menu'
+    select_menu_item('#new-game')
+    assert page.locator('#new-game-dialog').evaluate('element => element.open'), 'new-game menu item did not open the existing confirmation'
+    page.locator('#cancel-new-game').click()
+    assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'dismissing the new-game dialog did not restore focus to the visible menu button'
+
+    assert page.locator('#online-name').count() == 1 and page.locator('#online-join-name').count() == 0, 'waiting room does not have exactly one display-name field'
+    assert page.locator('#online-name').get_attribute('maxlength') == '24', 'display-name length limit changed'
+    select_menu_item('#online-open')
+    assert page.locator('#main-menu-items').is_hidden(), 'selecting a menu item did not close the menu'
+    before_empty_submit = page.evaluate('window.onlineMock.requests.length')
+    page.locator('#online-create').click()
+    assert '1〜24文字' in page.locator('#online-status').inner_text(), 'an empty display name did not show validation feedback'
+    assert page.evaluate('window.onlineMock.requests.length') == before_empty_submit, 'an empty display name was sent to the server'
     page.locator('#online-name').fill('テストホスト')
-    page.locator('#online-create button[type="submit"]').click()
+    page.locator('#online-create').click()
     wait_for("document.querySelector('#online-room-code').textContent === 'ABC234'")
+    assert page.evaluate("window.onlineMock.requests[0].body.displayName === 'テストホスト'"), 'room creation did not send the common display name'
+    assert page.locator('#menu-room').evaluate('element => !element.hidden'), 'room operations were not added to the menu for an online participant'
     wait_for("document.querySelector('#online-seats').children.length === 4 && document.querySelector('#online-seats').innerText.includes('テストホスト')")
     page.evaluate('window.onlineMock.addGuest()')
     wait_for("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
@@ -387,8 +441,9 @@ with sync_playwright() as p:
     assert 'テスト参加者' in page.locator('#online-seats').inner_text() and '人間' in page.locator('#online-seats').inner_text(), 'human seat was not described in text'
 
     page.locator('#online-close').click()
+    assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'closing the room dialog did not restore focus to the visible menu button'
     assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') !== null"), 'closing the dialog discarded the session token'
-    page.locator('#online-open').click()
+    select_menu_item('#online-open')
     wait_for('window.onlineMock.ticketRequests >= 2')
     wait_for("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
 
@@ -458,11 +513,90 @@ with sync_playwright() as p:
     page.locator('#online-call-options button[data-online-call]').click()
     wait_for("document.querySelector('#online-call-controls').hidden === true")
 
+    assert page.locator('#online-open-room').count() == 0, 'room operations button remained in the game action area'
+    assert page.locator('#online-game-controls').get_attribute('class') == 'discard-controls', 'online action area did not use the shared controls class'
+    action_sizes = page.evaluate('''() => {
+      const ids = ['discard','online-discard','riichi','online-riichi','tsumo','online-tsumo','kyuushu-kyuuhai','online-kyuushu','ron','online-ron','pass-ron','online-pass-ron','pass-calls','online-pass-call','next-round','online-next-round'];
+      return Object.fromEntries(ids.map(id => {
+        const style = getComputedStyle(document.getElementById(id));
+        return [id, {minHeight: style.minHeight, padding: style.padding}];
+      }));
+    }''')
+    for offline_id, online_id in [('discard','online-discard'),('riichi','online-riichi'),('tsumo','online-tsumo'),('kyuushu-kyuuhai','online-kyuushu'),('ron','online-ron'),('pass-ron','online-pass-ron'),('pass-calls','online-pass-call'),('next-round','online-next-round')]:
+      assert action_sizes[offline_id] == action_sizes[online_id], f'{offline_id} and {online_id} controls do not share dimensions'
+    option_sizes = page.evaluate('''() => {
+      const measure = selector => {
+        const host = document.querySelector(selector);
+        let button = host.querySelector('button');
+        const created = !button;
+        if (!button) { button = document.createElement('button'); button.type = 'button'; button.textContent = '操作'; host.append(button); }
+        const style = getComputedStyle(button);
+        const result = {minHeight: style.minHeight, minWidth: style.minWidth, padding: style.padding, flex: style.flex};
+        if (created) button.remove();
+        return result;
+      };
+      return Object.fromEntries(['#call-options','#online-call-options','#kan-options','#online-kan-options'].map(selector => [selector, measure(selector)]));
+    }''')
+    assert option_sizes['#call-options'] == option_sizes['#online-call-options'], f'call option buttons do not share dimensions: {option_sizes}'
+    assert option_sizes['#kan-options'] == option_sizes['#online-kan-options'], f'kan option buttons do not share dimensions: {option_sizes}'
+
+    for width, height in [(320,700),(375,812),(390,844),(430,932),(1280,900)]:
+      page.set_viewport_size({'width': width, 'height': height})
+      for count in [1, 6, 7, 18]:
+        declaration_cases = [-1] if count < 18 else [-1, 0, 5, 6, 17]
+        for viewer in range(4):
+          for declaration_index in declaration_cases:
+            page.evaluate('args => window.onlineMock.showRiverScenario(args.viewer, args.count, args.declaration)', {
+              'viewer': viewer, 'count': count, 'declaration': declaration_index,
+            })
+            metrics = page.evaluate('''() => {
+              const overlaps = (a,b) => a.left < b.right - .5 && b.left < a.right - .5 && a.top < b.bottom - .5 && b.top < a.bottom - .5;
+              const info = document.querySelector('[data-online-center-info]').getBoundingClientRect();
+              const rivers = [...document.querySelectorAll('[data-online-river]')].map(river => {
+                const rect = river.getBoundingClientRect();
+                const tiles = [...river.querySelectorAll('.river-tile svg')].map(tile => tile.getBoundingClientRect());
+                let tileOverlap = false;
+                for (let i=0; i<tiles.length; i++) for (let j=i+1; j<tiles.length; j++) tileOverlap ||= overlaps(tiles[i],tiles[j]);
+                const declaration = river.querySelector('[data-riichi-declaration="true"] svg');
+                const declarationRect = declaration?.getBoundingClientRect();
+                const side = river.dataset.onlineRiver === 'left' || river.dataset.onlineRiver === 'right';
+                const declarationDirection = !declarationRect || (side ? declarationRect.width < declarationRect.height : declarationRect.width > declarationRect.height);
+                return {count: tiles.length, infoOverlap: overlaps(rect,info), tileOverlap, declarationDirection, tilesInRiver: tiles.every(tile =>
+                  tile.left >= rect.left - 1 && tile.top >= rect.top - 1 && tile.right <= rect.right + 1 && tile.bottom <= rect.bottom + 1)};
+              });
+              const table = document.querySelector('#online-table').getBoundingClientRect();
+              return {overflow: document.documentElement.scrollWidth > innerWidth, tableInsideViewport: table.left >= -1 && table.right <= innerWidth + 1, rivers};
+            }''')
+            assert not metrics['overflow'] and metrics['tableInsideViewport'], f'online table overflow at {width}px, viewer {viewer}, {count} discards: {metrics}'
+            assert all(river['count'] == count for river in metrics['rivers']), f'online river count failed at {width}px: {metrics}'
+            assert all(not river['infoOverlap'] and not river['tileOverlap'] and river['declarationDirection'] and river['tilesInRiver'] for river in metrics['rivers']), f'online river geometry overlapped at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {metrics}'
+          if count == 18:
+            page.evaluate('args => window.onlineMock.showRiverScenario(args.viewer, 18, -1)', {'viewer': viewer})
+            base_positions = page.evaluate('''() => Object.fromEntries([...document.querySelectorAll('[data-online-river]')].map(river =>
+              [river.dataset.onlineRiver, [...river.querySelectorAll('.river-tile svg')].map(tile => {
+                const rect = tile.getBoundingClientRect(); return [rect.left,rect.top,rect.width,rect.height];
+              })]))''')
+            for declaration_index in [0, 5, 6, 17]:
+              page.evaluate('args => window.onlineMock.showRiverScenario(args.viewer, 18, args.declaration)', {
+                'viewer': viewer, 'declaration': declaration_index,
+              })
+              changed_positions = page.evaluate('''() => Object.fromEntries([...document.querySelectorAll('[data-online-river]')].map(river =>
+                [river.dataset.onlineRiver, [...river.querySelectorAll('.river-tile svg')].map(tile => {
+                  const rect = tile.getBoundingClientRect(); return [rect.left,rect.top,rect.width,rect.height];
+                })]))''')
+              for position, tiles in base_positions.items():
+                for index, rect in enumerate(tiles):
+                  if index != declaration_index:
+                    assert all(abs(before-after) < .1 for before, after in zip(rect, changed_positions[position][index])), f'riichi declaration moved another {position} discard at {width}px, viewer {viewer}, index {declaration_index}'
+      page.screenshot(path=str(OUT / f'step14-2-online-rivers-{width}.png'), full_page=True)
+    page.set_viewport_size({'width': 390, 'height': 844})
+    page.evaluate('window.onlineMock.resetRivers()')
+
     page.evaluate('window.onlineMock.endRound()')
     wait_for("document.querySelector('#online-round-result').hidden === false")
     assert 'ツモ' in page.locator('#online-round-result').inner_text(), 'round result was not displayed'
     assert page.locator('#online-next-round').is_visible() and page.locator('#online-next-round').is_enabled(), 'the host could not advance to the next round'
-    page.screenshot(path=str(OUT / 'step14-1-online-game-390.png'), full_page=True)
+    page.screenshot(path=str(OUT / 'step14-2-online-game-390.png'), full_page=True)
     page.locator('#online-next-round').click()
     wait_for("document.querySelector('#online-match-round').innerText.includes('東2局')")
     assert page.locator('#online-round-result').is_hidden(), 'the old round result remained after next-round transition'
@@ -475,7 +609,7 @@ with sync_playwright() as p:
     hand_after_reconnect = page.locator('#online-player-hand button[data-tile-id]').evaluate_all("nodes => nodes.map(node => node.dataset.tileId).join(',')")
     assert hand_after_reconnect == hand_before_reconnect, 'the online hand was not restored after reconnect'
 
-    page.locator('#online-open-room').click()
+    select_menu_item('#menu-room')
     page.locator('#online-leave').click()
     wait_for("document.querySelector('#online-room').hidden && !document.querySelector('#online-room-forms').hidden")
     assert page.locator('#online-match-status').inner_text() == '参加者が明示的に退出したため、対局を中断しました。', 'an explicit game exit did not show the abort reason'
@@ -487,10 +621,29 @@ with sync_playwright() as p:
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'online dialog causes horizontal overflow after leave'
     assert page.locator('.table').is_visible() and page.locator('#player-hand svg').count() > 0, 'the existing mahjong table was changed by the waiting room flow'
     assert all(tile_id not in page.locator('main').inner_html() for tile_id in private_ids), 'CPU private tile IDs leaked after leaving the room'
+
+    select_menu_item('#online-open')
+    page.locator('#online-name').fill('')
+    page.locator('#online-join-code').fill('ABC234')
+    before_invalid_code = page.evaluate('window.onlineMock.requests.length')
+    page.locator('#online-join').click()
+    assert '1〜24文字' in page.locator('#online-status').inner_text(), 'joining without a display name did not show validation feedback'
+    assert page.evaluate('window.onlineMock.requests.length') == before_invalid_code, 'a missing display name was sent to the server'
+    page.locator('#online-name').fill('共通参加者')
+    page.locator('#online-join-code').fill('bad!')
+    page.locator('#online-join').click()
+    assert 'ルームコード' in page.locator('#online-status').inner_text(), 'an invalid room code did not show validation feedback'
+    assert page.evaluate('window.onlineMock.requests.length') == before_invalid_code, 'an invalid room code was sent to the server'
+    page.locator('#online-join-code').fill('ABC234')
+    page.locator('#online-join').click()
+    wait_for("document.querySelector('#online-room-code').textContent === 'ABC234' && window.onlineMock.requests.some(request => request.path.endsWith('/join'))")
+    assert page.evaluate("window.onlineMock.requests.find(request => request.path.endsWith('/join')).body.displayName === '共通参加者'"), 'room join did not send the common display name'
+    wait_for("JSON.parse(sessionStorage.getItem('heibon-mahjong-online-session')).displayName === '共通参加者'")
+    assert page.evaluate("localStorage.getItem('heibon-mahjong-online-session') === null"), 'online participant session was moved to localStorage'
     assert not errors, errors
 
-    report = {'step': '14.1', 'viewport': [390, 844], 'scenario': '2 humans + CPU seats, seat rotation, private hands, discard sync, CPU update, ron/call controls, result, next round, reconnect, abort', 'result': 'pass'}
+    report = {'step': '14.2', 'viewports': [[320,700],[375,812],[390,844],[430,932],[1280,900]], 'scenario': 'shared hamburger menu, common display name, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, exit', 'result': 'pass'}
     print(json.dumps(report, ensure_ascii=False), flush=True)
-    (OUT / 'step14-1-online-game.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    (OUT / 'step14-2-online-game.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     page.close()
     browser.close()

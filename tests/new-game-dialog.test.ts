@@ -17,7 +17,7 @@ for (const status of ['playing', 'round-ended', 'match-ended']) {
         click() { this.listeners.click?.({ preventDefault() {} }); }
       }
       let focused: Node | null = null;
-      const nodes = new Map(['#new-game-dialog', '#new-game', '#result-new-game', '#cancel-new-game', '#confirm-new-game'].map(id => [id, new Node()]));
+      const nodes = new Map(['#new-game-dialog', '#new-game', '#result-new-game', '#main-menu-toggle', '#cancel-new-game', '#confirm-new-game'].map(id => [id, new Node()]));
       const original = globalThis.document;
       globalThis.document = { querySelector: (id: string) => nodes.get(id) } as unknown as Document;
       let match = status === 'playing' ? startMatch() : settleRound({ ...startMatch(), game: status === 'match-ended' ? fixedRon(3, [0], 2) : fixedRon(0, [1]), ...(status === 'match-ended' ? { roundNumber: 4, dealerId: 3 as const } : {}) });
@@ -37,7 +37,7 @@ for (const status of ['playing', 'round-ended', 'match-ended']) {
             nodes.get('#new-game-dialog')!.listeners.cancel({ preventDefault() { prevented = true; } });
             assert.equal(prevented, true);
           }
-          assert.equal(focused, nodes.get(trigger));
+          assert.equal(focused, nodes.get(trigger === '#new-game' ? '#main-menu-toggle' : trigger));
           assert.equal(nodes.get('#new-game-dialog')!.open, false);
           assert.equal(resets, 0);
           assert.deepEqual(match, snapshot);
@@ -48,7 +48,7 @@ for (const status of ['playing', 'round-ended', 'match-ended']) {
         assert.equal(match.lastSettlement, null);
         assert.equal(match.roundNumber, 1);
         assert.deepEqual(match.points, [25000, 25000, 25000, 25000]);
-        assert.equal(focused, nodes.get('#new-game'));
+        assert.equal(focused, nodes.get('#main-menu-toggle'));
         nodes.get('#confirm-new-game')!.click(); assert.equal(resets, 1);
       } finally { globalThis.document = original; }
     });

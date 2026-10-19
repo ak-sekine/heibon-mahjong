@@ -2,11 +2,11 @@ import type { GameActionPayload } from './protocol.ts';
 import type { PlayerGameView, PublicMeld, PublicTile } from './game-view.ts';
 import { createTileElement, tileLabel } from '../rendering/tile-svg.ts';
 import { renderDepositSticks } from '../rendering/deposit-sticks.ts';
+import { applyRiverLayout, applyRiverTilePlacement, calculateRiverLayout, riverPositionFor } from '../rendering/river-layout.ts';
 import { TILE_KINDS, tileKindKey } from '../model/tile.ts';
 
 type ActionSender = (action: GameActionPayload, expectedGameRevision: number) => void;
 type DecisionAction = { type: 'declare-ron' } | { type: 'pass-ron' } | { type: 'declare-call'; optionId: string } | { type: 'pass-call' };
-type Position = 'bottom' | 'right' | 'top' | 'left';
 const windNames = { east: '東', south: '南', west: '西', north: '北' } as const;
 
 function face(tile: PublicTile): SVGSVGElement {
@@ -20,10 +20,6 @@ function text(tag: string, content: string, className?: string): HTMLElement {
   node.textContent = content;
   if (className) node.className = className;
   return node;
-}
-
-function positionFor(viewer: number, seat: number): Position {
-  return (['bottom', 'right', 'top', 'left'] as const)[(seat - viewer + 4) % 4];
 }
 
 function asView(value: unknown): PlayerGameView | null {
@@ -107,10 +103,6 @@ export class OnlineGameController {
       if (button?.dataset.onlineCall) this.sendDecision({ type: 'declare-call', optionId: button.dataset.onlineCall });
     });
     document.querySelector<HTMLButtonElement>('#online-next-round')!.addEventListener('click', () => this.send({ type: 'next-round' }));
-    document.querySelector<HTMLButtonElement>('#online-open-room')!.addEventListener('click', () => {
-      const dialog = document.querySelector<HTMLDialogElement>('#online-dialog');
-      if (dialog && !dialog.open) dialog.showModal();
-    });
     document.querySelector<HTMLButtonElement>('#online-return-local')!.addEventListener('click', () => this.returnToLocalGame());
   }
 
@@ -219,7 +211,7 @@ export class OnlineGameController {
   private renderSeatLabels(view: PlayerGameView): void {
     const labels: HTMLElement[] = [];
     for (const seat of view.seats) {
-      const position = positionFor(view.viewerSeat, seat.seat);
+      const position = riverPositionFor(view.viewerSeat, seat.seat);
       const label = document.createElement('p');
       label.className = 'seat-label';
       label.dataset.active = String(view.status === 'playing' && view.turnPlayerId === seat.seat);
@@ -235,7 +227,7 @@ export class OnlineGameController {
   private renderHandsAndMelds(view: PlayerGameView): void {
     this.playerHand.replaceChildren();
     for (const seat of view.seats) {
-      const position = positionFor(view.viewerSeat, seat.seat);
+      const position = riverPositionFor(view.viewerSeat, seat.seat);
       const handNode = document.querySelector<HTMLElement>(`[data-online-hand="${position}"]`);
       const meldNode = document.querySelector<HTMLElement>(`[data-online-melds="${position}"]`);
       const seatNode = document.querySelector<HTMLElement>(`[data-online-seat="${position}"]`);
@@ -329,21 +321,22 @@ export class OnlineGameController {
 
   private renderRivers(view: PlayerGameView): void {
     for (const seat of view.seats) {
-      const position = positionFor(view.viewerSeat, seat.seat);
+      const position = riverPositionFor(view.viewerSeat, seat.seat);
       const river = document.querySelector<HTMLElement>(`[data-online-river="${position}"]`);
       if (!river) continue;
       river.className = `river river-${position}`;
+      const declarationIndex = seat.riichiDeclarationTileId
+        ? seat.river.findIndex(tile => tile.id === seat.riichiDeclarationTileId)
+        : -1;
+      const layout = calculateRiverLayout(position, seat.river.length, declarationIndex);
+      applyRiverLayout(river, layout);
       river.replaceChildren(...seat.river.map((tile, index) => {
-        const row = Math.floor(index / 6);
-        const column = index % 6;
-        const coords = position === 'bottom' ? [row, column]
-          : position === 'top' ? [2 - row, 5 - column]
-            : position === 'right' ? [5 - column, row] : [column, 2 - row];
         const item = document.createElement('div');
         item.className = 'river-tile';
-        item.style.gridRow = String(coords[0] + 1);
-        item.style.gridColumn = String(coords[1] + 1);
-        item.dataset.riichiDeclaration = String(seat.riichiDeclarationTileId === tile.id);
+        const placement = layout.placements[index];
+        applyRiverTilePlacement(item, placement);
+        item.dataset.tileId = tile.id;
+        item.dataset.riichiDeclaration = String(placement.declaration);
         item.append(face(tile));
         return item;
       }));
