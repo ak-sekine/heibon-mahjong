@@ -108,7 +108,8 @@ async function passGameDecisions(clients) {
 async function waitForHumanTurn(clients, afterRevision, timeoutMs = 20000) {
   const qualifies = view => Number(view?.gameRevision) > afterRevision && (
     view?.status !== 'playing' ||
-    view?.phase === 'awaiting-discard' && view.seats?.[view.turnPlayerId]?.control === 'human'
+    view?.phase === 'awaiting-discard' && view.viewerSeat === view.turnPlayerId &&
+      view.seats?.[view.turnPlayerId]?.control === 'human'
   );
   const existing = clients.map(client => latestGameMessage(client)?.view).find(qualifies);
   if (existing) return existing;
