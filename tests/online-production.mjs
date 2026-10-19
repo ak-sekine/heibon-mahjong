@@ -454,12 +454,12 @@ async function main() {
     inspectGameView(gameReconnect, 1, privateValues, two.roomCode);
     check(!two.host.privacyLeak && !two.guest.privacyLeak && !gameReconnect.privacyLeak, 'A game WebSocket update included a secret.');
 
-    const beforeGameExit = two.host.messages.length;
+    const beforeGuestGameExit = two.guest.messages.length;
     const leaveGame = await sendAction(two.host, { type: 'leave-room' }, 'game-host-leave');
     check(leaveGame.result.ok, 'A participant could not explicitly leave an active online game.');
     const abortedMessage = await waitForMessage(two.guest,
       message => message.type === 'game-aborted' || message.type === 'game-state' && message.view?.status === 'aborted',
-      beforeGameExit, 10000, 'game-aborted notification');
+      beforeGuestGameExit, 10000, 'game-aborted notification');
     check(abortedMessage.type === 'game-aborted' || abortedMessage.view.status === 'aborted', 'The remaining player did not receive an abort reason.');
     activeHostForCleanup = two.guest;
     const roomAfterAbort = await waitForRoomState(two.guest, state => state.status === 'finalized' && state.hostSeat === 1);
