@@ -350,6 +350,9 @@ async function main() {
     check(nonHostStart.result.ok === false && nonHostStart.result.code === 'not_host', 'A non-host started the game.');
     const gameStarted = await sendGameAction(two.host, { type: 'start-game', requestId: nextRequestId('game-start') }, 0, 'game-start');
     check(gameStarted.result.ok === true && gameStarted.result.gameRevision === 1, 'The host could not start the server-owned game.');
+    await Promise.all([two.host, two.guest].map((client, seat) => waitForGameState(client, view =>
+      view?.roomCode === two.roomCode && view.viewerSeat === seat &&
+      Number(view.gameRevision) >= Number(gameStarted.result.gameRevision), 0, 15000)));
     const hostView = inspectGameView(two.host, 0, privateValues, two.roomCode);
     const guestView = inspectGameView(two.guest, 1, privateValues, two.roomCode);
     const hostPrivateIds = new Set([
