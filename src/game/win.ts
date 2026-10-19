@@ -6,6 +6,7 @@ import type { GameState, PhysicalTile, PlayerId, SeatWind, WinDetails } from '..
 import { analyzeYaku, type YakuAnalysis, type YakuCandidate } from '../analysis/yaku.ts';
 import { countDora, countRedDora } from '../analysis/dora.ts';
 import { exposedDoraIndicators, uraDoraIndicators } from './dora.ts';
+import { isChiihouState, isTenhouState } from './first-turn-wins.ts';
 
 /** East-only match: the round wind stays east throughout all four rounds. */
 export const ROUND_WIND: SeatWind = 'east';
@@ -35,6 +36,8 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
       (ronWindow.kind === undefined || ronWindow.kind === 'discard') && ronWindow.lastLiveWallDiscard === true);
     const analysis = analyzeYaku(faces, { isClosed, openMelds, winMethod, winningTile: winningTile.tile,
       rinshan: winMethod==='tsumo' && player.drawnTileSource==='rinshan',
+      tenhou: winMethod==='tsumo' && isTenhouState(game, playerId),
+      chiihou: winMethod==='tsumo' && isChiihouState(game, playerId),
       chankan: winMethod==='ron' && Boolean(ronWindow?.kan),
       haitei: winMethod==='tsumo' && player.drawnTileSource==='live-wall' && game.liveWall.length===0,
       houtei,

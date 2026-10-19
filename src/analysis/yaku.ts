@@ -11,6 +11,10 @@ export interface WinningContext {
   readonly haitei?: boolean;
   /** Ron on a discard marked when it followed the last live-wall draw. */
   readonly houtei?: boolean;
+  /** Derived from the dealer's untouched initial deal state. */
+  readonly tenhou?: boolean;
+  /** Derived from this child's untouched first live-wall draw. */
+  readonly chiihou?: boolean;
   readonly winMethod: 'tsumo' | 'ron';
   readonly winningTile: TileKind;
   readonly seatWind: SeatWind;
@@ -27,9 +31,9 @@ export type YakuId = 'rinshan' | 'chankan' | 'sankantsu' | 'suukantsu' | 'ippats
   'iipeikou' | 'ryanpeikou' | 'sanankou' | 'chiitoitsu' | 'toitoi' | 'shousangen' | 'honroutou' |
   'chanta' | 'junchan' | 'sanshoku-doukou' | 'sanshoku-doujun' | 'ittsu' | 'honitsu' | 'chinitsu' |
   'kokushi-musou' | 'suuankou' | 'daisangen' | 'tsuuiisou' | 'ryuuiisou' | 'chinroutou' | 'haitei' | 'houtei' |
-  'shousuushii' | 'daisuushii' | 'chuuren-poutou';
+  'shousuushii' | 'daisuushii' | 'chuuren-poutou' | 'tenhou' | 'chiihou';
 type YakumanYakuId = Extract<YakuId, 'kokushi-musou' | 'suukantsu' | 'suuankou' | 'daisangen' |
-  'tsuuiisou' | 'ryuuiisou' | 'chinroutou' | 'shousuushii' | 'daisuushii' | 'chuuren-poutou'>;
+  'tsuuiisou' | 'ryuuiisou' | 'chinroutou' | 'shousuushii' | 'daisuushii' | 'chuuren-poutou' | 'tenhou' | 'chiihou'>;
 type NormalYakuId = Exclude<YakuId, YakumanYakuId>;
 type NormalYakuHan = 1 | 2 | 3 | 5 | 6;
 export type RecognizedYaku =
@@ -63,11 +67,19 @@ function validateContext(context: WinningContext, tiles: readonly Tile[]): void 
   if (!context || typeof context !== 'object' ||
       !['tsumo', 'ron'].includes(context.winMethod) ||
       !winds.includes(context.seatWind) || !winds.includes(context.roundWind) ||
-      (['rinshan', 'chankan', 'haitei', 'houtei', 'ippatsuEligible', 'doubleRiichi'] as const)
+      (['rinshan', 'chankan', 'haitei', 'houtei', 'tenhou', 'chiihou', 'ippatsuEligible', 'doubleRiichi'] as const)
         .some(key => context[key] !== undefined && typeof context[key] !== 'boolean') ||
       (context.riichi !== undefined && typeof context.riichi !== 'boolean') ||
       (context.isClosed !== undefined && context.isClosed !== true && !(context.isClosed === false && context.openMelds?.length))) {
     throw new RangeError('Invalid winning context; only closed hands are supported');
+  }
+  const firstTurnYakuman = context.tenhou === true || context.chiihou === true;
+  if (context.tenhou === true && context.chiihou === true || firstTurnYakuman &&
+      (context.winMethod !== 'tsumo' || context.rinshan === true || context.chankan === true ||
+        context.haitei === true || context.houtei === true || context.isClosed === false ||
+        Boolean(context.openMelds?.length) || context.riichi === true ||
+        context.ippatsuEligible === true || context.doubleRiichi === true)) {
+    throw new RangeError('Invalid first-turn yakuman context');
   }
   const kind = context.winningTile;
   if (!kind || typeof kind !== 'object' || !TILE_KINDS.some(k =>
@@ -219,6 +231,8 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
 
     const emit = (assignment: WinningTileAssignment, wait: WaitType, position: string) => {
       const yakuman: RecognizedYaku[] = [];
+      if (context.tenhou) yakuman.push(yakumanYaku('tenhou'));
+      if (context.chiihou) yakuman.push(yakumanYaku('chiihou'));
       if (allTiles.every(tile => tile.category === 'honor')) yakuman.push(yakumanYaku('tsuuiisou'));
       if (allTiles.every(isGreenTile)) yakuman.push(yakumanYaku('ryuuiisou'));
       if (allTiles.every(tile => tile.category === 'suited' && (tile.rank === 1 || tile.rank === 9))) {
@@ -267,6 +281,8 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
     const yaku = [...common];
     add(yaku, 'chiitoitsu', 2);
     const yakuman: RecognizedYaku[] = [];
+    if (context.tenhou) yakuman.push(yakumanYaku('tenhou'));
+    if (context.chiihou) yakuman.push(yakumanYaku('chiihou'));
     if (allTiles.every(tile => tile.category === 'honor')) yakuman.push(yakumanYaku('tsuuiisou'));
     if (allTiles.every(isGreenTile)) yakuman.push(yakumanYaku('ryuuiisou'));
     if (allTiles.every(tile => tile.category === 'suited' && (tile.rank === 1 || tile.rank === 9))) {
@@ -276,8 +292,13 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
       assignment: { type: 'pair', pairIndex: shapes.sevenPairs.pairs.findIndex(k => same(k, context.winningTile)) },
       wait: 'tanki', ...totals(yakuman.length ? yakuman : yaku) });
   }
-  if (shapes.thirteenOrphans.isWinning) candidates.push({ shape: 'thirteen-orphans', id: 'thirteen-orphans',
-    duplicate: shapes.thirteenOrphans.duplicate, assignment: null, wait: null,
-    ...totals([{ id: 'kokushi-musou', han: 0, yakuman: 1 }]) });
+  if (shapes.thirteenOrphans.isWinning) {
+    const yakuman: RecognizedYaku[] = [];
+    if (context.tenhou) yakuman.push(yakumanYaku('tenhou'));
+    if (context.chiihou) yakuman.push(yakumanYaku('chiihou'));
+    yakuman.push(yakumanYaku('kokushi-musou'));
+    candidates.push({ shape: 'thirteen-orphans', id: 'thirteen-orphans',
+      duplicate: shapes.thirteenOrphans.duplicate, assignment: null, wait: null, ...totals(yakuman) });
+  }
   return { isWinningShape: shapes.isWinning, hasSupportedYaku: candidates.some(c => c.yaku.length > 0), candidates };
 }

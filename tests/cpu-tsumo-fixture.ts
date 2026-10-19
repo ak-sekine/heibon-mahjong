@@ -1,14 +1,12 @@
 import { createWall, reserveDeadWall } from '../src/game/wall.ts';
 import { deal } from '../src/game/deal.ts';
-import { setupDiscard as discardTile } from './setup-discard.ts';
-import { drawTile } from '../src/game/draw.ts';
 import { getWaitingTileKinds } from '../src/game/ron.ts';
 import { shuffle } from '../src/game/shuffle.ts';
 import { tileKindKey, TILE_KINDS } from '../src/model/tile.ts';
 import type { GameState, PhysicalTile, PlayerId } from '../src/model/game.ts';
 
 const seeded = (seed: number) => () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
-/** Actual 136-tile wall, dealer 0, winner draws on its first ordinary turn. */
+/** Actual 136-tile wall, dealer 0, with the chosen child winning on its first turn. */
 export function cpuTsumoStart(winner: 1 | 2 | 3, groups = ['123m', '456m', '789p', '22p', '456s'], indicator = 'man-4'): GameState {
   const pool = shuffle(createWall(), seeded(91));
   const take = (key: string): PhysicalTile => {
@@ -35,10 +33,27 @@ export function cpuTsumoStart(winner: 1 | 2 | 3, groups = ['123m', '456m', '789p
   return deal(reserveDeadWall(wall as PhysicalTile[]));
 }
 export function cpuTsumoGame(winner: 1 | 2 | 3, groups?: string[], indicator?: string): GameState {
-  let game = cpuTsumoStart(winner, groups, indicator);
-  for (let id = 0; id < winner; id++) {
-    game = discardTile(game, id as PlayerId, game.players[id].drawnTile!.id);
-    game = drawTile(game, (id + 1) as PlayerId);
+  const dealt = cpuTsumoStart(winner, groups, indicator);
+  const waiting = new Set(getWaitingTileKinds(dealt.players[winner].hand.map(tile => tile.tile)).map(tileKindKey));
+  const winningDraw = dealt.liveWall[winner - 1];
+  const safe = dealt.liveWall.filter((tile, index) => index !== winner - 1 && !waiting.has(tileKindKey(tile.tile)));
+  if (safe.length < winner + 3) throw new RangeError('Unable to arrange a later CPU tsumo');
+  const wall = [...safe.slice(0, winner + 3), winningDraw, ...safe.slice(winner + 3),
+    ...dealt.liveWall.filter((tile, index) => index !== winner - 1 && waiting.has(tileKindKey(tile.tile)))];
+  const players = [...dealt.players] as [typeof dealt.players[number],typeof dealt.players[number],typeof dealt.players[number],typeof dealt.players[number]];
+  const discardDraw = (id: PlayerId, tile: PhysicalTile) => {
+    const player = players[id];
+    players[id] = { ...player, drawnTile: null, drawnTileSource: null,
+      river: [...player.river, tile], discardHistory: [...(player.discardHistory ?? player.river), tile] };
+  };
+  discardDraw(0, players[0].drawnTile!);
+  for (let id = 1; id < winner; id++) discardDraw(id as PlayerId, wall[id - 1]);
+  discardDraw(winner, wall[winner - 1]);
+  for (let offset = 1; offset <= 3; offset++) {
+    const id = ((winner + offset) % 4) as PlayerId;
+    discardDraw(id, wall[winner + offset - 1]);
   }
-  return game;
+  players[winner] = { ...players[winner], drawnTile: wall[winner + 3], drawnTileSource: 'live-wall' };
+  return { ...dealt, players: players as unknown as typeof dealt.players,
+    liveWall: wall.slice(winner + 4), turnPlayerId: winner, phase: 'awaiting-discard', ronWindow: null };
 }

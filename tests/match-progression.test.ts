@@ -65,11 +65,11 @@ test('ended match ignores subsequent game updates and retains final ranking',()=
  const match=settleRound({...startMatch(),roundNumber:4,game:fixedRon(0,[1])});assert.equal(updateMatchGame(match,startGame()),match);assert.equal(nextRound(match),match);
 });
 
-test('CPU automatic tsumo settlement once, double human confirmation and delayed completion safe',async()=>{
+test('CPU chiihou settlement once, double human confirmation and delayed completion safe',async()=>{
  const {cpuTsumoStart}=await import('./cpu-tsumo-fixture.ts');let notifications=0;
  const ui=new GameController(()=>cpuTsumoStart(1),{wait:async()=>{},onChange:()=>notifications++});
  ui.select(ui.game.players[0].drawnTile!.id);const run=ui.confirm();await ui.confirm();await run;
- assert.deepEqual(ui.match.points,[21000,33000,23000,23000]);const settled=ui.match;assert.equal(settleRound(settled),settled);assert.deepEqual(settled.lastSettlement!.after,settled.points);assert.ok(notifications>0);assert.equal(ui.match.status,'round-ended');
+ assert.deepEqual(ui.match.points,[9000,57000,17000,17000]);const settled=ui.match;assert.equal(settleRound(settled),settled);assert.deepEqual(settled.lastSettlement!.after,settled.points);assert.ok(notifications>0);assert.equal(ui.match.status,'round-ended');
 });
 test('human ron double declaration cannot pay twice',async()=>{
  const {scoringGame}=await import('./scoring-fixture.ts');const ui=new GameController(()=>scoringGame('ron-parent'));ui.declareRon();const settled=ui.match;assert.throws(()=>ui.declareRon(),RangeError);assert.equal(ui.match,settled);assert.deepEqual(settled.points,[30800,19200,25000,25000]);

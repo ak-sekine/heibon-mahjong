@@ -281,7 +281,7 @@ test('runner re-reads terminal state after a pending CPU wait and never writes a
   assert.equal(game.phase, 'won');
 });
 
-test('a real dealer deal with a supported winning shape still cannot declare ordinary tsumo', () => {
+test('a real dealer deal with a supported winning shape can declare tenhou tsumo', () => {
   const drawn = tsumoGame();
   const desired = [...drawn.players[0].hand, drawn.players[0].drawnTile!];
   const selectedIds = new Set(desired.map(t => t.id));
@@ -296,9 +296,12 @@ test('a real dealer deal with a supported winning shape still cannot declare ord
   assert.equal(analyzeYaku(desired.map(t => t.tile), {
     winMethod: 'tsumo', winningTile: desired[13].tile, seatWind: 'east', roundWind: 'east',
   }).hasSupportedYaku, true);
-  assert.equal(canDeclareTsumo(game, 0), false);
-  assert.throws(() => declareTsumo(game, 0), RangeError);
-  assert.deepEqual(game, snapshot); inventory(game, game);
+  assert.equal(canDeclareTsumo(game, 0), true);
+  const won = declareTsumo(game, 0);
+  assert.equal(won.phase, 'won');
+  assert.equal(won.winResult?.yakumanCount, 1);
+  assert.ok(won.winResult?.candidate.yaku.some(yaku => yaku.id === 'tenhou'));
+  assert.deepEqual(game, snapshot); inventory(game, won);
 });
 
 test('game API supports CPU control at seat zero, UI declaration still requires human control', () => {
