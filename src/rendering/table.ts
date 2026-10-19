@@ -372,7 +372,7 @@ function renderRoundSummary(game: GameState, settlement: RoundSettlement | null)
       section.append(total);
       const settledPayments = settlement?.payments.filter(payment => payment.recipientId === result.winnerId) ?? [];
       const depositPoints = settlement?.deposits?.recipientId === result.winnerId ? settlement.deposits.points : 0;
-      const receivedPoints = settledPayments.length
+      const receivedPoints = result.yakumanCount > 0 && settledPayments.length
         ? settledPayments.reduce((sum, payment) => sum + payment.points, 0) + depositPoints
         : result.totalPoints;
       total.querySelector('.round-summary-points')!.textContent = `${receivedPoints.toLocaleString('en-US')}点`;
@@ -530,7 +530,7 @@ function renderWinResult(game: GameState, settlement: RoundSettlement | null): v
     const method = `${result.winnerId === game.dealerId ? '親' : '子'}の${result.winMethod === 'ron' ? 'ロン' : 'ツモ'}`;
     const settledPayments = settlement?.payments.filter(payment => payment.recipientId === result.winnerId) ?? [];
     const depositPoints = settlement?.deposits?.recipientId === result.winnerId ? settlement.deposits.points : 0;
-    const receivedPoints = settledPayments.length
+    const receivedPoints = result.yakumanCount > 0 && settledPayments.length
       ? settledPayments.reduce((sum, payment) => sum + payment.points, 0) + depositPoints
       : result.totalPoints;
     const score = text('p', `獲得点数：${tier ? `${tier} ` : ''}${receivedPoints.toLocaleString('ja-JP')}点（${method}）`);
@@ -538,7 +538,7 @@ function renderWinResult(game: GameState, settlement: RoundSettlement | null): v
     section.append(score, text('p', '支払い：'));
     const payments = document.createElement('ul');
     payments.className = 'win-payments';
-    if (settledPayments.length) {
+    if (result.yakumanCount > 0 && settledPayments.length) {
       for (const payment of settledPayments) payments.append(text('li',
         `${seatNames[payment.payerId]}（${payment.payerId === game.dealerId ? '親' : '子'}） → ${seatNames[result.winnerId]} ${payment.points}点（基本${payment.basePoints}点＋本場${payment.honbaPoints}点）`));
     } else {
@@ -546,7 +546,7 @@ function renderWinResult(game: GameState, settlement: RoundSettlement | null): v
         `${seatNames[payment.playerId]}（${payment.playerId === game.dealerId ? '親' : '子'}） → ${seatNames[result.winnerId]} ${payment.points}点`));
     }
     section.append(payments);
-    if (settledPayments.length) {
+    if (result.yakumanCount > 0 && settledPayments.length) {
       section.append(text('p', `本場：${settlement!.honba}本場`));
       if (depositPoints > 0) section.append(text('p', `供託：${depositPoints.toLocaleString('ja-JP')}点を獲得`));
     }
