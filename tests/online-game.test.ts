@@ -196,8 +196,8 @@ test('an exhaustive draw never exposes another human hand without a declaration'
 });
 
 test('server action reducer rejects wrong turns, opponent tile IDs, and stale revisions without mutation', () => {
-  const session = startOnlineGame(identities([0, 1]), 0);
-  const connected = new Set<PlayerId>([0, 1]);
+  const session = startOnlineGame(identities([0, 1, 2, 3]), 0);
+  const connected = new Set<PlayerId>([0, 1, 2, 3]);
   const otherHandId = session.match.game.players[1].hand[0].id;
   const snapshot = structuredClone(session);
 
