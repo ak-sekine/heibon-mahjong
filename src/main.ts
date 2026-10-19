@@ -12,7 +12,7 @@ import { OnlineGameController } from './online/game-controller.ts';
 import { MainMenu } from './ui/main-menu.ts';
 
 installCallViewport();
-new MainMenu();
+if (document.querySelector('#main-menu-toggle')) new MainMenu();
 const resultDialog = new ResultDialog();
 const controller = new GameController(undefined, { onChange: render });
 function render(): void {

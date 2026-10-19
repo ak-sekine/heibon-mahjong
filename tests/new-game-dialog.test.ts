@@ -54,3 +54,31 @@ for (const status of ['playing', 'round-ended', 'match-ended']) {
     });
   }
 }
+
+test('new game confirmation supports the verification page without a hamburger menu', () => {
+  class Node {
+    open = false;
+    listeners: Record<string, (event: { preventDefault(): void }) => void> = {};
+    addEventListener(name: string, callback: typeof this.listeners[string]) { this.listeners[name] = callback; }
+    focus() { focused = this; }
+    showModal() { this.open = true; }
+    close() { this.open = false; this.listeners.close?.({ preventDefault() {} }); }
+    click() { this.listeners.click?.({ preventDefault() {} }); }
+  }
+  let focused: Node | null = null;
+  const nodes = new Map(['#new-game-dialog', '#new-game', '#result-new-game', '#cancel-new-game', '#confirm-new-game'].map(id => [id, new Node()]));
+  const original = globalThis.document;
+  globalThis.document = { querySelector: (id: string) => nodes.get(id) } as unknown as Document;
+  let resets = 0;
+  try {
+    new NewGameDialog(() => { resets++; });
+    nodes.get('#new-game')!.click();
+    assert.equal(focused, nodes.get('#cancel-new-game'));
+    nodes.get('#cancel-new-game')!.click();
+    assert.equal(focused, nodes.get('#new-game'));
+    nodes.get('#new-game')!.click();
+    nodes.get('#confirm-new-game')!.click();
+    assert.equal(resets, 1);
+    assert.equal(focused, nodes.get('#new-game'));
+  } finally { globalThis.document = original; }
+});
