@@ -41,5 +41,6 @@ READMEから移した各Stepの本文と、本文にあった検証資料・ス�
 | 13.11 | 天和・地和 | 2026-10-19 | [開発記録](step-13.11.md) · [検証記録](../verification/step13.11/README.md) |
 | 14.0 | Cloudflare Workersによるオンライン待機と座席同期 | 2026-10-19 | [開発記録](step-14.0.md) · [本番検証記録](../verification/step14.0/README.md) |
 | 14.0.1 | Ready、ホスト管理、CPU席、退出、再接続、同期・レート制限 | 2026-10-19 | [設計・実装記録](step-14.0.1.md) · [検証記録](../verification/step14.0.1/README.md) |
+| 14.1 | サーバー権威型オンライン東風戦、座席別表示、CPU・判断窓・局進行 | 2026-10-19 | [開発・設計記録](step-14.1.md) · [検証記録](../verification/step14.1/README.md) |
 
 Step 13.5のiPhone Safari実機確認は[2026-10-18の検証記録](../verification/kan-safari-2026-10-18.md)を参照してください。

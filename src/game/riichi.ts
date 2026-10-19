@@ -3,7 +3,7 @@ import type { GameState, PlayerId, PlayerState } from '../model/game.ts';
 import type { MatchState, Points } from '../model/match.ts';
 import type { TileKind } from '../model/tile.ts';
 import { canDiscard, discardTile } from './discard.ts';
-import { getWaitingTileKinds } from './ron.ts';
+import { getWaitingTileKinds, getWaitingTileKindsBefore } from './ron.ts';
 import { assertPointConservation, settleRound } from './match.ts';
 import { isFourWindsDraw } from './special-draws.ts';
 
@@ -27,6 +27,33 @@ export function getRiichiDiscardOptions(game: GameState, playerId: PlayerId, poi
     const waitingTileKinds = getWaitingTileKinds(tiles.filter(t => t.id !== tile.id).map(t => t.tile),winningMelds(player.melds));
     return waitingTileKinds.length ? [{ tileId: tile.id, waitingTileKinds, waitKindCount: waitingTileKinds.length }] : [];
   });
+}
+
+/** Bounded online variant. `null` means the full candidate set did not fit the budget. */
+export function getRiichiDiscardOptionsWithinBudget(
+  game: GameState,
+  playerId: PlayerId,
+  points: number,
+  budgetMs: number,
+): readonly RiichiDiscardOption[] | null {
+  if (!Number.isFinite(budgetMs) || budgetMs <= 0) return null;
+  if (game.pendingRiichi || !canDiscard(game, playerId) || !Number.isSafeInteger(points) || points < 1000 || game.liveWall.length < 4) return [];
+  const player = game.players[playerId];
+  if (player.riichi || !isClosedForRiichi(player)) return [];
+  const tiles = [...player.hand, player.drawnTile!];
+  if (new Set(tiles.map(tile => tile.id)).size !== 14 - 3 * (player.melds?.length ?? 0)) return [];
+  const deadline = performance.now() + budgetMs;
+  const options: RiichiDiscardOption[] = [];
+  for (const tile of [...tiles].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) {
+    const waitingTileKinds = getWaitingTileKindsBefore(
+      tiles.filter(candidate => candidate.id !== tile.id).map(candidate => candidate.tile),
+      winningMelds(player.melds),
+      deadline,
+    );
+    if (waitingTileKinds === null) return null;
+    if (waitingTileKinds.length) options.push({ tileId: tile.id, waitingTileKinds, waitKindCount: waitingTileKinds.length });
+  }
+  return options;
 }
 
 export function canDeclareRiichi(game: GameState, playerId: PlayerId, tileId: string, points: number): boolean {

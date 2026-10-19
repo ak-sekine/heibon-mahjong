@@ -69,9 +69,13 @@ export function completeKan(game: GameState, option: Omit<KanOption,'id'>): Game
   return cancelAllIppatsu({...game,turnPlayerId:p.id,players,deadWall,liveWall:game.liveWall.slice(0,-1),kanCount:count+1,callsMade:true,ronWindow:null,phase:distributed?'wall-exhausted':'awaiting-discard',...(distributed?{abortiveDraw:'four-kans' as const}:{})});
 }
 export function declareKan(game: GameState, playerId: PlayerId, optionId: string): GameState {
+  return resolveDiscardRon(declareKanForOnline(game, playerId, optionId));
+}
+/** Opens the robbery window without applying the local single-human policy. */
+export function declareKanForOnline(game: GameState, playerId: PlayerId, optionId: string): GameState {
   const option=getKanOptions(game,playerId).find(o=>o.id===optionId);
   if(!option) throw new RangeError('Invalid kan');
-  return resolveDiscardRon({...game,phase:'awaiting-ron',ronWindow:{kind:option.meld.type as 'ankan'|'kakan',discarderId:playerId,tileId:option.tile.id,kan:option}});
+  return {...game,phase:'awaiting-ron',ronWindow:{kind:option.meld.type as 'ankan'|'kakan',discarderId:playerId,tileId:option.tile.id,kan:option}};
 }
 /** Deterministic, own-hand-only: ankan preserves groups; kakan needs an existing
  * value route and must not worsen the best post-discard shanten. */

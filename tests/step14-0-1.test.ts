@@ -3,6 +3,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import { RateLimitDurableObject } from '../worker/rate-limit.ts';
 import { RoomDurableObject } from '../worker/room.ts';
+import { startMatch } from '../src/game/match.ts';
+import { ronGame } from './ron-fixture.ts';
 
 type SqlResult<Row> = { toArray(): Row[] };
 
@@ -209,11 +211,66 @@ function sendAction(fixture: RoomFixture, participant: Participant, value: Recor
   return result;
 }
 
+async function sendGameAction(
+  fixture: RoomFixture,
+  participant: Participant,
+  value: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const index = participant.client.sent.length;
+  await fixture.room.webSocketMessage(participant.server as unknown as WebSocket, JSON.stringify(value));
+  const messages = participant.client.sent.slice(index).map(item => JSON.parse(item) as Record<string, unknown>);
+  const result = messages.find(message => message.type === 'game-action-result');
+  assert.ok(result, `missing game action result for ${String(value.requestId)}`);
+  return result;
+}
+
 function latestState(participant: Participant): Record<string, unknown> {
   const messages = participant.client.sent.map(item => JSON.parse(item) as Record<string, unknown>);
   const state = messages.filter(message => message.type === 'room-state').at(-1);
   assert.ok(state, 'missing complete room state');
   return state;
+}
+
+function latestGameView(participant: Participant): Record<string, unknown> {
+  const messages = participant.client.sent.map(item => JSON.parse(item) as Record<string, unknown>);
+  const state = messages.filter(message => message.type === 'game-state' || message.type === 'game-started').at(-1);
+  assert.ok(state && state.view && typeof state.view === 'object', 'missing seat-specific game view');
+  return state.view as Record<string, unknown>;
+}
+
+function persistedGame(fixture: RoomFixture): Record<string, unknown> {
+  const row = fixture.ctx.storage.sql.exec<{ state_json: string; game_revision: number }>(
+    'SELECT state_json, game_revision FROM online_game WHERE singleton = 1',
+  ).toArray()[0];
+  assert.ok(row, 'game state was not saved to SQLite');
+  const value = JSON.parse(row.state_json) as Record<string, unknown>;
+  assert.equal(value.gameRevision, row.game_revision);
+  return value;
+}
+
+async function passVisibleDecisions(fixture: RoomFixture, participants: Participant[]): Promise<void> {
+  let sequence = 0;
+  for (let pass = 0; pass < 4; pass++) {
+    let answered = false;
+    for (const participant of participants) {
+      const view = latestGameView(participant);
+      const self = view.self as Record<string, unknown>;
+      const decision = self.decision as Record<string, unknown> | null;
+      if (!decision || decision.answered !== false) continue;
+      answered = true;
+      sequence++;
+      const action = decision.type === 'ron' ? 'pass-ron' : 'pass-call';
+      const result = await sendGameAction(fixture, participant, {
+        type: action,
+        requestId: nextOperationId(`pass-${sequence}`),
+        expectedGameRevision: decision.expectedGameRevision,
+        windowId: decision.windowId,
+      });
+      assert.equal(result.ok, true, `a visible ${String(decision.type)} pass should be accepted`);
+    }
+    if (!answered) return;
+  }
+  assert.fail('too many consecutive online response windows');
 }
 
 function publicSeats(state: Record<string, unknown>): Array<Record<string, unknown>> {
@@ -519,6 +576,203 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
       secondFixture.room.webSocketMessage(rateClient.server as unknown as WebSocket, JSON.stringify({ type: 'request-state' }));
     }
     assert.ok(rateClient.client.sent.some(message => JSON.parse(message).code === 'rate_limited'));
+  });
+
+  await t.test('starts, persists, isolates, resumes and advances a two-human online game', { timeout: 30_000 }, async () => {
+    const fixture = await makeRoom('Game host', token('7'));
+    const guestInfo = await joinRoom(fixture, 'Game guest', token('8'));
+    const host = await connectParticipant(fixture, fixture.hostToken);
+    let guest = await connectParticipant(fixture, guestInfo.token);
+    await readyAndFinalize(fixture, [host, guest]);
+
+    const nonHostStart = await sendGameAction(fixture, guest, {
+      type: 'start-game', requestId: 'game-non-host-start', expectedGameRevision: 0,
+    });
+    assert.equal(nonHostStart.ok, false);
+    assert.equal(nonHostStart.code, 'not_host');
+    const start = await sendGameAction(fixture, host, {
+      type: 'start-game', requestId: 'game-start-once', expectedGameRevision: 0,
+    });
+    assert.equal(start.ok, true);
+    const initial = persistedGame(fixture);
+    assert.equal(initial.gameRevision, 1);
+    const hostView = latestGameView(host);
+    const guestView = latestGameView(guest);
+    const hostSeats = hostView.seats as Array<Record<string, unknown>>;
+    const guestSeats = guestView.seats as Array<Record<string, unknown>>;
+    const hostHand = hostSeats[0].hand as Array<Record<string, unknown>>;
+    const guestHand = guestSeats[1].hand as Array<Record<string, unknown>>;
+    assert.equal(hostHand.length, 13);
+    assert.equal(hostSeats[0].drawnTile !== null, true);
+    assert.equal(guestHand.length, 13);
+    assert.equal(guestSeats[1].drawnTile, null);
+    assert.equal('hand' in hostSeats[1], false);
+    assert.equal('drawnTile' in hostSeats[1], false);
+    assert.equal('liveWall' in hostView, false);
+    assert.equal('deadWall' in hostView, false);
+    assert.equal('match' in hostView, false);
+    const guestPrivateId = String(guestHand[0].id);
+    assert.equal(JSON.stringify(hostView).includes(guestPrivateId), false);
+    assert.equal(JSON.stringify(guestView).includes(guestPrivateId), true);
+
+    const duplicateStart = await sendGameAction(fixture, host, {
+      type: 'start-game', requestId: 'game-start-once', expectedGameRevision: 0,
+    });
+    assert.equal(duplicateStart.ok, true);
+    assert.equal(persistedGame(fixture).gameRevision, 1, 'a duplicate start did not deal a second wall');
+
+    // Recreate the DO and replace one socket. The same participant token recovers
+    // the same seat hand from the persisted authoritative state.
+    const hostHandIds = hostHand.map(tile => tile.id).sort();
+    fixture.room = new RoomDurableObject(fixture.ctx as unknown as DurableObjectState, {} as Env);
+    const previousGuest = guest;
+    guest = await connectParticipant(fixture, guestInfo.token);
+    assert.equal(guest.seat, 1);
+    const recoveredGuest = latestGameView(guest);
+    assert.deepEqual(((recoveredGuest.seats as Array<Record<string, unknown>>)[1].hand as Array<Record<string, unknown>>)
+      .map(tile => tile.id).sort(), guestHand.map(tile => tile.id).sort());
+    assert.deepEqual(((latestGameView(host).seats as Array<Record<string, unknown>>)[0].hand as Array<Record<string, unknown>>)
+      .map(tile => tile.id).sort(), hostHandIds);
+    fixture.room.webSocketClose(previousGuest.server as unknown as WebSocket);
+
+    const revision = Number(latestGameView(host).gameRevision);
+    const currentGuestHand = (latestGameView(guest).seats as Array<Record<string, unknown>>)[1].hand as Array<Record<string, unknown>>;
+    const wrongTurn = await sendGameAction(fixture, guest, {
+      type: 'discard', requestId: 'game-wrong-turn', expectedGameRevision: revision,
+      tileId: String(currentGuestHand[0].id),
+    });
+    assert.equal(wrongTurn.ok, false);
+    assert.equal(wrongTurn.code, 'not_your_turn');
+    const illegalOwner = await sendGameAction(fixture, host, {
+      type: 'discard', requestId: 'game-other-hand', expectedGameRevision: revision,
+      tileId: String(currentGuestHand[0].id),
+    });
+    assert.equal(illegalOwner.ok, false);
+    assert.equal(illegalOwner.code, 'invalid_action');
+    assert.equal(persistedGame(fixture).gameRevision, revision, 'rejected operations changed game state');
+
+    const initialHostHand = (latestGameView(host).seats as Array<Record<string, unknown>>)[0].hand as Array<Record<string, unknown>>;
+    const discardTileId = String(initialHostHand[0].id);
+    const hostDiscard = await sendGameAction(fixture, host, {
+      type: 'discard', requestId: 'game-host-discard', expectedGameRevision: revision, tileId: discardTileId,
+    });
+    assert.equal(hostDiscard.ok, true);
+    const afterDiscardRevision = Number(persistedGame(fixture).gameRevision);
+    const duplicateDiscard = await sendGameAction(fixture, host, {
+      type: 'discard', requestId: 'game-host-discard', expectedGameRevision: revision, tileId: discardTileId,
+    });
+    assert.equal(duplicateDiscard.ok, true);
+    assert.equal(persistedGame(fixture).gameRevision, afterDiscardRevision, 'duplicate discard was applied twice');
+    await passVisibleDecisions(fixture, [host, guest]);
+
+    // The server draws for a human turn, then both human turns are resolved by
+    // requests. Once the guest discards, alarms advance the CPU seat without a
+    // browser CPU runner or a client-supplied game state.
+    for (let step = 0; step < 4 &&
+      (Number(latestGameView(guest).turnPlayerId) !== 1 || latestGameView(guest).phase !== 'awaiting-discard'); step++) {
+      await fixture.room.alarm();
+      await passVisibleDecisions(fixture, [host, guest]);
+    }
+    let guestTurn = latestGameView(guest);
+    assert.equal(guestTurn.turnPlayerId, 1);
+    assert.equal(guestTurn.phase, 'awaiting-discard');
+    const guestDiscardIds = (guestTurn.self as Record<string, unknown>).discardableTileIds as string[];
+    assert.ok(guestDiscardIds.length > 0);
+    const beforeCpuRevision = Number(guestTurn.gameRevision);
+    const guestDiscard = await sendGameAction(fixture, guest, {
+      type: 'discard', requestId: 'game-guest-discard', expectedGameRevision: beforeCpuRevision,
+      tileId: guestDiscardIds[0],
+    });
+    assert.equal(guestDiscard.ok, true);
+    await passVisibleDecisions(fixture, [host, guest]);
+    let cpuProgressed = false;
+    for (let step = 0; step < 12 && !cpuProgressed; step++) {
+      await fixture.room.alarm();
+      await passVisibleDecisions(fixture, [host, guest]);
+      const state = persistedGame(fixture);
+      const match = state.match as Record<string, unknown>;
+      const game = match.game as Record<string, unknown>;
+      const players = game.players as Array<Record<string, unknown>>;
+      cpuProgressed = Number(state.gameRevision) > beforeCpuRevision + 1 &&
+        (Boolean((players[2].river as unknown[]).length) || state.status !== 'playing');
+    }
+    assert.equal(cpuProgressed, true, 'the server did not advance a CPU turn after the human discard');
+
+    const roomBeforeLeave = await readState(fixture);
+    const leave = sendAction(fixture, host, {
+      type: 'leave-room', requestId: 'game-host-leaves', expectedRevision: roomBeforeLeave.revision,
+    });
+    assert.equal(leave.ok, true);
+    const aborted = persistedGame(fixture);
+    assert.equal(aborted.status, 'aborted');
+    const afterAbortRoom = await readState(fixture);
+    assert.equal(afterAbortRoom.status, 'finalized');
+    assert.equal(afterAbortRoom.hostSeat, 1);
+    const end = sendAction(fixture, guest, {
+      type: 'close-room', requestId: 'game-ci-cleanup', expectedRevision: afterAbortRoom.revision,
+    });
+    assert.equal(end.ok, true);
+    assert.equal((await readState(fixture)).status, 'closed');
+  });
+
+  await t.test('an answer racing a delayed alarm expires atomically and is rejected', async () => {
+    const fixture = await makeRoom('Timeout host', token('9'));
+    const guestInfo = await joinRoom(fixture, 'Timeout guest', token('a'));
+    const host = await connectParticipant(fixture, fixture.hostToken);
+    const guest = await connectParticipant(fixture, guestInfo.token);
+    await readyAndFinalize(fixture, [host, guest]);
+    const started = await sendGameAction(fixture, host, {
+      type: 'start-game', requestId: 'timeout-game-start', expectedGameRevision: 0,
+    });
+    assert.equal(started.ok, true);
+
+    const source = ronGame(1, [0]);
+    const players = source.players.map((player, seat) => ({
+      ...player,
+      control: seat === 0 ? 'human' : 'cpu',
+    })) as typeof source.players;
+    const match = startMatch({ ...source, players });
+    const identities = [0, 1, 2, 3].map(seat => ({
+      seat,
+      name: seat === 0 ? 'Timeout host' : `CPU ${seat}`,
+      control: seat === 0 ? 'human' : 'cpu',
+      connected: seat === 0,
+    }));
+    const session = {
+      schemaVersion: 1,
+      gameRevision: 77,
+      match,
+      status: 'playing',
+      identities,
+      hostSeat: 0,
+      decision: {
+        windowId: 'c'.repeat(24),
+        type: 'ron',
+        openedAt: Date.now() - 31_000,
+        expiresAt: Date.now() - 1,
+        baseGameRevision: 77,
+        requiredSeats: [0],
+        responses: { 0: 'pending' },
+      },
+    };
+    fixture.ctx.storage.sql.exec(
+      'UPDATE online_game SET game_revision = ?, state_json = ?, updated_at = ? WHERE singleton = 1',
+      session.gameRevision, JSON.stringify(session), Date.now(),
+    );
+
+    const late = await sendGameAction(fixture, host, {
+      type: 'pass-ron', requestId: 'timeout-late-response',
+      expectedGameRevision: 77, windowId: session.decision.windowId,
+    });
+    assert.equal(late.ok, false);
+    assert.equal(late.code, 'stale_decision');
+    assert.equal(late.gameRevision, 78);
+    const expired = persistedGame(fixture);
+    assert.equal(expired.gameRevision, 78, 'the timeout was not committed before rejecting the late answer');
+    const expiredMatch = expired.match as Record<string, unknown>;
+    const expiredGame = expiredMatch.game as Record<string, unknown>;
+    const expiredPlayers = expiredGame.players as Array<Record<string, unknown>>;
+    assert.equal(expiredPlayers[0].temporaryFuriten, true, 'timeout did not apply furiten to the ron passer');
   });
 
   await t.test('uses bounded, expiring IP rate buckets', async () => {

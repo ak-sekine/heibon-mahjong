@@ -88,6 +88,10 @@ export function compareCallPriority(game:GameState,a:CallOption,b:CallOption):nu
 function cpuOptions(game:GameState):CallOption[] {
   return game.players.flatMap(p=>{const c=chooseCpuCall(p,getCallOptions(game,p.id));return c?[c]:[];});
 }
+/** Automatic choices for online resolution; only the CPU's own hand and legal options are used. */
+export function getCpuCallOptions(game: GameState): readonly CallOption[] {
+  return cpuOptions(game);
+}
 function apply(game:GameState,option:CallOption):GameState {
   const p=game.players[option.playerId],source=game.players[option.fromPlayerId];
   const players=[...game.players] as [PlayerState,PlayerState,PlayerState,PlayerState];
@@ -103,6 +107,19 @@ function apply(game:GameState,option:CallOption):GameState {
 function finish(game:GameState,selected:readonly CallOption[]):GameState {
   const winner=[...selected].sort((a,b)=>compareCallPriority(game,a,b))[0];
   return winner?apply(game,winner):{...game,phase:'awaiting-draw',turnPlayerId:((game.ronWindow!.discarderId+1)%4) as PlayerId,ronWindow:null};
+}
+/** Applies the collected human responses together with the existing CPU policy. */
+export function resolveCallResponses(game: GameState, selected: readonly CallOption[]): GameState {
+  if (game.phase !== 'awaiting-call' || new Set(selected.map(option => option.playerId)).size !== selected.length) {
+    throw new RangeError('Invalid call responses');
+  }
+  for (const option of selected) {
+    if (game.players[option.playerId]?.control !== 'human' ||
+        !getCallOptions(game, option.playerId).some(candidate => candidate.id === option.id)) {
+      throw new RangeError('Invalid call response');
+    }
+  }
+  return finish(game, [...selected, ...getCpuCallOptions(game)]);
 }
 /** Entry only after all ron decisions are resolved. */
 export function resolveDiscardCalls(game:GameState):GameState {

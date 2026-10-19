@@ -70,6 +70,46 @@ header > div { min-width:0; }
 #match-result h2 { font-size:1.1rem; margin:0; }
 #match-result p { margin:6px 0; }
 #next-round { margin:8px 0; }
+.online-game-active main > .table-summary:not([aria-label^="オンライン卓"]),
+.online-game-active main > .table:not(#online-table),
+.online-game-active #round-result-summary,
+.online-game-active main > .discard-controls,
+.online-game-active .catalog { display:none !important; }
+#online-match { display:flex; flex-direction:column; gap:6px; width:100%; }
+.online-match-header { display:flex; justify-content:space-between; gap:8px; padding:0 4px; font-size:13px; }
+.online-match-header p { margin:0; }
+#online-match #online-player-hand { container-type:inline-size; width:100%; display:grid; grid-template-columns:repeat(14,minmax(0,1fr)); gap:1px; margin:0; padding:0; }
+#online-match #online-player-hand li { min-width:0; }
+#online-match #online-player-hand .drawn-tile { margin-left:4px; }
+#online-match #online-player-hand .tile-choice { width:round(down,100%,1px); max-width:min(42px,calc((100cqw - 13px) / 14)); margin:auto; }
+#online-match .seat-bottom #online-player-hand { display:flex; width:auto; max-width:100%; align-self:center; container-type:normal; }
+#online-match .seat-bottom #online-player-hand li { flex:0 0 var(--table-tile-width); width:var(--table-tile-width); }
+#online-match .seat-bottom #online-player-hand .tile-choice { width:100%; max-width:none; margin:0; }
+#online-match .public-hand-tile { display:block; flex:none; width:var(--river-tile-width); height:var(--river-tile-height); }
+#online-match .public-hand-tile .tile-svg { width:100%; height:100%; }
+#online-match .center-info #online-dora-row { display:grid; grid-template-columns:repeat(5,var(--river-tile-width)); grid-auto-rows:var(--river-tile-height); justify-content:center; gap:1px; }
+#online-match .center-info #online-dora-row .dora-slot { width:var(--river-tile-width); height:var(--river-tile-height); }
+#online-match .center-info #online-dora-row .dora-slot .tile-svg { width:100%; height:100%; }
+#online-match [data-ura-dora="true"] { outline:1px dashed #ffda7d; }
+#online-match #online-round-result { padding:8px; border:1px solid #ffda7d; border-radius:8px; overflow-wrap:anywhere; }
+#online-match #online-round-result[hidden] { display:none; }
+#online-match #online-round-result h2,#online-match #online-round-result h3 { margin:2px 0 6px; font-size:14px; }
+#online-match #online-round-result p { margin:4px 0; font-size:12px; }
+#online-match #online-game-controls > div { width:100%; }
+#online-match #online-game-controls button,
+#online-start-game { min-height:42px; padding:7px 10px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
+#online-match #online-game-controls button:disabled,
+#online-start-game:disabled { opacity:.55; cursor:default; }
+#online-match #online-game-action-status,#online-ron-status { flex:1 1 100%; min-width:0; margin:0; font-size:13px; overflow-wrap:anywhere; }
+#online-match #online-call-options,#online-match #online-kan-options { display:flex; flex-wrap:wrap; gap:4px; }
+#online-match #online-call-options button,#online-match #online-kan-options button { display:flex; align-items:center; justify-content:center; gap:2px; }
+#online-match #online-call-options .tile-svg,#online-match #online-kan-options .tile-svg { width:24px; }
+#online-match .seat-label[data-online-label="top"],#online-match .seat-label[data-online-label="bottom"] { white-space:nowrap; }
+@media (max-width:390px) {
+  .online-match-header { font-size:12px; }
+  #online-match .online-match-header p { overflow-wrap:anywhere; }
+  #online-match #online-call-options .tile-svg,#online-match #online-kan-options .tile-svg { width:20px; }
+}
 @media (max-height:650px) {
   main { gap:4px; }
   .keyboard-help { display:none; }

@@ -14,6 +14,25 @@ export function getWaitingTileKinds(hand: readonly Tile[], fixed: readonly impor
     return isWinningShape([...hand, ordinaryTile(kind)], fixed);
   });
 }
+/** Online CPU helper that abandons the complete wait scan at an absolute deadline. */
+export function getWaitingTileKindsBefore(
+  hand: readonly Tile[],
+  fixed: readonly import('../analysis/winning-shape.ts').WinningMeld[],
+  deadline: number,
+): readonly TileKind[] | null {
+  if (hand.length !== 13 - fixed.length * 3) throw new RangeError('Waiting tiles require thirteen tiles');
+  const fixedTiles = fixed.flatMap(meld => meld.type === 'triplet'
+    ? Array.from({ length: meld.kan ? 4 : 3 }, () => meld.tile) : meld.tiles);
+  const counts = new Map<string, number>();
+  for (const tile of [...hand, ...fixedTiles]) counts.set(tileKindKey(tile), (counts.get(tileKindKey(tile)) ?? 0) + 1);
+  const waits: TileKind[] = [];
+  for (const kind of TILE_KINDS) {
+    if ((counts.get(tileKindKey(kind)) ?? 0) < 4 &&
+        isWinningShape([...hand, ordinaryTile(kind)], fixed)) waits.push(kind);
+    if (performance.now() >= deadline) return null;
+  }
+  return waits;
+}
 export function isDiscardFuriten(player: PlayerState): boolean {
   const waits = new Set(getWaitingTileKinds(player.hand.map(t => t.tile), winningMelds(player.melds)).map(tileKindKey));
   return [...(player.discardHistory ?? []), ...player.river].some(t => waits.has(tileKindKey(t.tile)));
@@ -55,6 +74,26 @@ export function getRonCandidates(game: GameState): readonly RonCandidate[] {
 export function canDeclareRon(game: GameState, playerId: PlayerId): boolean {
   return getRonCandidates(game).some(c => c.winnerId === playerId);
 }
+/** Marks one legal pass without advancing the window; online tables collect every response first. */
+export function markRonPassed(game: GameState, playerId: PlayerId): GameState {
+  if (game.players[playerId]?.control !== 'human' || !canDeclareRon(game, playerId)) {
+    throw new RangeError('Passing ron is not allowed now');
+  }
+  const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
+  const player = players[playerId];
+  players[playerId] = { ...player, temporaryFuriten: true,
+    riichi: player.riichi ? { ...player.riichi, passedRon: true } : null };
+  return { ...game, players };
+}
+/** Resolves a collected set of ron declarations after the current response window closes. */
+export function resolveRonDeclarations(game: GameState, winnerIds: readonly PlayerId[]): GameState {
+  const candidates = getRonCandidates(game);
+  const ids = new Set(winnerIds);
+  if (ids.size !== winnerIds.length || winnerIds.some(id => !candidates.some(candidate => candidate.winnerId === id))) {
+    throw new RangeError('Invalid ron declarations');
+  }
+  return resolve(game, candidates.filter(candidate => ids.has(candidate.winnerId)));
+}
 function resolve(game: GameState, winners: readonly RonCandidate[]): GameState {
   if (!getRonTile(game)) throw new RangeError('No current ron window');
   const { discarderId, tileId } = game.ronWindow!;
@@ -79,13 +118,6 @@ export function declareRon(game: GameState, playerId: PlayerId): GameState {
   return resolve(game, candidates);
 }
 export function passRon(game: GameState, playerId: PlayerId): GameState {
-  if (game.players[playerId]?.control !== 'human' || !canDeclareRon(game, playerId)) {
-    throw new RangeError('Passing ron is not allowed now');
-  }
-  const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
-  const player = players[playerId];
-  players[playerId] = { ...player, temporaryFuriten: true,
-    riichi: player.riichi ? { ...player.riichi, passedRon: true } : null };
-  const passed = { ...game, players };
+  const passed = markRonPassed(game, playerId);
   return resolve(passed, getRonCandidates(passed));
 }

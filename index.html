@@ -24,17 +24,66 @@
       <p id="online-my-seat">自分の席：—</p>
       <p id="online-host">ホスト：—</p>
       <ol id="online-seats" aria-label="東・南・西・北の席"></ol>
-      <p id="online-finalized-message" role="status" hidden>対局準備完了。オンライン対局の開始機能は今後のステップで対応します。</p>
+      <p id="online-finalized-message" role="status" hidden>座席が確定しました。ホストはオンライン対局を開始できます。</p>
       <p id="online-error" role="alert" hidden></p>
       <div id="online-actions" aria-label="待機ルームの操作">
         <button id="online-ready" type="button" hidden>準備完了</button>
         <button id="online-finalize" type="button" hidden>座席を確定</button>
+        <button id="online-start-game" type="button" hidden>オンライン対局を開始</button>
         <button id="online-reconnect" type="button" hidden>再接続</button>
         <button id="online-leave" type="button" hidden>ルームを退出</button>
         <button id="online-close-room" type="button" hidden>ルームを終了</button>
       </div>
     </section>
   </dialog>
+  <section id="online-match" aria-label="オンライン対局" hidden>
+    <header class="online-match-header">
+      <p id="online-match-status" role="status" aria-live="polite">対局状態を同期しています。</p>
+      <p id="online-match-round"></p>
+    </header>
+    <section class="table-summary" aria-label="オンライン卓の点数と席情報"><div id="online-score-strip" class="score-strip"></div></section>
+    <section id="online-table" class="table" aria-label="オンライン四人麻雀卓">
+      <section class="seat seat-top" data-online-seat="top"><div class="concealed-hand" data-online-hand="top" role="img"></div><div class="open-melds" data-online-melds="top"></div></section>
+      <section class="seat seat-right" data-online-seat="right"><div class="concealed-hand" data-online-hand="right" role="img"></div><div class="open-melds" data-online-melds="right"></div></section>
+      <section class="seat seat-left" data-online-seat="left"><div class="concealed-hand" data-online-hand="left" role="img"></div><div class="open-melds" data-online-melds="left"></div></section>
+      <section class="rivers" aria-label="4人の河">
+        <div class="river river-top" data-online-river="top"></div>
+        <div class="river river-right" data-online-river="right"></div>
+        <div class="river river-bottom" data-online-river="bottom"></div>
+        <div class="river river-left" data-online-river="left"></div>
+        <div class="center-info">
+          <div id="online-dora-indicators" class="dora-area" aria-label="ドラ表示牌"></div>
+          <div id="online-deposit-sticks" hidden></div>
+        </div>
+      </section>
+      <section class="seat seat-bottom" data-online-seat="bottom"><div class="concealed-hand" data-online-hand="bottom" hidden></div><div class="open-melds" data-online-melds="bottom"></div><ul id="online-player-hand" aria-label="自分の手牌"></ul></section>
+    </section>
+    <section id="online-round-result" aria-live="polite" hidden></section>
+    <section id="online-game-controls" class="discard-controls" aria-label="オンライン対局の操作">
+      <div id="online-ron-controls" role="group" aria-label="ロン判断" hidden>
+        <p id="online-ron-status"></p>
+        <button id="online-ron" type="button">ロン</button>
+        <button id="online-pass-ron" type="button">見逃す</button>
+      </div>
+      <div id="online-call-controls" role="group" aria-label="鳴き判断" hidden>
+        <p id="online-call-status"></p>
+        <div id="online-call-options"></div>
+        <button id="online-pass-call" type="button">鳴かない</button>
+      </div>
+      <div id="online-kan-controls" role="group" aria-label="カンの選択" hidden>
+        <p>カンする面子を選んでください。</p>
+        <div id="online-kan-options"></div>
+      </div>
+      <p id="online-game-action-status" role="status" aria-live="polite"></p>
+      <button id="online-discard" type="button" disabled>打牌する</button>
+      <button id="online-riichi" type="button" hidden>リーチ</button>
+      <button id="online-tsumo" type="button" hidden>ツモ和了</button>
+      <button id="online-kyuushu" type="button" hidden>九種九牌</button>
+      <button id="online-next-round" type="button" hidden>次局へ</button>
+      <button id="online-open-room" type="button">ルーム操作</button>
+      <button id="online-return-local" type="button" hidden>ローカル卓へ戻る</button>
+    </section>
+  </section>
   <section class="table-summary" aria-label="点数と席情報"><div class="score-strip"><p class="seat-label" id="label-2"></p><p class="seat-label" id="label-1"></p><p class="seat-label" id="label-0"></p><p class="seat-label" id="label-3"></p></div></section>
   <section class="table" aria-label="4人麻雀卓">
     <section class="seat seat-top" data-player-id="2" aria-label="CPU2の席"><div class="concealed-hand" data-player-id="2" role="img"></div><div class="open-melds" data-player-id="2"></div></section>

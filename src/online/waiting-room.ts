@@ -5,6 +5,7 @@ import {
   type RoomActionPayload,
   type RoomActionResult,
   type RoomSocketError,
+  type GameActionPayload,
 } from './protocol.ts';
 
 type RoomSeat = OnlineRoomSeat;
@@ -21,6 +22,12 @@ type PendingAction = {
   requestId: string;
   expectedRevision: number;
   payload: RoomActionPayload;
+  sentGeneration: number | null;
+};
+type PendingGameAction = {
+  requestId: string;
+  expectedGameRevision: number;
+  payload: GameActionPayload;
   sentGeneration: number | null;
 };
 type SocketActionResult = RoomActionResult;
@@ -56,6 +63,22 @@ const socketErrorMessages: Record<string, string> = {
   stale_connection: '古い接続から操作が届きました。再接続してください。',
   room_closed: 'このルームは終了しました。',
   unauthorized: '参加者を認証できませんでした。',
+  already_started: 'このルームの対局はすでに開始しています。',
+  game_not_started: 'オンライン対局はまだ開始していません。',
+  game_not_playing: 'この局ではその操作を行えません。',
+  round_not_ended: '局が終了してから次局へ進んでください。',
+  round_not_available: '次局へ進めません。',
+  not_your_turn: 'あなたの手番ではありません。',
+  invalid_action: 'その操作は現在できません。',
+  invalid_option: 'その選択肢は現在使えません。',
+  invalid_riichi: 'その牌ではリーチできません。',
+  invalid_tsumo: '現在ツモ和了できません。',
+  invalid_kyuushu_kyuuhai: '現在九種九牌を宣言できません。',
+  decision_pending: 'ロン・鳴きの回答を確定してから操作してください。',
+  stale_decision: '判断窓が更新されました。最新状態を確認してください。',
+  already_responded: 'この判断にはすでに回答しています。',
+  not_eligible: 'この判断の対象ではありません。',
+  game_in_progress: '対局中はルームを終了できません。',
 };
 
 class RoomApiError extends Error {
@@ -83,6 +106,7 @@ export class OnlineWaitingRoom {
   private readonly finalizeButton = document.querySelector<HTMLButtonElement>('#online-finalize')!;
   private readonly leaveButton = document.querySelector<HTMLButtonElement>('#online-leave')!;
   private readonly closeRoomButton = document.querySelector<HTMLButtonElement>('#online-close-room')!;
+  private readonly startGameButton = document.querySelector<HTMLButtonElement>('#online-start-game')!;
   private readonly apiUrl: string;
   private session: RoomSession | null = null;
   private state: RoomState | null = null;
@@ -97,9 +121,15 @@ export class OnlineWaitingRoom {
   private dialogWasClosedByUser = false;
   private pendingAction: PendingAction | null = null;
   private pendingActionTimer: number | null = null;
+  private pendingGameAction: PendingGameAction | null = null;
+  private pendingGameActionTimer: number | null = null;
+  private gameActive = false;
+  private gameTerminated = false;
+  private readonly onGameMessage: (message: Record<string, unknown>) => void;
 
-  constructor(apiUrl: string | undefined) {
+  constructor(apiUrl: string | undefined, onGameMessage: (message: Record<string, unknown>) => void = () => {}) {
     this.apiUrl = (apiUrl ?? '').replace(/\/+$/u, '');
+    this.onGameMessage = onGameMessage;
     document.querySelector<HTMLButtonElement>('#online-open')!.addEventListener('click', () => {
       this.dialogWasClosedByUser = false;
       this.automaticReconnectAllowed = true;
@@ -123,12 +153,13 @@ export class OnlineWaitingRoom {
     });
     this.readyButton.addEventListener('click', () => this.toggleReady());
     this.finalizeButton.addEventListener('click', () => this.sendAction({ type: 'finalize-seats' }));
+    this.startGameButton.addEventListener('click', () => this.sendGameAction({ type: 'start-game' }, 0));
     this.leaveButton.addEventListener('click', () => this.leaveRoom());
     this.closeRoomButton.addEventListener('click', () => this.closeRoom());
     document.querySelector<HTMLButtonElement>('#online-copy-code')!.addEventListener('click', () => {
       void this.copyRoomCode();
     });
-    this.dialog.addEventListener('cancel', () => this.stopAutomaticConnection());
+    this.dialog.addEventListener('cancel', () => this.closeDialog());
     window.addEventListener('online', () => this.resumeConnection());
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') this.resumeConnection();
@@ -142,6 +173,7 @@ export class OnlineWaitingRoom {
       this.clearStableConnectionTimer();
       this.clearStateSyncTimer();
       this.clearPendingActionTimer();
+      this.clearPendingGameActionTimer();
       this.connectGeneration++;
       const socket = this.socket;
       this.socket = null;
@@ -404,8 +436,26 @@ export class OnlineWaitingRoom {
       if (roomState.status === 'closed') this.finishSession('ルームが終了しました。');
       return;
     }
+    if (message.type === 'game-started' || message.type === 'game-state' ||
+        message.type === 'round-ended' || message.type === 'match-ended' ||
+        message.type === 'game-aborted' || message.type === 'game-error') {
+      this.gameActive = true;
+      const viewStatus = message.view && typeof message.view === 'object'
+        ? (message.view as Record<string, unknown>).status : undefined;
+      this.gameTerminated = message.type === 'game-aborted' || message.type === 'match-ended' ||
+        viewStatus === 'aborted' || viewStatus === 'match-ended';
+      this.onGameMessage(message);
+      if (message.type === 'game-started' && this.dialog.open) this.dialog.close();
+      if (message.type === 'game-state' && this.pendingGameAction) this.sendPendingGameAction(socket, generation);
+      this.renderControls();
+      return;
+    }
     if (message.type === 'action-result') {
       this.receiveActionResult(message as unknown as SocketActionResult);
+      return;
+    }
+    if (message.type === 'game-action-result') {
+      this.receiveGameActionResult(message);
       return;
     }
     if (message.type === 'room-closed') {
@@ -470,9 +520,9 @@ export class OnlineWaitingRoom {
     this.hostOutput.textContent = host?.kind === 'human'
       ? `ホスト：${host.name ?? '参加者'}${host.seat === this.session?.playerSeat ? '（あなた）' : ''}`
       : 'ホスト：なし';
-    this.finalizedMessage.hidden = state.status !== 'finalized';
+    this.finalizedMessage.hidden = state.status !== 'finalized' || this.gameActive;
     if (state.status === 'finalized') {
-      this.setStatus('対局準備完了。オンライン対局の開始機能は今後のステップで対応します。');
+      this.setStatus(this.gameActive ? 'オンライン対局を進行しています。' : '座席が確定しました。ホストはオンライン対局を開始できます。');
     }
     this.roomPanel.hidden = false;
     this.renderControls();
@@ -484,17 +534,21 @@ export class OnlineWaitingRoom {
     const self = state?.seats.find(seat => seat.seat === session?.playerSeat && seat.kind === 'human');
     const humans = state?.seats.filter(seat => seat.kind === 'human') ?? [];
     const allReady = humans.length > 0 && humans.every(seat => seat.connected && seat.ready);
-    const pending = this.pendingAction !== null;
+    const pending = this.pendingAction !== null || this.pendingGameAction !== null;
     const socketConnected = this.isSocketOpen();
     this.readyButton.hidden = !self || state?.status !== 'waiting';
     this.readyButton.textContent = self?.ready ? '準備を解除' : '準備完了';
     this.readyButton.disabled = pending || !self?.connected || !socketConnected;
     this.finalizeButton.hidden = !self?.isHost || state?.status !== 'waiting';
     this.finalizeButton.disabled = pending || !socketConnected || !allReady;
+    const allHumansConnected = humans.length > 0 && humans.every(seat => seat.connected);
+    this.startGameButton.hidden = !self?.isHost || state?.status !== 'finalized' || this.gameActive;
+    this.startGameButton.disabled = pending || !socketConnected || !allHumansConnected;
     this.leaveButton.hidden = !session || state?.status === 'closed';
     this.leaveButton.disabled = pending || !socketConnected;
-    this.closeRoomButton.hidden = !self?.isHost || state?.status === 'closed';
+    this.closeRoomButton.hidden = !self?.isHost || state?.status === 'closed' || (this.gameActive && !this.gameTerminated);
     this.closeRoomButton.disabled = pending || !socketConnected;
+    document.querySelector<HTMLButtonElement>('#online-open-room')!.hidden = !session;
     if (this.socket?.readyState === WebSocket.OPEN) this.reconnectButton.hidden = true;
   }
 
@@ -509,7 +563,7 @@ export class OnlineWaitingRoom {
       this.setError('接続がありません。再接続してから操作してください。');
       return;
     }
-    if (this.pendingAction) return;
+    if (this.pendingAction || this.pendingGameAction) return;
     this.setError();
     this.pendingAction = {
       requestId: crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
@@ -521,12 +575,38 @@ export class OnlineWaitingRoom {
     this.sendPendingAction(this.socket, this.connectGeneration);
   }
 
+  sendGameAction(payload: GameActionPayload, expectedGameRevision: number): void {
+    if (!this.session || !this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      this.setError('接続がありません。再接続してから操作してください。');
+      return;
+    }
+    if (this.pendingAction || this.pendingGameAction) return;
+    this.setError();
+    this.pendingGameAction = {
+      requestId: crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+      expectedGameRevision,
+      payload,
+      sentGeneration: null,
+    };
+    this.renderControls();
+    this.sendPendingGameAction(this.socket, this.connectGeneration);
+  }
+
   private sendPendingAction(socket: WebSocket, generation: number): void {
     const pending = this.pendingAction;
     if (!pending || pending.sentGeneration === generation || socket.readyState !== WebSocket.OPEN) return;
     pending.sentGeneration = generation;
     socket.send(JSON.stringify({ ...pending.payload, requestId: pending.requestId, expectedRevision: pending.expectedRevision }));
     this.armPendingActionTimer();
+  }
+
+  private sendPendingGameAction(socket: WebSocket, generation: number): void {
+    const pending = this.pendingGameAction;
+    if (!pending || pending.sentGeneration === generation || socket.readyState !== WebSocket.OPEN) return;
+    pending.sentGeneration = generation;
+    socket.send(JSON.stringify({ ...pending.payload, requestId: pending.requestId,
+      expectedGameRevision: pending.expectedGameRevision }));
+    this.armPendingGameActionTimer();
   }
 
   private armPendingActionTimer(): void {
@@ -536,6 +616,17 @@ export class OnlineWaitingRoom {
       if (!this.pendingAction) return;
       this.setError('サーバーの応答を待っています。再接続すると同じ操作IDで状態を確認します。');
       this.socket?.send(JSON.stringify({ type: 'request-state' }));
+    }, 15_000);
+  }
+
+  private armPendingGameActionTimer(): void {
+    this.clearPendingGameActionTimer();
+    this.pendingGameActionTimer = window.setTimeout(() => {
+      this.pendingGameActionTimer = null;
+      if (!this.pendingGameAction) return;
+      this.pendingGameAction.sentGeneration = null;
+      this.socket?.send(JSON.stringify({ type: 'request-game-state' }));
+      this.setError('サーバーの応答を待っています。状態を再同期しています。');
     }, 15_000);
   }
 
@@ -553,10 +644,28 @@ export class OnlineWaitingRoom {
     }
     this.setError();
     if (completed.payload.type === 'leave-room') {
-      this.finishSession('ルームを退出しました。');
+      if (this.gameActive) {
+        this.onGameMessage({ type: 'game-aborted', reason: 'participant-left' });
+        this.finishSession('ルームを退出しました。対局は中断されました。', true);
+      } else this.finishSession('ルームを退出しました。');
     } else if (completed.payload.type === 'close-room') {
       this.finishSession('ルームを終了しました。');
     }
+  }
+
+  private receiveGameActionResult(message: Record<string, unknown>): void {
+    if (!this.pendingGameAction || message.requestId !== this.pendingGameAction.requestId || typeof message.ok !== 'boolean') return;
+    this.pendingGameAction = null;
+    this.clearPendingGameActionTimer();
+    this.onGameMessage(message);
+    this.renderControls();
+    if (!message.ok) {
+      const code = typeof message.code === 'string' ? message.code : '';
+      this.setError(socketErrorMessages[code] ?? '対局操作を適用できませんでした。');
+      if (code === 'stale_revision' || code === 'stale_decision') this.socket?.send(JSON.stringify({ type: 'request-game-state' }));
+      return;
+    }
+    this.setError();
   }
 
   private receiveSocketError(error: SocketError): void {
@@ -565,6 +674,12 @@ export class OnlineWaitingRoom {
         (code === 'rate_limited' && this.pendingAction !== null)) {
       this.pendingAction = null;
       this.clearPendingActionTimer();
+      this.renderControls();
+    }
+    if ((error.requestId && this.pendingGameAction?.requestId === error.requestId) ||
+        (code === 'rate_limited' && this.pendingGameAction !== null)) {
+      this.pendingGameAction = null;
+      this.clearPendingGameActionTimer();
       this.renderControls();
     }
     this.setError(socketErrorMessages[code] ?? 'サーバーが操作を受け付けませんでした。');
@@ -593,21 +708,32 @@ export class OnlineWaitingRoom {
     this.sendAction({ type: 'close-room' });
   }
 
-  private finishSession(message: string): void {
+  private finishSession(message: string, preserveGame = false): void {
     this.stopAutomaticConnection();
+    if (this.dialog.open) this.dialog.close();
     this.session = null;
     this.state = null;
     this.pendingAction = null;
+    this.pendingGameAction = null;
+    this.gameActive = false;
+    this.gameTerminated = false;
     this.clearPendingActionTimer();
+    this.clearPendingGameActionTimer();
     sessionStorage.removeItem(SESSION_KEY);
     this.forms.hidden = false;
     this.roomPanel.hidden = true;
     this.setError();
     this.setStatus(message);
     this.renderControls();
+    if (!preserveGame) this.onGameMessage({ type: 'online-session-ended' });
   }
 
   private closeDialog(): void {
+    if (this.gameActive) {
+      this.dialogWasClosedByUser = false;
+      this.dialog.close();
+      return;
+    }
     this.dialogWasClosedByUser = true;
     this.stopAutomaticConnection();
     this.dialog.close();
@@ -619,6 +745,7 @@ export class OnlineWaitingRoom {
     this.clearStableConnectionTimer();
     this.clearStateSyncTimer();
     this.clearPendingActionTimer();
+    this.clearPendingGameActionTimer();
     this.connectGeneration++;
     const socket = this.socket;
     this.socket = null;
@@ -706,5 +833,10 @@ export class OnlineWaitingRoom {
   private clearPendingActionTimer(): void {
     if (this.pendingActionTimer !== null) window.clearTimeout(this.pendingActionTimer);
     this.pendingActionTimer = null;
+  }
+
+  private clearPendingGameActionTimer(): void {
+    if (this.pendingGameActionTimer !== null) window.clearTimeout(this.pendingGameActionTimer);
+    this.pendingGameActionTimer = null;
   }
 }

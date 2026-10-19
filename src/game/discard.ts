@@ -29,12 +29,17 @@ export function canDiscard(game: GameState, playerId: PlayerId): boolean {
 
 /** Invalid operations throw, leaving the input state untouched. */
 export function discardTile(game: GameState, playerId: PlayerId, tileId: string): GameState {
+  return resolveDiscardRon(discardTileForOnline(game, playerId, tileId));
+}
+
+/** Applies the shared legal discard without resolving the response window. */
+export function discardTileForOnline(game: GameState, playerId: PlayerId, tileId: string): GameState {
   if (!canDiscard(game, playerId)) throw new RangeError('Discard is not allowed now');
   const beforeDiscard = game.players[playerId];
   const lastLiveWallDiscard = beforeDiscard.drawnTileSource === 'live-wall' && game.liveWall.length === 0;
   const player = discardFromPlayer(beforeDiscard, tileId);
   const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
   players[playerId] = player;
-  return resolveDiscardRon({ ...game, players, phase: 'awaiting-ron',
-    ronWindow: { discarderId: playerId, tileId: player.river.at(-1)!.id, lastLiveWallDiscard } });
+  return { ...game, players, phase: 'awaiting-ron',
+    ronWindow: { discarderId: playerId, tileId: player.river.at(-1)!.id, lastLiveWallDiscard } };
 }

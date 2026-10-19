@@ -4,7 +4,7 @@ import { ShantenCalculator, tileCounts } from '../analysis/shanten.ts';
 import { isWinningShape } from '../analysis/winning-shape.ts';
 import { TILE_KINDS, ordinaryTile, tileKindKey } from '../model/tile.ts';
 import { exposedDoraIndicators } from './dora.ts';
-import { getRiichiDiscardOptions } from './riichi.ts';
+import { getRiichiDiscardOptions, getRiichiDiscardOptionsWithinBudget } from './riichi.ts';
 import type { GameState, PlayerId, PlayerState } from '../model/game.ts';
 import type { RandomSource } from './shuffle.ts';
 
@@ -24,9 +24,13 @@ export const chooseRandomDiscard: DiscardStrategy = (player, random = Math.rando
 };
 
 /** Most wait kinds, then lexicographically ascending physical ID. No mutation/RNG. */
-export function chooseCpuRiichiDiscard(game: GameState, playerId: PlayerId, points: number): string | null {
+export function chooseCpuRiichiDiscard(game: GameState, playerId: PlayerId, points: number, budgetMs = Number.POSITIVE_INFINITY): string | null {
   if (game.players[playerId].control !== 'cpu') return null;
-  return [...getRiichiDiscardOptions(game, playerId, points)]
+  const options = Number.isFinite(budgetMs)
+    ? getRiichiDiscardOptionsWithinBudget(game, playerId, points, budgetMs)
+    : getRiichiDiscardOptions(game, playerId, points);
+  if (options === null) return null;
+  return [...options]
     .sort((a,b) => b.waitKindCount - a.waitKindCount || (a.tileId < b.tileId ? -1 : a.tileId > b.tileId ? 1 : 0))[0]?.tileId ?? null;
 }
 
@@ -78,6 +82,7 @@ function* evaluationSteps(input: ShantenDiscardInput, reportCache?: (entries: nu
     counts[discard]++;
     minimum=Math.min(minimum,shanten);
     candidates.set(discard,{shanten,effectiveTileCount:0,effectiveKindCount:0});
+    yield;
   }
   // Only minimum-shanten candidates can win; avoid useless hypothetical draws.
   for (const [discard,candidate] of candidates) {
@@ -97,6 +102,7 @@ function* evaluationSteps(input: ShantenDiscardInput, reportCache?: (entries: nu
           counts[next]--;
           improves=calculator.calculate(counts,open.length).minimum<minimum;
           counts[next]++;
+          yield;
           if (improves) break;
         }
       }
@@ -118,19 +124,25 @@ export function evaluateShantenDiscards(input: ShantenDiscardInput, reportCache?
   return result.value;
 }
 
-export async function chooseShantenDiscardAsync(game: GameState, playerId: PlayerId, signal: AbortSignal): Promise<string | null> {
+export async function chooseShantenDiscardAsync(
+  game: GameState,
+  playerId: PlayerId,
+  signal: AbortSignal,
+  sliceMilliseconds = 6,
+): Promise<string | null> {
   const player=game.players[playerId];
   if (player.riichi || player.hand.length+Number(Boolean(player.drawnTile))!==concealedSize(player)+1) throw new RangeError('Invalid normal discard');
   const steps=evaluationSteps({tiles:[...player.hand,...(player.drawnTile?[player.drawnTile]:[])], openMelds:winningMelds(player.melds), forbiddenKinds:player.callDiscard?.forbiddenKinds,
     visibleTiles:[...game.players.flatMap(p=>[...p.river,...(p.melds ?? []).flatMap(m=>m.tiles)]),...exposedDoraIndicators(game)]});
-  let deadline=performance.now()+6;
+  const slice = Math.max(0.5, Math.min(6, sliceMilliseconds));
+  let deadline=performance.now()+slice;
   for (;;) {
     if (signal.aborted) return null;
     const result=steps.next();
     if (result.done) return [...result.value].sort(compareDiscardEvaluations)[0].tileId;
     if (performance.now()>=deadline) {
       await new Promise<void>(resolve=>setTimeout(resolve,0));
-      deadline=performance.now()+6;
+      deadline=performance.now()+slice;
     }
   }
 }

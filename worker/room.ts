@@ -5,7 +5,23 @@ import {
   type RoomActionResult,
   type RoomMutationMessage,
   type RoomStatus,
+  type GameActionResult,
+  type GameMutationMessage,
 } from '../src/online/protocol.ts';
+import type { PlayerId } from '../src/model/game.ts';
+import {
+  advanceOnlineCpu,
+  applyOnlineGameAction,
+  hydrateOnlineGame,
+  markOnlineGameAborted,
+  onlineIdentitiesFromSeats,
+  startNextOnlineRound,
+  startOnlineGame,
+  timeoutOnlineDecision,
+  DECISION_TIMEOUT_MS,
+  OnlineGameRuleError,
+} from '../src/online/game-engine.ts';
+import { createPlayerGameView, type OnlineGameSession } from '../src/online/game-view.ts';
 
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 const TICKET_TTL_MS = 60 * 1000;
@@ -41,6 +57,11 @@ type PublicRoomState = OnlineRoomState;
 type SocketAttachment = { seat: number; connectionId: string; participantId: string };
 type RoomAction = RoomMutationMessage;
 type ActionResult = RoomActionResult;
+type GameActionResultMessage = GameActionResult;
+type ParsedSocketAction = RoomAction | GameMutationMessage | 'request-state' | 'request-game-state';
+type GameRow = { state_json: string; game_revision: number; updated_at: number };
+type GameOperationRow = { payload: string; response_json: string };
+type ConnectedHumanSeat = PlayerId;
 
 function json(body: unknown, status = 200, origin?: string): Response {
   const headers = new Headers({
@@ -88,6 +109,7 @@ async function internalJson(request: Request): Promise<Record<string, unknown> |
 
 export class RoomDurableObject {
   private readonly ctx: DurableObjectState;
+  private cpuProgressing = false;
 
   constructor(ctx: DurableObjectState, _env: Env) {
     this.ctx = ctx;
@@ -154,6 +176,115 @@ export class RoomDurableObject {
       window_start INTEGER NOT NULL,
       request_count INTEGER NOT NULL
     )`);
+    this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS online_game (
+      singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+      game_revision INTEGER NOT NULL,
+      state_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`);
+    this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS game_operations (
+      participant_id TEXT NOT NULL,
+      request_id TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      response_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (participant_id, request_id)
+    )`);
+  }
+
+  private gameSession(): OnlineGameSession | null {
+    const row = this.ctx.storage.sql.exec<GameRow>(
+      'SELECT state_json, game_revision, updated_at FROM online_game WHERE singleton = 1',
+    ).toArray()[0];
+    if (!row) return null;
+    const session = hydrateOnlineGame(row.state_json);
+    if (!session || session.gameRevision !== row.game_revision) {
+      throw new Error('Persisted online game state is invalid');
+    }
+    return session;
+  }
+
+  private saveGameSession(session: OnlineGameSession): void {
+    this.ctx.storage.sql.exec(
+      `INSERT INTO online_game (singleton, game_revision, state_json, updated_at) VALUES (1, ?, ?, ?)
+       ON CONFLICT(singleton) DO UPDATE SET game_revision = excluded.game_revision,
+       state_json = excluded.state_json, updated_at = excluded.updated_at`,
+      session.gameRevision, JSON.stringify(session), Date.now(),
+    );
+  }
+
+  private connectedHumanSeats(): Set<ConnectedHumanSeat> {
+    const live = this.liveConnectionIds();
+    return new Set(this.seats().filter(seat => seat.kind === 'human' && seat.connected === 1 &&
+      Boolean(seat.connection_id && live.get(seat.seat)?.has(seat.connection_id)))
+      .map(seat => seat.seat as PlayerId));
+  }
+
+  private gameView(session: OnlineGameSession, viewerSeat: PlayerId) {
+    return createPlayerGameView(session, viewerSeat, this.room()?.code ?? '', this.connectedHumanSeats());
+  }
+
+  private sendGameState(socket: WebSocket, session = this.gameSession()): void {
+    const attachment = this.attachment(socket);
+    if (!attachment || !session || session.identities[attachment.seat]?.control !== 'human') return;
+    const seat = this.seat(attachment.seat);
+    if (!seat || seat.kind !== 'human' || seat.token_hash !== attachment.participantId ||
+        seat.connection_id !== attachment.connectionId || seat.connected !== 1) return;
+    const view = this.gameView(session, attachment.seat as PlayerId);
+    try { socket.send(JSON.stringify({ type: 'game-state', view })); } catch { /* A closing connection is ignored. */ }
+  }
+
+  private broadcastGame(session = this.gameSession()): void {
+    if (!session) return;
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socket.readyState === 1) this.sendGameState(socket, session);
+    }
+    const result = this.gameView(session, session.identities[0].seat).result;
+    if (session.status === 'round-ended' && result) {
+      const message = JSON.stringify({ type: 'round-ended', gameRevision: session.gameRevision, result });
+      for (const socket of this.ctx.getWebSockets()) if (socket.readyState === 1) {
+        try { socket.send(message); } catch { /* A closing connection is ignored. */ }
+      }
+    } else if (session.status === 'match-ended' && result) {
+      const rankings: { playerId: PlayerId; points: number; rank: number }[] =
+        session.match.points.map((points: number, playerId: number) => ({ playerId: playerId as PlayerId, points }))
+          .sort((a, b) => b.points - a.points || a.playerId - b.playerId)
+          .map((player, index) => ({ ...player, rank: index + 1 }));
+      const message = JSON.stringify({ type: 'match-ended', gameRevision: session.gameRevision, result, rankings });
+      for (const socket of this.ctx.getWebSockets()) if (socket.readyState === 1) {
+        try { socket.send(message); } catch { /* A closing connection is ignored. */ }
+      }
+    } else if (session.status === 'aborted') {
+      const message = JSON.stringify({ type: 'game-aborted', gameRevision: session.gameRevision, reason: session.abortReason });
+      for (const socket of this.ctx.getWebSockets()) if (socket.readyState === 1) {
+        try { socket.send(message); } catch { /* A closing connection is ignored. */ }
+      }
+    }
+  }
+
+  private storeGameOperation(participantId: string, requestId: string, payload: string, result: GameActionResultMessage): void {
+    const now = Date.now();
+    this.ctx.storage.sql.exec('DELETE FROM game_operations WHERE created_at < ?', now - OPERATION_RETENTION_MS);
+    this.ctx.storage.sql.exec(
+      'INSERT INTO game_operations (participant_id, request_id, payload, response_json, created_at) VALUES (?, ?, ?, ?, ?)',
+      participantId, requestId, payload, JSON.stringify(result), now,
+    );
+    this.ctx.storage.sql.exec(`DELETE FROM game_operations WHERE participant_id = ? AND request_id IN (
+      SELECT request_id FROM game_operations WHERE participant_id = ? ORDER BY created_at DESC, request_id DESC
+      LIMIT -1 OFFSET ${MAX_OPERATIONS_PER_SEAT}
+    )`, participantId, participantId);
+  }
+
+  private async scheduleNextAlarm(session = this.gameSession()): Promise<void> {
+    const room = this.room();
+    if (!room) return;
+    let next = room.expires_at;
+    if (session?.decision) next = Math.min(next, session.decision.expiresAt);
+    else if (session?.status === 'playing' && (session.match.game.phase === 'awaiting-draw' ||
+        session.match.game.phase === 'awaiting-discard' && session.match.game.players[session.match.game.turnPlayerId].control === 'cpu')) {
+      next = Math.min(next, Date.now() + 20);
+    }
+    await this.ctx.storage.setAlarm(next);
   }
 
   private room(): RoomRow | undefined {
@@ -313,6 +444,8 @@ export class RoomDurableObject {
     if (this.reconcileConnections()) {
       this.incrementRevision();
       this.broadcast(false);
+      const session = this.gameSession();
+      if (session) this.broadcastGame(session);
       return json(this.publicState(), 200, origin);
     }
     return json(state, 200, origin);
@@ -457,6 +590,9 @@ export class RoomDurableObject {
     );
     if (changed) this.incrementRevision();
     this.broadcast();
+    const game = this.gameSession();
+    if (game) this.broadcastGame(game);
+    else this.sendGameState(pair[1]);
     const headers = new Headers({
       'Sec-WebSocket-Protocol': ONLINE_WS_PROTOCOL,
       'Access-Control-Allow-Origin': origin,
@@ -484,20 +620,51 @@ export class RoomDurableObject {
     return { allowed: true, retryAfterMs: 0 };
   }
 
-  private parseSocketAction(value: unknown): RoomAction | 'request-state' | null {
+  private parseSocketAction(value: unknown): ParsedSocketAction | null {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const message = value as Record<string, unknown>;
     if (message.type === 'request-state') return Object.keys(message).length === 1 ? 'request-state' : null;
-    if (message.type !== 'set-ready' && message.type !== 'finalize-seats' &&
-        message.type !== 'leave-room' && message.type !== 'close-room') return null;
+    if (message.type === 'request-game-state') return Object.keys(message).length === 1 ? 'request-game-state' : null;
+    const roomMutation = message.type === 'set-ready' || message.type === 'finalize-seats' ||
+      message.type === 'leave-room' || message.type === 'close-room';
+    const gameMutation = message.type === 'start-game' || message.type === 'discard' ||
+      message.type === 'declare-riichi' || message.type === 'declare-tsumo' ||
+      message.type === 'declare-ron' || message.type === 'pass-ron' ||
+      message.type === 'declare-call' || message.type === 'pass-call' ||
+      message.type === 'declare-kan' || message.type === 'declare-kyuushu-kyuuhai' ||
+      message.type === 'next-round';
+    if (!roomMutation && !gameMutation) return null;
+    const expectedKey = roomMutation ? 'expectedRevision' : 'expectedGameRevision';
     if (typeof message.requestId !== 'string' || !REQUEST_ID_PATTERN.test(message.requestId) ||
-        !Number.isSafeInteger(message.expectedRevision) || (message.expectedRevision as number) < 0) return null;
-    const allowed = message.type === 'set-ready'
-      ? ['type', 'requestId', 'expectedRevision', 'ready']
-      : ['type', 'requestId', 'expectedRevision'];
+        !Number.isSafeInteger(message[expectedKey]) || (message[expectedKey] as number) < 0) return null;
+    const allowedByType: Record<string, string[]> = {
+      'set-ready': ['type', 'requestId', 'expectedRevision', 'ready'],
+      'finalize-seats': ['type', 'requestId', 'expectedRevision'],
+      'leave-room': ['type', 'requestId', 'expectedRevision'],
+      'close-room': ['type', 'requestId', 'expectedRevision'],
+      'start-game': ['type', 'requestId', 'expectedGameRevision'],
+      'discard': ['type', 'requestId', 'expectedGameRevision', 'tileId'],
+      'declare-riichi': ['type', 'requestId', 'expectedGameRevision', 'tileId'],
+      'declare-tsumo': ['type', 'requestId', 'expectedGameRevision'],
+      'declare-ron': ['type', 'requestId', 'expectedGameRevision', 'windowId'],
+      'pass-ron': ['type', 'requestId', 'expectedGameRevision', 'windowId'],
+      'declare-call': ['type', 'requestId', 'expectedGameRevision', 'windowId', 'optionId'],
+      'pass-call': ['type', 'requestId', 'expectedGameRevision', 'windowId'],
+      'declare-kan': ['type', 'requestId', 'expectedGameRevision', 'optionId'],
+      'declare-kyuushu-kyuuhai': ['type', 'requestId', 'expectedGameRevision'],
+      'next-round': ['type', 'requestId', 'expectedGameRevision'],
+    };
+    const allowed = allowedByType[String(message.type)];
+    if (!allowed) return null;
     if (Object.keys(message).some(key => !allowed.includes(key))) return null;
     if (message.type === 'set-ready' && typeof message.ready !== 'boolean') return null;
-    return message as RoomAction;
+    if (['discard', 'declare-riichi'].includes(String(message.type)) &&
+        (typeof message.tileId !== 'string' || !/^[A-Za-z0-9:_-]{1,160}$/u.test(message.tileId))) return null;
+    if (['declare-kan', 'declare-call'].includes(String(message.type)) &&
+        (typeof message.optionId !== 'string' || !/^[A-Za-z0-9:_-]{1,200}$/u.test(message.optionId))) return null;
+    if (['declare-ron', 'pass-ron', 'declare-call', 'pass-call'].includes(String(message.type)) &&
+        (typeof message.windowId !== 'string' || !/^[a-f0-9]{24}$/u.test(message.windowId))) return null;
+    return roomMutation ? message as RoomAction : message as GameMutationMessage;
   }
 
   private rememberOperation(participantId: string, seat: number, requestId: string, payload: string, result: ActionResult): void {
@@ -521,6 +688,7 @@ export class RoomDurableObject {
     closeSeat?: number;
     closeRoom?: boolean;
     sendState: boolean;
+    gameChanged?: boolean;
   } {
     const payload = JSON.stringify(action.type === 'set-ready'
       ? { type: action.type, expectedRevision: action.expectedRevision, ready: action.ready }
@@ -549,6 +717,7 @@ export class RoomDurableObject {
       const actor = this.seat(attachment.seat);
       const currentRevision = room?.revision ?? 0;
       let code: string | undefined;
+      let gameChanged = false;
       if (!room || !actor || actor.kind !== 'human') code = 'unauthorized';
       else if (actor.token_hash !== attachment.participantId) code = 'unauthorized';
       else if (actor.connection_id !== attachment.connectionId || actor.connected !== 1) code = 'stale_connection';
@@ -582,24 +751,44 @@ export class RoomDurableObject {
           }
         }
       } else if (action.type === 'leave-room') {
-        const wasHost = room.host_seat === actor.seat;
-        const humans = this.seats().filter(seat => seat.kind === 'human');
-        this.ctx.storage.sql.exec("DELETE FROM seats WHERE kind = 'cpu'");
-        this.ctx.storage.sql.exec('DELETE FROM tickets WHERE seat = ?', actor.seat);
-        this.ctx.storage.sql.exec('DELETE FROM seats WHERE seat = ? AND kind = \'human\'', actor.seat);
-        const remaining = humans.filter(seat => seat.seat !== actor.seat);
-        this.ctx.storage.sql.exec('UPDATE seats SET ready = 0 WHERE kind = \'human\'');
-        if (remaining.length === 0) {
-          this.ctx.storage.sql.exec("UPDATE room SET status = 'closed', host_seat = NULL");
-        } else if (wasHost) {
-          const successor = Math.min(...remaining.map(seat => seat.seat));
-          this.ctx.storage.sql.exec('UPDATE room SET status = \'waiting\', host_seat = ?', successor);
+        const session = this.gameSession();
+        if (session) {
+          if (session.status === 'playing' || session.status === 'round-ended') {
+            this.saveGameSession(markOnlineGameAborted(session));
+            gameChanged = true;
+          }
+          const wasHost = room.host_seat === actor.seat;
+          const humans = this.seats().filter(seat => seat.kind === 'human');
+          const remaining = humans.filter(seat => seat.seat !== actor.seat);
+          this.ctx.storage.sql.exec('DELETE FROM tickets WHERE seat = ?', actor.seat);
+          this.ctx.storage.sql.exec('DELETE FROM seats WHERE seat = ? AND kind = \'human\'', actor.seat);
+          if (remaining.length === 0) {
+            this.ctx.storage.sql.exec("UPDATE room SET status = 'closed', host_seat = NULL");
+          } else if (wasHost) {
+            this.ctx.storage.sql.exec('UPDATE room SET host_seat = ?', Math.min(...remaining.map(seat => seat.seat)));
+          }
+          this.incrementRevision();
         } else {
-          this.ctx.storage.sql.exec("UPDATE room SET status = 'waiting'");
+          const wasHost = room.host_seat === actor.seat;
+          const humans = this.seats().filter(seat => seat.kind === 'human');
+          this.ctx.storage.sql.exec("DELETE FROM seats WHERE kind = 'cpu'");
+          this.ctx.storage.sql.exec('DELETE FROM tickets WHERE seat = ?', actor.seat);
+          this.ctx.storage.sql.exec('DELETE FROM seats WHERE seat = ? AND kind = \'human\'', actor.seat);
+          const remaining = humans.filter(seat => seat.seat !== actor.seat);
+          this.ctx.storage.sql.exec('UPDATE seats SET ready = 0 WHERE kind = \'human\'');
+          if (remaining.length === 0) {
+            this.ctx.storage.sql.exec("UPDATE room SET status = 'closed', host_seat = NULL");
+          } else if (wasHost) {
+            const successor = Math.min(...remaining.map(seat => seat.seat));
+            this.ctx.storage.sql.exec('UPDATE room SET status = \'waiting\', host_seat = ?', successor);
+          } else {
+            this.ctx.storage.sql.exec("UPDATE room SET status = 'waiting'");
+          }
+          this.incrementRevision();
         }
-        this.incrementRevision();
       } else if (action.type === 'close-room') {
         if (room.host_seat !== actor.seat) code = 'not_host';
+        else if (this.gameSession()?.status === 'playing' || this.gameSession()?.status === 'round-ended') code = 'game_in_progress';
         else if (room.status !== 'waiting' && room.status !== 'finalized') code = 'room_closed';
         else {
           this.ctx.storage.sql.exec("UPDATE room SET status = 'closed'");
@@ -621,11 +810,154 @@ export class RoomDurableObject {
         closeRoom: code === 'room_closed' || result.ok && action.type === 'close-room' ||
           (result.ok && action.type === 'leave-room' && this.room()?.status === 'closed'),
         sendState: result.ok || code === 'revision_conflict',
+        gameChanged,
       };
     });
   }
 
-  webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): void {
+  private applyGameAction(attachment: SocketAttachment, action: GameMutationMessage): {
+    result: GameActionResultMessage;
+    changed: boolean;
+    session: OnlineGameSession | null;
+    started: boolean;
+    sendState: boolean;
+  } {
+    const payload = JSON.stringify(Object.fromEntries(Object.entries(action)
+      .filter(([key]) => key !== 'requestId').sort(([a], [b]) => a.localeCompare(b))));
+    const connected = this.connectedHumanSeats();
+    return this.ctx.storage.transactionSync(() => {
+      const prior = this.ctx.storage.sql.exec<GameOperationRow>(
+        'SELECT payload, response_json FROM game_operations WHERE participant_id = ? AND request_id = ?',
+        attachment.participantId, action.requestId,
+      ).toArray()[0];
+      const previousSession = this.gameSession();
+      if (prior) {
+        if (prior.payload === payload) {
+          return {
+            result: JSON.parse(prior.response_json) as GameActionResultMessage,
+            changed: false,
+            session: previousSession,
+            started: false,
+            sendState: true,
+          };
+        }
+        return {
+          result: { type: 'game-action-result', requestId: action.requestId, ok: false,
+            gameRevision: previousSession?.gameRevision ?? 0, code: 'request_id_reused' },
+          changed: false,
+          session: previousSession,
+          started: false,
+          sendState: false,
+        };
+      }
+
+      const room = this.room();
+      const actor = this.seat(attachment.seat);
+      const currentRevision = previousSession?.gameRevision ?? 0;
+      let nextSession: OnlineGameSession | null = previousSession;
+      let code: string | undefined;
+      let started = false;
+      let expiredDecision = false;
+      if (!room || room.status !== 'finalized') code = room?.status === 'closed' ? 'room_closed' : 'room_not_finalized';
+      else if (!actor || actor.kind !== 'human' || actor.token_hash !== attachment.participantId) code = 'unauthorized';
+      else if (actor.connection_id !== attachment.connectionId || actor.connected !== 1) code = 'stale_connection';
+      else if (!connected.has(attachment.seat as PlayerId)) code = 'player_disconnected';
+      else if (room.expires_at <= Date.now()) code = 'room_closed';
+      else if (previousSession?.decision && previousSession.decision.expiresAt <= Date.now()) {
+        nextSession = timeoutOnlineDecision(previousSession, Date.now());
+        expiredDecision = true;
+        code = 'stale_decision';
+      }
+      else {
+        try {
+          if (action.type === 'start-game') {
+            if (room.host_seat !== actor.seat) throw new OnlineGameRuleError('not_host');
+            if (previousSession) throw new OnlineGameRuleError('already_started');
+            if (action.expectedGameRevision !== 0) throw new OnlineGameRuleError('stale_revision');
+            const seats = this.seats();
+            if (seats.length !== 4 || [0, 1, 2, 3].some(seat => !seats.some(item => item.seat === seat))) {
+              throw new OnlineGameRuleError('seat_assignment_invalid');
+            }
+            const identities = onlineIdentitiesFromSeats(seats.map(item => ({
+              seat: item.seat,
+              name: item.name,
+              kind: item.kind,
+              connected: item.connected === 1,
+            })));
+            if (identities.some(identity => identity.control === 'human' && !connected.has(identity.seat))) {
+              throw new OnlineGameRuleError('player_disconnected');
+            }
+            nextSession = startOnlineGame(identities, actor.seat as PlayerId);
+            started = true;
+          } else {
+            if (!previousSession) throw new OnlineGameRuleError('game_not_started');
+            if (action.type === 'next-round') {
+              if (room.host_seat !== actor.seat) throw new OnlineGameRuleError('not_host');
+              if (action.expectedGameRevision !== previousSession.gameRevision) throw new OnlineGameRuleError('stale_revision');
+              if ([...previousSession.identities].some(identity => identity.control === 'human' && !connected.has(identity.seat))) {
+                throw new OnlineGameRuleError('player_disconnected');
+              }
+              nextSession = startNextOnlineRound(previousSession);
+            } else {
+              nextSession = applyOnlineGameAction(previousSession, actor.seat as PlayerId, action, connected);
+            }
+          }
+        } catch (error) {
+          code = error instanceof OnlineGameRuleError ? error.code
+            : error instanceof RangeError ? 'invalid_action' : 'game_unavailable';
+          nextSession = previousSession;
+        }
+      }
+
+      const result: GameActionResultMessage = code
+        ? { type: 'game-action-result', requestId: action.requestId, ok: false,
+          gameRevision: nextSession?.gameRevision ?? currentRevision, code }
+        : { type: 'game-action-result', requestId: action.requestId, ok: true,
+          gameRevision: nextSession?.gameRevision ?? currentRevision };
+      if ((!code || expiredDecision) && nextSession && nextSession !== previousSession) this.saveGameSession(nextSession);
+      this.storeGameOperation(attachment.participantId, action.requestId, payload, result);
+      return {
+        result,
+        changed: (!code || expiredDecision) && nextSession !== previousSession,
+        session: nextSession,
+        started,
+        sendState: !code || code === 'stale_revision' || code === 'stale_decision',
+      };
+    });
+  }
+
+  private broadcastGameStarted(session: OnlineGameSession): void {
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socket.readyState !== 1) continue;
+      const attachment = this.attachment(socket);
+      if (!attachment) continue;
+      const seat = this.seat(attachment.seat);
+      if (!seat || seat.token_hash !== attachment.participantId || seat.connection_id !== attachment.connectionId || seat.connected !== 1) continue;
+      try { socket.send(JSON.stringify({ type: 'game-started', view: this.gameView(session, attachment.seat as PlayerId) })); }
+      catch { /* A closing connection is ignored. */ }
+    }
+  }
+
+  private async persistAutomaticProgress(session: OnlineGameSession): Promise<void> {
+    if (this.cpuProgressing) return;
+    this.cpuProgressing = true;
+    const baseRevision = session.gameRevision;
+    try {
+      const updated = await advanceOnlineCpu(session, Date.now());
+      if (updated === session) return;
+      const saved = this.ctx.storage.transactionSync(() => {
+        const current = this.gameSession();
+        if (!current || current.gameRevision !== baseRevision || current.status !== 'playing' || current.decision) return null;
+        this.saveGameSession(updated);
+        return updated;
+      });
+      if (saved) this.broadcastGame(saved);
+    } finally {
+      this.cpuProgressing = false;
+    }
+  }
+
+  async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const attachment = this.attachment(socket);
     if (!attachment) {
       this.sendError(socket, 'unauthorized');
@@ -664,7 +996,7 @@ export class RoomDurableObject {
       return;
     }
 
-    if (action === 'request-state') {
+    if (action === 'request-state' || action === 'request-game-state') {
       const room = this.room();
       const participant = this.seat(attachment.seat);
       if (!participant || participant.kind !== 'human' || participant.token_hash !== attachment.participantId) {
@@ -685,8 +1017,11 @@ export class RoomDurableObject {
       if (this.reconcileConnections()) {
         this.incrementRevision();
         this.broadcast(false);
+        const session = this.gameSession();
+        if (session) this.broadcastGame(session);
       } else {
-        this.sendState(socket);
+        if (action === 'request-state') this.sendState(socket);
+        else this.sendGameState(socket);
       }
       return;
     }
@@ -694,11 +1029,25 @@ export class RoomDurableObject {
     if (this.reconcileConnections()) {
       this.incrementRevision();
       this.broadcast(false);
+      const session = this.gameSession();
+      if (session) this.broadcastGame(session);
     }
+    if ('expectedGameRevision' in action) {
+      const outcome = this.applyGameAction(attachment, action);
+      try { socket.send(JSON.stringify(outcome.result)); } catch { /* Result remains durable for requestId replay. */ }
+      if (outcome.changed && outcome.session) {
+        if (outcome.started) this.broadcastGameStarted(outcome.session);
+        this.broadcastGame(outcome.session);
+        await this.scheduleNextAlarm(outcome.session);
+      } else if (outcome.sendState) this.sendGameState(socket, outcome.session);
+      return;
+    }
+
     const outcome = this.applyAction(attachment, action);
     try { socket.send(JSON.stringify(outcome.result)); } catch { /* Result remains durable for requestId replay. */ }
     if (outcome.changed) this.broadcast();
     else if (outcome.sendState) this.sendState(socket);
+    if (outcome.gameChanged) this.broadcastGame();
     if (outcome.closeSeat !== undefined) this.closeSockets(4003, 'Participant left the room', outcome.closeSeat);
     if (outcome.closeRoom) this.closeSockets(4002, 'Room closed');
   }
@@ -716,6 +1065,8 @@ export class RoomDurableObject {
     );
     if (changed) this.incrementRevision();
     this.broadcast(false);
+    const session = this.gameSession();
+    if (session) this.broadcastGame(session);
   }
 
   webSocketClose(socket: WebSocket): void {
@@ -730,19 +1081,43 @@ export class RoomDurableObject {
     const room = this.room();
     if (!room) return;
     const now = Date.now();
-    if (now < room.expires_at) {
-      await this.ctx.storage.setAlarm(room.expires_at);
+    if (now >= room.expires_at) {
+      if (room.status !== 'closed') {
+        this.ctx.storage.transactionSync(() => {
+          this.ctx.storage.sql.exec("UPDATE room SET status = 'closed', revision = revision + 1");
+          this.ctx.storage.sql.exec('DELETE FROM tickets');
+        });
+        this.broadcast(false);
+        this.closeSockets(4002, 'Room expired');
+      }
+      await this.ctx.storage.deleteAll();
+      this.ensureTables();
       return;
     }
-    if (room.status !== 'closed') {
-      this.ctx.storage.transactionSync(() => {
-        this.ctx.storage.sql.exec("UPDATE room SET status = 'closed', revision = revision + 1");
-        this.ctx.storage.sql.exec('DELETE FROM tickets');
-      });
-      this.broadcast(false);
-      this.closeSockets(4002, 'Room expired');
+
+    let session = this.gameSession();
+    if (session?.decision && session.decision.expiresAt <= now) {
+      const expired = timeoutOnlineDecision(session, now);
+      if (expired !== session) {
+        const saved = this.ctx.storage.transactionSync(() => {
+          const current = this.gameSession();
+          if (!current || current.gameRevision !== session!.gameRevision ||
+              current.decision?.windowId !== session!.decision?.windowId) return null;
+          this.saveGameSession(expired);
+          return expired;
+        });
+        if (saved) {
+          session = saved;
+          this.broadcastGame(saved);
+        }
+      }
     }
-    await this.ctx.storage.deleteAll();
-    this.ensureTables();
+    if (session?.status === 'playing' && !session.decision &&
+        (session.match.game.phase === 'awaiting-draw' ||
+          session.match.game.phase === 'awaiting-discard' && session.match.game.players[session.match.game.turnPlayerId].control === 'cpu')) {
+      await this.persistAutomaticProgress(session);
+      session = this.gameSession();
+    }
+    await this.scheduleNextAlarm(session);
   }
 }
