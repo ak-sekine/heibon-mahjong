@@ -1,4 +1,4 @@
-import type { GameState, PlayerId } from '../model/game.ts';
+import type { GameState, PlayerId, PlayerState } from '../model/game.ts';
 import { tileKindKey } from '../model/tile.ts';
 
 const playerIds: readonly PlayerId[] = [0, 1, 2, 3];
@@ -8,17 +8,18 @@ export function isTerminalOrHonor(tile: { readonly category: string; readonly ra
 }
 
 /** Missing history cannot prove that a player's earlier discards stayed uncalled. */
+export function isNagashiManganCandidate(player: PlayerState): boolean {
+  const history = player.discardHistory;
+  if (!history?.length || history.some(tile => !isTerminalOrHonor(tile.tile))) return false;
+  const historyIds = new Set(history.map(tile => tile.id));
+  const riverIds = new Set(player.river.map(tile => tile.id));
+  if (historyIds.size !== history.length || riverIds.size !== player.river.length || historyIds.size !== riverIds.size) return false;
+  return [...historyIds].every(id => riverIds.has(id)) && [...riverIds].every(id => historyIds.has(id));
+}
+
 export function getNagashiManganWinners(game: GameState): readonly PlayerId[] {
   if (game.phase !== 'wall-exhausted' || game.abortiveDraw || game.winResult) return [];
-  return playerIds.filter(id => {
-    const player = game.players[id];
-    const history = player.discardHistory;
-    if (!history?.length || history.some(tile => !isTerminalOrHonor(tile.tile))) return false;
-    const historyIds = new Set(history.map(tile => tile.id));
-    const riverIds = new Set(player.river.map(tile => tile.id));
-    if (historyIds.size !== history.length || riverIds.size !== player.river.length || historyIds.size !== riverIds.size) return false;
-    return [...historyIds].every(id => riverIds.has(id)) && [...riverIds].every(id => historyIds.has(id));
-  });
+  return playerIds.filter(id => isNagashiManganCandidate(game.players[id]));
 }
 
 /** A four-winds draw is checked after the fourth discard's full ron window. */

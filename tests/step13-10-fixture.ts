@@ -109,30 +109,63 @@ export function mixedFirstFourGame(drawKinds: readonly [string,string,string,str
 }
 
 /** A physically complete normal exhaustive draw fixture with a complete river history. */
-export function exhaustiveDrawGame(seed = 1): GameState {
-  const game = fixedRound(0, []);
-  return { ...game, players: game.players.map(player => ({ ...player, discardHistory: [...player.river] })) as unknown as GameState['players'] };
+export function exhaustiveDrawGame(tenpaiIds: readonly PlayerId[] = []): GameState {
+  const game = fixedRound(0, tenpaiIds);
+  // A legal no-call exhaustion has at most 18 river tiles per seat. The
+  // legacy point fixture assigns one extra discard to the dealer, so move
+  // that physical tile into the next seat's river while retaining 70 tiles.
+  const players = [...game.players] as [PlayerState,PlayerState,PlayerState,PlayerState];
+  const transferred = players[0].river.at(-1);
+  if (!transferred || players[0].river.length !== 19 || players[1].river.length !== 17) {
+    throw new RangeError('Unexpected fixed exhaustive draw river sizes');
+  }
+  players[0] = { ...players[0], river: players[0].river.slice(0,-1) };
+  players[1] = { ...players[1], river: [...players[1].river,transferred] };
+  return { ...game, players: players.map(player => ({ ...player, discardHistory: [...player.river] })) as unknown as GameState['players'] };
+}
+
+function arrangeNagashi(game: GameState, winnerIds: readonly PlayerId[], predicate: (tile: PhysicalTile) => boolean): GameState {
+  const winners = [...new Set(winnerIds)];
+  if (winners.length !== winnerIds.length || winners.some(id => !ids.includes(id))) throw new RangeError('Invalid Nagashi winner seats');
+  const nonWinners = ids.filter(id => !winners.includes(id));
+  const riverSizes = game.players.map(player => player.river.length);
+  const targetOutsideCount = winners.reduce((sum,id)=>sum+riverSizes[id],0)+nonWinners.length;
+  const all = () => allPhysical(game);
+  const riverIds = () => new Set(game.players.flatMap(player=>player.river).map(tile=>tile.id));
+  if (targetOutsideCount > all().filter(predicate).length || targetOutsideCount > riverSizes.reduce((sum,size)=>sum+size,0)) {
+    throw new RangeError('Not enough physical outside tiles for this Nagashi fixture');
+  }
+  let outsideCount = game.players.flatMap(player=>player.river).filter(predicate).length;
+  while (outsideCount !== targetOutsideCount) {
+    const idsInRiver = riverIds();
+    const idsInHand = new Set(game.players.flatMap(player=>player.hand).map(tile=>tile.id));
+    const movingOutsideIntoRiver = outsideCount < targetOutsideCount;
+    const outside = all().find(tile=>predicate(tile) && (movingOutsideIntoRiver ? idsInHand.has(tile.id) : idsInRiver.has(tile.id)));
+    const middle = all().find(tile=>!predicate(tile) && (movingOutsideIntoRiver ? idsInRiver.has(tile.id) : idsInHand.has(tile.id)));
+    if (!outside || !middle) throw new RangeError('Unable to balance physical river tiles');
+    game = swapPhysical(game,outside,middle);
+    outsideCount += outsideCount < targetOutsideCount ? 1 : -1;
+  }
+  const outsideRivers = game.players.flatMap(player=>player.river).filter(predicate);
+  const middleRivers = game.players.flatMap(player=>player.river).filter(tile=>!predicate(tile));
+  const rivers: PhysicalTile[][] = ids.map(() => []);
+  for (const id of winners) rivers[id].push(...outsideRivers.splice(0,riverSizes[id]));
+  for (const id of nonWinners) rivers[id].push(outsideRivers.shift()!);
+  for (const id of nonWinners) rivers[id].push(...middleRivers.splice(0,riverSizes[id]-1));
+  if (outsideRivers.length || middleRivers.length || rivers.some((river,id)=>river.length!==riverSizes[id])) {
+    throw new RangeError('Unable to fit physical discards into legal river sizes');
+  }
+  return { ...game, players: game.players.map(player => ({ ...player, river:rivers[player.id], discardHistory:[...rivers[player.id]] })) as unknown as GameState['players'] };
+}
+
+export function nagashiFixture(winnerIds: readonly PlayerId[], predicate: (tile: PhysicalTile) => boolean = tile => isTerminalOrHonor(tile.tile)):
+  { readonly game: GameState; readonly initial: GameState } {
+  const initial = exhaustiveDrawGame();
+  return { initial, game:arrangeNagashi(initial,winnerIds,predicate) };
 }
 
 export function nagashiGame(winnerIds: readonly PlayerId[], predicate: (tile: PhysicalTile) => boolean = tile => isTerminalOrHonor(tile.tile)): GameState {
-  const game = exhaustiveDrawGame();
-  const terminalRivers = game.players.flatMap(player => player.river).filter(predicate);
-  const otherRivers = game.players.flatMap(player => player.river).filter(tile => !predicate(tile));
-  const winners = [...new Set(winnerIds)];
-  const nonWinners = ids.filter(id => !winners.includes(id));
-  if (winners.length !== winnerIds.length || terminalRivers.length < winners.length || otherRivers.length < nonWinners.length) {
-    throw new RangeError('Exhaustive draw does not contain enough fixture tiles');
-  }
-  const rivers: PhysicalTile[][] = ids.map(() => []);
-  winners.forEach(id => rivers[id].push(terminalRivers.shift()!));
-  terminalRivers.splice(0).forEach((tile, index) => rivers[winners[index % winners.length]].push(tile));
-  nonWinners.forEach(id => rivers[id].push(otherRivers.shift()!));
-  if (nonWinners.length) otherRivers.forEach(tile => rivers[nonWinners[0]].push(tile));
-  else if (otherRivers.length) throw new RangeError('All players cannot retain non-terminal discards in this fixture');
-  const remainingTerminals = terminalRivers.splice(0);
-  if (nonWinners.length) rivers[nonWinners[0]].push(...remainingTerminals);
-  else if (remainingTerminals.length) rivers[winners[0]].push(...remainingTerminals);
-  return { ...game, players: game.players.map(player => ({ ...player, river: rivers[player.id], discardHistory: [...rivers[player.id]] })) as unknown as GameState['players'] };
+  return nagashiFixture(winnerIds,predicate).game;
 }
 
 function allPhysical(game: GameState): PhysicalTile[] {
@@ -237,15 +270,6 @@ export function sameKindHistoryMismatchGame(): { readonly game: GameState; reado
   const replacement = allPhysical(initial).find(tile => tile.id !== target.id && tileKindKey(tile.tile) === tileKindKey(target.tile) && !initial.players[0].river.some(river => river.id === tile.id));
   if (!replacement) throw new RangeError('Missing another physical copy for the same-kind history fixture');
   return { initial, game: swapPhysical(initial, target, replacement) };
-}
-
-export function noDiscardHistoryGame(): { readonly game: GameState; readonly initial: GameState } {
-  const initial = nagashiGame([1]);
-  const moved = initial.players[0].river;
-  const players = [...initial.players] as [PlayerState,PlayerState,PlayerState,PlayerState];
-  players[0] = { ...players[0], river:[], discardHistory:[] };
-  players[2] = { ...players[2], river:[...players[2].river,...moved], discardHistory:[...players[2].river,...moved] };
-  return { initial, game:{ ...initial, players } };
 }
 
 export function mixedDiscardNagashiGame(): { readonly game: GameState; readonly initial: GameState } {

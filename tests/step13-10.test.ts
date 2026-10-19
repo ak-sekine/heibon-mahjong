@@ -9,16 +9,15 @@ import { drawTile } from '../src/game/draw.ts';
 import { assertPointConservation, nextRound, settleRound, startMatch, updateMatchGame } from '../src/game/match.ts';
 import { canDeclareRiichi, declareRiichi } from '../src/game/riichi.ts';
 import { canDeclareRon, declareRon, getRonCandidates, getWaitingTileKinds, passRon } from '../src/game/ron.ts';
-import { canDeclareKyuushuKyuuhai, declareKyuushuKyuuhai, getNagashiManganWinners, isFourWindsDraw } from '../src/game/special-draws.ts';
+import { canDeclareKyuushuKyuuhai, declareKyuushuKyuuhai, getNagashiManganWinners, isFourWindsDraw, isNagashiManganCandidate } from '../src/game/special-draws.ts';
 import { canDeclareTsumo } from '../src/game/tsumo.ts';
 import { tileKindKey } from '../src/model/tile.ts';
 import type { GameState, PlayerId, PlayerState } from '../src/model/game.ts';
 import { GameController } from '../src/ui/controller.ts';
 import { riichiStart } from './riichi-fixture.ts';
 import { ronGame } from './ron-fixture.ts';
-import { fixedRound } from './match-fixture.ts';
 import { inventory } from './helpers.ts';
-import { arrangedDeal, calledNagashiGame, childKokushiGame, childKyuushuGame, childKyuushuKanGame, eightOrphanGame, fourWindsGame, mixedDiscardNagashiGame, mixedFirstFourGame, nagashiGame, noDiscardHistoryGame, parentKyuushuGame, playerPonGame, sameKindHistoryMismatchGame } from './step13-10-fixture.ts';
+import { arrangedDeal, calledNagashiGame, childKokushiGame, childKyuushuGame, childKyuushuKanGame, eightOrphanGame, exhaustiveDrawGame, fourWindsGame, mixedDiscardNagashiGame, mixedFirstFourGame, nagashiFixture, nagashiGame, parentKyuushuGame, playerPonGame, sameKindHistoryMismatchGame } from './step13-10-fixture.ts';
 import { startGame } from '../src/game/start.ts';
 
 function withPlayer(game: GameState, id: PlayerId, update: (player: PlayerState) => PlayerState): GameState {
@@ -43,7 +42,10 @@ function roundFourRiichi(game: GameState, alreadyRiichi: number, doubleSeat?: Pl
 }
 
 test('流し満貫 uses only outside discards and physical discard IDs', () => {
-  const terminal = nagashiGame([0]);
+  const { game:terminal, initial:terminalInitial } = nagashiFixture([0]);
+  assert.ok(terminal.players.every(player=>player.river.length<=18),'each river must fit its 18 physical display slots');
+  assert.equal(terminal.players.reduce((sum,player)=>sum+player.river.length,0),70);
+  inventory(terminal,terminalInitial);
   assert.deepEqual(getNagashiManganWinners(terminal), [0]);
   const honors = nagashiGame([0], tile => tile.tile.category === 'honor');
   assert.deepEqual(getNagashiManganWinners(honors), [0]);
@@ -60,9 +62,9 @@ test('流し満貫 uses only outside discards and physical discard IDs', () => {
   assert.notEqual(riverReplacement.id, missingHistoryTile.id);
   assert.deepEqual(getNagashiManganWinners(sameFaceDifferentId), []);
 
-  const { game:noDiscards, initial:noDiscardsInitial } = noDiscardHistoryGame();
-  inventory(noDiscards, noDiscardsInitial);
-  assert.equal(getNagashiManganWinners(noDiscards).includes(0),false,'the player with no discard is not a winner');
+  const noDiscards = parentKyuushuGame();
+  assert.equal(noDiscards.players[0].river.length,0);
+  assert.equal(isNagashiManganCandidate(noDiscards.players[0]),false,'a player with no discard is not a candidate');
   for (const type of ['chi','pon','daiminkan'] as const) {
     const { game, initial } = calledNagashiGame(type);
     inventory(game, initial);
@@ -113,7 +115,9 @@ test('流し満貫 settles child and dealer payments, honba, deposits and dealer
 });
 
 test('複数人の流し満貫は相互支払いを相殺し、供託は親から最も近い1人へ渡す', () => {
-  const game = nagashiGame([1,2]);
+  const { game, initial } = nagashiFixture([1,2]);
+  assert.ok(game.players.every(player=>player.river.length<=18));
+  inventory(game,initial);
   const settled = settleRound(matchReadyFor(game, [23000,25000,25000,25000], 2, 1));
   const result = settled.lastSettlement!;
   assert.deepEqual(result.nagashiManganWinners, [1,2]);
@@ -347,8 +351,11 @@ test('ロン on the fourth riichi declaration wins before charging its stick or 
 });
 
 test('ordinary exhaustive draw remains distinct and old states without histories cannot earn nagashi', () => {
-  const game = fixedRound(0,[0]);
+  const game = exhaustiveDrawGame([0]);
+  assert.ok(game.players.every(player=>player.river.length<=18));
+  inventory(game,game);
   assert.deepEqual(getNagashiManganWinners(game),[]);
+  assert.deepEqual(getNagashiManganWinners(withPlayer(game,0,player=>({...player,discardHistory:undefined}))),[]);
   const match = startMatch(game);
   assert.equal(match.lastSettlement?.reason,'draw');
   assert.ok(match.lastSettlement?.tenpai?.[0]);
