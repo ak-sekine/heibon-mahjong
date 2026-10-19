@@ -32,7 +32,7 @@ CPU時間の参考として、オンラインのリーチ候補スキャンに2.
 - 2人＋CPU2人の専用本番ルームを使った通信テスト：対局開始、座席別Viewと秘密情報非送信、合法・不正操作、CPU進行、WebSocket切断・再接続、明示的退出
 - GitHub Pages build / deploy
 
-初回の本番テスト実行では、検証コードが現在手番の相手側Viewを選べる条件になっていたため失敗しました。`viewerSeat === turnPlayerId`を条件に加えて再実行し、実際のWorker通信を含め全jobが成功しました。
+初回の本番テスト実行では、検証コードが現在手番の相手側Viewを選べる条件になっていたため失敗しました。`viewerSeat === turnPlayerId`を条件に加えて再実行し、実際のWorker通信を含め全jobが成功しました。後続の再検証では、人間の手番通知と本人向けViewの配信が前後するテスト待機競合も確認し、対象座席の最新Viewが届いてから操作するよう修正しました。
 
 ユーザー指定URL: [Cloudflare Worker](https://heibon-mahjong-online.ak-sekine.workers.dev) · [GitHub Pages](https://ak-sekine.github.io/heibon-mahjong/)
 

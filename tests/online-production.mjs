@@ -406,10 +406,14 @@ async function main() {
       if (current.status === 'playing' && current.phase === 'awaiting-discard' &&
           current.seats[current.turnPlayerId].control === 'human') {
         const client = current.turnPlayerId === 0 ? two.host : two.guest;
-        const humanView = latestGameMessage(client).view;
-        const legalId = humanView.self.discardableTileIds[0];
+        const humanViewMessage = await waitForGameState(client, view =>
+          Number(view?.gameRevision) >= Number(current.gameRevision) &&
+          view?.viewerSeat === current.turnPlayerId && view.phase === 'awaiting-discard' &&
+          view.seats?.[view.turnPlayerId]?.control === 'human' &&
+          Array.isArray(view.self?.discardableTileIds) && view.self.discardableTileIds.length > 0, 0, 15000);
+        const legalId = humanViewMessage.view.self.discardableTileIds[0];
         check(typeof legalId === 'string', 'A later human turn did not receive a legal discard candidate.');
-        const result = await sendGameAction(client, { type: 'discard', tileId: legalId }, humanView.gameRevision, 'next-human-discard');
+        const result = await sendGameAction(client, { type: 'discard', tileId: legalId }, humanViewMessage.view.gameRevision, 'next-human-discard');
         check(result.result.ok === true, 'A later legal human discard was rejected.');
         continue;
       }
