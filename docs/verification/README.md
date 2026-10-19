@@ -15,6 +15,7 @@
 | [Step 13.10](step13.10/README.md) | 流し満貫、九種九牌、四風連打、四家立直と局精算。Browser UI verification はGitHub Actionsで実施。 |
 | [Step 13.11](step13.11/README.md) | 天和・地和、配牌時ツモ、役満複合、CPU自動和了と局精算。Browser UI verification はGitHub Actionsで実施。 |
 | [Step 14.0](step14.0/README.md) | Cloudflare Workers本番URL、HTTPS、ルーム、WebSocket座席同期、再接続、認証・非公開情報の検証。 |
+| [Step 14.0.1](step14.0.1/README.md) | Ready、CPU補充、権限引き継ぎ、退出、revision、重複要求、レート制限、本番WebSocket・Browser UI検証。 |
 | [Step 13.7](step13.7/README.md) | 一般役7種類の候補判定、点数計算、結果表示。Browser UI verification はGitHub Actionsで実施。 |
 | [Step 13.5.5](step13.5.5/README.md) | 正方形卓、牌・河・副露の配置、実カン操作、画面サイズごとの検証。初回の未完了事項と後続修正も時系列で保存。 |
 | [Step 13.5.4](step13.5.4/README.md) | 卓上牌の寸法と画面表示。 |

@@ -1,3 +1,4 @@
+import { RateLimitDurableObject } from './rate-limit.ts';
 import { RoomDurableObject } from './room.ts';
 
 const allowedOrigins = new Set([
@@ -6,6 +7,15 @@ const allowedOrigins = new Set([
   'http://127.0.0.1:5173',
 ]);
 const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const ROOM_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/u;
+const PARTICIPANT_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
+
+const ratePolicies = {
+  create: { limit: 10, windowMs: 10 * 60 * 1000 },
+  join: { limit: 12, windowMs: 10 * 60 * 1000 },
+  ticket: { limit: 30, windowMs: 60 * 1000 },
+  socket: { limit: 24, windowMs: 60 * 1000 },
+} as const;
 
 function corsHeaders(origin: string): Headers {
   return new Headers({
@@ -17,10 +27,11 @@ function corsHeaders(origin: string): Headers {
   });
 }
 
-function json(body: unknown, status: number, origin: string): Response {
+function json(body: unknown, status: number, origin: string, extraHeaders?: HeadersInit): Response {
   const headers = corsHeaders(origin);
   headers.set('Content-Type', 'application/json; charset=utf-8');
   headers.set('Cache-Control', 'no-store');
+  new Headers(extraHeaders).forEach((value, key) => headers.set(key, value));
   return new Response(JSON.stringify(body), { status, headers });
 }
 
@@ -45,9 +56,9 @@ async function parseJson(request: Request): Promise<Record<string, unknown> | nu
   const declaredLength = Number(request.headers.get('Content-Length') ?? 0);
   if (Number.isFinite(declaredLength) && declaredLength > 2048) return null;
   try {
-    const text = await request.text();
-    if (text.length > 2048) return null;
-    const value: unknown = JSON.parse(text);
+    const body = await request.text();
+    if (new TextEncoder().encode(body).byteLength > 2048) return null;
+    const value: unknown = JSON.parse(body);
     return value !== null && typeof value === 'object' && !Array.isArray(value)
       ? value as Record<string, unknown>
       : null;
@@ -74,6 +85,43 @@ function internalRequest(path: string, method: string, body?: unknown, headers?:
     headers: requestHeaders,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+}
+
+async function consumeRateLimit(
+  request: Request,
+  env: Env,
+  scope: keyof typeof ratePolicies,
+): Promise<{ allowed: true } | { allowed: false; response: Response }> {
+  const origin = request.headers.get('Origin') ?? '';
+  const ipAddress = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`heibon-rate:${ipAddress}`));
+  const ipHash = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+  const policy = ratePolicies[scope];
+  let response: Response;
+  try {
+    response = await env.RATE_LIMITER.get(env.RATE_LIMITER.idFromName('global')).fetch(
+      new Request('https://rate.internal/internal/consume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bucket: `${ipHash}:${scope}`, ...policy }),
+      }),
+    );
+  } catch {
+    return { allowed: false, response: json({ error: 'rate_limit_unavailable' }, 503, origin) };
+  }
+  if (!response.ok) return { allowed: false, response: json({ error: 'rate_limit_unavailable' }, 503, origin) };
+  const result = await response.json() as { allowed?: boolean; retryAfterMs?: number };
+  if (result.allowed) return { allowed: true };
+  const retryAfterMs = Number.isFinite(result.retryAfterMs) ? Math.max(1, result.retryAfterMs ?? 1000) : 1000;
+  return {
+    allowed: false,
+    response: json(
+      { error: 'rate_limited', retryAfterMs },
+      429,
+      origin,
+      { 'Retry-After': String(Math.max(1, Math.ceil(retryAfterMs / 1000))) },
+    ),
+  };
 }
 
 async function createRoom(env: Env, origin: string, displayName: string): Promise<Response> {
@@ -107,6 +155,8 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
 
   const path = new URL(request.url).pathname;
   if (path === '/api/rooms' && request.method === 'POST') {
+    const limited = await consumeRateLimit(request, env, 'create');
+    if (!limited.allowed) return limited.response;
     const body = await parseJson(request);
     const displayName = cleanDisplayName(body?.displayName);
     if (!displayName) return json({ error: 'invalid_display_name' }, 400, origin);
@@ -116,6 +166,7 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
   const match = path.match(/^\/api\/rooms\/([A-HJ-NP-Z2-9]{6})(?:\/(join|ticket|socket))?$/u);
   if (!match) return json({ error: 'not_found' }, 404, origin);
   const [, code, action] = match;
+  if (!ROOM_CODE_PATTERN.test(code)) return json({ error: 'invalid_room_code' }, 400, origin);
   const stub = roomStub(env, code);
 
   if (action === undefined && request.method === 'GET') {
@@ -123,6 +174,8 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
   }
 
   if (action === 'join' && request.method === 'POST') {
+    const limited = await consumeRateLimit(request, env, 'join');
+    if (!limited.allowed) return limited.response;
     const body = await parseJson(request);
     const displayName = cleanDisplayName(body?.displayName);
     if (!displayName) return json({ error: 'invalid_display_name' }, 400, origin);
@@ -132,7 +185,10 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
       participantToken,
     }, { Origin: origin }));
     if (!response.ok) return response;
-    const room = await response.json() as { playerSeat: number; createdAt: number; expiresAt: number; seats: unknown[] };
+    const room = await response.json() as {
+      playerSeat: number; roomCode: string; status: string; hostSeat: number | null; revision: number;
+      createdAt: number; expiresAt: number; seats: unknown[];
+    };
     return json({
       roomCode: code,
       participantToken,
@@ -144,12 +200,18 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
   }
 
   if (action === 'ticket' && request.method === 'POST') {
+    const limited = await consumeRateLimit(request, env, 'ticket');
+    if (!limited.allowed) return limited.response;
     const participantToken = bearerToken(request);
-    if (!participantToken) return json({ error: 'unauthorized' }, 401, origin);
+    if (!participantToken || !PARTICIPANT_TOKEN_PATTERN.test(participantToken)) {
+      return json({ error: 'unauthorized' }, 401, origin);
+    }
     return stub.fetch(internalRequest('/internal/ticket', 'POST', { participantToken }, { Origin: origin }));
   }
 
   if (action === 'socket' && request.method === 'GET' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+    const limited = await consumeRateLimit(request, env, 'socket');
+    if (!limited.allowed) return limited.response;
     return stub.fetch(request);
   }
 
@@ -174,4 +236,4 @@ export default {
   },
 };
 
-export { RoomDurableObject };
+export { RateLimitDurableObject, RoomDurableObject };

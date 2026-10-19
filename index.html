@@ -17,11 +17,22 @@
       <form id="online-create"><label for="online-name">表示名</label><input id="online-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" required><button type="submit">ルームを作成</button></form>
       <form id="online-join"><label for="online-join-name">表示名</label><input id="online-join-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" required><label for="online-join-code">ルームコードで参加</label><input id="online-join-code" name="roomCode" type="text" maxlength="6" pattern="[A-HJ-NP-Z2-9]{6}" autocapitalize="characters" autocomplete="off" required><button type="submit">参加する</button></form>
     </section>
-    <section id="online-room" aria-label="ルームの座席" aria-live="polite" hidden>
-      <p>ルームコード：<strong id="online-room-code">—</strong></p>
+    <section id="online-room" aria-label="ルームの座席" hidden>
+      <p>ルームコード：<strong id="online-room-code">—</strong> <button id="online-copy-code" type="button">コードをコピー</button></p>
       <p>有効期限：<time id="online-room-expiry">—</time></p>
-      <ol id="online-seats"></ol>
-      <button id="online-reconnect" type="button" hidden>再接続</button>
+      <p id="online-connection" role="status" aria-live="polite">接続状態を確認しています。</p>
+      <p id="online-my-seat">自分の席：—</p>
+      <p id="online-host">ホスト：—</p>
+      <ol id="online-seats" aria-label="東・南・西・北の席"></ol>
+      <p id="online-finalized-message" role="status" hidden>対局準備完了。オンライン対局の開始機能は今後のステップで対応します。</p>
+      <p id="online-error" role="alert" hidden></p>
+      <div id="online-actions" aria-label="待機ルームの操作">
+        <button id="online-ready" type="button" hidden>準備完了</button>
+        <button id="online-finalize" type="button" hidden>座席を確定</button>
+        <button id="online-reconnect" type="button" hidden>再接続</button>
+        <button id="online-leave" type="button" hidden>ルームを退出</button>
+        <button id="online-close-room" type="button" hidden>ルームを終了</button>
+      </div>
     </section>
   </dialog>
   <section class="table-summary" aria-label="点数と席情報"><div class="score-strip"><p class="seat-label" id="label-2"></p><p class="seat-label" id="label-1"></p><p class="seat-label" id="label-0"></p><p class="seat-label" id="label-3"></p></div></section>

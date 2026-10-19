@@ -43,7 +43,7 @@ jobs:
       - name: Run Vite and browser regressions
         shell: bash
         run: |
-          npm run dev -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/heibon-vite.log 2>&1 &
+          VITE_ONLINE_API_URL=https://online-mock.invalid npm run dev -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/heibon-vite.log 2>&1 &
           vite_pid=$!
           trap 'kill "$vite_pid" 2>/dev/null || true' EXIT
           for attempt in {1..30}; do
@@ -85,6 +85,7 @@ jobs:
           run_browser_test tests/browser-step13-9.py
           run_browser_test tests/browser-step13-10.py
           run_browser_test tests/browser-step13-11.py
+          run_browser_test tests/browser-online-waiting-room.py
       - name: Save browser results and screenshots
         if: always()
         uses: actions/upload-artifact@v4

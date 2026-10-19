@@ -1,9 +1,46 @@
+import {
+  ONLINE_WS_PROTOCOL,
+  type OnlineRoomSeat,
+  type OnlineRoomState,
+  type RoomActionResult,
+  type RoomMutationMessage,
+  type RoomStatus,
+} from '../src/online/protocol.ts';
+
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 const TICKET_TTL_MS = 60 * 1000;
-const WS_PROTOCOL = 'heibon-mahjong.v1';
+const MAX_MESSAGE_BYTES = 4096;
+const MAX_OPERATIONS_PER_SEAT = 128;
+const OPERATION_RETENTION_MS = 24 * 60 * 60 * 1000;
+const WS_OPERATIONS_PER_MINUTE = 30;
+const WS_RATE_WINDOW_MS = 60 * 1000;
+const CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/u;
+const TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/u;
+const SEAT_LABELS = ['東', '南', '西', '北'] as const;
 
-type SeatRow = { seat: number; name: string; connected: number };
-type RoomRow = { code: string; created_at: number; expires_at: number };
+type RoomRow = {
+  code: string;
+  created_at: number;
+  expires_at: number;
+  status: RoomStatus;
+  host_seat: number | null;
+  revision: number;
+};
+type SeatRow = {
+  seat: number;
+  name: string;
+  token_hash: string;
+  connected: number;
+  kind: 'human' | 'cpu';
+  ready: number;
+  connection_id: string | null;
+};
+type PublicSeat = OnlineRoomSeat;
+type PublicRoomState = OnlineRoomState;
+type SocketAttachment = { seat: number; connectionId: string; participantId: string };
+type RoomAction = RoomMutationMessage;
+type ActionResult = RoomActionResult;
 
 function json(body: unknown, status = 200, origin?: string): Response {
   const headers = new Headers({
@@ -17,6 +54,13 @@ function json(body: unknown, status = 200, origin?: string): Response {
   return new Response(JSON.stringify(body), { status, headers });
 }
 
+function cleanDisplayName(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const name = value.trim().replace(/\s+/gu, ' ');
+  if (!name || [...name].length > 24 || /[\u0000-\u001f\u007f]/u.test(name)) return null;
+  return name;
+}
+
 function randomToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -27,6 +71,21 @@ async function tokenHash(token: string): Promise<string> {
   return [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+async function internalJson(request: Request): Promise<Record<string, unknown> | null> {
+  const length = Number(request.headers.get('Content-Length') ?? 0);
+  if (Number.isFinite(length) && length > 2048) return null;
+  try {
+    const body = await request.text();
+    if (new TextEncoder().encode(body).byteLength > 2048) return null;
+    const value: unknown = JSON.parse(body);
+    return value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export class RoomDurableObject {
   private readonly ctx: DurableObjectState;
 
@@ -35,46 +94,213 @@ export class RoomDurableObject {
     this.ensureTables();
   }
 
+  private ensureColumn(table: 'room' | 'seats', column: string, declaration: string): boolean {
+    const columns = this.ctx.storage.sql.exec<{ name: string }>(`PRAGMA table_info(${table})`).toArray();
+    if (columns.some(value => value.name === column)) return false;
+    this.ctx.storage.sql.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${declaration}`);
+    return true;
+  }
+
   private ensureTables(): void {
     this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS room (
       code TEXT PRIMARY KEY,
       created_at INTEGER NOT NULL,
-      expires_at INTEGER NOT NULL
+      expires_at INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'waiting',
+      host_seat INTEGER,
+      revision INTEGER NOT NULL DEFAULT 0
     )`);
     this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS seats (
       seat INTEGER PRIMARY KEY,
       name TEXT NOT NULL,
       token_hash TEXT NOT NULL UNIQUE,
-      connected INTEGER NOT NULL DEFAULT 0
+      connected INTEGER NOT NULL DEFAULT 0,
+      kind TEXT NOT NULL DEFAULT 'human',
+      ready INTEGER NOT NULL DEFAULT 0,
+      connection_id TEXT
     )`);
     this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS tickets (
       token_hash TEXT PRIMARY KEY,
       seat INTEGER NOT NULL,
       expires_at INTEGER NOT NULL
     )`);
+
+    // Step 14.0 databases already have these tables. Add only missing columns and
+    // keep every existing seat row and authentication hash intact.
+    const addedHostSeat = this.ensureColumn('room', 'host_seat', 'INTEGER');
+    this.ensureColumn('room', 'status', "TEXT NOT NULL DEFAULT 'waiting'");
+    this.ensureColumn('room', 'revision', 'INTEGER NOT NULL DEFAULT 0');
+    this.ensureColumn('seats', 'kind', "TEXT NOT NULL DEFAULT 'human'");
+    this.ensureColumn('seats', 'ready', 'INTEGER NOT NULL DEFAULT 0');
+    this.ensureColumn('seats', 'connection_id', 'TEXT');
+    if (addedHostSeat) {
+      // Step 14.0 always created seat 0 first. If it is absent, preserve the room
+      // without promoting another participant during migration.
+      this.ctx.storage.sql.exec(`UPDATE room SET host_seat = CASE
+        WHEN EXISTS (SELECT 1 FROM seats WHERE seat = 0 AND kind = 'human') THEN 0
+        ELSE NULL END`);
+    }
+    this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS operations (
+      seat INTEGER NOT NULL,
+      participant_id TEXT NOT NULL,
+      request_id TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      response_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (participant_id, request_id)
+    )`);
+    this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS ws_rate_limit (
+      seat INTEGER PRIMARY KEY,
+      window_start INTEGER NOT NULL,
+      request_count INTEGER NOT NULL
+    )`);
   }
 
   private room(): RoomRow | undefined {
-    return this.ctx.storage.sql.exec<RoomRow>('SELECT code, created_at, expires_at FROM room LIMIT 1').toArray()[0];
+    return this.ctx.storage.sql.exec<RoomRow>(
+      'SELECT code, created_at, expires_at, status, host_seat, revision FROM room LIMIT 1',
+    ).toArray()[0];
   }
 
   private seats(): SeatRow[] {
-    return this.ctx.storage.sql.exec<SeatRow>('SELECT seat, name, connected FROM seats ORDER BY seat').toArray();
+    return this.ctx.storage.sql.exec<SeatRow>(
+      'SELECT seat, name, token_hash, connected, kind, ready, connection_id FROM seats ORDER BY seat',
+    ).toArray();
   }
 
-  private publicState(room = this.room()): { roomCode: string; createdAt: number; expiresAt: number; seats: { seat: number; name: string; connected: boolean }[] } | null {
+  private seat(seat: number): SeatRow | undefined {
+    return this.ctx.storage.sql.exec<SeatRow>(
+      'SELECT seat, name, token_hash, connected, kind, ready, connection_id FROM seats WHERE seat = ?', seat,
+    ).toArray()[0];
+  }
+
+  private publicState(room = this.room()): PublicRoomState | null {
     if (!room) return null;
+    const stored = new Map(this.seats().map(value => [value.seat, value]));
+    const seats: PublicSeat[] = [0, 1, 2, 3].map(seat => {
+      const player = stored.get(seat);
+      if (!player) return { seat, kind: 'empty', name: null, connected: false, ready: false, isHost: false };
+      const kind = player.kind;
+      return {
+        seat,
+        kind,
+        name: player.name,
+        connected: kind === 'human' && player.connected === 1,
+        ready: kind === 'human' && player.ready === 1,
+        isHost: kind === 'human' && room.host_seat === seat,
+      };
+    });
     return {
       roomCode: room.code,
+      status: room.status,
+      hostSeat: room.host_seat,
+      revision: room.revision,
       createdAt: room.created_at,
       expiresAt: room.expires_at,
-      seats: this.seats().map(({ seat, name, connected }) => ({ seat, name, connected: connected === 1 })),
+      seats,
     };
+  }
+
+  private attachment(socket: WebSocket): SocketAttachment | null {
+    const extended = socket as WebSocket & { deserializeAttachment?: () => unknown };
+    const value = extended.deserializeAttachment?.();
+    if (!value || typeof value !== 'object') return null;
+    const attachment = value as Partial<SocketAttachment>;
+    return Number.isInteger(attachment.seat) && attachment.seat! >= 0 && attachment.seat! < 4 &&
+      typeof attachment.connectionId === 'string' && /^[a-f0-9]{64}$/u.test(String(attachment.participantId ?? ''))
+      ? { seat: attachment.seat!, connectionId: attachment.connectionId, participantId: String(attachment.participantId) }
+      : null;
+  }
+
+  private liveConnectionIds(): Map<number, Set<string>> {
+    const live = new Map<number, Set<string>>();
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socket.readyState !== 1) continue;
+      const attachment = this.attachment(socket);
+      if (!attachment) continue;
+      const ids = live.get(attachment.seat) ?? new Set<string>();
+      ids.add(attachment.connectionId);
+      live.set(attachment.seat, ids);
+    }
+    return live;
+  }
+
+  private reconcileConnections(): boolean {
+    const room = this.room();
+    if (!room || room.status === 'closed') return false;
+    const live = this.liveConnectionIds();
+    let changed = false;
+    for (const player of this.seats()) {
+      if (player.kind !== 'human') continue;
+      const connected = Boolean(player.connection_id && live.get(player.seat)?.has(player.connection_id));
+      if ((player.connected === 1) !== connected || (!connected && player.ready === 1)) {
+        this.ctx.storage.sql.exec(
+          'UPDATE seats SET connected = ?, ready = ?, connection_id = ? WHERE seat = ?',
+          connected ? 1 : 0,
+          connected ? player.ready : 0,
+          connected ? player.connection_id : null,
+          player.seat,
+        );
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  private incrementRevision(): number {
+    this.ctx.storage.sql.exec('UPDATE room SET revision = revision + 1');
+    return this.room()?.revision ?? 0;
+  }
+
+  private sendState(socket: WebSocket, state = this.publicState()): void {
+    if (!state) return;
+    const payload = JSON.stringify({ type: 'room-state', ...state });
+    try { socket.send(payload); } catch { /* A closing connection is ignored. */ }
+  }
+
+  private broadcast(reconcile = true): void {
+    if (reconcile && this.reconcileConnections()) this.incrementRevision();
+    const state = this.publicState();
+    if (!state) return;
+    const current = JSON.stringify({ type: 'room-state', ...state });
+    // Keep the Step 14.0 alias during the v1 client transition. Both messages
+    // carry the same complete state and revision; clients ignore duplicates.
+    const legacy = JSON.stringify({ type: 'room_state', ...state });
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socket.readyState !== 1) continue;
+      try {
+        socket.send(current);
+        socket.send(legacy);
+        if (state.status === 'closed') socket.send(JSON.stringify({ type: 'room-closed', revision: state.revision }));
+      } catch { /* A closing connection is ignored. */ }
+    }
+  }
+
+  private sendError(socket: WebSocket, code: string, requestId?: string, retryAfterMs?: number): void {
+    const error: Record<string, unknown> = { type: 'error', code };
+    if (requestId) error.requestId = requestId;
+    if (retryAfterMs !== undefined) error.retryAfterMs = retryAfterMs;
+    try { socket.send(JSON.stringify(error)); } catch { /* A closing connection is ignored. */ }
+  }
+
+  private closeSockets(code: number, reason: string, seat?: number): void {
+    const sockets = seat === undefined ? this.ctx.getWebSockets() : this.ctx.getWebSockets(`seat-${seat}`);
+    for (const socket of sockets) {
+      try { socket.close(code, reason); } catch { /* Already closed. */ }
+    }
   }
 
   private async clearExpired(): Promise<boolean> {
     const room = this.room();
     if (!room || room.expires_at > Date.now()) return false;
+    if (room.status !== 'closed') {
+      this.ctx.storage.transactionSync(() => {
+        this.ctx.storage.sql.exec("UPDATE room SET status = 'closed', revision = revision + 1");
+        this.ctx.storage.sql.exec('DELETE FROM tickets');
+      });
+      this.broadcast(false);
+      this.closeSockets(4002, 'Room expired');
+    }
     await this.ctx.storage.deleteAll();
     this.ensureTables();
     return true;
@@ -84,33 +310,44 @@ export class RoomDurableObject {
     if (await this.clearExpired()) return json({ error: 'room_expired' }, 410, origin);
     const state = this.publicState();
     if (!state) return json({ error: 'room_not_found' }, 404, origin);
+    if (this.reconcileConnections()) {
+      this.incrementRevision();
+      this.broadcast(false);
+      return json(this.publicState(), 200, origin);
+    }
     return json(state, 200, origin);
   }
 
-  private async broadcast(): Promise<void> {
-    const state = this.publicState();
-    if (!state) return;
-    const message = JSON.stringify({ type: 'room_state', ...state });
-    for (const socket of this.ctx.getWebSockets()) {
-      try { socket.send(message); } catch { /* Closed sockets are discarded by the runtime. */ }
-    }
-  }
-
   async fetch(request: Request): Promise<Response> {
-    this.ensureTables();
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') ?? undefined;
 
     if (url.pathname === '/internal/create' && request.method === 'POST') {
-      const body = await request.json() as { code?: string; displayName?: string; participantToken?: string };
+      const body = await internalJson(request);
+      const displayName = cleanDisplayName(body?.displayName);
+      if (!body || !CODE_PATTERN.test(String(body.code ?? '')) || !displayName ||
+          !TOKEN_PATTERN.test(String(body.participantToken ?? ''))) {
+        return json({ error: 'invalid_room' }, 400, origin);
+      }
       if (this.room()) return json({ error: 'room_exists' }, 409, origin);
-      if (!body.code || !body.displayName || !body.participantToken) return json({ error: 'invalid_room' }, 400, origin);
       const now = Date.now();
       const expiresAt = now + ROOM_TTL_MS;
-      this.ctx.storage.sql.exec('INSERT INTO room (code, created_at, expires_at) VALUES (?, ?, ?)', body.code, now, expiresAt);
-      this.ctx.storage.sql.exec('INSERT INTO seats (seat, name, token_hash, connected) VALUES (?, ?, ?, 0)', 0, body.displayName, await tokenHash(body.participantToken));
+      const hash = await tokenHash(String(body.participantToken));
+      const created = this.ctx.storage.transactionSync(() => {
+        if (this.room()) return false;
+        this.ctx.storage.sql.exec(
+          "INSERT INTO room (code, created_at, expires_at, status, host_seat, revision) VALUES (?, ?, ?, 'waiting', 0, 0)",
+          body.code, now, expiresAt,
+        );
+        this.ctx.storage.sql.exec(
+          'INSERT INTO seats (seat, name, token_hash, connected, kind, ready, connection_id) VALUES (0, ?, ?, 0, \'human\', 0, NULL)',
+          displayName, hash,
+        );
+        return true;
+      });
+      if (!created) return json({ error: 'room_exists' }, 409, origin);
       await this.ctx.storage.setAlarm(expiresAt);
-      return json({ ...this.publicState() }, 201, origin);
+      return json(this.publicState(), 201, origin);
     }
 
     if (await this.clearExpired()) return json({ error: 'room_expired' }, 410, origin);
@@ -118,30 +355,58 @@ export class RoomDurableObject {
     if (url.pathname === '/internal/state' && request.method === 'GET') return this.responseForState(origin);
 
     if (url.pathname === '/internal/join' && request.method === 'POST') {
-      const body = await request.json() as { displayName?: string; participantToken?: string };
-      const room = this.room();
-      if (!room) return json({ error: 'room_not_found' }, 404, origin);
-      if (!body.displayName || !body.participantToken) return json({ error: 'invalid_join' }, 400, origin);
-      const seats = this.seats();
-      const used = new Set(seats.map(seat => seat.seat));
-      const playerSeat = [0, 1, 2, 3].find(seat => !used.has(seat));
-      if (playerSeat === undefined) return json({ error: 'room_full' }, 409, origin);
-      this.ctx.storage.sql.exec('INSERT INTO seats (seat, name, token_hash, connected) VALUES (?, ?, ?, 0)', playerSeat, body.displayName, await tokenHash(body.participantToken));
-      const state = this.publicState()!;
-      await this.broadcast();
-      return json({ playerSeat, createdAt: state.createdAt, expiresAt: state.expiresAt, seats: state.seats }, 201, origin);
+      const body = await internalJson(request);
+      const displayName = cleanDisplayName(body?.displayName);
+      if (!body || !displayName || !TOKEN_PATTERN.test(String(body.participantToken ?? ''))) {
+        return json({ error: 'invalid_join' }, 400, origin);
+      }
+      const hash = await tokenHash(String(body.participantToken));
+      const joined = this.ctx.storage.transactionSync(() => {
+        const room = this.room();
+        if (!room) return { status: 404, code: 'room_not_found' } as const;
+        if (room.status === 'closed') return { status: 410, code: 'room_closed' } as const;
+        if (room.status !== 'waiting') return { status: 409, code: 'room_finalized' } as const;
+        const humans = this.seats().filter(seat => seat.kind === 'human');
+        const occupied = new Set(humans.map(seat => seat.seat));
+        const playerSeat = [0, 1, 2, 3].find(seat => !occupied.has(seat));
+        if (playerSeat === undefined) return { status: 409, code: 'room_full' } as const;
+        this.ctx.storage.sql.exec('UPDATE seats SET ready = 0 WHERE kind = \'human\'');
+        this.ctx.storage.sql.exec(
+          'INSERT INTO seats (seat, name, token_hash, connected, kind, ready, connection_id) VALUES (?, ?, ?, 0, \'human\', 0, NULL)',
+          playerSeat, displayName, hash,
+        );
+        const revision = this.incrementRevision();
+        return { status: 201, playerSeat, revision } as const;
+      });
+      if (joined.status !== 201) return json({ error: joined.code }, joined.status, origin);
+      this.broadcast();
+      const state = this.publicState();
+      return json({ ...state, playerSeat: joined.playerSeat }, 201, origin);
     }
 
     if (url.pathname === '/internal/ticket' && request.method === 'POST') {
-      const body = await request.json() as { participantToken?: string };
-      if (!body.participantToken) return json({ error: 'unauthorized' }, 401, origin);
-      const hash = await tokenHash(body.participantToken);
-      const seat = this.ctx.storage.sql.exec<{ seat: number }>('SELECT seat FROM seats WHERE token_hash = ?', hash).toArray()[0];
-      if (!seat) return json({ error: 'unauthorized' }, 401, origin);
+      const body = await internalJson(request);
+      const participantToken = body?.participantToken;
+      if (typeof participantToken !== 'string' || !TOKEN_PATTERN.test(participantToken)) {
+        return json({ error: 'unauthorized' }, 401, origin);
+      }
+      const room = this.room();
+      if (!room) return json({ error: 'room_not_found' }, 404, origin);
+      if (room.status === 'closed') return json({ error: 'room_closed' }, 410, origin);
+      const hash = await tokenHash(participantToken);
+      const player = this.ctx.storage.sql.exec<{ seat: number; kind: string }>(
+        "SELECT seat, kind FROM seats WHERE token_hash = ? AND kind = 'human'", hash,
+      ).toArray()[0];
+      if (!player) return json({ error: 'unauthorized' }, 401, origin);
       const ticket = randomToken();
+      const digest = await tokenHash(ticket);
       const expiresAt = Date.now() + TICKET_TTL_MS;
-      this.ctx.storage.sql.exec('DELETE FROM tickets WHERE expires_at <= ?', Date.now());
-      this.ctx.storage.sql.exec('INSERT INTO tickets (token_hash, seat, expires_at) VALUES (?, ?, ?)', await tokenHash(ticket), seat.seat, expiresAt);
+      this.ctx.storage.transactionSync(() => {
+        this.ctx.storage.sql.exec('DELETE FROM tickets WHERE expires_at <= ?', Date.now());
+        this.ctx.storage.sql.exec(
+          'INSERT INTO tickets (token_hash, seat, expires_at) VALUES (?, ?, ?)', digest, player.seat, expiresAt,
+        );
+      });
       return json({ ticket, expiresAt }, 200, origin);
     }
 
@@ -152,51 +417,332 @@ export class RoomDurableObject {
 
   private async connectWebSocket(request: Request, origin?: string): Promise<Response> {
     if (!origin) return json({ error: 'origin_required' }, 403);
-    const offered = (request.headers.get('Sec-WebSocket-Protocol') ?? '').split(',').map(value => value.trim()).filter(Boolean);
-    if (!offered.includes(WS_PROTOCOL)) return json({ error: 'websocket_protocol_required' }, 400, origin);
+    const room = this.room();
+    if (!room) return json({ error: 'room_not_found' }, 404, origin);
+    if (room.status === 'closed') return json({ error: 'room_closed' }, 410, origin);
+    const offered = (request.headers.get('Sec-WebSocket-Protocol') ?? '')
+      .split(',').map(value => value.trim()).filter(Boolean);
+    if (!offered.includes(ONLINE_WS_PROTOCOL)) return json({ error: 'websocket_protocol_required' }, 400, origin);
     const ticketProtocol = offered.find(value => value.startsWith('ticket.'));
     const ticket = ticketProtocol?.slice('ticket.'.length) ?? '';
-    if (!/^[a-f0-9]{64}$/u.test(ticket)) return json({ error: 'invalid_ticket' }, 401, origin);
+    if (!TOKEN_PATTERN.test(ticket)) return json({ error: 'invalid_ticket' }, 401, origin);
 
     const ticketDigest = await tokenHash(ticket);
-    const row = this.ctx.storage.sql.exec<{ seat: number; expires_at: number }>(
-      'SELECT seat, expires_at FROM tickets WHERE token_hash = ?', ticketDigest,
-    ).toArray()[0];
-    if (!row || row.expires_at < Date.now()) return json({ error: 'invalid_ticket' }, 401, origin);
-    this.ctx.storage.sql.exec('DELETE FROM tickets WHERE token_hash = ?', ticketDigest);
+    const row = this.ctx.storage.transactionSync(() => {
+      const value = this.ctx.storage.sql.exec<{ seat: number; expires_at: number }>(
+        'SELECT seat, expires_at FROM tickets WHERE token_hash = ?', ticketDigest,
+      ).toArray()[0];
+      if (!value || value.expires_at <= Date.now()) return undefined;
+      this.ctx.storage.sql.exec('DELETE FROM tickets WHERE token_hash = ?', ticketDigest);
+      return value;
+    });
+    if (!row) return json({ error: 'invalid_ticket' }, 401, origin);
+    const player = this.seat(row.seat);
+    if (!player || player.kind !== 'human' || (this.room()?.status ?? 'closed') === 'closed') {
+      return json({ error: 'invalid_ticket' }, 401, origin);
+    }
 
     const tag = `seat-${row.seat}`;
     for (const existing of this.ctx.getWebSockets(tag)) {
       try { existing.close(4001, 'Reconnected elsewhere'); } catch { /* Already closed. */ }
     }
     const pair = new WebSocketPair();
+    const connectionId = randomToken();
     this.ctx.acceptWebSocket(pair[1], [tag]);
     const accepted = pair[1] as WebSocket & { serializeAttachment?: (attachment: unknown) => void };
-    accepted.serializeAttachment?.({ seat: row.seat });
-    this.ctx.storage.sql.exec('UPDATE seats SET connected = 1 WHERE seat = ?', row.seat);
-    await this.broadcast();
+    accepted.serializeAttachment?.({ seat: row.seat, connectionId, participantId: player.token_hash } satisfies SocketAttachment);
+    const changed = player.connected !== 1 || player.ready !== 0;
+    this.ctx.storage.sql.exec(
+      'UPDATE seats SET connected = 1, ready = 0, connection_id = ? WHERE seat = ?', connectionId, row.seat,
+    );
+    if (changed) this.incrementRevision();
+    this.broadcast();
     const headers = new Headers({
-      'Sec-WebSocket-Protocol': WS_PROTOCOL,
+      'Sec-WebSocket-Protocol': ONLINE_WS_PROTOCOL,
       'Access-Control-Allow-Origin': origin,
       'Vary': 'Origin',
     });
     return new Response(null, { status: 101, headers, webSocket: pair[0] } as ResponseInit & { webSocket: WebSocket });
   }
 
+  private consumeSocketRateLimit(seat: number): { allowed: boolean; retryAfterMs: number } {
+    const now = Date.now();
+    const entry = this.ctx.storage.sql.exec<{ window_start: number; request_count: number }>(
+      'SELECT window_start, request_count FROM ws_rate_limit WHERE seat = ?', seat,
+    ).toArray()[0];
+    if (!entry || now - entry.window_start >= WS_RATE_WINDOW_MS) {
+      this.ctx.storage.sql.exec(
+        'INSERT INTO ws_rate_limit (seat, window_start, request_count) VALUES (?, ?, 1) ON CONFLICT(seat) DO UPDATE SET window_start = excluded.window_start, request_count = 1',
+        seat, now,
+      );
+      return { allowed: true, retryAfterMs: 0 };
+    }
+    if (entry.request_count >= WS_OPERATIONS_PER_MINUTE) {
+      return { allowed: false, retryAfterMs: Math.max(1, WS_RATE_WINDOW_MS - (now - entry.window_start)) };
+    }
+    this.ctx.storage.sql.exec('UPDATE ws_rate_limit SET request_count = request_count + 1 WHERE seat = ?', seat);
+    return { allowed: true, retryAfterMs: 0 };
+  }
+
+  private parseSocketAction(value: unknown): RoomAction | 'request-state' | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const message = value as Record<string, unknown>;
+    if (message.type === 'request-state') return Object.keys(message).length === 1 ? 'request-state' : null;
+    if (message.type !== 'set-ready' && message.type !== 'finalize-seats' &&
+        message.type !== 'leave-room' && message.type !== 'close-room') return null;
+    if (typeof message.requestId !== 'string' || !REQUEST_ID_PATTERN.test(message.requestId) ||
+        !Number.isSafeInteger(message.expectedRevision) || (message.expectedRevision as number) < 0) return null;
+    const allowed = message.type === 'set-ready'
+      ? ['type', 'requestId', 'expectedRevision', 'ready']
+      : ['type', 'requestId', 'expectedRevision'];
+    if (Object.keys(message).some(key => !allowed.includes(key))) return null;
+    if (message.type === 'set-ready' && typeof message.ready !== 'boolean') return null;
+    return message as RoomAction;
+  }
+
+  private rememberOperation(participantId: string, seat: number, requestId: string, payload: string, result: ActionResult): void {
+    const now = Date.now();
+    this.ctx.storage.sql.exec(
+      'DELETE FROM operations WHERE created_at < ?', now - OPERATION_RETENTION_MS,
+    );
+    this.ctx.storage.sql.exec(
+      'INSERT INTO operations (seat, participant_id, request_id, payload, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      seat, participantId, requestId, payload, JSON.stringify(result), now,
+    );
+    this.ctx.storage.sql.exec(`DELETE FROM operations WHERE participant_id = ? AND request_id IN (
+      SELECT request_id FROM operations WHERE participant_id = ? ORDER BY created_at DESC, request_id DESC
+      LIMIT -1 OFFSET ${MAX_OPERATIONS_PER_SEAT}
+    )`, participantId, participantId);
+  }
+
+  private applyAction(attachment: SocketAttachment, action: RoomAction): {
+    result: ActionResult;
+    changed: boolean;
+    closeSeat?: number;
+    closeRoom?: boolean;
+    sendState: boolean;
+  } {
+    const payload = JSON.stringify(action.type === 'set-ready'
+      ? { type: action.type, expectedRevision: action.expectedRevision, ready: action.ready }
+      : { type: action.type, expectedRevision: action.expectedRevision });
+    return this.ctx.storage.transactionSync(() => {
+      const previous = this.ctx.storage.sql.exec<{ payload: string; response_json: string }>(
+        'SELECT payload, response_json FROM operations WHERE participant_id = ? AND request_id = ?',
+        attachment.participantId, action.requestId,
+      ).toArray()[0];
+      if (previous) {
+        if (previous.payload === payload) {
+          return {
+            result: JSON.parse(previous.response_json) as ActionResult,
+            changed: false,
+            sendState: true,
+          };
+        }
+        return {
+          result: { type: 'action-result', requestId: action.requestId, ok: false, revision: this.room()?.revision ?? 0, code: 'request_id_reused' },
+          changed: false,
+          sendState: false,
+        };
+      }
+
+      const room = this.room();
+      const actor = this.seat(attachment.seat);
+      const currentRevision = room?.revision ?? 0;
+      let code: string | undefined;
+      if (!room || !actor || actor.kind !== 'human') code = 'unauthorized';
+      else if (actor.token_hash !== attachment.participantId) code = 'unauthorized';
+      else if (actor.connection_id !== attachment.connectionId || actor.connected !== 1) code = 'stale_connection';
+      else if (room.expires_at <= Date.now() || room.status === 'closed') code = 'room_closed';
+      else if (action.expectedRevision !== room.revision) code = 'revision_conflict';
+      else if (action.type === 'set-ready') {
+        if (room.status !== 'waiting') code = 'room_finalized';
+        else if (actor.ready !== (action.ready ? 1 : 0)) {
+          this.ctx.storage.sql.exec('UPDATE seats SET ready = ? WHERE seat = ?', action.ready ? 1 : 0, actor.seat);
+          this.incrementRevision();
+        }
+      } else if (action.type === 'finalize-seats') {
+        if (room.host_seat !== actor.seat) code = 'not_host';
+        else if (room.status !== 'waiting') code = room.status === 'finalized' ? 'already_finalized' : 'room_closed';
+        else {
+          const humans = this.seats().filter(seat => seat.kind === 'human');
+          if (humans.length === 0) code = 'no_participants';
+          else if (humans.some(seat => seat.connected !== 1)) code = 'player_disconnected';
+          else if (humans.some(seat => seat.ready !== 1)) code = 'players_not_ready';
+          else {
+            const occupied = new Set(humans.map(seat => seat.seat));
+            for (const seat of [0, 1, 2, 3]) {
+              if (occupied.has(seat)) continue;
+              this.ctx.storage.sql.exec(
+                "INSERT INTO seats (seat, name, token_hash, connected, kind, ready, connection_id) VALUES (?, ?, ?, 0, 'cpu', 0, NULL)",
+                seat, `CPU（${SEAT_LABELS[seat]}席）`, `cpu:${seat}`,
+              );
+            }
+            this.ctx.storage.sql.exec("UPDATE room SET status = 'finalized'");
+            this.incrementRevision();
+          }
+        }
+      } else if (action.type === 'leave-room') {
+        const wasHost = room.host_seat === actor.seat;
+        const humans = this.seats().filter(seat => seat.kind === 'human');
+        this.ctx.storage.sql.exec("DELETE FROM seats WHERE kind = 'cpu'");
+        this.ctx.storage.sql.exec('DELETE FROM tickets WHERE seat = ?', actor.seat);
+        this.ctx.storage.sql.exec('DELETE FROM seats WHERE seat = ? AND kind = \'human\'', actor.seat);
+        const remaining = humans.filter(seat => seat.seat !== actor.seat);
+        this.ctx.storage.sql.exec('UPDATE seats SET ready = 0 WHERE kind = \'human\'');
+        if (remaining.length === 0) {
+          this.ctx.storage.sql.exec("UPDATE room SET status = 'closed', host_seat = NULL");
+        } else if (wasHost) {
+          const successor = Math.min(...remaining.map(seat => seat.seat));
+          this.ctx.storage.sql.exec('UPDATE room SET status = \'waiting\', host_seat = ?', successor);
+        } else {
+          this.ctx.storage.sql.exec("UPDATE room SET status = 'waiting'");
+        }
+        this.incrementRevision();
+      } else if (action.type === 'close-room') {
+        if (room.host_seat !== actor.seat) code = 'not_host';
+        else if (room.status !== 'waiting' && room.status !== 'finalized') code = 'room_closed';
+        else {
+          this.ctx.storage.sql.exec("UPDATE room SET status = 'closed'");
+          this.ctx.storage.sql.exec('DELETE FROM tickets');
+          this.incrementRevision();
+        }
+      }
+
+      const result: ActionResult = code
+        ? { type: 'action-result', requestId: action.requestId, ok: false, revision: this.room()?.revision ?? currentRevision, code }
+        : { type: 'action-result', requestId: action.requestId, ok: true, revision: this.room()?.revision ?? currentRevision };
+      this.rememberOperation(attachment.participantId, attachment.seat, action.requestId, payload, result);
+      const changed = result.ok && ['set-ready', 'finalize-seats', 'leave-room', 'close-room'].includes(action.type) &&
+        result.revision !== currentRevision;
+      return {
+        result,
+        changed,
+        closeSeat: result.ok && action.type === 'leave-room' ? attachment.seat : undefined,
+        closeRoom: code === 'room_closed' || result.ok && action.type === 'close-room' ||
+          (result.ok && action.type === 'leave-room' && this.room()?.status === 'closed'),
+        sendState: result.ok || code === 'revision_conflict',
+      };
+    });
+  }
+
+  webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): void {
+    const attachment = this.attachment(socket);
+    if (!attachment) {
+      this.sendError(socket, 'unauthorized');
+      return;
+    }
+    const rate = this.consumeSocketRateLimit(attachment.seat);
+    if (!rate.allowed) {
+      this.sendError(socket, 'rate_limited', undefined, rate.retryAfterMs);
+      return;
+    }
+    let text: string;
+    try {
+      if (typeof message === 'string') text = message;
+      else if (message instanceof ArrayBuffer) text = new TextDecoder().decode(message);
+      else {
+        this.sendError(socket, 'invalid_message');
+        return;
+      }
+    } catch {
+      this.sendError(socket, 'invalid_message');
+      return;
+    }
+    if (new TextEncoder().encode(text).byteLength > MAX_MESSAGE_BYTES) {
+      this.sendError(socket, 'message_too_large');
+      try { socket.close(1009, 'Message too large'); } catch { /* Already closed. */ }
+      return;
+    }
+    let decoded: unknown;
+    try { decoded = JSON.parse(text); } catch {
+      this.sendError(socket, 'invalid_json');
+      return;
+    }
+    const action = this.parseSocketAction(decoded);
+    if (!action) {
+      this.sendError(socket, 'invalid_message');
+      return;
+    }
+
+    if (action === 'request-state') {
+      const room = this.room();
+      const participant = this.seat(attachment.seat);
+      if (!participant || participant.kind !== 'human' || participant.token_hash !== attachment.participantId) {
+        this.sendError(socket, 'unauthorized');
+        try { socket.close(4003, 'Participant is no longer in the room'); } catch { /* Already closed. */ }
+        return;
+      }
+      if (participant.connection_id !== attachment.connectionId || participant.connected !== 1) {
+        this.sendError(socket, 'stale_connection');
+        try { socket.close(4001, 'Reconnected elsewhere'); } catch { /* Already closed. */ }
+        return;
+      }
+      if (!room || room.status === 'closed' || room.expires_at <= Date.now()) {
+        this.sendError(socket, 'room_closed');
+        try { socket.close(4002, 'Room closed or expired'); } catch { /* Already closed. */ }
+        return;
+      }
+      if (this.reconcileConnections()) {
+        this.incrementRevision();
+        this.broadcast(false);
+      } else {
+        this.sendState(socket);
+      }
+      return;
+    }
+
+    if (this.reconcileConnections()) {
+      this.incrementRevision();
+      this.broadcast(false);
+    }
+    const outcome = this.applyAction(attachment, action);
+    try { socket.send(JSON.stringify(outcome.result)); } catch { /* Result remains durable for requestId replay. */ }
+    if (outcome.changed) this.broadcast();
+    else if (outcome.sendState) this.sendState(socket);
+    if (outcome.closeSeat !== undefined) this.closeSockets(4003, 'Participant left the room', outcome.closeSeat);
+    if (outcome.closeRoom) this.closeSockets(4002, 'Room closed');
+  }
+
+  private socketEnded(socket: WebSocket): void {
+    const attachment = this.attachment(socket);
+    if (!attachment) return;
+    const room = this.room();
+    const player = this.seat(attachment.seat);
+    // A delayed close from a replaced socket cannot mark the current connection offline.
+    if (!room || room.status === 'closed' || !player || player.connection_id !== attachment.connectionId) return;
+    const changed = player.connected === 1 || player.ready === 1;
+    this.ctx.storage.sql.exec(
+      'UPDATE seats SET connected = 0, ready = 0, connection_id = NULL WHERE seat = ?', attachment.seat,
+    );
+    if (changed) this.incrementRevision();
+    this.broadcast(false);
+  }
+
   webSocketClose(socket: WebSocket): void {
-    const extended = socket as WebSocket & { deserializeAttachment?: () => unknown };
-    const attachment = extended.deserializeAttachment?.() as { seat?: number } | null | undefined;
-    if (attachment?.seat === undefined) return;
-    const stillConnected = this.ctx.getWebSockets(`seat-${attachment.seat}`).some(candidate => candidate !== socket);
-    this.ctx.storage.sql.exec('UPDATE seats SET connected = ? WHERE seat = ?', stillConnected ? 1 : 0, attachment.seat);
-    void this.broadcast();
+    this.socketEnded(socket);
   }
 
   webSocketError(socket: WebSocket): void {
-    this.webSocketClose(socket);
+    this.socketEnded(socket);
   }
 
   async alarm(): Promise<void> {
+    const room = this.room();
+    if (!room) return;
+    const now = Date.now();
+    if (now < room.expires_at) {
+      await this.ctx.storage.setAlarm(room.expires_at);
+      return;
+    }
+    if (room.status !== 'closed') {
+      this.ctx.storage.transactionSync(() => {
+        this.ctx.storage.sql.exec("UPDATE room SET status = 'closed', revision = revision + 1");
+        this.ctx.storage.sql.exec('DELETE FROM tickets');
+      });
+      this.broadcast(false);
+      this.closeSockets(4002, 'Room expired');
+    }
     await this.ctx.storage.deleteAll();
+    this.ensureTables();
   }
 }

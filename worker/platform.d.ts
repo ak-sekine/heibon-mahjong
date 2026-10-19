@@ -13,6 +13,7 @@ interface DurableObjectStorage {
   sql: SqlStorage;
   setAlarm(timestamp: number): Promise<void>;
   deleteAll(): Promise<void>;
+  transactionSync<T>(closure: () => T): T;
 }
 
 interface DurableObjectState {
@@ -28,6 +29,7 @@ interface DurableObjectNamespace {
 
 interface Env {
   ROOMS: DurableObjectNamespace;
+  RATE_LIMITER: DurableObjectNamespace;
 }
 
 declare const WebSocketPair: {
