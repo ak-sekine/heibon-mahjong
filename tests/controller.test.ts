@@ -22,7 +22,7 @@ test('selection toggles by physical ID without changing game; confirmation is si
   assert.deepEqual(ui.game, snapshot);
   ui.select(a.id);
   ui.confirm();
-  assert.equal(ui.game.players[0].river[0], a);
+  assert.equal(ui.game.players[0].discardHistory[0], a);
   assert.equal(ui.game.players[0].hand.length, 13);
   assert.equal(ui.selectedTileId, null);
   assert.equal(ui.canConfirm, false);
