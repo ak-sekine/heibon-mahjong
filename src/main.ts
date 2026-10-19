@@ -7,6 +7,7 @@ import { renderMatch } from './rendering/match.ts';
 import { ResultDialog } from './ui/result-dialog.ts';
 import { NewGameDialog } from './ui/new-game-dialog.ts';
 import { GameController } from './ui/controller.ts';
+import { OnlineWaitingRoom } from './online/waiting-room.ts';
 
 installCallViewport();
 const resultDialog = new ResultDialog();
@@ -19,6 +20,7 @@ function render(): void {
 }
 function newGame(): void { controller.newGame(); window.scrollTo(0, 0); }
 new NewGameDialog(newGame);
+if (document.querySelector('#online-open')) new OnlineWaitingRoom(import.meta.env.VITE_ONLINE_API_URL);
 document.querySelector('#player-hand')!.addEventListener('click', event => {
   const button = (event.target as Element).closest<HTMLButtonElement>('button[data-tile-id]');
   if (!button) return;

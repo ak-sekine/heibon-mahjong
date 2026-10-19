@@ -9,7 +9,21 @@
 </head>
 <body>
 <main>
-  <header><div><h1>Heibon Mahjong</h1></div><button id="new-game" type="button">新しい対局</button></header>
+  <header><div><h1>Heibon Mahjong</h1></div><div class="header-actions"><button id="online-open" type="button" aria-haspopup="dialog">オンライン待機</button><button id="new-game" type="button">新しい対局</button></div></header>
+  <dialog id="online-dialog" aria-labelledby="online-title">
+    <header class="online-dialog-header"><h2 id="online-title">オンライン待機</h2><button id="online-close" type="button" aria-label="オンライン待機を閉じる">閉じる</button></header>
+    <p id="online-status" role="status" aria-live="polite">オンライン接続を準備しています。</p>
+    <section id="online-room-forms" aria-label="ルームの作成と参加">
+      <form id="online-create"><label for="online-name">表示名</label><input id="online-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" required><button type="submit">ルームを作成</button></form>
+      <form id="online-join"><label for="online-join-name">表示名</label><input id="online-join-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" required><label for="online-join-code">ルームコードで参加</label><input id="online-join-code" name="roomCode" type="text" maxlength="6" pattern="[A-HJ-NP-Z2-9]{6}" autocapitalize="characters" autocomplete="off" required><button type="submit">参加する</button></form>
+    </section>
+    <section id="online-room" aria-label="ルームの座席" aria-live="polite" hidden>
+      <p>ルームコード：<strong id="online-room-code">—</strong></p>
+      <p>有効期限：<time id="online-room-expiry">—</time></p>
+      <ol id="online-seats"></ol>
+      <button id="online-reconnect" type="button" hidden>再接続</button>
+    </section>
+  </dialog>
   <section class="table-summary" aria-label="点数と席情報"><div class="score-strip"><p class="seat-label" id="label-2"></p><p class="seat-label" id="label-1"></p><p class="seat-label" id="label-0"></p><p class="seat-label" id="label-3"></p></div></section>
   <section class="table" aria-label="4人麻雀卓">
     <section class="seat seat-top" data-player-id="2" aria-label="CPU2の席"><div class="concealed-hand" data-player-id="2" role="img"></div><div class="open-melds" data-player-id="2"></div></section>

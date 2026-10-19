@@ -39,5 +39,6 @@ READMEから移した各Stepの本文と、本文にあった検証資料・ス�
 | 13.9 | 海底摸月・河底撈魚 | 2026-10-18 | [開発記録](step-13.9.md) · [検証記録](../verification/step13.9/README.md) |
 | 13.10 | 流し満貫・九種九牌・四風連打・四家立直 | 2026-10-18〜19 | [開発記録](step-13.10.md) · [検証記録](../verification/step13.10/README.md) |
 | 13.11 | 天和・地和 | 2026-10-19 | [開発記録](step-13.11.md) · [検証記録](../verification/step13.11/README.md) |
+| 14.0 | Cloudflare Workersによるオンライン待機と座席同期 | 2026-10-19 | [開発記録](step-14.0.md) · [本番検証記録](../verification/step14.0/README.md) |
 
 Step 13.5のiPhone Safari実機確認は[2026-10-18の検証記録](../verification/kan-safari-2026-10-18.md)を参照してください。
