@@ -2,7 +2,7 @@
 
 **実施日:** 2026-10-19
 **対象:** `ak-sekine/heibon-mahjong`
-**状態:** ローカル実装・検証済み。本番Cloudflare通信とGitHub Actionsの結果はpush後に追記する。
+**状態:** 実装済み。ローカル検証、本番Cloudflare通信、GitHub Actions、Pages deployは成功。iPhone Safari実機確認は未実施。
 
 ## 目的と範囲
 
@@ -70,8 +70,8 @@ CPUはブラウザーで実行しません。既存のツモ・九種九牌・�
 - WebSocket HibernationとSQLiteを維持し、常時ポーリングや新しい有料Cloudflare機能を追加しません。
 - CPU判断は1 alarmにつき最大1ゲーム操作です。オンラインのリーチ候補評価は2.5msの期限、シャンテン探索は2ms区間・3ms中断予算で実行し、超過時は合法・決定的フォールバックを使います。全局の決定的なローカルhuman+CPU結合テストは約1.4秒で東4局終了を確認しました。初期手`advanceOnlineCpu` 12サンプルのNode wall timeは中央値7.23ms、最大18.16msでした。最大値には初回実行のcold/JIT影響も含まれます。これはローカル経過時間で、Cloudflare CPU時間の測定ではありません。実CloudflareのCPU限度適合は本番workflow結果や運用計測で継続して確認します。
 - 同じルームでの再戦、牌譜、観戦、途中CPU代打、途中参加、通常手番タイムアウト、南場は未実装です。
-- 本番Worker通信、production test、ActionsのBrowser UI、Pages build/deploy結果はpush後に検証記録へ追記します。
+- 本番Worker通信、production test、ActionsのBrowser UI、Pages build/deployは2026-10-19のrun 39304886411（main SHA `dbf5837311c4c6f2fb1d26a5ee27a3710e7833f7`）ですべて成功しました。詳細は[検証記録](../verification/step14.1/README.md)を参照してください。
 
-## ローカル検証時点
+## ローカル検証
 
 `npm test`（48テストファイル）、`npm run typecheck:worker`、`npm run build`、`git diff --check`、本番テスト・ブラウザー検証スクリプトの構文確認、Wrangler `deploy --dry-run`は成功しています。オンライン専用スイートは10ケース、Step 14.0.1のDurable Object統合は11シナリオです。全局human+CPU結合テストは決定的なRandomSourceで東1局から東4局終了まで進めました。結果の詳細は[Step 14.1検証記録](../verification/step14.1/README.md)を参照してください。

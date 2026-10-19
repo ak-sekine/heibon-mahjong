@@ -24,7 +24,7 @@ CPU時間の参考として、オンラインのリーチ候補スキャンに2.
 
 ## 本番Cloudflare・GitHub Actions・Pages
 
-`.github/workflows/deploy.yml`の[run 39295431676](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39295431676)（main SHA `429ac60f975bc643343b71308d9f058399aaa5bf`）で、以下すべて成功しました。
+`.github/workflows/deploy.yml`の[run 39304886411](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39304886411)（main SHA `dbf5837311c4c6f2fb1d26a5ee27a3710e7833f7`）で、以下すべて成功しました。
 
 - `verify`（回帰テスト、Worker型検査、Pages build）
 - Browser UI verification（既存1人用回帰とオンライン代表ケース）
@@ -32,7 +32,7 @@ CPU時間の参考として、オンラインのリーチ候補スキャンに2.
 - 2人＋CPU2人の専用本番ルームを使った通信テスト：対局開始、座席別Viewと秘密情報非送信、合法・不正操作、CPU進行、WebSocket切断・再接続、明示的退出
 - GitHub Pages build / deploy
 
-初回の本番テスト実行では、検証コードが現在手番の相手側Viewを選べる条件になっていたため失敗しました。`viewerSeat === turnPlayerId`を条件に加えて再実行し、実際のWorker通信を含め全jobが成功しました。後続の再検証で対局開始直後と人間の手番切替時に本人向けViewが他クライアントのViewより遅れて届く競合も確認しました。検証クライアントが各操作後に本人の対象revision以上のViewを待つよう修正しました。
+本番テスト用クライアントでは、相手向け座席Viewの選択、別接続のメッセージcursor利用、WebSocket更新の到着順序を原因とする検証上の失敗を修正しました。最終runでは2人＋CPU2人の本番通信を含む全jobが成功しました。
 
 ユーザー指定URL: [Cloudflare Worker](https://heibon-mahjong-online.ak-sekine.workers.dev) · [GitHub Pages](https://ak-sekine.github.io/heibon-mahjong/)
 
