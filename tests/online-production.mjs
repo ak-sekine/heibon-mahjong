@@ -420,13 +420,14 @@ async function main() {
         const client = current.turnPlayerId === 0 ? two.host : two.guest;
         const humanViewMessage = await waitForGameState(client, view =>
           Number(view?.gameRevision) >= Number(current.gameRevision) &&
-          view?.viewerSeat === current.turnPlayerId && view.phase === 'awaiting-discard' &&
+          view?.viewerSeat === current.turnPlayerId && view.viewerSeat === view.turnPlayerId &&
+          view.phase === 'awaiting-discard' &&
           view.seats?.[view.turnPlayerId]?.control === 'human' &&
           Array.isArray(view.self?.discardableTileIds) && view.self.discardableTileIds.length > 0, 0, 15000);
         const legalId = humanViewMessage.view.self.discardableTileIds[0];
         check(typeof legalId === 'string', 'A later human turn did not receive a legal discard candidate.');
         const result = await sendGameAction(client, { type: 'discard', tileId: legalId }, humanViewMessage.view.gameRevision, 'next-human-discard');
-        check(result.result.ok === true, 'A later legal human discard was rejected.');
+        check(result.result.ok === true, `A later legal human discard was rejected (${result.result.code ?? 'unknown'}).`);
         continue;
       }
       const indexes = [two.host.messages.length, two.guest.messages.length];
