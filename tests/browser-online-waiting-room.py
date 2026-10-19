@@ -437,7 +437,7 @@ with sync_playwright() as p:
     hidden_guest_ids = page.evaluate('window.onlineMock.privateTileIds(1)')
     assert all(tile_id not in page.locator('#online-match').inner_html() for tile_id in hidden_guest_ids), 'the guest view exposed other private tile IDs'
     page.evaluate('window.onlineMock.setViewerSeat(0)')
-    wait_for("document.querySelector('#online-player-hand button[data-tile-id]').length === 14")
+    wait_for("document.querySelectorAll('#online-player-hand button[data-tile-id]').length === 14")
 
     page.locator('#online-player-hand button[data-tile-id]').first.click()
     assert page.locator('#online-discard').is_enabled(), 'a legal host discard was not enabled after selecting a tile'
@@ -471,7 +471,7 @@ with sync_playwright() as p:
     tickets_before_reconnect = page.evaluate('window.onlineMock.ticketRequests')
     page.evaluate('window.onlineMock.forceDisconnect()')
     wait_for(f'window.onlineMock.ticketRequests > {tickets_before_reconnect}', timeout=10000)
-    wait_for("document.querySelector('#online-player-hand button[data-tile-id]').length === 14", timeout=10000)
+    wait_for("document.querySelectorAll('#online-player-hand button[data-tile-id]').length === 14", timeout=10000)
     hand_after_reconnect = page.locator('#online-player-hand button[data-tile-id]').evaluate_all("nodes => nodes.map(node => node.dataset.tileId).join(',')")
     assert hand_after_reconnect == hand_before_reconnect, 'the online hand was not restored after reconnect'
 
