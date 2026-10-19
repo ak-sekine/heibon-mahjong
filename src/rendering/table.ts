@@ -533,7 +533,7 @@ function renderWinResult(game: GameState, settlement: RoundSettlement | null): v
     const receivedPoints = result.yakumanCount > 0 && settledPayments.length
       ? settledPayments.reduce((sum, payment) => sum + payment.points, 0) + depositPoints
       : result.totalPoints;
-    const score = text('p', `獲得点数：${tier ? `${tier} ` : ''}${receivedPoints.toLocaleString('ja-JP')}点（${method}）`);
+    const score = text('p', `獲得点数：${tier ? `${tier} ` : ''}${receivedPoints}点（${method}）`);
     score.className = 'win-score';
     section.append(score, text('p', '支払い：'));
     const payments = document.createElement('ul');

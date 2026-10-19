@@ -101,7 +101,7 @@ with sync_playwright() as p:
         details = section.inner_text()
         assert all(f'{name} 1役満' in details for name in expected_names), details
         assert f'役満：{expected_count}' in details, details
-        assert f'{expected_points:,}点' in section.locator('.win-score').inner_text(), details
+        assert f'{expected_points}点' in section.locator('.win-score').inner_text(), details
         assert dealer_status in details, details
         if scenario == 'chiihou':
             assert '（親） → 自分 16000点' in details, details
