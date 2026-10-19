@@ -83,9 +83,18 @@ async function sendGameAction(client, payload, expectedGameRevision, prefix = 'g
   client.socket.send(JSON.stringify({ ...payload, requestId, expectedGameRevision }));
   const result = await waitForMessage(client,
     message => message.type === 'game-action-result' && message.requestId === requestId, before, 10000, `game-action-result for ${payload.type}`);
-  if (result.ok) await waitForGameState(client,
+  if (result.ok || result.code === 'stale_revision') await waitForGameState(client,
     view => Number(view.gameRevision) >= Number(result.gameRevision), before, 15000, `game-state after ${payload.type}`);
   return { result, requestId, before };
+}
+
+async function discardAtCurrentRevision(client, tileId, expectedGameRevision, prefix) {
+  const first = await sendGameAction(client, { type: 'discard', tileId }, expectedGameRevision, prefix);
+  if (first.result.code !== 'stale_revision') return first;
+  const fresh = latestGameMessage(client)?.view;
+  if (fresh?.phase !== 'awaiting-discard' || fresh.viewerSeat !== fresh.turnPlayerId ||
+      !fresh.self.discardableTileIds.includes(tileId)) return null;
+  return sendGameAction(client, { type: 'discard', tileId }, fresh.gameRevision, `${prefix}-retry`);
 }
 
 async function passGameDecisions(clients) {
@@ -426,7 +435,13 @@ async function main() {
           Array.isArray(view.self?.discardableTileIds) && view.self.discardableTileIds.length > 0, 0, 15000);
         const legalId = humanViewMessage.view.self.discardableTileIds[0];
         check(typeof legalId === 'string', 'A later human turn did not receive a legal discard candidate.');
-        const result = await sendGameAction(client, { type: 'discard', tileId: legalId }, humanViewMessage.view.gameRevision, 'next-human-discard');
+        const result = await discardAtCurrentRevision(client, legalId, humanViewMessage.view.gameRevision, 'next-human-discard');
+        if (!result || result.result.code === 'stale_revision') {
+          lastGameRevision = Math.max(lastGameRevision,
+            Number(latestGameMessage(two.host)?.view.gameRevision ?? 0),
+            Number(latestGameMessage(two.guest)?.view.gameRevision ?? 0));
+          continue;
+        }
         check(result.result.ok === true, `A later legal human discard was rejected (${result.result.code ?? 'unknown'}).`);
         continue;
       }
