@@ -12,9 +12,22 @@ with sync_playwright() as p:
         for width, height in [(320,568),(375,812),(390,844),(414,896),(430,932),(1280,800)]:
             page = browser.new_page(viewport={'width':width,'height':height})
             errors = []
+            console_errors = []
             page.on('pageerror', lambda e: errors.append(str(e)))
+            page.on('console', lambda message: console_errors.append(message.text) if message.type == 'error' else None)
             page.goto('http://localhost:4173/heibon-mahjong/' + entry)
-            page.wait_for_selector('#player-hand svg')
+            try:
+                page.wait_for_selector('#player-hand svg')
+            except Exception:
+                try:
+                    page_state = page.evaluate('''()=>({url:location.href,readyState:document.readyState,
+                      hand:document.querySelector('#player-hand')?.outerHTML??null,
+                      main:document.querySelector('main')?.innerHTML.slice(0,1200)??null})''')
+                except Exception as diagnostic_error:
+                    page_state = {'diagnosticError': str(diagnostic_error)}
+                print(json.dumps({'entry':entry or 'index.html','width':width,'pageErrors':errors,
+                    'consoleErrors':console_errors,'pageState':page_state},ensure_ascii=False),flush=True)
+                raise
             page.evaluate('''async()=>{
               window.matchRenderer=await import('/heibon-mahjong/src/rendering/match.ts');
               window.match=(await import('/heibon-mahjong/src/game/match.ts')).startMatch();
