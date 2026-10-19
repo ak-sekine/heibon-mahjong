@@ -20,6 +20,9 @@
 1. 親の配牌直後に天和＋国士無双でツモ和了し、2役満・役名・96,000点・子3人の各32,000点・親連荘を確認。
 2. 子の第一ツモで地和を成立させ、1役満・役名・32,000点・親16,000点と子2人各8,000点・親交代を確認。
 
-両局面で最初のツモボタン、結果概要・詳細の開閉、次局遷移、390px幅の横はみ出し、物理牌IDの一意性、CPU非公開牌IDのDOM非露出を確認します。GitHub Actions実行結果とGitHub Pagesのbuild/deploy結果はmain push後に追記します。
+両局面で最初のツモボタン、結果概要・詳細の開閉、次局遷移、390px幅の横はみ出し、物理牌IDの一意性、CPU非公開牌IDのDOM非露出を確認しました。既存の全ブラウザー回帰も含めGitHub Actionsで成功しました。
+
+- [Browser UI verification #39196860671](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39196860671)（commit `cb02cc8`）。
+- [GitHub Pages #39196860672](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39196860672)（commit `cb02cc8`）。`build` と `deploy` の両jobが成功しました。
 
 Codex CloudではChromiumを起動していません。iPhone Safari実機は未確認です。

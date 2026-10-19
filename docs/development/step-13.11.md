@@ -27,5 +27,7 @@
 - `npm test`：46テストファイルすべて成功。
 - `npm run build`：成功。
 - `git diff --check`：成功。
-- Browser UI verification：main push後にGitHub Actionsで確認予定。Codex CloudではChromiumを起動していません。
+- [Browser UI verification #39196860671](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39196860671)（commit `cb02cc8`）で全既存ケースとStep 13.11の2ケースが成功しました。
+- [GitHub Pages #39196860672](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39196860672)（commit `cb02cc8`）でbuildとdeployが成功しました。
+- Codex CloudではChromiumを起動していません。
 - iPhone Safari実機：未確認。
