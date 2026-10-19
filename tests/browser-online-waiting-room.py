@@ -360,8 +360,14 @@ with sync_playwright() as p:
 
     page.route('**/src/main.ts', expose_app)
     page.goto(BASE_URL)
+    def wait_for(expression, **kwargs):
+        try:
+            return page.wait_for_function(expression, **kwargs)
+        except Exception as error:
+            raise AssertionError(f'online browser UI wait timed out: {expression}') from error
+
     page.wait_for_selector('#player-hand svg')
-    page.wait_for_function('typeof window.onlineUiTest === "object"')
+    wait_for('typeof window.onlineUiTest === "object"')
     private_ids = page.evaluate('''() => window.onlineUiTest.controller.game.players.slice(1).flatMap(player => [
       ...player.hand, ...(player.drawnTile ? [player.drawnTile] : []),
     ]).map(tile => tile.id)''')
@@ -371,10 +377,10 @@ with sync_playwright() as p:
     page.locator('#online-open').click()
     page.locator('#online-name').fill('テストホスト')
     page.locator('#online-create button[type="submit"]').click()
-    page.wait_for_function("document.querySelector('#online-room-code').textContent === 'ABC234'")
-    page.wait_for_function("document.querySelector('#online-seats').children.length === 4 && document.querySelector('#online-seats').innerText.includes('テストホスト')")
+    wait_for("document.querySelector('#online-room-code').textContent === 'ABC234'")
+    wait_for("document.querySelector('#online-seats').children.length === 4 && document.querySelector('#online-seats').innerText.includes('テストホスト')")
     page.evaluate('window.onlineMock.addGuest()')
-    page.wait_for_function("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
+    wait_for("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
     assert 'ホスト（あなた）' in page.locator('#online-host').inner_text(), 'the host was not identified in the UI'
     assert '東（テストホスト）' in page.locator('#online-my-seat').inner_text(), 'the current player seat was not identified'
     assert page.locator('#online-finalize').is_visible() and not page.locator('#online-finalize').is_enabled(), 'host finalize was enabled before both players were ready'
@@ -383,37 +389,37 @@ with sync_playwright() as p:
     page.locator('#online-close').click()
     assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') !== null"), 'closing the dialog discarded the session token'
     page.locator('#online-open').click()
-    page.wait_for_function('window.onlineMock.ticketRequests >= 2')
-    page.wait_for_function("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
+    wait_for('window.onlineMock.ticketRequests >= 2')
+    wait_for("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
 
     page.locator('#online-ready').click()
-    page.wait_for_function("document.querySelector('#online-ready').textContent === '準備を解除'")
+    wait_for("document.querySelector('#online-ready').textContent === '準備を解除'")
     page.evaluate('window.onlineMock.setGuestReady(true)')
-    page.wait_for_function('document.querySelector("#online-finalize").disabled === false')
+    wait_for('document.querySelector("#online-finalize").disabled === false')
 
     page.evaluate('window.onlineMock.forceDisconnect()')
-    page.wait_for_function("document.querySelector('#online-connection').textContent.includes('再接続')")
-    page.wait_for_function("document.querySelector('#online-seats').innerText.includes('切断中')")
-    page.wait_for_function('window.onlineMock.ticketRequests >= 3', timeout=10000)
-    page.wait_for_function("document.querySelector('#online-seats').innerText.includes('接続中')")
-    page.wait_for_function("document.querySelector('#online-ready').textContent === '準備完了'", timeout=10000)
+    wait_for("document.querySelector('#online-connection').textContent.includes('再接続')")
+    wait_for("document.querySelector('#online-seats').innerText.includes('切断中')")
+    wait_for('window.onlineMock.ticketRequests >= 3', timeout=10000)
+    wait_for("document.querySelector('#online-seats').innerText.includes('接続中')")
+    wait_for("document.querySelector('#online-ready').textContent === '準備完了'", timeout=10000)
     page.locator('#online-ready').click()
-    page.wait_for_function('document.querySelector("#online-finalize").disabled === false')
+    wait_for('document.querySelector("#online-finalize").disabled === false')
     page.locator('#online-finalize').click()
-    page.wait_for_function("document.querySelector('#online-finalized-message').hidden === false")
+    wait_for("document.querySelector('#online-finalized-message').hidden === false")
     assert page.locator('#online-finalized-message').inner_text() == '座席が確定しました。ホストはオンライン対局を開始できます。'
     seat_text = page.locator('#online-seats').inner_text()
     assert 'CPU（西席）' in seat_text and 'CPU（北席）' in seat_text, seat_text
     assert 'ホスト' in seat_text and '自分' in seat_text, seat_text
     assert page.locator('#online-dialog').evaluate('element => element.scrollWidth <= element.clientWidth'), 'online dialog content overflows horizontally'
     page.locator('#online-copy-code').click()
-    page.wait_for_function("window.onlineMock.copied === 'ABC234'")
+    wait_for("window.onlineMock.copied === 'ABC234'")
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'online dialog causes horizontal overflow at 390px'
     assert all(tile_id not in page.locator('main').inner_html() for tile_id in private_ids), 'CPU private tile IDs leaked while the waiting room was open'
 
     page.locator('#online-start-game').click()
-    page.wait_for_function("document.querySelector('#online-dialog').open === false && document.querySelector('#online-match').hidden === false")
-    page.wait_for_function("document.querySelectorAll('#online-player-hand button[data-tile-id]').length === 14")
+    wait_for("document.querySelector('#online-dialog').open === false && document.querySelector('#online-match').hidden === false")
+    wait_for("document.querySelectorAll('#online-player-hand button[data-tile-id]').length === 14")
     assert page.locator('#online-table').is_visible(), 'the online board was not displayed after host start'
     assert page.locator('#online-score-strip').inner_text().count('CPU') == 2, 'the two CPU seats were not shown at the table'
     assert page.locator('[data-online-hand="right"] .tile-back').count() == 13, 'the other human hand was not shown as backs'
@@ -425,56 +431,56 @@ with sync_playwright() as p:
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'online table causes horizontal overflow at 390px'
 
     page.evaluate('window.onlineMock.setViewerSeat(1)')
-    page.wait_for_function("document.querySelector('#online-score-strip [data-online-label=bottom]')?.innerText.startsWith('テスト参加者')")
+    wait_for("document.querySelector('#online-score-strip [data-online-label=bottom]')?.innerText.startsWith('テスト参加者')")
     assert page.locator('#online-score-strip [data-online-label="left"]').inner_text().startswith('テストホスト'), 'seat rotation was wrong for the south player'
     assert page.locator('#online-player-hand button[data-tile-id]').count() == 13, 'the second viewer did not get their own hand'
     hidden_guest_ids = page.evaluate('window.onlineMock.privateTileIds(1)')
     assert all(tile_id not in page.locator('#online-match').inner_html() for tile_id in hidden_guest_ids), 'the guest view exposed other private tile IDs'
     page.evaluate('window.onlineMock.setViewerSeat(0)')
-    page.wait_for_function("document.querySelector('#online-player-hand button[data-tile-id]').length === 14")
+    wait_for("document.querySelector('#online-player-hand button[data-tile-id]').length === 14")
 
     page.locator('#online-player-hand button[data-tile-id]').first.click()
     assert page.locator('#online-discard').is_enabled(), 'a legal host discard was not enabled after selecting a tile'
     page.locator('#online-discard').click()
-    page.wait_for_function("document.querySelector('#online-match-status').innerText.includes('テスト参加者の手番')")
+    wait_for("document.querySelector('#online-match-status').innerText.includes('テスト参加者の手番')")
     assert page.locator('[data-online-river="bottom"] .river-tile').count() == 1, 'the accepted discard was not synchronized into the host river'
     page.evaluate('window.onlineMock.advanceCpu()')
-    page.wait_for_function("document.querySelector('[data-online-river=top] .river-tile') !== null")
+    wait_for("document.querySelector('[data-online-river=top] .river-tile') !== null")
 
     page.evaluate('window.onlineMock.showRon()')
-    page.wait_for_function("document.querySelector('#online-ron-controls').hidden === false")
+    wait_for("document.querySelector('#online-ron-controls').hidden === false")
     assert page.locator('#online-ron').is_enabled() and page.locator('#online-pass-ron').is_enabled(), 'ron choices were not actionable'
     page.locator('#online-pass-ron').click()
-    page.wait_for_function("document.querySelector('#online-ron-controls').hidden === true")
+    wait_for("document.querySelector('#online-ron-controls').hidden === true")
     page.evaluate('window.onlineMock.showCall()')
-    page.wait_for_function("document.querySelector('#online-call-controls').hidden === false")
+    wait_for("document.querySelector('#online-call-controls').hidden === false")
     assert page.locator('#online-call-options button[data-online-call]').count() == 1, 'the legal call option was not shown'
     page.locator('#online-call-options button[data-online-call]').click()
-    page.wait_for_function("document.querySelector('#online-call-controls').hidden === true")
+    wait_for("document.querySelector('#online-call-controls').hidden === true")
 
     page.evaluate('window.onlineMock.endRound()')
-    page.wait_for_function("document.querySelector('#online-round-result').hidden === false")
+    wait_for("document.querySelector('#online-round-result').hidden === false")
     assert 'ツモ' in page.locator('#online-round-result').inner_text(), 'round result was not displayed'
     assert page.locator('#online-next-round').is_visible() and page.locator('#online-next-round').is_enabled(), 'the host could not advance to the next round'
     page.screenshot(path=str(OUT / 'step14-1-online-game-390.png'), full_page=True)
     page.locator('#online-next-round').click()
-    page.wait_for_function("document.querySelector('#online-match-round').innerText.includes('東2局')")
+    wait_for("document.querySelector('#online-match-round').innerText.includes('東2局')")
     assert page.locator('#online-round-result').is_hidden(), 'the old round result remained after next-round transition'
 
     hand_before_reconnect = page.locator('#online-player-hand button[data-tile-id]').evaluate_all("nodes => nodes.map(node => node.dataset.tileId).join(',')")
     tickets_before_reconnect = page.evaluate('window.onlineMock.ticketRequests')
     page.evaluate('window.onlineMock.forceDisconnect()')
-    page.wait_for_function(f'window.onlineMock.ticketRequests > {tickets_before_reconnect}', timeout=10000)
-    page.wait_for_function("document.querySelector('#online-player-hand button[data-tile-id]').length === 14", timeout=10000)
+    wait_for(f'window.onlineMock.ticketRequests > {tickets_before_reconnect}', timeout=10000)
+    wait_for("document.querySelector('#online-player-hand button[data-tile-id]').length === 14", timeout=10000)
     hand_after_reconnect = page.locator('#online-player-hand button[data-tile-id]').evaluate_all("nodes => nodes.map(node => node.dataset.tileId).join(',')")
     assert hand_after_reconnect == hand_before_reconnect, 'the online hand was not restored after reconnect'
 
     page.locator('#online-open-room').click()
     page.locator('#online-leave').click()
-    page.wait_for_function("document.querySelector('#online-room').hidden && !document.querySelector('#online-room-forms').hidden")
+    wait_for("document.querySelector('#online-room').hidden && !document.querySelector('#online-room-forms').hidden")
     assert page.locator('#online-match-status').inner_text() == '参加者が明示的に退出したため、対局を中断しました。', 'an explicit game exit did not show the abort reason'
     page.locator('#online-return-local').click()
-    page.wait_for_function("document.querySelector('#online-match').hidden === true")
+    wait_for("document.querySelector('#online-match').hidden === true")
 
     assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') === null"), 'successful leave did not remove the session'
     assert '退出しました' in page.locator('#online-status').inner_text(), 'successful leave was not reported'
