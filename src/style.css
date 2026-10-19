@@ -380,9 +380,9 @@ header > div { min-width:0; }
 .table .seat-left .open-meld,.table .seat-right .open-meld { --meld-tile-gap:.1px; gap:var(--meld-tile-gap); }
 @media (max-width:430px) {
  .table .seat-right .concealed-hand { transform:translateX(var(--river-tile-width)); }
- .table .seat-right .open-melds { transform:translate(var(--river-tile-width),.68px); }
+ .table .seat-right .open-melds { transform:translate(calc(var(--river-tile-width) + 1.2px),.5px); }
  .table .seat-left .concealed-hand { transform:translateX(calc(0px - var(--river-tile-width))); }
- .table .seat-left .open-melds { transform:translate(calc(0px - var(--river-tile-width)),.68px); }
+ .table .seat-left .open-melds { transform:translate(calc(0px - var(--river-tile-width) + 1.2px),.5px); }
 }
 .table .seat .concealed-hand { display:flex; flex-direction:row; gap:1px; margin:0; max-width:none; }
 .table .seat .tile-back { width:var(--river-tile-width); height:var(--river-tile-height); }
