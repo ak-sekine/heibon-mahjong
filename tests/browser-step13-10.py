@@ -93,7 +93,7 @@ with sync_playwright() as p:
         assert page.locator('#round-result-summary').evaluate('element => element.scrollWidth <= element.clientWidth'), 'summary overflow'
         result_text = page.locator('#round-result-summary').inner_text()
         if scenario == 'nagashi-mangan':
-            assert '成立：自分' in result_text and '自分 → CPU1 4,200点' in result_text, result_text
+            assert '成立：自分' in result_text and 'CPU1 → 自分 4,200点' in result_text, result_text
             assert '供託 2,000点は自分へ' in result_text and '2本場' in result_text, result_text
         elif scenario == 'kyuushu':
             assert '途中流局（九種九牌）' in result_text, result_text
@@ -105,7 +105,7 @@ with sync_playwright() as p:
         assert page.locator('#result-title').inner_text() == expected_title
         details = page.locator('#match-result').inner_text()
         if scenario == 'nagashi-mangan':
-            assert '自分 → CPU1 4,200点' in details and '満貫相当' in details, details
+            assert 'CPU1 → 自分 4,200点' in details and '満貫相当' in details, details
             assert '供託：自分 ＋2000点' in details and '親：連荘' in details, details
         else:
             assert '供託：0本を次局へ持ち越し' in details, details
