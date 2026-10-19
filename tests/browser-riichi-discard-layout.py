@@ -103,6 +103,8 @@ with sync_playwright() as p:
                     noScroll:document.documentElement.scrollWidth<=innerWidth,
                     viewport:{scrollWidth:document.documentElement.scrollWidth,innerWidth,outsideViewport},
                     inTable:allRiverSvgs.every(a=>a.left>=table.left-.2&&a.right<=table.right+.2&&a.top>=table.top-.2&&a.bottom<=table.bottom+.2),
+                    tableBox:{left:+table.left.toFixed(2),top:+table.top.toFixed(2),right:+table.right.toFixed(2),bottom:+table.bottom.toFixed(2)},
+                    outsideTable:allRiverSvgs.map((r,index)=>({index,left:+r.left.toFixed(2),top:+r.top.toFixed(2),right:+r.right.toFixed(2),bottom:+r.bottom.toFixed(2)})).filter(r=>r.left<table.left-.2||r.right>table.right+.2||r.top<table.top-.2||r.bottom>table.bottom+.2).slice(0,8),
                     privateIds:privateTiles.every(t=>!publicIds.has(t.id)&&!q('main').innerHTML.includes(t.id)),
                     decBox:{x:d.x,y:d.y,width:d.width,height:d.height},normalBox:{x:n.x,y:n.y,width:n.width,height:n.height}
                   };
