@@ -20,20 +20,22 @@ CPU時間の参考として、オンラインのリーチ候補スキャンに2.
 
 ## ブラウザー検証
 
-既存の`.github/workflows/browser-ui.yml`が実行する`tests/browser-online-waiting-room.py`に、390×844の2人＋CPU2人の卓、座席回転、各席の伏せ牌、合法操作、打牌同期、CPU河、ロン・鳴き選択肢、局結果、次局、再接続、退出中断を追加しました。Python構文確認は成功しています。AGENTS.mdに従いCodex Cloud内ではChromiumを起動していません。Actions結果はpush後に追記します。
+既存の`.github/workflows/browser-ui.yml`が実行する`tests/browser-online-waiting-room.py`に、390×844の2人＋CPU2人の卓、座席回転、各席の伏せ牌、合法操作、打牌同期、CPU河、ロン・鳴き選択肢、局結果、次局、再接続、退出中断を追加しました。AGENTS.mdに従いCodex Cloud内ではChromiumを起動していません。GitHub ActionsのBrowser UI verificationは成功しました。従来の1人用ブラウザー回帰も同じジョブで成功しています。
 
 ## 本番Cloudflare・GitHub Actions・Pages
 
-**未確認（push後に更新）。** `.github/workflows/deploy.yml`を使い、次を含むrunを確認します。
+`.github/workflows/deploy.yml`の[run 39295431676](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39295431676)（main SHA `429ac60f975bc643343b71308d9f058399aaa5bf`）で、以下すべて成功しました。
 
-- 既存Workerへのdeployと2人＋CPU2人の専用Production test room
-- 両人間の開始・座席別手牌・秘密情報非送信・合法／不正操作・CPU進行
-- WebSocket切断・再接続、同じ操作ID再送、正規のroom close
-- `verify`、Browser UI verification、Pages build / deploy
+- `verify`（回帰テスト、Worker型検査、Pages build）
+- Browser UI verification（既存1人用回帰とオンライン代表ケース）
+- 既存Workerへのdeploy
+- 2人＋CPU2人の専用本番ルームを使った通信テスト：対局開始、座席別Viewと秘密情報非送信、合法・不正操作、CPU進行、WebSocket切断・再接続、明示的退出
+- GitHub Pages build / deploy
+
+初回の本番テスト実行では、検証コードが現在手番の相手側Viewを選べる条件になっていたため失敗しました。`viewerSeat === turnPlayerId`を条件に加えて再実行し、実際のWorker通信を含め全jobが成功しました。
 
 ユーザー指定URL: [Cloudflare Worker](https://heibon-mahjong-online.ak-sekine.workers.dev) · [GitHub Pages](https://ak-sekine.github.io/heibon-mahjong/)
 
 ## 未確認
 
-- push後のCloudflare実通信、GitHub Actions runの各job、Pages公開結果。
 - iPhone Safari実機の画面・操作。

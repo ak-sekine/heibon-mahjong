@@ -130,6 +130,6 @@ Step 13.8までの役満10種類に、Step 13.11で天和・地和を加え、�
 | PWA対応 | 未実装 |
 | Step 14.0：Cloudflareオンライン待機基盤 | 完了 | ルーム作成・参加、WebSocket認証、24時間TTL、本番デプロイ・通信テストを実装しました。[検証記録](verification/step14.0/README.md) |
 | Step 14.0.1：オンライン待機ルーム完成 | 完了 | Ready、ホスト権限と引き継ぎ、CPU席補充、座席確定、退出、自動再接続、revision・重複要求防止、レート制限を実装しました。[設計・実装記録](development/step-14.0.1.md) · [検証記録](verification/step14.0.1/README.md) |
-| Step 14.1：オンライン対局の進行共有 | 一部実装 | サーバー権威型のゲーム状態・座席別ビュー、打牌・判断窓・CPU進行・局精算・再接続、オンライン卓を実装しました。ローカル検証は成功し、本番Cloudflare通信とGitHub Actionsの完了確認を残しています。[開発・設計記録](development/step-14.1.md) · [検証記録](verification/step14.1/README.md) |
+| Step 14.1：オンライン対局の進行共有 | 完了 | サーバー権威型のゲーム状態・座席別ビュー、打牌・判断窓・CPU進行・局精算・再接続、オンライン卓を実装しました。ローカル検証、GitHub ActionsのBrowser UI、Cloudflare本番通信、Pages build / deployが成功しました。[開発・設計記録](development/step-14.1.md) · [検証記録](verification/step14.1/README.md) |
 
 各項目を着手する際は、実装範囲を決めてからこの表と[SPEC.md](SPEC.md)を更新します。
