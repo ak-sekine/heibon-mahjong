@@ -54,9 +54,8 @@ export function calculateRiverLayout(
   const slotOffset = (index: number): string => index === 0
     ? '0px'
     : `calc(var(--river-tile-height) * ${index} + ${index * GAP}px)`;
-  const centeredFace = (face: string): string => face === '--river-tile-height'
-    ? '0px'
-    : `calc((var(--river-tile-height) - var(${face})) * .5)`;
+  const centerInSlot = (face: string): string => `calc((var(--river-tile-height) - var(${face})) * .5)`;
+  const alignEndInSlot = (face: string): string => `calc(var(--river-tile-height) - var(${face}))`;
 
   const placements = Array.from({ length: discardCount }, (_, index) => {
     const row = Math.floor(index / 6);
@@ -74,6 +73,12 @@ export function calculateRiverLayout(
     const heightFace = side
       ? declaration ? '--river-tile-height' : '--river-tile-width'
       : declaration ? '--river-tile-width' : '--river-tile-height';
+    const leftInSlot = side
+      ? centerInSlot(widthFace)
+      : position === 'top' ? alignEndInSlot(widthFace) : '0px';
+    const topInSlot = side
+      ? position === 'right' ? alignEndInSlot(heightFace) : '0px'
+      : centerInSlot(heightFace);
 
     return {
       row: screenRow,
@@ -81,8 +86,8 @@ export function calculateRiverLayout(
       declaration,
       width: `var(${widthFace})`,
       height: `var(${heightFace})`,
-      left: `calc(${slotOffset(screenColumn)} + ${centeredFace(widthFace)})`,
-      top: `calc(${slotOffset(screenRow)} + ${centeredFace(heightFace)})`,
+      left: `calc(${slotOffset(screenColumn)} + ${leftInSlot})`,
+      top: `calc(${slotOffset(screenRow)} + ${topInSlot})`,
     };
   });
   return { width, height, placements };
