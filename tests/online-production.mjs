@@ -44,13 +44,14 @@ async function request(path, { method = 'GET', body, token, origin = pageOrigin 
   return { response, value };
 }
 
-function waitForMessage(client, predicate, afterIndex = 0, timeoutMs = 10000) {
+function waitForMessage(client, predicate, afterIndex = 0, timeoutMs = 10000, description = 'protocol response') {
   const existing = client.messages.slice(afterIndex).find(predicate);
   if (existing) return Promise.resolve(existing);
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       client.waiters.delete(onMessage);
-      reject(new Error('Timed out waiting for a room protocol response.'));
+      const recentTypes = client.messages.slice(afterIndex).slice(-8).map(message => message.type).join(', ') || 'none';
+      reject(new Error(`Timed out waiting for ${description}; recent protocol message types: ${recentTypes}.`));
     }, timeoutMs);
     const onMessage = message => {
       if (!predicate(message)) return;
@@ -62,13 +63,13 @@ function waitForMessage(client, predicate, afterIndex = 0, timeoutMs = 10000) {
   });
 }
 
-function waitForRoomState(client, predicate, afterIndex = 0, timeoutMs = 10000) {
-  return waitForMessage(client, message => message.type === 'room-state' && predicate(message), afterIndex, timeoutMs);
+function waitForRoomState(client, predicate, afterIndex = 0, timeoutMs = 10000, description = 'room-state update') {
+  return waitForMessage(client, message => message.type === 'room-state' && predicate(message), afterIndex, timeoutMs, description);
 }
 
-function waitForGameState(client, predicate, afterIndex = 0, timeoutMs = 15000) {
+function waitForGameState(client, predicate, afterIndex = 0, timeoutMs = 15000, description = 'game-state update') {
   return waitForMessage(client, message =>
-    (message.type === 'game-state' || message.type === 'game-started') && predicate(message.view), afterIndex, timeoutMs);
+    (message.type === 'game-state' || message.type === 'game-started') && predicate(message.view), afterIndex, timeoutMs, description);
 }
 
 function latestGameMessage(client) {
@@ -81,9 +82,9 @@ async function sendGameAction(client, payload, expectedGameRevision, prefix = 'g
   const before = client.messages.length;
   client.socket.send(JSON.stringify({ ...payload, requestId, expectedGameRevision }));
   const result = await waitForMessage(client,
-    message => message.type === 'game-action-result' && message.requestId === requestId, before);
+    message => message.type === 'game-action-result' && message.requestId === requestId, before, 10000, `game-action-result for ${payload.type}`);
   if (result.ok) await waitForGameState(client,
-    view => Number(view.gameRevision) >= Number(result.gameRevision), before);
+    view => Number(view.gameRevision) >= Number(result.gameRevision), before, 15000, `game-state after ${payload.type}`);
   return { result, requestId, before };
 }
 
@@ -113,7 +114,8 @@ async function waitForHumanTurn(clients, afterRevision, timeoutMs = 20000) {
   );
   const existing = clients.map(client => latestGameMessage(client)?.view).find(qualifies);
   if (existing) return existing;
-  return Promise.race(clients.map(client => waitForGameState(client, qualifies, 0, timeoutMs).then(message => message.view)));
+  return Promise.race(clients.map(client => waitForGameState(client, qualifies, 0, timeoutMs, 'authenticated human turn view')
+    .then(message => message.view)));
 }
 
 async function waitForCpuProgress(clients, afterRevision, previousRivers, timeoutMs = 15000) {
@@ -128,7 +130,7 @@ async function waitForCpuProgress(clients, afterRevision, previousRivers, timeou
     if (current) return current;
     const indexes = clients.map(client => client.messages.length);
     await Promise.race(clients.map((client, index) => waitForGameState(client,
-      view => Number(view?.gameRevision) > afterRevision, indexes[index], timeoutMs)));
+      view => Number(view?.gameRevision) > afterRevision, indexes[index], timeoutMs, 'CPU progress update')));
   }
   throw new Error('The server did not advance an automatic CPU action.');
 }
@@ -240,9 +242,10 @@ async function sendAction(client, payload, prefix = 'ci') {
   const beforeRevision = currentRevision(client);
   const expectedRevision = payload.expectedRevision ?? currentRevision(client);
   client.socket.send(JSON.stringify({ ...payload, requestId, expectedRevision }));
-  const result = await waitForMessage(client, message => message.type === 'action-result' && message.requestId === requestId, before);
+  const result = await waitForMessage(client, message => message.type === 'action-result' && message.requestId === requestId,
+    before, 10000, `action-result for ${payload.type}`);
   if (result.ok && result.revision > beforeRevision) {
-    await waitForRoomState(client, state => state.revision >= result.revision, before);
+    await waitForRoomState(client, state => state.revision >= result.revision, before, 10000, `room-state after ${payload.type}`);
   }
   return { result, requestId, expectedRevision };
 }
@@ -251,7 +254,7 @@ async function syncState(client) {
   check(client.socket.readyState === WebSocket.OPEN, 'A WebSocket client needed for state sync is closed.');
   const before = client.messages.length;
   client.socket.send(JSON.stringify({ type: 'request-state' }));
-  await waitForRoomState(client, () => true, before);
+  await waitForRoomState(client, () => true, before, 10000, 'request-state snapshot');
 }
 
 async function ready(client, shouldBeReady = true) {
@@ -325,7 +328,8 @@ async function main() {
     const finalizeRevision = currentRevision(two.host);
     two.host.socket.send(JSON.stringify({ type: 'finalize-seats', requestId: finalizeRequestId, expectedRevision: finalizeRevision }));
     const finalizedResult = await waitForMessage(two.host,
-      message => message.type === 'action-result' && message.requestId === finalizeRequestId, beforeFinalize);
+      message => message.type === 'action-result' && message.requestId === finalizeRequestId,
+      beforeFinalize, 10000, 'finalize-seats action-result');
     check(finalizedResult.ok === true, 'The host could not finalize ready players.');
     const hostFinal = await waitForRoomState(two.host, state => state.status === 'finalized' && state.revision > finalizeRevision, beforeFinalize);
     await waitForRoomState(two.guest, state => state.status === 'finalized');
@@ -337,7 +341,8 @@ async function main() {
     const beforeDuplicate = two.host.messages.length;
     two.host.socket.send(JSON.stringify({ type: 'finalize-seats', requestId: finalizeRequestId, expectedRevision: finalizeRevision }));
     const replay = await waitForMessage(two.host,
-      message => message.type === 'action-result' && message.requestId === finalizeRequestId, beforeDuplicate);
+      message => message.type === 'action-result' && message.requestId === finalizeRequestId,
+      beforeDuplicate, 10000, 'duplicate finalize-seats action-result');
     check(replay.ok === true && currentRevision(two.host) === revisionAfterFinalize, 'A duplicate request changed the room twice.');
     const tooLateJoin = await joinRoomStatus(two.roomCode, testName(label, 'late'));
     check(tooLateJoin === 409, 'A new participant joined after seat finalization.');
@@ -352,7 +357,7 @@ async function main() {
     check(gameStarted.result.ok === true && gameStarted.result.gameRevision === 1, 'The host could not start the server-owned game.');
     await Promise.all([two.host, two.guest].map((client, seat) => waitForGameState(client, view =>
       view?.roomCode === two.roomCode && view.viewerSeat === seat &&
-      Number(view.gameRevision) >= Number(gameStarted.result.gameRevision), 0, 15000)));
+      Number(view.gameRevision) >= Number(gameStarted.result.gameRevision), 0, 15000, `game-started view for seat ${seat}`)));
     const hostView = inspectGameView(two.host, 0, privateValues, two.roomCode);
     const guestView = inspectGameView(two.guest, 1, privateValues, two.roomCode);
     const hostPrivateIds = new Set([
@@ -449,7 +454,8 @@ async function main() {
     const leaveGame = await sendAction(two.host, { type: 'leave-room' }, 'game-host-leave');
     check(leaveGame.result.ok, 'A participant could not explicitly leave an active online game.');
     const abortedMessage = await waitForMessage(two.guest,
-      message => message.type === 'game-aborted' || message.type === 'game-state' && message.view?.status === 'aborted', beforeGameExit);
+      message => message.type === 'game-aborted' || message.type === 'game-state' && message.view?.status === 'aborted',
+      beforeGameExit, 10000, 'game-aborted notification');
     check(abortedMessage.type === 'game-aborted' || abortedMessage.view.status === 'aborted', 'The remaining player did not receive an abort reason.');
     activeHostForCleanup = two.guest;
     const roomAfterAbort = await waitForRoomState(two.guest, state => state.status === 'finalized' && state.hostSeat === 1);
@@ -527,7 +533,8 @@ async function main() {
 
     const badJsonStart = connectedGuests[0].messages.length;
     connectedGuests[0].socket.send('{');
-    const badJson = await waitForMessage(connectedGuests[0], message => message.type === 'error' && message.code === 'invalid_json', badJsonStart);
+    const badJson = await waitForMessage(connectedGuests[0], message => message.type === 'error' && message.code === 'invalid_json',
+      badJsonStart, 10000, 'invalid-json error');
     check(badJson.type === 'error', 'Malformed JSON was not rejected.');
     const oversizedSocket = concurrent.host.socket;
     const oversizedClosed = new Promise(resolve => oversizedSocket.once('close', resolve));
