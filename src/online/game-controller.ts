@@ -52,6 +52,33 @@ export class OnlineGameController {
   private finalRanks: readonly Readonly<{ playerId: number; points: number; rank: number }>[] | null = null;
   private readonly tileOrder = new Map(TILE_KINDS.map((tile, index) => [tileKindKey(tile), index]));
 
+  private setTableClasses(active: boolean): void {
+    const set = (element: HTMLElement | null, activeClass: string, inactiveClass: string): void => {
+      if (element) element.className = active ? activeClass : inactiveClass;
+    };
+    set(document.querySelector<HTMLElement>('#online-table'), 'table', 'online-table');
+    set(this.root.querySelector<HTMLElement>('[data-online-summary]'), 'table-summary', 'online-table-summary');
+    set(this.root.querySelector<HTMLElement>('[data-online-rivers]'), 'rivers', 'online-rivers');
+    set(this.root.querySelector<HTMLElement>('[data-online-center-info]'), 'center-info', 'online-center-info');
+    set(document.querySelector<HTMLElement>('#online-dora-indicators'), 'dora-area', 'online-dora-area');
+    set(document.querySelector<HTMLElement>('#online-game-controls'), 'discard-controls', 'online-discard-controls');
+    this.root.querySelectorAll<HTMLElement>('[data-online-seat]').forEach(node => {
+      const position = node.dataset.onlineSeat;
+      set(node, `seat seat-${position}`, `online-seat online-seat-${position}`);
+    });
+    this.root.querySelectorAll<HTMLElement>('[data-online-hand]').forEach(node => {
+      set(node, 'concealed-hand', 'online-concealed-hand');
+    });
+    this.root.querySelectorAll<HTMLElement>('[data-online-melds]').forEach(node => {
+      set(node, 'open-melds', 'online-open-melds');
+    });
+    this.root.querySelectorAll<HTMLElement>('[data-online-river]').forEach(node => {
+      const position = node.dataset.onlineRiver;
+      set(node, `river river-${position}`, `online-river online-river-${position}`);
+    });
+    if (!active) this.scores.replaceChildren();
+  }
+
   constructor() {
     this.playerHand.addEventListener('click', event => {
       const button = (event.target as Element).closest<HTMLButtonElement>('button[data-tile-id]');
@@ -96,6 +123,7 @@ export class OnlineGameController {
       this.finalRanks = null;
       this.actionPending = false;
       this.root.hidden = true;
+      this.setTableClasses(false);
       document.body.classList.remove('online-game-active');
       document.querySelector<HTMLButtonElement>('#new-game')!.disabled = false;
       return;
@@ -131,6 +159,7 @@ export class OnlineGameController {
     if (!this.view || next.gameRevision !== this.view.gameRevision) this.selectedTileId = null;
     this.view = next;
     this.actionPending = false;
+    this.setTableClasses(true);
     this.root.hidden = false;
     document.body.classList.add('online-game-active');
     document.querySelector<HTMLButtonElement>('#new-game')!.disabled = true;
@@ -210,6 +239,8 @@ export class OnlineGameController {
       const seatNode = document.querySelector<HTMLElement>(`[data-online-seat="${position}"]`);
       if (!handNode || !meldNode || !seatNode) continue;
       seatNode.className = `seat ${position === 'bottom' ? 'seat-bottom' : position === 'right' ? 'seat-right' : position === 'left' ? 'seat-left' : 'seat-top'}`;
+      handNode.className = 'concealed-hand';
+      meldNode.className = 'open-melds';
       meldNode.replaceChildren(...seat.melds.map(meld => this.renderMeld(meld, seat.seat)));
       handNode.replaceChildren();
       if (position === 'bottom' && seat.hand) {
@@ -442,6 +473,7 @@ export class OnlineGameController {
     this.finalRanks = null;
     this.actionPending = false;
     this.root.hidden = true;
+    this.setTableClasses(false);
     document.body.classList.remove('online-game-active');
     document.querySelector<HTMLButtonElement>('#new-game')!.disabled = false;
   }

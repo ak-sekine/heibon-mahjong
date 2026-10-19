@@ -41,25 +41,25 @@
       <p id="online-match-status" role="status" aria-live="polite">対局状態を同期しています。</p>
       <p id="online-match-round"></p>
     </header>
-    <section class="table-summary" aria-label="オンライン卓の点数と席情報"><div id="online-score-strip" class="score-strip"></div></section>
-    <section id="online-table" class="table" aria-label="オンライン四人麻雀卓">
-      <section class="seat seat-top" data-online-seat="top"><div class="concealed-hand" data-online-hand="top" role="img"></div><div class="open-melds" data-online-melds="top"></div></section>
-      <section class="seat seat-right" data-online-seat="right"><div class="concealed-hand" data-online-hand="right" role="img"></div><div class="open-melds" data-online-melds="right"></div></section>
-      <section class="seat seat-left" data-online-seat="left"><div class="concealed-hand" data-online-hand="left" role="img"></div><div class="open-melds" data-online-melds="left"></div></section>
-      <section class="rivers" aria-label="4人の河">
-        <div class="river river-top" data-online-river="top"></div>
-        <div class="river river-right" data-online-river="right"></div>
-        <div class="river river-bottom" data-online-river="bottom"></div>
-        <div class="river river-left" data-online-river="left"></div>
-        <div class="center-info">
-          <div id="online-dora-indicators" class="dora-area" aria-label="ドラ表示牌"></div>
+    <section class="online-table-summary" data-online-summary aria-label="オンライン卓の点数と席情報"><div id="online-score-strip" class="score-strip"></div></section>
+    <section id="online-table" class="online-table" aria-label="オンライン四人麻雀卓">
+      <section class="online-seat online-seat-top" data-online-seat="top"><div class="online-concealed-hand" data-online-hand="top" role="img"></div><div class="online-open-melds" data-online-melds="top"></div></section>
+      <section class="online-seat online-seat-right" data-online-seat="right"><div class="online-concealed-hand" data-online-hand="right" role="img"></div><div class="online-open-melds" data-online-melds="right"></div></section>
+      <section class="online-seat online-seat-left" data-online-seat="left"><div class="online-concealed-hand" data-online-hand="left" role="img"></div><div class="online-open-melds" data-online-melds="left"></div></section>
+      <section class="online-rivers" data-online-rivers aria-label="4人の河">
+        <div class="online-river online-river-top" data-online-river="top"></div>
+        <div class="online-river online-river-right" data-online-river="right"></div>
+        <div class="online-river online-river-bottom" data-online-river="bottom"></div>
+        <div class="online-river online-river-left" data-online-river="left"></div>
+        <div class="online-center-info" data-online-center-info>
+          <div id="online-dora-indicators" class="online-dora-area" aria-label="ドラ表示牌"></div>
           <div id="online-deposit-sticks" hidden></div>
         </div>
       </section>
-      <section class="seat seat-bottom" data-online-seat="bottom"><div class="concealed-hand" data-online-hand="bottom" hidden></div><div class="open-melds" data-online-melds="bottom"></div><ul id="online-player-hand" aria-label="自分の手牌"></ul></section>
+      <section class="online-seat online-seat-bottom" data-online-seat="bottom"><div class="online-concealed-hand" data-online-hand="bottom" hidden></div><div class="online-open-melds" data-online-melds="bottom"></div><ul id="online-player-hand" aria-label="自分の手牌"></ul></section>
     </section>
     <section id="online-round-result" aria-live="polite" hidden></section>
-    <section id="online-game-controls" class="discard-controls" aria-label="オンライン対局の操作">
+    <section id="online-game-controls" class="online-discard-controls" aria-label="オンライン対局の操作">
       <div id="online-ron-controls" role="group" aria-label="ロン判断" hidden>
         <p id="online-ron-status"></p>
         <button id="online-ron" type="button">ロン</button>
