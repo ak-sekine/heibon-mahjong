@@ -143,8 +143,8 @@ export class OnlineGameController {
         abortReason: 'participant-left',
         self: { ...this.view.self, decision: null },
       } : null;
-      this.status.textContent = '参加者が明示的に退出したため、対局を中断しました。';
       this.render();
+      this.status.textContent = '参加者が明示的に退出したため、対局を中断しました。';
       return;
     }
     if (message.type === 'round-ended' || message.type === 'match-ended') {
@@ -204,7 +204,9 @@ export class OnlineGameController {
           : `${view.seats[view.turnPlayerId].name}の手番です。`
       : view.status === 'round-ended' ? '局が終了しました。結果を確認できます。'
         : view.status === 'match-ended' ? '東風戦が終了しました。最終結果です。'
-          : '対局を中断しました。';
+          : view.abortReason === 'participant-left'
+            ? '参加者が明示的に退出したため、対局を中断しました。'
+            : '対局を中断しました。';
     this.roundLabel.textContent = `東${view.round.roundNumber}局${view.round.honba ? ` ${view.round.honba}本場` : ''} · 残り${view.liveWallCount}枚`;
     this.renderSeatLabels(view);
     this.renderHandsAndMelds(view);
