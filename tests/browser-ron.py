@@ -25,7 +25,7 @@ def geometry(page, pending=False):
     boxes = hand.locator('li').evaluate_all('els=>els.map(e=>{let r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})')
     assert len(set(round(b['y'],1) for b in boxes)) == 1
     assert all(b['x'] >= 0 and b['x']+b['w'] <= page.viewport_size['width'] for b in boxes)
-    control = page.locator('.discard-controls').bounding_box()
+    control = page.locator('#local-game-controls').bounding_box()
     assert max(b['y']+b['h'] for b in boxes) <= control['y'] + .5, (page.viewport_size, boxes, control, page.evaluate('ronCheck()'))
     assert page.locator('.dora-slot').count() == 5
     assert page.locator('.dora-slot svg').count() == 1

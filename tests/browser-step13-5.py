@@ -68,7 +68,7 @@ controller.match=startMatch(g);render();};
    assert snapshot['integrity']
    assert sum(snapshot['m']['points'])+snapshot['m']['depositSticks']*1000==100000
    assert not snapshot['leaks'],snapshot['leaks']
-   assert page.evaluate("document.querySelector('.discard-controls').getBoundingClientRect().top>=document.querySelector('.table').getBoundingClientRect().bottom")
+   assert page.evaluate("document.querySelector('#local-game-controls').getBoundingClientRect().top>=document.querySelector('.table').getBoundingClientRect().bottom")
    for sel in ['#kan','#kan-options button','#cancel-kan','#call-options button','#ron','#pass-ron']:
     for e in page.locator(sel).all():
      if e.is_visible():assert e.bounding_box()['height']>=44 and e.bounding_box()['width']>=44

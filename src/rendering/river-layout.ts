@@ -27,10 +27,29 @@ export type RiverLayout = Readonly<{
 const GAP = 1;
 const MAX_DISCARDS = 18;
 
+function compactOffset(index: number): string {
+  return index === 0 ? '0px'
+    : `calc(var(--river-tile-height) * ${index * 0.5} + var(--river-tile-width) * ${index * 0.5} + ${index * GAP}px)`;
+}
+
+function fullOffset(index: number): string {
+  return index === 0 ? '0px' : `calc(var(--river-tile-height) * ${index} + ${index * GAP}px)`;
+}
+
+function compactSpan(cellCount: number): string {
+  const intervals = cellCount - 1;
+  return `calc(var(--river-tile-height) + var(--river-tile-height) * ${intervals * 0.5} + var(--river-tile-width) * ${intervals * 0.5} + ${intervals * GAP}px)`;
+}
+
+function fullSpan(cellCount: number): string {
+  return `calc(var(--river-tile-height) * ${cellCount} + ${(cellCount - 1) * GAP}px)`;
+}
+
 /**
- * Give every discard a fixed square slot sized for the sideways face. A
- * riichi declaration changes only its own face dimensions; it never changes
- * another tile's slot or the row/column positions in the river.
+ * Keep every slot fixed across discard counts and declaration positions.
+ * Along the river, centers are half-way between a regular face and a sideways
+ * declaration face apart, plus the 1px gap. Across rows, reserve the full
+ * tile length. A declaration changes only its own face dimensions.
  */
 export function calculateRiverLayout(
   position: RiverPosition,
@@ -45,17 +64,12 @@ export function calculateRiverLayout(
   }
 
   const side = position === 'right' || position === 'left';
-  const width = side
-    ? `calc(var(--river-tile-height) * 3 + ${2 * GAP}px)`
-    : `calc(var(--river-tile-height) * 6 + ${5 * GAP}px)`;
-  const height = side
-    ? `calc(var(--river-tile-height) * 6 + ${5 * GAP}px)`
-    : `calc(var(--river-tile-height) * 3 + ${2 * GAP}px)`;
-  const slotOffset = (index: number): string => index === 0
-    ? '0px'
-    : `calc(var(--river-tile-height) * ${index} + ${index * GAP}px)`;
+  const width = side ? fullSpan(3) : compactSpan(6);
+  const height = side ? compactSpan(6) : fullSpan(3);
   const centerInSlot = (face: string): string => `calc((var(--river-tile-height) - var(${face})) * .5)`;
-  const alignEndInSlot = (face: string): string => `calc(var(--river-tile-height) - var(${face}))`;
+  const add = (offset: string, centered: string): string => offset === '0px'
+    ? centered
+    : `calc(${offset} + ${centered})`;
 
   const placements = Array.from({ length: discardCount }, (_, index) => {
     const row = Math.floor(index / 6);
@@ -74,11 +88,11 @@ export function calculateRiverLayout(
       ? declaration ? '--river-tile-height' : '--river-tile-width'
       : declaration ? '--river-tile-width' : '--river-tile-height';
     const leftInSlot = side
-      ? centerInSlot(widthFace)
-      : position === 'top' ? alignEndInSlot(widthFace) : '0px';
+      ? add(fullOffset(screenColumn), centerInSlot(widthFace))
+      : add(compactOffset(screenColumn), centerInSlot(widthFace));
     const topInSlot = side
-      ? position === 'right' ? alignEndInSlot(heightFace) : '0px'
-      : centerInSlot(heightFace);
+      ? add(compactOffset(screenRow), centerInSlot(heightFace))
+      : add(fullOffset(screenRow), centerInSlot(heightFace));
 
     return {
       row: screenRow,
@@ -86,8 +100,8 @@ export function calculateRiverLayout(
       declaration,
       width: `var(${widthFace})`,
       height: `var(${heightFace})`,
-      left: `calc(${slotOffset(screenColumn)} + ${leftInSlot})`,
-      top: `calc(${slotOffset(screenRow)} + ${topInSlot})`,
+      left: leftInSlot,
+      top: topInSlot,
     };
   });
   return { width, height, placements };
@@ -102,8 +116,8 @@ export function applyRiverLayout(container: HTMLElement, layout: RiverLayout): v
 }
 
 export function applyRiverTilePlacement(element: HTMLElement, placement: RiverTilePlacement): void {
-  element.style.gridRow = String(placement.row + 1);
-  element.style.gridColumn = String(placement.column + 1);
+  element.dataset.riverRow = String(placement.row);
+  element.dataset.riverColumn = String(placement.column);
   element.style.position = 'absolute';
   element.style.width = placement.width;
   element.style.height = placement.height;

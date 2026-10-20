@@ -3,12 +3,12 @@ import type { PlayerGameView, PublicMeld, PublicTile } from './game-view.ts';
 import { createTileElement, tileLabel } from '../rendering/tile-svg.ts';
 import { renderDepositSticks } from '../rendering/deposit-sticks.ts';
 import { applyRiverLayout, applyRiverTilePlacement, calculateRiverLayout, riverPositionFor } from '../rendering/river-layout.ts';
+import { renderDoraIndicators } from '../rendering/dora.ts';
+import { renderSeatLabel, renderTableRoundInfo, setActionStatus } from '../rendering/shared-table-components.ts';
 import { TILE_KINDS, tileKindKey } from '../model/tile.ts';
 
 type ActionSender = (action: GameActionPayload, expectedGameRevision: number) => void;
 type DecisionAction = { type: 'declare-ron' } | { type: 'pass-ron' } | { type: 'declare-call'; optionId: string } | { type: 'pass-call' };
-const windNames = { east: '東', south: '南', west: '西', north: '北' } as const;
-
 function face(tile: PublicTile): SVGSVGElement {
   const svg = createTileElement(tile.tile);
   svg.setAttribute('aria-hidden', 'true');
@@ -34,8 +34,6 @@ function asView(value: unknown): PlayerGameView | null {
 
 export class OnlineGameController {
   private readonly root = document.querySelector<HTMLElement>('#online-match')!;
-  private readonly status = document.querySelector<HTMLElement>('#online-match-status')!;
-  private readonly roundLabel = document.querySelector<HTMLElement>('#online-match-round')!;
   private readonly scores = document.querySelector<HTMLElement>('#online-score-strip')!;
   private readonly playerHand = document.querySelector<HTMLUListElement>('#online-player-hand')!;
   private readonly actionStatus = document.querySelector<HTMLElement>('#online-game-action-status')!;
@@ -45,6 +43,7 @@ export class OnlineGameController {
   private sender: ActionSender | null = null;
   private decisionCountdownTimer: number | null = null;
   private decisionWindowId: string | null = null;
+  private kanChoicesOpen = false;
   private finalRanks: readonly Readonly<{ playerId: number; points: number; rank: number }>[] | null = null;
   private readonly tileOrder = new Map(TILE_KINDS.map((tile, index) => [tileKindKey(tile), index]));
 
@@ -56,8 +55,6 @@ export class OnlineGameController {
     set(this.root.querySelector<HTMLElement>('[data-online-summary]'), 'table-summary', 'online-table-summary');
     set(this.root.querySelector<HTMLElement>('[data-online-rivers]'), 'rivers', 'online-rivers');
     set(this.root.querySelector<HTMLElement>('[data-online-center-info]'), 'center-info', 'online-center-info');
-    set(document.querySelector<HTMLElement>('#online-dora-indicators'), 'dora-area', 'online-dora-area');
-    set(document.querySelector<HTMLElement>('#online-game-controls'), 'discard-controls', 'online-discard-controls');
     this.root.querySelectorAll<HTMLElement>('[data-online-seat]').forEach(node => {
       const position = node.dataset.onlineSeat;
       set(node, `seat seat-${position}`, `online-seat online-seat-${position}`);
@@ -72,7 +69,6 @@ export class OnlineGameController {
       const position = node.dataset.onlineRiver;
       set(node, `river river-${position}`, `online-river online-river-${position}`);
     });
-    if (!active) this.scores.replaceChildren();
   }
 
   constructor() {
@@ -98,6 +94,15 @@ export class OnlineGameController {
       const button = (event.target as Element).closest<HTMLButtonElement>('button[data-online-kan]');
       if (button?.dataset.onlineKan) this.send({ type: 'declare-kan', optionId: button.dataset.onlineKan });
     });
+    document.querySelector<HTMLButtonElement>('#online-kan')!.addEventListener('click', () => {
+      this.kanChoicesOpen = true;
+      this.render();
+      document.querySelector<HTMLElement>('#online-kan-controls')!.scrollIntoView({ block: 'nearest' });
+    });
+    document.querySelector<HTMLButtonElement>('#online-cancel-kan')!.addEventListener('click', () => {
+      this.kanChoicesOpen = false;
+      this.render();
+    });
     document.querySelector<HTMLButtonElement>('#online-call-options')!.addEventListener('click', event => {
       const button = (event.target as Element).closest<HTMLButtonElement>('button[data-online-call]');
       if (button?.dataset.onlineCall) this.sendDecision({ type: 'declare-call', optionId: button.dataset.onlineCall });
@@ -114,6 +119,7 @@ export class OnlineGameController {
       this.view = null;
       this.finalRanks = null;
       this.actionPending = false;
+      this.kanChoicesOpen = false;
       this.root.hidden = true;
       this.setTableClasses(false);
       document.body.classList.remove('online-game-active');
@@ -136,7 +142,6 @@ export class OnlineGameController {
         self: { ...this.view.self, decision: null },
       } : null;
       this.render();
-      this.status.textContent = '参加者が明示的に退出したため、対局を中断しました。';
       return;
     }
     if (message.type === 'round-ended' || message.type === 'match-ended') {
@@ -148,7 +153,10 @@ export class OnlineGameController {
     if (message.type !== 'game-state' && message.type !== 'game-started') return;
     const next = asView(message.view);
     if (!next || this.view && next.gameRevision < this.view.gameRevision) return;
-    if (!this.view || next.gameRevision !== this.view.gameRevision) this.selectedTileId = null;
+    if (!this.view || next.gameRevision !== this.view.gameRevision) {
+      this.selectedTileId = null;
+      this.kanChoicesOpen = false;
+    }
     this.view = next;
     this.actionPending = false;
     this.setTableClasses(true);
@@ -190,16 +198,11 @@ export class OnlineGameController {
   private render(): void {
     const view = this.view;
     if (!view) return;
-    this.status.textContent = view.status === 'playing'
-      ? view.phase === 'awaiting-ron' ? 'ロン判断を待っています。'
-        : view.phase === 'awaiting-call' ? '鳴き判断を待っています。'
-          : `${view.seats[view.turnPlayerId].name}の手番です。`
-      : view.status === 'round-ended' ? '局が終了しました。結果を確認できます。'
-        : view.status === 'match-ended' ? '東風戦が終了しました。最終結果です。'
-          : view.abortReason === 'participant-left'
-            ? '参加者が明示的に退出したため、対局を中断しました。'
-            : '対局を中断しました。';
-    this.roundLabel.textContent = `東${view.round.roundNumber}局${view.round.honba ? ` ${view.round.honba}本場` : ''} · 残り${view.liveWallCount}枚`;
+    renderTableRoundInfo(
+      document.querySelector<HTMLElement>('#online-table-round')!,
+      document.querySelector<HTMLElement>('#online-wall-count')!,
+      { ...view.round, liveWallCount: view.liveWallCount },
+    );
     this.renderSeatLabels(view);
     this.renderHandsAndMelds(view);
     this.renderRivers(view);
@@ -209,19 +212,28 @@ export class OnlineGameController {
   }
 
   private renderSeatLabels(view: PlayerGameView): void {
-    const labels: HTMLElement[] = [];
     for (const seat of view.seats) {
       const position = riverPositionFor(view.viewerSeat, seat.seat);
-      const label = document.createElement('p');
-      label.className = 'seat-label';
-      label.dataset.active = String(view.status === 'playing' && view.turnPlayerId === seat.seat);
-      const identity = text('span', `${seat.name} · ${windNames[seat.wind]}${seat.isDealer ? ' 親' : ''}${seat.riichi ? ' · リーチ' : ''}${seat.connected ? '' : ' · 切断中'}`);
-      const score = text('span', `${seat.points.toLocaleString('ja-JP')}点`, 'seat-points');
-      label.append(identity, score);
-      label.dataset.onlineLabel = position;
-      labels.push(label);
+      const label = this.scores.querySelector<HTMLElement>(`[data-online-label="${position}"]`);
+      if (!label) continue;
+      renderSeatLabel(label, {
+        name: this.displayName(view, seat),
+        wind: seat.wind,
+        points: seat.points,
+        isDealer: seat.isDealer,
+        isSelf: seat.seat === view.viewerSeat,
+        isActive: view.status === 'playing' && view.turnPlayerId === seat.seat,
+        isRiichi: seat.riichi,
+        isConnected: seat.connected,
+      });
     }
-    this.scores.replaceChildren(...labels);
+  }
+
+  private displayName(view: PlayerGameView, seat: PlayerGameView['seats'][number]): string {
+    if (seat.control !== 'cpu') return seat.name;
+    const cpuSeats = view.seats.filter(candidate => candidate.control === 'cpu').sort((a, b) => a.seat - b.seat);
+    const index = cpuSeats.findIndex(candidate => candidate.seat === seat.seat);
+    return index < 0 ? seat.name : `CPU${index + 1}`;
   }
 
   private renderHandsAndMelds(view: PlayerGameView): void {
@@ -252,7 +264,7 @@ export class OnlineGameController {
       }
       const visible = seat.revealedHand;
       const tiles = visible ?? Array.from({ length: seat.concealedCount }, () => null);
-      handNode.setAttribute('aria-label', `${seat.name}の${visible ? '公開手牌' : '裏向き手牌'} ${tiles.length}枚`);
+      handNode.setAttribute('aria-label', `${this.displayName(view, seat)}の${visible ? '公開手牌' : '裏向き手牌'} ${tiles.length}枚`);
       for (const tile of tiles) {
         if (!tile) {
           const back = document.createElement('span');
@@ -345,23 +357,7 @@ export class OnlineGameController {
 
   private renderDora(view: PlayerGameView): void {
     const area = document.querySelector<HTMLElement>('#online-dora-indicators')!;
-    area.replaceChildren(text('h2', 'ドラ表示牌'));
-    const row = document.createElement('div');
-    row.id = 'online-dora-row';
-    for (const tile of view.doraIndicators) {
-      const slot = document.createElement('span');
-      slot.className = 'dora-slot';
-      slot.append(face(tile));
-      row.append(slot);
-    }
-    for (const tile of view.uraDoraIndicators ?? []) {
-      const slot = document.createElement('span');
-      slot.className = 'dora-slot';
-      slot.dataset.uraDora = 'true';
-      slot.append(face(tile));
-      row.append(slot);
-    }
-    area.append(row);
+    renderDoraIndicators(area, view.doraIndicators, view.uraDoraIndicators ?? []);
     const deposit = document.querySelector<HTMLElement>('#online-deposit-sticks')!;
     renderDepositSticks(deposit, view.round.depositSticks);
   }
@@ -375,19 +371,19 @@ export class OnlineGameController {
     section.append(text('h2', `東${result.roundNumber}局 ${result.honba}本場 · ${result.reason === 'draw' ? '流局' : result.reason === 'ron' ? 'ロン' : result.reason === 'tsumo' ? 'ツモ' : result.reason === 'nagashi-mangan' ? '流し満貫' : '途中流局'}`));
     for (const winner of result.winners) {
       const seat = view.seats[winner.winnerId];
-      section.append(text('p', `${seat.name} ${winner.method === 'tsumo' ? 'ツモ' : `ロン（${view.seats[winner.discarderId ?? 0].name}から）`} · ${winner.yakumanCount ? `${winner.yakumanCount}役満` : `${winner.han}翻 ${winner.fu ?? '—'}符`} · ${winner.totalPoints.toLocaleString('ja-JP')}点`));
+      section.append(text('p', `${this.displayName(view, seat)} ${winner.method === 'tsumo' ? 'ツモ' : `ロン（${this.displayName(view, view.seats[winner.discarderId ?? 0])}から）`} · ${winner.yakumanCount ? `${winner.yakumanCount}役満` : `${winner.han}翻 ${winner.fu ?? '—'}符`} · ${winner.totalPoints.toLocaleString('ja-JP')}点`));
       section.append(text('p', winner.yaku.map(yaku => yaku.id).join('・')));
     }
-    section.append(text('p', `点数：${result.after.map((points, seat) => `${view.seats[seat].name} ${points.toLocaleString('ja-JP')}点 (${result.deltas[seat] >= 0 ? '+' : ''}${result.deltas[seat].toLocaleString('ja-JP')})`).join(' · ')}`));
+    section.append(text('p', `点数：${result.after.map((points, seat) => `${this.displayName(view, view.seats[seat])} ${points.toLocaleString('ja-JP')}点 (${result.deltas[seat] >= 0 ? '+' : ''}${result.deltas[seat].toLocaleString('ja-JP')})`).join(' · ')}`));
     for (const payment of result.payments) {
-      section.append(text('p', `${view.seats[payment.payerId].name} → ${view.seats[payment.recipientId].name}：${payment.points.toLocaleString('ja-JP')}点`));
+      section.append(text('p', `${this.displayName(view, view.seats[payment.payerId])} → ${this.displayName(view, view.seats[payment.recipientId])}：${payment.points.toLocaleString('ja-JP')}点`));
     }
-    if (result.tenpai) section.append(text('p', `テンパイ：${result.tenpai.map((tenpai, seat) => tenpai ? view.seats[seat].name : null).filter(Boolean).join('・') || 'なし'}`));
+    if (result.tenpai) section.append(text('p', `テンパイ：${result.tenpai.map((tenpai, seat) => tenpai ? this.displayName(view, view.seats[seat]) : null).filter(Boolean).join('・') || 'なし'}`));
     if (view.status === 'match-ended') {
       const ranks = this.finalRanks ?? view.round.points.map((points, playerId) => ({ playerId, points, rank: 0 }))
         .sort((a, b) => b.points - a.points || a.playerId - b.playerId)
         .map((player, index) => ({ ...player, rank: index + 1 }));
-      section.append(text('h3', `東風戦終了 · ${ranks.map(player => `${player.rank}位 ${view.seats[player.playerId].name} ${player.points.toLocaleString('ja-JP')}点`).join(' · ')}`));
+      section.append(text('h3', `東風戦終了 · ${ranks.map(player => `${player.rank}位 ${this.displayName(view, view.seats[player.playerId])} ${player.points.toLocaleString('ja-JP')}点`).join(' · ')}`));
     }
   }
 
@@ -409,12 +405,15 @@ export class OnlineGameController {
     const kyuushu = document.querySelector<HTMLButtonElement>('#online-kyuushu')!;
     kyuushu.hidden = !active || !view.self.canKyuushuKyuuhai;
     kyuushu.disabled = this.actionPending;
+    const kanButton = document.querySelector<HTMLButtonElement>('#online-kan')!;
+    kanButton.hidden = !active || view.self.kanOptions.length === 0 || decision !== null;
+    kanButton.disabled = this.actionPending;
     const kanGroup = document.querySelector<HTMLElement>('#online-kan-controls')!;
-    kanGroup.hidden = !active || view.self.kanOptions.length === 0 || decision !== null;
+    kanGroup.hidden = !this.kanChoicesOpen || !active || view.self.kanOptions.length === 0 || decision !== null;
     const kanOptions = document.querySelector<HTMLElement>('#online-kan-options')!;
     kanOptions.replaceChildren(...view.self.kanOptions.map(option => {
       const button = document.createElement('button');
-      button.type = 'button'; button.dataset.onlineKan = option.id; button.disabled = this.actionPending;
+      button.type = 'button'; button.className = 'control-option-button'; button.dataset.onlineKan = option.id; button.disabled = this.actionPending;
       button.append(text('span', option.type === 'ankan' ? '暗カン ' : '加カン '));
       for (const tile of option.tiles) button.append(face(tile));
       return button;
@@ -422,12 +421,13 @@ export class OnlineGameController {
     const ron = document.querySelector<HTMLElement>('#online-ron-controls')!;
     const canAnswerRon = Boolean(decision?.type === 'ron' && !decision.answered && view.self.canRon);
     ron.hidden = !decision || decision.type !== 'ron';
+    document.querySelector<HTMLElement>('#online-game-controls')!.classList.toggle('ron-pending', canAnswerRon);
     const calls = document.querySelector<HTMLElement>('#online-call-controls')!;
     calls.hidden = !decision || decision.type !== 'call';
     const callOptions = document.querySelector<HTMLElement>('#online-call-options')!;
     callOptions.replaceChildren(...view.self.callOptions.map(option => {
       const button = document.createElement('button');
-      button.type = 'button'; button.dataset.onlineCall = option.id;
+      button.type = 'button'; button.className = 'control-option-button'; button.dataset.onlineCall = option.id;
       button.disabled = this.actionPending || Boolean(decision?.answered) || this.decisionSeconds(decision) === 0;
       button.append(text('span', option.type === 'pon' ? 'ポン ' : option.type === 'chi' ? 'チー ' : '大明カン '));
       for (const tile of option.tiles) button.append(face(tile));
@@ -442,8 +442,12 @@ export class OnlineGameController {
       : decision.answered
         ? `回答済みです。他のプレイヤーの回答を待っています。残り ${secondsLeft} 秒。`
         : `${decision.type === 'ron' ? 'ロン' : '鳴き'}判断の残り ${secondsLeft} 秒です。`;
-    ronStatus.textContent = `${statusText}${decision?.type === 'ron' && view.self.ronTile ? ` ${tileLabel(view.self.ronTile.tile)}` : ''}`;
+    ronStatus.textContent = statusText;
     callStatus.textContent = statusText;
+    const ronTarget = document.querySelector<HTMLElement>('#online-ron-target')!;
+    if (canAnswerRon && view.self.ronTile) {
+      ronTarget.replaceChildren(face(view.self.ronTile), text('p', `${tileLabel(view.self.ronTile.tile)} · この牌でロンできます`));
+    } else ronTarget.replaceChildren();
     document.querySelector<HTMLButtonElement>('#online-ron')!.disabled = this.actionPending || !canAnswerRon || expired;
     document.querySelector<HTMLButtonElement>('#online-pass-ron')!.disabled = this.actionPending || !canAnswerRon || expired;
     document.querySelector<HTMLButtonElement>('#online-pass-call')!.disabled = this.actionPending || Boolean(decision?.answered) || expired;
@@ -451,14 +455,26 @@ export class OnlineGameController {
     const next = document.querySelector<HTMLButtonElement>('#online-next-round')!;
     next.hidden = view.status !== 'round-ended' || !view.self.isHost;
     next.disabled = this.actionPending || view.seats.some(seat => seat.control === 'human' && !seat.connected);
-    document.querySelector<HTMLButtonElement>('#online-return-local')!.hidden = view.status !== 'match-ended' && view.status !== 'aborted';
-    if (this.actionPending) this.actionStatus.textContent = 'サーバーで操作を確認しています…';
-    else if (decision?.answered) this.actionStatus.textContent = '回答を受け付けました。他のプレイヤーの回答を待っています。';
-    else if (view.status === 'playing' && !decision && view.turnPlayerId !== view.viewerSeat) this.actionStatus.textContent = `手番：${view.seats[view.turnPlayerId].name}`;
-    else if (view.status === 'playing' && !decision && view.self.discardableTileIds.length) this.actionStatus.textContent = this.selectedTileId ? '牌を選択中です。' : '打牌する牌を選択してください。';
-    else if (view.status === 'playing' && !decision) this.actionStatus.textContent = 'サーバーの更新を待っています。';
-    else if (view.status === 'round-ended' && !view.self.isHost) this.actionStatus.textContent = 'ホストが次局へ進めるまでお待ちください。';
-    else if (view.status === 'aborted') this.actionStatus.textContent = 'この対局は中断されました。';
+    const returnLocal = document.querySelector<HTMLButtonElement>('#online-return-local')!;
+    returnLocal.hidden = view.status !== 'match-ended' && view.status !== 'aborted';
+    const roundActions = document.querySelector<HTMLElement>('#online-round-result-actions')!;
+    roundActions.hidden = next.hidden && returnLocal.hidden;
+
+    let message: string;
+    if (this.actionPending) message = 'サーバーで操作を確認しています…';
+    else if (decision?.answered) message = '回答を受け付けました。他のプレイヤーの回答を待っています。';
+    else if (decision) message = statusText;
+    else if (view.status === 'round-ended') message = view.self.isHost ? '局が終了しました。結果を確認してください。' : 'ホストが次局へ進めるまでお待ちください。';
+    else if (view.status === 'match-ended') message = '東風戦が終了しました。最終結果を確認できます。';
+    else if (view.status === 'aborted') message = view.abortReason === 'participant-left'
+      ? '参加者が明示的に退出したため、対局を中断しました。'
+      : 'この対局は中断されました。';
+    else if (view.phase === 'awaiting-ron') message = 'ロン判断を待っています。';
+    else if (view.phase === 'awaiting-call') message = '鳴き判断を待っています。';
+    else if (view.turnPlayerId !== view.viewerSeat) message = `手番：${this.displayName(view, view.seats[view.turnPlayerId])}`;
+    else if (view.self.discardableTileIds.length) message = this.selectedTileId ? '牌を選択中です。' : '打牌する牌を選択してください。';
+    else message = 'サーバーの更新を待っています。';
+    setActionStatus(this.actionStatus, message);
   }
 
   private returnToLocalGame(): void {

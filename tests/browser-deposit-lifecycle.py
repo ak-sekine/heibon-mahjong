@@ -34,7 +34,7 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
    boxes=page.locator('#player-hand li').evaluate_all('els=>els.map(e=>{let r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})')
    assert len(set(round(b['y'],1) for b in boxes))==1
    assert all(b['x']>=0 and b['x']+b['w']<=width for b in boxes)
-   controls=page.locator('.discard-controls').bounding_box()
+   controls=page.locator('#local-game-controls').bounding_box()
    assert all(b['y']+b['h']<=controls['y'] for b in boxes),(width,height,boxes[-1],controls)
    assert page.locator('.dora-slot').count()==5
    assert page.locator('#dora-indicators').evaluate('e=>getComputedStyle(e).gridTemplateColumns.split(" ").length')==5

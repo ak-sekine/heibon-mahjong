@@ -79,7 +79,7 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'normal-multiple', 'u
     nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
   }
   for (const key of ['#player-hand', '#wall-count', '#win-result', '#round-result-summary', '#dora-indicators']) nodes.set(key, new ElementStub());
-  for (const key of ['#ron-controls', '#ron-status', '#ron', '#pass-ron', '.discard-controls']) {
+  for (const key of ['#ron-controls', '#ron-status', '#ron', '#pass-ron', '#local-game-controls']) {
     const node = new ElementStub(); node.hidden = true; nodes.set(key, node);
   }
   const original = globalThis.document;
@@ -183,7 +183,7 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
   nodes.set('#tsumo', new ElementStub());
   nodes.set('#discard', new ElementStub());
   nodes.set('#selection-status', new ElementStub());
-  for (const key of ['#ron-controls', '#ron-status', '#ron', '#pass-ron', '.discard-controls']) {
+  for (const key of ['#ron-controls', '#ron-status', '#ron', '#pass-ron', '#local-game-controls']) {
     const node = new ElementStub(); node.hidden = true; nodes.set(key, node);
   }
   const original = globalThis.document;
@@ -213,12 +213,18 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
         const order = (tile: typeof a.tile) => tile.category === 'suited' ? ['man', 'pin', 'sou'].indexOf(tile.suit) * 9 + tile.rank - 1 : 27 + ['east', 'south', 'west', 'north', 'white', 'green', 'red'].indexOf(tile.honor);
         return order(a.tile) - order(b.tile) || a.id.localeCompare(b.id);
       }).map(tile => tile.id).concat(game.players[0].drawnTile!.id));
-      assert.match(nodes.get('#label-0')!.textContent, /^自分 · 東 · 14枚 · 親$/);
+      const selfLabel = nodes.get('#label-0')!;
+      assert.equal(selfLabel.children[0].textContent, '自分');
+      assert.deepEqual(selfLabel.children[1].children.map(item => item.textContent), ['東', '親']);
+      assert.equal(selfLabel.children[2].textContent, '25,000点');
       for (const id of [1, 2, 3]) {
         const backs = nodes.get(`.concealed-hand[data-player-id="${id}"]`)!.children;
         assert.equal(backs.length, 13);
         assert.ok(backs.every(item => item.className === 'tile-back' && item.children.length === 0 && Object.keys(item.dataset).length === 0));
-        assert.match(nodes.get(`#label-${id}`)!.textContent, new RegExp(`^CPU${id} · ${['', '南', '西', '北'][id]} · 13枚$`));
+        const label = nodes.get(`#label-${id}`)!;
+        assert.equal(label.children[0].textContent, `CPU${id}`);
+        assert.equal(label.children[1].children[0].textContent, ['', '南', '西', '北'][id]);
+        assert.equal(label.children[2].textContent, '25,000点');
       }
       assert.deepEqual(nodes.get('#wall-count')!.children.map(item => item.textContent), ['山69枚', '王牌 14枚']);
       assert.equal(nodes.get('#label-0')!.dataset.active, 'true');
@@ -269,11 +275,11 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
     for (const id of [0, 1, 2, 3]) {
       const items = nodes.get(`.river[data-player-id="${id}"]`)!.children;
       assert.deepEqual(items.map(item => item.dataset.tileId), tiles.map(tile => tile.id));
-      assert.equal(new Set(items.map(item => `${item.style.gridRow},${item.style.gridColumn}`)).size, 18);
+      assert.equal(new Set(items.map(item => `${item.dataset.riverRow},${item.dataset.riverColumn}`)).size, 18);
       for (const [index, item] of items.entries()) {
         const row = Math.floor(index / 6), col = index % 6;
         const expected = [[row+1,col+1], [6-col,row+1], [3-row,6-col], [col+1,3-row]][id];
-        assert.deepEqual([Number(item.style.gridRow), Number(item.style.gridColumn)], expected);
+        assert.deepEqual([Number(item.dataset.riverRow), Number(item.dataset.riverColumn)], expected.map(value => value - 1));
       }
     }
     assert.deepEqual(fullRivers, snapshot);
@@ -334,7 +340,7 @@ test('confirmed draw publishes only tenpai CPU hands, summarizes settlement and 
   for (const key of ['#player-hand', '#wall-count', '#win-result', '#round-result-summary', '#dora-indicators', '#selection-status',
     '#table-round', '#deposit-sticks', '#match-result', '#next-round']) nodes.set(key, new ElementStub());
   for (const key of ['#tsumo', '#discard', '#ron', '#pass-ron']) nodes.set(key, new ElementStub());
-  for (const key of ['#ron-controls', '#ron-status', '.discard-controls']) {
+  for (const key of ['#ron-controls', '#ron-status', '#local-game-controls']) {
     const node = new ElementStub(); node.hidden = true; nodes.set(key, node);
   }
   const original = globalThis.document;
@@ -433,7 +439,7 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     if (seat) nodes.set(`.concealed-hand[data-player-id="${seat}"]`, new ElementStub());
   }
   for (const key of ['#player-hand', '#wall-count', '#win-result', '#round-result-summary', '#dora-indicators', '#discard', '#tsumo', '#selection-status']) nodes.set(key, new ElementStub());
-  for (const key of ['#ron-controls', '#ron-status', '#ron', '#pass-ron', '.discard-controls']) {
+  for (const key of ['#ron-controls', '#ron-status', '#ron', '#pass-ron', '#local-game-controls']) {
     const node = new ElementStub(); node.hidden = true; nodes.set(key, node);
   }
   const original = globalThis.document;
@@ -518,7 +524,7 @@ for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','f
       nodes.set(`.river[data-player-id="${id}"]`,new ElementStub());
       if (id) nodes.set(`.concealed-hand[data-player-id="${id}"]`,new ElementStub());
     }
-    for (const key of ['#player-hand','#wall-count','#win-result','#round-result-summary','#dora-indicators','#discard','#tsumo','#selection-status','#ron-controls','#ron-status','#ron','#pass-ron','.discard-controls']) nodes.set(key,new ElementStub());
+    for (const key of ['#player-hand','#wall-count','#win-result','#round-result-summary','#dora-indicators','#discard','#tsumo','#selection-status','#ron-controls','#ron-status','#ron','#pass-ron','#local-game-controls']) nodes.set(key,new ElementStub());
     nodes.get('#ron-controls')!.hidden = true;
     nodes.get('#ron')!.disabled = true;
     const original = globalThis.document;
@@ -599,7 +605,7 @@ for (const mode of ['plain', 'riichi', 'double', 'double-ron', 'triple-ron', 'pl
     nodes.set(`#label-${id}`, new ElementStub());
     nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
   }
-  for (const key of ['#player-hand', '#wall-count', '#win-result', '#dora-indicators', '#ron-controls', '#ron-status', '#ron', '#pass-ron', '.discard-controls']) nodes.set(key, new ElementStub());
+  for (const key of ['#player-hand', '#wall-count', '#win-result', '#dora-indicators', '#ron-controls', '#ron-status', '#ron', '#pass-ron', '#local-game-controls']) nodes.set(key, new ElementStub());
   const original = globalThis.document;
   globalThis.document = { querySelector: (s: string) => nodes.get(s), createElement: (t: string) => new ElementStub(t) } as unknown as Document;
   try {
@@ -663,7 +669,7 @@ for (const mode of ['discard', 'red', 'pending', 'ron', 'pass', 'reset', 'new-ma
     nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
     nodes.set(`.open-melds[data-player-id="${id}"]`, new ElementStub());
   }
-  for (const key of ['#player-hand','#wall-count','#win-result','#dora-indicators','#discard','#tsumo','#selection-status','#ron-controls','#ron-status','#ron-target','#ron','#pass-ron','.discard-controls']) nodes.set(key,new ElementStub());
+  for (const key of ['#player-hand','#wall-count','#win-result','#dora-indicators','#discard','#tsumo','#selection-status','#ron-controls','#ron-status','#ron-target','#ron','#pass-ron','#local-game-controls']) nodes.set(key,new ElementStub());
   nodes.get('#ron-controls')!.hidden=true;
   const original=globalThis.document;
   globalThis.document={querySelector:(s:string)=>nodes.get(s), querySelectorAll:()=>nodes.get('#player-hand')!.children.map(c=>c.children[0]), createElement:(tag:string)=>new ElementStub(tag)} as unknown as Document;

@@ -96,7 +96,7 @@ import { cpuTsumoStart } from '/heibon-mahjong/tests/cpu-tsumo-fixture.ts';
    page.wait_for_timeout(700)
    assert page.evaluate('JSON.stringify(matchCheck())')==before
   def geometry(initial=False):
-   if initial: page.locator('.discard-controls').scroll_into_view_if_needed()
+   if initial: page.locator('#local-game-controls').scroll_into_view_if_needed()
    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
    boxes=page.locator('#player-hand li').evaluate_all('els=>els.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})')
    assert len(set(round(b['y'],1) for b in boxes))==1
@@ -105,7 +105,7 @@ import { cpuTsumoStart } from '/heibon-mahjong/tests/cpu-tsumo-fixture.ts';
    assert page.locator('#dora-indicators').evaluate('el=>getComputedStyle(el).gridTemplateColumns.split(" ").length')==5
    if initial:
     assert len(boxes)==14
-    controls=page.locator('.discard-controls').bounding_box()
+    controls=page.locator('#local-game-controls').bounding_box()
     assert all(b['y']+b['h']<=controls['y'] for b in boxes),(width,height,boxes[-1],controls)
     assert all(b['y']>=0 and b['y']+b['h']<=height for b in boxes), (width,height,boxes[-1])
     for selector in ['#discard','#tsumo']:
@@ -128,7 +128,8 @@ import { cpuTsumoStart } from '/heibon-mahjong/tests/cpu-tsumo-fixture.ts';
   assert '東1局 1本場' in page.locator('#match-info').inner_text();assert page.evaluate('matchCheck().points')==[30800,19200,25000,25000]
   geometry(True);page.screenshot(path=str(out/f'{width}x{height}-next-round.png'))
   page.evaluate("matchFixture('change')");page.locator('#next-round').click();page.evaluate('scrollTo(0,0)')
-  assert '自分（北）' in page.locator('#label-0').inner_text();assert 'CPU1（東）' in page.locator('#label-1').inner_text()
+  assert page.locator('#label-0 .seat-name').inner_text()=='自分' and page.locator('#label-0 .seat-wind').inner_text()=='北'
+  assert page.locator('#label-1 .seat-name').inner_text()=='CPU1' and page.locator('#label-1 .seat-wind').inner_text()=='東'
   page.evaluate("matchFixture('cpu')");page.evaluate('scrollTo(0,0)')
   tile_id=page.evaluate('matchCheck().game.players[0].drawnTile.id')
   page.locator(f'#player-hand button[data-tile-id="{tile_id}"]').click();page.locator('#discard').click()

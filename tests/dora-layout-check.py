@@ -22,6 +22,7 @@ with sync_playwright() as p:
         page.evaluate('''async () => {
           const { renderDoraIndicators } = await import('/heibon-mahjong/src/rendering/dora.ts');
           const { renderTable } = await import('/heibon-mahjong/src/rendering/table.ts');
+          window.riverLayout = await import('/heibon-mahjong/src/rendering/river-layout.ts');
           const { startGame } = await import('/heibon-mahjong/src/game/start.ts');
           const game = startGame();
           renderTable(game);
@@ -44,7 +45,7 @@ with sync_playwright() as p:
             assert page.locator('#dora-indicators svg').count() == count
             assert page.locator('.dora-placeholder').count() == 5-count
             assert page.locator('.dora-placeholder').evaluate_all('''els=>els.every(el=>el.children.length===0 && el.textContent==='' && Object.keys(el.dataset).length===0)''')
-            page.locator('.discard-controls').scroll_into_view_if_needed()
+            page.locator('#local-game-controls').scroll_into_view_if_needed()
             metrics = page.evaluate('''() => {
               const rect = el => { const r=el.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height}; };
               const region=document.querySelector('#dora-indicators');
@@ -57,7 +58,7 @@ with sync_playwright() as p:
                 positions:[...document.querySelectorAll('.seat,.river,.center-info,#discard,#tsumo')].map(rect)};
             }''')
             assert not metrics['overflow'] and metrics['childrenContained']
-            assert page.locator('.table-summary #dora-indicators').count() == 1
+            assert page.locator('.table .center-info #dora-indicators').count() == 1
             # Keep Step 13.5.4's shared physical scale through the square-table layout.
             for i in range(count):
                 tile=page.locator('#dora-indicators svg').nth(i).bounding_box()
@@ -66,7 +67,7 @@ with sync_playwright() as p:
                 assert abs(tile['width']/hand_tile['width']-1)<.001 and abs(tile['height']/tile['width']-1.4)<.003
                 assert tile['width']==cpu['width'] and tile['height']==cpu['height']
             hand = page.locator('#player-hand').bounding_box()
-            controls = page.locator('.discard-controls').bounding_box()
+            controls = page.locator('#local-game-controls').bounding_box()
             assert hand['y'] >= 0 and hand['y'] + hand['height'] <= controls['y']
             assert all(page.locator(s).evaluate('''e=>{const r=e.getBoundingClientRect();return r.height>=44&&r.width>=44&&r.top>=0&&r.bottom<=document.documentElement.scrollHeight}''') for s in ['#discard','#tsumo'])
             slots = metrics['slots']
@@ -86,15 +87,17 @@ with sync_playwright() as p:
             # Fill each river to capacity using only synthetic public tiles.
             page.evaluate('''async () => {
               const {createTileElement}=await import('/heibon-mahjong/src/rendering/tile-svg.ts');
+              const {calculateRiverLayout,applyRiverLayout,applyRiverTilePlacement}=window.riverLayout;
+              const positions=['bottom','right','top','left'];
               for(const river of document.querySelectorAll('.river')) {
                 river.replaceChildren(); const id=Number(river.dataset.playerId);
                 for(let i=0;i<18;i++) {
                   const item=document.createElement('div');item.className='river-tile';
-                  const row=Math.floor(i/6),col=i%6;
-                  const cells=[[row+1,col+1],[6-col,row+1],[3-row,6-col],[col+1,3-row]][id];
-                  item.style.gridRow=String(cells[0]);item.style.gridColumn=String(cells[1]);
                   item.append(createTileElement({category:'suited',suit:'pin',rank:9,isRed:false}));river.append(item);
                 }
+                const layout=calculateRiverLayout(positions[id],river.children.length);
+                applyRiverLayout(river,layout);
+                [...river.children].forEach((item,index)=>applyRiverTilePlacement(item,layout.placements[index]));
               }
             }''')
             assert page.evaluate('''() => {

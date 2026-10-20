@@ -40,7 +40,7 @@ g={...g,players,deadWall:pool.splice(-14),liveWall:pool,phase:'awaiting-discard'
   page.route('**/src/main.ts',inject)
   page.goto('http://127.0.0.1:4173/heibon-mahjong/');page.wait_for_function('typeof load==="function"')
   def geometry(result=False):
-   assert page.evaluate('''()=>{const a=document.querySelector('.table').getBoundingClientRect(),b=document.querySelector('.discard-controls').getBoundingClientRect();return b.top>=a.bottom;}'''), 'controls overlap table'
+   assert page.evaluate('''()=>{const a=document.querySelector('.table').getBoundingClientRect(),b=document.querySelector('#local-game-controls').getBoundingClientRect();return b.top>=a.bottom;}'''), 'controls overlap table'
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), 'horizontal page overflow'
    if result:
     assert page.locator('#result-dialog').is_visible()
@@ -81,7 +81,7 @@ g={...g,players,deadWall:pool.splice(-14),liveWall:pool,phase:'awaiting-discard'
   page.evaluate('displayMelds()');geometry();inventory();private()
   assert page.locator('.seat .open-meld').count()==4
   # Meld boxes stay outside all river rectangles and the controls.
-  assert page.evaluate('''()=>{const a=[...document.querySelectorAll('.seat .open-meld')].map(e=>e.getBoundingClientRect());const b=[...document.querySelectorAll('.river,.discard-controls')].map(e=>e.getBoundingClientRect());return a.every(x=>b.every(y=>x.right<=y.left||x.left>=y.right||x.bottom<=y.top||x.top>=y.bottom));}''')
+  assert page.evaluate('''()=>{const a=[...document.querySelectorAll('.seat .open-meld')].map(e=>e.getBoundingClientRect());const b=[...document.querySelectorAll('.river,#local-game-controls')].map(e=>e.getBoundingClientRect());return a.every(x=>b.every(y=>x.right<=y.left||x.left>=y.right||x.bottom<=y.top||x.top>=y.bottom));}''')
   page.screenshot(path=str(out/f'{width}x{height}-four-seats.png'),full_page=True)
   for method in ['ron','tsumo']:
    page.evaluate('load',method)

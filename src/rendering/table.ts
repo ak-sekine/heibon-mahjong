@@ -20,6 +20,7 @@ import { exposedDoraIndicators } from '../game/dora.ts';
 import { renderDoraIndicators, createResultDoraRow } from './dora.ts';
 import { applyRiverLayout, applyRiverTilePlacement, calculateRiverLayout, riverPositionFor } from './river-layout.ts';
 import type { RoundSettlement } from '../model/match.ts';
+import { renderSeatLabel, renderWallCount, setActionStatus } from './shared-table-components.ts';
 
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
 const seatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
@@ -95,20 +96,19 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
     const publicRonTileCount = player.control === 'cpu' && winningResult?.winMethod === 'ron' ? 1 : 0;
     const count = player.hand.length + Number(player.drawnTile !== null) + publicRonTileCount;
     const label = document.querySelector<HTMLElement>(`#label-${id}`)!;
-    if (points) {
-      const identity = Object.assign(document.createElement('span'), { textContent: `${seatNames[id]}（${winds[player.wind]}）${game.dealerId === id ? '親' : ''}` });
-      if (player.riichi) {
-        const status = previewText('span', ' リーチ');
-        status.className = 'seat-status';
-        identity.append(status);
-      }
-      const balance = Object.assign(document.createElement('span'), { textContent: `${points[id].toLocaleString('ja-JP')}点`, className: 'seat-points' });
-      label.replaceChildren(identity, document.createTextNode(' '), balance);
-    } else label.textContent = `${seatNames[id]} · ${winds[player.wind]} · ${count}枚${game.dealerId === id ? ' · 親' : ''}${player.riichi ? ' · リーチ' : ''}`;
+    renderSeatLabel(label, {
+      name: seatNames[id],
+      wind: player.wind,
+      points: points?.[id] ?? 25000,
+      isDealer: game.dealerId === id,
+      isSelf: id === 0,
+      isActive: game.phase !== 'wall-exhausted' && game.phase !== 'won' && game.turnPlayerId === id,
+      isRiichi: Boolean(player.riichi),
+      isConnected: true,
+    });
     if(game.phase==='awaiting-ron' && game.ronWindow?.kind==='kakan' && game.ronWindow.kan?.playerId===id) {
       const declaration=previewText('span','加カン宣言中'); declaration.className='seat-declaration'; label.append(declaration);
     }
-    label.dataset.active = String(game.phase !== 'wall-exhausted' && game.phase !== 'won' && game.turnPlayerId === id);
     if (id === 0) renderSelf(player, canDiscard(game, 0));
     else {
       const backHand = document.querySelector<HTMLElement>(`.concealed-hand[data-player-id="${id}"]`);
@@ -150,10 +150,10 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
       return item;
     }));
   }
-  document.querySelector<HTMLElement>('#wall-count')!.replaceChildren(
-    Object.assign(document.createElement('span'), { textContent: `山${game.liveWall.length}枚` }),
-    Object.assign(document.createElement('span'), { textContent: `王牌 ${game.deadWall.length}枚` }),
-  );
+  renderWallCount(document.querySelector<HTMLElement>('#wall-count')!, {
+    liveWallCount: game.liveWall.length,
+    deadWallCount: game.deadWall.length,
+  });
 }
 
 /** Selection rendering never changes GameState or rebuilds focused tile buttons. */
@@ -175,7 +175,7 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
   if(kanPanel) {
     if(!kanOptions.length) kanPanel.hidden=true;
     document.querySelector('#kan-options')!.replaceChildren(...kanOptions.map(option=>{
-      const b=document.createElement('button');b.type='button';b.dataset.kanId=option.id;
+      const b=document.createElement('button');b.type='button';b.className='control-option-button';b.dataset.kanId=option.id;
       b.append(document.createTextNode(option.meld.type==='ankan'?'暗カン':'加カン'));
       for(const t of option.meld.tiles) b.append(createTileElement(t.tile));
       return b;
@@ -187,7 +187,7 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
     calls.hidden = !options.length;
     const choices = document.querySelector<HTMLElement>('#call-options')!;
     choices.replaceChildren(...options.map(option => {
-      const button = document.createElement('button'); button.type='button'; button.dataset.callId=option.id;
+      const button = document.createElement('button'); button.type='button'; button.className='control-option-button'; button.dataset.callId=option.id;
       const name = option.type==='pon' ? 'ポン' : option.type==='daiminkan'?'大明カン':'チー';
       button.setAttribute('aria-label', `${name}：${option.tiles.map(t=>tileLabel(t.tile)).join('・')}（${option.handTileIds.join('、')}）`);
       button.append(document.createTextNode(name));
@@ -224,8 +224,9 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
   document.querySelector<HTMLButtonElement>('#ron')!.disabled = !canRon;
   document.querySelector<HTMLButtonElement>('#pass-ron')!.disabled = !canRon;
   if (canRon && wasHidden) document.querySelector<HTMLButtonElement>('#ron')!.focus({ preventScroll: true });
-  document.querySelector<HTMLElement>('.discard-controls')!.classList.toggle('ron-pending', canRon);
-  document.querySelector<HTMLElement>('.discard-controls')!.classList.toggle('game-ended', game.phase === 'won');
+  const controls = document.querySelector<HTMLElement>('#local-game-controls')!;
+  controls.classList.toggle('ron-pending', canRon);
+  controls.classList.toggle('game-ended', game.phase === 'won');
   const player = game.players[0];
   const selected = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
     .find(tile => tile.id === selectedTileId);
@@ -237,11 +238,11 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
     riichi.disabled = progressing || !selected || !canDeclareRiichi(game, 0, selected.id, points);
   }
   document.querySelector<HTMLButtonElement>('#tsumo')!.disabled = progressing || game.players[0].control !== 'human' || !canDeclareTsumo(game, 0);
-  document.querySelector<HTMLElement>('#selection-status')!.textContent = game.phase === 'wall-exhausted'
+  setActionStatus(document.querySelector<HTMLElement>('#selection-status')!, game.phase === 'wall-exhausted'
     ? '牌山がなくなりました'
     : !canDiscard(game, 0) ? turnLabel(game)
     : player.riichi ? 'リーチ中：ツモ和了 または ツモ切り'
-    : selected ? `選択：${tileLabel(selected.tile)}` : 'あなたの手番：牌を選択して「打牌する」で確定';
+    : selected ? `選択：${tileLabel(selected.tile)}` : 'あなたの手番：牌を選択して「打牌する」で確定');
 }
 
 const yakuNames: Record<YakuId, string> = {

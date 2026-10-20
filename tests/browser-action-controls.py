@@ -32,12 +32,12 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
   measurements = []
   def geometry():
    # The enlarged table intentionally scrolls; exercise normal panel scrolling.
-   page.locator('.discard-controls').scroll_into_view_if_needed()
+   page.locator('#local-game-controls').scroll_into_view_if_needed()
    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
    boxes=page.locator('#player-hand li').evaluate_all('els=>els.map(e=>{let r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})')
    assert len(set(round(b['y'],1) for b in boxes))==1
    assert all(b['x']>=0 and b['x']+b['w']<=width for b in boxes)
-   controls=page.locator('.discard-controls').bounding_box()
+   controls=page.locator('#local-game-controls').bounding_box()
    assert all(b['y']+b['h']<=controls['y'] for b in boxes),(width,height,boxes[-1],controls)
    assert page.locator('.dora-slot').count()==5
    assert page.locator('#dora-indicators').evaluate('e=>getComputedStyle(e).gridTemplateColumns.split(" ").length')==5
@@ -47,7 +47,7 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
      assert box['height']>=44 and box['width']>=44 and box['y']>=0 and box['y']+box['height']<=page.locator('html').evaluate('e=>e.scrollHeight'),(selector,box)
      if box['y']+box['height']>height:
       assert height<600,(selector,box)
-      assert page.locator('.discard-controls').evaluate('''async(panel,id)=>{const y=scrollY;panel.scrollIntoView({block:'end'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const e=panel.querySelector(id),b=e.getBoundingClientRect(),hit=document.elementFromPoint(b.x+b.width/2,b.y+b.height/2),ok=b.top>=0&&b.bottom<=innerHeight&&b.width>=44&&b.height>=44&&(hit===e||e.contains(hit));window.scrollTo(0,y);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return ok}''',selector)
+      assert page.locator('#local-game-controls').evaluate('''async(panel,id)=>{const y=scrollY;panel.scrollIntoView({block:'end'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const e=panel.querySelector(id),b=e.getBoundingClientRect(),hit=document.elementFromPoint(b.x+b.width/2,b.y+b.height/2),ok=b.top>=0&&b.bottom<=innerHeight&&b.width>=44&&b.height>=44&&(hit===e||e.contains(hit));window.scrollTo(0,y);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return ok}''',selector)
    if not page.locator('#ron').is_visible() and not page.locator('#show-result').is_visible():
     actions=page.locator('#discard,#riichi,#tsumo').evaluate_all('els=>els.map(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {id:e.id,x:r.x,y:r.y,width:r.width,height:r.height,disabled:e.disabled,background:s.backgroundColor,color:s.color,opacity:s.opacity}})')
     assert [a['id'] for a in actions]==['discard','riichi','tsumo']

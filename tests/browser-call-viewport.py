@@ -35,7 +35,7 @@ window.callState=()=>controller.game;
      const r=e.getBoundingClientRect();return r.top>=top&&r.bottom<=bottom&&r.left>=0&&r.right<=innerWidth&&r.height>=44;
     });}''')
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-   assert page.evaluate('''()=>document.querySelector('.discard-controls').getBoundingClientRect().top>=document.querySelector('.table').getBoundingClientRect().bottom''')
+   assert page.evaluate('''()=>document.querySelector('#local-game-controls').getBoundingClientRect().top>=document.querySelector('.table').getBoundingClientRect().bottom''')
   for height in [844,564,448]:
    page.set_viewport_size({'width':width,'height':height})
    for mode,count in [('chi',3),('red',2),('pon',2)]:

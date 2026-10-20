@@ -32,22 +32,22 @@ with sync_playwright() as p:
         river_metrics = page.evaluate('''()=>{
           const rect=e=>e.getBoundingClientRect();
           const rivers=[...document.querySelectorAll('.table .river')].map(river=>{
-            const cells=[...river.children].map(rect);
+            const cells=[...river.children].map(item=>rect(item.querySelector('svg')));
             const cols=river.classList.contains('river-left')||river.classList.contains('river-right')?3:6;
             const rows=18/cols;
             const gaps=[];
             const rowCenters={};
             for(const item of river.children){
-              const row=item.style.gridRow;(rowCenters[row]??=[]).push(rect(item).top+rect(item).height/2);
+              const row=item.dataset.riverRow,face=rect(item.querySelector('svg'));(rowCenters[row]??=[]).push(face.top+face.height/2);
             }
             const rowAlignment=Math.max(0,...Object.values(rowCenters).map(values=>Math.max(...values)-Math.min(...values)));
             for(let i=0;i<cells.length;i++){
-              const row=Number(river.children[i].style.gridRow)-1;
-              const col=Number(river.children[i].style.gridColumn)-1;
+              const row=Number(river.children[i].dataset.riverRow);
+              const col=Number(river.children[i].dataset.riverColumn);
               for(let j=0;j<cells.length;j++){
                 if(i===j)continue;
-                const otherRow=Number(river.children[j].style.gridRow)-1;
-                const otherCol=Number(river.children[j].style.gridColumn)-1;
+                const otherRow=Number(river.children[j].dataset.riverRow);
+                const otherCol=Number(river.children[j].dataset.riverColumn);
                 if(row===otherRow&&otherCol===col+1)gaps.push(cells[j].left-cells[i].right);
                 if(col===otherCol&&otherRow===row+1)gaps.push(cells[j].top-cells[i].bottom);
               }

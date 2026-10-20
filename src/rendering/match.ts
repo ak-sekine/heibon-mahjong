@@ -3,6 +3,7 @@ import { rankPlayers } from '../game/match.ts';
 import { createTileElement } from './tile-svg.ts';
 import { renderDepositSticks } from './deposit-sticks.ts';
 import { HONORS, SUITS, type Tile } from '../model/tile.ts';
+import { renderRoundLabel } from './shared-table-components.ts';
 const names = ['自分','CPU1','CPU2','CPU3'];
 const renderedSettlements = new WeakMap<HTMLElement, MatchState['lastSettlement']>();
 const abortiveNames = {
@@ -15,8 +16,8 @@ function tileOrder(tile: Tile): number {
   return tile.category === 'suited' ? SUITS.indexOf(tile.suit) * 9 + tile.rank - 1 : 27 + HONORS.indexOf(tile.honor);
 }
 export function renderMatch(match: MatchState): void {
-  const round=document.querySelector('#table-round');
-  if(round) round.textContent=`東${match.roundNumber}局${match.honba > 0 ? ` ${match.honba}本場` : ''}`;
+  const round=document.querySelector<HTMLElement>('#table-round');
+  if(round) renderRoundLabel(round, { roundNumber: match.roundNumber, honba: match.honba });
   const deposits = document.querySelector<HTMLElement>('#deposit-sticks');
   if (deposits) renderDepositSticks(deposits, match.depositSticks);
   const panel = document.querySelector<HTMLElement>('#match-result')!;

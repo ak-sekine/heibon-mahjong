@@ -47,7 +47,7 @@ def geometry(page):
             const t = tile.getBoundingClientRect();
             const svg = tile.querySelector('svg').getBoundingClientRect();
             return {x:t.x,y:t.y,width:t.width,height:t.height,
-                declaration:tile.dataset.riichiDeclaration === "true",row:Number(tile.style.gridRow),column:Number(tile.style.gridColumn),
+                declaration:tile.dataset.riichiDeclaration === "true",row:Number(tile.dataset.riverRow),column:Number(tile.dataset.riverColumn),
                 transform:getComputedStyle(tile.querySelector("svg")).transform,
                 contained:t.left >= r.left + el.clientLeft - .5 &&
                     t.right <= r.left + el.clientLeft + el.clientWidth + .5 &&
@@ -71,7 +71,7 @@ def geometry(page):
             assert tile['x'] >= 0 and tile['x']+tile['width'] <= page.viewport_size['width'], tile
             player = int(river['player'])
             row, column = divmod(i, 6)
-            expected = {0:(row+1,column+1),1:(6-column,row+1),2:(3-row,6-column),3:(column+1,3-row)}[player]
+            expected = {0:(row,column),1:(5-column,row),2:(2-row,5-column),3:(column,2-row)}[player]
             assert (tile['row'],tile['column']) == expected, (player,i,tile)
             matrix = {0:'matrix(1, 0, 0, 1,',1:'matrix(0, -1, 1, 0,',2:'matrix(-1, 0, 0, -1,',3:'matrix(0, 1, -1, 0,'}[player]
             if not tile['declaration']: assert tile['transform'].startswith(matrix), tile
@@ -165,6 +165,7 @@ with sync_playwright() as p:
             route.fulfill(response=response, body=source)
         page.route('**/src/main.ts', inject_progression)
         page.goto(options.url)
+        page.evaluate('''async()=>{window.riverLayout=await import('/heibon-mahjong/src/rendering/river-layout.ts')}''')
         page.clock.install()
         page.clock.pause_at(page.evaluate('Date.now()'))
         dora_snapshot(page)
@@ -268,7 +269,7 @@ with sync_playwright() as p:
                 geometry(page)
                 controls_visible(page)
                 assert page.locator('#discard').is_enabled()
-                assert separate(box(page,'#player-hand'),box(page,'.discard-controls'))
+                assert separate(box(page,'#player-hand'),box(page,'#local-game-controls'))
                 page.screenshot(path=f'{options.screenshots}/{w}-toolbar-selected-viewport.png')
             page.locator('#discard').click()
             if toolbar_check:
@@ -334,13 +335,16 @@ with sync_playwright() as p:
         # Rendering-only capacity fixture: normal wall exhaustion leaves CPU2/3 at 17.
         # Clone the public tile into their last cell without changing game state.
         page.evaluate('''() => {
+            const {calculateRiverLayout, applyRiverTilePlacement, applyRiverLayout} = window.riverLayout;
             for (const id of [2,3]) {
                 const river = document.querySelector(`.river[data-player-id="${id}"]`);
                 const tile = river.lastElementChild.cloneNode(true);
                 tile.dataset.tileId = `capacity-${id}`;
-                tile.style.gridRow = id === 2 ? '1' : '6';
-                tile.style.gridColumn = '1';
+                tile.dataset.riichiDeclaration = 'false';
                 river.append(tile);
+                const layout = calculateRiverLayout(id === 2 ? 'top' : 'left', river.children.length);
+                applyRiverLayout(river, layout);
+                [...river.children].forEach((item, index) => applyRiverTilePlacement(item, layout.placements[index]));
             }
         }''')
         assert [page.locator(f'.river[data-player-id="{id}"] svg').count() for id in range(4)] == [18]*4
@@ -407,7 +411,7 @@ function fixtureStart() {
             page.set_viewport_size({'width':w,'height':h-120})
             page.evaluate('window.scrollTo(0,document.documentElement.scrollHeight)')
             page.locator('#tsumo').scroll_into_view_if_needed()
-            assert separate(box(page,'#player-hand'),box(page,'.discard-controls'))
+            assert separate(box(page,'#player-hand'),box(page,'#local-game-controls'))
             controls_visible(page)
             geometry(page)
             page.screenshot(path=f'{options.screenshots}/{w}-tsumo-toolbar.png')

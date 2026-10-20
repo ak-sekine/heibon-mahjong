@@ -47,7 +47,7 @@ window.stepRows=(position)=>{controller.newGame();const g=riichiStart('tsumo');c
    page.screenshot(path=str(out/f'{width}x{height}-{name}.png'))
   def geometry():
    # Step 13.4 uses document flow; short phones may need ordinary scrolling.
-   page.locator('.discard-controls').scroll_into_view_if_needed()
+   page.locator('#local-game-controls').scroll_into_view_if_needed()
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
    boxes=page.locator('#player-hand li').evaluate_all('els=>els.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})')
    assert len(set(round(b['y'],1) for b in boxes))==1
@@ -58,7 +58,7 @@ window.stepRows=(position)=>{controller.newGame();const g=riichiStart('tsumo');c
     actions=page.locator('#discard,#riichi,#tsumo').evaluate_all('els=>els.map(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {x:r.x,y:r.y,w:r.width,h:r.height,bg:s.backgroundColor,disabled:e.disabled}})')
     assert max(a['w'] for a in actions)-min(a['w'] for a in actions)<.1
     assert all(a['h']==44 and a['y']+a['h']<=height and a['bg']==('rgb(212, 229, 219)' if a['disabled'] else 'rgb(255, 218, 125)') for a in actions),actions
-    assert boxes[-1]['y']+boxes[-1]['h']<=page.locator('.discard-controls').bounding_box()['y']
+    assert boxes[-1]['y']+boxes[-1]['h']<=page.locator('#local-game-controls').bounding_box()['y']
     if measurements:
      assert all(abs(a['x']-b['x'])<.1 and abs(a['w']-b['w'])<.1 for a,b in zip(actions,measurements[0]))
     measurements.append(actions)

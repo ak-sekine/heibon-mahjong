@@ -49,27 +49,27 @@ with sync_playwright() as p:
                   const svgs=items.map(e=>rect(e.querySelector('svg')));
                   const normalRowCenters=items.reduce((result,item,index)=>{
                     if(item.dataset.riichiDeclaration==='true')return result;
-                    const row=item.style.gridRow;(result[row]??=[]).push(svgs[index].top+svgs[index].height/2);return result;
+                    const row=item.dataset.riverRow;(result[row]??=[]).push(svgs[index].top+svgs[index].height/2);return result;
                   },{});
                   const normalRowAlignment=Math.max(0,...Object.values(normalRowCenters).map(values=>Math.max(...values)-Math.min(...values)));
                   const lineGroups=items.reduce((result,item,index)=>{
-                    const line=side?item.style.gridColumn:item.style.gridRow;
+                    const line=side?item.dataset.riverColumn:item.dataset.riverRow;
                     (result[line]??=[]).push(svgs[index]);return result;
                   },{});
                   const lineOrigins=Object.values(lineGroups).map(line=>side
-                    ? river.classList.contains('river-right') ? Math.max(...line.map(r=>r.bottom)) : Math.min(...line.map(r=>r.top))
-                    : river.classList.contains('river-top') ? Math.max(...line.map(r=>r.right)) : Math.min(...line.map(r=>r.left)));
+                    ? Math.min(...line.map(r=>r.top+r.height/2))
+                    : Math.min(...line.map(r=>r.left+r.width/2)));
                   const lineOriginSpread=Math.max(...lineOrigins)-Math.min(...lineOrigins);
                   const preservesPerspectiveOrder=items.every((item,index)=>{
                     const row=Math.floor(index/6),column=index%6;
                     const screenRow=seat===1?5-column:seat===3?column:seat===2?2-row:row;
                     const screenColumn=seat===1?row:seat===3?2-row:seat===2?5-column:column;
-                    return +item.style.gridRow===screenRow+1&&+item.style.gridColumn===screenColumn+1;
+                    return +item.dataset.riverRow===screenRow&&+item.dataset.riverColumn===screenColumn;
                   });
                   const adjacentGaps=[];
                   for(let i=0;i<items.length;i++)for(let j=i+1;j<items.length;j++){
-                    const ri=+items[i].style.gridRow, ci=+items[i].style.gridColumn;
-                    const rj=+items[j].style.gridRow, cj=+items[j].style.gridColumn;
+                    const ri=+items[i].dataset.riverRow, ci=+items[i].dataset.riverColumn;
+                    const rj=+items[j].dataset.riverRow, cj=+items[j].dataset.riverColumn;
                     const hasDeclaration=items[i].dataset.riichiDeclaration==='true'||items[j].dataset.riichiDeclaration==='true';
                     if(ri===rj&&Math.abs(ci-cj)===1){const left=ci<cj?svgs[i]:svgs[j],right=ci<cj?svgs[j]:svgs[i];adjacentGaps.push({gap:right.left-left.right,axis:'horizontal',hasDeclaration});}
                     if(ci===cj&&Math.abs(ri-rj)===1){const top=ri<rj?svgs[i]:svgs[j],bottom=ri<rj?svgs[j]:svgs[i];adjacentGaps.push({gap:bottom.top-top.bottom,axis:'vertical',hasDeclaration});}
@@ -81,9 +81,9 @@ with sync_playwright() as p:
                   const crossSizeDelta=side?Math.abs(n.width-d.width):Math.abs(n.height-d.height);
                   const mainSizeDelta=side?Math.abs(n.height-d.height):Math.abs(n.width-d.width);
                   const riichiCrossGapExpected=1+crossSizeDelta/2;
-                  const regularMainGapExpected=1+mainSizeDelta;
+                  const regularMainGapExpected=1+mainSizeDelta/2;
                   const regularCrossGapExpected=1;
-                  const riichiMainGapMaxExpected=1+mainSizeDelta;
+                  const riichiMainGapExpected=1;
                   const publicIds=new Set([...document.querySelectorAll('[data-tile-id]')].map(e=>e.dataset.tileId));
                   const visibleIds=new Set([...shown.players.flatMap(p=>p.river),...shown.players.flatMap(p=>p.melds.flatMap(m=>m.tiles)),...dora.exposedDoraIndicators(shown)].map(t=>t.id));
                   const privateTiles=[...shown.players.slice(1).flatMap(p=>[...p.hand,...(p.drawnTile?[p.drawnTile]:[])]),...shown.liveWall,...shown.deadWall].filter(t=>!visibleIds.has(t.id));
@@ -101,7 +101,7 @@ with sync_playwright() as p:
                     noSvgOverlap:allRiverSvgs.every((a,i)=>allRiverSvgs.slice(i+1).every(b=>!overlaps(a,b))),
                     normalMainGaps,normalCrossGaps,riichiMainGaps,riichiCrossGaps,
                     regularMainGapExpected,regularCrossGapExpected,riichiCrossGapExpected,
-                    riichiMainGapMaxExpected,
+                    riichiMainGapExpected,
                     lineOriginSpread:+lineOriginSpread.toFixed(3),
                     normalRowAlignment:+normalRowAlignment.toFixed(3),
                     order:items.every((e,i)=>e.dataset.tileId===shown.players[seat].river[i].id),
@@ -116,14 +116,14 @@ with sync_playwright() as p:
                 checks = {k:v for k,v in metrics.items() if k not in (
                     'decBox','normalBox','normalMainGaps','normalCrossGaps','riichiMainGaps',
                     'riichiCrossGaps','regularMainGapExpected','regularCrossGapExpected',
-                    'riichiCrossGapExpected','riichiMainGapMaxExpected','viewport','lineOriginSpread',
+                    'riichiCrossGapExpected','riichiMainGapExpected','viewport','lineOriginSpread',
                     'normalRowAlignment'
                 )}
                 assert all(checks.values()), f'{width}px seat {seat} riichi {position+1}: {metrics}'
                 assert metrics['lineOriginSpread']<.35, f'{width}px seat {seat} riichi {position+1} six-discard origin alignment: {metrics}'
                 assert metrics['normalMainGaps'] and all(abs(g-metrics['regularMainGapExpected'])<.35 for g in metrics['normalMainGaps']), f'{width}px seat {seat} riichi {position+1} regular line spacing: {metrics}'
                 assert metrics['normalCrossGaps'] and all(abs(g-metrics['regularCrossGapExpected'])<.35 for g in metrics['normalCrossGaps']), f'{width}px seat {seat} riichi {position+1} regular cross spacing: {metrics}'
-                assert metrics['riichiMainGaps'] and all(.65<=g<=metrics['riichiMainGapMaxExpected']+.35 for g in metrics['riichiMainGaps']), f'{width}px seat {seat} riichi {position+1} declaration line spacing: {metrics}'
+                assert metrics['riichiMainGaps'] and all(abs(g-metrics['riichiMainGapExpected'])<.35 for g in metrics['riichiMainGaps']), f'{width}px seat {seat} riichi {position+1} declaration line spacing: {metrics}'
                 assert metrics['riichiCrossGaps'] and all(abs(g-metrics['riichiCrossGapExpected'])<.35 for g in metrics['riichiCrossGaps']), f'{width}px seat {seat} riichi {position+1} declaration cross spacing: {metrics}'
                 rowAlignmentLimit = metrics['riichiCrossGapExpected']-1+.35 if seat in (1,3) else .35
                 assert metrics['normalRowAlignment']<rowAlignmentLimit, f'{width}px seat {seat} riichi {position+1} normal tile alignment: {metrics}'

@@ -34,7 +34,7 @@ with sync_playwright() as p:
      const dirs=rivers.every(e=>{const a=r(e),id=e.dataset.playerId;return id==='0'?a.top>=c.bottom-.5&&a.bottom<=seats[id].top+.5:id==='2'?a.bottom<=c.top+.5&&a.top>=seats[id].bottom-.5:id==='1'?a.left>=c.right-.5&&a.right<=seats[id].left+.5:id==='3'?a.right<=c.left+.5&&a.left>=seats[id].right-.5:false});
      const order=rivers.every(e=>[...e.children].every((tile,i)=>{
       const row=Math.floor(i/6),col=i%6,id=e.dataset.playerId;
-      return +tile.style.gridRow===(id==='1'?6-col:id==='3'?col+1:id==='2'?3-row:row+1)&&+tile.style.gridColumn===(id==='1'?row+1:id==='3'?3-row:id==='2'?6-col:col+1);
+      return +tile.dataset.riverRow===(id==='1'?5-col:id==='3'?col:id==='2'?2-row:row)&&+tile.dataset.riverColumn===(id==='1'?row:id==='3'?2-row:id==='2'?5-col:col);
      }));
      const hands=[...document.querySelectorAll('.concealed-hand,#player-hand')];
      const perimeter=hands.every(e=>{const a=r(e),s=e.closest('.seat');return inside(a,t)&&(s.classList.contains('seat-top')?a.bottom<t.top+t.height*.15:s.classList.contains('seat-bottom')?a.top>t.bottom-t.height*.16:s.classList.contains('seat-left')?a.right<t.left+t.width*.15:a.left>t.right-t.width*.15)});
@@ -47,8 +47,8 @@ with sync_playwright() as p:
      return {width:t.width,height:t.height,square:Math.abs(t.width-t.height)<1,countOK,riverScale,dirs,order,perimeter,clear,
       riversInside:rivers.every(e=>inside(r(e),t)),noOverflow:document.documentElement.scrollWidth<=innerWidth,
       equalHand:hand.every(a=>Math.abs(a.width-hand[0].width)<.1&&Math.abs(a.height-hand[0].height)<.1),
-      touch:[...document.querySelectorAll('.discard-controls>button:not([hidden])')].every(e=>r(e).height>=44),
-      actionsBottom:r(q('.discard-controls')).bottom};
+      touch:[...document.querySelectorAll('#local-game-controls .control-action-button')].filter(e=>e.getClientRects().length>0).every(e=>r(e).height>=44),
+      actionsBottom:r(q('#local-game-controls')).bottom};
     }''')
     for k,v in result.items():
      if isinstance(v,bool):assert v,(name,n,k,result)

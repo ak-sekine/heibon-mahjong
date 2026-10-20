@@ -18,7 +18,7 @@ export class ResultDialog {
     const result = match.lastSettlement;
     this.reopen.hidden = !result;
     document.querySelector<HTMLElement>('#round-result-actions')!.hidden = !result;
-    document.querySelector('.discard-controls')!.classList.toggle('result-available', !!result);
+    document.querySelector('#local-game-controls')!.classList.toggle('result-available', !!result);
     document.querySelector<HTMLButtonElement>('#result-new-game')!.hidden = match.status !== 'match-ended';
     if (result === this.result) return;
     this.result = result;

@@ -391,6 +391,62 @@ with sync_playwright() as p:
             page.locator('#main-menu-toggle').click()
         page.locator(selector).click()
 
+    def measure_shared_layout():
+        return page.evaluate('''() => {
+          const rect = (element, origin) => {
+            const box = element.getBoundingClientRect();
+            const base = origin ? origin.getBoundingClientRect() : {left: 0, top: 0};
+            return Object.fromEntries(['left','top','width','height'].map(key => [key, Number((box[key] - (key === 'left' ? base.left : key === 'top' ? base.top : 0)).toFixed(2))]));
+          };
+          const style = element => {
+            const value = getComputedStyle(element);
+            return {background: value.backgroundColor, color: value.color, border: value.borderColor,
+              radius: value.borderRadius, padding: value.padding, fontSize: value.fontSize,
+              fontWeight: value.fontWeight, lineHeight: value.lineHeight, gap: value.gap};
+          };
+          const collect = online => {
+            const root = document.querySelector('main');
+            const summary = document.querySelector(online ? '[data-online-summary]' : '#local-table-summary');
+            const table = document.querySelector(online ? '#online-table' : '#local-table');
+            const center = table.querySelector(online ? '[data-online-center-info]' : '.center-info');
+            const controls = document.querySelector(online ? '#online-game-controls' : '#local-game-controls');
+            const status = controls.querySelector(online ? '#online-game-action-status' : '#selection-status');
+            const discard = controls.querySelector(online ? '#online-discard' : '#discard');
+            const labels = online
+              ? Object.fromEntries([...summary.querySelectorAll('[data-online-label]')].map(node => [node.dataset.onlineLabel, rect(node, summary)]))
+              : Object.fromEntries([['top','#label-2'],['right','#label-1'],['bottom','#label-0'],['left','#label-3']].map(([position, selector]) => [position, rect(summary.querySelector(selector), summary)]));
+            const rivers = online
+              ? Object.fromEntries([...table.querySelectorAll('[data-online-river]')].map(node => [node.dataset.onlineRiver, rect(node, table)]))
+              : Object.fromEntries([['top','2'],['right','1'],['bottom','0'],['left','3']].map(([position, id]) => [position, rect(table.querySelector(`.river[data-player-id="${id}"]`), table)]));
+            const dora = center.querySelector('.dora-indicators');
+            const buttonStyle = style(discard);
+            const buttonRect = rect(discard, controls);
+            return {
+              summary: rect(summary, root), table: rect(table, root), center: rect(center, table),
+              round: rect(center.querySelector('.round-label'), table), wall: rect(center.querySelector('.wall-count'), table),
+              doraArea: rect(center.querySelector('.dora-area'), table), dora: rect(dora, table),
+              doraTile: rect(dora.querySelector('svg'), table), deposits: rect(center.querySelector('.deposit-sticks'), table),
+              labels, rivers, controls: rect(controls, root), status: rect(status, controls), discard: buttonRect,
+              labelStyle: style(summary.querySelector('.seat-label')), centerStyle: style(center),
+              controlsStyle: style(controls), statusStyle: style(status), discardStyle: buttonStyle,
+              discardHitbox: buttonRect.width >= 44 && buttonRect.height >= 44,
+            };
+          };
+          const onlineRoot = document.querySelector('#online-match');
+          const wasHidden = onlineRoot.hidden;
+          const wasActive = document.body.classList.contains('online-game-active');
+          const online = collect(true);
+          try {
+            onlineRoot.hidden = true;
+            document.body.classList.remove('online-game-active');
+            const local = collect(false);
+            return {online, local, noOverflow: document.documentElement.scrollWidth <= innerWidth};
+          } finally {
+            onlineRoot.hidden = wasHidden;
+            if (wasActive) document.body.classList.add('online-game-active');
+          }
+        }''')
+
     page.wait_for_selector('#player-hand svg')
     wait_for('typeof window.onlineUiTest === "object"')
     private_ids = page.evaluate('''() => window.onlineUiTest.controller.game.players.slice(1).flatMap(player => [
@@ -402,6 +458,19 @@ with sync_playwright() as p:
     assert page.locator('#main-menu-toggle').is_visible(), 'the shared hamburger menu was not rendered'
     page.locator('#main-menu-toggle').click()
     assert page.locator('#main-menu-items').is_visible(), 'the hamburger menu did not open'
+    menu_metrics = page.evaluate('''() => {
+      const menu = document.querySelector('#main-menu-items');
+      const style = getComputedStyle(menu);
+      const buttons = [...menu.querySelectorAll('button:not([hidden])')].map(button => {
+        const rect = button.getBoundingClientRect();
+        const computed = getComputedStyle(button);
+        return {width: rect.width, height: rect.height, background: computed.backgroundColor, padding: computed.padding};
+      });
+      return {background: style.backgroundColor, gap: style.gap, borderRadius: style.borderRadius, buttons};
+    }''')
+    assert menu_metrics['gap'] == '0px' and menu_metrics['background'] in ('rgb(255, 253, 247)', 'rgb(255, 255, 255)'), menu_metrics
+    assert all(button['height'] >= 44 and button['width'] >= 44 and button['background'] in ('rgba(0, 0, 0, 0)', 'transparent') for button in menu_metrics['buttons']), menu_metrics
+    assert page.locator('#menu-room').is_hidden(), 'room operations were shown before joining a room'
     assert page.locator('#main-menu-toggle').get_attribute('aria-expanded') == 'true', 'menu expanded state was not announced'
     page.locator('#main-menu-toggle').click()
     assert page.locator('#main-menu-items').is_hidden(), 'the hamburger menu did not close on a second press'
@@ -483,11 +552,46 @@ with sync_playwright() as p:
     assert all(tile_id not in page.locator('#online-match').inner_html() for tile_id in hidden_online_ids), 'an opponent tile ID reached the online DOM'
     assert page.locator('#online-score-strip [data-online-label="bottom"]').inner_text().startswith('テストホスト'), 'the viewer seat was not placed at the bottom'
     assert page.locator('#online-score-strip [data-online-label="right"]').inner_text().startswith('テスト参加者'), 'the adjacent seat was not placed on the right'
+    cpu_one = page.locator('#online-score-strip [data-online-label="top"]').inner_text()
+    cpu_two = page.locator('#online-score-strip [data-online-label="left"]').inner_text()
+    assert cpu_one.startswith('CPU1') and '西' in cpu_one, f'CPU1 and its west wind were not shown separately: {cpu_one}'
+    assert cpu_two.startswith('CPU2') and '北' in cpu_two, f'CPU2 and its north wind were not shown separately: {cpu_two}'
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'online table causes horizontal overflow at 390px'
+
+    for width, height in [(320,700),(375,812),(390,844),(430,932),(1280,900)]:
+      page.set_viewport_size({'width': width, 'height': height})
+      geometry = measure_shared_layout()
+      assert geometry['noOverflow'], f'shared online/offline scene causes horizontal overflow at {width}px'
+      assert geometry['online']['discardHitbox'] and geometry['local']['discardHitbox'], f'discard hitbox is too small at {width}px: {geometry}'
+      for part in ['summary','table','center','round','wall','doraArea','dora','doraTile','deposits']:
+        for dimension in ['left','top','width','height']:
+          online_value = geometry['online'][part][dimension]
+          local_value = geometry['local'][part][dimension]
+          assert abs(online_value-local_value) <= .5, f'{part} {dimension} differs at {width}px: online={online_value}, offline={local_value}'
+      for position in ['top','right','bottom','left']:
+        for dimension in ['left','top','width','height']:
+          online_value = geometry['online']['labels'][position][dimension]
+          local_value = geometry['local']['labels'][position][dimension]
+          assert abs(online_value-local_value) <= .5, f'{position} seat label {dimension} differs at {width}px: online={online_value}, offline={local_value}'
+        for dimension in ['left','top','width','height']:
+          online_value = geometry['online']['rivers'][position][dimension]
+          local_value = geometry['local']['rivers'][position][dimension]
+          assert abs(online_value-local_value) <= .5, f'{position} river {dimension} differs at {width}px: online={online_value}, offline={local_value}'
+      for part in ['labelStyle','centerStyle','controlsStyle','statusStyle','discardStyle']:
+        assert geometry['online'][part] == geometry['local'][part], f'{part} differs at {width}px: {geometry["online"][part]} != {geometry["local"][part]}'
+      for dimension in ['left','top','width']:
+        assert abs(geometry['online']['controls'][dimension]-geometry['local']['controls'][dimension]) <= .5, f'action panel {dimension} differs at {width}px'
+      for dimension in ['left','top','width']:
+        assert abs(geometry['online']['status'][dimension]-geometry['local']['status'][dimension]) <= .5, f'action status {dimension} differs at {width}px'
+      for dimension in ['width','height']:
+        assert abs(geometry['online']['discard'][dimension]-geometry['local']['discard'][dimension]) <= .5, f'discard button {dimension} differs at {width}px'
+    page.set_viewport_size({'width': 390, 'height': 844})
 
     page.evaluate('window.onlineMock.setViewerSeat(1)')
     wait_for("document.querySelector('#online-score-strip [data-online-label=bottom]')?.innerText.startsWith('テスト参加者')")
     assert page.locator('#online-score-strip [data-online-label="left"]').inner_text().startswith('テストホスト'), 'seat rotation was wrong for the south player'
+    assert page.locator('#online-score-strip [data-online-label="top"]').inner_text().startswith('CPU2'), 'CPU2 name changed when the viewer seat rotated'
+    assert page.locator('#online-score-strip [data-online-label="right"]').inner_text().startswith('CPU1'), 'CPU1 name changed when the viewer seat rotated'
     assert page.locator('#online-player-hand button[data-tile-id]').count() == 13, 'the second viewer did not get their own hand'
     hidden_guest_ids = page.evaluate('window.onlineMock.privateTileIds(1)')
     assert all(tile_id not in page.locator('#online-match').inner_html() for tile_id in hidden_guest_ids), 'the guest view exposed other private tile IDs'
@@ -497,7 +601,7 @@ with sync_playwright() as p:
     page.locator('#online-player-hand button[data-tile-id]').first.click()
     assert page.locator('#online-discard').is_enabled(), 'a legal host discard was not enabled after selecting a tile'
     page.locator('#online-discard').click()
-    wait_for("document.querySelector('#online-match-status').innerText.includes('テスト参加者の手番')")
+    wait_for("document.querySelector('#online-game-action-status').innerText.includes('テスト参加者の手番')")
     assert page.locator('[data-online-river="bottom"] .river-tile').count() == 1, 'the accepted discard was not synchronized into the host river'
     page.evaluate('window.onlineMock.advanceCpu()')
     wait_for("document.querySelector('[data-online-river=top] .river-tile') !== null")
@@ -610,7 +714,7 @@ with sync_playwright() as p:
     assert page.locator('#online-next-round').is_visible() and page.locator('#online-next-round').is_enabled(), 'the host could not advance to the next round'
     page.screenshot(path=str(OUT / 'step14-2-online-game-390.png'), full_page=True)
     page.locator('#online-next-round').click()
-    wait_for("document.querySelector('#online-match-round').innerText.includes('東2局')")
+    wait_for("document.querySelector('#online-table-round').innerText.includes('東2局')")
     assert page.locator('#online-round-result').is_hidden(), 'the old round result remained after next-round transition'
 
     hand_before_reconnect = page.locator('#online-player-hand button[data-tile-id]').evaluate_all("nodes => nodes.map(node => node.dataset.tileId).join(',')")
@@ -624,7 +728,7 @@ with sync_playwright() as p:
     select_menu_item('#menu-room')
     page.locator('#online-leave').click()
     wait_for("document.querySelector('#online-room').hidden && !document.querySelector('#online-room-forms').hidden")
-    assert page.locator('#online-match-status').inner_text() == '参加者が明示的に退出したため、対局を中断しました。', 'an explicit game exit did not show the abort reason'
+    assert page.locator('#online-game-action-status').inner_text() == '参加者が明示的に退出したため、対局を中断しました。', 'an explicit game exit did not show the abort reason'
     page.locator('#online-return-local').click()
     wait_for("document.querySelector('#online-match').hidden === true")
 

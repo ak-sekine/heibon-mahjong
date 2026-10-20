@@ -9,7 +9,7 @@ import { discardTile } from '../src/game/discard.ts';
 
 for (const state of ['other','unselected','eligible','ineligible','established-other','established-own','progressing'] as const) test(`action controls remain visible: ${state}`, () => {
   const nodes = new Map<string, any>();
-  for (const id of ['#discard','#riichi','#tsumo','#ron-controls','#ron-status','#ron','#pass-ron','#selection-status','.discard-controls']) nodes.set(id, {hidden:false,disabled:false,classList:{toggle(){}},focus(){}});
+  for (const id of ['#discard','#riichi','#tsumo','#ron-controls','#ron-status','#ron','#pass-ron','#selection-status','#local-game-controls']) nodes.set(id, {hidden:false,disabled:false,classList:{toggle(){}},focus(){}});
   nodes.get('#ron-controls').hidden=true;
   const original=globalThis.document;
   globalThis.document={querySelector:(s:string)=>nodes.get(s),querySelectorAll:()=>[]} as unknown as Document;
