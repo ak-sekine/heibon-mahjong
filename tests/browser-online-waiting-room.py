@@ -523,7 +523,7 @@ with sync_playwright() as p:
       }));
     }''')
     for offline_id, online_id in [('discard','online-discard'),('riichi','online-riichi'),('tsumo','online-tsumo'),('kyuushu-kyuuhai','online-kyuushu'),('ron','online-ron'),('pass-ron','online-pass-ron'),('pass-calls','online-pass-call'),('next-round','online-next-round')]:
-      assert action_sizes[offline_id] == action_sizes[online_id], f'{offline_id} and {online_id} controls do not share dimensions'
+      assert action_sizes[offline_id] == action_sizes[online_id], f'{offline_id} and {online_id} controls do not share dimensions: {action_sizes[offline_id]} != {action_sizes[online_id]}'
     option_sizes = page.evaluate('''() => {
       const measure = selector => {
         const host = document.querySelector(selector);
