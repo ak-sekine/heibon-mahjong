@@ -135,7 +135,7 @@ export class OnlineWaitingRoom {
     this.roomMenuItem.addEventListener('click', () => this.openDialog());
     document.querySelector<HTMLButtonElement>('#online-close')!.addEventListener('click', () => this.closeDialog());
     this.dialog.addEventListener('close', () => {
-      document.querySelector<HTMLButtonElement>('#main-menu-toggle')!.focus({ preventScroll: true });
+      this.restoreMenuFocus();
     });
     document.querySelector<HTMLFormElement>('#online-room-form')!.addEventListener('submit', event => {
       event.preventDefault();
@@ -767,11 +767,17 @@ export class OnlineWaitingRoom {
     if (this.gameActive) {
       this.dialogWasClosedByUser = false;
       this.dialog.close();
+      this.restoreMenuFocus();
       return;
     }
     this.dialogWasClosedByUser = true;
     this.stopAutomaticConnection();
     this.dialog.close();
+    this.restoreMenuFocus();
+  }
+
+  private restoreMenuFocus(): void {
+    document.querySelector<HTMLButtonElement>('#main-menu-toggle')?.focus({ preventScroll: true });
   }
 
   private stopAutomaticConnection(): void {
