@@ -2,7 +2,7 @@
 
 ## ローカル自動検証
 
-2026-10-19に実施しました。
+2026-10-19〜20に実施しました。
 
 | 検証 | 結果 |
 | --- | --- |
@@ -23,9 +23,23 @@
 
 対象SHA `8ed2e8157cfa966df883bf65897ce5beaaa488da` の[Actions run 39338271518](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39338271518)では、`verify`（テスト、Worker型検査、build）は成功しました。Browser UIは320pxのオフライン河で段の開始位置のずれを検出して失敗しました。固定スロット内の牌面を開始端にそろえる修正を加え、次のmain commitで再検証します。Browser UI失敗により後続のWorker deploy、production test、Pages deployは実行されていません。
 
+### 2026-10-20の再検証履歴
+
+過去の失敗記録は残したまま、各Browser UIの検出内容と修正を追記します。
+
+- [Actions run 39350224006](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39350224006)、SHA `025dd570f368931ba6c1ba41ea271815874614d9`: `verify`は成功。Browser UIは4席・各枚数・オンライン視点回転を含む卓配置測定を通過し、ルームダイアログを閉じた後のフォーカス復帰で失敗しました。閉じる操作中にもメニューボタンへフォーカスを戻す処理を追加しました。
+- [Actions run 39351128771](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39351128771)、SHA `c55fbd8cfc5ca4be5b6566d9c813a48b3a01700e`: `verify`は成功。フォーカス検査を通過し、オンライン・オフラインの打牌ボタンのpadding差を検出しました。オンラインゲーム操作に残っていた高詳細度の重複指定を除去しました。
+- [Actions run 39351931957](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39351931957)、SHA `c3762dd001fffa820eed3f584a9b53e4f1020bd4`: `verify`は成功。次局ボタンの寸法差を検出し、オンライン操作の共通paddingと結果ダイアログ内のオフラインボタン寸法を調査しました。
+- [Actions run 39352726295](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39352726295)、SHA `fb6a6eab0bb96a2dfd8699659a6a551003133349`: `verify`は成功。打牌・リーチ・和了・パスの寸法比較を通過しましたが、次局ボタンの寸法差が続いたため、Browser UI検査に実測値を含めるようにしました。
+- [Actions run 39353359902](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39353359902)、SHA `337ad7f014f331394f55cefc9385298154c2b4ec`: `verify`は成功。検査メッセージに実測値を追加して差を確定し、オンラインの次局ボタンを48px高・左右10pxへ合わせました。
+- [Actions run 39354138412](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39354138412)、SHA `1a1928b03193b4b694b00e79d6af9cf41dde42ff`: `verify`は成功。Browser UIではpaddingは一致した一方、汎用ボタン規則の詳細度によりオンライン側の最小高さが44pxのままで、オフライン側の48pxと差が残りました。次局ボタンに限定した高詳細度の指定を追加しました。
+- [Actions run 39354908093](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39354908093)、SHA `9b2bbc94f851ab35f31dfbc629d9aa75bd3dd454`: `verify`は成功。全操作ボタンの寸法比較を通過しましたが、宣言牌切替時の位置検査がページ上の絶対座標を比較しており、卓基準の移動かページ全体の移動か切り分けられませんでした。卓基準の相対座標に検査を変更し、卓内の牌位置が動く場合は前後の実測値を記録します。
+
+各回ともBrowser UIが失敗したため、Worker deploy、production test、Pages build / deployの後続jobは実行されていません。座標比較を修正した次のmain SHAで最終確認します。
+
 ## GitHub Actions、本番Worker、Pages
 
-修正後のmainへのpushで起動する`deploy.yml`の対象SHAについて、`verify`、Browser UI verification、Cloudflare Worker deploy、production test、GitHub Pages build / deploy の結果を追記します。
+最終修正SHAの`verify`、Browser UI verification、Cloudflare Worker deploy、production test、GitHub Pages build / deploy の結果を完了後に追記します。
 
 ## 未確認
 

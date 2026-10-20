@@ -572,22 +572,29 @@ with sync_playwright() as p:
             assert all(not river['infoOverlap'] and not river['tileOverlap'] and river['declarationDirection'] and river['tilesInRiver'] for river in metrics['rivers']), f'online river geometry overlapped at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {metrics}'
           if count == 18:
             page.evaluate('args => window.onlineMock.showRiverScenario(args.viewer, 18, -1)', {'viewer': viewer})
-            base_positions = page.evaluate('''() => Object.fromEntries([...document.querySelectorAll('[data-online-river]')].map(river =>
+            base_positions = page.evaluate('''() => {
+              const table = document.querySelector('#online-table').getBoundingClientRect();
+              return Object.fromEntries([...document.querySelectorAll('[data-online-river]')].map(river =>
               [river.dataset.onlineRiver, [...river.querySelectorAll('.river-tile svg')].map(tile => {
-                const rect = tile.getBoundingClientRect(); return [rect.left,rect.top,rect.width,rect.height];
-              })]))''')
+                const rect = tile.getBoundingClientRect(); return [rect.left-table.left,rect.top-table.top,rect.width,rect.height];
+              })]));
+            }''')
             for declaration_index in [0, 5, 6, 17]:
               page.evaluate('args => window.onlineMock.showRiverScenario(args.viewer, 18, args.declaration)', {
                 'viewer': viewer, 'declaration': declaration_index,
               })
-              changed_positions = page.evaluate('''() => Object.fromEntries([...document.querySelectorAll('[data-online-river]')].map(river =>
+              changed_positions = page.evaluate('''() => {
+                const table = document.querySelector('#online-table').getBoundingClientRect();
+                return Object.fromEntries([...document.querySelectorAll('[data-online-river]')].map(river =>
                 [river.dataset.onlineRiver, [...river.querySelectorAll('.river-tile svg')].map(tile => {
-                  const rect = tile.getBoundingClientRect(); return [rect.left,rect.top,rect.width,rect.height];
-                })]))''')
+                  const rect = tile.getBoundingClientRect(); return [rect.left-table.left,rect.top-table.top,rect.width,rect.height];
+                })]));
+              }''')
               for position, tiles in base_positions.items():
                 for index, rect in enumerate(tiles):
                   if index != declaration_index:
-                    assert all(abs(before-after) < .1 for before, after in zip(rect, changed_positions[position][index])), f'riichi declaration moved another {position} discard at {width}px, viewer {viewer}, index {declaration_index}'
+                    after_rect = changed_positions[position][index]
+                    assert all(abs(before-after) < .1 for before, after in zip(rect, after_rect)), f'riichi declaration moved another {position} discard at {width}px, viewer {viewer}, declaration {declaration_index}, tile {index}: {rect} -> {after_rect}'
       page.screenshot(path=str(OUT / f'step14-2-online-rivers-{width}.png'), full_page=True)
     page.set_viewport_size({'width': 390, 'height': 844})
     page.evaluate('window.onlineMock.resetRivers()')
