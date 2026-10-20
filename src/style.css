@@ -353,6 +353,8 @@ header > div { min-width:0; }
 .score-strip { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); flex:1; gap:1px 4px; }
 .score-strip .seat-label { padding:1px; font-size:10px; line-height:1.3; }
 .score-strip .seat-label span { display:inline; }
+#online-match .table-summary .seat-label { min-width:0; overflow-wrap:anywhere; }
+#online-match .table-summary .seat-label span { display:block; white-space:normal; overflow-wrap:anywhere; }
 .table-summary .dora-area { flex:none; text-align:center; }
 .table-summary #dora-indicators { grid-template-columns:repeat(5,var(--table-tile-width)); grid-template-rows:var(--table-tile-height); }
 .table-summary #deposit-sticks { margin-top:1px; }

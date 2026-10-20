@@ -35,8 +35,9 @@
 - [Actions run 39354138412](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39354138412)、SHA `1a1928b03193b4b694b00e79d6af9cf41dde42ff`: `verify`は成功。Browser UIではpaddingは一致した一方、汎用ボタン規則の詳細度によりオンライン側の最小高さが44pxのままで、オフライン側の48pxと差が残りました。次局ボタンに限定した高詳細度の指定を追加しました。
 - [Actions run 39354908093](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39354908093)、SHA `9b2bbc94f851ab35f31dfbc629d9aa75bd3dd454`: `verify`は成功。全操作ボタンの寸法比較を通過しましたが、宣言牌切替時の位置検査がページ上の絶対座標を比較しており、卓基準の移動かページ全体の移動か切り分けられませんでした。卓基準の相対座標に検査を変更し、卓内の牌位置が動く場合は前後の実測値を記録します。
 - [Actions run 39355898689](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39355898689)、SHA `dfd25fe747fb5c1043800433f465cfd06f8bec8b`: `verify`（49テスト、Worker型検査、Pages build）は成功。Browser UIは320px・南家視点・18枚の河で文書幅がviewportを超えたため停止しました。卓枠と牌・中央情報の配置に重なりはありませんでした。横スクロール要素を特定する実測値をBrowser UI出力へ追加します。
+- [Actions run 39356768350](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39356768350)、SHA `b42dc342f3eda7aa357360b29fbc803013da70cc`: `verify`は成功。横スクロール要素は卓サマリー2列目の2つの点数表示で、右端が329px（viewport 320px）でした。座席名と点数をオンライン卓サマリーの列幅で折り返すCSSを追加しました。
 
-各回ともBrowser UIが失敗したため、Worker deploy、production test、Pages build / deployの後続jobは実行されていません。320pxで検出した横スクロールの原因を修正した次のmain SHAで再確認します。
+各回ともBrowser UIが失敗したため、Worker deploy、production test、Pages build / deployの後続jobは実行されていません。点数表示の折り返し修正を次のmain SHAで再確認します。
 
 ## GitHub Actions、本番Worker、Pages
 
