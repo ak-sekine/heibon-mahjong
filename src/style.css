@@ -388,6 +388,9 @@ header > div { min-width:0; }
 .table .seat .tile-back { width:var(--river-tile-width); height:var(--river-tile-height); }
 .table .seat .tile-back,.table .seat .concealed-kan-back { box-sizing:border-box; }
 .table .seat .open-melds { display:flex; flex-direction:row; flex-wrap:nowrap; gap:1px; width:auto; padding:0; align-self:auto; max-width:none; }
+@media (max-width:430px) {
+ .table .seat-left .open-melds,.table .seat-right .open-melds { gap:.5px; }
+}
 .table .seat-top .open-melds { flex-direction:row-reverse; }
 .table .seat .open-meld { transform:none; margin:0; padding:0; }
 .table .seat .open-meld > span { width:var(--meld-tile-width); height:var(--meld-tile-height); }
