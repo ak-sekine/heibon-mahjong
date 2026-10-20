@@ -42,7 +42,20 @@
 
 ## GitHub Actions、本番Worker、Pages
 
-最終修正SHAの`verify`、Browser UI verification、Cloudflare Worker deploy、production test、GitHub Pages build / deploy の結果を完了後に追記します。
+対象SHA `0ea718388b7d90ac92d3f3f074feff6e9d4ebb5a` の[Actions run 39358234356](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39358234356)は成功しました。2026-10-20にGitHubコネクターからrun metadataとjob一覧を直接取得し、`head_sha`とmainのSHAが一致すること、run全体の`conclusion: success`、6 jobすべての`status: completed`・`conclusion: success`を確認しました。
+
+| Job | 結果 |
+| --- | --- |
+| `verify`（回帰テスト、Worker型検査、Pages build） | 成功 |
+| `browser-ui / browser-ui`（`npm test`、build、Browser UI回帰検査・画面保存） | 成功 |
+| `deploy-worker` | 成功 |
+| `production-test` | 成功 |
+| `pages-build` | 成功 |
+| `pages-deploy` | 成功 |
+
+このrunにより、直前のrunで未解決としていた参加後`sessionStorage`のBrowser UI確認も通過しました。過去の失敗記録は履歴として残しています。Codex Cloud内のChromiumは起動していません。iPhone Safari実機確認は引き続き未確認です。
+
+直接確認元: GitHubコネクターのActions run metadataと`/actions/runs/39358234356/jobs`応答。metadataの`head_branch`は`main`、`head_sha`は上記SHA、`status`は`completed`、`conclusion`は`success`でした。
 
 ## 未確認
 
