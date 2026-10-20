@@ -52,6 +52,11 @@ const ONLINE_IDS: Readonly<Record<string, string>> = {
   'return-local': 'online-return-local',
 };
 
+/** Required data parts in the shared HTML template, used by its contract test. */
+export const ACTION_PANEL_TEMPLATE_PARTS = Object.freeze(
+  [...new Set([...Object.keys(LOCAL_IDS), ...Object.keys(ONLINE_IDS)])],
+);
+
 /** Clone the shared controls component; game modes keep their own event handlers. */
 export function mountActionPanel(host: HTMLElement, mode: ActionPanelMode): HTMLElement {
   const template = document.querySelector<HTMLTemplateElement>('#game-controls-template');

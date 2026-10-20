@@ -38,4 +38,12 @@
 
 同じグローバルクラス参照を持つオフライン検査10本を`#local-table`配下へ修正し、幅・位置・重なりの期待値は緩めていません。修正版は次の1回のmain pushでBrowser UIを再確認します。run 39507823447の明示的なrerunは0回です。
 
+### Actions run 39508741032
+
+対象SHA `64e7830c75b488a845a79a6c5f9e17cdd2e9117a`。`verify`は成功しました。Browser UIは`tests/browser-table-ui.py`の`kan-test.html` 320pxケースで失敗し、Worker deploy、production test、Pages build/deployはskipされました。
+
+このrunは先に`tests/browser-riichi-discard-layout.py`を実行し、320・355・375・390・430・1280pxで4席の河とリーチ宣言牌を検査しました。通常牌間のSVG面の隙間は3.83〜7.41px、宣言牌の両隣は0.99〜1.02px、最大の行起点ずれは0.02pxで、全席・宣言位置に合格しました。
+
+続く`kan-test.html`ケースで、共通操作テンプレートに必要な`return-local`がなく、ページ初期化時に`Game controls part is missing: return-local`となっていました。検証ページの操作テンプレートへ非表示ボタンを追加し、`tests/action-panel-template.test.ts`で`index.html`と`kan-test.html`の全必須部品を照合するテストを加えました。対象の単体テストは1/1成功、buildと`git diff --check`も成功です。3回目のBrowser UI runで後続検査を確認します。明示的なActions rerunは0回です。
+
 iPhone Safari実機での確認は未実施です。
