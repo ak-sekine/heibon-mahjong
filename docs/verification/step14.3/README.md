@@ -36,7 +36,7 @@
 
 原因はUI配置ではなく、`tests/browser-table-ui.py`が`document.querySelector('.center-info')`で非表示のオンライン用パネルを選んでいたことです。取得した診断値では選ばれたオンライン側の中央パネルが0×0でしたが、ローカル側の局情報と牌山表示はそれぞれ28.80×14.39px、35.48×14.39pxで描画されていました。Actions artifactの320px診断画像にも卓・ドラ牌の重なりはありませんでした。
 
-同じグローバルクラス参照を持つオフライン検査10本を`#local-table`配下へ修正し、幅・位置・重なりの期待値は緩めていません。修正版は次の1回のmain pushでBrowser UIを再確認します。run 39507823447の明示的なrerunは0回です。
+同じグローバルクラス参照を持つオフライン検査10本を`#local-table`配下へ修正し、幅・位置・重なりの期待値は緩めていません。run 39508741032では検証ページの起動後に別のHTML構造差が見つかりました。run 39507823447の明示的なrerunは0回です。
 
 ### Actions run 39508741032
 
@@ -44,6 +44,14 @@
 
 このrunは先に`tests/browser-riichi-discard-layout.py`を実行し、320・355・375・390・430・1280pxで4席の河とリーチ宣言牌を検査しました。通常牌間のSVG面の隙間は3.83〜7.41px、宣言牌の両隣は0.99〜1.02px、最大の行起点ずれは0.02pxで、全席・宣言位置に合格しました。
 
-続く`kan-test.html`ケースで、共通操作テンプレートに必要な`return-local`がなく、ページ初期化時に`Game controls part is missing: return-local`となっていました。検証ページの操作テンプレートへ非表示ボタンを追加し、`tests/action-panel-template.test.ts`で`index.html`と`kan-test.html`の全必須部品を照合するテストを加えました。対象の単体テストは1/1成功、buildと`git diff --check`も成功です。3回目のBrowser UI runで後続検査を確認します。明示的なActions rerunは0回です。
+続く`kan-test.html`ケースで、共通操作テンプレートに必要な`return-local`がなく、ページ初期化時に`Game controls part is missing: return-local`となっていました。検証ページの操作テンプレートへ非表示ボタンを追加し、`tests/action-panel-template.test.ts`で`index.html`と`kan-test.html`の全必須部品を照合するテストを加えました。対象の単体テストは1/1成功、buildと`git diff --check`も成功です。明示的なActions rerunは0回です。
+
+### Actions run 39509493851
+
+対象SHA `a260af310d17f47445024fa5b46f53c2516af845`。`verify`は成功し、Browser UIは失敗しました。production test、Worker deploy、Pages build/deployはskipされました。
+
+このrunも`tests/browser-riichi-discard-layout.py`の6幅・4席・宣言牌検査に合格しました。続く`browser-table-ui.py`は`kan-test.html`で`#local-table`を検索して矩形を得られず、`Cannot read properties of null`になりました。通常の`index.html`には同IDがありますが、検証ページは卓ルートのclassだけを持っていました。
+
+3回目の失敗を受け、オフラインの2つのHTMLページとテスト条件をまとめて確認しました。検証ページにも`id="local-table"`を付け、同テストを拡張し、両ページに卓ルートが1つずつあること、点数欄・中央欄・操作領域のテンプレート内容が一致すること、4席・中央情報・オンライン／オフライン操作部品がすべて揃うことを検査します。修正後のローカル全テストは50/50成功、buildと`git diff --check`も成功しました。4回目のActions runで後続ブラウザースクリプトを確認します。明示的なrerunは各runとも0回です。
 
 iPhone Safari実機での確認は未実施です。
