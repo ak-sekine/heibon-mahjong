@@ -409,9 +409,10 @@ header > div { min-width:0; }
 .table .seat-left .open-meld[data-meld-type='kakan'] .added-kan-tile { top:calc(0px - var(--meld-tile-width) - var(--meld-tile-gap)); }
 .table .seat-right .open-meld[data-meld-type='kakan'] .added-kan-tile { top:calc(var(--meld-tile-width) + var(--meld-tile-gap)); }
 @media (min-width:960px) {
- .table .seat-right .open-melds { transform:translate(calc(var(--river-tile-width)*.85 + 9px),calc(var(--river-tile-width)*.1)); }
+ .table .seat-right .open-melds { transform:translate(calc(var(--river-tile-width)*.85 + 4.5px),calc(var(--river-tile-width)*.1)); }
  .table .seat-left .open-melds { transform:translate(calc(0px - var(--river-tile-width)*.85 + 9px),calc(var(--river-tile-width)*.1)); }
- .table .seat-right .open-meld[data-meld-type='kakan'] { transform:translateY(calc(0px - var(--meld-tile-width) - var(--meld-tile-gap))); }
+ .table .seat-left .open-melds,.table .seat-right .open-melds { gap:.5px; }
+ .table .seat-right .open-meld[data-meld-type='kakan'] { transform:translate(4.5px,calc(0px - var(--meld-tile-width) - var(--meld-tile-gap))); }
 }
 .table .seat-bottom { left:5px; right:5px; bottom:2px; flex-direction:row; gap:8px; align-items:flex-end; justify-content:center; }
 .table .seat-bottom #player-hand { order:1; }
