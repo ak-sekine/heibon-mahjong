@@ -565,9 +565,14 @@ with sync_playwright() as p:
                   tile.left >= rect.left - 1 && tile.top >= rect.top - 1 && tile.right <= rect.right + 1 && tile.bottom <= rect.bottom + 1)};
               });
               const table = document.querySelector('#online-table').getBoundingClientRect();
-              return {overflow: document.documentElement.scrollWidth > innerWidth, tableInsideViewport: table.left >= -1 && table.right <= innerWidth + 1, rivers};
+              const overflow = document.documentElement.scrollWidth > innerWidth;
+              const overflowElements = overflow ? [...document.querySelectorAll('body *')].map(element => {
+                const rect = element.getBoundingClientRect();
+                return {tag: element.tagName, id: element.id, className: typeof element.className === 'string' ? element.className : '', left: rect.left, right: rect.right};
+              }).filter(element => element.left < -.1 || element.right > innerWidth + .1).sort((a,b) => b.right - a.right).slice(0,12) : [];
+              return {overflow, documentWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth, overflowElements, tableInsideViewport: table.left >= -1 && table.right <= innerWidth + 1, rivers};
             }''')
-            assert not metrics['overflow'] and metrics['tableInsideViewport'], f'online table overflow at {width}px, viewer {viewer}, {count} discards: {metrics}'
+            assert not metrics['overflow'] and metrics['tableInsideViewport'], f'online table overflow at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {metrics}'
             assert all(river['count'] == count for river in metrics['rivers']), f'online river count failed at {width}px: {metrics}'
             assert all(not river['infoOverlap'] and not river['tileOverlap'] and river['declarationDirection'] and river['tilesInRiver'] for river in metrics['rivers']), f'online river geometry overlapped at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {metrics}'
           if count == 18:
