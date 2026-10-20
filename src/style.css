@@ -109,7 +109,8 @@ header > div { min-width:0; }
 #online-match #online-round-result p { margin:4px 0; font-size:12px; }
 #online-match #online-game-controls > div { width:100%; }
 #online-match #online-game-controls button,
-#online-start-game { min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
+#online-start-game { min-height:44px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
+#online-start-game { padding:8px 12px; }
 #online-match #online-game-controls button:disabled,
 #online-start-game:disabled { opacity:.55; cursor:default; }
 #online-match #online-game-action-status,#online-ron-status,#online-call-status { flex:1 1 100%; min-width:0; margin:0; font-size:14px; overflow-wrap:anywhere; }
@@ -228,7 +229,8 @@ header > div { min-width:0; }
 #call-options button { display:flex; align-items:center; justify-content:center; gap:2px; min-height:48px; flex:1 1 130px; }
 #call-options .tile-svg { width:22px; height:31px; }
 #pass-calls { width:100%; min-height:44px; margin-top:4px; }
-#call-options button, #pass-calls { padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; touch-action:manipulation; cursor:pointer; }
+#call-options button, #pass-calls,
+#online-match #online-call-options button, #online-match #online-kan-options button, #online-pass-call { padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; touch-action:manipulation; cursor:pointer; }
 #call-options button:focus-visible, #pass-calls:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
 #kan { min-height:44px; min-width:44px; flex:1 1 0; padding:8px 6px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; }
 #kan-controls { width:100%; }
