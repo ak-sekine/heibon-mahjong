@@ -3,7 +3,7 @@
 **対象日:** 2026-10-20 UTC
 **リポジトリ:** `/workspace/heibon-mahjong` (`ak-sekine/heibon-mahjong`)
 **計測開始:** `2026-10-20T15:10:13Z`（シェルの`date -u`）
-**文書更新終了:** `2026-10-20T15:20:49Z`。開始から文書更新終了までの計測時間は10分36秒です。main commit/pushはこの後に実行し、最終報告で別記します。
+**計測終端:** `2026-10-20T15:21:42Z`（最初の計測対象commitをmainへpushし、remote SHAを確認）。開始からの経過は11分29秒です。計測記録を確定する追補commit/pushはこの終端後の記録公開作業として別計測します。
 
 ## 結果の読み方
 
@@ -19,11 +19,11 @@
 | B 実装・修正 | 15:11:57 | 15:11:57 | 1秒未満 | 対象6項目は実装・検証記録済み。ソース変更なし |
 | C 単体テスト・ビルド | 15:11:57 | 15:11:57 | 1秒未満 | コード変更がないため再実行なし。ローカル`npm test` 0回、`npm run build` 0回 |
 | D UI検証 | 15:11:57 | 15:11:57 | 1秒未満 | UI変更がないため再実行なし。今回のローカルUI検証 0回、失敗 0回、修正 0回 |
-| E Git操作 | 15:12:42 | commit/push後に記録 | 計測中 | main確認の通常通信は既存プロキシ接続エラー。標準の一時ネットワーク許可を使った`git ls-remote`は成功し、mainが`0ea7183…`と一致。commit/pushを含む確定時刻・所要時間は最終報告で記録 |
+| E Git操作・push | 15:12:42 | 15:21:42 | 9分00秒（分断区間を含む） | main確認、文書commit、fast-forward push、remote SHA確認。区間内にF/Gが含まれるため実コマンド時間は別表 |
 | F GitHub Actions確認・待機 | 15:12:05 | 15:15:38 | 3分33秒（工程間隔） | プロキシ経由照会1回は失敗。GitHubコネクターでjob一覧・run metadataを各1回取得し成功。監視・待機はなし |
 | G 文書更新・最終報告準備 | 15:17:52 | 15:20:49 | 2分57秒 | 検証README・計測記録を更新し、`git diff --cached --check`成功を確認 |
 
-工程表のFの経過時間には、2回のGitHubコネクター照会の間隔も含みます。実際のAPI待機は後述のとおり30秒に制限し、完了済みrunへのポーリングはしていません。
+工程表のEは、remote main確認とcommit/pushを離れた時刻に実施したため、開始から終了までの幅が9分あります。Fの3分33秒も照会間の区間を含む幅で、実際のAPI待機ではありません。API呼出しは30秒の上限内で完了し、完了済みrunへのポーリングはしていません。
 
 ## コマンド別所要時間・実行回数
 
@@ -37,6 +37,10 @@
 | `/usr/bin/time -p timeout 30s git ls-remote ...` | 1回 | 1秒未満 | 終了コード127。`/usr/bin/time`が存在せず、Git通信自体は未実行 | 計測手段をbash組込み`time`へ修正 |
 | `time timeout 30s git ls-remote origin refs/heads/main`（通常実行） | 1回 | 0.028秒 | 終了コード128。プロキシport 8080への接続不可 | AGENTS.mdの標準ネットワーク許可フローで同じGit確認を1回実行 |
 | `time timeout 30s git ls-remote origin refs/heads/main`（一時ネットワーク許可） | 1回 | 0.671秒 | 終了コード0。main=`0ea718388b7d90ac92d3f3f074feff6e9d4ebb5a` | プロキシ設定・ポリシー変更なし |
+| final main確認 `git ls-remote`（一時ネットワーク許可） | 1回 | 2.225秒 | 終了コード0。main=`0ea718388b7d90ac92d3f3f074feff6e9d4ebb5a` | push直前の安全確認 |
+| `git commit` | 1回 | 1秒未満 | 終了コード0。`86f193c4b6358ece972fc5a38acbb486c3e38580` | 文書2件のみ |
+| `git push origin HEAD:main` | 1回 | 1.785秒 | 終了コード0。`0ea7183..86f193c` fast-forward | force pushなし |
+| push後の`git ls-remote`確認 | 1回 | 0.466秒 | 終了コード0。remote main=`86f193c4b6358ece972fc5a38acbb486c3e38580` | push後SHA確認 |
 | `git diff --check` / `git diff --cached --check` | 4回 | 各1秒未満 | 初回確認はREADMEのみで成功。次の確認で新規文書の末尾空白3箇所を検出し、後続2回は終了コード0 | 文書整形後に再確認 |
 | `gh run watch` | 0回 | — | 使用せず | — |
 
@@ -63,4 +67,4 @@
 
 - Codex内部の推論時間、各推論の内訳、ツール呼出し間の時間の内訳は未計測です。
 - iPhone Safari実機での表示・操作は未確認です。
-- この文書のGit commit/push所要時間と完了時刻は、文書をmainへ反映するGit操作後に最終報告で記録します。
+- 上記の主計測終端後に、この計測記録へGit commit/push実測値を追記してmainへ追補pushします。その記録公開コマンドの時間は主計測窓の外として、最終報告で分けて示します。
