@@ -3,7 +3,8 @@
 **対象日:** 2026-10-20 UTC
 **リポジトリ:** `/workspace/heibon-mahjong` (`ak-sekine/heibon-mahjong`)
 **計測開始:** `2026-10-20T15:10:13Z`（シェルの`date -u`）
-**計測終端:** `2026-10-20T15:21:42Z`（最初の計測対象commitをmainへpushし、remote SHAを確認）。開始からの経過は11分29秒です。計測記録を確定する追補commit/pushはこの終端後の記録公開作業として別計測します。
+**主計測終端:** `2026-10-20T15:21:42Z`（最初の記録commitをmainへpushし、remote SHAを確認）。開始から11分29秒です。
+**全体計測終端:** `2026-10-20T15:25:28Z`。タスク開始から計測記録の最終修正完了まで15分15秒です。最終修正をmainへ公開するGit操作はこの終端後なので、別途計測します。
 
 ## 結果の読み方
 
@@ -19,11 +20,12 @@
 | B 実装・修正 | 15:11:57 | 15:11:57 | 1秒未満 | 対象6項目は実装・検証記録済み。ソース変更なし |
 | C 単体テスト・ビルド | 15:11:57 | 15:11:57 | 1秒未満 | コード変更がないため再実行なし。ローカル`npm test` 0回、`npm run build` 0回 |
 | D UI検証 | 15:11:57 | 15:11:57 | 1秒未満 | UI変更がないため再実行なし。今回のローカルUI検証 0回、失敗 0回、修正 0回 |
-| E Git操作・push | 15:12:42 | 15:21:42 | 9分00秒（分断区間を含む） | main確認、文書commit、fast-forward push、remote SHA確認。区間内にF/Gが含まれるため実コマンド時間は別表 |
-| F GitHub Actions確認・待機 | 15:12:05 | 15:15:38 | 3分33秒（工程間隔） | プロキシ経由照会1回は失敗。GitHubコネクターでjob一覧・run metadataを各1回取得し成功。監視・待機はなし |
+| E Git操作・push | 15:12:42 | 15:22:58 | 10分16秒（分断区間を含む） | main確認、文書2件のcommit/push、計測追補commit/push、remote SHA確認。区間内にF/Gが含まれるため実コマンド時間は別表 |
+| F GitHub Actions確認・待機 | 15:12:05 | 15:23:12 | 11分07秒（分断区間を含む） | プロキシ経由照会1回失敗。GitHubコネクター照会3回成功。最終照会は新規run pending。監視・待機はなし |
 | G 文書更新・最終報告準備 | 15:17:52 | 15:20:49 | 2分57秒 | 検証README・計測記録を更新し、`git diff --cached --check`成功を確認 |
+| G 計測追補・最終報告準備 | 15:24:46 | 15:25:28 | 0分42秒 | main追補push後のActions状態と実測値を追記、`git diff --cached --check`終了コード0 |
 
-工程表のEは、remote main確認とcommit/pushを離れた時刻に実施したため、開始から終了までの幅が9分あります。Fの3分33秒も照会間の区間を含む幅で、実際のAPI待機ではありません。API呼出しは30秒の上限内で完了し、完了済みrunへのポーリングはしていません。
+工程表のE・Fは複数の離れた操作を含み、他工程と時間帯が重なります。経過幅には操作間の時間が含まれるため、実コマンド時間は下表を参照してください。API照会は各30秒上限内で完了し、Actionsの完了待ち・ポーリングはしていません。
 
 ## コマンド別所要時間・実行回数
 
@@ -34,14 +36,19 @@
 | `curl .../actions/runs/39358234356/jobs?per_page=100`（`--max-time 30 --connect-timeout 30`） | 1回 | 0.000734秒 | 終了コード7。`Failed to connect to proxy port 8080 after 0 ms` | 同じプロキシ経路での再試行0回 |
 | `github_fetch_workflow_run_jobs`（run 39358234356） | 1回 | UTC秒表示で4秒以内 | 成功。6 jobすべてsuccess | jobs応答を直接確認 |
 | `github_fetch`（run metadata） | 1回 | UTC秒表示で2秒以内 | 成功。main、head SHA、run conclusionを確認 | jobs照会とは別のmetadata取得 |
+| `github_fetch`（main最新Actions run一覧、追補push後） | 1回 | UTC秒表示で1秒以内 | 成功。run `39447874175`、SHA `7a6e185…`、status `pending`、conclusion未確定 | 2026-10-20 15:23:12Z時点の1回照会。待機なし |
 | `/usr/bin/time -p timeout 30s git ls-remote ...` | 1回 | 1秒未満 | 終了コード127。`/usr/bin/time`が存在せず、Git通信自体は未実行 | 計測手段をbash組込み`time`へ修正 |
 | `time timeout 30s git ls-remote origin refs/heads/main`（通常実行） | 1回 | 0.028秒 | 終了コード128。プロキシport 8080への接続不可 | AGENTS.mdの標準ネットワーク許可フローで同じGit確認を1回実行 |
 | `time timeout 30s git ls-remote origin refs/heads/main`（一時ネットワーク許可） | 1回 | 0.671秒 | 終了コード0。main=`0ea718388b7d90ac92d3f3f074feff6e9d4ebb5a` | プロキシ設定・ポリシー変更なし |
 | final main確認 `git ls-remote`（一時ネットワーク許可） | 1回 | 2.225秒 | 終了コード0。main=`0ea718388b7d90ac92d3f3f074feff6e9d4ebb5a` | push直前の安全確認 |
+| 追補push前`git ls-remote` | 1回 | 0.616秒 | 終了コード0。main=`86f193c4b6358ece972fc5a38acbb486c3e38580` | 計測追補commitのfast-forward確認 |
+| 追補`git commit` | 1回 | 1秒未満 | 終了コード0。`7a6e18550a44b144558b972d1e62246e5841ab6c` | 性能記録を確定 |
+| 追補`git push origin HEAD:main` | 1回 | 1.360秒 | 終了コード0。`86f193c..7a6e185` fast-forward | force pushなし |
+| 追補push後の`git ls-remote` | 1回 | 0.429秒 | 終了コード0。remote main=`7a6e18550a44b144558b972d1e62246e5841ab6c` | push後SHA確認 |
 | `git commit` | 1回 | 1秒未満 | 終了コード0。`86f193c4b6358ece972fc5a38acbb486c3e38580` | 文書2件のみ |
 | `git push origin HEAD:main` | 1回 | 1.785秒 | 終了コード0。`0ea7183..86f193c` fast-forward | force pushなし |
 | push後の`git ls-remote`確認 | 1回 | 0.466秒 | 終了コード0。remote main=`86f193c4b6358ece972fc5a38acbb486c3e38580` | push後SHA確認 |
-| `git diff --check` / `git diff --cached --check` | 4回 | 各1秒未満 | 初回確認はREADMEのみで成功。次の確認で新規文書の末尾空白3箇所を検出し、後続2回は終了コード0 | 文書整形後に再確認 |
+| `git diff --check` / `git diff --cached --check` | 6回 | 各1秒未満 | 初回はREADMEのみで成功。次に新規文書の末尾空白3箇所を検出し、その修正後の4回は終了コード0 | 文書整形後・追補後に再確認 |
 | `gh run watch` | 0回 | — | 使用せず | — |
 
 ## テスト・UI・APIの回数
@@ -50,13 +57,13 @@
 - この継続タスク内のBrowser UI実行: 0回。新しいUI変更なし。Codex Cloud Chromiumも起動していません。
 - この継続タスク内のUI失敗・修正: 失敗0回、修正0回。文書整形では末尾空白を3箇所修正。過去の失敗と修正履歴は`docs/verification/step14.2/README.md`にそのまま残しています。
 - GitHub API相当のプロキシ経由照会: 失敗1回、同経路の再試行0回。GitHubコネクターによる照会は別経路で2回、両方成功。
-- Actionsの監視・待機: 0秒。runは完了済みで、`gh run watch`やポーリングなし。
+- Actionsの監視・待機: 0秒。run 39358234356は完了済み。追補pushで始まったrun 39447874175は15:23:12Z時点でpendingと一度照会し、以後の`gh run watch`やポーリングなし。
 - 確認できたActions実行時間: run metadataの`run_started_at` `02:18:57Z`から`updated_at` `02:27:00Z`まで8分03秒。これはGitHub Actions側の所要時間であり、Codexの待機時間ではありません。
 
 ## 遅延の上位5件と観測できた原因
 
 1. 工程Aの開始から終了まで1分44秒。単一コマンドの長時間実行ではありません。環境・記録・実装・テストの確認を複数回の短いコマンドに分けました。内訳の推論時間は未計測です。
-2. 一時ネットワーク許可付きGit確認のツール呼出しは約6.6秒（許可フロー込み）、その中の`git ls-remote`自体は0.671秒でした。
+2. 一時ネットワーク許可付きGit確認のツール呼出しは最長約8秒（許可フロー込み）。実コマンドは最長`git ls-remote` 2.225秒、`git push`は1.785秒でした。
 3. GitHub Actions jobs照会は開始・終了マーカー間で約4秒。
 4. GitHub Actions run metadata照会は開始・終了マーカー間で約2秒。
 5. ソース確認コマンド群の最大`exec_command` wall timeは約0.36秒。ほかの読み取りコマンドは1秒未満でした。
@@ -67,4 +74,4 @@
 
 - Codex内部の推論時間、各推論の内訳、ツール呼出し間の時間の内訳は未計測です。
 - iPhone Safari実機での表示・操作は未確認です。
-- 上記の主計測終端後に、この計測記録へGit commit/push実測値を追記してmainへ追補pushします。その記録公開コマンドの時間は主計測窓の外として、最終報告で分けて示します。
+- 主計測終端後、追補commit/pushと1回のActions状態照会を行いました。その区間も全体経過に含めます。最終ログ訂正を保存するcommit/push自体は、この記録の公開後となるため最終報告で別記します。
