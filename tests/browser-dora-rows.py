@@ -33,9 +33,9 @@ with sync_playwright() as p:
                       tr.renderTable({...game,liveWall:game.liveWall.slice(count)},match.points);
                       const wall={...game,kanCount:Math.max(0,count-1)}, omote=dg.exposedDoraIndicators(wall), ura=count?dg.uraDoraIndicators(wall):[];
                       dr.renderDoraIndicators(q('#dora-indicators'),omote,ura);
-                      const selectors=['.center-info','.dora-area','#table-round','#wall-count','#deposit-sticks'];
+                      const selectors=['#local-table .center-info','#local-table .dora-area','#table-round','#wall-count','#deposit-sticks'];
                       const boxes=Object.fromEntries(selectors.map(s=>[s,box(q(s))]));
-                      const c=boxes['.center-info'],d=boxes['.dora-area'],r=boxes['#table-round'],w=boxes['#wall-count'];
+                      const c=boxes['#local-table .center-info'],d=boxes['#local-table .dora-area'],r=boxes['#table-round'],w=boxes['#wall-count'];
                       const slots=[...q('#dora-indicators').children], sticks=[...q('#deposit-sticks').children], t=box(q('.table'));
                       const riverFace=box(q('.river-top .tile-svg'));
                       const doraFaces=slots.map(e=>box(e.querySelector('svg')||e));

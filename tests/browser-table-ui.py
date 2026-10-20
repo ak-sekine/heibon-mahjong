@@ -77,7 +77,7 @@ with sync_playwright() as p:
                       const q=s=>document.querySelector(s),r=e=>e.getBoundingClientRect();
                       const separate=(a,b)=>a.right<=b.left+.15||b.right<=a.left+.15||a.bottom<=b.top+.15||b.bottom<=a.top+.15;
                       const inside=(a,b)=>a.left>=b.left-.1&&a.right<=b.right+.1&&a.top>=b.top-.1&&a.bottom<=b.bottom+.1;
-                      const t=r(q('.table')),c=r(q('.center-info')),d=r(q('.dora-area'));
+                      const t=r(q('#local-table')),c=r(q('#local-table .center-info')),d=r(q('#local-table .dora-area'));
                       const riverRects=Object.fromEntries([...document.querySelectorAll('.river')].map(e=>[e.dataset.playerId,r(e)]));
                       const seats=Object.fromEntries([...document.querySelectorAll('.table .seat')].map(e=>[e.dataset.playerId,r(e)]));
                       const meldDirection=[0,1,2,3].every(id=>{
@@ -137,13 +137,13 @@ with sync_playwright() as p:
                           const table=q('.table'),t=r(table),hand=q('.seat-bottom #player-hand'),melds=q('.seat-bottom .open-melds');
                           const clearElements=[...document.querySelectorAll('.river svg,#player-hand svg,.concealed-hand,.open-meld')],clearOverlaps=[];
                           for(let i=0;i<clearElements.length;i++)for(let j=i+1;j<clearElements.length;j++)if(!separate(r(clearElements[i]),r(clearElements[j])))clearOverlaps.push(overlap(clearElements[i],clearElements[j],'tile-to-tile'));
-                          const center=q('.center-info');
+                          const center=q('#local-table .center-info');
                           for(const tile of document.querySelectorAll('.river svg'))if(!separate(r(tile),r(center)))clearOverlaps.push(overlap(tile,center,'river-center-panel'));
                           const overflow=[table,...table.querySelectorAll('*')].filter(e=>{const b=r(e);return b.width>0&&b.height>0&&(b.left<t.left-.5||b.top<t.top-.5||b.right>t.right+.5||b.bottom>t.bottom+.5)}).slice(0,120).map(e=>{
                             const b=r(e);return {selector:selector(e),rect:box(e),overflow:{left:+Math.max(0,t.left-b.left).toFixed(2),top:+Math.max(0,t.top-b.top).toFixed(2),right:+Math.max(0,b.right-t.right).toFixed(2),bottom:+Math.max(0,b.bottom-t.bottom).toFixed(2)}};
                           });
                           const handBox=box(hand),meldBox=box(melds),groups=[...(melds?.children||[])].map(e=>({selector:selector(e),rect:box(e),tiles:[...e.querySelectorAll('svg')].map(box)}));
-                          return {central: Object.fromEntries([".center-info",".dora-area","#table-round","#wall-count","#deposit-sticks"].map(s=>[s,box(q(s))])), depositSticks:[...document.querySelectorAll(".deposit-stick")].map(box), viewport:{innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth},table:box(table),seatBottom:box(q('.seat-bottom')),hand:handBox,melds:meldBox,meldGapPx:handBox&&groups.length?+(r(melds.children[0]).left-r(hand).right).toFixed(2):null,meldGroups:groups,overflow,clearOverlaps};
+                          return {central: Object.fromEntries(["#local-table .center-info","#local-table .dora-area","#table-round","#wall-count","#deposit-sticks"].map(s=>[s,box(q(s))])), depositSticks:[...document.querySelectorAll(".deposit-stick")].map(box), viewport:{innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth},table:box(table),seatBottom:box(q('.seat-bottom')),hand:handBox,melds:meldBox,meldGapPx:handBox&&groups.length?+(r(melds.children[0]).left-r(hand).right).toFixed(2):null,meldGroups:groups,overflow,clearOverlaps};
                         }''')
                         image_name=f'diagnostic-{"normal" if not entry else "kan"}-{width}-{scene}-riichi-{riichi}.png'
                         image_path=out/image_name

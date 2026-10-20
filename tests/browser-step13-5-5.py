@@ -26,7 +26,7 @@ with sync_playwright() as p:
      renderer.renderTable({...base,players:base.players.map((p,i)=>({...p,river:pool.slice(i*18,i*18+n)}))},[25000,25000,25000,25000]);
     }''',n)
     result=page.evaluate('''()=>{
-     const r=e=>e.getBoundingClientRect(),q=s=>document.querySelector(s),t=r(q('.table')),c=r(q('.center-info'));
+     const r=e=>e.getBoundingClientRect(),q=s=>document.querySelector(s),t=r(q('#local-table')),c=r(q('#local-table .center-info'));
      const inside=(a,b)=>a.left>=b.left-.1&&a.top>=b.top-.1&&a.right<=b.right+.1&&a.bottom<=b.bottom+.1;
      const separate=(a,b)=>a.right<=b.left+.1||b.right<=a.left+.1||a.bottom<=b.top+.1||b.bottom<=a.top+.1;
      const rivers=[...document.querySelectorAll('.river')];

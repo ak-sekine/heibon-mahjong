@@ -24,4 +24,18 @@
 - オンラインCPU1・CPU2の表示名と席風を分け、ビューアー席の回転後も名前が維持されることを確認します。
 - 他家の非公開牌IDがオンラインDOMに露出しないことを既存テストで確認します。
 
-Actions run、対象SHA、Job別結果、失敗原因、再実行数は実行後にここへ追記します。iPhone Safari実機での確認は未実施です。
+### Actions run 39507823447
+
+対象SHA `3930cea127c18ca5d3cd857cce95201cba5fdad2`。GitHubコネクターでrun metadataとjob一覧を確認しました。
+
+| Job | 結果 |
+| --- | --- |
+| `verify`（regression、Worker typecheck、build） | 成功 |
+| `browser-ui / browser-ui` | 失敗。`tests/browser-table-ui.py`が320px・通常局面で検査を停止 |
+| Worker deploy、production test、Pages build/deploy | 依存するBrowser UI失敗によりskip |
+
+原因はUI配置ではなく、`tests/browser-table-ui.py`が`document.querySelector('.center-info')`で非表示のオンライン用パネルを選んでいたことです。取得した診断値では選ばれたオンライン側の中央パネルが0×0でしたが、ローカル側の局情報と牌山表示はそれぞれ28.80×14.39px、35.48×14.39pxで描画されていました。Actions artifactの320px診断画像にも卓・ドラ牌の重なりはありませんでした。
+
+同じグローバルクラス参照を持つオフライン検査10本を`#local-table`配下へ修正し、幅・位置・重なりの期待値は緩めていません。修正版は次の1回のmain pushでBrowser UIを再確認します。run 39507823447の明示的なrerunは0回です。
+
+iPhone Safari実機での確認は未実施です。

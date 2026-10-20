@@ -182,7 +182,7 @@ with sync_playwright() as p:
             page.evaluate('window.scrollTo(0,0)')
             geometry(page)
             assert page.locator('#dora-indicators').inner_html() == indicator
-            assert page.locator('.river-top').bounding_box()['height'] == river_height, (name,width,river_height,page.locator('.river-top').bounding_box()['height'],page.locator('.center-info').inner_text())
+            assert page.locator('.river-top').bounding_box()['height'] == river_height, (name,width,river_height,page.locator('.river-top').bounding_box()['height'],page.locator('#local-table .center-info').inner_text())
             page.screenshot(path=f'{args.screenshots}/{width}-{name}-result.png',full_page=True)
             page.set_viewport_size({'width':width,'height':height-120})
             if page.locator('#result-dialog').is_visible(): page.locator('#view-table').click()

@@ -24,7 +24,7 @@ with sync_playwright() as p:
   assert page.evaluate('''()=>{const g=testController.game;return g.players.slice(1).every(p=>{
     const hand=document.querySelector(`.concealed-hand[data-player-id="${p.id}"]`);
     return hand.children.length===p.hand.length+Number(!!p.drawnTile)&&[...hand.children].every(e=>!e.children.length&&!e.dataset.tileId)&&!hand.innerHTML.includes('svg');})}''')
-  assert page.evaluate('''()=>{const rect=s=>document.querySelector(s).getBoundingClientRect();const t=rect('.seat-top'),r=rect('.seat-right'),l=rect('.seat-left'),b=rect('.seat-bottom'),c=rect('.center-info');return t.bottom<=c.top&&b.top>=c.bottom&&r.left>=c.right&&l.right<=c.left;}''')
+  assert page.evaluate('''()=>{const rect=s=>document.querySelector(s).getBoundingClientRect();const t=rect('.seat-top'),r=rect('.seat-right'),l=rect('.seat-left'),b=rect('.seat-bottom'),c=rect('#local-table .center-info');return t.bottom<=c.top&&b.top>=c.bottom&&r.left>=c.right&&l.right<=c.left;}''')
   page.screenshot(path=str(out/f'{width}x{height}-empty.png'),full_page=True)
   before=page.locator('#player-hand').bounding_box()
   page.evaluate('''()=>{const g=testController.game,pool=[...g.liveWall,...g.deadWall];tableRenderer.renderTable({...g,players:g.players.map((p,i)=>({...p,river:pool.slice(i*18,i*18+18)}))},testController.match.points)}''')

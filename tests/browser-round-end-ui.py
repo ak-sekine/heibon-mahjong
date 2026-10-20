@@ -298,7 +298,7 @@ with sync_playwright() as p:
               const rivers=[...document.querySelectorAll('.table .river .river-tile .tile-svg')];
               const handTiles=[...document.querySelectorAll('#player-hand svg,.table .concealed-hand .tile-back,.table .concealed-hand .revealed-tile')];
               const meldTiles=[...document.querySelectorAll('.table .open-meld svg,.table .concealed-kan-back')];
-              const center=rect(document.querySelector('.center-info'));
+              const center=rect(document.querySelector('#local-table .center-info'));
               const violations=[];
               for(const face of faces){
                 const r=rect(face);
@@ -433,7 +433,7 @@ with sync_playwright() as p:
                       const rivers=[...document.querySelectorAll('.table .river .river-tile .tile-svg')];
                       const hands=[...document.querySelectorAll('#player-hand svg,.table .concealed-hand .tile-back,.table .concealed-hand .revealed-tile')];
                       const melds=[...document.querySelectorAll('.table .open-meld svg,.table .concealed-kan-back')];
-                      const center=rect(document.querySelector('.center-info'));
+                      const center=rect(document.querySelector('#local-table .center-info'));
                       const violations=[];
                       for(const face of faces){
                         const r=rect(face);

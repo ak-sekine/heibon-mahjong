@@ -112,7 +112,7 @@ with sync_playwright() as p:
                   const meld=e=>e.closest('.open-meld');
                   const describe=e=>({player:Number(owner(e)),kind:e.classList.contains('tile-back')?'back':e.classList.contains('concealed-kan-back')?'ankan-back':'face',
                     type:meld(e)?.dataset.meldType||null,added:Boolean(e.closest('.added-kan-tile')),called:Boolean(e.closest('.called-tile')),rect:rect(e)});
-                  const q=s=>document.querySelector(s),table=rawRect(q('.table')),center=rawRect(q('.center-info'));
+                  const q=s=>document.querySelector(s),table=rawRect(q('#local-table')),center=rawRect(q('#local-table .center-info'));
                   const river=[...document.querySelectorAll(`.river[data-player-id="${player}"] .river-tile .tile-svg`)];
                   const riverSize=rect(river[0]);
                   const expected=[riverSize.width,riverSize.height].sort((a,b)=>a-b);
@@ -187,7 +187,7 @@ with sync_playwright() as p:
                   for(const e of tiles){
                     const r=rawRect(e);
                     if(r.width===0||r.height===0||r.left<table.left-.1||r.top<table.top-.1||r.right>table.right+.1||r.bottom>table.bottom+.1)inside.push(describe(e));
-                    if(!separate(r,center))record(collisions.center,e,q('.center-info'));
+                    if(!separate(r,center))record(collisions.center,e,q('#local-table .center-info'));
                   }
                   for(let i=0;i<tiles.length;i++)for(let j=i+1;j<tiles.length;j++){
                     const a=tiles[i],b=tiles[j];

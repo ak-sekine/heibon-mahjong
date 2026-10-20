@@ -49,13 +49,13 @@ with sync_playwright() as p:
             metrics = page.evaluate('''() => {
               const rect = el => { const r=el.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height}; };
               const region=document.querySelector('#dora-indicators');
-              return {area:rect(document.querySelector('.dora-area')),region:rect(region),table:rect(document.querySelector('.table')),
+              return {area:rect(document.querySelector('#local-table .dora-area')),region:rect(region),table:rect(document.querySelector('#local-table')),
                 slots:[...region.children].map(rect),
                 childrenContained:[...region.children].every(slot=>{const r=slot.getBoundingClientRect();return [...slot.querySelectorAll('svg')].every(el=>{const c=el.getBoundingClientRect();return c.left>=r.left && c.right<=r.right && c.top>=r.top && c.bottom<=r.bottom;});}),
                 overflow:document.documentElement.scrollWidth>innerWidth,
                 content:[...region.querySelectorAll('.dora-kind')].map(el=>({text:el.textContent,clipped:el.scrollHeight>el.clientHeight || el.scrollWidth>el.clientWidth})),
                 hand:[...document.querySelectorAll('#player-hand li')].map(rect),
-                positions:[...document.querySelectorAll('.seat,.river,.center-info,#discard,#tsumo')].map(rect)};
+                positions:[...document.querySelectorAll('#local-table .seat,#local-table .river,#local-table .center-info,#discard,#tsumo')].map(rect)};
             }''')
             assert not metrics['overflow'] and metrics['childrenContained']
             assert page.locator('.table .center-info #dora-indicators').count() == 1
@@ -101,7 +101,7 @@ with sync_playwright() as p:
               }
             }''')
             assert page.evaluate('''() => {
-              const c=document.querySelector('.center-info').getBoundingClientRect();
+              const c=document.querySelector('#local-table .center-info').getBoundingClientRect();
               return [...document.querySelectorAll('.river-tile')].every(el=>{
                 const r=el.getBoundingClientRect(),p=el.parentElement.getBoundingClientRect();
                 return (r.right<=c.left || r.left>=c.right || r.bottom<=c.top || r.top>=c.bottom) &&

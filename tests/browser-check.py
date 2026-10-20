@@ -35,7 +35,7 @@ def geometry(page):
     assert len(set(round(b['y'],1) for b in bounds))==1
     assert all(b['x']>=0 and b['x']+b['width']<=page.viewport_size['width'] for b in bounds)
     for river in ['top','right','bottom','left']:
-        assert separate(box(page,f'.river-{river}'),box(page,'.center-info')), (river, box(page,f'.river-{river}'), box(page,'.center-info'))
+        assert separate(box(page,f'.river-{river}'),box(page,'#local-table .center-info')), (river, box(page,f'.river-{river}'), box(page,'#local-table .center-info'))
     river_boxes = [box(page, f'.river-{name}') for name in ['top','right','bottom','left']]
     for i, bounds in enumerate(river_boxes):
         assert all(separate(bounds, other) for other in river_boxes[i+1:])

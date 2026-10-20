@@ -132,6 +132,6 @@ Step 13.8までの役満10種類に、Step 13.11で天和・地和を加え、�
 | Step 14.0.1：オンライン待機ルーム完成 | 完了 | Ready、ホスト権限と引き継ぎ、CPU席補充、座席確定、退出、自動再接続、revision・重複要求防止、レート制限を実装しました。[設計・実装記録](development/step-14.0.1.md) · [検証記録](verification/step14.0.1/README.md) |
 | Step 14.1：オンライン対局の進行共有 | 完了 | サーバー権威型のゲーム状態・座席別ビュー、打牌・判断窓・CPU進行・局精算・再接続、オンライン卓を実装しました。ローカル検証、GitHub ActionsのBrowser UI、Cloudflare本番通信、Pages build / deployが成功しました。[開発・設計記録](development/step-14.1.md) · [検証記録](verification/step14.1/README.md) |
 | Step 14.2：河の配置、共通メニュー、表示名 | 完了 | オンライン・オフラインで共通の河座標、右上メニュー、対局操作領域、待機画面の表示名欄を統一しました。[開発・設計記録](development/step-14.2.md) · [検証記録](verification/step14.2/README.md) |
-| Step 14.3：対局UI共通化、河間隔、CPU表示名 | 一部実装 | 共通操作・点数・卓中央コンポーネント、コンパクトな河座標、ドロップダウンメニュー、オンラインCPU番号を実装しました。Browser UIはActionsで確認予定です。[開発・設計記録](development/step-14.3.md) · [検証記録](verification/step14.3/README.md) |
+| Step 14.3：対局UI共通化、河間隔、CPU表示名 | 一部実装 | 共通操作・点数・卓中央コンポーネント、コンパクトな河座標、ドロップダウンメニュー、オンラインCPU番号を実装しました。最初のBrowser UI実行で検査対象の誤選択が見つかり、対象を修正して再確認中です。[開発・設計記録](development/step-14.3.md) · [検証記録](verification/step14.3/README.md) |
 
 各項目を着手する際は、実装範囲を決めてからこの表と[SPEC.md](SPEC.md)を更新します。
