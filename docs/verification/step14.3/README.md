@@ -6,7 +6,7 @@
 
 | 検証 | 結果 |
 | --- | --- |
-| `npm test` | 成功。49テストファイル、49成功、失敗0件 |
+| `npm test` | 成功。50テストファイル、50成功、失敗0件 |
 | `npm run build` | 成功。TypeScript型検査とVite production build |
 | Python構文解析 | 成功。既存Browser UI用Pythonスクリプト38件 |
 | `git diff --check` / staged diff check | tracked差分および全41 staged filesで成功。初回staged checkが開発ノートの末尾空白2件を検出し、1回修正後に成功 |
@@ -16,7 +16,7 @@
 
 ## Browser UI verification
 
-既存の[Browser UI verification workflow](../../../.github/workflows/browser-ui.yml)に次の実測比較を追加し、main push後のActionsで確認します。Codex Cloud内ではChromiumを起動しません。
+既存の[Browser UI verification workflow](../../../.github/workflows/browser-ui.yml)に次の実測比較を追加し、main push後のActionsで確認しました。Codex Cloud内ではChromiumを起動していません。
 
 - オンラインとオフラインの局サマリー、4席ラベル、卓、中央局・牌山・ドラ、河、操作領域、状態メッセージ、打牌ボタンの位置と寸法を320・375・390・430・1280pxで比較します。
 - 4席回転、リーチ宣言牌、1・6・7・18枚の河について、牌SVGの位置・間隔・重なりを測定します。
@@ -60,6 +60,21 @@
 
 同ブラウザーテストは、オンライン／オフラインの寸法比較、CPU番号と席風、席回転、他家の非公開牌ID非露出を通過し、自分の打牌を送信しました。失敗したのは、その後にオンライン状態メッセージが「テスト参加者の手番」を含むことを待つ箇所です。共通化後の`OnlineGameController`は「手番：テスト参加者」と表示しており、旧表示「テスト参加者の手番です。」と文言が変わっていました。
 
-既存の状態メッセージを維持し、`テスト参加者の手番です。`に戻しました。テスト期待値は緩和していません。変更後のローカル`npm test`は50/50成功、buildと`git diff --check`も成功です。5回目のActions runで最終確認します。明示的なActions rerunは0回です。
+既存の状態メッセージを維持し、`テスト参加者の手番です。`に戻しました。テスト期待値は緩和していません。変更後のローカル`npm test`は50/50成功、buildと`git diff --check`も成功しました。明示的なActions rerunは0回です。
+
+### Actions run 39511674963
+
+対象SHA `abff375a8f11709902c29a0866570b19eb872d6b`。2026-10-20 22:56:43 UTCに開始し、23:05:46 UTCに全体成功で終了しました。実行時間は9分03秒です。
+
+| Job | 結果 |
+| --- | --- |
+| `verify`（regression、Worker typecheck、build） | 成功 |
+| `browser-ui / browser-ui` | 成功 |
+| `deploy-worker` | 成功 |
+| `production-test` | 成功 |
+| `pages-build` | 成功 |
+| `pages-deploy` | 成功 |
+
+Browser UIログでは、320・355・375・390・430・1280pxの河とリーチ宣言牌の実測、オンライン・オフラインの画面寸法・席情報・操作状態・メニュー比較、CPU名と席回転、他家の非公開牌ID非露出、300 UI scenes、360中央ドラ・供託配置、432副露配置、28正方卓シーン、10カン操作配置、得点とオンライン待機室の各シナリオが成功しました。通常牌間のSVG面の隙間は3.83〜7.41px、宣言牌の隣は0.99〜1.02px、行起点の最大ずれは0.02pxでした。
 
 iPhone Safari実機での確認は未実施です。
