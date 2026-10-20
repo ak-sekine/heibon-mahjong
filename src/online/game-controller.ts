@@ -471,7 +471,7 @@ export class OnlineGameController {
       : 'この対局は中断されました。';
     else if (view.phase === 'awaiting-ron') message = 'ロン判断を待っています。';
     else if (view.phase === 'awaiting-call') message = '鳴き判断を待っています。';
-    else if (view.turnPlayerId !== view.viewerSeat) message = `手番：${this.displayName(view, view.seats[view.turnPlayerId])}`;
+    else if (view.turnPlayerId !== view.viewerSeat) message = `${this.displayName(view, view.seats[view.turnPlayerId])}の手番です。`;
     else if (view.self.discardableTileIds.length) message = this.selectedTileId ? '牌を選択中です。' : '打牌する牌を選択してください。';
     else message = 'サーバーの更新を待っています。';
     setActionStatus(this.actionStatus, message);
