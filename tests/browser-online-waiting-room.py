@@ -650,7 +650,24 @@ with sync_playwright() as p:
     page.locator('#online-join').click()
     wait_for("document.querySelector('#online-room-code').textContent === 'ABC234' && window.onlineMock.requests.some(request => request.path.endsWith('/join'))")
     assert page.evaluate("window.onlineMock.requests.find(request => request.path.endsWith('/join')).body.displayName === '共通参加者'"), 'room join did not send the common display name'
-    wait_for("JSON.parse(sessionStorage.getItem('heibon-mahjong-online-session')).displayName === '共通参加者'")
+    try:
+      wait_for("(() => { const value = sessionStorage.getItem('heibon-mahjong-online-session'); return value !== null && JSON.parse(value).displayName === '共通参加者'; })()")
+    except AssertionError as error:
+      join_debug = page.evaluate('''() => {
+        const value = sessionStorage.getItem('heibon-mahjong-online-session');
+        let displayName = null;
+        try { displayName = value === null ? null : JSON.parse(value).displayName; } catch {}
+        return {
+          sessionPresent: value !== null, displayName,
+          formsHidden: document.querySelector('#online-room-forms').hidden,
+          roomHidden: document.querySelector('#online-room').hidden,
+          status: document.querySelector('#online-status').innerText,
+          connection: document.querySelector('#online-connection').innerText,
+          ticketRequests: window.onlineMock.ticketRequests,
+          requests: window.onlineMock.requests,
+        };
+      }''')
+      raise AssertionError(f'room join did not persist the shared display name: {join_debug}') from error
     assert page.evaluate("localStorage.getItem('heibon-mahjong-online-session') === null"), 'online participant session was moved to localStorage'
     assert not errors, errors
 
