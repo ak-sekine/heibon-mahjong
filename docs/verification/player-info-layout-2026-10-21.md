@@ -17,6 +17,8 @@
 
 main push時に[Deploy workflow](../../.github/workflows/deploy.yml)から既存の[Browser UI verification workflow](../../.github/workflows/browser-ui.yml)を実行します。Codex環境ではChromiumを起動せず、該当commitのActions結果を別途確認します。
 
+初回Deploy run [39683183233](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39683183233)は`verify`が成功し、Browser UIは既存`browser-action-controls.py`が成立後の「リーチ」を点数欄に期待して失敗しました。リーチ状態と点棒減算を保ったまま、欄に「リーチ」がなくstatus要素もないことを検査するよう更新し、次のmain pushで再検証します。
+
 ## 実機確認
 
 iPhone Safari実機は未確認です。
