@@ -18,7 +18,7 @@
 | [Step 14.0.1](step14.0.1/README.md) | Ready、CPU補充、権限引き継ぎ、退出、revision、重複要求、レート制限、本番WebSocket・Browser UI検証。 |
 | [Step 14.1](step14.1/README.md) | サーバー権威型オンライン対局、座席別情報保護、進行・再接続、ローカル結合、Cloudflare本番WebSocket・Browser UI検証。 |
 | [Step 14.2](step14.2/README.md) | オンライン・オフライン河の共通座標、4席回転、リーチ宣言牌、メニュー、共通操作領域、表示名欄。 |
-| [Step 14.3](step14.3/README.md) | 共通操作・点数・卓中央UI、実測によるオンライン・オフライン寸法比較、河間隔、CPU1〜3、非公開牌DOM保護。 |
+| [Step 14.3](step14.3/README.md) | 共通操作・点数・卓中央UIに加え、オンライン待機ダイアログの表示名・参加条件と320〜430px幅を確認。 |
 | [Step 13.7](step13.7/README.md) | 一般役7種類の候補判定、点数計算、結果表示。Browser UI verification はGitHub Actionsで実施。 |
 | [Step 13.5.5](step13.5.5/README.md) | 正方形卓、牌・河・副露の配置、実カン操作、画面サイズごとの検証。初回の未完了事項と後続修正も時系列で保存。 |
 | [Step 13.5.4](step13.5.4/README.md) | 卓上牌の寸法と画面表示。 |

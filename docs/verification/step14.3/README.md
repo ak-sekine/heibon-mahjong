@@ -78,3 +78,24 @@
 Browser UIログでは、320・355・375・390・430・1280pxの河とリーチ宣言牌の実測、オンライン・オフラインの画面寸法・席情報・操作状態・メニュー比較、CPU名と席回転、他家の非公開牌ID非露出、300 UI scenes、360中央ドラ・供託配置、432副露配置、28正方卓シーン、10カン操作配置、得点とオンライン待機室の各シナリオが成功しました。通常牌間のSVG面の隙間は3.83〜7.41px、宣言牌の隣は0.99〜1.02px、行起点の最大ずれは0.02pxでした。
 
 iPhone Safari実機での確認は未実施です。
+
+## 2026-10-21 オンライン待機ダイアログ追補
+
+対象SHA `8272be811eb59f11766e98d4ad18cefc97b655e2`。ローカルの`npm test`は50/50成功、`npm run build`は成功しました。Browser UIスクリプトのPython構文解析と`git diff --check`も成功しました。Codex Cloud内ではChromiumを起動せず、既存Actionsを使いました。
+
+### Actions run 39538777308
+
+[対象run](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39538777308)は03:28:40 UTCに開始し、03:35:10 UTCに成功して終了しました（6分30秒）。対象SHAは`8272be811eb59f11766e98d4ad18cefc97b655e2`です。
+
+| Job | 結果 |
+| --- | --- |
+| `verify`（regression、Worker typecheck、build） | 成功 |
+| `browser-ui / browser-ui` | 成功 |
+| `deploy-worker` | 成功 |
+| `production-test` | 成功 |
+| `pages-build` | 成功 |
+| `pages-deploy` | 成功 |
+
+Browser UIログの待機ダイアログ実測幅は、320px画面で282px、375pxで337px、390pxで352px、430pxで392pxでした。全幅で画面外へのはみ出し、ダイアログ内・フォーム内の横スクロールがないことを確認しています。表示名・コードが足りないときの無効状態、不足項目の補助文、両方が有効になった後の参加、作成・参加と待機ルームの既存シナリオも成功しました。
+
+iPhone Safari実機での確認は未実施です。処理時間の内訳は[記録](../codex-performance/online-waiting-dialog.md)を参照してください。
