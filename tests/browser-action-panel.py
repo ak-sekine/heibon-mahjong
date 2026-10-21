@@ -167,8 +167,9 @@ with sync_playwright() as p:
         }""")
         assert page.locator('[data-browser-action-panel] [data-panel-part="show-result"]').nth(1).is_visible()
         assert page.locator('[data-browser-action-panel] [data-panel-part="next-round"]').nth(1).is_visible()
-        page.locator('[data-browser-action-panel] [data-panel-part="next-round"]').nth(1).click()
-        assert page.evaluate("window.actionPanelBrowser.onlineEvents[-1]") == {'type': 'next-round'}
+        online_panel.locator('[data-panel-part="next-round"]').click()
+        online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
+        assert online_events[-1] == {'type': 'next-round'}, online_events
 
         layout = page.evaluate("""() => {
           const host = document.querySelector('[data-browser-action-panel]');
