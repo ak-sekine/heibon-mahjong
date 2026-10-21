@@ -2,7 +2,7 @@ name: Browser UI verification
 
 on:
   push:
-    branches: [main, fix-mobile-table-layout, ui-river-spacing, fix-riichi-discard-layout]
+    branches: [fix-mobile-table-layout, ui-river-spacing, fix-riichi-discard-layout]
   workflow_dispatch:
   workflow_call:
 
