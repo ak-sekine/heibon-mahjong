@@ -306,7 +306,9 @@ export class OnlineWaitingRoom {
   }
 
   private closeEntryDialog(dialog: HTMLDialogElement): void {
-    if (dialog.open) dialog.close();
+    if (!dialog.open) return;
+    dialog.close();
+    this.restoreMenuFocusIfNoDialogIsOpen();
   }
 
   private openRoomDialog(): void {

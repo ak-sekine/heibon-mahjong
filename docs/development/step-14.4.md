@@ -16,3 +16,5 @@
 ## 検証
 
 実行コマンドとGitHub Actions結果は[Step 14.4検証記録](../verification/step14.4/README.md)、工程別の実測・概算時間は[処理時間記録](../verification/codex-performance/step14-4-menu-dialog-separation.md)を参照してください。
+
+最初のBrowser UI runで、作成ダイアログを閉じた直後のフォーカス復帰検査が失敗しました。閉じる処理が`close`イベントの後続処理だけに依存していたため、メニューボタンへのフォーカス復帰を閉じる処理の中でも同期的に実行するよう修正しました。検査の期待値は変えていません。
