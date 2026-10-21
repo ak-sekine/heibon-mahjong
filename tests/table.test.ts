@@ -215,8 +215,12 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       }).map(tile => tile.id).concat(game.players[0].drawnTile!.id));
       const selfLabel = nodes.get('#label-0')!;
       assert.equal(selfLabel.children[0].textContent, '自分');
-      assert.deepEqual(selfLabel.children[1].children.map(item => item.textContent), ['東', '親']);
+      assert.deepEqual(selfLabel.children[1].children.map(item => item.textContent), ['東', '・親']);
       assert.equal(selfLabel.children[2].textContent, '25,000点');
+      assert.equal(selfLabel.children.length, 3);
+      assert.equal(selfLabel.children[0].title, '自分');
+      assert.equal(selfLabel.children[0].attributes['aria-label'], '自分');
+      assert.equal(selfLabel.children[1].children.some(item => item.className === 'seat-status' || item.className === 'seat-self-marker'), false);
       for (const id of [1, 2, 3]) {
         const backs = nodes.get(`.concealed-hand[data-player-id="${id}"]`)!.children;
         assert.equal(backs.length, 13);

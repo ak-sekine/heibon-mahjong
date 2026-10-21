@@ -34,6 +34,7 @@ MOCK = r"""
   let decision = null;
   let roundResult = null;
   let viewerOverride = null;
+  const gameNameOverrides = {};
   let declarationIndexes = [-1, -1, -1, -1];
   let hands = [0, 1, 2, 3].map(seat => Array.from({ length: 13 }, (_, i) => makeTile(`online-${seat}-${i}`, seat + i)));
   let drawnTiles = [makeTile('online-0-draw', 7), null, null, null];
@@ -42,7 +43,7 @@ MOCK = r"""
   const makeView = viewerSeat => {
     const viewSeats = [0, 1, 2, 3].map(seat => ({
       seat,
-      name: state.seats[seat].name,
+      name: gameNameOverrides[seat] ?? state.seats[seat].name,
       control: state.seats[seat].kind,
       connected: state.seats[seat].kind === 'cpu' || state.seats[seat].connected,
       wind: wind[(seat + 4) % 4],
@@ -268,6 +269,15 @@ MOCK = r"""
         send(socket, { type: 'game-state', view: makeView(seat) });
       });
     },
+    setGameDisplayName(seat, name) {
+      gameNameOverrides[seat] = name;
+      broadcastGame('game-state');
+    },
+    setSeatPresentation(seat, riichi, connected) {
+      declarationIndexes[seat] = riichi ? 0 : -1;
+      state.seats[seat].connected = connected;
+      broadcastGame('game-state');
+    },
     advanceCpu() {
       if (!gameStarted || gameStatus !== 'playing') return;
       if (turnPlayerId === 1) {
@@ -415,6 +425,48 @@ with sync_playwright() as p:
             const labels = online
               ? Object.fromEntries([...summary.querySelectorAll('[data-online-label]')].map(node => [node.dataset.onlineLabel, rect(node, summary)]))
               : Object.fromEntries([['top','#label-2'],['right','#label-1'],['bottom','#label-0'],['left','#label-3']].map(([position, selector]) => [position, rect(summary.querySelector(selector), summary)]));
+            const scoreStrip = summary.querySelector('.score-strip');
+            const scoreRows = [...scoreStrip.querySelectorAll(':scope > .seat-label')];
+            const scoreStripStyle = getComputedStyle(scoreStrip);
+            const seatRows = scoreRows.map(row => {
+              const name = row.querySelector('.seat-name');
+              const details = row.querySelector('.seat-details');
+              const wind = details.querySelector('.seat-wind');
+              const role = details.querySelector('.seat-role');
+              const points = row.querySelector('.seat-points');
+              const box = element => element.getBoundingClientRect();
+              const rowBox = box(row);
+              const nameBox = box(name);
+              const detailsBox = box(details);
+              const pointsBox = box(points);
+              const nameStyle = getComputedStyle(name);
+              return {
+                position: online ? row.dataset.onlineLabel : row.dataset.seatPosition,
+                id: row.id,
+                order: Number(row.dataset.displayOrder),
+                name: name.textContent,
+                nameTitle: name.title,
+                nameAriaLabel: name.getAttribute('aria-label'),
+                nameOverflow: name.scrollWidth > name.clientWidth,
+                nameWhiteSpace: nameStyle.whiteSpace,
+                nameTextOverflow: nameStyle.textOverflow,
+                nameHeight: nameBox.height,
+                rowHeight: rowBox.height,
+                details: details.textContent,
+                wind: wind.textContent,
+                role: role?.textContent ?? '',
+                points: points.textContent,
+                pointsRight: Number(pointsBox.right.toFixed(2)),
+                contentsFit: nameBox.left >= rowBox.left && detailsBox.right <= rowBox.right && pointsBox.right <= rowBox.right,
+                partsSequential: nameBox.right <= detailsBox.left && detailsBox.right <= pointsBox.left,
+                directParts: row.children.length,
+                status: row.querySelector('.seat-status') !== null,
+                selfMarker: row.querySelector('.seat-self-marker') !== null,
+                declaration: row.querySelector('.seat-declaration') !== null,
+                active: row.dataset.active === 'true',
+                activeBorder: getComputedStyle(row).borderColor,
+              };
+            });
             const rivers = online
               ? Object.fromEntries([...table.querySelectorAll('[data-online-river]')].map(node => [node.dataset.onlineRiver, rect(node, table)]))
               : Object.fromEntries([['top','2'],['right','1'],['bottom','0'],['left','3']].map(([position, id]) => [position, rect(table.querySelector(`.river[data-player-id="${id}"]`), table)]));
@@ -426,6 +478,8 @@ with sync_playwright() as p:
               round: rect(center.querySelector('.round-label'), table), wall: rect(center.querySelector('.wall-count'), table),
               doraArea: rect(center.querySelector('.dora-area'), table), dora: rect(dora, table),
               doraTile: rect(dora.querySelector('svg'), table), deposits: rect(center.querySelector('.deposit-sticks'), table),
+              seatRows, seatStripColumns: scoreStripStyle.gridTemplateColumns.trim().split(' ').filter(Boolean).length,
+              seatRowOrder: scoreRows.map(row => online ? row.dataset.onlineLabel : row.dataset.seatPosition),
               labels, rivers, controls: rect(controls, root), status: rect(status, controls), discard: buttonRect,
               labelStyle: style(summary.querySelector('.seat-label')), centerStyle: style(center),
               controlsStyle: style(controls), statusStyle: style(status), discardStyle: buttonStyle,
@@ -707,7 +761,27 @@ with sync_playwright() as p:
     assert cpu_two.startswith('CPU2') and '北' in cpu_two, f'CPU2 and its north wind were not shown separately: {cpu_two}'
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'online table causes horizontal overflow at 390px'
 
-    for width, height in [(320,700),(375,812),(390,844),(430,932),(1280,900)]:
+    online_long_name = 'テストホスト123456789012345678'
+    assert len(online_long_name) == 24, 'the long-name browser fixture must stay within the existing limit'
+    page.evaluate('(name) => window.onlineMock.setGameDisplayName(0, name)', online_long_name)
+    wait_for(f"document.querySelector('#online-score-strip [data-online-label=bottom] .seat-name')?.title === '{online_long_name}'")
+    assert page.locator('#online-score-strip .seat-label').count() == 4, 'online player information did not contain four rows'
+    assert page.locator('#local-score-strip .seat-label').count() == 4, 'offline player information did not contain four rows'
+    assert page.locator('#online-score-strip .seat-label').evaluate_all("rows => rows.map(row => row.dataset.onlineLabel)") == ['bottom','right','top','left'], 'online seats were not ordered from the viewer through relative seats'
+    assert page.locator('#local-score-strip .seat-label').evaluate_all("rows => rows.map(row => row.dataset.seatPosition)") == ['bottom','right','top','left'], 'offline seats were not ordered self, CPU1, CPU2, CPU3'
+    assert page.locator('#online-score-strip .seat-name').all_text_contents() == [online_long_name,'テスト参加者','CPU1','CPU2'], 'online rows did not use the current display names in relative seat order'
+    assert page.locator('#local-score-strip .seat-name').all_text_contents() == ['自分','CPU1','CPU2','CPU3'], 'offline player names or their order changed'
+    assert page.locator('#online-score-strip .seat-details').all_text_contents() == ['東・親','南','西','北'], 'online wind or dealer information was missing or assigned to the wrong seat'
+    assert page.locator('#local-score-strip .seat-details').all_text_contents() == ['東・親','南','西','北'], 'offline wind or dealer information was missing or assigned to the wrong seat'
+    assert page.locator('#online-score-strip .seat-label[data-active="true"]').count() == 1 and page.locator('#online-score-strip .seat-label[data-active="true"]').evaluate("row => getComputedStyle(row).borderColor === 'rgb(255, 218, 125)'") , 'online turn emphasis was not preserved'
+    assert page.locator('#local-score-strip .seat-label[data-active="true"]').count() == 1 and page.locator('#local-score-strip .seat-label[data-active="true"]').evaluate("row => getComputedStyle(row).borderColor === 'rgb(255, 218, 125)'") , 'offline turn emphasis was not preserved'
+    page.evaluate('window.onlineMock.setSeatPresentation(1, true, false)')
+    wait_for("document.querySelector('#online-score-strip [data-online-label=right]')?.dataset.displayOrder === '1'")
+    guest_row_text = page.locator('#online-score-strip [data-online-label="right"]').inner_text()
+    assert 'リーチ' not in guest_row_text and '切断中' not in guest_row_text and page.locator('#online-score-strip [data-online-label="right"] .seat-status, #online-score-strip [data-online-label="right"] .seat-self-marker').count() == 0, f'online auxiliary player status was displayed: {guest_row_text}'
+    page.evaluate('window.onlineMock.setSeatPresentation(1, false, true)')
+
+    for width, height in [(320,700),(355,745),(375,812),(390,844),(430,932),(1280,900)]:
       page.set_viewport_size({'width': width, 'height': height})
       geometry = measure_shared_layout()
       assert geometry['noOverflow'], f'shared online/offline scene causes horizontal overflow at {width}px'
@@ -726,6 +800,20 @@ with sync_playwright() as p:
           online_value = geometry['online']['rivers'][position][dimension]
           local_value = geometry['local']['rivers'][position][dimension]
           assert abs(online_value-local_value) <= .5, f'{position} river {dimension} differs at {width}px: online={online_value}, offline={local_value}'
+      for mode in ['online','local']:
+        seat_rows = geometry[mode]['seatRows']
+        assert len(seat_rows) == 4 and geometry[mode]['seatStripColumns'] == 1, f'{mode} player information was not four rows in one column at {width}px'
+        assert geometry[mode]['seatRowOrder'] == ['bottom','right','top','left'], f'{mode} DOM order changed at {width}px'
+        assert all(row['order'] == index and row['directParts'] == 3 for index,row in enumerate(seat_rows)), f'{mode} rows did not contain one name, one wind/dealer cell, and one score at {width}px: {seat_rows}'
+        assert all(row['contentsFit'] and row['partsSequential'] and row['nameWhiteSpace'] == 'nowrap' and row['nameTextOverflow'] == 'ellipsis' and row['nameHeight'] <= row['rowHeight'] for row in seat_rows), f'{mode} seat information wrapped, overlapped, or overflowed at {width}px: {seat_rows}'
+        assert all(not row['status'] and not row['selfMarker'] and not row['declaration'] for row in seat_rows), f'{mode} auxiliary player marker leaked into a row at {width}px: {seat_rows}'
+        assert len({row['pointsRight'] for row in seat_rows}) == 1, f'{mode} scores were not right-aligned at {width}px: {seat_rows}'
+        assert sum(row['role'] == '・親' for row in seat_rows) == 1, f'{mode} dealer marker was not shown exactly once at {width}px'
+      assert geometry['online']['seatRows'][0]['name'] == online_long_name and geometry['online']['seatRows'][0]['nameTitle'] == online_long_name and geometry['online']['seatRows'][0]['nameAriaLabel'] == online_long_name, f'24-character online name was lost or inaccessible at {width}px'
+      if width == 320:
+        assert geometry['online']['seatRows'][0]['nameOverflow'], 'long online name was not ellipsized in the narrow viewport'
+      for mode in ['online','local']:
+        assert abs(geometry[mode]['table']['width']-geometry[mode]['table']['height']) <= .5, f'{mode} square table changed at {width}px'
       for part in ['labelStyle','centerStyle','controlsStyle','statusStyle','discardStyle']:
         assert geometry['online'][part] == geometry['local'][part], f'{part} differs at {width}px: {geometry["online"][part]} != {geometry["local"][part]}'
       for dimension in ['left','top','width']:
@@ -741,6 +829,8 @@ with sync_playwright() as p:
     assert page.locator('#online-score-strip [data-online-label="left"]').inner_text().startswith('テストホスト'), 'seat rotation was wrong for the south player'
     assert page.locator('#online-score-strip [data-online-label="top"]').inner_text().startswith('CPU2'), 'CPU2 name changed when the viewer seat rotated'
     assert page.locator('#online-score-strip [data-online-label="right"]').inner_text().startswith('CPU1'), 'CPU1 name changed when the viewer seat rotated'
+    assert page.locator('#online-score-strip .seat-label').evaluate_all("rows => rows.map(row => row.dataset.onlineLabel)") == ['bottom','right','top','left'], 'the online score strip DOM order did not follow the viewer seat after rotation'
+    assert page.locator('#online-score-strip .seat-name').all_text_contents() == ['テスト参加者','CPU1','CPU2',online_long_name], 'CPU and human names were assigned to the wrong relative seat after rotation'
     assert page.locator('#online-player-hand button[data-tile-id]').count() == 13, 'the second viewer did not get their own hand'
     hidden_guest_ids = page.evaluate('window.onlineMock.privateTileIds(1)')
     assert all(tile_id not in page.locator('#online-match').inner_html() for tile_id in hidden_guest_ids), 'the guest view exposed other private tile IDs'

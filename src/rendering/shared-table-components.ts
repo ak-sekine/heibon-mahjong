@@ -7,6 +7,7 @@ export type SeatLabelView = Readonly<{
   isDealer: boolean;
   isSelf: boolean;
   isActive: boolean;
+  displayOrder: number;
   isRiichi: boolean;
   isConnected?: boolean;
 }>;
@@ -25,23 +26,33 @@ function span(className: string, content: string): HTMLSpanElement {
   return node;
 }
 
-/** Render the same player identity, wind, status, and score in both game modes. */
+/** Render one compact player row shared by offline and online tables. */
 export function renderSeatLabel(label: HTMLElement, view: SeatLabelView): void {
   label.className = 'seat-label';
   label.dataset.active = String(view.isActive);
   label.dataset.self = String(view.isSelf);
+  label.dataset.displayOrder = String(view.displayOrder);
 
   const name = span('seat-name', view.name);
+  name.title = view.name;
+  name.setAttribute('aria-label', view.name);
   const details = document.createElement('span');
   details.className = 'seat-details';
   details.append(span('seat-wind', WIND_LABELS[view.wind]));
-  if (view.isSelf && view.name !== '自分') details.append(span('seat-self-marker', '自分'));
-  if (view.isDealer) details.append(span('seat-role', '親'));
-  if (view.isRiichi) details.append(span('seat-status', 'リーチ'));
-  if (view.isConnected === false) details.append(span('seat-status', '切断中'));
+  if (view.isDealer) details.append(span('seat-role', '・親'));
 
   const score = span('seat-points', `${view.points.toLocaleString('ja-JP')}点`);
   label.replaceChildren(name, details, score);
+
+  // DOM order also carries the screen-reader order: viewer/self first, then
+  // the other seats in relative turn order.
+  const strip = label.parentElement;
+  if (strip?.classList.contains('score-strip')) {
+    const rows = Array.from(strip.children)
+      .filter((child): child is HTMLElement => child.classList.contains('seat-label'))
+      .sort((first, second) => Number(first.dataset.displayOrder) - Number(second.dataset.displayOrder));
+    strip.append(...rows);
+  }
 }
 
 export type TableRoundView = Readonly<{

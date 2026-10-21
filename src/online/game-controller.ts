@@ -238,6 +238,7 @@ export class OnlineGameController {
         isDealer: seat.isDealer,
         isSelf: seat.seat === view.viewerSeat,
         isActive: view.status === 'playing' && view.turnPlayerId === seat.seat,
+        displayOrder: (seat.seat - view.viewerSeat + 4) % 4,
         isRiichi: seat.riichi,
         isConnected: seat.connected,
       });

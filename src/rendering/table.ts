@@ -17,7 +17,6 @@ import { renderSeatLabel, renderWallCount } from './shared-table-components.ts';
 
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
 const seatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
-function previewText(tag: string, textContent: string): HTMLElement { return Object.assign(document.createElement(tag), {textContent}); }
 
 function tileOrder(tile: Tile): number {
   return tile.category === 'suited' ? SUITS.indexOf(tile.suit) * 9 + tile.rank - 1 : 27 + HONORS.indexOf(tile.honor);
@@ -80,12 +79,10 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
       isDealer: game.dealerId === id,
       isSelf: id === 0,
       isActive: game.phase !== 'wall-exhausted' && game.phase !== 'won' && game.turnPlayerId === id,
+      displayOrder: id,
       isRiichi: Boolean(player.riichi),
       isConnected: true,
     });
-    if(game.phase==='awaiting-ron' && game.ronWindow?.kind==='kakan' && game.ronWindow.kan?.playerId===id) {
-      const declaration=previewText('span','加カン宣言中'); declaration.className='seat-declaration'; label.append(declaration);
-    }
     if (id === 0) renderSelf(player, canDiscard(game, 0));
     else {
       const backHand = document.querySelector<HTMLElement>(`.concealed-hand[data-player-id="${id}"]`);
