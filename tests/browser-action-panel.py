@@ -126,8 +126,10 @@ with sync_playwright() as p:
           test.update(test.tile.id, false, false, true);
         }""")
         assert page.locator('[data-browser-action-panel] [data-panel-part="kan-controls"]').nth(1).is_visible()
-        page.locator('[data-browser-action-panel] [data-panel-part="kan-options"] button').nth(1).click()
-        assert page.evaluate("window.actionPanelBrowser.onlineEvents[-1]") == {'type': 'select-kan', 'optionId': 'server-kan-option'}
+        online_panel = page.locator('[data-browser-action-panel] > [data-panel-part="root"]').nth(1)
+        online_panel.locator('[data-panel-part="kan-options"] button').click()
+        online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
+        assert online_events[-1] == {'type': 'select-kan', 'optionId': 'server-kan-option'}, online_events
 
         page.evaluate("""() => {
           const test = window.actionPanelBrowser;
@@ -140,8 +142,9 @@ with sync_playwright() as p:
         }""")
         assert page.locator('[data-browser-action-panel] [data-panel-part="call-controls"]').nth(1).is_visible()
         assert page.locator('[data-browser-action-panel] [data-panel-part="pass-call"]').nth(1).is_enabled()
-        page.locator('[data-browser-action-panel] [data-panel-part="call-options"] button').nth(1).click()
-        assert page.evaluate("window.actionPanelBrowser.onlineEvents[-1]") == {'type': 'select-call', 'optionId': 'server-call-option'}
+        online_panel.locator('[data-panel-part="call-options"] button').click()
+        online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
+        assert online_events[-1] == {'type': 'select-call', 'optionId': 'server-call-option'}, online_events
 
         page.evaluate("""() => {
           const test = window.actionPanelBrowser;
