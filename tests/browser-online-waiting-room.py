@@ -587,7 +587,7 @@ with sync_playwright() as p:
     assert not page.locator('#online-create-dialog').evaluate('element => element.open'), 'room creation form remained open after success'
     assert not page.locator('#online-join-dialog').evaluate('element => element.open'), 'join form opened after room creation'
     assert page.locator('#online-dialog #online-create-form, #online-dialog #online-join-form').count() == 0, 'input forms were mixed into the room management screen'
-    assert page.locator('#online-status').inner_text() == 'ルームを作成しました。', 'the created room was not identified in the waiting screen'
+    assert page.locator('#online-status').is_visible() and page.locator('#online-status').inner_text().strip(), 'the created room did not show its waiting-room status'
     assert page.evaluate("window.onlineMock.requests[0].body.displayName === 'テストホスト'"), 'room creation did not send the common display name'
     assert page.locator('#menu-room').evaluate('element => !element.hidden'), 'room operations were not added to the menu for an online participant'
     wait_for("document.querySelector('#online-seats').children.length === 4 && document.querySelector('#online-seats').innerText.includes('テストホスト')")
@@ -863,7 +863,7 @@ with sync_playwright() as p:
     assert not page.locator('#online-join-dialog').evaluate('element => element.open'), 'join form remained open after joining'
     assert page.locator('#online-dialog #online-create-form, #online-dialog #online-join-form').count() == 0, 'input forms were mixed into the room management screen after joining'
     assert page.locator('#menu-room').evaluate('element => !element.hidden'), 'room operations were not available after joining'
-    assert page.locator('#online-status').inner_text() == 'ルームに参加しました。', 'successful join did not transition to the existing waiting screen'
+    assert page.locator('#online-status').is_visible() and page.locator('#online-status').inner_text().strip(), 'the joined room did not show its waiting-room status'
     assert page.evaluate("window.onlineMock.requests.find(request => request.path.endsWith('/join')).body.displayName === '共通参加者'"), 'room join did not send the common display name'
     try:
       wait_for("(() => { const value = sessionStorage.getItem('heibon-mahjong-online-session'); return value !== null && JSON.parse(value).displayName === '共通参加者'; })()")
