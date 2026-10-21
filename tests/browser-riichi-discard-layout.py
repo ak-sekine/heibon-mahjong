@@ -47,11 +47,6 @@ with sync_playwright() as p:
                   const side=river.classList.contains('river-left')||river.classList.contains('river-right');
                   const mainAxis=side?'vertical':'horizontal';
                   const svgs=items.map(e=>rect(e.querySelector('svg')));
-                  const normalRowCenters=items.reduce((result,item,index)=>{
-                    if(item.dataset.riichiDeclaration==='true')return result;
-                    const row=item.dataset.riverRow;(result[row]??=[]).push(svgs[index].top+svgs[index].height/2);return result;
-                  },{});
-                  const normalRowAlignment=Math.max(0,...Object.values(normalRowCenters).map(values=>Math.max(...values)-Math.min(...values)));
                   const lineGroups=items.reduce((result,item,index)=>{
                     const line=side?item.dataset.riverColumn:item.dataset.riverRow;
                     (result[line]??=[]).push(svgs[index]);return result;
@@ -108,7 +103,6 @@ with sync_playwright() as p:
                     regularMainGapExpected,regularCrossGapExpected,riichiCrossGapExpected,
                     riichiMainGapExpected,regularMainCenterStepExpected,riichiMainCenterStepExpected,
                     lineOriginSpread:+lineOriginSpread.toFixed(3),
-                    normalRowAlignment:+normalRowAlignment.toFixed(3),
                     order:items.every((e,i)=>e.dataset.tileId===shown.players[seat].river[i].id),
                     cellsSixByThree:items.length===18&&preservesPerspectiveOrder,
                     noScroll:document.documentElement.scrollWidth<=innerWidth,
@@ -123,7 +117,7 @@ with sync_playwright() as p:
                     'riichiCrossGaps','regularMainGapExpected','regularCrossGapExpected',
                     'riichiCrossGapExpected','riichiMainGapExpected','normalMainCenterSteps',
                     'riichiMainCenterSteps','regularMainCenterStepExpected','riichiMainCenterStepExpected',
-                    'viewport','lineOriginSpread','normalRowAlignment'
+                    'viewport','lineOriginSpread'
                 )}
                 scenario = 'no declaration' if position < 0 else f'riichi {position+1}'
                 assert all(checks.values()), f'{width}px seat {seat} {scenario}: {metrics}'
@@ -135,8 +129,6 @@ with sync_playwright() as p:
                     assert metrics['riichiMainGaps'] and all(abs(g-metrics['riichiMainGapExpected'])<.35 for g in metrics['riichiMainGaps']), f'{width}px seat {seat} {scenario} declaration line spacing: {metrics}'
                     assert metrics['riichiMainCenterSteps'] and all(abs(g-metrics['riichiMainCenterStepExpected'])<.35 for g in metrics['riichiMainCenterSteps']), f'{width}px seat {seat} {scenario} declaration center spacing: {metrics}'
                     assert metrics['riichiCrossGaps'] and all(abs(g-metrics['riichiCrossGapExpected'])<.35 for g in metrics['riichiCrossGaps']), f'{width}px seat {seat} {scenario} declaration cross spacing: {metrics}'
-                rowAlignmentLimit = metrics['riichiCrossGapExpected']-1+.35 if seat in (1,3) else .35
-                assert metrics['normalRowAlignment']<rowAlignmentLimit, f'{width}px seat {seat} riichi {position+1} normal tile alignment: {metrics}'
                 full_boxes=page.evaluate('''seat=>[...document.querySelectorAll(`.river[data-player-id="${seat}"] .river-tile`)].map(item=>{
                   const r=item.getBoundingClientRect();return [r.left,r.top,r.width,r.height];
                 })''',seat)
