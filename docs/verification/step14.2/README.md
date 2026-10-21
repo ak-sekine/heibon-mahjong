@@ -69,11 +69,15 @@
 | `npm run build` | 成功 |
 | `git diff --check` | 成功 |
 | Browser UI Python構文 | 成功 |
-| Browser UI / Actions | run [39625745903](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39625745903): `verify`成功、Browser UI失敗 |
+| Browser UI / Actions | run [39625745903](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39625745903): `verify`成功、旧行揃え条件でBrowser UI失敗。修正後のrun [39626236021](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39626236021) attempt 2は全ジョブ成功 |
 
 Browser UIでは牌SVGの座標から縁間隔と中心間隔を測定します。オフラインは4席・6幅・宣言牌なしと1〜18枚目の宣言位置を含め、オンラインは4視点・6幅・1、6、7、12、18枚（宣言牌なしと各境界の宣言牌）を確認します。非公開牌IDのDOM検査も維持しています。
 
 初回runのBrowser UIは320px・右席・宣言牌2枚目で、旧`normalRowAlignment`条件に失敗しました。通常隣接の縁間隔は1〜1.016px、宣言牌の中心間隔は牌面寸法からの期待値と一致し、重なり・横スクロール・非公開牌ID検査も通過していました。失敗した条件は別々の並びの通常牌まで同じ中心座標に固定しており、宣言牌の追加寸法をその並びの後続牌へ加算する新しい配置と両立しません。並びの開始位置、順序、重なり、全隣接間隔を引き続き検査し、旧条件を除いたBrowser UIを再実行します。
+
+修正後の[Actions run 39626236021](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39626236021)はSHA `edff394f1047b2887af7c704899142e747d79e2e`、attempt 2で完了し、`verify`、`browser-ui / browser-ui`、`deploy-worker`、`production-test`、`pages-build`、`pages-deploy`の全6 jobが成功しました。Browser UIでは幅320、355、375、390、430、1280pxの4席について、1・6・7・12・18枚、宣言牌なしと各折り返し境界を含む宣言牌位置を測定しました。オフラインのSVG縁間隔は通常牌間・宣言牌の前後とも0.99〜1.02px、行頭の最大位置差は0.02pxでした。オンラインも同じ共通配置を通り、全ケースで主軸縁間隔1px、牌面寸法に応じた中心間隔、重なりなしを確認しました。和了結果表示中の18枚河、非公開牌IDのDOM非露出、320pxでの横はみ出しなしも検査対象に含まれています。
+
+runのattempt 1では`production-test`が人間席へのターン復帰待ちでタイムアウトしました。失敗jobのみ再実行したattempt 2ではproduction testが成功し、それに続くPages build/deployも完了しました。失敗の再現はなく、河の表示・Workerコード変更との関係は確認されていません。
 
 ## 未確認
 
