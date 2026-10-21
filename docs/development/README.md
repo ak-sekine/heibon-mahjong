@@ -44,5 +44,6 @@ READMEから移した各Stepの本文と、本文にあった検証資料・ス�
 | 14.1 | サーバー権威型オンライン東風戦、座席別表示、CPU・判断窓・局進行 | 2026-10-19 | [開発・設計記録](step-14.1.md) · [検証記録](../verification/step14.1/README.md) |
 | 14.2 | 河の位置修正、ヘッダーメニュー、共通操作領域、表示名欄統一 | 2026-10-19 | [開発記録](step-14.2.md) · [検証記録](../verification/step14.2/README.md) |
 | 14.3 | 対局UI共通化、河間隔修正、オンラインCPU表示名 | 2026-10-20 | [開発記録](step-14.3.md) · [検証記録](../verification/step14.3/README.md) · [処理時間記録](../verification/codex-performance/ui-unification.md) |
+| 14.4 | メニューとオンラインダイアログの分離 | 2026-10-21 | [開発記録](step-14.4.md) · [検証記録](../verification/step14.4/README.md) · [処理時間記録](../verification/codex-performance/step14-4-menu-dialog-separation.md) |
 
 Step 13.5のiPhone Safari実機確認は[2026-10-18の検証記録](../verification/kan-safari-2026-10-18.md)を参照してください。

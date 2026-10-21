@@ -37,7 +37,7 @@ function render(): void {
 }
 function newGame(): void { controller.newGame(); window.scrollTo(0, 0); }
 new NewGameDialog(newGame);
-if (document.querySelector('#online-open')) {
+if (document.querySelector('#online-create-open')) {
   const onlineGame = new OnlineGameController();
   const waitingRoom = new OnlineWaitingRoom(import.meta.env.VITE_ONLINE_API_URL, message => onlineGame.receive(message));
   onlineGame.setActionSender((action, expectedGameRevision) => waitingRoom.sendGameAction(action, expectedGameRevision));

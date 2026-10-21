@@ -470,6 +470,9 @@ with sync_playwright() as p:
     }''')
     assert menu_metrics['gap'] == '0px' and menu_metrics['background'] in ('rgb(255, 253, 247)', 'rgb(255, 255, 255)'), menu_metrics
     assert all(button['height'] >= 44 and button['width'] >= 44 and button['background'] in ('rgba(0, 0, 0, 0)', 'transparent') for button in menu_metrics['buttons']), menu_metrics
+    assert [item.inner_text() for item in page.locator('#main-menu-items button:not([hidden])').all()] == [
+      'オフラインで新規対局', '新しくルームを作る', 'ルームに参加する',
+    ], 'the menu did not show the three requested actions in order'
     assert page.locator('#menu-room').is_hidden(), 'room operations were shown before joining a room'
     assert page.locator('#main-menu-toggle').get_attribute('aria-expanded') == 'true', 'menu expanded state was not announced'
     page.locator('#main-menu-toggle').click()
@@ -477,7 +480,7 @@ with sync_playwright() as p:
     page.locator('#main-menu-toggle').press('Enter')
     assert page.locator('#new-game').evaluate('element => document.activeElement === element'), 'keyboard open did not focus the first menu item'
     page.keyboard.press('ArrowDown')
-    assert page.locator('#online-open').evaluate('element => document.activeElement === element'), 'arrow navigation did not move through menu items'
+    assert page.locator('#online-create-open').evaluate('element => document.activeElement === element'), 'arrow navigation did not move through menu items'
     page.keyboard.press('Escape')
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'Escape did not return focus to the menu button'
     page.locator('#main-menu-toggle').click()
@@ -488,46 +491,103 @@ with sync_playwright() as p:
     page.locator('#cancel-new-game').click()
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'dismissing the new-game dialog did not restore focus to the visible menu button'
 
-    assert page.locator('#online-name').count() == 1 and page.locator('#online-join-name').count() == 0, 'waiting room does not have exactly one display-name field'
-    assert page.locator('#online-name').get_attribute('maxlength') == '24', 'display-name length limit changed'
-    assert page.locator('#online-name-title').inner_text() == '共通の表示名', 'the shared display-name section was not labeled'
-    assert 'ルーム作成・参加のどちらにも使います' in page.locator('#online-name-help').inner_text(), 'the display-name field was not described as shared'
-    select_menu_item('#online-open')
+    assert page.locator('#online-create-name').count() == 1 and page.locator('#online-join-name').count() == 1, 'create and join must have separate display-name fields'
+    assert page.evaluate('''() => { const ids = [...document.querySelectorAll('[id]')].map(node => node.id); return new Set(ids).size === ids.length; }'''), 'the UI contains duplicate DOM IDs'
+    assert page.locator('#online-create-name').get_attribute('maxlength') == '24' and page.locator('#online-join-name').get_attribute('maxlength') == '24', 'display-name length limit changed'
+    select_menu_item('#online-create-open')
     assert page.locator('#main-menu-items').is_hidden(), 'selecting a menu item did not close the menu'
-
+    assert page.locator('#online-create-dialog').evaluate('element => element.open'), 'room creation did not open its dedicated dialog'
+    assert page.locator('#online-join-dialog').evaluate('element => !element.open'), 'room creation also opened the join dialog'
+    assert page.locator('#online-create-dialog h2').inner_text() == '新しくルームを作る', 'room creation dialog title was not shown'
+    assert page.locator('#online-create-dialog label').all_inner_texts() == ['表示名'], 'room creation dialog showed unrelated fields'
+    assert page.locator('#online-create-dialog #online-join').count() == 0, 'room creation dialog contains a join button'
     assert page.locator('#online-create').is_disabled(), 'room creation was enabled without a display name'
-    assert page.locator('#online-join').is_disabled(), 'room joining was enabled without a display name and room code'
-    assert '表示名とルームコード' in page.locator('#online-join-requirements').inner_text(), 'the join section did not explain its required inputs'
-    waiting_room_layouts = []
+    page.locator('#online-create-name').fill('   ')
+    assert page.locator('#online-create').is_disabled(), 'room creation was enabled for a whitespace-only display name'
+    page.locator('#online-create-name').fill('テストホスト')
+    assert page.locator('#online-create').is_enabled(), 'room creation remained disabled after entering a valid display name'
+    assert page.locator('#online-join-name').input_value() == 'テストホスト', 'the display name was not shared with the join form'
+    create_form_layouts = []
     for width, height in [[320,700],[375,812],[390,844],[430,932]]:
       page.set_viewport_size({'width': width, 'height': height})
-      layout = page.locator('#online-dialog').evaluate('''dialog => {
+      layout = page.locator('#online-create-dialog').evaluate('''dialog => {
         const rect = dialog.getBoundingClientRect();
-        const form = dialog.querySelector('#online-room-form');
+        const form = dialog.querySelector('#online-create-form');
         return {
           left: rect.left, right: rect.right, width: rect.width,
           dialogClientWidth: dialog.clientWidth, dialogScrollWidth: dialog.scrollWidth,
           formClientWidth: form.clientWidth, formScrollWidth: form.scrollWidth,
-          sectionWidths: [...form.querySelectorAll('.online-form-section')].map(section => section.getBoundingClientRect().width),
+          controls: [...form.querySelectorAll('input,button')].map(control => {
+            const box = control.getBoundingClientRect(); return {width: box.width, height: box.height};
+          }),
         };
       }''')
       assert layout['left'] >= 0 and layout['right'] <= width, (width, layout)
       assert layout['dialogScrollWidth'] <= layout['dialogClientWidth'], (width, layout)
       assert layout['formScrollWidth'] <= layout['formClientWidth'], (width, layout)
-      assert all(section_width <= layout['formClientWidth'] for section_width in layout['sectionWidths']), (width, layout)
-      waiting_room_layouts.append([width, round(layout['width'], 2)])
+      assert all(control['width'] <= layout['formClientWidth'] and control['height'] >= 44 for control in layout['controls']), (width, layout)
+      assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'create dialog caused horizontal overflow')
+      create_form_layouts.append([width, round(layout['width'], 2)])
     page.set_viewport_size({'width': 390, 'height': 844})
-
+    page.locator('#online-create-close').click()
+    assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'closing the create form did not restore menu focus'
+    select_menu_item('#online-join-open')
+    assert page.locator('#online-join-dialog').evaluate('element => element.open'), 'room joining did not open its dedicated dialog'
+    assert page.locator('#online-create-dialog').evaluate('element => !element.open'), 'room joining also opened the create dialog'
+    assert page.locator('#online-join-dialog h2').inner_text() == 'ルームに参加する', 'room join dialog title was not shown'
+    assert page.locator('#online-join-dialog label').all_inner_texts() == ['表示名', 'ルームコード'], 'room join dialog did not show only its required fields'
+    assert page.locator('#online-join-dialog #online-create').count() == 0, 'room join dialog contains a create button'
+    assert page.locator('#online-join-code').get_attribute('maxlength') == '6', 'room code length limit changed'
+    assert page.locator('#online-join-name').input_value() == 'テストホスト', 'the previous display name was not initially shown in the join dialog'
+    assert page.locator('#online-join').is_disabled(), 'room joining was enabled without a room code'
+    join_form_layouts = []
+    for width, height in [[320,700],[375,812],[390,844],[430,932]]:
+      page.set_viewport_size({'width': width, 'height': height})
+      layout = page.locator('#online-join-dialog').evaluate('''dialog => {
+        const rect = dialog.getBoundingClientRect();
+        const form = dialog.querySelector('#online-join-form');
+        return {left: rect.left, right: rect.right, width: rect.width,
+          dialogClientWidth: dialog.clientWidth, dialogScrollWidth: dialog.scrollWidth,
+          formClientWidth: form.clientWidth, formScrollWidth: form.scrollWidth,
+          controls: [...form.querySelectorAll('input,button')].map(control => {
+            const box = control.getBoundingClientRect(); return {width: box.width, height: box.height};
+          })};
+      }''')
+      assert layout['left'] >= 0 and layout['right'] <= width, (width, layout)
+      assert layout['dialogScrollWidth'] <= layout['dialogClientWidth'], (width, layout)
+      assert layout['formScrollWidth'] <= layout['formClientWidth'], (width, layout)
+      assert all(control['width'] <= layout['formClientWidth'] and control['height'] >= 44 for control in layout['controls']), (width, layout)
+      assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'join dialog caused horizontal overflow')
+      join_form_layouts.append([width, round(layout['width'], 2)])
+    page.set_viewport_size({'width': 390, 'height': 320})
+    compressed_dialog = page.locator('#online-join-dialog').evaluate('''dialog => ({
+      top: dialog.getBoundingClientRect().top,
+      bottom: dialog.getBoundingClientRect().bottom,
+      scrollHeight: dialog.scrollHeight,
+      clientHeight: dialog.clientHeight,
+      documentWidth: document.documentElement.scrollWidth,
+    })''')
+    assert compressed_dialog['top'] >= 0 and compressed_dialog['bottom'] <= 320, compressed_dialog
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), compressed_dialog
+    page.locator('#online-join').scroll_into_view_if_needed()
+    assert page.locator('#online-join').is_visible(), 'the join action could not be reached after a short viewport resize'
+    page.set_viewport_size({'width': 390, 'height': 844})
+    page.keyboard.press('Escape')
+    assert page.locator('#online-join-dialog').evaluate('element => !element.open'), 'Escape did not close the join dialog'
+    assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'Escape did not restore menu focus from the join dialog'
+    select_menu_item('#online-create-open')
+    page.locator('#online-create-name').fill('')
     before_empty_submit = page.evaluate('window.onlineMock.requests.length')
     assert page.locator('#online-create').is_disabled(), 'room creation was enabled while the display name was empty'
-    assert page.locator('#online-join').is_disabled(), 'room joining was enabled while the display name was empty'
     assert page.evaluate('window.onlineMock.requests.length') == before_empty_submit, 'an empty display name was sent to the server'
-    page.locator('#online-name').fill('テストホスト')
-    assert page.locator('#online-create').is_enabled(), 'room creation remained disabled after entering a display name'
-    assert page.locator('#online-join').is_disabled(), 'room joining was enabled before entering a room code'
-    assert 'ルームコードを入力' in page.locator('#online-join-requirements').inner_text(), 'the missing room code was not identified'
+    page.locator('#online-create-name').fill('テストホスト')
+    assert page.locator('#online-create').is_enabled(), 'room creation remained disabled after restoring a valid display name'
     page.locator('#online-create').click()
-    wait_for("document.querySelector('#online-room-code').textContent === 'ABC234'")
+    wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234'")
+    assert not page.locator('#online-create-dialog').evaluate('element => element.open'), 'room creation form remained open after success'
+    assert not page.locator('#online-join-dialog').evaluate('element => element.open'), 'join form opened after room creation'
+    assert page.locator('#online-dialog #online-create-form, #online-dialog #online-join-form').count() == 0, 'input forms were mixed into the room management screen'
+    assert page.locator('#online-status').inner_text() == 'ルームを作成しました。', 'the created room was not identified in the waiting screen'
     assert page.evaluate("window.onlineMock.requests[0].body.displayName === 'テストホスト'"), 'room creation did not send the common display name'
     assert page.locator('#menu-room').evaluate('element => !element.hidden'), 'room operations were not added to the menu for an online participant'
     wait_for("document.querySelector('#online-seats').children.length === 4 && document.querySelector('#online-seats').innerText.includes('テストホスト')")
@@ -541,7 +601,22 @@ with sync_playwright() as p:
     page.locator('#online-close').click()
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'closing the room dialog did not restore focus to the visible menu button'
     assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') !== null"), 'closing the dialog discarded the session token'
-    select_menu_item('#online-open')
+    assert [item.inner_text() for item in page.locator('#main-menu-items button:not([hidden])').all()] == [
+      'オフラインで新規対局', '新しくルームを作る', 'ルームに参加する', 'ルーム操作',
+    ], 'the three menu actions and room operation were not available during a room session'
+    request_count_before_blocked_actions = page.evaluate('window.onlineMock.requests.length')
+    select_menu_item('#online-create-open')
+    assert page.locator('#online-create').is_disabled(), 'a second room was allowed while a session was active'
+    assert 'すでにルームに参加' in page.locator('#online-create-message').inner_text(), 'the active-session restriction was not explained in the create form'
+    assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') !== null"), 'opening create form discarded the current session'
+    page.locator('#online-create-close').click()
+    select_menu_item('#online-join-open')
+    assert page.locator('#online-join').is_disabled(), 'joining another room was allowed while a session was active'
+    assert 'すでにルームに参加' in page.locator('#online-join-message').inner_text(), 'the active-session restriction was not explained in the join form'
+    assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') !== null"), 'opening join form discarded the current session'
+    page.locator('#online-join-close').click()
+    assert page.evaluate('window.onlineMock.requests.length') == request_count_before_blocked_actions, 'a blocked room action reached the server'
+    select_menu_item('#menu-room')
     wait_for('window.onlineMock.ticketRequests >= 2')
     wait_for("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
 
@@ -756,33 +831,39 @@ with sync_playwright() as p:
 
     select_menu_item('#menu-room')
     page.locator('#online-leave').click()
-    wait_for("document.querySelector('#online-room').hidden && !document.querySelector('#online-room-forms').hidden")
+    wait_for("!document.querySelector('#online-dialog').open && sessionStorage.getItem('heibon-mahjong-online-session') === null")
     assert page.locator('#online-game-action-status').inner_text() == '参加者が明示的に退出したため、対局を中断しました。', 'an explicit game exit did not show the abort reason'
     page.locator('#online-return-local').click()
     wait_for("document.querySelector('#online-match').hidden === true")
 
     assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') === null"), 'successful leave did not remove the session'
+    assert page.locator('#menu-room').is_hidden(), 'room operations remained in the menu after leaving'
     assert '退出しました' in page.locator('#online-status').inner_text(), 'successful leave was not reported'
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'online dialog causes horizontal overflow after leave'
     assert page.locator('.table').is_visible() and page.locator('#player-hand svg').count() > 0, 'the existing mahjong table was changed by the waiting room flow'
     assert all(tile_id not in page.locator('main').inner_html() for tile_id in private_ids), 'CPU private tile IDs leaked after leaving the room'
 
-    select_menu_item('#online-open')
-    page.locator('#online-name').fill('')
+    select_menu_item('#online-join-open')
+    assert page.locator('#online-join-name').input_value() == 'テストホスト', 'the last display name was not shown when reopening the join form'
+    page.locator('#online-join-name').fill('')
     page.locator('#online-join-code').fill('ABC234')
     before_invalid_code = page.evaluate('window.onlineMock.requests.length')
     assert page.locator('#online-join').is_disabled(), 'joining was enabled without a display name'
-    assert '先に表示名' in page.locator('#online-join-requirements').inner_text(), 'joining without a display name did not identify the missing input'
     assert page.evaluate('window.onlineMock.requests.length') == before_invalid_code, 'a missing display name was sent to the server'
-    page.locator('#online-name').fill('共通参加者')
+    page.locator('#online-join-name').fill('共通参加者')
+    assert page.locator('#online-create-name').input_value() == '共通参加者', 'a join-form name change was not reflected in the create form'
     page.locator('#online-join-code').fill('bad!')
     assert page.locator('#online-join').is_disabled(), 'joining was enabled with an invalid room code'
-    assert 'ルームコード' in page.locator('#online-join-requirements').inner_text(), 'an invalid room code was not identified'
     assert page.evaluate('window.onlineMock.requests.length') == before_invalid_code, 'an invalid room code was sent to the server'
     page.locator('#online-join-code').fill('ABC234')
     assert page.locator('#online-join').is_enabled(), 'joining remained disabled after both inputs became valid'
     page.locator('#online-join').click()
-    wait_for("document.querySelector('#online-room-code').textContent === 'ABC234' && window.onlineMock.requests.some(request => request.path.endsWith('/join'))")
+    wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234' && window.onlineMock.requests.some(request => request.path.endsWith('/join'))")
+    assert not page.locator('#online-create-dialog').evaluate('element => element.open'), 'create form remained open after joining'
+    assert not page.locator('#online-join-dialog').evaluate('element => element.open'), 'join form remained open after joining'
+    assert page.locator('#online-dialog #online-create-form, #online-dialog #online-join-form').count() == 0, 'input forms were mixed into the room management screen after joining'
+    assert page.locator('#menu-room').evaluate('element => !element.hidden'), 'room operations were not available after joining'
+    assert page.locator('#online-status').inner_text() == 'ルームに参加しました。', 'successful join did not transition to the existing waiting screen'
     assert page.evaluate("window.onlineMock.requests.find(request => request.path.endsWith('/join')).body.displayName === '共通参加者'"), 'room join did not send the common display name'
     try:
       wait_for("(() => { const value = sessionStorage.getItem('heibon-mahjong-online-session'); return value !== null && JSON.parse(value).displayName === '共通参加者'; })()")
@@ -793,8 +874,9 @@ with sync_playwright() as p:
         try { displayName = value === null ? null : JSON.parse(value).displayName; } catch {}
         return {
           sessionPresent: value !== null, displayName,
-          formsHidden: document.querySelector('#online-room-forms').hidden,
           roomHidden: document.querySelector('#online-room').hidden,
+          createDialogOpen: document.querySelector('#online-create-dialog').open,
+          joinDialogOpen: document.querySelector('#online-join-dialog').open,
           status: document.querySelector('#online-status').innerText,
           connection: document.querySelector('#online-connection').innerText,
           ticketRequests: window.onlineMock.ticketRequests,
@@ -805,8 +887,8 @@ with sync_playwright() as p:
     assert page.evaluate("localStorage.getItem('heibon-mahjong-online-session') === null"), 'online participant session was moved to localStorage'
     assert not errors, errors
 
-    report = {'step': '14.3', 'viewports': [[320,700],[375,812],[390,844],[430,932],[1280,900]], 'waitingRoomViewports': waiting_room_layouts, 'scenario': 'shared display-name section, join-button requirements, waiting-room layout at 320/375/390/430px, shared hamburger menu, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, exit', 'result': 'pass'}
+    report = {'step': '14.4', 'viewports': [[320,700],[375,812],[390,844],[430,932],[1280,900]], 'createFormViewports': create_form_layouts, 'joinFormViewports': join_form_layouts, 'scenario': 'separate create/join forms, shared display name, input-gated actions, session-safe menu actions, compact hamburger menu, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, exit', 'result': 'pass'}
     print(json.dumps(report, ensure_ascii=False), flush=True)
-    (OUT / 'step14-2-online-game.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    (OUT / 'step14-4-online-room-ui.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     page.close()
     browser.close()

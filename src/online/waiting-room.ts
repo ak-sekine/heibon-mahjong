@@ -89,8 +89,17 @@ class RoomApiError extends Error {
 }
 
 export class OnlineWaitingRoom {
+  private readonly createDialog = document.querySelector<HTMLDialogElement>('#online-create-dialog')!;
+  private readonly joinDialog = document.querySelector<HTMLDialogElement>('#online-join-dialog')!;
   private readonly dialog = document.querySelector<HTMLDialogElement>('#online-dialog')!;
   private readonly status = document.querySelector<HTMLElement>('#online-status')!;
+  private readonly createNameInput = document.querySelector<HTMLInputElement>('#online-create-name')!;
+  private readonly joinNameInput = document.querySelector<HTMLInputElement>('#online-join-name')!;
+  private readonly joinCodeInput = document.querySelector<HTMLInputElement>('#online-join-code')!;
+  private readonly createButton = document.querySelector<HTMLButtonElement>('#online-create')!;
+  private readonly joinButton = document.querySelector<HTMLButtonElement>('#online-join')!;
+  private readonly createMessage = document.querySelector<HTMLElement>('#online-create-message')!;
+  private readonly joinMessage = document.querySelector<HTMLElement>('#online-join-message')!;
   private readonly connection = document.querySelector<HTMLElement>('#online-connection')!;
   private readonly seats = document.querySelector<HTMLOListElement>('#online-seats')!;
   private readonly codeOutput = document.querySelector<HTMLElement>('#online-room-code')!;
@@ -99,7 +108,6 @@ export class OnlineWaitingRoom {
   private readonly hostOutput = document.querySelector<HTMLElement>('#online-host')!;
   private readonly errorOutput = document.querySelector<HTMLElement>('#online-error')!;
   private readonly finalizedMessage = document.querySelector<HTMLElement>('#online-finalized-message')!;
-  private readonly forms = document.querySelector<HTMLElement>('#online-room-forms')!;
   private readonly roomPanel = document.querySelector<HTMLElement>('#online-room')!;
   private readonly reconnectButton = document.querySelector<HTMLButtonElement>('#online-reconnect')!;
   private readonly readyButton = document.querySelector<HTMLButtonElement>('#online-ready')!;
@@ -109,7 +117,10 @@ export class OnlineWaitingRoom {
   private readonly startGameButton = document.querySelector<HTMLButtonElement>('#online-start-game')!;
   private readonly roomMenuItem = document.querySelector<HTMLButtonElement>('#menu-room')!;
   private readonly apiUrl: string;
+  private readonly onlineUnavailableMessage: string;
   private session: RoomSession | null = null;
+  private displayName = '';
+  private roomRequestPending = false;
   private state: RoomState | null = null;
   private socket: WebSocket | null = null;
   private connectGeneration = 0;
@@ -130,27 +141,36 @@ export class OnlineWaitingRoom {
 
   constructor(apiUrl: string | undefined, onGameMessage: (message: Record<string, unknown>) => void = () => {}) {
     this.apiUrl = (apiUrl ?? '').replace(/\/+$/u, '');
+    this.onlineUnavailableMessage = !this.apiUrl
+      ? 'オンライン接続先はまだ設定されていません。'
+      : !this.isSecureApiUrl(this.apiUrl) ? 'オンライン接続先の設定を確認してください。' : '';
     this.onGameMessage = onGameMessage;
-    document.querySelector<HTMLButtonElement>('#online-open')!.addEventListener('click', () => this.openDialog());
-    this.roomMenuItem.addEventListener('click', () => this.openDialog());
+    document.querySelector<HTMLButtonElement>('#online-create-open')!.addEventListener('click', () => this.openEntryDialog(this.createDialog, this.createNameInput));
+    document.querySelector<HTMLButtonElement>('#online-join-open')!.addEventListener('click', () => this.openEntryDialog(this.joinDialog, this.joinNameInput));
+    this.roomMenuItem.addEventListener('click', () => this.openRoomDialog());
+    document.querySelector<HTMLButtonElement>('#online-create-close')!.addEventListener('click', () => this.closeEntryDialog(this.createDialog));
+    document.querySelector<HTMLButtonElement>('#online-join-close')!.addEventListener('click', () => this.closeEntryDialog(this.joinDialog));
     document.querySelector<HTMLButtonElement>('#online-close')!.addEventListener('click', () => this.closeDialog());
     this.dialog.addEventListener('close', () => {
-      this.restoreMenuFocus();
+      this.restoreMenuFocusIfNoDialogIsOpen();
     });
-    document.querySelector<HTMLInputElement>('#online-name')!.addEventListener('input', () => this.updateFormAvailability());
-    document.querySelector<HTMLInputElement>('#online-join-code')!.addEventListener('input', () => this.updateFormAvailability());
+    this.createDialog.addEventListener('close', () => this.restoreMenuFocusIfNoDialogIsOpen());
+    this.joinDialog.addEventListener('close', () => this.restoreMenuFocusIfNoDialogIsOpen());
+    this.createDialog.addEventListener('cancel', event => { event.preventDefault(); this.closeEntryDialog(this.createDialog); });
+    this.joinDialog.addEventListener('cancel', event => { event.preventDefault(); this.closeEntryDialog(this.joinDialog); });
+    this.createNameInput.addEventListener('input', () => this.captureDisplayName(this.createNameInput));
+    this.joinNameInput.addEventListener('input', () => this.captureDisplayName(this.joinNameInput));
+    this.joinCodeInput.addEventListener('input', () => this.updateFormAvailability());
+    this.displayName = '';
+    this.syncDisplayNameFields(this.displayName);
     this.updateFormAvailability();
-    document.querySelector<HTMLFormElement>('#online-room-form')!.addEventListener('submit', event => {
+    document.querySelector<HTMLFormElement>('#online-create-form')!.addEventListener('submit', event => {
       event.preventDefault();
-      const action = (event as SubmitEvent).submitter?.getAttribute('value');
-      if (action === 'join') void this.joinRoom();
-      else void this.createRoom();
+      void this.createRoom();
     });
-    document.querySelector<HTMLInputElement>('#online-join-code')!.addEventListener('keydown', event => {
-      if (event.key === 'Enter' && !event.isComposing) {
-        event.preventDefault();
-        document.querySelector<HTMLButtonElement>('#online-join')!.click();
-      }
+    document.querySelector<HTMLFormElement>('#online-join-form')!.addEventListener('submit', event => {
+      event.preventDefault();
+      void this.joinRoom();
     });
     this.reconnectButton.addEventListener('click', () => {
       this.automaticReconnectAllowed = true;
@@ -166,7 +186,7 @@ export class OnlineWaitingRoom {
     document.querySelector<HTMLButtonElement>('#online-copy-code')!.addEventListener('click', () => {
       void this.copyRoomCode();
     });
-    this.dialog.addEventListener('cancel', () => this.closeDialog());
+    this.dialog.addEventListener('cancel', event => { event.preventDefault(); this.closeDialog(); });
     window.addEventListener('online', () => this.resumeConnection());
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') this.resumeConnection();
@@ -193,14 +213,8 @@ export class OnlineWaitingRoom {
       }
     });
 
-    if (!this.apiUrl) {
-      this.setStatus('オンライン接続先はまだ設定されていません。');
-      this.forms.hidden = true;
-      return;
-    }
-    if (!this.isSecureApiUrl(this.apiUrl)) {
-      this.setStatus('オンライン接続先の設定を確認してください。');
-      this.forms.hidden = true;
+    if (this.onlineUnavailableMessage) {
+      this.updateFormAvailability();
       return;
     }
     this.restoreSession();
@@ -217,6 +231,7 @@ export class OnlineWaitingRoom {
 
   private setStatus(message: string): void {
     this.status.textContent = message;
+    this.status.hidden = !message;
   }
 
   private setError(message = ''): void {
@@ -225,40 +240,87 @@ export class OnlineWaitingRoom {
   }
 
   private updateFormAvailability(): void {
-    const nameInput = document.querySelector<HTMLInputElement>('#online-name')!;
-    const codeInput = document.querySelector<HTMLInputElement>('#online-join-code')!;
-    const name = nameInput.value.trim();
-    const code = codeInput.value.trim();
-    const validName = name.length >= 1 && name.length <= 24;
+    const validName = this.isValidDisplayName(this.displayName);
+    const code = this.joinCodeInput.value.trim();
     const validCode = ROOM_CODE_PATTERN.test(code.toUpperCase());
-    document.querySelector<HTMLButtonElement>('#online-create')!.disabled = !validName;
-    document.querySelector<HTMLButtonElement>('#online-join')!.disabled = !validName || !validCode;
+    const blocked = Boolean(this.onlineUnavailableMessage || this.session || this.roomRequestPending);
+    this.createButton.disabled = !validName || blocked;
+    this.joinButton.disabled = !validName || !validCode || blocked;
 
-    const requirements = document.querySelector<HTMLElement>('#online-join-requirements')!;
-    if (!validName && code.length === 0) requirements.textContent = '表示名とルームコードを入力してください。';
-    else if (!validName && !validCode) requirements.textContent = '表示名とルームコードを確認してください。';
-    else if (!validName) requirements.textContent = '参加するには、先に表示名を入力してください。';
-    else if (code.length === 0) requirements.textContent = '参加するには、ルームコードを入力してください。';
-    else if (!validCode) requirements.textContent = 'ルームコードは6文字の英大文字または数字で入力してください。';
-    else requirements.textContent = '表示名とルームコードがそろいました。参加できます。';
+    const message = this.onlineUnavailableMessage || (this.session
+      ? 'すでにルームに参加しています。「ルーム操作」から退出してから利用してください。'
+      : this.roomRequestPending ? '処理中です。しばらくお待ちください。' : '');
+    if (message) {
+      this.setFormMessage(this.createMessage, message);
+      this.setFormMessage(this.joinMessage, message);
+    } else {
+      const restrictions = [this.onlineUnavailableMessage, this.getActiveSessionMessage(), '処理中です。しばらくお待ちください。'];
+      if (restrictions.includes(this.createMessage.textContent ?? '')) this.setFormMessage(this.createMessage, '');
+      if (restrictions.includes(this.joinMessage.textContent ?? '')) this.setFormMessage(this.joinMessage, '');
+    }
+  }
+
+  private isValidDisplayName(value: string): boolean {
+    const length = value.trim().length;
+    return length >= 1 && length <= 24;
+  }
+
+  private setFormMessage(element: HTMLElement, message: string): void {
+    element.textContent = message;
+    element.hidden = !message;
+  }
+
+  private syncDisplayNameFields(value: string): void {
+    this.displayName = value;
+    this.createNameInput.value = value;
+    this.joinNameInput.value = value;
+  }
+
+  private rememberDisplayName(value: string): void {
+    this.syncDisplayNameFields(value);
+    this.updateFormAvailability();
+  }
+
+  private captureDisplayName(source: HTMLInputElement): void {
+    this.displayName = source.value;
+    if (source !== this.createNameInput) this.createNameInput.value = source.value;
+    if (source !== this.joinNameInput) this.joinNameInput.value = source.value;
+    this.updateFormAvailability();
   }
 
   private setConnection(message: string): void {
     this.connection.textContent = message;
   }
 
-  private openDialog(): void {
+  private openEntryDialog(dialog: HTMLDialogElement, input: HTMLInputElement): void {
+    this.syncDisplayNameFields(this.displayName);
+    this.updateFormAvailability();
+    if (dialog === this.createDialog) this.setFormMessage(this.createMessage, this.onlineUnavailableMessage || (this.session ? this.getActiveSessionMessage() : ''));
+    else this.setFormMessage(this.joinMessage, this.onlineUnavailableMessage || (this.session ? this.getActiveSessionMessage() : ''));
+    if (!dialog.open) dialog.showModal();
+    input.focus({ preventScroll: true });
+  }
+
+  private getActiveSessionMessage(): string {
+    return 'すでにルームに参加しています。「ルーム操作」から退出してから利用してください。';
+  }
+
+  private closeEntryDialog(dialog: HTMLDialogElement): void {
+    if (dialog.open) dialog.close();
+  }
+
+  private openRoomDialog(): void {
+    if (!this.session) return;
     this.dialogWasClosedByUser = false;
     this.automaticReconnectAllowed = true;
     if (!this.dialog.open) this.dialog.showModal();
     if (this.session && !this.isSocketOpen()) void this.connect();
   }
 
-  private validatedDisplayName(): string | null {
-    const input = document.querySelector<HTMLInputElement>('#online-name')!;
+  private validatedDisplayName(input: HTMLInputElement, message: HTMLElement): string | null {
     const name = input.value.trim();
-    if (name.length < 1 || name.length > 24) {
-      this.setStatus('表示名を1〜24文字で入力してください。');
+    if (!this.isValidDisplayName(name)) {
+      this.setFormMessage(message, '表示名を1〜24文字で入力してください。');
       input.focus({ preventScroll: true });
       return null;
     }
@@ -290,49 +352,66 @@ export class OnlineWaitingRoom {
   }
 
   private async createRoom(): Promise<void> {
-    const name = this.validatedDisplayName();
+    const name = this.validatedDisplayName(this.createNameInput, this.createMessage);
     if (name === null) return;
-    this.setError();
-    this.setStatus('ルームを作成しています…');
+    if (this.onlineUnavailableMessage || this.session || this.roomRequestPending) {
+      this.updateFormAvailability();
+      return;
+    }
+    this.roomRequestPending = true;
+    this.setFormMessage(this.createMessage, 'ルームを作成しています…');
+    this.updateFormAvailability();
     try {
       const result = await this.request<ApiRoomResponse>('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: name }),
       });
-      this.setSession(result, name);
+      this.closeEntryDialog(this.createDialog);
+      this.setSession(result, name, 'ルームを作成しました。');
       await this.connect();
     } catch (error) {
-      this.setStatus(error instanceof Error ? error.message : 'ルームを作成できませんでした。');
+      this.setFormMessage(this.createMessage, error instanceof Error ? error.message : 'ルームを作成できませんでした。');
+    } finally {
+      this.roomRequestPending = false;
+      this.updateFormAvailability();
     }
   }
 
   private async joinRoom(): Promise<void> {
-    const name = this.validatedDisplayName();
+    const name = this.validatedDisplayName(this.joinNameInput, this.joinMessage);
     if (name === null) return;
-    const codeInput = document.querySelector<HTMLInputElement>('#online-join-code')!;
-    const code = codeInput.value.trim().toUpperCase();
+    const code = this.joinCodeInput.value.trim().toUpperCase();
     if (!ROOM_CODE_PATTERN.test(code)) {
-      this.setStatus('ルームコードを確認してください。');
-      codeInput.focus({ preventScroll: true });
+      this.setFormMessage(this.joinMessage, 'ルームコードを確認してください。');
+      this.joinCodeInput.focus({ preventScroll: true });
       return;
     }
-    this.setError();
-    this.setStatus('ルームに参加しています…');
+    if (this.onlineUnavailableMessage || this.session || this.roomRequestPending) {
+      this.updateFormAvailability();
+      return;
+    }
+    this.roomRequestPending = true;
+    this.setFormMessage(this.joinMessage, 'ルームに参加しています…');
+    this.updateFormAvailability();
     try {
       const result = await this.request<ApiRoomResponse>(`/api/rooms/${encodeURIComponent(code)}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: name }),
       });
-      this.setSession(result, name);
+      this.closeEntryDialog(this.joinDialog);
+      this.setSession(result, name, 'ルームに参加しました。');
       await this.connect();
     } catch (error) {
-      this.setStatus(error instanceof Error ? error.message : 'ルームに参加できませんでした。');
+      this.setFormMessage(this.joinMessage, error instanceof Error ? error.message : 'ルームに参加できませんでした。');
+    } finally {
+      this.roomRequestPending = false;
+      this.updateFormAvailability();
     }
   }
 
-  private setSession(result: ApiRoomResponse, displayName: string): void {
+  private setSession(result: ApiRoomResponse, displayName: string, message: string): void {
     this.session = {
       roomCode: result.roomCode,
       participantToken: result.participantToken,
@@ -346,14 +425,16 @@ export class OnlineWaitingRoom {
     this.pendingAction = null;
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(this.session));
     this.syncRoomMenu();
-    this.forms.hidden = true;
+    this.rememberDisplayName(displayName);
     this.roomPanel.hidden = false;
     this.codeOutput.textContent = result.roomCode;
     this.expiryOutput.textContent = new Date(result.expiresAt).toLocaleString();
     this.finalizedMessage.hidden = true;
     this.setError();
+    this.setStatus(message);
     if (!this.dialog.open) this.dialog.showModal();
     this.renderControls();
+    this.updateFormAvailability();
   }
 
   private restoreSession(): void {
@@ -370,7 +451,7 @@ export class OnlineWaitingRoom {
       }
       this.session = session;
       this.syncRoomMenu();
-      this.forms.hidden = true;
+      this.rememberDisplayName(this.displayName || session.displayName);
       this.roomPanel.hidden = false;
       this.codeOutput.textContent = session.roomCode;
       this.expiryOutput.textContent = new Date(session.expiresAt).toLocaleString();
@@ -777,11 +858,11 @@ export class OnlineWaitingRoom {
     this.clearPendingActionTimer();
     this.clearPendingGameActionTimer();
     sessionStorage.removeItem(SESSION_KEY);
-    this.forms.hidden = false;
     this.roomPanel.hidden = true;
     this.setError();
     this.setStatus(message);
     this.renderControls();
+    this.updateFormAvailability();
     if (!preserveGame) this.onGameMessage({ type: 'online-session-ended' });
   }
 
@@ -800,6 +881,10 @@ export class OnlineWaitingRoom {
 
   private restoreMenuFocus(): void {
     document.querySelector<HTMLButtonElement>('#main-menu-toggle')?.focus({ preventScroll: true });
+  }
+
+  private restoreMenuFocusIfNoDialogIsOpen(): void {
+    if (!this.dialog.open && !this.createDialog.open && !this.joinDialog.open) this.restoreMenuFocus();
   }
 
   private stopAutomaticConnection(): void {
