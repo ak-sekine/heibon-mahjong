@@ -665,12 +665,23 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.equal(persistedGame(fixture).gameRevision, afterDiscardRevision, 'duplicate discard was applied twice');
     await passVisibleDecisions(fixture, [host, guest]);
 
-    // The server draws for a human turn, then both human turns are resolved by
-    // requests. Once the guest discards, alarms advance the CPU seat without a
-    // browser CPU runner or a client-supplied game state.
-    for (let step = 0; step < 4 &&
-      (Number(latestGameView(guest).turnPlayerId) !== 1 || latestGameView(guest).phase !== 'awaiting-discard'); step++) {
-      await fixture.room.alarm();
+    // Advance the server until the guest has a discard. A CPU can call the
+    // host's discard, which returns the turn to the host before the guest gets
+    // a turn, so drive any such host discard through its legal server view.
+    for (let step = 0; step < 16; step++) {
+      const currentView = latestGameView(host);
+      if (Number(currentView.turnPlayerId) === 1 && currentView.phase === 'awaiting-discard') break;
+      if (Number(currentView.turnPlayerId) === 0 && currentView.phase === 'awaiting-discard') {
+        const hostDiscardIds = (currentView.self as Record<string, unknown>).discardableTileIds as string[];
+        assert.ok(hostDiscardIds.length > 0, 'the host turn exposes a legal discard');
+        const hostFollowup = await sendGameAction(fixture, host, {
+          type: 'discard', requestId: nextOperationId('game-host-followup'),
+          expectedGameRevision: Number(currentView.gameRevision), tileId: hostDiscardIds[0],
+        });
+        assert.equal(hostFollowup.ok, true);
+      } else {
+        await fixture.room.alarm();
+      }
       await passVisibleDecisions(fixture, [host, guest]);
     }
     let guestTurn = latestGameView(guest);

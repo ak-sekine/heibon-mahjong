@@ -105,7 +105,7 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
   assert page.locator('#show-result').is_visible();page.locator('#show-result').click();assert page.locator('#result-dialog').is_visible()
   assert page.evaluate('riichiCheck().depositSticks')==0;assert page.evaluate('riichiCheck().game.players[0].riichi') is None
   assert page.evaluate('riichiCheck().lastSettlement.before[0]')==25000;assert '立直' not in page.locator('#win-result').inner_text();conservation();shot('declaration-ron')
-  page.locator('#view-table').click();page.locator('#new-game').click();page.locator('#confirm-new-game').click()
+  page.locator('#view-table').click();page.locator('#main-menu-toggle').click();page.locator('#new-game').click();page.locator('#confirm-new-game').click()
   assert page.evaluate('riichiCheck().points')==[25000]*4;assert page.evaluate('riichiCheck().depositSticks')==0;assert page.evaluate('riichiCheck().game.players.every(p=>p.riichi===null)');geometry();conservation()
   assert not errors,errors
   reports.append({'width':width,'height':height,'result':'passed','measurements':measurements,'checks':['eligible-ineligible','normal-discard','deposit','riichi-label','concealed-disabled','physical-tsumogiri','riichi-tsumo','riichi-only-ron','declaration-ron-no-deposit','deposit-settlement','modal','table-result-toggle','next-round-clear','confirmed-reset','conservation','one-row-hand','no-horizontal-scroll','dora-3+2','touch-44','cpu-hidden']})
