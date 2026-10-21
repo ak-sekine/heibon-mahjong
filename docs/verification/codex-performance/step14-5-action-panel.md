@@ -10,8 +10,8 @@
 | 共通インターフェース設計 | 未計測 | 工程境界の時刻を記録していません。 |
 | ActionPanel実装 | 未計測 | 工程境界の時刻を記録していません。 |
 | ローカル・オンラインへの組み込み | 未計測 | 工程境界の時刻を記録していません。 |
-| `npm test` | 最終成功ラン20.34秒 | Node test runner報告20.07秒、コマンド呼出しのwall time20.34秒。52/52成功。 |
-| `npm run build` | 最終成功ラン3.96秒 | コマンド呼出しのwall time。TypeScriptとVite build成功。Vite処理は1.01秒。 |
+| `npm test` | 統合後の最終成功ラン20.18秒 | Node test runner報告19.97秒、コマンド呼出しのwall time20.18秒。52/52成功。 |
+| `npm run build` | 統合後の最終成功ラン4.01秒 | コマンド呼出しのwall time。TypeScriptとVite build成功。Vite処理は1.07秒。 |
 | Browser UIシナリオのPython構文解析 | 成功、所要時間未計測 | `ast.parse`で`tests/browser-action-controls.py`と`tests/browser-action-panel.py`を解析。 |
 | `git diff --check` | 成功、所要時間未計測 | 修正後に実行。 |
 | Browser UI Actions・Actions待機 | main push後に計測・追記 | Browser UI、Worker deploy・production test、Pages build/deployのrun結果を確認後、実測値を報告します。 |

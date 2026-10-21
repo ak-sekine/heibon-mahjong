@@ -7,8 +7,8 @@
 
 | 検証 | 結果 |
 | --- | --- |
-| `npm test` | 成功。52/52。最終ランの実測時間20.34秒（Node test runner: 20.07秒）。 |
-| `npm run build` | 成功。TypeScript検査とVite build。最終ランの実測時間3.96秒。 |
+| `npm test` | 成功。52/52。統合後の最終ランの実測時間20.18秒（Node test runner: 19.97秒）。 |
+| `npm run build` | 成功。TypeScript検査とVite build。統合後の最終ランの実測時間4.01秒。 |
 | Browser UI Python構文解析 | 成功。`tests/browser-action-controls.py`と`tests/browser-action-panel.py`をPython `ast.parse`で確認。 |
 | `git diff --check` | 成功。 |
 
