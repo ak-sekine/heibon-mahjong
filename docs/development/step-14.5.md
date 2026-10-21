@@ -2,7 +2,7 @@
 
 **実施日:** 2026-10-21
 **対象:** オフライン・オンライン対局の操作欄
-**状態:** 実装・ローカル検証完了。main Actionsで追加したBrowser UIシナリオに古い非手番・結果ダイアログ期待があり、3回修正しました。現在の再検証結果は[検証記録](../verification/step14.5/README.md)を参照。iPhone Safari実機は未確認。
+**状態:** 実装・検証完了。main ActionsのBrowser UI追加・既存シナリオとオンライン統合テストの前提を段階的に修正し、最終Browser UI runは成功しました。Worker、本番通信テスト、Pages buildも成功し、Pages deployは`github-pages` jobの承認待ちです。詳細は[検証記録](../verification/step14.5/README.md)を参照。iPhone Safari実機は未確認。
 
 ## 目的と変更前の重複
 
@@ -41,7 +41,7 @@ Step 14.5では、同じ表示になるだけの条件分岐統合ではなく�
 
 単体テストは[`tests/action-panel.test.ts`](../../tests/action-panel.test.ts)と[`tests/action-panel-state.test.ts`](../../tests/action-panel-state.test.ts)に追加しました。通常手番、牌選択前後、リーチ・ツモ・カンの可否、ロン・鳴き判断、処理中、局終了、サーバー送信待ち・期限切れ、両モード間の状態一致を確認します。
 
-`npm test`は52/52成功、`npm run build`は成功、Browser UI Pythonシナリオの構文解析と`git diff --check`も成功しました。初回検証で見つかった失敗と修正回数、計測値は[検証・処理時間記録](../verification/step14.5/README.md)を参照してください。GitHub Actionsはmain反映後に確認し、結果は最終報告に記録します。
+`npm test`は52/52成功、`npm run build`は成功し、Browser UI Pythonシナリオ3本の構文解析と`git diff --check`も成功しました。GitHub Actionsの最終Browser UIは300卓シーン、ActionPanelの320・375・390・430px、既存モバイル・カン配置シナリオを通過しました。Worker deploy、本番HTTPS・WebSocket・再接続・権限・プライバシー検証、Pages buildも成功しています。Pages deployは`github-pages` jobが`waiting`のため未完了です。初回検証で見つかった失敗と修正回数、工程別計測値は[検証・処理時間記録](../verification/step14.5/README.md)を参照してください。
 
 ActionsのBrowser UIシナリオは既存シナリオを維持し、共通パネル、表示切替、イベント委譲、送信中・期限切れ、判断・局結果操作、320・375・390・430px、相手の非公開物理IDがDOMに現れないことを追加確認します。実際のオンライン通信とサーバー側権限検証は既存のWorker・本番通信検証を引き続き使用します。iPhone Safari実機は別途未確認です。
 
