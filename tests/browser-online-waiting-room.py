@@ -501,11 +501,22 @@ with sync_playwright() as p:
     assert page.locator('#online-create-dialog h2').inner_text() == '新しくルームを作る', 'room creation dialog title was not shown'
     assert page.locator('#online-create-dialog label').all_inner_texts() == ['表示名'], 'room creation dialog showed unrelated fields'
     assert page.locator('#online-create-dialog #online-join').count() == 0, 'room creation dialog contains a join button'
+    assert page.locator('#online-create-close').evaluate('element => document.activeElement === element'), 'opening the create dialog did not focus its close button'
+    assert page.locator('#online-create-name').evaluate('element => document.activeElement !== element'), 'opening the create dialog focused its display-name input'
+    page.keyboard.press('Tab')
+    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Tab did not move from the create close button to its display-name input'
+    page.keyboard.press('Shift+Tab')
+    assert page.locator('#online-create-close').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to the create close button'
     assert page.locator('#online-create').is_disabled(), 'room creation was enabled without a display name'
-    page.locator('#online-create-name').fill('   ')
+    page.locator('#online-create-name').click()
+    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'manually selecting the create name input did not focus it'
+    page.keyboard.type('   ')
+    assert page.locator('#online-create-name').input_value() == '   ', 'typing after selecting the create name input did not work'
     assert page.locator('#online-create').is_disabled(), 'room creation was enabled for a whitespace-only display name'
-    page.locator('#online-create-name').fill('テストホスト')
+    page.keyboard.press('Control+A')
+    page.keyboard.type('テストホスト')
     assert page.locator('#online-create').is_enabled(), 'room creation remained disabled after entering a valid display name'
+    assert page.locator('#online-create-name').input_value() == 'テストホスト', 'typing a valid create name did not update the input'
     assert page.locator('#online-join-name').input_value() == 'テストホスト', 'the display name was not shared with the join form'
     create_form_layouts = []
     for width, height in [[320,700],[375,812],[390,844],[430,932]]:
@@ -528,6 +539,11 @@ with sync_playwright() as p:
       assert all(control['width'] <= layout['formClientWidth'] and control['height'] >= 44 for control in layout['controls']), (width, layout)
       assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'create dialog caused horizontal overflow')
       create_form_layouts.append([width, round(layout['width'], 2)])
+    page.set_viewport_size({'width': 390, 'height': 320})
+    page.locator('#online-create-name').scroll_into_view_if_needed()
+    assert page.locator('#online-create-name').evaluate('element => { const rect = element.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight; }'), 'the create name input could not be reached after manual selection and scrolling in a short viewport'
+    page.locator('#online-create').scroll_into_view_if_needed()
+    assert page.locator('#online-create').evaluate('element => { const rect = element.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight; }'), 'the create action could not be reached after manual selection and scrolling in a short viewport'
     page.set_viewport_size({'width': 390, 'height': 844})
     page.locator('#online-create-close').click()
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'closing the create form did not restore menu focus'
@@ -537,8 +553,32 @@ with sync_playwright() as p:
     assert page.locator('#online-join-dialog h2').inner_text() == 'ルームに参加する', 'room join dialog title was not shown'
     assert page.locator('#online-join-dialog label').all_inner_texts() == ['表示名', 'ルームコード'], 'room join dialog did not show only its required fields'
     assert page.locator('#online-join-dialog #online-create').count() == 0, 'room join dialog contains a create button'
+    assert page.locator('#online-join-close').evaluate('element => document.activeElement === element'), 'opening the join dialog did not focus its close button'
+    assert page.locator('#online-join-name').evaluate('element => document.activeElement !== element'), 'opening the join dialog focused its display-name input'
+    assert page.locator('#online-join-code').evaluate('element => document.activeElement !== element'), 'opening the join dialog focused its room-code input'
+    page.keyboard.press('Tab')
+    assert page.locator('#online-join-name').evaluate('element => document.activeElement === element'), 'Tab did not move from the join close button to its display-name input'
+    page.keyboard.press('Tab')
+    assert page.locator('#online-join-code').evaluate('element => document.activeElement === element'), 'Tab did not move from the join name to the room-code input'
+    page.keyboard.press('Shift+Tab')
+    assert page.locator('#online-join-name').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to the join display-name input'
+    page.keyboard.press('Shift+Tab')
+    assert page.locator('#online-join-close').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to the join close button'
     assert page.locator('#online-join-code').get_attribute('maxlength') == '6', 'room code length limit changed'
     assert page.locator('#online-join-name').input_value() == 'テストホスト', 'the previous display name was not initially shown in the join dialog'
+    page.locator('#online-join-name').click()
+    assert page.locator('#online-join-name').evaluate('element => document.activeElement === element'), 'manually selecting the join name input did not focus it'
+    page.keyboard.press('End')
+    page.keyboard.type('X')
+    assert page.locator('#online-join-name').input_value() == 'テストホストX', 'typing after selecting the join name input did not work'
+    page.keyboard.press('Backspace')
+    assert page.locator('#online-join-name').input_value() == 'テストホスト', 'the join name could not be corrected after typing'
+    page.locator('#online-join-code').click()
+    assert page.locator('#online-join-code').evaluate('element => document.activeElement === element'), 'manually selecting the room-code input did not focus it'
+    page.keyboard.type('ABC234')
+    assert page.locator('#online-join-code').input_value() == 'ABC234', 'typing after selecting the room-code input did not work'
+    page.keyboard.press('Control+A')
+    page.keyboard.press('Backspace')
     assert page.locator('#online-join').is_disabled(), 'room joining was enabled without a room code'
     join_form_layouts = []
     for width, height in [[320,700],[375,812],[390,844],[430,932]]:
@@ -569,7 +609,12 @@ with sync_playwright() as p:
     })''')
     assert compressed_dialog['top'] >= 0 and compressed_dialog['bottom'] <= 320, compressed_dialog
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), compressed_dialog
+    page.locator('#online-join-name').scroll_into_view_if_needed()
+    assert page.locator('#online-join-name').evaluate('element => { const rect = element.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight; }'), 'the join name input could not be reached after manual selection and scrolling in a short viewport'
+    page.locator('#online-join-code').scroll_into_view_if_needed()
+    assert page.locator('#online-join-code').evaluate('element => { const rect = element.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight; }'), 'the room-code input could not be reached after manual selection and scrolling in a short viewport'
     page.locator('#online-join').scroll_into_view_if_needed()
+    assert page.locator('#online-join').evaluate('element => { const rect = element.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight; }'), 'the join action could not be reached after manual selection and scrolling in a short viewport'
     assert page.locator('#online-join').is_visible(), 'the join action could not be reached after a short viewport resize'
     page.set_viewport_size({'width': 390, 'height': 844})
     page.keyboard.press('Escape')
@@ -887,7 +932,7 @@ with sync_playwright() as p:
     assert page.evaluate("localStorage.getItem('heibon-mahjong-online-session') === null"), 'online participant session was moved to localStorage'
     assert not errors, errors
 
-    report = {'step': '14.4', 'viewports': [[320,700],[375,812],[390,844],[430,932],[1280,900]], 'createFormViewports': create_form_layouts, 'joinFormViewports': join_form_layouts, 'scenario': 'separate create/join forms, shared display name, input-gated actions, session-safe menu actions, compact hamburger menu, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, exit', 'result': 'pass'}
+    report = {'step': '14.4', 'viewports': [[320,700],[375,812],[390,844],[430,932],[1280,900]], 'createFormViewports': create_form_layouts, 'joinFormViewports': join_form_layouts, 'scenario': 'separate create/join forms, close-button initial focus, Tab navigation, manual name/code input, shared display name, short-viewport scrolling, input-gated actions, session-safe menu actions, compact hamburger menu, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, exit', 'result': 'pass'}
     print(json.dumps(report, ensure_ascii=False), flush=True)
     (OUT / 'step14-4-online-room-ui.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     page.close()

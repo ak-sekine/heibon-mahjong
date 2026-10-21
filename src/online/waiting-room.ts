@@ -98,6 +98,8 @@ export class OnlineWaitingRoom {
   private readonly joinCodeInput = document.querySelector<HTMLInputElement>('#online-join-code')!;
   private readonly createButton = document.querySelector<HTMLButtonElement>('#online-create')!;
   private readonly joinButton = document.querySelector<HTMLButtonElement>('#online-join')!;
+  private readonly createCloseButton = document.querySelector<HTMLButtonElement>('#online-create-close')!;
+  private readonly joinCloseButton = document.querySelector<HTMLButtonElement>('#online-join-close')!;
   private readonly createMessage = document.querySelector<HTMLElement>('#online-create-message')!;
   private readonly joinMessage = document.querySelector<HTMLElement>('#online-join-message')!;
   private readonly connection = document.querySelector<HTMLElement>('#online-connection')!;
@@ -145,11 +147,11 @@ export class OnlineWaitingRoom {
       ? 'オンライン接続先はまだ設定されていません。'
       : !this.isSecureApiUrl(this.apiUrl) ? 'オンライン接続先の設定を確認してください。' : '';
     this.onGameMessage = onGameMessage;
-    document.querySelector<HTMLButtonElement>('#online-create-open')!.addEventListener('click', () => this.openEntryDialog(this.createDialog, this.createNameInput));
-    document.querySelector<HTMLButtonElement>('#online-join-open')!.addEventListener('click', () => this.openEntryDialog(this.joinDialog, this.joinNameInput));
+    document.querySelector<HTMLButtonElement>('#online-create-open')!.addEventListener('click', () => this.openEntryDialog(this.createDialog, this.createCloseButton));
+    document.querySelector<HTMLButtonElement>('#online-join-open')!.addEventListener('click', () => this.openEntryDialog(this.joinDialog, this.joinCloseButton));
     this.roomMenuItem.addEventListener('click', () => this.openRoomDialog());
-    document.querySelector<HTMLButtonElement>('#online-create-close')!.addEventListener('click', () => this.closeEntryDialog(this.createDialog));
-    document.querySelector<HTMLButtonElement>('#online-join-close')!.addEventListener('click', () => this.closeEntryDialog(this.joinDialog));
+    this.createCloseButton.addEventListener('click', () => this.closeEntryDialog(this.createDialog));
+    this.joinCloseButton.addEventListener('click', () => this.closeEntryDialog(this.joinDialog));
     document.querySelector<HTMLButtonElement>('#online-close')!.addEventListener('click', () => this.closeDialog());
     this.dialog.addEventListener('close', () => {
       this.restoreMenuFocusIfNoDialogIsOpen();
@@ -292,13 +294,13 @@ export class OnlineWaitingRoom {
     this.connection.textContent = message;
   }
 
-  private openEntryDialog(dialog: HTMLDialogElement, input: HTMLInputElement): void {
+  private openEntryDialog(dialog: HTMLDialogElement, closeButton: HTMLButtonElement): void {
     this.syncDisplayNameFields(this.displayName);
     this.updateFormAvailability();
     if (dialog === this.createDialog) this.setFormMessage(this.createMessage, this.onlineUnavailableMessage || (this.session ? this.getActiveSessionMessage() : ''));
     else this.setFormMessage(this.joinMessage, this.onlineUnavailableMessage || (this.session ? this.getActiveSessionMessage() : ''));
     if (!dialog.open) dialog.showModal();
-    input.focus({ preventScroll: true });
+    closeButton.focus({ preventScroll: true });
   }
 
   private getActiveSessionMessage(): string {
