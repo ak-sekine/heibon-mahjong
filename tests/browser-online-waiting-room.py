@@ -761,7 +761,7 @@ with sync_playwright() as p:
     assert cpu_two.startswith('CPU2') and '北' in cpu_two, f'CPU2 and its north wind were not shown separately: {cpu_two}'
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'online table causes horizontal overflow at 390px'
 
-    online_long_name = 'テストホスト123456789012345678'
+    online_long_name = 'あいうえおかきくけこさしすせそたちつてとなにぬね'
     assert len(online_long_name) == 24, 'the long-name browser fixture must stay within the existing limit'
     page.evaluate('(name) => window.onlineMock.setGameDisplayName(0, name)', online_long_name)
     wait_for(f"document.querySelector('#online-score-strip [data-online-label=bottom] .seat-name')?.title === '{online_long_name}'")
@@ -826,7 +826,7 @@ with sync_playwright() as p:
 
     page.evaluate('window.onlineMock.setViewerSeat(1)')
     wait_for("document.querySelector('#online-score-strip [data-online-label=bottom]')?.innerText.startsWith('テスト参加者')")
-    assert page.locator('#online-score-strip [data-online-label="left"]').inner_text().startswith('テストホスト'), 'seat rotation was wrong for the south player'
+    assert page.locator('#online-score-strip [data-online-label="left"] .seat-name').inner_text() == online_long_name, 'seat rotation was wrong for the south player'
     assert page.locator('#online-score-strip [data-online-label="top"]').inner_text().startswith('CPU2'), 'CPU2 name changed when the viewer seat rotated'
     assert page.locator('#online-score-strip [data-online-label="right"]').inner_text().startswith('CPU1'), 'CPU1 name changed when the viewer seat rotated'
     assert page.locator('#online-score-strip .seat-label').evaluate_all("rows => rows.map(row => row.dataset.onlineLabel)") == ['bottom','right','top','left'], 'the online score strip DOM order did not follow the viewer seat after rotation'
