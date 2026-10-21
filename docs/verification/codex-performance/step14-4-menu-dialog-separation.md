@@ -9,10 +9,10 @@
 | 設計 | 約2分（概算） | 独立フォーム、共通表示名、参加中の既存セッション保護、既存待機画面への遷移を整理。工程境界未記録のため概算。 |
 | 実装 | 約6分（概算） | HTML、TypeScript、CSS、Browser UIシナリオ、Step記録を更新。工程境界未記録のため概算。 |
 | ローカル検証 | 29.48秒・3.79秒（実測） | 最終`npm test`は11:30:21 UTC開始、50/50成功。`npm run build`は11:30:52 UTC開始で成功。Python AST解析と`git diff --check`もassertion変更後に成功。修正後の先行検証は24.61秒・3.43秒。 |
-| Browser UI検証 | 4分11秒、5分41秒（実測、いずれも失敗） | Run 39590650104は11:15:53–11:20:04 UTC。フォーカス復帰assertionで失敗。Run 39591517679はrun全体11:22:49–11:28:35 UTC（Browser jobは約11:22:53–11:28:30）。状態文言の固定値検査で失敗。3回目を実行予定。 |
+| Browser UI検証 | 4分08秒、5分39秒（失敗）、5分40秒（成功） | Browser job logs: run 39590650104は11:15:54.218–11:20:02.629、run 39591517679は11:22:53.681–11:28:32.572、run 39592642768は11:32:01.858–11:37:41.355 UTC。成功runのStep 14.4 scenarioは11:37:39 UTCに320・375・390・430・1280px幅でpass。 |
 | 不具合修正 | アプリ修正1回、テスト修正1回 | Browser UIで判明した非同期フォーカス復帰を修正し、検査期待値は維持。2回目に固定文言への不要な依存を確認し、待機画面と非空状態表示の検査を残してassertionを更新。各修正後にローカル検証を実施。 |
-| Git操作 | 2 push済み、テスト更新commit/push待ち | 通常権限の初回`git ls-remote`は`github.com`宛てproxy port 8080接続で失敗。許可付き読み取りでmain先端を確認しcommit `7d5bf44`を11:15:41–11:15:47 UTC、commit `2bd2899`を11:22:36–11:22:48 UTCにpush。現在のリモートmainは`2bd2899`。各push後のSHAを照合。 |
-| Actions確認 | 2 run完了、3回目待ち | 2 runとも`verify`成功、Browser UI失敗でWorker deploy・production test・Pages build/deployはskip。Run 39590650104のログはGitHub connectorで原因確認。`gh run view --log-failed`は`results-receiver.actions.githubusercontent.com`のForbidden、以後同じCLIログ経路を再試行せずconnectorを利用。Run 39591517679のBrowser assertion失敗を修正中。`gh run view`のAPIは401だったため、run/jobs確認はGitHub connectorを使用。`gh run watch`は未使用。 |
-| ドキュメント更新 | 進行中 | 開発記録・検証記録に2回のActions結果と修正を追記。3回目Actionsと最終push後に完了時刻・結果・SHA・ロードマップを反映する。 |
+| Git操作 | 4回fast-forward push（実測） | `7d5bf44`を11:15:41–11:15:47 UTC、`2bd2899`を11:22:36–11:22:48 UTC、検証対象`f867926`を11:31台にpush。最終ドキュメント専用commitはActions成功後にpushし、SHAと所要時間は最終報告で示す。通常権限の初回`git ls-remote`はproxy port 8080接続失敗、権限付き確認・pushと各SHA照合は成功。force pushなし。 |
+| Actions確認 | 3 run、累計17分41秒（実測） | 全run: 39590650104は4分15秒（11:15:50–11:20:05）、39591517679は5分46秒（11:22:49–11:28:35）、39592642768は7分40秒（11:31:58–11:39:38）。成功runの各job: verify 42秒、Browser UI 5分40秒、Worker deploy 18秒、本番通信テスト43秒、Pages build 22秒、Pages deploy 7秒。待機対象は順にChromiumシナリオ、Worker publish、HTTPS/WebSocket/再接続/認証テスト、Pages build/deploy。run間を含む確認期間は23分48秒。`gh run watch`は未使用。 |
+| ドキュメント更新 | 2分09秒（実測、11:41:08–11:43:17 UTC） | 開発・検証・性能記録とROADMAPを3回目Actions成功後に最終化。ドキュメント専用commitのpushはGit操作の行に記録。 |
 
-現時点でBrowser UI runは2回失敗。1回目は実装のフォーカス復帰不具合を修正し、2回目は状態メッセージを固定文言にしたテストassertionを1か所調整しています。各修正後にローカル検証し、最終ローカル検証は50/50・build成功です。1回目の`npm test`出力取得には再実行1回が必要でした。概算と実測値は区別し、Actions 3回目と最終工程の時刻を後で追記します。
+Browser UI検証は2回失敗、3回目成功です。実装修正はフォーカス復帰の1回、テストassertionの調整1回で、修正後のローカル検証を各1回実施。最終は50/50・build成功でした。初回`npm test`は出力取得のため1回再実行し、後続最終検証も別途1回実施。`gh run view --log-failed`のForbiddenと`gh run view`のAPI 401を受け、ログ・job確認はGitHub connectorを利用し、失敗したCLI経路は繰り返していません。iPhone Safari実機は未確認です。調査・設計・実装は工程境界を実測していないため概算、その他の実測時刻と待機対象は上表の通りです。
