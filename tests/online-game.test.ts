@@ -11,6 +11,7 @@ import { tileKindKey } from '../src/model/tile.ts';
 import type { GameState, PlayerId, PlayerState } from '../src/model/game.ts';
 import { isForbiddenDiscard } from '../src/game/melds.ts';
 import { ankanGame } from './kan-fixture.ts';
+import { callStart } from './calls-fixture.ts';
 import { riichiStart } from './riichi-fixture.ts';
 import { parentKyuushuGame } from './step13-10-fixture.ts';
 import { tsumoGame } from './tsumo-fixture.ts';
@@ -19,6 +20,7 @@ import {
   advanceOnlineCpu,
   startOnlineGame,
   startNextOnlineRound,
+  transferOnlineSeatToCpu,
   timeoutOnlineDecision,
   hydrateOnlineGame,
   OnlineGameRuleError,
@@ -387,6 +389,73 @@ test('simultaneous chi and pon decisions wait for both humans and apply pon prio
   assert.equal(resolved.match.game.phase, 'awaiting-discard');
   assert.equal(resolved.match.game.turnPlayerId, 2);
   assert.equal(resolved.match.game.players[2].melds?.at(-1)?.type, 'pon');
+});
+
+test('CPU takeover preserves the seat state and advances the game revision once', () => {
+  const initial = sessionForGame(riichiStart(), [0, 1], 18);
+  const option = getRiichiDiscardOptions(initial.match.game, 0, initial.match.points[0])[0];
+  assert.ok(option);
+  const riichi = applyOnlineGameAction(initial, 0, {
+    type: 'declare-riichi', requestId: 'leave-riichi', expectedGameRevision: 18, tileId: option.tileId,
+  }, new Set<PlayerId>([0, 1]), 1000);
+  const before = structuredClone(riichi);
+  const transferred = transferOnlineSeatToCpu(riichi, 0, 1, 2000);
+
+  assert.equal(transferred.status, 'playing');
+  assert.equal(transferred.gameRevision, before.gameRevision + 1);
+  assert.equal(transferred.hostSeat, 1);
+  assert.deepEqual(transferred.match.points, before.match.points);
+  assert.deepEqual(transferred.match.game.liveWall, before.match.game.liveWall);
+  assert.deepEqual(transferred.match.game.deadWall, before.match.game.deadWall);
+  assert.deepEqual(transferred.match.game.players.map((player, seat) => ({
+    ...player,
+    control: before.match.game.players[seat].control,
+  })), before.match.game.players);
+  assert.equal(transferred.match.game.players[0].control, 'cpu');
+  assert.equal(transferred.identities[0].control, 'cpu');
+  assert.equal(transferred.identities[0].name, 'CPU1');
+  assert.deepEqual(transferred.identities.filter(identity => identity.control === 'cpu').map(identity => identity.name), ['CPU1', 'CPU2', 'CPU3']);
+  assert.deepEqual(transferred.identities[1], before.identities[1]);
+});
+
+test('leaving a pending ron window transfers only that answer and keeps other human answers valid', () => {
+  const game = ronGame(1, [0, 2]);
+  const decision = ronDecision([0, 2], 30);
+  const waiting = sessionForGame(game, [0, 2], 30, decision);
+  const transferred = transferOnlineSeatToCpu(waiting, 0, 2, 2000);
+
+  assert.equal(transferred.gameRevision, 31);
+  assert.deepEqual(transferred.decision?.requiredSeats, [2]);
+  assert.deepEqual(transferred.decision?.responses, { 2: 'pending' });
+  assert.throws(() => applyOnlineGameAction(transferred, 0, {
+    type: 'declare-ron', requestId: 'old-seat-ron', expectedGameRevision: 30, windowId: decision.windowId,
+  }, new Set<PlayerId>([2]), 2001), error => error instanceof OnlineGameRuleError && error.code === 'unauthorized');
+
+  const completed = applyOnlineGameAction(transferred, 2, {
+    type: 'declare-ron', requestId: 'remaining-seat-ron', expectedGameRevision: 30, windowId: decision.windowId,
+  }, new Set<PlayerId>([2]), 2002);
+  assert.equal(completed.status, 'round-ended');
+  assert.deepEqual(completed.match.game.winResult?.winMethod === 'ron'
+    ? completed.match.game.winResult.winners.map(winner => winner.winnerId).sort() : [], [0, 2]);
+});
+
+test('leaving a pending call window lets the CPU use the existing call policy immediately', () => {
+  const initial = callStart();
+  const discarded = discardTileForOnline(initial, 3, initial.players[3].drawnTile!.id);
+  const game = { ...discarded, phase: 'awaiting-call' as const };
+  assert.ok(getCallOptions(game, 0).length > 0);
+  const decision: PlayerDecisionWindow = {
+    windowId: 'c'.repeat(24), type: 'call', openedAt: 1000, expiresAt: 31_000,
+    baseGameRevision: 30, requiredSeats: [0], responses: { 0: 'pending' },
+  };
+  const waiting = sessionForGame(game, [0, 1], 30, decision);
+  const transferred = transferOnlineSeatToCpu(waiting, 0, 1, 2000);
+
+  assert.equal(transferred.decision, null);
+  assert.equal(transferred.match.game.phase, 'awaiting-discard');
+  assert.equal(transferred.match.game.turnPlayerId, 0);
+  assert.equal(transferred.match.game.players[0].control, 'cpu');
+  assert.equal(transferred.match.game.players[0].melds?.at(-1)?.type, 'pon');
 });
 
 test('a deterministic human-plus-CPU online match settles through East 4', { timeout: 120_000 }, async () => {

@@ -210,6 +210,64 @@ function finishDecision(
   return advanceDecision({ ...session, decision: null }, settled, session.gameRevision + 1, now);
 }
 
+/** Transfer control of a persisted seat without changing any of its game state. */
+export function transferOnlineSeatToCpu(
+  session: OnlineGameSession,
+  seat: PlayerId,
+  hostSeat: PlayerId,
+  now = Date.now(),
+): OnlineGameSession {
+  if (session.status === 'aborted' || session.identities[seat]?.control !== 'human') {
+    throw new OnlineGameRuleError('seat_not_human');
+  }
+  const cpuSeats = session.identities
+    .filter(identity => identity.control === 'cpu' || identity.seat === seat)
+    .map(identity => identity.seat)
+    .sort((a, b) => a - b);
+  const cpuNames = new Map(cpuSeats.map((cpuSeat, index) => [cpuSeat, `CPU${index + 1}`]));
+  const identities = session.identities.map(identity => {
+    const control = identity.seat === seat ? 'cpu' as const : identity.control;
+    const cpuName = cpuNames.get(identity.seat);
+    return {
+      ...identity,
+      ...(cpuName ? { name: cpuName } : {}),
+      control,
+      ...(identity.seat === seat ? { connected: true } : {}),
+    };
+  }) as unknown as OnlineGameSession['identities'];
+  const players = session.match.game.players.map(player => player.id === seat
+    ? { ...player, control: 'cpu' as const }
+    : player) as unknown as OnlineGameSession['match']['game']['players'];
+  const converted: OnlineGameSession = {
+    ...session,
+    match: { ...session.match, game: { ...session.match.game, players } },
+    identities,
+    hostSeat,
+  };
+
+  const decision = session.decision;
+  if (!decision || !decision.requiredSeats.includes(seat)) {
+    return { ...converted, gameRevision: session.gameRevision + 1 };
+  }
+
+  const responses = { ...decision.responses };
+  delete responses[seat];
+  const updatedDecision: PlayerDecisionWindow = {
+    ...decision,
+    requiredSeats: decision.requiredSeats.filter(requiredSeat => requiredSeat !== seat),
+    responses,
+  };
+  const withUpdatedDecision = { ...converted, decision: updatedDecision };
+  if (updatedDecision.requiredSeats.some(requiredSeat => responses[requiredSeat] === 'pending')) {
+    return { ...withUpdatedDecision, gameRevision: session.gameRevision + 1 };
+  }
+
+  // Resolve now when the departed seat was the last pending answer. The shared
+  // resolver applies the existing CPU ron and call policies while retaining all
+  // answers already submitted by the other humans.
+  return finishDecision(withUpdatedDecision, updatedDecision, now);
+}
+
 function requireHuman(session: OnlineGameSession, seat: PlayerId, connectedSeats: ReadonlySet<PlayerId>): void {
   if (session.identities[seat]?.control !== 'human' || !connectedSeats.has(seat)) {
     throw new OnlineGameRuleError('unauthorized');

@@ -5,6 +5,13 @@ import { RateLimitDurableObject } from '../worker/rate-limit.ts';
 import { RoomDurableObject } from '../worker/room.ts';
 import { startMatch } from '../src/game/match.ts';
 import { ronGame } from './ron-fixture.ts';
+import { callStart } from './calls-fixture.ts';
+import { tsumoGame } from './tsumo-fixture.ts';
+import { discardTileForOnline } from '../src/game/discard.ts';
+import { getCallOptions } from '../src/game/calls.ts';
+import { applyOnlineGameAction } from '../src/online/game-engine.ts';
+import type { OnlineGameSession, PlayerDecisionWindow } from '../src/online/game-view.ts';
+import type { GameState, PlayerId, PlayerState } from '../src/model/game.ts';
 
 type SqlResult<Row> = { toArray(): Row[] };
 
@@ -246,6 +253,36 @@ function persistedGame(fixture: RoomFixture): Record<string, unknown> {
   const value = JSON.parse(row.state_json) as Record<string, unknown>;
   assert.equal(value.gameRevision, row.game_revision);
   return value;
+}
+
+function saveGameSession(fixture: RoomFixture, session: OnlineGameSession): void {
+  fixture.ctx.storage.sql.exec(
+    'UPDATE online_game SET game_revision = ?, state_json = ?, updated_at = ? WHERE singleton = 1',
+    session.gameRevision, JSON.stringify(session), Date.now(),
+  );
+}
+
+function onlineSessionForGame(
+  fixture: RoomFixture,
+  game: GameState,
+  gameRevision: number,
+  decision: PlayerDecisionWindow | null = null,
+): OnlineGameSession {
+  const base = persistedGame(fixture) as unknown as OnlineGameSession;
+  const players = game.players.map((player, seat) => ({
+    ...player,
+    control: base.identities[seat as PlayerId].control,
+  })) as [PlayerState, PlayerState, PlayerState, PlayerState];
+  const match = startMatch({ ...game, players });
+  return {
+    schemaVersion: 1,
+    gameRevision,
+    match,
+    status: match.status,
+    identities: base.identities,
+    hostSeat: base.hostSeat,
+    decision,
+  };
 }
 
 async function passVisibleDecisions(fixture: RoomFixture, participants: Participant[]): Promise<void> {
@@ -624,8 +661,14 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     // Recreate the DO and replace one socket. The same participant token recovers
     // the same seat hand from the persisted authoritative state.
     const hostHandIds = hostHand.map(tile => tile.id).sort();
-    fixture.room = new RoomDurableObject(fixture.ctx as unknown as DurableObjectState, {} as Env);
     const previousGuest = guest;
+    previousGuest.server.close(1000, 'browser refresh');
+    fixture.room.webSocketClose(previousGuest.server as unknown as WebSocket);
+    const disconnectedRoom = await readState(fixture);
+    assert.equal(publicSeats(disconnectedRoom)[1].kind, 'human');
+    assert.equal(publicSeats(disconnectedRoom)[1].connected, false);
+    assert.equal((persistedGame(fixture).identities as Array<Record<string, unknown>>)[1].control, 'human');
+    fixture.room = new RoomDurableObject(fixture.ctx as unknown as DurableObjectState, {} as Env);
     guest = await connectParticipant(fixture, guestInfo.token);
     assert.equal(guest.seat, 1);
     const recoveredGuest = latestGameView(guest);
@@ -714,16 +757,317 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
       type: 'leave-room', requestId: 'game-host-leaves', expectedRevision: roomBeforeLeave.revision,
     });
     assert.equal(leave.ok, true);
-    const aborted = persistedGame(fixture);
-    assert.equal(aborted.status, 'aborted');
-    const afterAbortRoom = await readState(fixture);
-    assert.equal(afterAbortRoom.status, 'finalized');
-    assert.equal(afterAbortRoom.hostSeat, 1);
+    const afterHostLeave = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.equal(afterHostLeave.status, 'playing');
+    assert.equal(afterHostLeave.identities[0].control, 'cpu');
+    assert.equal(afterHostLeave.match.game.players[0].control, 'cpu');
+    const afterHostLeaveRoom = await readState(fixture);
+    assert.equal(afterHostLeaveRoom.status, 'finalized');
+    assert.equal(afterHostLeaveRoom.hostSeat, 1);
+    assert.equal(publicSeats(afterHostLeaveRoom)[0].kind, 'cpu');
     const end = sendAction(fixture, guest, {
-      type: 'close-room', requestId: 'game-ci-cleanup', expectedRevision: afterAbortRoom.revision,
+      type: 'leave-room', requestId: 'game-ci-last-human-leaves', expectedRevision: afterHostLeaveRoom.revision,
     });
     assert.equal(end.ok, true);
     assert.equal((await readState(fixture)).status, 'closed');
+  });
+
+  await t.test('turns an exiting host into a CPU, keeps the game moving through sequential exits, and rejects stale authority', { timeout: 30_000 }, async () => {
+    const fixture = await makeRoom('Handoff host', token('2'));
+    const firstInfo = await joinRoom(fixture, 'First guest', token('3'));
+    const secondInfo = await joinRoom(fixture, 'Second guest', token('4'));
+    const host = await connectParticipant(fixture, fixture.hostToken);
+    const firstGuest = await connectParticipant(fixture, firstInfo.token);
+    const lastGuest = await connectParticipant(fixture, secondInfo.token);
+    await readyAndFinalize(fixture, [host, firstGuest, lastGuest]);
+    assert.equal((await sendGameAction(fixture, host, {
+      type: 'start-game', requestId: 'handoff-start', expectedGameRevision: 0,
+    })).ok, true);
+
+    const pendingTicketResponse = await fixture.room.fetch(new Request('https://room.internal/internal/ticket', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ participantToken: fixture.hostToken }),
+    }));
+    assert.equal(pendingTicketResponse.status, 200);
+    const pendingTicket = (await responseObject(pendingTicketResponse)).ticket as string;
+    const original = persistedGame(fixture) as unknown as OnlineGameSession;
+    const originalRevision = original.gameRevision;
+    const oldPrivateId = original.match.game.players[0].hand[0].id;
+    const beforeLeaveRoom = await readState(fixture);
+    const leave = sendAction(fixture, host, {
+      type: 'leave-room', requestId: 'handoff-host-leaves', expectedRevision: beforeLeaveRoom.revision,
+    });
+    assert.equal(leave.ok, true);
+
+    const afterHostLeave = await readState(fixture);
+    let session = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.equal(afterHostLeave.status, 'finalized');
+    assert.equal(afterHostLeave.revision, (beforeLeaveRoom.revision as number) + 1);
+    assert.equal(afterHostLeave.hostSeat, 1);
+    assert.equal(publicSeats(afterHostLeave)[0].kind, 'cpu');
+    assert.equal(publicSeats(afterHostLeave)[0].name, 'CPU1');
+    assert.equal(publicSeats(afterHostLeave)[1].isHost, true);
+    assert.equal(session.hostSeat, 1, 'the game host seat did not follow the room host');
+    assert.equal(session.gameRevision, originalRevision + 1);
+    assert.equal(session.identities[0].control, 'cpu');
+    assert.equal(session.match.game.players[0].control, 'cpu');
+    assert.deepEqual(session.match.points, original.match.points);
+    assert.deepEqual(session.match.game.liveWall, original.match.game.liveWall);
+    assert.deepEqual(session.match.game.deadWall, original.match.game.deadWall);
+    assert.deepEqual(session.match.game.players.map((player, seat) => ({
+      ...player,
+      control: original.match.game.players[seat].control,
+    })), original.match.game.players);
+    const survivorView = latestGameView(firstGuest);
+    const publicViewSeats = survivorView.seats as Array<Record<string, unknown>>;
+    assert.equal(publicViewSeats[0].control, 'cpu');
+    assert.equal('hand' in publicViewSeats[0], false);
+    assert.equal(JSON.stringify(survivorView).includes(oldPrivateId), false);
+    const notice = firstGuest.client.sent.map(message => JSON.parse(message) as Record<string, unknown>)
+      .filter(message => message.type === 'seat-taken-over').at(-1);
+    assert.equal(notice?.cpuName, 'CPU1');
+    assert.equal(notice?.hostChanged, true);
+    assert.equal(notice?.hostName, 'First guest');
+
+    const replay = sendAction(fixture, host, {
+      type: 'leave-room', requestId: 'handoff-host-leaves', expectedRevision: beforeLeaveRoom.revision,
+    });
+    assert.equal(replay.ok, true);
+    assert.equal((persistedGame(fixture) as unknown as OnlineGameSession).gameRevision, session.gameRevision,
+      'a repeated leave request applied a second takeover');
+    const revokedToken = await fixture.room.fetch(new Request('https://room.internal/internal/ticket', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ participantToken: fixture.hostToken }),
+    }));
+    assert.equal(revokedToken.status, 401);
+    const revokedTicket = await fixture.room.fetch(new Request(`https://room.internal/${fixture.code}/socket`, {
+      headers: {
+        Origin: 'https://ak-sekine.github.io',
+        Upgrade: 'websocket',
+        'Sec-WebSocket-Protocol': `heibon-mahjong.v1, ticket.${pendingTicket}`,
+      },
+    }));
+    assert.equal(revokedTicket.status, 401);
+    const staleGameAction = await sendGameAction(fixture, host, {
+      type: 'declare-tsumo', requestId: 'exited-host-action', expectedGameRevision: session.gameRevision,
+    });
+    assert.equal(staleGameAction.code, 'unauthorized');
+
+    // Start a CPU turn computation, then hand off another seat before its
+    // asynchronous evaluator attempts to persist its old game revision.
+    const expectedSecondLeave = afterHostLeave.revision;
+    const cpuInFlight = fixture.room.alarm();
+    const secondLeave = sendAction(fixture, firstGuest, {
+      type: 'leave-room', requestId: 'handoff-first-guest-leaves', expectedRevision: expectedSecondLeave as number,
+    });
+    assert.equal(secondLeave.ok, true);
+    const afterSecondLeave = persistedGame(fixture) as unknown as OnlineGameSession;
+    await cpuInFlight;
+    session = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.deepEqual(session, afterSecondLeave, 'a stale CPU calculation overwrote the newer handoff state');
+    assert.equal(session.hostSeat, 2);
+    assert.deepEqual(session.identities.map(identity => identity.control), ['cpu', 'cpu', 'human', 'cpu']);
+    const oneHumanRoom = await readState(fixture);
+    assert.equal(oneHumanRoom.hostSeat, 2);
+    assert.equal(publicSeats(oneHumanRoom).filter(seat => seat.kind === 'human').length, 1);
+    assert.equal(publicSeats(oneHumanRoom).filter(seat => seat.kind === 'cpu').length, 3);
+    assert.equal(new Set(publicSeats(oneHumanRoom).filter(seat => seat.kind === 'cpu').map(seat => seat.name)).size, 3);
+    const lateJoin = await fixture.room.fetch(new Request('https://room.internal/internal/join', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: 'Late joiner', participantToken: token('5') }),
+    }));
+    assert.equal(lateJoin.status, 409);
+
+    const afterHandoffRevision = session.gameRevision;
+    for (let step = 0; step < 6; step++) {
+      await passVisibleDecisions(fixture, [lastGuest]);
+      await fixture.room.alarm();
+      await passVisibleDecisions(fixture, [lastGuest]);
+      session = persistedGame(fixture) as unknown as OnlineGameSession;
+      if (session.gameRevision > afterHandoffRevision) break;
+    }
+    assert.ok(session.gameRevision > afterHandoffRevision, 'the remaining human plus CPU3 seats did not resume play');
+
+    const beforeLastLeave = await readState(fixture);
+    const lastLeave = sendAction(fixture, lastGuest, {
+      type: 'leave-room', requestId: 'handoff-last-player-leaves', expectedRevision: beforeLastLeave.revision as number,
+    });
+    assert.equal(lastLeave.ok, true);
+    assert.equal((await readState(fixture)).status, 'closed');
+  });
+
+  await t.test('a non-host exit hands over only that seat and keeps the existing host', async () => {
+    const fixture = await makeRoom('Existing host', token('6'));
+    const guestInfo = await joinRoom(fixture, 'Departing guest', token('7'));
+    const host = await connectParticipant(fixture, fixture.hostToken);
+    const guest = await connectParticipant(fixture, guestInfo.token);
+    await readyAndFinalize(fixture, [host, guest]);
+    await sendGameAction(fixture, host, { type: 'start-game', requestId: 'non-host-start', expectedGameRevision: 0 });
+    const before = persistedGame(fixture) as unknown as OnlineGameSession;
+    const beforeRoom = await readState(fixture);
+
+    const leave = sendAction(fixture, guest, {
+      type: 'leave-room', requestId: 'non-host-leaves-game', expectedRevision: beforeRoom.revision as number,
+    });
+    assert.equal(leave.ok, true);
+    const afterRoom = await readState(fixture);
+    const after = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.equal(afterRoom.hostSeat, 0);
+    assert.equal(afterRoom.revision, (beforeRoom.revision as number) + 1);
+    assert.equal(after.hostSeat, 0);
+    assert.equal(after.gameRevision, before.gameRevision + 1);
+    assert.equal(after.identities[1].control, 'cpu');
+    assert.deepEqual(after.match.game.liveWall, before.match.game.liveWall);
+    assert.deepEqual(after.match.points, before.match.points);
+  });
+
+  await t.test('a host exit during a pending ron keeps the other human answer and applies CPU ron', async () => {
+    const fixture = await makeRoom('Ron host', token('8'));
+    const guestInfo = await joinRoom(fixture, 'Ron guest', token('9'));
+    const host = await connectParticipant(fixture, fixture.hostToken);
+    const guest = await connectParticipant(fixture, guestInfo.token);
+    await readyAndFinalize(fixture, [host, guest]);
+    await sendGameAction(fixture, host, { type: 'start-game', requestId: 'ron-handoff-start', expectedGameRevision: 0 });
+    const decision: PlayerDecisionWindow = {
+      windowId: 'd'.repeat(24), type: 'ron', openedAt: Date.now(), expiresAt: Date.now() + 30_000,
+      baseGameRevision: 40, requiredSeats: [0, 1], responses: { 0: 'pending', 1: 'pending' },
+    };
+    const waiting = onlineSessionForGame(fixture, ronGame(2, [0, 1]), 40, decision);
+    saveGameSession(fixture, waiting);
+    const roomBefore = await readState(fixture);
+
+    const leave = sendAction(fixture, host, {
+      type: 'leave-room', requestId: 'ron-host-leaves', expectedRevision: roomBefore.revision as number,
+    });
+    assert.equal(leave.ok, true);
+    let transferred = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.equal(transferred.status, 'playing');
+    assert.equal(transferred.hostSeat, 1);
+    assert.equal(transferred.gameRevision, 41);
+    assert.deepEqual(transferred.decision?.requiredSeats, [1]);
+    assert.deepEqual(transferred.decision?.responses, { 1: 'pending' });
+    assert.equal((latestGameView(guest).self as Record<string, unknown>).isHost, true);
+    const oldAnswer = await sendGameAction(fixture, host, {
+      type: 'declare-ron', requestId: 'revoked-ron-answer', expectedGameRevision: 40, windowId: decision.windowId,
+    });
+    assert.equal(oldAnswer.code, 'unauthorized');
+    const validAnswer = await sendGameAction(fixture, guest, {
+      type: 'declare-ron', requestId: 'remaining-ron-answer', expectedGameRevision: 40, windowId: decision.windowId,
+    });
+    assert.equal(validAnswer.ok, true);
+    transferred = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.equal(transferred.status, 'round-ended');
+    assert.deepEqual(transferred.match.game.winResult?.winMethod === 'ron'
+      ? transferred.match.game.winResult.winners.map(winner => winner.winnerId).sort() : [], [0, 1]);
+  });
+
+  await t.test('a pending call for an exiting seat is resolved by the CPU and resumes its turn', async () => {
+    const fixture = await makeRoom('Call host', token('a'));
+    const guestInfo = await joinRoom(fixture, 'Call guest', token('b'));
+    const host = await connectParticipant(fixture, fixture.hostToken);
+    const guest = await connectParticipant(fixture, guestInfo.token);
+    await readyAndFinalize(fixture, [host, guest]);
+    await sendGameAction(fixture, host, { type: 'start-game', requestId: 'call-handoff-start', expectedGameRevision: 0 });
+    const dealt = callStart();
+    const discarded = discardTileForOnline(dealt, 3, dealt.players[3].drawnTile!.id);
+    const game = { ...discarded, phase: 'awaiting-call' as const };
+    assert.ok(getCallOptions(game, 0).some(option => option.type === 'pon'));
+    const decision: PlayerDecisionWindow = {
+      windowId: 'e'.repeat(24), type: 'call', openedAt: 1000, expiresAt: 31_000,
+      baseGameRevision: 50, requiredSeats: [0], responses: { 0: 'pending' },
+    };
+    saveGameSession(fixture, onlineSessionForGame(fixture, game, 50, decision));
+    const roomBefore = await readState(fixture);
+
+    const leave = sendAction(fixture, host, {
+      type: 'leave-room', requestId: 'call-host-leaves', expectedRevision: roomBefore.revision as number,
+    });
+    assert.equal(leave.ok, true);
+    let transferred = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.equal(transferred.decision, null);
+    assert.equal(transferred.match.game.phase, 'awaiting-discard');
+    assert.equal(transferred.match.game.turnPlayerId, 0);
+    assert.equal(transferred.match.game.players[0].control, 'cpu');
+    assert.equal(transferred.match.game.players[0].melds?.at(-1)?.type, 'pon');
+    assert.ok(fixture.ctx.storage.alarmAt, 'the new CPU turn did not schedule an alarm');
+    await fixture.room.alarm();
+    transferred = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.ok(transferred.gameRevision > 50);
+    assert.ok(transferred.match.game.players[0].river.length > 0, 'the CPU did not discard after its call');
+    const view = latestGameView(guest);
+    const seatZero = (view.seats as Array<Record<string, unknown>>)[0];
+    assert.equal('hand' in seatZero, false);
+    assert.ok(Array.isArray(seatZero.melds) && (seatZero.melds as unknown[]).length > 0);
+  });
+
+  await t.test('a round-result exit preserves settlement and lets the successor start the next round', async () => {
+    const fixture = await makeRoom('Round host', token('c'));
+    const guestInfo = await joinRoom(fixture, 'Round guest', token('d'));
+    const host = await connectParticipant(fixture, fixture.hostToken);
+    const guest = await connectParticipant(fixture, guestInfo.token);
+    await readyAndFinalize(fixture, [host, guest]);
+    await sendGameAction(fixture, host, { type: 'start-game', requestId: 'round-handoff-start', expectedGameRevision: 0 });
+    const active = onlineSessionForGame(fixture, tsumoGame(undefined, true), 60);
+    const ended = applyOnlineGameAction(active, 0, {
+      type: 'declare-tsumo', requestId: 'worker-round-tsumo', expectedGameRevision: 60,
+    }, new Set<PlayerId>([0, 1]), 1000);
+    assert.equal(ended.status, 'round-ended');
+    saveGameSession(fixture, ended);
+    const beforePoints = [...ended.match.points];
+    const beforeSettlement = structuredClone(ended.match.lastSettlement);
+    const roomBefore = await readState(fixture);
+
+    const leave = sendAction(fixture, host, {
+      type: 'leave-room', requestId: 'round-host-leaves', expectedRevision: roomBefore.revision as number,
+    });
+    assert.equal(leave.ok, true);
+    const transferred = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.equal(transferred.status, 'round-ended');
+    assert.deepEqual(transferred.match.points, beforePoints);
+    assert.deepEqual(transferred.match.lastSettlement, beforeSettlement);
+    assert.equal(transferred.hostSeat, 1);
+    assert.equal(transferred.identities[0].control, 'cpu');
+
+    const nextRound = await sendGameAction(fixture, guest, {
+      type: 'next-round', requestId: 'successor-starts-next-round', expectedGameRevision: transferred.gameRevision,
+    });
+    assert.equal(nextRound.ok, true);
+    const resumed = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.equal(resumed.status, 'playing');
+    assert.equal(resumed.match.roundNumber, 2);
+    assert.deepEqual(resumed.match.points, beforePoints);
+    assert.equal(resumed.identities[0].control, 'cpu');
+    assert.equal(resumed.match.game.players[0].control, 'cpu');
+  });
+
+  await t.test('the last human leaving an active game closes the room without CPU-only play', async () => {
+    const fixture = await makeRoom('Last host', token('e'));
+    const guestInfo = await joinRoom(fixture, 'Last guest', token('f'));
+    const host = await connectParticipant(fixture, fixture.hostToken);
+    const guest = await connectParticipant(fixture, guestInfo.token);
+    await readyAndFinalize(fixture, [host, guest]);
+    await sendGameAction(fixture, host, { type: 'start-game', requestId: 'last-player-start', expectedGameRevision: 0 });
+    let roomState = await readState(fixture);
+    const firstLeave = sendAction(fixture, host, {
+      type: 'leave-room', requestId: 'first-human-leaves', expectedRevision: roomState.revision as number,
+    });
+    assert.equal(firstLeave.ok, true);
+    roomState = await readState(fixture);
+    assert.equal(roomState.status, 'finalized');
+    const finalLeave = sendAction(fixture, guest, {
+      type: 'leave-room', requestId: 'final-human-leaves', expectedRevision: roomState.revision as number,
+    });
+    assert.equal(finalLeave.ok, true);
+    const closed = await readState(fixture);
+    assert.equal(closed.status, 'closed');
+    assert.equal(closed.hostSeat, null);
+    assert.deepEqual(publicSeats(closed).map(seat => seat.kind), ['empty', 'empty', 'empty', 'empty']);
+    const ended = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.equal(ended.status, 'aborted');
+    const revision = ended.gameRevision;
+    await fixture.room.alarm();
+    assert.equal((persistedGame(fixture) as unknown as OnlineGameSession).gameRevision, revision,
+      'CPU-only play continued after the final human left');
   });
 
   await t.test('an answer racing a delayed alarm expires atomically and is rejected', async () => {

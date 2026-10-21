@@ -471,17 +471,37 @@ async function main() {
     check(!two.host.privacyLeak && !two.guest.privacyLeak && !gameReconnect.privacyLeak, 'A game WebSocket update included a secret.');
 
     const beforeGuestGameExit = two.guest.messages.length;
+    const hostViewBeforeExit = latestGameMessage(two.host).view;
+    const hostPrivateIdsAtExit = new Set([
+      ...hostViewBeforeExit.seats[0].hand.map(tile => tile.id),
+      hostViewBeforeExit.seats[0].drawnTile?.id,
+    ].filter(Boolean));
     const leaveGame = await sendAction(two.host, { type: 'leave-room' }, 'game-host-leave');
     check(leaveGame.result.ok, 'A participant could not explicitly leave an active online game.');
-    const abortedMessage = await waitForMessage(two.guest,
-      message => message.type === 'game-aborted' || message.type === 'game-state' && message.view?.status === 'aborted',
-      beforeGuestGameExit, 10000, 'game-aborted notification');
-    check(abortedMessage.type === 'game-aborted' || abortedMessage.view.status === 'aborted', 'The remaining player did not receive an abort reason.');
+    const takeoverNotice = await waitForMessage(two.guest,
+      message => message.type === 'seat-taken-over' && message.seat === 0,
+      beforeGuestGameExit, 10000, 'seat takeover notification');
+    check(takeoverNotice.cpuName === 'CPU1' && takeoverNotice.hostChanged === true,
+      'The exiting host seat was not announced as a CPU takeover with host transfer.');
     activeHostForCleanup = two.guest;
-    const roomAfterAbort = await waitForRoomState(two.guest, state => state.status === 'finalized' && state.hostSeat === 1);
-    check(roomAfterAbort.seats[1].isHost, 'Room host control was not transferred after explicit game exit.');
-    await closeRoom(two, two.guest);
-    roomSummaries.push({ scenario: 'two-human-two-cpu-game-start-discard-cpu-reconnect-abort', roomCode: two.roomCode, revision: currentRevision(two.guest) });
+    const roomAfterHandoff = await waitForRoomState(two.guest,
+      state => state.status === 'finalized' && state.hostSeat === 1 && state.seats[0].kind === 'cpu');
+    check(roomAfterHandoff.seats[0].name === 'CPU1', 'The replacement seat did not use the CPU1 display name.');
+    check(roomAfterHandoff.seats[1].isHost, 'Room host control was not transferred after explicit game exit.');
+    const resumedAfterExit = await waitForGameState(two.guest, view =>
+      (view.status === 'playing' || view.status === 'round-ended') &&
+      view.seats[0].control === 'cpu' && view.self.isHost === true &&
+      Number(view.gameRevision) > revisionAfterStart, 0, 15000, 'CPU takeover game state');
+    check(!('hand' in resumedAfterExit.view.seats[0]) &&
+      [...hostPrivateIdsAtExit].every(id => !JSON.stringify(resumedAfterExit).includes(id)),
+      'The CPU takeover exposed the departed seat concealed hand.');
+    check(resumedAfterExit.view.seats[0].name === 'CPU1', 'The online game view did not use the CPU1 display name.');
+    const departedGameToken = await request(`/api/rooms/${two.roomCode}/ticket`, { method: 'POST', token: two.hostToken });
+    check(departedGameToken.response.status === 401, 'An exited host token was accepted after CPU takeover.');
+    const finalLeave = await sendAction(two.guest, { type: 'leave-room' }, 'game-final-human-leave');
+    check(finalLeave.result.ok === true, 'The final human could not close the CPU-only room.');
+    await waitForRoomState(two.guest, state => state.status === 'closed');
+    roomSummaries.push({ scenario: 'two-human-game-host-cpu-handoff-reconnect', roomCode: two.roomCode, revision: currentRevision(two.guest) });
     activeHostForCleanup = null;
 
     // Scenario 2: disconnection clears Ready; the same token receives a complete state on reconnect.

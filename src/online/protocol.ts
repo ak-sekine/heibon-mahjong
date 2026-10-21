@@ -54,6 +54,15 @@ export type RoomSocketError = {
 export type RoomStateMessage = { type: 'room-state' } & OnlineRoomState;
 export type LegacyRoomStateMessage = { type: 'room_state' } & OnlineRoomState;
 export type RoomClosedMessage = { type: 'room-closed'; revision: number };
+export type SeatTakenOverMessage = {
+  type: 'seat-taken-over';
+  seat: number;
+  departedName: string;
+  cpuName: string;
+  hostChanged: boolean;
+  hostSeat: number;
+  hostName: string;
+};
 
 export type GameActionPayload =
   | { type: 'start-game' }

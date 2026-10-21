@@ -93,6 +93,7 @@ export class OnlineWaitingRoom {
   private readonly joinDialog = document.querySelector<HTMLDialogElement>('#online-join-dialog')!;
   private readonly dialog = document.querySelector<HTMLDialogElement>('#online-dialog')!;
   private readonly status = document.querySelector<HTMLElement>('#online-status')!;
+  private readonly exitNotice = document.querySelector<HTMLElement>('#online-exit-notice')!;
   private readonly createNameInput = document.querySelector<HTMLInputElement>('#online-create-name')!;
   private readonly joinNameInput = document.querySelector<HTMLInputElement>('#online-join-name')!;
   private readonly joinCodeInput = document.querySelector<HTMLInputElement>('#online-join-code')!;
@@ -137,6 +138,7 @@ export class OnlineWaitingRoom {
   private pendingActionTimer: number | null = null;
   private pendingGameAction: PendingGameAction | null = null;
   private pendingGameActionTimer: number | null = null;
+  private exitNoticeTimer: number | null = null;
   private gameActive = false;
   private gameTerminated = false;
   private readonly onGameMessage: (message: Record<string, unknown>) => void;
@@ -295,6 +297,7 @@ export class OnlineWaitingRoom {
   }
 
   private openEntryDialog(dialog: HTMLDialogElement, closeButton: HTMLButtonElement): void {
+    this.clearExitNotice();
     this.syncDisplayNameFields(this.displayName);
     this.updateFormAvailability();
     if (dialog === this.createDialog) this.setFormMessage(this.createMessage, this.onlineUnavailableMessage || (this.session ? this.getActiveSessionMessage() : ''));
@@ -592,6 +595,10 @@ export class OnlineWaitingRoom {
       this.renderControls();
       return;
     }
+    if (message.type === 'seat-taken-over') {
+      this.onGameMessage(message);
+      return;
+    }
     if (message.type === 'action-result') {
       this.receiveActionResult(message as unknown as SocketActionResult);
       return;
@@ -785,10 +792,8 @@ export class OnlineWaitingRoom {
     }
     this.setError();
     if (completed.payload.type === 'leave-room') {
-      if (this.gameActive) {
-        this.onGameMessage({ type: 'game-aborted', reason: 'participant-left' });
-        this.finishSession('ルームを退出しました。対局は中断されました。', true);
-      } else this.finishSession('ルームを退出しました。');
+      this.showExitNotice('ルームを退出しました。');
+      this.finishSession('ルームを退出しました。');
     } else if (completed.payload.type === 'close-room') {
       this.finishSession('ルームを終了しました。');
     }
@@ -868,6 +873,24 @@ export class OnlineWaitingRoom {
     this.renderControls();
     this.updateFormAvailability();
     if (!preserveGame) this.onGameMessage({ type: 'online-session-ended' });
+  }
+
+  private showExitNotice(message: string): void {
+    this.clearExitNotice();
+    this.exitNotice.textContent = message;
+    this.exitNotice.hidden = false;
+    this.exitNoticeTimer = window.setTimeout(() => {
+      this.exitNotice.hidden = true;
+      this.exitNotice.textContent = '';
+      this.exitNoticeTimer = null;
+    }, 8000);
+  }
+
+  private clearExitNotice(): void {
+    if (this.exitNoticeTimer !== null) window.clearTimeout(this.exitNoticeTimer);
+    this.exitNoticeTimer = null;
+    this.exitNotice.hidden = true;
+    this.exitNotice.textContent = '';
   }
 
   private closeDialog(): void {

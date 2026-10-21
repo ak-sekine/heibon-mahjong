@@ -44,6 +44,8 @@ export class OnlineGameController {
   private actionPending = false;
   private decisionPending = false;
   private actionNotice = '';
+  private roomNotice = '';
+  private roomNoticeTimer: number | null = null;
   private sender: ActionSender | null = null;
   private decisionCountdownTimer: number | null = null;
   private decisionWindowId: string | null = null;
@@ -122,6 +124,7 @@ export class OnlineGameController {
   receive(message: Record<string, unknown>): void {
     if (message.type === 'online-session-ended') {
       this.stopDecisionCountdown();
+      this.clearRoomNotice();
       this.view = null;
       this.finalRanks = null;
       this.actionPending = false;
@@ -132,6 +135,22 @@ export class OnlineGameController {
       this.setTableClasses(false);
       document.body.classList.remove('online-game-active');
       document.querySelector<HTMLButtonElement>('#new-game')!.disabled = false;
+      return;
+    }
+    if (message.type === 'seat-taken-over') {
+      if (typeof message.departedName === 'string' && typeof message.cpuName === 'string') {
+        const hostNotice = message.hostChanged === true && typeof message.hostName === 'string'
+          ? ` 新ホストは${message.hostName}です。`
+          : '';
+        this.clearRoomNotice();
+        this.roomNotice = `${message.departedName}が退出し、${message.cpuName}が席を引き継ぎました。${hostNotice}`;
+        this.roomNoticeTimer = window.setTimeout(() => {
+          this.roomNotice = '';
+          this.roomNoticeTimer = null;
+          if (this.view) this.renderActions(this.view);
+        }, 8000);
+        if (this.view) this.render();
+      }
       return;
     }
     if (message.type === 'game-action-result') {
@@ -411,7 +430,7 @@ export class OnlineGameController {
       this.decisionPending,
       this.kanChoicesOpen,
       this.decisionSeconds(view.self.decision),
-      this.actionNotice,
+      this.roomNotice || this.actionNotice,
     ));
     this.syncDecisionCountdown(view.self.decision);
   }
@@ -419,6 +438,7 @@ export class OnlineGameController {
   private returnToLocalGame(): void {
     if (!this.view || (this.view.status !== 'match-ended' && this.view.status !== 'aborted')) return;
     this.stopDecisionCountdown();
+    this.clearRoomNotice();
     this.view = null;
     this.finalRanks = null;
     this.actionPending = false;
@@ -428,6 +448,12 @@ export class OnlineGameController {
     this.setTableClasses(false);
     document.body.classList.remove('online-game-active');
     document.querySelector<HTMLButtonElement>('#new-game')!.disabled = false;
+  }
+
+  private clearRoomNotice(): void {
+    if (this.roomNoticeTimer !== null) window.clearTimeout(this.roomNoticeTimer);
+    this.roomNoticeTimer = null;
+    this.roomNotice = '';
   }
 
   private decisionSeconds(decision: PlayerGameView['self']['decision']): number | null {

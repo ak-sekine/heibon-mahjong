@@ -157,6 +157,7 @@ header > div { min-width:0; }
 .online-entry-form button { width:100%; }
 .online-form-message { margin:0; color:#fff1cc; font-size:.9rem; line-height:1.45; overflow-wrap:anywhere; }
 #online-status { margin:0 0 12px; padding:10px 12px; border-radius:6px; background:#123f32; line-height:1.45; overflow-wrap:anywhere; }
+#online-exit-notice { position:fixed; z-index:40; top:max(12px,env(safe-area-inset-top)); left:12px; right:12px; max-width:520px; margin:0 auto; padding:10px 12px; border:1px solid #ffda7d; border-radius:8px; background:#123f32; color:#fffdf7; box-shadow:0 4px 16px rgb(0 0 0 / 30%); line-height:1.45; overflow-wrap:anywhere; }
 #online-room { margin-top:12px; padding-top:8px; border-top:1px solid #63947a; }
 #online-room p { margin:4px 0; }
 #online-seats { display:grid; gap:6px; padding:0; margin:10px 0; list-style:none; }

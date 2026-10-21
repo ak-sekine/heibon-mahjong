@@ -7,6 +7,7 @@ import {
   type RoomStatus,
   type GameActionResult,
   type GameMutationMessage,
+  type SeatTakenOverMessage,
 } from '../src/online/protocol.ts';
 import type { PlayerId } from '../src/model/game.ts';
 import {
@@ -17,6 +18,7 @@ import {
   onlineIdentitiesFromSeats,
   startNextOnlineRound,
   startOnlineGame,
+  transferOnlineSeatToCpu,
   timeoutOnlineDecision,
   DECISION_TIMEOUT_MS,
   OnlineGameRuleError,
@@ -259,6 +261,19 @@ export class RoomDurableObject {
       for (const socket of this.ctx.getWebSockets()) if (socket.readyState === 1) {
         try { socket.send(message); } catch { /* A closing connection is ignored. */ }
       }
+    }
+  }
+
+  private broadcastSeatTakenOver(message: SeatTakenOverMessage): void {
+    const payload = JSON.stringify(message);
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socket.readyState !== 1) continue;
+      const attachment = this.attachment(socket);
+      if (!attachment || attachment.seat === message.seat) continue;
+      const seat = this.seat(attachment.seat);
+      if (!seat || seat.kind !== 'human' || seat.connected !== 1 ||
+          seat.token_hash !== attachment.participantId || seat.connection_id !== attachment.connectionId) continue;
+      try { socket.send(payload); } catch { /* A closing connection is ignored. */ }
     }
   }
 
@@ -689,6 +704,8 @@ export class RoomDurableObject {
     closeRoom?: boolean;
     sendState: boolean;
     gameChanged?: boolean;
+    gameSession?: OnlineGameSession | null;
+    takeoverNotice?: SeatTakenOverMessage;
   } {
     const payload = JSON.stringify(action.type === 'set-ready'
       ? { type: action.type, expectedRevision: action.expectedRevision, ready: action.ready }
@@ -718,6 +735,8 @@ export class RoomDurableObject {
       const currentRevision = room?.revision ?? 0;
       let code: string | undefined;
       let gameChanged = false;
+      let changedGame: OnlineGameSession | null | undefined;
+      let takeoverNotice: SeatTakenOverMessage | undefined;
       if (!room || !actor || actor.kind !== 'human') code = 'unauthorized';
       else if (actor.token_hash !== attachment.participantId) code = 'unauthorized';
       else if (actor.connection_id !== attachment.connectionId || actor.connected !== 1) code = 'stale_connection';
@@ -752,21 +771,62 @@ export class RoomDurableObject {
         }
       } else if (action.type === 'leave-room') {
         const session = this.gameSession();
-        if (session) {
+        const wasHost = room.host_seat === actor.seat;
+        const humans = this.seats().filter(seat => seat.kind === 'human');
+        const remaining = humans.filter(seat => seat.seat !== actor.seat);
+        if (session && session.status !== 'aborted' && remaining.length > 0) {
+          const nextHost = wasHost
+            ? Math.min(...remaining.map(seat => seat.seat))
+            : room.host_seat;
+          if (nextHost === null || !remaining.some(seat => seat.seat === nextHost)) {
+            code = 'game_unavailable';
+          } else {
+            const cpuSeats = session.identities
+              .filter(identity => identity.control === 'cpu' || identity.seat === actor.seat)
+              .map(identity => identity.seat)
+              .sort((a, b) => a - b);
+            const cpuName = `CPU${cpuSeats.indexOf(actor.seat as PlayerId) + 1}`;
+            const nextSession = transferOnlineSeatToCpu(
+              session,
+              actor.seat as PlayerId,
+              nextHost as PlayerId,
+              Date.now(),
+            );
+            this.ctx.storage.sql.exec('DELETE FROM tickets WHERE seat = ?', actor.seat);
+            this.ctx.storage.sql.exec(
+              "UPDATE seats SET name = ?, token_hash = ?, connected = 0, kind = 'cpu', ready = 0, connection_id = NULL WHERE seat = ? AND kind = 'human'",
+              cpuName, `cpu:${actor.seat}`, actor.seat,
+            );
+            cpuSeats.forEach((cpuSeat, index) => {
+              if (cpuSeat === actor.seat) return;
+              this.ctx.storage.sql.exec("UPDATE seats SET name = ? WHERE seat = ? AND kind = 'cpu'", `CPU${index + 1}`, cpuSeat);
+            });
+            this.ctx.storage.sql.exec('UPDATE room SET status = \'finalized\', host_seat = ?', nextHost);
+            this.saveGameSession(nextSession);
+            this.incrementRevision();
+            changedGame = nextSession;
+            gameChanged = true;
+            const newHost = this.seat(nextHost);
+            if (!newHost || newHost.kind !== 'human') throw new Error('Online game host seat is invalid');
+            takeoverNotice = {
+              type: 'seat-taken-over',
+              seat: actor.seat,
+              departedName: actor.name,
+              cpuName,
+              hostChanged: wasHost,
+              hostSeat: nextHost,
+              hostName: newHost.name,
+            };
+          }
+        } else if (session && session.status !== 'aborted') {
           if (session.status === 'playing' || session.status === 'round-ended') {
-            this.saveGameSession(markOnlineGameAborted(session));
+            changedGame = markOnlineGameAborted(session);
+            this.saveGameSession(changedGame);
             gameChanged = true;
           }
-          const wasHost = room.host_seat === actor.seat;
-          const humans = this.seats().filter(seat => seat.kind === 'human');
-          const remaining = humans.filter(seat => seat.seat !== actor.seat);
-          this.ctx.storage.sql.exec('DELETE FROM tickets WHERE seat = ?', actor.seat);
-          this.ctx.storage.sql.exec('DELETE FROM seats WHERE seat = ? AND kind = \'human\'', actor.seat);
-          if (remaining.length === 0) {
-            this.ctx.storage.sql.exec("UPDATE room SET status = 'closed', host_seat = NULL");
-          } else if (wasHost) {
-            this.ctx.storage.sql.exec('UPDATE room SET host_seat = ?', Math.min(...remaining.map(seat => seat.seat)));
-          }
+          this.ctx.storage.sql.exec('DELETE FROM tickets');
+          this.ctx.storage.sql.exec('DELETE FROM seats');
+          this.ctx.storage.sql.exec("UPDATE room SET status = 'closed', host_seat = NULL");
           this.incrementRevision();
         } else {
           const wasHost = room.host_seat === actor.seat;
@@ -811,6 +871,8 @@ export class RoomDurableObject {
           (result.ok && action.type === 'leave-room' && this.room()?.status === 'closed'),
         sendState: result.ok || code === 'revision_conflict',
         gameChanged,
+        gameSession: changedGame,
+        takeoverNotice,
       };
     });
   }
@@ -1047,7 +1109,11 @@ export class RoomDurableObject {
     try { socket.send(JSON.stringify(outcome.result)); } catch { /* Result remains durable for requestId replay. */ }
     if (outcome.changed) this.broadcast();
     else if (outcome.sendState) this.sendState(socket);
-    if (outcome.gameChanged) this.broadcastGame();
+    if (outcome.gameChanged && outcome.gameSession) {
+      this.broadcastGame(outcome.gameSession);
+      await this.scheduleNextAlarm(outcome.gameSession);
+    }
+    if (outcome.takeoverNotice) this.broadcastSeatTakenOver(outcome.takeoverNotice);
     if (outcome.closeSeat !== undefined) this.closeSockets(4003, 'Participant left the room', outcome.closeSeat);
     if (outcome.closeRoom) this.closeSockets(4002, 'Room closed');
   }

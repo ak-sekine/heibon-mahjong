@@ -195,11 +195,35 @@ MOCK = r"""
         result(this, message, true);
         broadcast();
       } else if (message.type === 'leave-room') {
-        if (gameStarted && gameStatus === 'playing') {
-          gameStatus = 'aborted'; phase = 'awaiting-discard'; gameRevision++;
+        if (gameStarted && gameStatus !== 'aborted' && state.seats.filter(seat => seat.kind === 'human').length > 1) {
+          const departedName = state.seats[this.seat].name;
+          const cpuSeats = state.seats.filter(seat => seat.kind === 'cpu').map(seat => seat.seat).concat(this.seat).sort((a, b) => a - b);
+          const cpuName = `CPU${cpuSeats.indexOf(this.seat) + 1}`;
+          state.seats[this.seat] = {
+            seat: this.seat, kind: 'cpu', name: cpuName,
+            connected: false, ready: false, isHost: false,
+          };
+          const successor = state.seats.find(seat => seat.kind === 'human').seat;
+          state.hostSeat = successor;
+          state.seats.forEach(seat => { seat.isHost = seat.seat === successor; });
+          state.status = 'finalized';
+          state.revision++;
+          gameRevision++;
           result(this, message, true);
-          broadcast(this);
-          send(this, { type: 'game-aborted', gameRevision, reason: 'participant-left' });
+          broadcast();
+          broadcastGame('game-state');
+          sockets.filter(socket => socket !== this && socket.readyState === MockWebSocket.OPEN).forEach(socket => send(socket, {
+            type: 'seat-taken-over', seat: this.seat, departedName, cpuName,
+            hostChanged: true, hostSeat: successor, hostName: state.seats[successor].name,
+          }));
+          this.finish(4003, 'Participant left');
+          return;
+        }
+        if (gameStarted) {
+          gameStatus = 'aborted'; phase = 'awaiting-discard'; gameRevision++;
+          state.status = 'closed'; state.hostSeat = null; state.revision++;
+          result(this, message, true);
+          broadcast();
           this.finish(4003, 'Participant left');
           return;
         }
@@ -261,6 +285,28 @@ MOCK = r"""
       state.seats[1].ready = ready;
       state.revision++;
       broadcast();
+    },
+    setGuestAsHost() {
+      state.hostSeat = 1;
+      state.seats.forEach(seat => { seat.isHost = seat.seat === 1; });
+    },
+    simulateGuestExit() {
+      const seat = 1;
+      const departedName = state.seats[seat].name;
+      const hostChanged = state.hostSeat === seat;
+      state.seats[seat] = { seat, kind: 'cpu', name: '', connected: false, ready: false, isHost: false };
+      if (hostChanged) state.hostSeat = state.seats.find(value => value.kind === 'human').seat;
+      state.seats.forEach(value => { value.isHost = value.seat === state.hostSeat; });
+      state.seats.filter(value => value.kind === 'cpu').sort((a, b) => a.seat - b.seat)
+        .forEach((cpu, index) => { cpu.name = `CPU${index + 1}`; });
+      state.revision++;
+      gameRevision++;
+      broadcast();
+      broadcastGame('game-state');
+      sockets.filter(socket => socket.seat !== seat && socket.readyState === MockWebSocket.OPEN).forEach(socket => send(socket, {
+        type: 'seat-taken-over', seat, departedName, cpuName: 'CPU1', hostChanged,
+        hostSeat: state.hostSeat, hostName: state.seats[state.hostSeat].name,
+      }));
     },
     setViewerSeat(seat) {
       viewerOverride = seat;
@@ -344,6 +390,11 @@ MOCK = r"""
       return hands.flatMap((hand, seat) => seat === viewerSeat ? [] : [
         ...hand.map(tile => tile.id), ...(drawnTiles[seat] ? [drawnTiles[seat].id] : []),
       ]);
+    },
+    snapshot() {
+      return { room: JSON.parse(JSON.stringify(state)), gameStatus, gameRevision, phase, turnPlayerId, roundNumber,
+        points: [25000, 25000, 25000, 25000], rivers: JSON.parse(JSON.stringify(rivers)),
+        hands: JSON.parse(JSON.stringify(hands)), drawnTiles: JSON.parse(JSON.stringify(drawnTiles)) };
     },
     forceDisconnect() { sockets.filter(socket => socket.readyState === MockWebSocket.OPEN).at(-1)?.forceDisconnect(); },
     get ticketRequests() { return tickets; },
@@ -961,17 +1012,30 @@ with sync_playwright() as p:
     hand_after_reconnect = page.locator('#online-player-hand button[data-tile-id]').evaluate_all("nodes => nodes.map(node => node.dataset.tileId).join(',')")
     assert hand_after_reconnect == hand_before_reconnect, 'the online hand was not restored after reconnect'
 
+    page.evaluate('''() => { window.onlineMock.setGuestAsHost(); window.onlineMock.simulateGuestExit(); }''')
+    wait_for("document.querySelector('#online-game-action-status').innerText.includes('テスト参加者が退出し、CPU1が席を引き継ぎました。 新ホストはテストホストです。')")
+    wait_for("document.querySelector('#online-score-strip [data-online-label=right]')?.innerText.startsWith('CPU1')")
+    after_guest_handoff = page.evaluate('window.onlineMock.snapshot()')
+    assert after_guest_handoff['room']['seats'][1]['kind'] == 'cpu' and after_guest_handoff['room']['seats'][1]['name'] == 'CPU1', after_guest_handoff['room']
+    assert after_guest_handoff['gameStatus'] == 'playing' and after_guest_handoff['room']['hostSeat'] == 0, 'a non-host exit ended the game or changed its host'
+    assert after_guest_handoff['roundNumber'] == 2 and after_guest_handoff['points'] == [25000] * 4, 'a CPU handoff changed the current round or points'
+    assert page.locator('#online-match').is_visible() and page.locator('[data-online-hand="right"] .tile-back').count() == 13, 'the replacement CPU hand was shown in public'
+    assert all(tile_id not in page.locator('#online-match').inner_html() for tile_id in hidden_guest_ids), 'the replacement CPU private hand leaked after handoff'
+
     select_menu_item('#menu-room')
+    before_exit = page.evaluate('window.onlineMock.snapshot()')
     page.locator('#online-leave').click()
-    wait_for("!document.querySelector('#online-dialog').open && sessionStorage.getItem('heibon-mahjong-online-session') === null")
-    assert page.locator('#online-game-action-status').inner_text() == '参加者が明示的に退出したため、対局を中断しました。', 'an explicit game exit did not show the abort reason'
-    page.locator('#online-return-local').click()
-    wait_for("document.querySelector('#online-match').hidden === true")
+    wait_for("!document.querySelector('#online-dialog').open && sessionStorage.getItem('heibon-mahjong-online-session') === null && !document.querySelector('#online-exit-notice').hidden")
+    after_exit = page.evaluate('window.onlineMock.snapshot()')
+    assert after_exit['room']['status'] == 'closed' and after_exit['room']['hostSeat'] is None, after_exit['room']
+    assert after_exit['gameStatus'] == 'aborted' and after_exit['roundNumber'] == before_exit['roundNumber'], 'the final human exit did not end the CPU-only room'
+    assert after_exit['points'] == before_exit['points'] and after_exit['rivers'] == before_exit['rivers'], 'the explicit exit changed public game state'
+    assert after_exit['hands'] == before_exit['hands'] and after_exit['drawnTiles'] == before_exit['drawnTiles'], 'the explicit exit changed a concealed hand or draw'
+    assert page.locator('#online-exit-notice').inner_text() == 'ルームを退出しました。', 'the departing player was not told that they left the room'
 
     assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') === null"), 'successful leave did not remove the session'
     assert page.locator('#menu-room').is_hidden(), 'room operations remained in the menu after leaving'
-    assert '退出しました' in page.locator('#online-status').inner_text(), 'successful leave was not reported'
-    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'online dialog causes horizontal overflow after leave'
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'exit notice causes horizontal overflow after leaving'
     assert page.locator('.table').is_visible() and page.locator('#player-hand svg').count() > 0, 'the existing mahjong table was changed by the waiting room flow'
     assert all(tile_id not in page.locator('main').inner_html() for tile_id in private_ids), 'CPU private tile IDs leaked after leaving the room'
 
@@ -1019,8 +1083,8 @@ with sync_playwright() as p:
     assert page.evaluate("localStorage.getItem('heibon-mahjong-online-session') === null"), 'online participant session was moved to localStorage'
     assert not errors, errors
 
-    report = {'step': '14.4', 'viewports': [[320,700],[375,812],[390,844],[430,932],[1280,900]], 'createFormViewports': create_form_layouts, 'joinFormViewports': join_form_layouts, 'scenario': 'separate create/join forms, close-button initial focus, Tab navigation, manual name/code input, shared display name, short-viewport scrolling, input-gated actions, session-safe menu actions, compact hamburger menu, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, exit', 'result': 'pass'}
+    report = {'step': '14.6', 'viewports': [[320,700],[375,812],[390,844],[430,932],[1280,900]], 'createFormViewports': create_form_layouts, 'joinFormViewports': join_form_layouts, 'scenario': 'separate create/join forms, close-button initial focus, Tab navigation, manual name/code input, shared display name, short-viewport scrolling, input-gated actions, session-safe menu actions, compact hamburger menu, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, surviving host notice after CPU takeover, last-human room close and exit notice', 'result': 'pass'}
     print(json.dumps(report, ensure_ascii=False), flush=True)
-    (OUT / 'step14-4-online-room-ui.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    (OUT / 'step14-6-online-room-ui.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     page.close()
     browser.close()
