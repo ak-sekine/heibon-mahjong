@@ -18,7 +18,7 @@
 
 `.github/workflows/browser-ui.yml`に`tests/browser-action-controls.py`と`tests/browser-action-panel.py`を追加しました。既存のBrowser UIシナリオもワークフローに残しています。main pushで`deploy.yml`がこのワークフローを呼び出し、Worker本番通信テストとPages build/deployまで実行します。
 
-main SHA `837ed96e0e66a74b6b08b67cb6b335a3cd31decc`で最終検証しました。Browser UI run [39614995656](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39614995656) はsuccess。Deploy run [39614996215](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39614996215) では回帰テスト、Worker型検査、Browser UI、Worker deploy、本番通信テスト、Worker URLを含むPages buildがすべてsuccessです。Pages deploy jobだけは`github-pages` environmentで`waiting`となっており、Actions上の承認待ちのため未完了です。iPhone Safari実機確認は未実施です。
+main SHA `837ed96e0e66a74b6b08b67cb6b335a3cd31decc`で最終検証しました。Browser UI run [39614995656](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39614995656) はsuccess。Deploy run [39614996215](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39614996215) では回帰テスト、Worker型検査、Browser UI、Worker deploy、本番通信テスト、Worker URLを含むPages build/deployがすべてsuccessです。iPhone Safari実機確認は未実施です。
 
 Browser UIと統合テストの初回失敗・修正は、原因ごとに以下の8件でした。各pushではstandalone Browser UIとDeploy内Browser UIが重複実行される場合があります。
 
