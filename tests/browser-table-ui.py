@@ -29,7 +29,7 @@ with sync_playwright() as p:
                     'consoleErrors':console_errors,'pageState':page_state},ensure_ascii=False),flush=True)
                 raise
             page.evaluate('''async()=>{
-              window.matchRenderer=await import('/heibon-mahjong/src/rendering/match.ts');
+              window.app=await import('/heibon-mahjong/src/main.ts');
               window.match=(await import('/heibon-mahjong/src/game/match.ts')).startMatch();
               window.dora=await import('/heibon-mahjong/src/game/dora.ts');
               window.renderer=await import('/heibon-mahjong/src/rendering/table.ts');
@@ -69,9 +69,8 @@ with sync_playwright() as p:
                     page.evaluate('''index=>{
                       const pool=[...game.liveWall,...game.deadWall];
                       window.shown={...game,players:game.players.map((p,id)=>({...p,river:pool.slice(id*18,id*18+18),riichi:index<0?null:{declarationTileId:pool[id*18+index].id}}))};
-                      renderer.renderTable(shown,[25000,25000,25000,25000]);
-                      renderer.renderSelection(shown,null);
-                      matchRenderer.renderMatch({...match,game:shown,depositSticks:index===17?17:0,honba:index===17?10:0});
+                      app.controller.match={...match,game:shown,depositSticks:index===17?17:0,honba:index===17?10:0};
+                      app.render();
                     }''',riichi)
                     result=page.evaluate('''()=>{
                       const q=s=>document.querySelector(s),r=e=>e.getBoundingClientRect();
