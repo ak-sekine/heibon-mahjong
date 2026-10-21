@@ -50,8 +50,9 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
       assert page.locator('#local-game-controls').evaluate('''async(panel,id)=>{const y=scrollY;panel.scrollIntoView({block:'end'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const e=panel.querySelector(id),b=e.getBoundingClientRect(),hit=document.elementFromPoint(b.x+b.width/2,b.y+b.height/2),ok=b.top>=0&&b.bottom<=innerHeight&&b.width>=44&&b.height>=44&&(hit===e||e.contains(hit));window.scrollTo(0,y);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return ok}''',selector)
    if not page.locator('#ron').is_visible() and not page.locator('#show-result').is_visible():
     actions=page.locator('#discard:visible,#riichi:visible,#tsumo:visible').evaluate_all('els=>els.map(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {id:e.id,x:r.x,y:r.y,width:r.width,height:r.height,disabled:e.disabled,background:s.backgroundColor,color:s.color,opacity:s.opacity}})')
-    assert actions and len(actions)<=3
-    assert max(a['y'] for a in actions)-min(a['y'] for a in actions)<.1
+    assert len(actions)<=3
+    if actions:
+     assert max(a['y'] for a in actions)-min(a['y'] for a in actions)<.1
     for a in actions:
      assert a['height']>=44 and a['width']>=44
      assert a['background']==('rgb(212, 229, 219)' if a['disabled'] else 'rgb(255, 218, 125)')

@@ -2,7 +2,7 @@
 
 **実施日:** 2026-10-21
 **対象:** オフライン・オンライン対局の操作欄
-**状態:** 実装・ローカル検証完了。main push後のGitHub Actions結果は[検証記録](../verification/step14.5/README.md)を参照。iPhone Safari実機は未確認。
+**状態:** 実装・ローカル検証完了。最初のmain Actionsで既存Browser UI assertionが新しい非手番表示方針と合わず失敗したため修正し、再検証中。履歴は[検証記録](../verification/step14.5/README.md)を参照。iPhone Safari実機は未確認。
 
 ## 目的と変更前の重複
 

@@ -18,7 +18,7 @@
 
 `.github/workflows/browser-ui.yml`に`tests/browser-action-controls.py`と`tests/browser-action-panel.py`を追加しました。既存のBrowser UIシナリオもワークフローに残しています。main pushで`deploy.yml`がこのワークフローを呼び出し、Worker本番通信テストとPages build/deployまで実行します。
 
-Actions実行ID・対象SHA・Browser UIの幅別結果・WorkerおよびPagesの結果・実行時間は、main push後に結果を確認して最終報告へ記録します。この事前記録の作成時点ではrunはまだ開始していません。Actionsの成功をローカルでのChromium実行とは扱いません。
+最初のmain push（SHA `32518a8`）ではBrowser UI run `39609998145`とDeploy run `39609998208`が実行されました。両Browser jobは`tests/browser-action-controls.py`の「ボタンが常に1個以上表示される」という古い期待値で失敗しました。新方針では他家の手番に実行可能なボタンがなく、すべて隠れるため、その局面で0個を許容し、表示中のボタンがある場合のサイズ・配置検査は維持するよう修正しました。Deployの`verify` jobは成功し、Browser UI失敗のためWorker deploy・本番通信・Pages build/deployはskipされました。修正後のpushによるActions再検証は実行中です。最終結果と幅別レポートは最終報告にも記載します。Actionsの結果をローカルChromium実行とは扱いません。
 
 Browser UIシナリオは共通の`ActionPanel`クラスを両モードのテンプレートインスタンスで使い、同じ状態が同じ表示になること、異なるハンドラーへイベントが渡ること、合法操作だけが表示されることを確認します。操作送信待ち、判断期限切れ、ロン・鳴き、カン、結果操作、320・375・390・430pxでの画面幅とボタン寸法、相手の非公開物理IDがDOMに露出しないことも確認対象です。
 
