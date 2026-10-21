@@ -94,6 +94,7 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
   assert 'ダブル立直 2翻' in page.locator('#win-result').inner_text();assert '門前清自摸和 1翻' in page.locator('#win-result').inner_text()
   assert page.evaluate('riichiCheck().lastSettlement.deposits.points')==1000;conservation();shot('tsumo-result')
   page.locator('#view-table').click();assert page.locator('#result-dialog').is_hidden();page.locator('#show-result').click();assert page.locator('#result-dialog').is_visible()
+  page.locator('#view-table').click();assert page.locator('#result-dialog').is_hidden()
   page.locator('#next-round').click();assert page.evaluate('riichiCheck().game.players.every(p=>p.riichi===null)');conservation()
   page.evaluate("riichiFixture('ron')");select_draw();page.locator('#riichi').click();page.evaluate('window.savedRiichi=riichiCheck();riichiRestore(savedRiichi);riichiDiscard()')
   assert page.locator('#ron').is_enabled();assert page.locator('#pass-ron').is_enabled();assert page.locator('#riichi').is_hidden();shot('ron-pending');page.locator('#ron').click()

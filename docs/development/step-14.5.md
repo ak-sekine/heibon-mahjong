@@ -2,7 +2,7 @@
 
 **実施日:** 2026-10-21
 **対象:** オフライン・オンライン対局の操作欄
-**状態:** 実装・ローカル検証完了。main Actionsで追加したBrowser UIシナリオに古い非手番・結果ダイアログ期待があり、2回修正しました。現在の再検証結果は[検証記録](../verification/step14.5/README.md)を参照。iPhone Safari実機は未確認。
+**状態:** 実装・ローカル検証完了。main Actionsで追加したBrowser UIシナリオに古い非手番・結果ダイアログ期待があり、3回修正しました。現在の再検証結果は[検証記録](../verification/step14.5/README.md)を参照。iPhone Safari実機は未確認。
 
 ## 目的と変更前の重複
 
