@@ -87,6 +87,7 @@ MOCK = r"""
   });
   const sockets = [];
   let tickets = 0;
+  let nextSocketSeat = 0;
   let copied = '';
   const send = (socket, message) => {
     if (socket.readyState === MockWebSocket.OPEN) socket.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(message) }));
@@ -105,13 +106,14 @@ MOCK = r"""
     constructor() {
       super();
       this.readyState = MockWebSocket.CONNECTING;
-      this.seat = 0;
+      this.seat = nextSocketSeat;
+      nextSocketSeat = 0;
       sockets.push(this);
       setTimeout(() => {
         if (this.readyState !== MockWebSocket.CONNECTING) return;
         this.readyState = MockWebSocket.OPEN;
-        if (state.seats[0].connected === false) state.revision++;
-        state.seats[0].connected = true;
+        if (state.seats[this.seat].connected === false) state.revision++;
+        state.seats[this.seat].connected = true;
         this.dispatchEvent(new Event('open'));
         send(this, { type: 'room-state', ...JSON.parse(JSON.stringify(state)) });
         if (gameStarted) send(this, { type: 'game-state', view: makeView(this.seat) });
@@ -247,9 +249,9 @@ MOCK = r"""
     }
     close(code = 1000, reason = '') {
       if (this.readyState >= MockWebSocket.CLOSING) return;
-      if (state.seats[0].connected && state.status !== 'closed') {
-        state.seats[0].connected = false;
-        state.seats[0].ready = false;
+      if (state.seats[this.seat].connected && state.status !== 'closed') {
+        state.seats[this.seat].connected = false;
+        state.seats[this.seat].ready = false;
         state.revision++;
         broadcast();
       }
@@ -257,8 +259,8 @@ MOCK = r"""
     }
     forceDisconnect() {
       if (this.readyState !== MockWebSocket.OPEN) return;
-      state.seats[0].connected = false;
-      state.seats[0].ready = false;
+      state.seats[this.seat].connected = false;
+      state.seats[this.seat].ready = false;
       state.revision++;
       broadcast();
       this.finish(1006, 'Network interruption');
@@ -413,6 +415,28 @@ MOCK = r"""
       tickets++;
       value = { ticket: 'c'.repeat(64), expiresAt: Date.now() + 60000 };
     } else if (requestUrl.pathname === `/api/rooms/${code}/join`) {
+      const displayName = JSON.parse(init.body).displayName;
+      state.status = 'waiting';
+      state.hostSeat = 0;
+      state.revision = 0;
+      state.seats.splice(0, 4,
+        { seat: 0, kind: 'human', name: '既存ホスト', connected: false, ready: false, isHost: true },
+        { seat: 1, kind: 'human', name: displayName, connected: false, ready: false, isHost: false },
+        empty(2), empty(3));
+      gameStarted = false;
+      gameStatus = 'playing';
+      phase = 'awaiting-discard';
+      turnPlayerId = 0;
+      roundNumber = 1;
+      decision = null;
+      roundResult = null;
+      viewerOverride = null;
+      declarationIndexes = [-1, -1, -1, -1];
+      rivers = [[], [], [], []];
+      hands = [0, 1, 2, 3].map(seat => Array.from({ length: 13 }, (_, i) => makeTile(`rejoined-${seat}-${i}`, seat + i)));
+      drawnTiles = [makeTile('rejoined-0-draw', 7), null, null, null];
+      gameRevision = 0;
+      nextSocketSeat = 1;
       value = { roomCode: code, participantToken: guestToken, playerSeat: 1, createdAt: state.createdAt, expiresAt: state.expiresAt, seats: state.seats };
     } else {
       value = { error: 'not_found' };
