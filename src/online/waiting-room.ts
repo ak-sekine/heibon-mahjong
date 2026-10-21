@@ -137,6 +137,9 @@ export class OnlineWaitingRoom {
     this.dialog.addEventListener('close', () => {
       this.restoreMenuFocus();
     });
+    document.querySelector<HTMLInputElement>('#online-name')!.addEventListener('input', () => this.updateFormAvailability());
+    document.querySelector<HTMLInputElement>('#online-join-code')!.addEventListener('input', () => this.updateFormAvailability());
+    this.updateFormAvailability();
     document.querySelector<HTMLFormElement>('#online-room-form')!.addEventListener('submit', event => {
       event.preventDefault();
       const action = (event as SubmitEvent).submitter?.getAttribute('value');
@@ -219,6 +222,25 @@ export class OnlineWaitingRoom {
   private setError(message = ''): void {
     this.errorOutput.textContent = message;
     this.errorOutput.hidden = !message;
+  }
+
+  private updateFormAvailability(): void {
+    const nameInput = document.querySelector<HTMLInputElement>('#online-name')!;
+    const codeInput = document.querySelector<HTMLInputElement>('#online-join-code')!;
+    const name = nameInput.value.trim();
+    const code = codeInput.value.trim();
+    const validName = name.length >= 1 && name.length <= 24;
+    const validCode = ROOM_CODE_PATTERN.test(code.toUpperCase());
+    document.querySelector<HTMLButtonElement>('#online-create')!.disabled = !validName;
+    document.querySelector<HTMLButtonElement>('#online-join')!.disabled = !validName || !validCode;
+
+    const requirements = document.querySelector<HTMLElement>('#online-join-requirements')!;
+    if (!validName && code.length === 0) requirements.textContent = '表示名とルームコードを入力してください。';
+    else if (!validName && !validCode) requirements.textContent = '表示名とルームコードを確認してください。';
+    else if (!validName) requirements.textContent = '参加するには、先に表示名を入力してください。';
+    else if (code.length === 0) requirements.textContent = '参加するには、ルームコードを入力してください。';
+    else if (!validCode) requirements.textContent = 'ルームコードは6文字の英大文字または数字で入力してください。';
+    else requirements.textContent = '表示名とルームコードがそろいました。参加できます。';
   }
 
   private setConnection(message: string): void {

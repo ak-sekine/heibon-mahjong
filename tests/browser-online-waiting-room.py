@@ -490,13 +490,42 @@ with sync_playwright() as p:
 
     assert page.locator('#online-name').count() == 1 and page.locator('#online-join-name').count() == 0, 'waiting room does not have exactly one display-name field'
     assert page.locator('#online-name').get_attribute('maxlength') == '24', 'display-name length limit changed'
+    assert page.locator('#online-name-title').inner_text() == '共通の表示名', 'the shared display-name section was not labeled'
+    assert 'ルーム作成・参加のどちらにも使います' in page.locator('#online-name-help').inner_text(), 'the display-name field was not described as shared'
     select_menu_item('#online-open')
     assert page.locator('#main-menu-items').is_hidden(), 'selecting a menu item did not close the menu'
+
+    assert page.locator('#online-create').is_disabled(), 'room creation was enabled without a display name'
+    assert page.locator('#online-join').is_disabled(), 'room joining was enabled without a display name and room code'
+    assert '表示名とルームコード' in page.locator('#online-join-requirements').inner_text(), 'the join section did not explain its required inputs'
+    waiting_room_layouts = []
+    for width, height in [[320,700],[375,812],[390,844],[430,932]]:
+      page.set_viewport_size({'width': width, 'height': height})
+      layout = page.locator('#online-dialog').evaluate('''dialog => {
+        const rect = dialog.getBoundingClientRect();
+        const form = dialog.querySelector('#online-room-form');
+        return {
+          left: rect.left, right: rect.right, width: rect.width,
+          dialogClientWidth: dialog.clientWidth, dialogScrollWidth: dialog.scrollWidth,
+          formClientWidth: form.clientWidth, formScrollWidth: form.scrollWidth,
+          sectionWidths: [...form.querySelectorAll('.online-form-section')].map(section => section.getBoundingClientRect().width),
+        };
+      }''')
+      assert layout['left'] >= 0 and layout['right'] <= width, (width, layout)
+      assert layout['dialogScrollWidth'] <= layout['dialogClientWidth'], (width, layout)
+      assert layout['formScrollWidth'] <= layout['formClientWidth'], (width, layout)
+      assert all(section_width <= layout['formClientWidth'] for section_width in layout['sectionWidths']), (width, layout)
+      waiting_room_layouts.append([width, round(layout['width'], 2)])
+    page.set_viewport_size({'width': 390, 'height': 844})
+
     before_empty_submit = page.evaluate('window.onlineMock.requests.length')
-    page.locator('#online-create').click()
-    assert '1〜24文字' in page.locator('#online-status').inner_text(), 'an empty display name did not show validation feedback'
+    assert page.locator('#online-create').is_disabled(), 'room creation was enabled while the display name was empty'
+    assert page.locator('#online-join').is_disabled(), 'room joining was enabled while the display name was empty'
     assert page.evaluate('window.onlineMock.requests.length') == before_empty_submit, 'an empty display name was sent to the server'
     page.locator('#online-name').fill('テストホスト')
+    assert page.locator('#online-create').is_enabled(), 'room creation remained disabled after entering a display name'
+    assert page.locator('#online-join').is_disabled(), 'room joining was enabled before entering a room code'
+    assert 'ルームコードを入力' in page.locator('#online-join-requirements').inner_text(), 'the missing room code was not identified'
     page.locator('#online-create').click()
     wait_for("document.querySelector('#online-room-code').textContent === 'ABC234'")
     assert page.evaluate("window.onlineMock.requests[0].body.displayName === 'テストホスト'"), 'room creation did not send the common display name'
@@ -742,15 +771,16 @@ with sync_playwright() as p:
     page.locator('#online-name').fill('')
     page.locator('#online-join-code').fill('ABC234')
     before_invalid_code = page.evaluate('window.onlineMock.requests.length')
-    page.locator('#online-join').click()
-    assert '1〜24文字' in page.locator('#online-status').inner_text(), 'joining without a display name did not show validation feedback'
+    assert page.locator('#online-join').is_disabled(), 'joining was enabled without a display name'
+    assert '先に表示名' in page.locator('#online-join-requirements').inner_text(), 'joining without a display name did not identify the missing input'
     assert page.evaluate('window.onlineMock.requests.length') == before_invalid_code, 'a missing display name was sent to the server'
     page.locator('#online-name').fill('共通参加者')
     page.locator('#online-join-code').fill('bad!')
-    page.locator('#online-join').click()
-    assert 'ルームコード' in page.locator('#online-status').inner_text(), 'an invalid room code did not show validation feedback'
+    assert page.locator('#online-join').is_disabled(), 'joining was enabled with an invalid room code'
+    assert 'ルームコード' in page.locator('#online-join-requirements').inner_text(), 'an invalid room code was not identified'
     assert page.evaluate('window.onlineMock.requests.length') == before_invalid_code, 'an invalid room code was sent to the server'
     page.locator('#online-join-code').fill('ABC234')
+    assert page.locator('#online-join').is_enabled(), 'joining remained disabled after both inputs became valid'
     page.locator('#online-join').click()
     wait_for("document.querySelector('#online-room-code').textContent === 'ABC234' && window.onlineMock.requests.some(request => request.path.endsWith('/join'))")
     assert page.evaluate("window.onlineMock.requests.find(request => request.path.endsWith('/join')).body.displayName === '共通参加者'"), 'room join did not send the common display name'
@@ -775,7 +805,7 @@ with sync_playwright() as p:
     assert page.evaluate("localStorage.getItem('heibon-mahjong-online-session') === null"), 'online participant session was moved to localStorage'
     assert not errors, errors
 
-    report = {'step': '14.2', 'viewports': [[320,700],[375,812],[390,844],[430,932],[1280,900]], 'scenario': 'shared hamburger menu, common display name, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, exit', 'result': 'pass'}
+    report = {'step': '14.3', 'viewports': [[320,700],[375,812],[390,844],[430,932],[1280,900]], 'waitingRoomViewports': waiting_room_layouts, 'scenario': 'shared display-name section, join-button requirements, waiting-room layout at 320/375/390/430px, shared hamburger menu, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, exit', 'result': 'pass'}
     print(json.dumps(report, ensure_ascii=False), flush=True)
     (OUT / 'step14-2-online-game.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     page.close()

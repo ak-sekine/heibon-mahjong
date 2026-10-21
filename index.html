@@ -24,12 +24,23 @@
     <p id="online-status" role="status" aria-live="polite">オンライン接続を準備しています。</p>
     <section id="online-room-forms" aria-label="ルームの作成と参加">
       <form id="online-room-form" novalidate>
-        <label for="online-name">表示名</label>
-        <input id="online-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" required>
-        <button id="online-create" type="submit" name="roomAction" value="create" formnovalidate>ルームを作成</button>
-        <label for="online-join-code">ルームコードで参加</label>
-        <input id="online-join-code" name="roomCode" type="text" maxlength="6" pattern="[A-HJ-NP-Z2-9]{6}" autocapitalize="characters" autocomplete="off" required>
-        <button id="online-join" type="submit" name="roomAction" value="join">参加する</button>
+        <section id="online-form-identity" class="online-form-section" aria-labelledby="online-name-title">
+          <h3 id="online-name-title">共通の表示名</h3>
+          <p id="online-name-help" class="online-form-hint">ルーム作成・参加のどちらにも使います。</p>
+          <label for="online-name">表示名（1〜24文字）</label>
+          <input id="online-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" aria-describedby="online-name-help" required>
+        </section>
+        <section id="online-form-create" class="online-form-section" aria-labelledby="online-create-title">
+          <h3 id="online-create-title">新しくルームを作る</h3>
+          <button id="online-create" type="submit" name="roomAction" value="create" formnovalidate>ルームを作成</button>
+        </section>
+        <section id="online-form-join" class="online-form-section" aria-labelledby="online-join-title">
+          <h3 id="online-join-title">ルームコードで参加する</h3>
+          <p id="online-join-requirements" class="online-form-hint" aria-live="polite">参加には表示名とルームコードが必要です。</p>
+          <label for="online-join-code">ルームコード（6文字）</label>
+          <input id="online-join-code" name="roomCode" type="text" maxlength="6" pattern="[A-HJ-NP-Z2-9]{6}" autocapitalize="characters" autocomplete="off" aria-describedby="online-join-requirements" required>
+          <button id="online-join" type="submit" name="roomAction" value="join">参加する</button>
+        </section>
       </form>
     </section>
     <section id="online-room" aria-label="ルームの座席" hidden>
