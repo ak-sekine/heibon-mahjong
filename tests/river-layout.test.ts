@@ -14,9 +14,9 @@ test('online seat rotation puts each viewer at the bottom and rotates all other 
   }
 });
 
-test('1, 6, 7, and 18 discards use ordered, unique slots in all four directions', () => {
+test('1, 6, 7, 12, and 18 discards use ordered, unique slots in all four directions', () => {
   for (const direction of directions) {
-    for (const count of [1, 6, 7, 18]) {
+    for (const count of [1, 6, 7, 12, 18]) {
       const { placements } = calculateRiverLayout(direction, count);
       assert.equal(placements.length, count);
       assert.equal(new Set(placements.map(({ row, column }) => `${row},${column}`)).size, count);
@@ -33,10 +33,14 @@ test('1, 6, 7, and 18 discards use ordered, unique slots in all four directions'
   }
 });
 
-test('riichi rotation changes only its own face and leaves all other discard coordinates fixed', () => {
+test('riichi adds its extra face length only to later tiles on the same line', () => {
   for (const direction of directions) {
     const plain = calculateRiverLayout(direction, 18);
-    for (const declarationIndex of [0, 5, 6, 17]) {
+    const side = direction === 'left' || direction === 'right';
+    const mainOffset = (placement: (typeof plain.placements)[number]): string => side ? placement.top : placement.left;
+    const mainAxis = (placement: (typeof plain.placements)[number]): number => side ? placement.row : placement.column;
+    const mainLine = (placement: (typeof plain.placements)[number]): number => side ? placement.column : placement.row;
+    for (const declarationIndex of [0, 5, 6, 11, 12, 17]) {
       const riichi = calculateRiverLayout(direction, 18, declarationIndex);
       assert.equal(riichi.width, plain.width);
       assert.equal(riichi.height, plain.height);
@@ -44,15 +48,26 @@ test('riichi rotation changes only its own face and leaves all other discard coo
         const before = plain.placements[index];
         const after = riichi.placements[index];
         assert.deepEqual([after.row, after.column], [before.row, before.column], `${direction} declaration ${declarationIndex}, slot ${index}`);
-        if (index !== declarationIndex) {
-          assert.deepEqual([after.left, after.top], [before.left, before.top], `${direction} declaration ${declarationIndex}, tile ${index}`);
+        if (index === declarationIndex) {
+          assert.equal(after.declaration, true);
+          assert.equal(after.width,
+            side ? 'var(--river-tile-width)' : 'var(--river-tile-height)');
+          assert.equal(after.height,
+            side ? 'var(--river-tile-height)' : 'var(--river-tile-width)');
+          continue;
         }
-        assert.equal(after.declaration, index === declarationIndex);
+
+        assert.equal(after.declaration, false);
+        const declaration = riichi.placements[declarationIndex];
+        const followsDeclaration = mainLine(after) === mainLine(declaration) && mainAxis(after) > mainAxis(declaration);
+        if (followsDeclaration) {
+          assert.match(mainOffset(after), /var\(--river-tile-height\) - var\(--river-tile-width\)/,
+            `${direction} declaration ${declarationIndex}, following tile ${index} reserves the sideways face length`);
+        } else {
+          assert.equal(mainOffset(after), mainOffset(before),
+            `${direction} declaration ${declarationIndex}, unaffected tile ${index}`);
+        }
       }
-      assert.equal(riichi.placements[declarationIndex].width,
-        direction === 'left' || direction === 'right' ? 'var(--river-tile-width)' : 'var(--river-tile-height)');
-      assert.equal(riichi.placements[declarationIndex].height,
-        direction === 'left' || direction === 'right' ? 'var(--river-tile-height)' : 'var(--river-tile-width)');
     }
   }
 });

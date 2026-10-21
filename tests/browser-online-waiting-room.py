@@ -793,10 +793,10 @@ with sync_playwright() as p:
     assert option_sizes['#call-options'] == option_sizes['#online-call-options'], f'call option buttons do not share dimensions: {option_sizes}'
     assert option_sizes['#kan-options'] == option_sizes['#online-kan-options'], f'kan option buttons do not share dimensions: {option_sizes}'
 
-    for width, height in [(320,700),(375,812),(390,844),(430,932),(1280,900)]:
+    for width, height in [(320,700),(355,812),(375,812),(390,844),(430,932),(1280,900)]:
       page.set_viewport_size({'width': width, 'height': height})
-      for count in [1, 6, 7, 18]:
-        declaration_cases = [-1] if count < 18 else [-1, 0, 5, 6, 17]
+      for count in [1, 6, 7, 12, 18]:
+        declaration_cases = [-1, count-1] if count < 18 else [-1, 0, 5, 6, 17]
         for viewer in range(4):
           for declaration_index in declaration_cases:
             page.evaluate('args => window.onlineMock.showRiverScenario(args.viewer, args.count, args.declaration)', {
@@ -807,14 +807,32 @@ with sync_playwright() as p:
               const info = document.querySelector('[data-online-center-info]').getBoundingClientRect();
               const rivers = [...document.querySelectorAll('[data-online-river]')].map(river => {
                 const rect = river.getBoundingClientRect();
-                const tiles = [...river.querySelectorAll('.river-tile svg')].map(tile => tile.getBoundingClientRect());
+                const items = [...river.querySelectorAll('.river-tile')];
+                const tiles = items.map(item => item.querySelector('svg').getBoundingClientRect());
                 let tileOverlap = false;
                 for (let i=0; i<tiles.length; i++) for (let j=i+1; j<tiles.length; j++) tileOverlap ||= overlaps(tiles[i],tiles[j]);
                 const declaration = river.querySelector('[data-riichi-declaration="true"] svg');
                 const declarationRect = declaration?.getBoundingClientRect();
                 const side = river.dataset.onlineRiver === 'left' || river.dataset.onlineRiver === 'right';
                 const declarationDirection = !declarationRect || (side ? declarationRect.width < declarationRect.height : declarationRect.width > declarationRect.height);
-                return {count: tiles.length, infoOverlap: overlaps(rect,info), tileOverlap, declarationDirection, tilesInRiver: tiles.every(tile =>
+                const mainSpacing = [];
+                for (let i=0; i<items.length; i++) for (let j=i+1; j<items.length; j++) {
+                  const rowI=+items[i].dataset.riverRow, columnI=+items[i].dataset.riverColumn;
+                  const rowJ=+items[j].dataset.riverRow, columnJ=+items[j].dataset.riverColumn;
+                  const axisI=side?rowI:columnI, axisJ=side?rowJ:columnJ;
+                  const lineI=side?columnI:rowI, lineJ=side?columnJ:rowJ;
+                  if (lineI!==lineJ || Math.abs(axisI-axisJ)!==1) continue;
+                  const [first,second,firstIndex,secondIndex]=axisI<axisJ
+                    ? [tiles[i],tiles[j],i,j] : [tiles[j],tiles[i],j,i];
+                  const gap=side?second.top-first.bottom:second.left-first.right;
+                  const firstSize=side?first.height:first.width, secondSize=side?second.height:second.width;
+                  mainSpacing.push({
+                    gap, centerStep:side?second.top+second.height/2-first.top-first.height/2:second.left+second.width/2-first.left-first.width/2,
+                    expectedCenterStep:(firstSize+secondSize)/2+1,
+                    hasDeclaration:items[firstIndex].dataset.riichiDeclaration==='true'||items[secondIndex].dataset.riichiDeclaration==='true',
+                  });
+                }
+                return {count: tiles.length, infoOverlap: overlaps(rect,info), tileOverlap, declarationDirection, mainSpacing, tilesInRiver: tiles.every(tile =>
                   tile.left >= rect.left - 1 && tile.top >= rect.top - 1 && tile.right <= rect.right + 1 && tile.bottom <= rect.bottom + 1)};
               });
               const table = document.querySelector('#online-table').getBoundingClientRect();
@@ -828,31 +846,10 @@ with sync_playwright() as p:
             assert not metrics['overflow'] and metrics['tableInsideViewport'], f'online table overflow at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {metrics}'
             assert all(river['count'] == count for river in metrics['rivers']), f'online river count failed at {width}px: {metrics}'
             assert all(not river['infoOverlap'] and not river['tileOverlap'] and river['declarationDirection'] and river['tilesInRiver'] for river in metrics['rivers']), f'online river geometry overlapped at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {metrics}'
-          if count == 18:
-            page.evaluate('args => window.onlineMock.showRiverScenario(args.viewer, 18, -1)', {'viewer': viewer})
-            base_positions = page.evaluate('''() => {
-              const table = document.querySelector('#online-table').getBoundingClientRect();
-              return Object.fromEntries([...document.querySelectorAll('[data-online-river]')].map(river =>
-              [river.dataset.onlineRiver, [...river.querySelectorAll('.river-tile svg')].map(tile => {
-                const rect = tile.getBoundingClientRect(); return [rect.left-table.left,rect.top-table.top,rect.width,rect.height];
-              })]));
-            }''')
-            for declaration_index in [0, 5, 6, 17]:
-              page.evaluate('args => window.onlineMock.showRiverScenario(args.viewer, 18, args.declaration)', {
-                'viewer': viewer, 'declaration': declaration_index,
-              })
-              changed_positions = page.evaluate('''() => {
-                const table = document.querySelector('#online-table').getBoundingClientRect();
-                return Object.fromEntries([...document.querySelectorAll('[data-online-river]')].map(river =>
-                [river.dataset.onlineRiver, [...river.querySelectorAll('.river-tile svg')].map(tile => {
-                  const rect = tile.getBoundingClientRect(); return [rect.left-table.left,rect.top-table.top,rect.width,rect.height];
-                })]));
-              }''')
-              for position, tiles in base_positions.items():
-                for index, rect in enumerate(tiles):
-                  if index != declaration_index:
-                    after_rect = changed_positions[position][index]
-                    assert all(abs(before-after) < .1 for before, after in zip(rect, after_rect)), f'riichi declaration moved another {position} discard at {width}px, viewer {viewer}, declaration {declaration_index}, tile {index}: {rect} -> {after_rect}'
+            for river in metrics['rivers']:
+              for pair in river['mainSpacing']:
+                assert abs(pair['gap']-1)<.35, f'online main-axis edge gap is not 1px at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {pair}'
+                assert abs(pair['centerStep']-pair['expectedCenterStep'])<.35, f'online main-axis center spacing does not match displayed face sizes at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {pair}'
       page.screenshot(path=str(OUT / f'step14-2-online-rivers-{width}.png'), full_page=True)
     page.set_viewport_size({'width': 390, 'height': 844})
     page.evaluate('window.onlineMock.resetRivers()')

@@ -386,8 +386,8 @@ header > div { min-width:0; }
  .table-summary { --table-tile-width:min(42px,round(down,calc((100svh - 132px) / 15.8),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
 }
 
-/* River tiles use one absolute layout helper so compact spacing and fixed
-   declaration positions match in local and online games. */
+/* The shared absolute layout sizes each interval from the displayed face, so
+   local and online rivers keep the same spacing around a declaration. */
 .table .river-tile { width:var(--river-tile-width); height:var(--river-tile-height); justify-self:center; align-self:center; }
 .table .river-left .river-tile,.table .river-right .river-tile { width:var(--river-tile-height); height:var(--river-tile-width); }
 /* Both indicator rows use the same unrotated face size as river tiles. */

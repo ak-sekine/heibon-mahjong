@@ -27,9 +27,11 @@ export type RiverLayout = Readonly<{
 const GAP = 1;
 const MAX_DISCARDS = 18;
 
-function compactOffset(index: number): string {
-  return index === 0 ? '0px'
-    : `calc(var(--river-tile-height) * ${index * 0.5} + var(--river-tile-width) * ${index * 0.5} + ${index * GAP}px)`;
+function compactOffset(index: number, declarationFirst: boolean, declarationBefore: boolean): string {
+  const inset = declarationFirst ? '' : ' + var(--river-tile-height) * .5 - var(--river-tile-width) * .5';
+  const declarationLength = declarationBefore ? ' + var(--river-tile-height) - var(--river-tile-width)' : '';
+  if (index === 0 && declarationFirst) return '0px';
+  return `calc(var(--river-tile-width) * ${index} + ${index * GAP}px${inset}${declarationLength})`;
 }
 
 function fullOffset(index: number): string {
@@ -38,7 +40,9 @@ function fullOffset(index: number): string {
 
 function compactSpan(cellCount: number): string {
   const intervals = cellCount - 1;
-  return `calc(var(--river-tile-height) + var(--river-tile-height) * ${intervals * 0.5} + var(--river-tile-width) * ${intervals * 0.5} + ${intervals * GAP}px)`;
+  // Reserve the widest possible line: six tiles, including one sideways
+  // declaration between the two end half-cells.
+  return `calc(var(--river-tile-height) * 2 + var(--river-tile-width) * ${cellCount - 2} + ${intervals * GAP}px)`;
 }
 
 function fullSpan(cellCount: number): string {
@@ -46,10 +50,9 @@ function fullSpan(cellCount: number): string {
 }
 
 /**
- * Keep every slot fixed across discard counts and declaration positions.
- * Along the river, centers are half-way between a regular face and a sideways
- * declaration face apart, plus the 1px gap. Across rows, reserve the full
- * tile length. A declaration changes only its own face dimensions.
+ * Pack each line from the actual displayed face lengths. Ordinary neighbors
+ * keep a 1px edge gap; a sideways declaration adds its extra face length only
+ * to the following tile on that line. Across lines, reserve a full tile length.
  */
 export function calculateRiverLayout(
   position: RiverPosition,
@@ -71,7 +74,7 @@ export function calculateRiverLayout(
     ? centered
     : `calc(${offset} + ${centered})`;
 
-  const placements = Array.from({ length: discardCount }, (_, index) => {
+  const slots = Array.from({ length: discardCount }, (_, index) => {
     const row = Math.floor(index / 6);
     const column = index % 6;
     const screenRow = position === 'right' ? 5 - column
@@ -87,19 +90,37 @@ export function calculateRiverLayout(
     const heightFace = side
       ? declaration ? '--river-tile-height' : '--river-tile-width'
       : declaration ? '--river-tile-width' : '--river-tile-height';
-    const leftInSlot = side
-      ? add(fullOffset(screenColumn), centerInSlot(widthFace))
-      : add(compactOffset(screenColumn), centerInSlot(widthFace));
-    const topInSlot = side
-      ? add(compactOffset(screenRow), centerInSlot(heightFace))
-      : add(fullOffset(screenRow), centerInSlot(heightFace));
-
     return {
       row: screenRow,
       column: screenColumn,
       declaration,
-      width: `var(${widthFace})`,
-      height: `var(${heightFace})`,
+      widthFace,
+      heightFace,
+    };
+  });
+
+  const declarationSlot = slots.find(slot => slot.declaration);
+  const placements = slots.map(slot => {
+    const line = side ? slot.column : slot.row;
+    const axis = side ? slot.row : slot.column;
+    const declarationLine = declarationSlot && (side ? declarationSlot.column : declarationSlot.row);
+    const declarationAxis = declarationSlot && (side ? declarationSlot.row : declarationSlot.column);
+    const declarationFirst = declarationLine === line && declarationAxis === 0;
+    const declarationBefore = declarationLine === line && declarationAxis !== undefined && declarationAxis < axis;
+    const compactPosition = compactOffset(axis, declarationFirst, declarationBefore);
+    const leftInSlot = side
+      ? add(fullOffset(slot.column), centerInSlot(slot.widthFace))
+      : compactPosition;
+    const topInSlot = side
+      ? compactPosition
+      : add(fullOffset(slot.row), centerInSlot(slot.heightFace));
+
+    return {
+      row: slot.row,
+      column: slot.column,
+      declaration: slot.declaration,
+      width: `var(${slot.widthFace})`,
+      height: `var(${slot.heightFace})`,
       left: leftInSlot,
       top: topInSlot,
     };
