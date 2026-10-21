@@ -10,7 +10,8 @@ import { GameController } from './ui/controller.ts';
 import { OnlineWaitingRoom } from './online/waiting-room.ts';
 import { OnlineGameController } from './online/game-controller.ts';
 import { MainMenu } from './ui/main-menu.ts';
-import { mountActionPanel } from './ui/action-panel.ts';
+import { ActionPanel, mountActionPanel } from './ui/action-panel.ts';
+import { createLocalActionPanelState } from './rendering/local-action-panel-state.ts';
 import { mountScoreStrip, mountTableInfoPanel } from './ui/table-components.ts';
 
 const localScoreHost = document.querySelector<HTMLElement>('#local-score-strip-host');
@@ -22,23 +23,76 @@ if (localTableInfoHost) mountTableInfoPanel(localTableInfoHost, 'local');
 const onlineTableInfoHost = document.querySelector<HTMLElement>('#online-table-info-host');
 if (onlineTableInfoHost) mountTableInfoPanel(onlineTableInfoHost, 'online');
 const localActionHost = document.querySelector<HTMLElement>('#local-action-panel-host');
-if (localActionHost) mountActionPanel(localActionHost, 'local');
+const localActionRoot = localActionHost ? mountActionPanel(localActionHost, 'local') : null;
 const onlineActionHost = document.querySelector<HTMLElement>('#online-action-panel-host');
-if (onlineActionHost) mountActionPanel(onlineActionHost, 'online');
+const onlineActionRoot = onlineActionHost ? mountActionPanel(onlineActionHost, 'online') : null;
 installCallViewport();
 if (document.querySelector('#main-menu-toggle')) new MainMenu();
 const resultDialog = new ResultDialog();
 const controller = new GameController(undefined, { onChange: render });
+let localKanChoicesOpen = false;
+let localActionPanel: ActionPanel | null = null;
 function render(): void {
   renderTable(controller.game, controller.match.points, controller.match.lastSettlement);
   renderMatch(controller.match);
-  renderSelection(controller.game, controller.selectedTileId, controller.progressing, controller.match.points[0]);
+  renderSelection(controller.game, controller.selectedTileId, controller.progressing);
+  localActionPanel?.update(createLocalActionPanelState(
+    controller.match, controller.selectedTileId, controller.progressing, localKanChoicesOpen,
+  ));
   resultDialog.update(controller.match);
 }
+export function resetLocalActionChoices(): void { localKanChoicesOpen = false; }
 function newGame(): void { controller.newGame(); window.scrollTo(0, 0); }
 new NewGameDialog(newGame);
+if (localActionRoot) localActionPanel = new ActionPanel(localActionRoot, event => {
+  switch (event.type) {
+    case 'discard':
+      void controller.confirm().catch(error => console.error('Turn progression failed', error));
+      if (!document.querySelector<HTMLDialogElement>('#result-dialog')!.open) document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
+      break;
+    case 'riichi':
+      void controller.declareRiichi().catch(error => console.error('Riichi progression failed', error));
+      break;
+    case 'tsumo': controller.declareTsumo(); break;
+    case 'kyuushu': controller.declareKyuushuKyuuhai(); break;
+    case 'ron':
+      controller.declareRon();
+      if (!document.querySelector<HTMLDialogElement>('#result-dialog')!.open) document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
+      break;
+    case 'pass-ron':
+      void controller.passRon().catch(error => console.error('Turn progression failed', error));
+      if (!document.querySelector<HTMLDialogElement>('#result-dialog')!.open) document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
+      break;
+    case 'pass-call':
+      void controller.passCalls().catch(error => console.error('Call pass failed', error));
+      break;
+    case 'kan-toggle':
+      localKanChoicesOpen = true;
+      render();
+      break;
+    case 'cancel-kan':
+      localKanChoicesOpen = false;
+      render();
+      break;
+    case 'select-kan':
+      localKanChoicesOpen = false;
+      void controller.kan(event.optionId).catch(error => console.error('Kan failed', error));
+      break;
+    case 'select-call':
+      void controller.call(event.optionId).catch(error => console.error('Call failed', error));
+      break;
+    case 'next-round':
+      if (!controller.canNextRound) return;
+      window.scrollTo(0, 0);
+      void controller.nextRound().catch(error => console.error('Next round failed', error));
+      break;
+    case 'show-result': resultDialog.open(); break;
+    case 'return-local': break;
+  }
+});
 if (document.querySelector('#online-create-open')) {
-  const onlineGame = new OnlineGameController();
+  if (!onlineActionRoot) throw new Error('Online action panel host is missing');
+  const onlineGame = new OnlineGameController(new ActionPanel(onlineActionRoot));
   const waitingRoom = new OnlineWaitingRoom(import.meta.env.VITE_ONLINE_API_URL, message => onlineGame.receive(message));
   onlineGame.setActionSender((action, expectedGameRevision) => waitingRoom.sendGameAction(action, expectedGameRevision));
 }
@@ -46,36 +100,11 @@ document.querySelector('#player-hand')!.addEventListener('click', event => {
   const button = (event.target as Element).closest<HTMLButtonElement>('button[data-tile-id]');
   if (!button) return;
   controller.select(button.dataset.tileId!);
-  renderSelection(controller.game, controller.selectedTileId, controller.progressing, controller.match.points[0]);
+  renderSelection(controller.game, controller.selectedTileId, controller.progressing);
+  localActionPanel?.update(createLocalActionPanelState(
+    controller.match, controller.selectedTileId, controller.progressing, localKanChoicesOpen,
+  ));
   resultDialog.update(controller.match);
-});
-document.querySelector<HTMLButtonElement>('#discard')!.addEventListener('click', () => {
-  void controller.confirm().catch(error => console.error('Turn progression failed', error));
-  if (!document.querySelector<HTMLDialogElement>('#result-dialog')!.open) document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
-});
-document.querySelector<HTMLButtonElement>('#riichi')!.addEventListener('click', () => {
-  void controller.declareRiichi().catch(error => console.error('Riichi progression failed', error));
-});
-document.querySelector<HTMLButtonElement>('#tsumo')!.addEventListener('click', () => {
-  controller.declareTsumo();
-});
-document.querySelector<HTMLButtonElement>('#kyuushu-kyuuhai')!.addEventListener('click', () => {
-  controller.declareKyuushuKyuuhai();
-});
-document.querySelector<HTMLButtonElement>('#ron')!.addEventListener('click', () => {
-  controller.declareRon();
-  if (!document.querySelector<HTMLDialogElement>('#result-dialog')!.open) document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
-});
-document.querySelector<HTMLButtonElement>('#pass-ron')!.addEventListener('click', () => {
-  void controller.passRon().catch(error => console.error('Turn progression failed', error));
-  if (!document.querySelector<HTMLDialogElement>('#result-dialog')!.open) document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
-});
-document.querySelector<HTMLButtonElement>('#next-round')!.addEventListener('click', () => {
-  if (!controller.canNextRound) return;
-  document.querySelector<HTMLButtonElement>('#next-round')!.disabled = true;
-  const progression = controller.nextRound();
-  window.scrollTo(0, 0);
-  void progression.catch(error => console.error('Next round failed', error));
 });
 render();
 
@@ -87,24 +116,6 @@ for (const tile of [...TILE_KINDS.map(ordinaryTile), ...SUITS.map(redFive)]) {
   item.append(createTileElement(tile), label);
   gallery.append(item);
 }
-
-document.querySelector('#call-options')!.addEventListener('click', event => {
-  const button = (event.target as Element).closest<HTMLButtonElement>('button[data-call-id]');
-  if (button) void controller.call(button.dataset.callId!).catch(error => console.error('Call failed', error));
-});
-document.querySelector('#pass-calls')!.addEventListener('click', () => {
-  void controller.passCalls().catch(error => console.error('Call pass failed', error));
-});
-
-document.querySelector('#kan')!.addEventListener('click',()=>{
-  document.querySelector<HTMLElement>('#kan-controls')!.hidden=false;
-  document.querySelector('#kan-controls')!.scrollIntoView({block:'nearest'});
-});
-document.querySelector('#cancel-kan')!.addEventListener('click',()=>{document.querySelector<HTMLElement>('#kan-controls')!.hidden=true;});
-document.querySelector('#kan-options')!.addEventListener('click',event=>{
-  const button=(event.target as Element).closest<HTMLButtonElement>('button[data-kan-id]');
-  if(button) { document.querySelector<HTMLElement>('#kan-controls')!.hidden=true; void controller.kan(button.dataset.kanId!).catch(e=>console.error('Kan failed',e)); }
-});
 
 // Shared UI entry for the isolated verification page.
 export { controller, render };

@@ -21,9 +21,6 @@ export function renderMatch(match: MatchState): void {
   const deposits = document.querySelector<HTMLElement>('#deposit-sticks');
   if (deposits) renderDepositSticks(deposits, match.depositSticks);
   const panel = document.querySelector<HTMLElement>('#match-result')!;
-  const button = document.querySelector<HTMLButtonElement>('#next-round')!;
-  button.hidden = match.status !== 'round-ended';
-  button.disabled = button.hidden;
   if (renderedSettlements.has(panel) && renderedSettlements.get(panel) === match.lastSettlement) return;
   renderedSettlements.set(panel, match.lastSettlement);
   panel.hidden = !match.lastSettlement;

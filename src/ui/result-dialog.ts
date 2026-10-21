@@ -7,7 +7,6 @@ export class ResultDialog {
   private readonly reopen = document.querySelector<HTMLButtonElement>('#show-result')!;
   constructor() {
     document.querySelector('#view-table')!.addEventListener('click', () => this.close());
-    this.reopen.addEventListener('click', () => this.open());
     this.dialog.addEventListener('cancel', event => { event.preventDefault(); this.close(); });
     this.dialog.addEventListener('close', () => {
       document.documentElement.classList.remove('result-open');
@@ -16,9 +15,6 @@ export class ResultDialog {
   }
   update(match: MatchState): void {
     const result = match.lastSettlement;
-    this.reopen.hidden = !result;
-    document.querySelector<HTMLElement>('#round-result-actions')!.hidden = !result;
-    document.querySelector('#local-game-controls')!.classList.toggle('result-available', !!result);
     document.querySelector<HTMLButtonElement>('#result-new-game')!.hidden = match.status !== 'match-ended';
     if (result === this.result) return;
     this.result = result;

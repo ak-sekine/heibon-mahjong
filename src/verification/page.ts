@@ -1,4 +1,4 @@
-import { controller, render } from '../main.ts';
+import { controller, render, resetLocalActionChoices } from '../main.ts';
 import { startMatch } from '../game/match.ts';
 import { declareKan, getKanOptions } from '../game/kan.ts';
 import { scenarioGame, scenarioHelp, type Scenario } from './scenarios.ts';
@@ -11,7 +11,7 @@ function load() {
   // Cancel pending CPU work before replacing the match, using the normal lifecycle.
   controller.newGame();
   controller.match = startMatch(scenarioGame(mode));
-  document.querySelector<HTMLElement>('#kan-controls')!.hidden = true;
+  resetLocalActionChoices();
   document.querySelector('#scenario-help')!.textContent = scenarioHelp[mode];
   cpuKan.hidden = mode !== 'chankan';
   cpuKan.disabled = false;

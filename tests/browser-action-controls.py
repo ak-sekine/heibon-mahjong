@@ -5,8 +5,8 @@ from playwright.sync_api import sync_playwright
 out=pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', 'docs/verification/step13.5.2/screenshots')) / 'browser-action-controls';out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
- browser=p.chromium.launch(executable_path=shutil.which('chromium'),args=['--no-sandbox'])
- for width,height in [(320,568),(375,667),(390,844),(414,896),(1280,800),(375,547),(390,724)]:
+ browser=p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'),args=['--no-sandbox'])
+ for width,height in [(320,568),(375,667),(390,844),(414,896),(430,844),(1280,800),(375,547),(390,724)]:
   page=browser.new_page(viewport={'width':width,'height':height});errors=[]
   page.on('pageerror',lambda e: errors.append(str(e)))
   def inject(route):
@@ -49,13 +49,11 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
       assert height<600,(selector,box)
       assert page.locator('#local-game-controls').evaluate('''async(panel,id)=>{const y=scrollY;panel.scrollIntoView({block:'end'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const e=panel.querySelector(id),b=e.getBoundingClientRect(),hit=document.elementFromPoint(b.x+b.width/2,b.y+b.height/2),ok=b.top>=0&&b.bottom<=innerHeight&&b.width>=44&&b.height>=44&&(hit===e||e.contains(hit));window.scrollTo(0,y);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return ok}''',selector)
    if not page.locator('#ron').is_visible() and not page.locator('#show-result').is_visible():
-    actions=page.locator('#discard,#riichi,#tsumo').evaluate_all('els=>els.map(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {id:e.id,x:r.x,y:r.y,width:r.width,height:r.height,disabled:e.disabled,background:s.backgroundColor,color:s.color,opacity:s.opacity}})')
-    assert [a['id'] for a in actions]==['discard','riichi','tsumo']
-    assert max(a['width'] for a in actions)-min(a['width'] for a in actions)<.1
+    actions=page.locator('#discard:visible,#riichi:visible,#tsumo:visible').evaluate_all('els=>els.map(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {id:e.id,x:r.x,y:r.y,width:r.width,height:r.height,disabled:e.disabled,background:s.backgroundColor,color:s.color,opacity:s.opacity}})')
+    assert actions and len(actions)<=3
     assert max(a['y'] for a in actions)-min(a['y'] for a in actions)<.1
-    if not baseline: baseline.extend(actions)
-    for a,b in zip(actions,baseline):
-     assert abs(a['width']-b['width'])<.1 and abs(a['x']-b['x'])<.1 and a['height']==b['height'],(actions,baseline)
+    for a in actions:
+     assert a['height']>=44 and a['width']>=44
      assert a['background']==('rgb(212, 229, 219)' if a['disabled'] else 'rgb(255, 218, 125)')
      assert a['color']=='rgb(21, 78, 60)' and a['opacity']=='1'
     measurements.append(actions)
@@ -68,14 +66,14 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
   page.evaluate("riichiFixture('ron')");geometry();shot('own-turn')
   assert page.locator('#discard').is_disabled() and page.locator('#riichi').is_disabled()
   page.evaluate('riichiDiscard()');geometry();shot('other-turn')
-  for selector in ['#discard','#riichi','#tsumo']: assert page.locator(selector).is_visible() and page.locator(selector).is_disabled()
+  for selector in ['#discard','#riichi','#tsumo']: assert page.locator(selector).is_hidden()
   page.evaluate("riichiFixture('ron')");geometry()
   tile_id=page.evaluate('riichiCheck().game.players[0].hand.find(t=>t.tile.suit==="man" && t.tile.rank===1).id')
-  page.locator(f'#player-hand button[data-tile-id="{tile_id}"]').click();assert page.locator('#riichi').is_disabled()
+  page.locator(f'#player-hand button[data-tile-id="{tile_id}"]').click();assert page.locator('#riichi').is_hidden()
   select_draw();assert page.locator('#riichi').is_enabled();geometry();shot('before')
   page.locator('#discard').click();assert page.evaluate('riichiCheck().depositSticks')==0;assert page.evaluate('riichiCheck().game.players[0].riichi') is None;conservation()
   page.evaluate("riichiFixture('tsumo')");select_draw();page.locator('#riichi').click();assert page.evaluate('riichiCheck().depositSticks')==1
-  assert page.evaluate('riichiCheck().points[0]')==24000;assert 'リーチ' in page.locator('#label-0').inner_text();assert page.locator('#riichi').is_visible();assert page.locator('#riichi').is_disabled();conservation();geometry();shot('established')
+  assert page.evaluate('riichiCheck().points[0]')==24000;assert 'リーチ' in page.locator('#label-0').inner_text();assert page.locator('#riichi').is_hidden();conservation();geometry();shot('established')
   assert page.locator('#player-hand button:enabled').count()==0
   # Stop the scheduler by resetting its generation while retaining the test match.
   page.evaluate('window.savedRiichi=riichiCheck()')

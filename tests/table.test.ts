@@ -8,6 +8,7 @@ import { startGame } from '../src/game/start.ts';
 import { renderTable, renderSelection, yakuDisplayName } from '../src/rendering/table.ts';
 import type { YakuId } from '../src/analysis/yaku.ts';
 import { renderMatch } from '../src/rendering/match.ts';
+import { createLocalActionPanelState } from '../src/rendering/local-action-panel-state.ts';
 import { startMatch, nextRound } from '../src/game/match.ts';
 import { fixedRound } from './match-fixture.ts';
 import { discardTile } from '../src/game/discard.ts';
@@ -205,7 +206,6 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       for (const physical of game.deadWall.filter((_,i) => i !== 4)) assert.ok(!publicIds.includes(physical.id));
       for (const player of game.players.slice(1)) for (const physical of player.hand) assert.ok(!publicIds.includes(physical.id));
       renderSelection(game, null);
-      assert.equal(nodes.get('#discard')!.disabled, true);
       const own = nodes.get('#player-hand')!.children;
       assert.equal(own.length, 14);
       assert.equal(own.filter(item => item.className === 'drawn-tile').length, 1);
@@ -232,13 +232,11 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       const selected = game.players[0].drawnTile!;
       const snapshot = structuredClone(game);
       renderSelection(game, selected.id);
-      assert.equal(nodes.get('#discard')!.disabled, false);
       assert.equal(own[13].children[0].attributes['aria-pressed'], 'true');
       assert.deepEqual(game, snapshot);
       renderSelection(game, game.players[0].hand[0].id);
       assert.equal(own[13].children[0].attributes['aria-pressed'], 'false');
       renderSelection(game, null);
-      assert.equal(nodes.get('#discard')!.disabled, true);
       const stopped = discardTile(game, 0, selected.id);
       renderTable(stopped);
       renderSelection(stopped, null);
@@ -247,11 +245,8 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       const river = nodes.get('.river[data-player-id="0"]')!.children;
       assert.equal(river.length, 1);
       assert.equal(river[0].dataset.tileId, selected.id);
-      assert.equal(nodes.get('#discard')!.disabled, true);
-      assert.match(nodes.get('#selection-status')!.textContent, /CPU1の手番/);
       assert.equal(nodes.get('#label-1')!.dataset.active, 'true');
       renderSelection({ ...stopped, phase: 'wall-exhausted' }, null);
-      assert.equal(nodes.get('#selection-status')!.textContent, '牌山がなくなりました');
       // Next loop renders a new game and proves old river and selection are cleared.
     }
     const summary = nodes.get('#round-result-summary')!;
@@ -312,13 +307,9 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
     const eligible = tsumoGame();
     renderTable(eligible);
     renderSelection(eligible, eligible.players[0].hand[0].id);
-    assert.equal(nodes.get('#tsumo')!.disabled, false);
     renderSelection(eligible, null, true);
-    assert.equal(nodes.get('#tsumo')!.disabled, true);
     const won = declareTsumo(eligible, 0);
     renderTable(won); renderSelection(won, null);
-    assert.equal(nodes.get('#tsumo')!.disabled, true);
-    assert.equal(nodes.get('#discard')!.disabled, true);
     assert.equal(nodes.get('#player-hand')!.children.length, 14);
     assert.equal(nodes.get('#win-result')!.hidden, false);
     assert.ok(nodes.get('#win-result')!.children[0].children.some(c => c.textContent === 'ツモ和了！'));
@@ -501,11 +492,9 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     }
     assert.deepEqual(nodes.get('#player-hand')!.children.map(n => n.dataset.tileId), own);
     assert.ok(nodes.get('#player-hand')!.children.every(n => n.children[0].disabled));
-    assert.equal(nodes.get('#discard')!.disabled, true); assert.equal(nodes.get('#tsumo')!.disabled, true);
     const text = descend(panel).map(n => n.textContent);
     assert.ok(text.includes(`CPU${id}（${['', '南','西','北'][id]}）`));
     for (const s of ['平和 1翻', '門前清自摸和 1翻', '通常ドラ：1枚（1翻）', '赤ドラ：2枚（2翻）', '合計：5翻']) assert.ok(text.includes(s));
-    assert.equal(nodes.get('#selection-status')!.textContent, `CPU${id}がツモ和了！`);
     inventory(won, game);
     renderTable(cpuTsumoStart(id));
     assert.equal(panel.hidden, true); assert.equal(panel.children.length, 0);
@@ -549,14 +538,14 @@ for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','f
       renderTable(game, undefined, game.phase === 'won' ? startMatch(game).lastSettlement : null); renderSelection(game,null,true);
       assert.deepEqual(game,snapshot);
       const pending = scenario === 'waiting';
-      assert.equal(nodes.get('#ron-controls')!.hidden,!pending);
-      assert.equal(nodes.get('#ron')!.disabled,!pending);
-      assert.equal(nodes.get('#pass-ron')!.disabled,!pending);
+      const panelState = createLocalActionPanelState(startMatch(game), null, false, false);
+      assert.equal(panelState.ronGroup.visible,pending);
+      assert.equal(panelState.buttons.ron.enabled,pending);
+      assert.equal(panelState.buttons['pass-ron'].enabled,pending);
       if (pending) {
-        assert.equal(nodes.get('#ron')!.focused,true);
-        assert.match(nodes.get('#ron-status')!.textContent,/CPU1が赤5索を捨てました/);
+        assert.match(panelState.ronGroup.status,/CPU1が赤5索を捨てました/);
+        assert.equal(panelState.ronGroup.target?.tile.category,'suited');
       }
-      assert.equal(nodes.get('#discard')!.disabled,true); assert.equal(nodes.get('#tsumo')!.disabled,true);
       assert.ok(nodes.get('#player-hand')!.children.every(c=>c.children[0].disabled));
       const panel = nodes.get('#win-result')!;
       assert.equal(panel.hidden,game.phase!=='won');
@@ -669,8 +658,7 @@ for (const mode of ['discard', 'red', 'pending', 'ron', 'pass', 'reset', 'new-ma
     nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
     nodes.set(`.open-melds[data-player-id="${id}"]`, new ElementStub());
   }
-  for (const key of ['#player-hand','#wall-count','#win-result','#dora-indicators','#discard','#tsumo','#selection-status','#ron-controls','#ron-status','#ron-target','#ron','#pass-ron','#local-game-controls']) nodes.set(key,new ElementStub());
-  nodes.get('#ron-controls')!.hidden=true;
+  for (const key of ['#player-hand','#wall-count','#win-result','#dora-indicators']) nodes.set(key,new ElementStub());
   const original=globalThis.document;
   globalThis.document={querySelector:(s:string)=>nodes.get(s), querySelectorAll:()=>nodes.get('#player-hand')!.children.map(c=>c.children[0]), createElement:(tag:string)=>new ElementStub(tag)} as unknown as Document;
   const walk=(n:ElementStub):ElementStub[]=>[n,...n.children.flatMap(walk)];
@@ -681,12 +669,11 @@ for (const mode of ['discard', 'red', 'pending', 'ron', 'pass', 'reset', 'new-ma
     const snapshot=structuredClone(game);
     renderTable(game);renderSelection(game,null);
     assert.deepEqual(game,snapshot);
-    const target=nodes.get('#ron-target')!;
     const physical=game.ronWindow!.kan?.tile ?? game.players[1].river.at(-1)!;
-    assert.equal(target.children[0].innerHTML,tileSvgMarkup(physical.tile));
-    assert.equal(target.children[0].attributes['aria-hidden'],'true');
-    assert.equal(target.children[0].dataset.tileId,undefined);
-    if(mode==='red') assert.match(target.children[0].innerHTML,/赤5索/);
+    const actionState=createLocalActionPanelState(startMatch(game),null,false,false);
+    assert.equal(actionState.ronGroup.visible,true);
+    assert.deepEqual(actionState.ronGroup.target?.tile,physical.tile);
+    if(mode==='red') assert.match(actionState.ronGroup.status,/赤5索/);
     if(game===pending) {
       const group=nodes.get('.open-melds[data-player-id="1"]')!.children[0];
       assert.equal(group.dataset.meldType,'pon');assert.equal(group.dataset.kanPending,'true');
@@ -695,7 +682,7 @@ for (const mode of ['discard', 'red', 'pending', 'ron', 'pass', 'reset', 'new-ma
       const preview=called.children.find(n=>n.className.includes('pending-kan-tile'))!;
       assert.equal(preview.dataset.tileId,undefined);
       assert.equal(preview.children[0].innerHTML,tileSvgMarkup(physical.tile));
-      assert.match(nodes.get('#ron-status')!.textContent,/CPU1が1萬を加カン/);
+      assert.match(actionState.ronGroup.status,/CPU1が1萬を加カン/);
     }
     for(const p of game.players.slice(1)) for(const t of p.hand) assert.ok(![...nodes.values()].flatMap(walk).some(n=>n.dataset.tileId===t.id));
     inventory(game,mode==='discard'||mode==='red'?game:initial);
@@ -709,8 +696,9 @@ for (const mode of ['discard', 'red', 'pending', 'ron', 'pass', 'reset', 'new-ma
       for(const seat of [0,1,2,3]) assert.equal(nodes.get(`.open-melds[data-player-id="${seat}"]`)!.children[0].dataset.kanPending,seat===id?'true':undefined);
     } else if(game!==pending && !['discard','red'].includes(mode)) {
       renderTable(game);renderSelection(game,null);
-      assert.equal(target.children.length,0);
-      assert.equal(nodes.get('#ron-status')!.textContent,'');
+      const actionStateAfter=createLocalActionPanelState(startMatch(game),null,false,false);
+      assert.equal(actionStateAfter.ronGroup.target,null);
+      assert.equal(actionStateAfter.ronGroup.status,'');
       assert.ok(![...nodes.values()].flatMap(walk).some(n=>n.dataset.kanPending==='true'));
       if(mode==='ron') {
         const { allTiles }=await import('./helpers.ts');

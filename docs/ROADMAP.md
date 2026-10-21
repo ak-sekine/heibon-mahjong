@@ -1,6 +1,6 @@
 # 実装状況と開発候補
 
-この表は2026-10-19時点のソースを確認した状況です。候補は実装が確定した計画ではありません。現在の仕様は[SPEC.md](SPEC.md)、過去の判断・検証記録は[開発記録](development/README.md)を参照してください。
+この表は2026-10-21時点のソースを確認した状況です。候補は実装が確定した計画ではありません。現在の仕様は[SPEC.md](SPEC.md)、過去の判断・検証記録は[開発記録](development/README.md)を参照してください。
 
 ## 状態の見方
 
@@ -134,5 +134,6 @@ Step 13.8までの役満10種類に、Step 13.11で天和・地和を加え、�
 | Step 14.2：河の配置、共通メニュー、表示名 | 完了 | オンライン・オフラインで共通の河座標、右上メニュー、対局操作領域、待機画面の表示名欄を統一しました。[開発・設計記録](development/step-14.2.md) · [検証記録](verification/step14.2/README.md) |
 | Step 14.3：対局UI共通化、河間隔、CPU表示名 | 完了 | 共通操作・点数・卓中央コンポーネント、コンパクトな河座標、ドロップダウンメニュー、オンラインCPU番号を実装しました。ローカル50テスト、build、およびActionsのBrowser UI・Worker deploy・production test・Pages build/deployが成功しました。iPhone Safari実機確認は未実施です。[開発・設計記録](development/step-14.3.md) · [検証記録](verification/step14.3/README.md) |
 | Step 14.4：メニューとオンラインダイアログの分離 | 完了 | 作成・参加の入力フォームを分離し、ActionsのChromium、Worker本番通信、Pages build/deployまで成功しました。iPhone Safari実機確認は未実施です。[開発記録](development/step-14.4.md) · [検証記録](verification/step14.4/README.md) · [処理時間記録](verification/codex-performance/step14-4-menu-dialog-separation.md) |
+| Step 14.5：操作欄のソースコード共通化 | 実装・ローカル検証完了 | 共通ActionPanel、ローカル／オンライン状態アダプター、モード別操作委譲、ActionPanel単体テストを追加しました。main push後のBrowser UI・Worker・Pages Actions結果は[検証記録](verification/step14.5/README.md)に追記します。iPhone Safari実機確認は未実施です。[開発記録](development/step-14.5.md) · [検証記録](verification/step14.5/README.md) · [処理時間記録](verification/codex-performance/step14-5-action-panel.md) |
 
 各項目を着手する際は、実装範囲を決めてからこの表と[SPEC.md](SPEC.md)を更新します。

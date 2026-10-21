@@ -1,7 +1,4 @@
 import { renderMelds } from './melds.ts';
-import { getKanOptions } from '../game/kan.ts';
-import { uniqueCallOptions } from '../ui/call-options.ts';
-import { getCallOptions } from '../game/calls.ts';
 import { isForbiddenDiscard } from '../game/melds.ts';
 import { uraDoraIndicators } from '../game/dora.ts';
 import { ordinaryTile } from '../model/tile.ts';
@@ -10,36 +7,16 @@ import type { ScoreTier } from '../analysis/score.ts';
 import type { GameState, PlayerId, PlayerState, PhysicalTile, SeatWind, TsumoResult, RonCandidate } from '../model/game.ts';
 import { HONORS, SUITS, type Tile } from '../model/tile.ts';
 import { createTileElement, tileLabel } from './tile-svg.ts';
-import { canDeclareRon, getRonTile } from '../game/ron.ts';
-import { canDeclareTsumo } from '../game/tsumo.ts';
 import type { YakuId } from '../analysis/yaku.ts';
-import { canDeclareRiichi } from '../game/riichi.ts';
-import { canDeclareKyuushuKyuuhai } from '../game/special-draws.ts';
 import { canDiscard } from '../game/discard.ts';
 import { exposedDoraIndicators } from '../game/dora.ts';
 import { renderDoraIndicators, createResultDoraRow } from './dora.ts';
 import { applyRiverLayout, applyRiverTilePlacement, calculateRiverLayout, riverPositionFor } from './river-layout.ts';
 import type { RoundSettlement } from '../model/match.ts';
-import { renderSeatLabel, renderWallCount, setActionStatus } from './shared-table-components.ts';
+import { renderSeatLabel, renderWallCount } from './shared-table-components.ts';
 
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
 const seatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
-function turnLabel(game: GameState): string {
-  if (game.phase === 'won') {
-    const result = game.winResult!;
-    return result.winMethod === 'ron'
-      ? `${result.winners.map(w => seatNames[w.winnerId]).join('・')}がロン和了！ 放銃：${seatNames[result.discarderId]}`
-      : `${seatNames[result.winnerId]}がツモ和了！`;
-  }
-  if (game.phase === 'awaiting-call') return 'ポン・チー宣言待ち';
-  if (game.phase === 'awaiting-ron') return 'ロン宣言待ち';
-  if (game.phase === 'wall-exhausted') return game.abortiveDraw === 'four-kans' ? '四開槓・途中流局'
-    : game.abortiveDraw === 'kyuushu-kyuuhai' ? '九種九牌・途中流局'
-      : game.abortiveDraw === 'four-winds' ? '四風連打・途中流局'
-        : game.abortiveDraw === 'four-riichi' ? '四家立直・途中流局' : '牌山がなくなりました';
-  return `${game.turnPlayerId === 0 ? 'あなた' : seatNames[game.turnPlayerId]}の手番`;
-}
-
 function previewText(tag: string, textContent: string): HTMLElement { return Object.assign(document.createElement(tag), {textContent}); }
 
 function tileOrder(tile: Tile): number {
@@ -156,93 +133,12 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
   });
 }
 
-/** Selection rendering never changes GameState or rebuilds focused tile buttons. */
-export function renderSelection(game: GameState, selectedTileId: string | null, progressing = false, points = 25000): void {
+/** Tile selection rendering never changes GameState or rebuilds focused tile buttons. */
+export function renderSelection(game: GameState, selectedTileId: string | null, progressing = false): void {
   for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('#player-hand button'))) {
     button.setAttribute('aria-pressed', String(button.dataset.tileId === selectedTileId));
     button.disabled = isForbiddenDiscard(game.players[0],button.dataset.tileId!) || progressing || !canDiscard(game, 0) || Boolean(game.players[0].riichi && button.dataset.tileId !== game.players[0].drawnTile?.id);
   }
-  const kanOptions=progressing?[]:getKanOptions(game,0);
-  const kanButton=document.querySelector<HTMLButtonElement>('#kan');
-  if(kanButton) {kanButton.hidden=!kanOptions.length;kanButton.disabled=!kanOptions.length;}
-  const kyuushuButton=document.querySelector<HTMLButtonElement>('#kyuushu-kyuuhai');
-  if(kyuushuButton) {
-    const available=!progressing && game.players[0].control==='human' && canDeclareKyuushuKyuuhai(game,0);
-    kyuushuButton.hidden=!available;
-    kyuushuButton.disabled=!available;
-  }
-  const kanPanel=document.querySelector<HTMLElement>('#kan-controls');
-  if(kanPanel) {
-    if(!kanOptions.length) kanPanel.hidden=true;
-    document.querySelector('#kan-options')!.replaceChildren(...kanOptions.map(option=>{
-      const b=document.createElement('button');b.type='button';b.className='control-option-button';b.dataset.kanId=option.id;
-      b.append(document.createTextNode(option.meld.type==='ankan'?'暗カン':'加カン'));
-      for(const t of option.meld.tiles) b.append(createTileElement(t.tile));
-      return b;
-    }));
-  }
-  const calls = document.querySelector<HTMLElement>('#call-controls');
-  if (calls) {
-    const options = game.phase === 'awaiting-call' ? uniqueCallOptions(getCallOptions(game,0)) : [];
-    calls.hidden = !options.length;
-    const choices = document.querySelector<HTMLElement>('#call-options')!;
-    choices.replaceChildren(...options.map(option => {
-      const button = document.createElement('button'); button.type='button'; button.className='control-option-button'; button.dataset.callId=option.id;
-      const name = option.type==='pon' ? 'ポン' : option.type==='daiminkan'?'大明カン':'チー';
-      button.setAttribute('aria-label', `${name}：${option.tiles.map(t=>tileLabel(t.tile)).join('・')}（${option.handTileIds.join('、')}）`);
-      button.append(document.createTextNode(name));
-      for (const tile of option.tiles) button.append(createTileElement(tile.tile));
-      return button;
-    }));
-  }
-  const ron = document.querySelector<HTMLElement>('#ron-controls')!;
-  const wasHidden = ron.hidden;
-  const canRon = game.players[0].control === 'human' && canDeclareRon(game, 0);
-  ron.hidden = !canRon;
-  const tile = getRonTile(game);
-  const status = document.querySelector<HTMLElement>('#ron-status')!;
-  const target = document.querySelector<HTMLElement>('#ron-target');
-  if (canRon && tile) {
-    const kind = game.ronWindow?.kind;
-    const action = kind === 'kakan' ? 'を加カンしようとしています'
-      : kind === 'ankan' ? 'で暗カンを宣言しました' : 'を捨てました';
-    status.textContent = `${seatNames[game.ronWindow!.discarderId]}が${tileLabel(tile.tile)}${action}`;
-    if (target) {
-      const svg = createTileElement(tile.tile);
-      // The status already names the exact (including red) face once.
-      svg.setAttribute('aria-hidden', 'true');
-      target.replaceChildren(svg, previewText('p', kind === 'kakan' ? '追加する牌・この牌で槍槓できます'
-        : kind === 'ankan' ? 'この牌で槍槓できます' : 'この牌でロンできます'));
-    }
-  } else {
-    status.textContent = '';
-    target?.replaceChildren();
-    if (document.activeElement === document.querySelector('#ron') || document.activeElement === document.querySelector('#pass-ron')) {
-      (document.activeElement as HTMLElement).blur();
-    }
-  }
-  document.querySelector<HTMLButtonElement>('#ron')!.disabled = !canRon;
-  document.querySelector<HTMLButtonElement>('#pass-ron')!.disabled = !canRon;
-  if (canRon && wasHidden) document.querySelector<HTMLButtonElement>('#ron')!.focus({ preventScroll: true });
-  const controls = document.querySelector<HTMLElement>('#local-game-controls')!;
-  controls.classList.toggle('ron-pending', canRon);
-  controls.classList.toggle('game-ended', game.phase === 'won');
-  const player = game.players[0];
-  const selected = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
-    .find(tile => tile.id === selectedTileId);
-  const discard = document.querySelector<HTMLButtonElement>('#discard')!;
-  discard.textContent = player.riichi ? 'ツモ切り' : '打牌する';
-  discard.disabled = progressing || (!player.riichi && !selected) || !canDiscard(game, 0);
-  const riichi = document.querySelector<HTMLButtonElement>('#riichi');
-  if (riichi) {
-    riichi.disabled = progressing || !selected || !canDeclareRiichi(game, 0, selected.id, points);
-  }
-  document.querySelector<HTMLButtonElement>('#tsumo')!.disabled = progressing || game.players[0].control !== 'human' || !canDeclareTsumo(game, 0);
-  setActionStatus(document.querySelector<HTMLElement>('#selection-status')!, game.phase === 'wall-exhausted'
-    ? '牌山がなくなりました'
-    : !canDiscard(game, 0) ? turnLabel(game)
-    : player.riichi ? 'リーチ中：ツモ和了 または ツモ切り'
-    : selected ? `選択：${tileLabel(selected.tile)}` : 'あなたの手番：牌を選択して「打牌する」で確定');
 }
 
 const yakuNames: Record<YakuId, string> = {

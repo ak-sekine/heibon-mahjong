@@ -4,8 +4,10 @@ import { createTileElement, tileLabel } from '../rendering/tile-svg.ts';
 import { renderDepositSticks } from '../rendering/deposit-sticks.ts';
 import { applyRiverLayout, applyRiverTilePlacement, calculateRiverLayout, riverPositionFor } from '../rendering/river-layout.ts';
 import { renderDoraIndicators } from '../rendering/dora.ts';
-import { renderSeatLabel, renderTableRoundInfo, setActionStatus } from '../rendering/shared-table-components.ts';
+import { renderSeatLabel, renderTableRoundInfo } from '../rendering/shared-table-components.ts';
 import { TILE_KINDS, tileKindKey } from '../model/tile.ts';
+import { ActionPanel, type ActionPanelEvent } from '../ui/action-panel.ts';
+import { createOnlineActionPanelState } from './action-panel-state.ts';
 
 type ActionSender = (action: GameActionPayload, expectedGameRevision: number) => void;
 type DecisionAction = { type: 'declare-ron' } | { type: 'pass-ron' } | { type: 'declare-call'; optionId: string } | { type: 'pass-call' };
@@ -33,13 +35,15 @@ function asView(value: unknown): PlayerGameView | null {
 }
 
 export class OnlineGameController {
+  private readonly actionPanel: ActionPanel;
   private readonly root = document.querySelector<HTMLElement>('#online-match')!;
   private readonly scores = document.querySelector<HTMLElement>('#online-score-strip')!;
   private readonly playerHand = document.querySelector<HTMLUListElement>('#online-player-hand')!;
-  private readonly actionStatus = document.querySelector<HTMLElement>('#online-game-action-status')!;
   private view: PlayerGameView | null = null;
   private selectedTileId: string | null = null;
   private actionPending = false;
+  private decisionPending = false;
+  private actionNotice = '';
   private sender: ActionSender | null = null;
   private decisionCountdownTimer: number | null = null;
   private decisionWindowId: string | null = null;
@@ -71,44 +75,46 @@ export class OnlineGameController {
     });
   }
 
-  constructor() {
+  constructor(actionPanel: ActionPanel) {
+    this.actionPanel = actionPanel;
+    this.actionPanel.setHandler(event => this.handleAction(event));
     this.playerHand.addEventListener('click', event => {
       const button = (event.target as Element).closest<HTMLButtonElement>('button[data-tile-id]');
       if (!button || button.disabled) return;
       this.selectedTileId = this.selectedTileId === button.dataset.tileId ? null : button.dataset.tileId ?? null;
       this.render();
     });
-    document.querySelector<HTMLButtonElement>('#online-discard')!.addEventListener('click', () => {
-      const tileId = this.discardTileId();
-      if (tileId) this.send({ type: 'discard', tileId });
-    });
-    document.querySelector<HTMLButtonElement>('#online-riichi')!.addEventListener('click', () => {
-      if (this.selectedTileId) this.send({ type: 'declare-riichi', tileId: this.selectedTileId });
-    });
-    document.querySelector<HTMLButtonElement>('#online-tsumo')!.addEventListener('click', () => this.send({ type: 'declare-tsumo' }));
-    document.querySelector<HTMLButtonElement>('#online-kyuushu')!.addEventListener('click', () => this.send({ type: 'declare-kyuushu-kyuuhai' }));
-    document.querySelector<HTMLButtonElement>('#online-ron')!.addEventListener('click', () => this.sendDecision({ type: 'declare-ron' }));
-    document.querySelector<HTMLButtonElement>('#online-pass-ron')!.addEventListener('click', () => this.sendDecision({ type: 'pass-ron' }));
-    document.querySelector<HTMLButtonElement>('#online-pass-call')!.addEventListener('click', () => this.sendDecision({ type: 'pass-call' }));
-    document.querySelector<HTMLButtonElement>('#online-kan-options')!.addEventListener('click', event => {
-      const button = (event.target as Element).closest<HTMLButtonElement>('button[data-online-kan]');
-      if (button?.dataset.onlineKan) this.send({ type: 'declare-kan', optionId: button.dataset.onlineKan });
-    });
-    document.querySelector<HTMLButtonElement>('#online-kan')!.addEventListener('click', () => {
-      this.kanChoicesOpen = true;
-      this.render();
-      document.querySelector<HTMLElement>('#online-kan-controls')!.scrollIntoView({ block: 'nearest' });
-    });
-    document.querySelector<HTMLButtonElement>('#online-cancel-kan')!.addEventListener('click', () => {
-      this.kanChoicesOpen = false;
-      this.render();
-    });
-    document.querySelector<HTMLButtonElement>('#online-call-options')!.addEventListener('click', event => {
-      const button = (event.target as Element).closest<HTMLButtonElement>('button[data-online-call]');
-      if (button?.dataset.onlineCall) this.sendDecision({ type: 'declare-call', optionId: button.dataset.onlineCall });
-    });
-    document.querySelector<HTMLButtonElement>('#online-next-round')!.addEventListener('click', () => this.send({ type: 'next-round' }));
-    document.querySelector<HTMLButtonElement>('#online-return-local')!.addEventListener('click', () => this.returnToLocalGame());
+  }
+
+  private handleAction(event: ActionPanelEvent): void {
+    switch (event.type) {
+      case 'discard': {
+        const tileId = this.discardTileId();
+        if (tileId) this.send({ type: 'discard', tileId });
+        break;
+      }
+      case 'riichi':
+        if (this.selectedTileId) this.send({ type: 'declare-riichi', tileId: this.selectedTileId });
+        break;
+      case 'tsumo': this.send({ type: 'declare-tsumo' }); break;
+      case 'kyuushu': this.send({ type: 'declare-kyuushu-kyuuhai' }); break;
+      case 'ron': this.sendDecision({ type: 'declare-ron' }); break;
+      case 'pass-ron': this.sendDecision({ type: 'pass-ron' }); break;
+      case 'pass-call': this.sendDecision({ type: 'pass-call' }); break;
+      case 'kan-toggle':
+        this.kanChoicesOpen = true;
+        this.render();
+        break;
+      case 'cancel-kan':
+        this.kanChoicesOpen = false;
+        this.render();
+        break;
+      case 'select-kan': this.send({ type: 'declare-kan', optionId: event.optionId }); break;
+      case 'select-call': this.sendDecision({ type: 'declare-call', optionId: event.optionId }); break;
+      case 'next-round': this.send({ type: 'next-round' }); break;
+      case 'show-result': document.querySelector<HTMLElement>('#online-round-result')?.scrollIntoView({ block: 'nearest' }); break;
+      case 'return-local': this.returnToLocalGame(); break;
+    }
   }
 
   setActionSender(sender: ActionSender): void { this.sender = sender; }
@@ -119,6 +125,8 @@ export class OnlineGameController {
       this.view = null;
       this.finalRanks = null;
       this.actionPending = false;
+      this.decisionPending = false;
+      this.actionNotice = '';
       this.kanChoicesOpen = false;
       this.root.hidden = true;
       this.setTableClasses(false);
@@ -128,13 +136,16 @@ export class OnlineGameController {
     }
     if (message.type === 'game-action-result') {
       this.actionPending = false;
-      if (message.ok === false) this.actionStatus.textContent = '操作が受け付けられませんでした。最新状態を確認してください。';
+      this.decisionPending = false;
+      this.actionNotice = message.ok === false ? '操作が受け付けられませんでした。最新状態を確認してください。' : '';
       this.render();
       return;
     }
     if (message.type === 'game-aborted') {
       this.stopDecisionCountdown();
       this.actionPending = false;
+      this.decisionPending = false;
+      this.actionNotice = '';
       this.view = this.view ? {
         ...this.view,
         status: 'aborted',
@@ -159,6 +170,8 @@ export class OnlineGameController {
     }
     this.view = next;
     this.actionPending = false;
+    this.decisionPending = false;
+    this.actionNotice = '';
     this.setTableClasses(true);
     this.root.hidden = false;
     document.body.classList.add('online-game-active');
@@ -171,7 +184,8 @@ export class OnlineGameController {
     if (!view || !this.sender || this.actionPending ||
         (view.status !== 'playing' && !(action.type === 'next-round' && view.status === 'round-ended'))) return;
     this.actionPending = true;
-    this.actionStatus.textContent = 'サーバーで操作を確認しています…';
+    this.decisionPending = false;
+    this.actionNotice = '';
     this.render();
     this.sender(action, view.gameRevision);
   }
@@ -181,7 +195,8 @@ export class OnlineGameController {
     const decision = view?.self.decision;
     if (!view || !decision || decision.answered || !this.sender || this.actionPending) return;
     this.actionPending = true;
-    this.actionStatus.textContent = '回答をサーバーへ送信しています…';
+    this.decisionPending = true;
+    this.actionNotice = '';
     this.render();
     this.sender({ ...action, windowId: decision.windowId } as GameActionPayload, decision.expectedGameRevision);
   }
@@ -388,93 +403,16 @@ export class OnlineGameController {
   }
 
   private renderActions(view: PlayerGameView): void {
-    const active = view.status === 'playing';
-    const decision = view.self.decision;
-    const discarding = view.self.discardableTileIds.length > 0 && !decision;
-    const selected = this.discardTileId();
-    const discard = document.querySelector<HTMLButtonElement>('#online-discard')!;
-    discard.hidden = !discarding;
-    discard.textContent = view.seats[view.viewerSeat].riichi ? 'ツモ切り' : '打牌する';
-    discard.disabled = !active || this.actionPending || !selected;
-    const riichi = document.querySelector<HTMLButtonElement>('#online-riichi')!;
-    riichi.hidden = !active || !selected || !view.self.riichiTileIds.includes(selected);
-    riichi.disabled = this.actionPending;
-    const tsumo = document.querySelector<HTMLButtonElement>('#online-tsumo')!;
-    tsumo.hidden = !active || !view.self.canTsumo;
-    tsumo.disabled = this.actionPending;
-    const kyuushu = document.querySelector<HTMLButtonElement>('#online-kyuushu')!;
-    kyuushu.hidden = !active || !view.self.canKyuushuKyuuhai;
-    kyuushu.disabled = this.actionPending;
-    const kanButton = document.querySelector<HTMLButtonElement>('#online-kan')!;
-    kanButton.hidden = !active || view.self.kanOptions.length === 0 || decision !== null;
-    kanButton.disabled = this.actionPending;
-    const kanGroup = document.querySelector<HTMLElement>('#online-kan-controls')!;
-    kanGroup.hidden = !this.kanChoicesOpen || !active || view.self.kanOptions.length === 0 || decision !== null;
-    const kanOptions = document.querySelector<HTMLElement>('#online-kan-options')!;
-    kanOptions.replaceChildren(...view.self.kanOptions.map(option => {
-      const button = document.createElement('button');
-      button.type = 'button'; button.className = 'control-option-button'; button.dataset.onlineKan = option.id; button.disabled = this.actionPending;
-      button.append(text('span', option.type === 'ankan' ? '暗カン ' : '加カン '));
-      for (const tile of option.tiles) button.append(face(tile));
-      return button;
-    }));
-    const ron = document.querySelector<HTMLElement>('#online-ron-controls')!;
-    const canAnswerRon = Boolean(decision?.type === 'ron' && !decision.answered && view.self.canRon);
-    ron.hidden = !decision || decision.type !== 'ron';
-    document.querySelector<HTMLElement>('#online-game-controls')!.classList.toggle('ron-pending', canAnswerRon);
-    const calls = document.querySelector<HTMLElement>('#online-call-controls')!;
-    calls.hidden = !decision || decision.type !== 'call';
-    const callOptions = document.querySelector<HTMLElement>('#online-call-options')!;
-    callOptions.replaceChildren(...view.self.callOptions.map(option => {
-      const button = document.createElement('button');
-      button.type = 'button'; button.className = 'control-option-button'; button.dataset.onlineCall = option.id;
-      button.disabled = this.actionPending || Boolean(decision?.answered) || this.decisionSeconds(decision) === 0;
-      button.append(text('span', option.type === 'pon' ? 'ポン ' : option.type === 'chi' ? 'チー ' : '大明カン '));
-      for (const tile of option.tiles) button.append(face(tile));
-      return button;
-    }));
-    const secondsLeft = this.decisionSeconds(decision);
-    const expired = Boolean(decision && secondsLeft === 0);
-    const ronStatus = document.querySelector<HTMLElement>('#online-ron-status')!;
-    const callStatus = document.querySelector<HTMLElement>('#online-call-status')!;
-    const statusText = !decision ? '' : expired
-      ? '判断期限が過ぎました。サーバーの確定を待っています。'
-      : decision.answered
-        ? `回答済みです。他のプレイヤーの回答を待っています。残り ${secondsLeft} 秒。`
-        : `${decision.type === 'ron' ? 'ロン' : '鳴き'}判断の残り ${secondsLeft} 秒です。`;
-    ronStatus.textContent = statusText;
-    callStatus.textContent = statusText;
-    const ronTarget = document.querySelector<HTMLElement>('#online-ron-target')!;
-    if (canAnswerRon && view.self.ronTile) {
-      ronTarget.replaceChildren(face(view.self.ronTile), text('p', `${tileLabel(view.self.ronTile.tile)} · この牌でロンできます`));
-    } else ronTarget.replaceChildren();
-    document.querySelector<HTMLButtonElement>('#online-ron')!.disabled = this.actionPending || !canAnswerRon || expired;
-    document.querySelector<HTMLButtonElement>('#online-pass-ron')!.disabled = this.actionPending || !canAnswerRon || expired;
-    document.querySelector<HTMLButtonElement>('#online-pass-call')!.disabled = this.actionPending || Boolean(decision?.answered) || expired;
-    this.syncDecisionCountdown(decision);
-    const next = document.querySelector<HTMLButtonElement>('#online-next-round')!;
-    next.hidden = view.status !== 'round-ended' || !view.self.isHost;
-    next.disabled = this.actionPending || view.seats.some(seat => seat.control === 'human' && !seat.connected);
-    const returnLocal = document.querySelector<HTMLButtonElement>('#online-return-local')!;
-    returnLocal.hidden = view.status !== 'match-ended' && view.status !== 'aborted';
-    const roundActions = document.querySelector<HTMLElement>('#online-round-result-actions')!;
-    roundActions.hidden = next.hidden && returnLocal.hidden;
-
-    let message: string;
-    if (this.actionPending) message = 'サーバーで操作を確認しています…';
-    else if (decision?.answered) message = '回答を受け付けました。他のプレイヤーの回答を待っています。';
-    else if (decision) message = statusText;
-    else if (view.status === 'round-ended') message = view.self.isHost ? '局が終了しました。結果を確認してください。' : 'ホストが次局へ進めるまでお待ちください。';
-    else if (view.status === 'match-ended') message = '東風戦が終了しました。最終結果を確認できます。';
-    else if (view.status === 'aborted') message = view.abortReason === 'participant-left'
-      ? '参加者が明示的に退出したため、対局を中断しました。'
-      : 'この対局は中断されました。';
-    else if (view.phase === 'awaiting-ron') message = 'ロン判断を待っています。';
-    else if (view.phase === 'awaiting-call') message = '鳴き判断を待っています。';
-    else if (view.turnPlayerId !== view.viewerSeat) message = `${this.displayName(view, view.seats[view.turnPlayerId])}の手番です。`;
-    else if (view.self.discardableTileIds.length) message = this.selectedTileId ? '牌を選択中です。' : '打牌する牌を選択してください。';
-    else message = 'サーバーの更新を待っています。';
-    setActionStatus(this.actionStatus, message);
+    this.actionPanel.update(createOnlineActionPanelState(
+      view,
+      this.selectedTileId,
+      this.actionPending,
+      this.decisionPending,
+      this.kanChoicesOpen,
+      this.decisionSeconds(view.self.decision),
+      this.actionNotice,
+    ));
+    this.syncDecisionCountdown(view.self.decision);
   }
 
   private returnToLocalGame(): void {
@@ -483,6 +421,8 @@ export class OnlineGameController {
     this.view = null;
     this.finalRanks = null;
     this.actionPending = false;
+    this.decisionPending = false;
+    this.actionNotice = '';
     this.root.hidden = true;
     this.setTableClasses(false);
     document.body.classList.remove('online-game-active');
