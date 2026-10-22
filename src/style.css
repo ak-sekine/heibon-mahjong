@@ -406,6 +406,65 @@ header > div { min-width:0; }
 .dora-slot.ura-indicator:nth-child(6)::after { content:"裏"; position:absolute; left:0; bottom:0; background:#ffda7d; color:#123f32; font-size:6px; line-height:1; }
 .table .wall-dead-count { color:inherit; }
 
+.declaration-bubble {
+  position:absolute;
+  z-index:40;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-sizing:border-box;
+  max-width:min(150px,calc(100% - 8px));
+  padding:8px 12px;
+  border:2px solid #805300;
+  border-radius:15px;
+  background:#fff1b8;
+  color:#26372b;
+  box-shadow:0 3px 8px rgb(0 0 0 / 35%);
+  font-size:clamp(21px,7vw,29px);
+  font-weight:900;
+  line-height:1;
+  white-space:nowrap;
+  writing-mode:horizontal-tb;
+  text-orientation:mixed;
+  pointer-events:none;
+  user-select:none;
+}
+.declaration-bubble::after {
+  position:absolute;
+  width:12px;
+  height:12px;
+  background:inherit;
+  content:"";
+}
+.declaration-bubble-top::after {
+  top:-8px;
+  left:calc(50% - 6px);
+  border-top:2px solid #805300;
+  border-left:2px solid #805300;
+  transform:rotate(45deg);
+}
+.declaration-bubble-right::after {
+  top:calc(50% - 6px);
+  right:-8px;
+  border-top:2px solid #805300;
+  border-right:2px solid #805300;
+  transform:rotate(45deg);
+}
+.declaration-bubble-bottom::after {
+  bottom:-8px;
+  left:calc(50% - 6px);
+  border-right:2px solid #805300;
+  border-bottom:2px solid #805300;
+  transform:rotate(45deg);
+}
+.declaration-bubble-left::after {
+  top:calc(50% - 6px);
+  left:-8px;
+  border-bottom:2px solid #805300;
+  border-left:2px solid #805300;
+  transform:rotate(45deg);
+}
+
 .table .center-info .deposit-stick { width:clamp(18px,calc(var(--cell)*.48),30px); height:clamp(6px,calc(var(--cell)*.16),10px); }
 /* Give the summary enough of the river gap for two full-size indicator rows
    and larger, 60:16 deposit sticks while keeping its text size unchanged. */

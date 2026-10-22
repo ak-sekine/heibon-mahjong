@@ -10,6 +10,9 @@ import { ActionPanel, type ActionPanelEvent } from '../ui/action-panel.ts';
 import { ResultDialog } from '../ui/result-dialog.ts';
 import { createOnlineActionPanelState } from './action-panel-state.ts';
 import { renderOnlineWinSummary } from './result-content.ts';
+import { DeclarationBubbleRenderer } from '../rendering/declaration-bubbles.ts';
+import type { PublicDeclarationEvent } from '../model/declaration.ts';
+import { collectRecentDeclarations } from './declaration-cursor.ts';
 
 type ActionSender = (action: GameActionPayload, expectedGameRevision: number) => void;
 type DecisionAction = { type: 'declare-ron' } | { type: 'pass-ron' } | { type: 'declare-call'; optionId: string } | { type: 'pass-call' };
@@ -33,15 +36,26 @@ function asView(value: unknown): PlayerGameView | null {
       !Number.isInteger(view.viewerSeat) || view.viewerSeat! < 0 || view.viewerSeat! > 3 ||
       view.self?.seat !== view.viewerSeat || !Array.isArray(view.seats) || view.seats.length !== 4 ||
       !['playing', 'round-ended', 'match-ended', 'aborted'].includes(String(view.status))) return null;
-  return view as PlayerGameView;
+  const declarations = view.declarations;
+  if (declarations !== undefined && (!Array.isArray(declarations) || declarations.some(event =>
+    !event || !Number.isSafeInteger(event.id) || !Number.isInteger(event.roundNumber) ||
+    !Number.isInteger(event.dealerId) || event.dealerId! < 0 || event.dealerId! > 3 ||
+    !Number.isInteger(event.honba) || event.honba! < 0 ||
+    !Number.isInteger(event.seat) || event.seat! < 0 || event.seat! > 3 ||
+    !['riichi', 'pon', 'kan', 'chi', 'ron'].includes(String(event.kind)) ||
+    !Number.isFinite(event.occurredAt)))) return null;
+  return { ...view, declarations: (declarations ?? []) as readonly PublicDeclarationEvent[] } as PlayerGameView;
 }
 
 export class OnlineGameController {
   private readonly actionPanel: ActionPanel;
   private readonly root = document.querySelector<HTMLElement>('#online-match')!;
+  private readonly table = document.querySelector<HTMLElement>('#online-table')!;
   private readonly scores = document.querySelector<HTMLElement>('#online-score-strip')!;
   private readonly playerHand = document.querySelector<HTMLUListElement>('#online-player-hand')!;
+  private readonly declarationBubbles = new DeclarationBubbleRenderer(this.table);
   private view: PlayerGameView | null = null;
+  private declarationCursor: number | null = null;
   private selectedTileId: string | null = null;
   private actionPending = false;
   private decisionPending = false;
@@ -127,7 +141,9 @@ export class OnlineGameController {
     if (message.type === 'online-session-ended') {
       this.stopDecisionCountdown();
       this.clearRoomNotice();
+      this.declarationBubbles.clearAll();
       this.view = null;
+      this.declarationCursor = null;
       this.finalRanks = null;
       this.actionPending = false;
       this.decisionPending = false;
@@ -185,7 +201,18 @@ export class OnlineGameController {
     }
     if (message.type !== 'game-state' && message.type !== 'game-started') return;
     const next = asView(message.view);
-    if (!next || this.view && next.gameRevision < this.view.gameRevision) return;
+    if (!next) return;
+    const replacesSession = message.type === 'game-started' && this.view !== null &&
+      (next.roomCode !== this.view.roomCode || this.view.status !== 'playing' || next.gameRevision < this.view.gameRevision);
+    if (this.view && next.gameRevision < this.view.gameRevision && !replacesSession) return;
+    if (replacesSession) {
+      this.declarationBubbles.clearAll();
+      this.declarationCursor = null;
+      this.view = null;
+    }
+    if (!this.view || this.declarationCursor === null) {
+      this.declarationBubbles.clearAll();
+    }
     if (!this.view || next.gameRevision !== this.view.gameRevision) {
       this.selectedTileId = null;
       this.kanChoicesOpen = false;
@@ -243,10 +270,27 @@ export class OnlineGameController {
     this.renderSeatLabels(view);
     this.renderHandsAndMelds(view);
     this.renderRivers(view);
+    this.renderDeclarationEvents(view);
     this.renderDora(view);
     this.renderResult(view);
     this.renderActions(view);
     this.resultDialog.updateOnline(view);
+  }
+
+  private renderDeclarationEvents(view: PlayerGameView): void {
+    const batch = collectRecentDeclarations(this.declarationCursor, view.declarations, view.round, Date.now());
+    this.declarationCursor = batch.cursor;
+    for (const { event, remainingMs } of batch.recent) {
+      const position = riverPositionFor(view.viewerSeat, event.seat);
+      const river = document.querySelector<HTMLElement>(`[data-online-river="${position}"]`);
+      if (river) this.declarationBubbles.show(
+        event.seat,
+        event.kind,
+        position,
+        river,
+        remainingMs,
+      );
+    }
   }
 
   private renderSeatLabels(view: PlayerGameView): void {
@@ -439,7 +483,9 @@ export class OnlineGameController {
     if (!this.view || (this.view.status !== 'match-ended' && this.view.status !== 'aborted')) return;
     this.stopDecisionCountdown();
     this.clearRoomNotice();
+    this.declarationBubbles.clearAll();
     this.view = null;
+    this.declarationCursor = null;
     this.finalRanks = null;
     this.actionPending = false;
     this.decisionPending = false;

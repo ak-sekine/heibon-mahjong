@@ -35,6 +35,7 @@ MOCK = r"""
   let roundResult = null;
   let viewerOverride = null;
   const gameNameOverrides = {};
+  let declarations = [];
   let declarationIndexes = [-1, -1, -1, -1];
   let hands = [0, 1, 2, 3].map(seat => Array.from({ length: 13 }, (_, i) => makeTile(`online-${seat}-${i}`, seat + i)));
   let drawnTiles = [makeTile('online-0-draw', 7), null, null, null];
@@ -62,6 +63,7 @@ MOCK = r"""
     const callTiles = [hands[viewerSeat][0], hands[viewerSeat][1], makeTile('online-called', 8)];
     return {
       type: 'game-state', roomCode: code, gameRevision, viewerSeat, status: gameStatus,
+      declarations: JSON.parse(JSON.stringify(declarations)),
       round: { roundNumber, dealerId: 0, honba: roundResult?.honba ?? 0, points: roundResult?.after ?? [25000, 25000, 25000, 25000], depositSticks: roundResult?.reason === 'draw' ? 1 : 0 },
       phase, turnPlayerId, liveWallCount: 90 - gameRevision, seats: viewSeats,
       doraIndicators: [makeTile('online-dora', 4)],
@@ -140,6 +142,7 @@ MOCK = r"""
         if (gameStarted) return gameResult(this, message, false, 'already_started');
         gameStarted = true;
         gameRevision = 1;
+        declarations = [];
         gameResult(this, message, true);
         send(this, { type: 'game-started', view: makeView(this.seat) });
         broadcastGame('game-state');
@@ -327,6 +330,19 @@ MOCK = r"""
       gameNameOverrides[seat] = name;
       broadcastGame('game-state');
     },
+    showDeclarations(events) {
+      for (const item of events) declarations.push({
+        id: declarations.length + 1,
+        roundNumber,
+        dealerId: 0,
+        honba: roundResult?.honba ?? 0,
+        seat: item.seat,
+        kind: item.kind,
+        occurredAt: Date.now(),
+      });
+      gameRevision++;
+      broadcastGame('game-state');
+    },
     setSeatPresentation(seat, riichi, connected) {
       declarationIndexes[seat] = riichi ? 0 : -1;
       state.seats[seat].connected = connected;
@@ -466,6 +482,7 @@ MOCK = r"""
       roundNumber = 1;
       decision = null;
       roundResult = null;
+      declarations = [];
       viewerOverride = null;
       declarationIndexes = [-1, -1, -1, -1];
       rivers = [[], [], [], []];
@@ -862,6 +879,14 @@ with sync_playwright() as p:
     assert page.locator('#online-score-strip').inner_text().count('CPU') == 2, 'the two CPU seats were not shown at the table'
     assert page.locator('[data-online-hand="right"] .tile-back').count() == 13, 'the other human hand was not shown as backs'
     assert page.locator('[data-online-hand="top"] .tile-back').count() == 13, 'the CPU hand was not shown as backs'
+    page.evaluate("window.onlineMock.showDeclarations([{seat: 0, kind: 'riichi'}, {seat: 2, kind: 'ron'}])")
+    wait_for("document.querySelectorAll('#online-table .declaration-bubble').length === 2")
+    online_bubbles = page.locator('#online-table .declaration-bubble').evaluate_all('''nodes => Object.fromEntries(nodes.map(node => [node.dataset.seat, {
+      label: node.textContent, classes: [...node.classList], pointerEvents: getComputedStyle(node).pointerEvents,
+    }]))''')
+    assert online_bubbles['0']['label'] == 'リーチ' and 'declaration-bubble-bottom' in online_bubbles['0']['classes'], online_bubbles
+    assert online_bubbles['2']['label'] == 'ロン' and 'declaration-bubble-top' in online_bubbles['2']['classes'], online_bubbles
+    assert all(bubble['pointerEvents'] == 'none' for bubble in online_bubbles.values()), online_bubbles
     hidden_online_ids = page.evaluate('window.onlineMock.privateTileIds(0)')
     assert all(tile_id not in page.locator('#online-match').inner_html() for tile_id in hidden_online_ids), 'an opponent tile ID reached the online DOM'
     assert page.locator('#online-score-strip [data-online-label="bottom"]').inner_text().startswith('テストホスト'), 'the viewer seat was not placed at the bottom'

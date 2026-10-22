@@ -13,6 +13,9 @@ import { MainMenu } from './ui/main-menu.ts';
 import { ActionPanel, mountActionPanel } from './ui/action-panel.ts';
 import { createLocalActionPanelState } from './rendering/local-action-panel-state.ts';
 import { mountScoreStrip, mountTableInfoPanel } from './ui/table-components.ts';
+import { declarationsBetween } from './model/declaration.ts';
+import { DeclarationBubbleRenderer } from './rendering/declaration-bubbles.ts';
+import { riverPositionFor } from './rendering/river-layout.ts';
 
 const localScoreHost = document.querySelector<HTMLElement>('#local-score-strip-host');
 if (localScoreHost) mountScoreStrip(localScoreHost, 'local');
@@ -30,11 +33,27 @@ installCallViewport();
 if (document.querySelector('#main-menu-toggle')) new MainMenu();
 const resultDialog = new ResultDialog();
 let onlineGameController: OnlineGameController | null = null;
+const localTable = document.querySelector<HTMLElement>('#local-table')!;
+const localDeclarationBubbles = new DeclarationBubbleRenderer(localTable);
 const controller = new GameController(undefined, { onChange: render });
+let previouslyRenderedGame: typeof controller.game | null = null;
+let previouslyRenderedMatchStatus = controller.match.status;
 let localKanChoicesOpen = false;
 let localActionPanel: ActionPanel | null = null;
 function render(): void {
-  renderTable(controller.game, controller.match.points, controller.match.lastSettlement);
+  const game = controller.game;
+  if (previouslyRenderedMatchStatus !== 'playing' && controller.match.status === 'playing') {
+    localDeclarationBubbles.clearAll();
+  }
+  const declarations = declarationsBetween(previouslyRenderedGame, game);
+  renderTable(game, controller.match.points, controller.match.lastSettlement);
+  for (const declaration of declarations) {
+    const position = riverPositionFor(0, declaration.seat);
+    const river = localTable.querySelector<HTMLElement>(`.river[data-player-id="${declaration.seat}"]`);
+    if (river) localDeclarationBubbles.show(declaration.seat, declaration.kind, position, river);
+  }
+  previouslyRenderedGame = game;
+  previouslyRenderedMatchStatus = controller.match.status;
   renderMatch(controller.match);
   renderSelection(controller.game, controller.selectedTileId, controller.progressing);
   localActionPanel?.update(createLocalActionPanelState(
@@ -43,7 +62,11 @@ function render(): void {
   resultDialog.update(controller.match);
 }
 export function resetLocalActionChoices(): void { localKanChoicesOpen = false; }
-function newGame(): void { controller.newGame(); window.scrollTo(0, 0); }
+function newGame(): void {
+  localDeclarationBubbles.clearAll();
+  controller.newGame();
+  window.scrollTo(0, 0);
+}
 new NewGameDialog(newGame);
 if (localActionRoot) localActionPanel = new ActionPanel(localActionRoot, event => {
   switch (event.type) {

@@ -14,6 +14,7 @@ import type { RandomSource } from '../game/shuffle.ts';
 import { tileKindKey } from '../model/tile.ts';
 import type { GameState, PlayerId, PlayerState } from '../model/game.ts';
 import type { MatchState } from '../model/match.ts';
+import { declarationsBetween, type PublicDeclarationEvent } from '../model/declaration.ts';
 import type { GameMutationMessage } from './protocol.ts';
 import type { OnlineGameSession, OnlineSeatIdentity, PlayerDecisionWindow } from './game-view.ts';
 
@@ -76,7 +77,29 @@ export function startOnlineGame(
     identities,
     hostSeat,
     decision: null,
+    declarations: [],
   };
+}
+
+function recordResolvedDeclarations(
+  previous: OnlineGameSession,
+  next: OnlineGameSession,
+  now: number,
+): OnlineGameSession {
+  const signals = declarationsBetween(previous.match.game, next.match.game);
+  if (!signals.length) return next;
+  const history = previous.declarations ?? [];
+  let id = history.reduce((last, event) => Math.max(last, event.id), 0);
+  const events: PublicDeclarationEvent[] = signals.map(signal => ({
+    id: ++id,
+    roundNumber: previous.match.roundNumber,
+    dealerId: previous.match.dealerId,
+    honba: previous.match.honba,
+    seat: signal.seat,
+    kind: signal.kind,
+    occurredAt: now,
+  }));
+  return { ...next, declarations: [...history, ...events] };
 }
 
 function randomWindowId(): string {
@@ -171,7 +194,11 @@ function commitMatch(
   match: MatchState,
   now: number,
 ): OnlineGameSession {
-  return advanceDecision(session, match, session.gameRevision + 1, now);
+  return recordResolvedDeclarations(
+    session,
+    advanceDecision(session, match, session.gameRevision + 1, now),
+    now,
+  );
 }
 
 function markPassedCandidates(game: GameState, seats: readonly PlayerId[]): GameState {
@@ -207,7 +234,8 @@ function finishDecision(
     game = resolveCallResponses(game, selected);
   }
   const settled = updateMatchGame(match, game);
-  return advanceDecision({ ...session, decision: null }, settled, session.gameRevision + 1, now);
+  const next = advanceDecision({ ...session, decision: null }, settled, session.gameRevision + 1, now);
+  return recordResolvedDeclarations(session, next, now);
 }
 
 /** Transfer control of a persisted seat without changing any of its game state. */

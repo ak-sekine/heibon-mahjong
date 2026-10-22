@@ -3,6 +3,7 @@ import type { ScoreTier } from '../analysis/score.ts';
 import type { GameState, OpenMeld, PhysicalTile, PlayerId, PlayerState, WinDetails } from '../model/game.ts';
 import type { MatchState, RoundSettlement } from '../model/match.ts';
 import type { Tile } from '../model/tile.ts';
+import type { PublicDeclarationEvent } from '../model/declaration.ts';
 import { exposedDoraIndicators, uraDoraIndicators } from '../game/dora.ts';
 import { canDiscard } from '../game/discard.ts';
 import { getCallOptions, type CallOption } from '../game/calls.ts';
@@ -68,6 +69,8 @@ export type PlayerGameView = Readonly<{
   type: 'game-state';
   roomCode: string;
   gameRevision: number;
+  /** Public declarations are retained so clients can catch up between snapshots. */
+  declarations: readonly PublicDeclarationEvent[];
   viewerSeat: PlayerId;
   status: 'playing' | 'round-ended' | 'match-ended' | 'aborted';
   abortReason?: 'participant-left';
@@ -151,6 +154,8 @@ export type OnlineGameSession = Readonly<{
   identities: readonly [OnlineSeatIdentity, OnlineSeatIdentity, OnlineSeatIdentity, OnlineSeatIdentity];
   hostSeat: PlayerId;
   decision: PlayerDecisionWindow | null;
+  /** Missing only on sessions persisted before declaration events were added. */
+  declarations?: readonly PublicDeclarationEvent[];
   abortReason?: 'participant-left';
 }>;
 
@@ -294,6 +299,7 @@ export function createPlayerGameView(
     type: 'game-state',
     roomCode,
     gameRevision: session.gameRevision,
+    declarations: session.declarations ?? [],
     viewerSeat,
     status: session.status,
     ...(session.abortReason ? { abortReason: session.abortReason } : {}),

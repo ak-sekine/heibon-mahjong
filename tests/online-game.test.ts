@@ -75,6 +75,7 @@ function sessionForGame(
     identities: seats,
     hostSeat: 0,
     decision,
+    declarations: [],
   };
 }
 
@@ -96,6 +97,7 @@ test('online game start fills four seats with secure-wall inventory and 25,000 p
     const game = session.match.game;
     const tiles = allTiles(game);
     assert.equal(session.gameRevision, 1);
+    assert.deepEqual(session.declarations, []);
     assert.deepEqual(session.match.points, [25_000, 25_000, 25_000, 25_000]);
     assert.equal(session.match.roundNumber, 1);
     assert.equal(game.dealerId, 0);
@@ -128,6 +130,7 @@ test('every player view allowlists only that viewer hand, with no wall or CPU de
   for (const viewer of [0, 1, 2, 3] as const) {
     const view = createPlayerGameView(session, viewer, 'A2CDEF', new Set([0, 1]));
     const wire = JSON.stringify({ type: 'game-state', view });
+    assert.deepEqual(view.declarations, []);
     assert.equal(view.self.seat, viewer);
     assert.equal(view.seats[viewer].hand?.length, 13);
     assert.equal('drawnTile' in view.seats[viewer], true);
@@ -307,6 +310,10 @@ test('online action reducer validates riichi, tsumo, kan, kyuushu, and starts th
   assert.equal(riichi.match.depositSticks, 1);
   assert.ok(riichi.match.game.players[0].riichi);
   assert.equal(riichi.match.game.pendingRiichi, null);
+  assert.deepEqual(riichi.declarations, [{ id: 1, roundNumber: 1, dealerId: 0, honba: 0, seat: 0, kind: 'riichi', occurredAt: 1000 }]);
+  for (const viewer of [0, 1, 2, 3] as const) {
+    assert.deepEqual(createPlayerGameView(riichi, viewer, 'A2CDEF', new Set([0])).declarations, riichi.declarations);
+  }
 
   const kanGame = ankanGame();
   const kanSession = sessionForGame(kanGame, [0]);
@@ -318,6 +325,7 @@ test('online action reducer validates riichi, tsumo, kan, kyuushu, and starts th
   assert.equal(kan.match.game.kanCount, 1);
   assert.equal(kan.match.game.players[0].drawnTileSource, 'rinshan');
   assert.equal(kan.match.game.players[0].melds?.[0].type, 'ankan');
+  assert.deepEqual(kan.declarations, [{ id: 1, roundNumber: 1, dealerId: 0, honba: 0, seat: 0, kind: 'kan', occurredAt: 2000 }]);
 
   const kyuushuGame = parentKyuushuGame(9);
   const kyuushu = applyOnlineGameAction(sessionForGame(kyuushuGame, [0]), 0, {
@@ -360,6 +368,8 @@ test('all ron candidates are collected, multiple ron resolves together, and only
   assert.equal(bothRon.status, 'round-ended');
   assert.deepEqual(bothRon.match.game.winResult?.winMethod === 'ron'
     ? bothRon.match.game.winResult.winners.map(winner => winner.winnerId).sort() : [], [0, 2]);
+  assert.deepEqual(bothRon.declarations.map(event => [event.seat, event.kind]).sort((a, b) => a[0] - b[0]), [[0, 'ron'], [2, 'ron']]);
+  assert.ok(bothRon.declarations.every(event => event.occurredAt === 20_001));
   assert.equal(bothRon.match.lastSettlement?.reason, 'ron');
   assert.equal(bothRon.match.points.reduce((sum, points) => sum + points, 0) + bothRon.match.depositSticks * 1000, 100_000);
 
@@ -372,6 +382,7 @@ test('all ron candidates are collected, multiple ron resolves together, and only
   }, connected, 20_001);
   assert.deepEqual(oneRon.match.game.winResult?.winMethod === 'ron'
     ? oneRon.match.game.winResult.winners.map(winner => winner.winnerId) : [], [2]);
+  assert.deepEqual(oneRon.declarations.map(event => [event.seat, event.kind]), [[2, 'ron']]);
   assert.equal(oneRon.match.game.players[0].temporaryFuriten, true);
   assert.equal(oneRon.match.game.players[2].temporaryFuriten, false);
 });
@@ -392,6 +403,7 @@ test('JSON recovery preserves pending answers and settled multi-ron scoring', ()
   }, connected, 10_001);
   const restoredResult = hydrateOnlineGame(JSON.stringify(ended));
   assert.equal(restoredResult?.status, 'round-ended');
+  assert.deepEqual(restoredResult?.declarations, ended.declarations);
   assert.deepEqual(restoredResult?.match.game.winResult?.winMethod === 'ron'
     ? restoredResult.match.game.winResult.winners.map(winner => ({
       winnerId: winner.winnerId,
@@ -455,12 +467,27 @@ test('simultaneous chi and pon decisions wait for both humans and apply pon prio
     type: 'declare-call', requestId: 'chi-first', expectedGameRevision: 30, windowId: decision.windowId, optionId: chi.id,
   }, connected, 2000);
   assert.equal(first.match.game.phase, 'awaiting-call');
+  assert.deepEqual(first.declarations, [], 'an unanswered call window is not a completed declaration');
   const resolved = applyOnlineGameAction(first, 2, {
     type: 'declare-call', requestId: 'pon-second', expectedGameRevision: 30, windowId: decision.windowId, optionId: pon!.id,
   }, connected, 2001);
   assert.equal(resolved.match.game.phase, 'awaiting-discard');
   assert.equal(resolved.match.game.turnPlayerId, 2);
   assert.equal(resolved.match.game.players[2].melds?.at(-1)?.type, 'pon');
+  assert.deepEqual(resolved.declarations.map(event => [event.seat, event.kind]), [[2, 'pon']]);
+
+  const chiOnlyDecision: PlayerDecisionWindow = {
+    ...decision,
+    type: 'call',
+    requiredSeats: [0],
+    responses: { 0: 'pending' },
+  };
+  const chiOnlySession = sessionForGame(game, [0], 30, chiOnlyDecision);
+  const resolvedChi = applyOnlineGameAction(chiOnlySession, 0, {
+    type: 'declare-call', requestId: 'chi-only', expectedGameRevision: 30,
+    windowId: chiOnlyDecision.windowId, optionId: chi.id,
+  }, new Set<PlayerId>([0]), 2002);
+  assert.deepEqual(resolvedChi.declarations.map(event => [event.seat, event.kind]), [[0, 'chi']]);
 });
 
 test('CPU takeover preserves the seat state and advances the game revision once', () => {
