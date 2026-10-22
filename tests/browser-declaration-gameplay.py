@@ -104,10 +104,16 @@ window.declarationGameplayTest = { controller, render, onlineGameController };
 
     assert_visible_bubble('local 320px', local_metrics, 'リーチ')
     page.screenshot(path=str(OUT / f'declaration-gameplay-local-320-{ENGINE}.png'))
-    page.wait_for_timeout(1800)
-    assert page.locator('#local-table .declaration-bubble').count() == 1, 'local bubble disappeared before two seconds'
-    page.wait_for_timeout(350)
-    assert page.locator('#local-table .declaration-bubble').count() == 0, 'local bubble did not disappear after two seconds'
+    page.wait_for_function('''() => {
+      const show = window.declarationBubbleShows.find(event => event.mode === 'local');
+      return show && performance.now() - show.at >= 1800 &&
+        document.querySelector('#local-table .declaration-bubble');
+    }''', timeout=2500)
+    page.wait_for_function('''() => {
+      const show = window.declarationBubbleShows.find(event => event.mode === 'local');
+      return show && performance.now() - show.at >= 2100 &&
+        !document.querySelector('#local-table .declaration-bubble');
+    }''', timeout=1000)
 
     online = page.evaluate('''async() => {
       const [fixture, matchModule, engine, views] = await Promise.all([
@@ -176,10 +182,16 @@ window.declarationGameplayTest = { controller, render, onlineGameController };
     assert online_metrics['operationToShowMs'] is not None and 0 <= online_metrics['operationToShowMs'] < 500, online_metrics
     assert_visible_bubble('online 320px', online_metrics, 'リーチ')
     page.screenshot(path=str(OUT / f'declaration-gameplay-online-320-{ENGINE}.png'))
-    page.wait_for_timeout(1800)
-    assert page.locator('#online-table .declaration-bubble').count() == 1, 'online bubble disappeared before two seconds'
-    page.wait_for_timeout(350)
-    assert page.locator('#online-table .declaration-bubble').count() == 0, 'online bubble did not disappear after two seconds'
+    page.wait_for_function('''() => {
+      const show = [...window.declarationBubbleShows].reverse().find(event => event.mode === 'online');
+      return show && performance.now() - show.at >= 1800 &&
+        document.querySelector('#online-table .declaration-bubble');
+    }''', timeout=2500)
+    page.wait_for_function('''() => {
+      const show = [...window.declarationBubbleShows].reverse().find(event => event.mode === 'online');
+      return show && performance.now() - show.at >= 2100 &&
+        !document.querySelector('#online-table .declaration-bubble');
+    }''', timeout=1000)
     assert not errors, f'page errors: {errors}'
     print('Local and online riichi UI actions produced visible 320px bubbles and each expired after two seconds.')
     print(f'local evidence: {json.dumps(local_metrics, ensure_ascii=False)}')
