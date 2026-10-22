@@ -18,7 +18,7 @@ with sync_playwright() as p:
       launch_options['executable_path'] = os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium')
     browser = browser_type.launch(**launch_options)
     page = browser.new_page(
-      viewport={'width': 320, 'height': 900},
+      viewport={'width': 320, 'height': 568},
       device_scale_factor=2 if ENGINE == 'webkit' else 1,
       is_mobile=ENGINE == 'webkit',
       has_touch=ENGINE == 'webkit',
@@ -70,7 +70,6 @@ window.declarationGameplayTest = { controller, render, onlineGameController };
     page.evaluate('window.localActionStartedAt = performance.now()')
     page.locator('#riichi').click()
     page.locator('#local-table .declaration-bubble[data-declaration="riichi"]').wait_for(timeout=1000)
-    page.locator('#local-table').scroll_into_view_if_needed()
     local_metrics = page.evaluate('''() => {
       const bubble = document.querySelector('#local-table .declaration-bubble[data-declaration="riichi"]');
       const table = document.querySelector('#local-table');
@@ -151,7 +150,6 @@ window.declarationGameplayTest = { controller, render, onlineGameController };
     page.evaluate('window.onlineActionStartedAt = performance.now()')
     page.locator('#online-riichi').click()
     page.locator('#online-table .declaration-bubble[data-declaration="riichi"]').wait_for(timeout=1000)
-    page.locator('#online-table').scroll_into_view_if_needed()
     online_metrics = page.evaluate('''() => {
       const bubble = document.querySelector('#online-table .declaration-bubble[data-declaration="riichi"]');
       const table = document.querySelector('#online-table');
