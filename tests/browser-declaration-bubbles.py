@@ -78,9 +78,13 @@ with sync_playwright() as p:
               const bubbles=[...activeTable.querySelectorAll('.declaration-bubble')].map(node=>{
                 const box=rect(node),style=getComputedStyle(node);
                 const hit=document.elementFromPoint(box.left+box.width/2,box.top+box.height/2);
+                const tail=[...node.classList].find(name=>name.startsWith('declaration-bubble-')&&!name.endsWith('bubble'))?.replace('declaration-bubble-','');
+                const tailWithin=tail==='top'?box.top>=table.top+11:tail==='bottom'?box.bottom<=table.bottom-11:
+                  tail==='left'?box.left>=table.left+11:box.right<=table.right-11;
                 return {label:node.textContent,seat:node.dataset.seat,classes:[...node.classList],
                   left:box.left,top:box.top,right:box.right,bottom:box.bottom,
                   within:box.left>=table.left+10&&box.top>=table.top+10&&box.right<=table.right-10&&box.bottom<=table.bottom-10,
+                  tailWithin,
                   fontSize:parseFloat(style.fontSize),fontWeight:style.fontWeight,writingMode:style.writingMode,
                   transform:style.transform,pointerEvents:style.pointerEvents,hitBubble:Boolean(hit?.closest('.declaration-bubble'))};
               });
@@ -89,6 +93,7 @@ with sync_playwright() as p:
             assert len(metrics['bubbles']) == 4, f'{mode} {width}px should show four simultaneous seats: {metrics}'
             assert [bubble['label'] for bubble in metrics['bubbles']] == ['リーチ','ポン','カン','チー'], metrics
             assert all(bubble['within'] for bubble in metrics['bubbles']), f'{mode} bubble escaped table at {width}px: {metrics}'
+            assert all(bubble['tailWithin'] for bubble in metrics['bubbles']), f'{mode} bubble tail escaped table at {width}px: {metrics}'
             assert all(bubble['fontSize'] >= 21 and int(bubble['fontWeight']) >= 700 for bubble in metrics['bubbles']), metrics
             assert all(bubble['writingMode'] == 'horizontal-tb' and bubble['transform'] == 'none' for bubble in metrics['bubbles']), metrics
             assert all(bubble['pointerEvents'] == 'none' and not bubble['hitBubble'] for bubble in metrics['bubbles']), metrics

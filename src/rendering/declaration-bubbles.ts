@@ -24,7 +24,7 @@ export function calculateDeclarationBubblePoint(
   bubble: BubbleSize,
   position: RiverPosition,
   gap = 5,
-  inset = 10,
+  inset = 16,
 ): BubblePoint {
   let left: number;
   let top: number;

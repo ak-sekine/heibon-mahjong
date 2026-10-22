@@ -79,8 +79,8 @@ test('four positions keep the bubble inside a 320px square table', () => {
   } as const;
   for (const position of ['bottom', 'right', 'top', 'left'] as const) {
     const point = calculateDeclarationBubblePoint(table, rivers[position], { width: 100, height: 50 }, position);
-    assert.ok(point.left >= 10 && point.top >= 10, `${position}: ${JSON.stringify(point)}`);
-    assert.ok(point.left + 100 <= 302 && point.top + 50 <= 302, `${position}: ${JSON.stringify(point)}`);
+    assert.ok(point.left >= 16 && point.top >= 16, `${position}: ${JSON.stringify(point)}`);
+    assert.ok(point.left + 100 <= 296 && point.top + 50 <= 296, `${position}: ${JSON.stringify(point)}`);
   }
 });
 
