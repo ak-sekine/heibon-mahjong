@@ -38,6 +38,15 @@ test('offline entry pages expose the same local table root and shared templates'
   }
 });
 
+test('offline entry pages expose the same shared result dialog structure', () => {
+  const dialog = (html: string, file: string): string => {
+    const match = html.match(/<dialog id="result-dialog"[\s\S]*?<\/dialog>/);
+    assert.ok(match, `${file} must include #result-dialog`);
+    return normalized(match[0]);
+  };
+  assert.equal(dialog(pages[1].html, pages[1].file), dialog(pages[0].html, pages[0].file));
+});
+
 test('shared templates provide all mode-specific mount parts and positions', () => {
   const expectedActionParts = [...ACTION_PANEL_TEMPLATE_PARTS].sort();
   const expectedScorePositions = ['bottom', 'left', 'right', 'top'];
