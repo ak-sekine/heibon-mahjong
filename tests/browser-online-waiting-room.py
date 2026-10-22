@@ -1054,6 +1054,7 @@ with sync_playwright() as p:
       page.screenshot(path=str(OUT / f'step14-2-online-rivers-{width}.png'), full_page=True)
     page.set_viewport_size({'width': 390, 'height': 844})
     page.evaluate('window.onlineMock.resetRivers()')
+    page.evaluate("window.onlineMock.setGameDisplayName(0, 'テストホスト')")
 
     page.evaluate('window.onlineMock.endRound()')
     wait_for("document.querySelector('#online-round-result').hidden === false")
