@@ -1019,8 +1019,11 @@ with sync_playwright() as p:
     assert option_sizes['#call-options'] == option_sizes['#online-call-options'], f'call option buttons do not share dimensions: {option_sizes}'
     assert option_sizes['#kan-options'] == option_sizes['#online-kan-options'], f'kan option buttons do not share dimensions: {option_sizes}'
 
+    page.evaluate("window.onlineLayoutResizeCount = 0; window.addEventListener('resize', () => window.onlineLayoutResizeCount++)")
     for width, height in [(320,700),(355,812),(375,812),(390,844),(430,932),(1280,900)]:
+      resize_count = page.evaluate('window.onlineLayoutResizeCount')
       page.set_viewport_size({'width': width, 'height': height})
+      page.wait_for_function(f'window.onlineLayoutResizeCount > {resize_count}')
       for count in [1, 6, 7, 12, 18]:
         declaration_cases = [-1, count-1] if count < 18 else [-1, 0, 5, 6, 17]
         for viewer in range(4):
