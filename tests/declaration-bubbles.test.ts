@@ -6,12 +6,14 @@ import type { GameState, OpenMeld, PlayerId, PlayerState } from '../src/model/ga
 import { declarationsBetween, type DeclarationKind } from '../src/model/declaration.ts';
 import type { PublicDeclarationEvent } from '../src/model/declaration.ts';
 import { collectRecentDeclarations } from '../src/online/declaration-cursor.ts';
+import { GameController } from '../src/ui/controller.ts';
 import {
   calculateDeclarationBubblePoint,
   DECLARATION_BUBBLE_DURATION_MS,
   declarationLabel,
 } from '../src/rendering/declaration-bubbles.ts';
 import { ronGame } from './ron-fixture.ts';
+import { riichiStart } from './riichi-fixture.ts';
 
 const base = startGame(() => 0.25);
 
@@ -67,6 +69,27 @@ test('declaration changes emit only newly established calls, kans, riichi, and e
     .map(event => event.seat).sort(), [0, 2]);
   assert.ok(declarationsBetween(ronGame(1, [0, 2]), ron).every(event => event.kind === 'ron'));
   assert.deepEqual(declarationsBetween(null, ron), [], 'the first view is a baseline, not a new declaration');
+});
+
+test('a real local riichi action emits its established declaration through the state observer', async () => {
+  let controller!: GameController;
+  let previous: GameState | null = null;
+  const events: ReturnType<typeof declarationsBetween>[number][] = [];
+  controller = new GameController(() => riichiStart('ron'), {
+    wait: async () => {},
+    chooseDiscard: player => player.hand[0]?.id ?? null,
+    onChange: () => {
+      const next = controller.game;
+      events.push(...declarationsBetween(previous, next));
+      previous = next;
+    },
+  });
+  previous = controller.game;
+  const declarationTile = controller.game.players[0].drawnTile!;
+  controller.select(declarationTile.id);
+  assert.equal(controller.canRiichi, true);
+  await controller.declareRiichi();
+  assert.deepEqual(events[0], { seat: 0, kind: 'riichi' });
 });
 
 test('four positions keep the bubble inside a 320px square table', () => {
