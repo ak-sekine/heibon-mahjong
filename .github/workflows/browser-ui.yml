@@ -2,7 +2,7 @@ name: Browser UI verification
 
 on:
   push:
-    branches: [main, fix-mobile-table-layout, ui-river-spacing, fix-riichi-discard-layout]
+    branches: [main, fix-mobile-table-layout, ui-river-spacing, fix-riichi-discard-layout, debug/declaration-bubble-gameplay]
   workflow_dispatch:
   workflow_call:
 
@@ -76,6 +76,7 @@ jobs:
           run_browser_test tests/browser-action-panel.py
           run_browser_test tests/browser-table-ui.py
           run_browser_test tests/browser-declaration-bubbles.py
+          run_browser_test tests/browser-declaration-gameplay.py
           run_browser_test tests/browser-round-end-ui.py
           run_browser_test tests/browser-dora-rows.py
           run_browser_test tests/browser-mobile-table-layout.py
