@@ -4,7 +4,7 @@ import { getCallOptions } from '../src/game/calls.ts';
 import { discardTileForOnline } from '../src/game/discard.ts';
 import { getKanOptions } from '../src/game/kan.ts';
 import { getRiichiDiscardOptions } from '../src/game/riichi.ts';
-import { canDeclareTsumo } from '../src/game/tsumo.ts';
+import { canDeclareTsumo, declareTsumo } from '../src/game/tsumo.ts';
 import { markRonPassed } from '../src/game/ron.ts';
 import { startMatch } from '../src/game/match.ts';
 import { tileKindKey } from '../src/model/tile.ts';
@@ -152,6 +152,36 @@ test('every player view allowlists only that viewer hand, with no wall or CPU de
         `seat ${seat}'s tile kind crossed viewer ${viewer}'s view boundary`);
     }
   }
+});
+
+test('online round results include only the public scoring and winning-hand details', () => {
+  const game = declareTsumo(tsumoGame(), 0);
+  const session = sessionForGame(game, [0]);
+  const view = createPlayerGameView(session, 1, 'A2CDEF', new Set([0]));
+  const result = view.result;
+  assert.ok(result);
+  assert.equal(result.reason, 'tsumo');
+  assert.equal(result.winners.length, 1);
+  const winner = result.winners[0];
+  const details = game.winResult;
+  assert.ok(details && details.winMethod === 'tsumo');
+  assert.equal(winner.winnerId, details.winnerId);
+  assert.equal(winner.totalPoints, details.totalPoints);
+  assert.equal(winner.yakuHan, details.yakuHan);
+  assert.equal(winner.han, details.totalHanIncludingDora);
+  assert.equal(winner.fu, details.fu);
+  assert.equal(winner.rawFu, details.rawFu);
+  assert.equal(winner.scoreTier, details.scoreTier);
+  assert.deepEqual(winner.doraCounts, {
+    normal: details.doraCount,
+    ura: details.uraDoraCount,
+    red: details.redDoraCount,
+  });
+  assert.equal(view.seats[winner.winnerId].revealedHand?.some(tile => tile.id === winner.winningTile.id), true);
+  assert.equal('liveWall' in view, false);
+  assert.equal('deadWall' in view, false);
+  assert.equal('analysis' in winner, false);
+  assert.equal('candidate' in winner, false);
 });
 
 test('an exhaustive draw never exposes another human hand without a declaration', () => {

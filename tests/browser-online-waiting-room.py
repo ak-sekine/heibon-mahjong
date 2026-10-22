@@ -48,20 +48,24 @@ MOCK = r"""
       connected: state.seats[seat].kind === 'cpu' || state.seats[seat].connected,
       wind: wind[(seat + 4) % 4],
       isDealer: seat === 0,
-      points: 25000,
-      riichi: declarationIndexes[seat] >= 0,
+      points: roundResult?.after?.[seat] ?? 25000,
+      riichi: declarationIndexes[seat] >= 0 || Boolean(roundResult?.winners?.some(winner => winner.winnerId === seat)),
       ...(declarationIndexes[seat] >= 0 ? { riichiDeclarationTileId: rivers[seat][declarationIndexes[seat]]?.id } : {}),
       concealedCount: hands[seat].length + Number(Boolean(drawnTiles[seat])),
       ...(seat === viewerSeat ? { hand: hands[seat], drawnTile: drawnTiles[seat] } : {}),
+      ...(roundResult?.winners?.some(winner => winner.winnerId === seat) ? {
+        revealedHand: [...Array.from({ length: 13 }, (_, i) => makeTile(`online-result-hand-${seat}-${i}`, seat + i)), roundResult.winners.find(winner => winner.winnerId === seat).winningTile],
+      } : {}),
       river: rivers[seat],
       melds: [],
     }));
     const callTiles = [hands[viewerSeat][0], hands[viewerSeat][1], makeTile('online-called', 8)];
     return {
       type: 'game-state', roomCode: code, gameRevision, viewerSeat, status: gameStatus,
-      round: { roundNumber, dealerId: 0, honba: 0, points: [25000, 25000, 25000, 25000], depositSticks: 0 },
+      round: { roundNumber, dealerId: 0, honba: roundResult?.honba ?? 0, points: roundResult?.after ?? [25000, 25000, 25000, 25000], depositSticks: roundResult?.reason === 'draw' ? 1 : 0 },
       phase, turnPlayerId, liveWallCount: 90 - gameRevision, seats: viewSeats,
       doraIndicators: [makeTile('online-dora', 4)],
+      ...(roundResult?.winners?.length ? { uraDoraIndicators: [makeTile('online-ura-dora', 5)] } : {}),
       self: {
         seat: viewerSeat, isHost: viewerSeat === 0,
         discardableTileIds: gameStatus === 'playing' && phase === 'awaiting-discard' && turnPlayerId === viewerSeat
@@ -86,6 +90,7 @@ MOCK = r"""
     ...(codeName ? { code: codeName } : {}),
   });
   const sockets = [];
+  const gameActions = [];
   let tickets = 0;
   let nextSocketSeat = 0;
   let copied = '';
@@ -121,6 +126,7 @@ MOCK = r"""
     }
     send(raw) {
       const message = JSON.parse(raw);
+      if (['discard', 'declare-riichi', 'declare-tsumo', 'declare-kyuushu-kyuuhai', 'declare-kan', 'declare-ron', 'pass-ron', 'declare-call', 'pass-call', 'next-round'].includes(message.type)) gameActions.push(message.type);
       if (message.type === 'request-state') {
         send(this, { type: 'room-state', ...JSON.parse(JSON.stringify(state)) });
         return;
@@ -357,22 +363,45 @@ MOCK = r"""
       decision = { windowId: '2'.repeat(24), type: 'call', seat: 0, baseGameRevision: gameRevision, expiresAt: Date.now() + 30000 };
       broadcastGame('game-state');
     },
-    endRound() {
+    setResultScenario(kind, viewerSeat) {
       if (!gameStarted) return;
+      const winnerId = kind === 'opponent-tsumo' ? 3 : 0;
+      const method = kind.endsWith('ron') ? 'ron' : 'tsumo';
+      const discarderId = method === 'ron' ? (kind === 'self-ron' ? 1 : 2) : undefined;
+      const matchEnded = kind === 'match-ended';
+      roundNumber = matchEnded ? 4 : 1;
+      gameStatus = matchEnded ? 'match-ended' : 'round-ended';
+      phase = kind === 'draw' ? 'wall-exhausted' : 'won';
+      decision = null;
+      viewerOverride = viewerSeat;
+      declarationIndexes = [-1, -1, -1, -1];
+      const before = [25000, 25000, 25000, 25000];
+      let payments = [];
+      let tenpai = null;
+      let winners = [];
+      if (kind === 'draw') {
+        tenpai = [true, false, false, false];
+        payments = [1, 2, 3].map(payerId => ({ payerId, recipientId: 0, basePoints: 0, honbaPoints: 0, notenPoints: 1000, points: 1000 }));
+      } else {
+        const payment = method === 'ron' ? 3900 : 1000;
+        const payers = method === 'ron' ? [discarderId] : [0, 1, 2, 3].filter(seat => seat !== winnerId);
+        payments = payers.map(payerId => ({ payerId, recipientId: winnerId, basePoints: payment, honbaPoints: method === 'ron' ? 300 : 100, notenPoints: 0, points: payment + (method === 'ron' ? 300 : 100) }));
+        const winningTile = makeTile(`online-result-${kind}-${gameRevision + 1}`, 4);
+        winners = [{ winnerId, method, ...(discarderId === undefined ? {} : { discarderId }), winningTile,
+          totalPoints: payment * payers.length, han: method === 'ron' ? 4 : 4, yakuHan: 1, fu: 30, rawFu: 27, scoreTier: 'normal',
+          yakumanCount: 0, yaku: [{ id: 'riichi', han: 1, yakuman: false }],
+          dora: { normal: 1, ura: 1, red: 1 }, doraCounts: { normal: 1, ura: 1, red: 1 }, fuEntries: [] }];
+      }
+      const after = [...before];
+      for (const payment of payments) { after[payment.payerId] -= payment.points; after[payment.recipientId] += payment.points; }
+      const honba = 1;
+      roundResult = { reason: kind === 'draw' ? 'draw' : method, roundNumber, dealerId: 0, honba, before, after,
+        deltas: after.map((points, seat) => points - before[seat]), payments, deposits: null, tenpai, winners,
+        matchEnded, next: matchEnded ? null : { roundNumber: roundNumber + 1, dealerId: 1, honba: 0 } };
       gameRevision++;
-      phase = 'won';
-      gameStatus = 'round-ended';
-      const points = [25000, 25000, 25000, 25000];
-      roundResult = {
-        reason: 'tsumo', roundNumber, dealerId: 0, honba: 0, before: points, after: points,
-        deltas: [0, 0, 0, 0], payments: [], deposits: null, tenpai: null,
-        winners: [{ winnerId: 0, method: 'tsumo', winningTile: makeTile(`online-result-${gameRevision}`, 4), totalPoints: 1300,
-          han: 1, fu: 30, yakumanCount: 0, yaku: [{ id: 'riichi', han: 1, yakuman: false }],
-          dora: { normal: 0, ura: 0, red: 0 }, fuEntries: [] }],
-        matchEnded: false, next: { roundNumber: roundNumber + 1, dealerId: 1, honba: 0 },
-      };
       broadcastGame('game-state');
     },
+    endRound() { this.setResultScenario('self-tsumo', 0); },
     showRiverScenario(viewerSeat, count, declarationIndex = -1) {
       viewerOverride = viewerSeat;
       declarationIndexes = [0, 1, 2, 3].map(() => declarationIndex);
@@ -393,13 +422,20 @@ MOCK = r"""
         ...hand.map(tile => tile.id), ...(drawnTiles[seat] ? [drawnTiles[seat].id] : []),
       ]);
     },
+    hiddenNonWinnerTileIds(viewerSeat) {
+      const winners = new Set(roundResult?.winners?.map(winner => winner.winnerId) ?? []);
+      return hands.flatMap((hand, seat) => seat === viewerSeat || winners.has(seat) ? [] : [
+        ...hand.map(tile => tile.id), ...(drawnTiles[seat] ? [drawnTiles[seat].id] : []),
+      ]);
+    },
     snapshot() {
       return { room: JSON.parse(JSON.stringify(state)), gameStatus, gameRevision, phase, turnPlayerId, roundNumber,
-        points: [25000, 25000, 25000, 25000], rivers: JSON.parse(JSON.stringify(rivers)),
+        points: roundResult?.after ?? [25000, 25000, 25000, 25000], roundResult: JSON.parse(JSON.stringify(roundResult)), rivers: JSON.parse(JSON.stringify(rivers)),
         hands: JSON.parse(JSON.stringify(hands)), drawnTiles: JSON.parse(JSON.stringify(drawnTiles)) };
     },
     forceDisconnect() { sockets.filter(socket => socket.readyState === MockWebSocket.OPEN).at(-1)?.forceDisconnect(); },
     get ticketRequests() { return tickets; },
+    get gameActions() { return [...gameActions]; },
     get requests() { return requests; },
     get copied() { return copied; },
   };
@@ -461,7 +497,7 @@ with sync_playwright() as p:
 
     def expose_app(route):
         response = route.fetch()
-        route.fulfill(response=response, body=response.text() + '\nwindow.onlineUiTest = { controller };\n')
+        route.fulfill(response=response, body=response.text() + '\nwindow.onlineUiTest = { controller, onlineGameController, resultDialog };\n')
 
     page.route('**/src/main.ts', expose_app)
     page.goto(BASE_URL)
@@ -1024,6 +1060,56 @@ with sync_playwright() as p:
     assert 'ツモ' in page.locator('#online-round-result').inner_text(), 'round result was not displayed'
     assert page.locator('#online-next-round').is_visible() and page.locator('#online-next-round').is_enabled(), 'the host could not advance to the next round'
     page.screenshot(path=str(OUT / 'step14-2-online-game-390.png'), full_page=True)
+
+    result_scenarios = [
+      ('self-tsumo', 0, ['ツモ和了！', '和了者：テストホスト', '立直 1翻', '通常ドラ：1枚（1翻）', '裏ドラ：1枚（1翻）', '赤ドラ：1枚（1翻）', '符：30符', 'CPU1（子） → テストホスト', '局終了後の持ち点']),
+      ('opponent-ron', 1, ['ロン和了！', '和了者：テストホスト', '放銃者：CPU1', '支払い', '局終了後の持ち点']),
+      ('opponent-tsumo', 1, ['ツモ和了！', '和了者：CPU2', '局終了後の持ち点']),
+      ('self-ron', 0, ['ロン和了！', '和了者：テストホスト', '放銃者：テスト参加者', '局終了後の持ち点']),
+      ('draw', 1, ['荒牌流局', 'テスト参加者：ノーテン', '供託：1本を次局へ持ち越し', '局終了後の持ち点']),
+      ('match-ended', 1, ['東風戦終了', '1位 テストホスト', '局終了後の持ち点']),
+    ]
+    for scenario_index, (scenario, viewer, expected) in enumerate(result_scenarios):
+      viewport = {'width': 375, 'height': 667} if scenario_index == 0 else {'width': 320, 'height': 568}
+      page.set_viewport_size(viewport)
+      if scenario_index:
+        page.evaluate('args => window.onlineMock.setResultScenario(args.scenario, args.viewer)', {'scenario': scenario, 'viewer': viewer})
+      wait_for(f"document.querySelector('#online-show-result').hidden === false && document.querySelector('#result-dialog').open === false")
+      before_result_open = page.evaluate('JSON.stringify(window.onlineUiTest.onlineGameController.view)')
+      before_action_count = page.evaluate('window.onlineMock.gameActions.length')
+      page.locator('#online-show-result').click()
+      assert page.locator('#result-dialog').evaluate('element => element.open'), f'{scenario}: actual online result button click did not open the shared dialog'
+      result_text = page.locator('#online-result-content').inner_text()
+      assert all(label in result_text for label in expected), f'{scenario}: expected result detail was missing: {expected}; got {result_text}'
+      assert page.locator('#online-result-content .result-dora').count() == (0 if scenario == 'draw' else 2), f'{scenario}: public dora rows did not match the result'
+      assert page.locator('#result-new-game').is_hidden(), f'{scenario}: the offline new-game action appeared during an online match'
+      assert page.evaluate('''() => {
+        const dialog = document.querySelector('#result-dialog').getBoundingClientRect();
+        const body = document.querySelector('#result-body');
+        return dialog.left >= -1 && dialog.top >= -1 && dialog.right <= innerWidth + 1 && dialog.bottom <= innerHeight + 1 &&
+          getComputedStyle(body).overflowY === 'auto' && document.documentElement.scrollWidth <= innerWidth;
+      }'''), f'{scenario}: shared result dialog did not fit or scroll at {viewport["width"]}x{viewport["height"]}'
+      hidden_result_ids = page.evaluate('viewer => window.onlineMock.hiddenNonWinnerTileIds(viewer)', viewer)
+      assert all(tile_id not in page.locator('#online-result-content').inner_html() for tile_id in hidden_result_ids), f'{scenario}: a nonwinning private tile ID reached the result details'
+      if scenario_index == 0:
+        page.screenshot(path=str(OUT / 'step14-2-online-result-375x667.png'))
+      elif scenario_index == 1:
+        page.screenshot(path=str(OUT / 'step14-2-online-result-320x568.png'))
+      assert page.evaluate('JSON.stringify(window.onlineUiTest.onlineGameController.view)') == before_result_open, f'{scenario}: opening the result changed game state'
+      assert page.evaluate('window.onlineMock.gameActions.length') == before_action_count, f'{scenario}: opening the result sent a game action'
+      page.locator('#view-table').click()
+      assert not page.locator('#result-dialog').evaluate('element => element.open'), f'{scenario}: 卓を見る did not close the result dialog'
+      assert page.locator('#online-show-result').evaluate('element => document.activeElement === element'), f'{scenario}: close did not restore focus to the online result button'
+      assert page.evaluate('JSON.stringify(window.onlineUiTest.onlineGameController.view)') == before_result_open, f'{scenario}: closing the result changed game state'
+      assert page.evaluate('window.onlineMock.gameActions.length') == before_action_count, f'{scenario}: closing the result sent a game action'
+      page.locator('#online-show-result').click()
+      assert page.locator('#result-dialog').evaluate('element => element.open'), f'{scenario}: the result could not be reopened'
+      assert page.evaluate('JSON.stringify(window.onlineUiTest.onlineGameController.view)') == before_result_open, f'{scenario}: reopening the result changed game state'
+      assert page.evaluate('window.onlineMock.gameActions.length') == before_action_count, f'{scenario}: reopening the result sent a game action'
+      page.locator('#view-table').click()
+    page.set_viewport_size({'width': 390, 'height': 844})
+    page.evaluate("window.onlineMock.setResultScenario('self-tsumo', 0)")
+    wait_for("document.querySelector('#online-show-result').hidden === false")
     page.locator('#online-next-round').click()
     wait_for("document.querySelector('#online-table-round').innerText.includes('東2局')")
     assert page.locator('#online-round-result').is_hidden(), 'the old round result remained after next-round transition'

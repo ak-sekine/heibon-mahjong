@@ -50,6 +50,12 @@ summary { cursor:pointer; padding:4px; }
 #win-result { padding:12px; border:1px solid #ffda7d; border-radius:8px; overflow-wrap:anywhere; }
 #win-result h2 { margin:0; font-size:1.2rem; }
 #win-result p { margin:8px 0; }
+#online-result-content { padding:12px; border:1px solid #ffda7d; border-radius:8px; overflow-wrap:anywhere; }
+#online-result-content[hidden] { display:none; }
+#online-result-content .online-settlement { margin-top:16px; padding-top:12px; border-top:1px solid #63947a; }
+#online-result-content h2 { margin:0; font-size:1.1rem; }
+#online-result-content h3 { margin:10px 0 4px; font-size:1rem; }
+#online-result-content p { margin:6px 0; }
 @media (max-width:350px) {
   header { gap:4px; padding-inline:2px; }
   h1 { font-size:14px; }
@@ -85,6 +91,8 @@ header > div { min-width:0; }
 .online-game-active #round-result-summary,
 .online-game-active #local-game-controls,
 .online-game-active .catalog { display:none !important; }
+.online-game-active #win-result,
+.online-game-active #match-result { display:none !important; }
 #online-match { display:flex; flex-direction:column; gap:8px; width:100%; }
 #online-match #online-player-hand { container-type:inline-size; width:100%; display:grid; grid-template-columns:repeat(14,minmax(0,1fr)); gap:1px; margin:0; padding:0; }
 #online-match #online-player-hand li { min-width:0; }

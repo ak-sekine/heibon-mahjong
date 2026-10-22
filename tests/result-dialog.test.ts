@@ -18,7 +18,7 @@ for (const scenario of ['human-ron','human-tsumo','cpu-ron','cpu-tsumo','draw','
     close() { this.open = false; this.listeners.close?.({ preventDefault() {} }); }
     click() { this.listeners.click?.({ preventDefault() {} }); }
   }
-  const nodes = new Map(['#result-dialog','#show-result','#view-table','#result-new-game','#result-title','#result-body'].map(id => [id,new Node()]));
+  const nodes = new Map(['#result-dialog','#show-result','#view-table','#result-new-game','#result-title','#result-body','#online-result-content'].map(id => [id,new Node()]));
   const original = globalThis.document;
   globalThis.document = { querySelector: (s: string) => nodes.get(s), documentElement: new Node() } as unknown as Document;
   try {

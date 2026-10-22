@@ -1,4 +1,5 @@
 import type { FuEntry } from '../analysis/fu.ts';
+import type { ScoreTier } from '../analysis/score.ts';
 import type { GameState, OpenMeld, PhysicalTile, PlayerId, PlayerState, WinDetails } from '../model/game.ts';
 import type { MatchState, RoundSettlement } from '../model/match.ts';
 import type { Tile } from '../model/tile.ts';
@@ -35,10 +36,14 @@ export type PublicWinSummary = Readonly<{
   winningTile: PublicTile;
   totalPoints: number;
   han: number;
+  yakuHan: number;
   fu: number | null;
+  rawFu: number | null;
+  scoreTier: ScoreTier;
   yakumanCount: number;
   yaku: readonly Readonly<{ id: string; han: number; yakuman: boolean }>[];
   dora: Readonly<{ normal: number; ura: number; red: number }>;
+  doraCounts: Readonly<{ normal: number; ura: number; red: number }>;
   fuEntries: readonly FuEntry[];
 }>;
 
@@ -187,10 +192,14 @@ function publicWin(
     winningTile: publicTile(tile),
     totalPoints: result.totalPoints,
     han: result.totalHanIncludingDora,
+    yakuHan: result.yakuHan,
     fu: result.fu,
+    rawFu: result.rawFu,
+    scoreTier: result.scoreTier,
     yakumanCount: result.yakumanCount,
     yaku: result.candidate.yaku.map(entry => ({ id: entry.id, han: entry.han, yakuman: entry.yakuman > 0 })),
     dora: { normal: result.doraHan, ura: result.uraDoraHan, red: result.redDoraHan },
+    doraCounts: { normal: result.doraCount, ura: result.uraDoraCount, red: result.redDoraCount },
     fuEntries: result.fuBreakdown,
   };
 }

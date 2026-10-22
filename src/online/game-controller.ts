@@ -7,6 +7,7 @@ import { renderDoraIndicators } from '../rendering/dora.ts';
 import { renderSeatLabel, renderTableRoundInfo } from '../rendering/shared-table-components.ts';
 import { TILE_KINDS, tileKindKey } from '../model/tile.ts';
 import { ActionPanel, type ActionPanelEvent } from '../ui/action-panel.ts';
+import { ResultDialog } from '../ui/result-dialog.ts';
 import { createOnlineActionPanelState } from './action-panel-state.ts';
 
 type ActionSender = (action: GameActionPayload, expectedGameRevision: number) => void;
@@ -77,7 +78,7 @@ export class OnlineGameController {
     });
   }
 
-  constructor(actionPanel: ActionPanel) {
+  constructor(actionPanel: ActionPanel, private readonly resultDialog: ResultDialog) {
     this.actionPanel = actionPanel;
     this.actionPanel.setHandler(event => this.handleAction(event));
     this.playerHand.addEventListener('click', event => {
@@ -114,7 +115,7 @@ export class OnlineGameController {
       case 'select-kan': this.send({ type: 'declare-kan', optionId: event.optionId }); break;
       case 'select-call': this.sendDecision({ type: 'declare-call', optionId: event.optionId }); break;
       case 'next-round': this.send({ type: 'next-round' }); break;
-      case 'show-result': document.querySelector<HTMLElement>('#online-round-result')?.scrollIntoView({ block: 'nearest' }); break;
+      case 'show-result': this.resultDialog.open(document.querySelector<HTMLButtonElement>('#online-show-result')); break;
       case 'return-local': this.returnToLocalGame(); break;
     }
   }
@@ -134,6 +135,7 @@ export class OnlineGameController {
       this.root.hidden = true;
       this.setTableClasses(false);
       document.body.classList.remove('online-game-active');
+      this.resultDialog.updateOnline(null);
       document.querySelector<HTMLButtonElement>('#new-game')!.disabled = false;
       return;
     }
@@ -243,6 +245,7 @@ export class OnlineGameController {
     this.renderDora(view);
     this.renderResult(view);
     this.renderActions(view);
+    this.resultDialog.updateOnline(view);
   }
 
   private renderSeatLabels(view: PlayerGameView): void {
@@ -447,6 +450,7 @@ export class OnlineGameController {
     this.root.hidden = true;
     this.setTableClasses(false);
     document.body.classList.remove('online-game-active');
+    this.resultDialog.updateOnline(null);
     document.querySelector<HTMLButtonElement>('#new-game')!.disabled = false;
   }
 

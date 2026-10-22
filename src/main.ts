@@ -29,6 +29,7 @@ const onlineActionRoot = onlineActionHost ? mountActionPanel(onlineActionHost, '
 installCallViewport();
 if (document.querySelector('#main-menu-toggle')) new MainMenu();
 const resultDialog = new ResultDialog();
+let onlineGameController: OnlineGameController | null = null;
 const controller = new GameController(undefined, { onChange: render });
 let localKanChoicesOpen = false;
 let localActionPanel: ActionPanel | null = null;
@@ -92,9 +93,9 @@ if (localActionRoot) localActionPanel = new ActionPanel(localActionRoot, event =
 });
 if (document.querySelector('#online-create-open')) {
   if (!onlineActionRoot) throw new Error('Online action panel host is missing');
-  const onlineGame = new OnlineGameController(new ActionPanel(onlineActionRoot));
-  const waitingRoom = new OnlineWaitingRoom(import.meta.env.VITE_ONLINE_API_URL, message => onlineGame.receive(message));
-  onlineGame.setActionSender((action, expectedGameRevision) => waitingRoom.sendGameAction(action, expectedGameRevision));
+  onlineGameController = new OnlineGameController(new ActionPanel(onlineActionRoot), resultDialog);
+  const waitingRoom = new OnlineWaitingRoom(import.meta.env.VITE_ONLINE_API_URL, message => onlineGameController?.receive(message));
+  onlineGameController.setActionSender((action, expectedGameRevision) => waitingRoom.sendGameAction(action, expectedGameRevision));
 }
 document.querySelector('#player-hand')!.addEventListener('click', event => {
   const button = (event.target as Element).closest<HTMLButtonElement>('button[data-tile-id]');
