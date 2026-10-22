@@ -204,7 +204,7 @@ with sync_playwright() as p:
                 discarderId: entry.winMethod === 'ron' ? entry.discarderId : null,
                 yaku: entry.candidate.yaku.map(yaku => yaku.id),
                 doraHan: entry.doraHan, uraDoraHan: entry.uraDoraHan, redDoraHan: entry.redDoraHan,
-                totalHanIncludingDora: entry.totalHanIncludingDora, yakumanCount: entry.yakumanCount,
+                totalHanIncludingDora: entry.totalHanIncludingDora, fu: entry.fu, yakumanCount: entry.yakumanCount,
                 scoreTier: entry.scoreTier, totalPoints: entry.totalPoints,
                 winningTileId: entry.winningTileId })),
               settlement: match.lastSettlement ? { honba: match.lastSettlement.honba,
