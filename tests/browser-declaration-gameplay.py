@@ -6,13 +6,23 @@ import shutil
 from playwright.sync_api import sync_playwright
 
 BASE_URL = os.environ.get('HEIBON_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
+ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 OUT.mkdir(parents=True, exist_ok=True)
 
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'))
-    page = browser.new_page(viewport={'width': 320, 'height': 900}, device_scale_factor=1)
+    browser_type = getattr(p, ENGINE)
+    launch_options = {}
+    if ENGINE == 'chromium':
+      launch_options['executable_path'] = os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium')
+    browser = browser_type.launch(**launch_options)
+    page = browser.new_page(
+      viewport={'width': 320, 'height': 900},
+      device_scale_factor=2 if ENGINE == 'webkit' else 1,
+      is_mobile=ENGINE == 'webkit',
+      has_touch=ENGINE == 'webkit',
+    )
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
 
@@ -94,7 +104,7 @@ window.declarationGameplayTest = { controller, render, onlineGameController };
         assert metrics['inViewport'] and metrics['topmost'], (mode, metrics)
 
     assert_visible_bubble('local 320px', local_metrics, 'リーチ')
-    page.screenshot(path=str(OUT / 'declaration-gameplay-local-320.png'))
+    page.screenshot(path=str(OUT / f'declaration-gameplay-local-320-{ENGINE}.png'))
     page.wait_for_timeout(1800)
     assert page.locator('#local-table .declaration-bubble').count() == 1, 'local bubble disappeared before two seconds'
     page.wait_for_timeout(350)
@@ -167,7 +177,7 @@ window.declarationGameplayTest = { controller, render, onlineGameController };
     assert online_metrics['stateEstablished'], f'online engine did not publish its resolved riichi state: {online_metrics}'
     assert online_metrics['operationToShowMs'] is not None and 0 <= online_metrics['operationToShowMs'] < 500, online_metrics
     assert_visible_bubble('online 320px', online_metrics, 'リーチ')
-    page.screenshot(path=str(OUT / 'declaration-gameplay-online-320.png'))
+    page.screenshot(path=str(OUT / f'declaration-gameplay-online-320-{ENGINE}.png'))
     page.wait_for_timeout(1800)
     assert page.locator('#online-table .declaration-bubble').count() == 1, 'online bubble disappeared before two seconds'
     page.wait_for_timeout(350)

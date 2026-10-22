@@ -39,7 +39,7 @@ jobs:
           fi
       - run: npm run build
       - run: python -m pip install playwright
-      - run: python -m playwright install --with-deps chromium
+      - run: python -m playwright install --with-deps chromium webkit
       - name: Run Vite and browser regressions
         shell: bash
         run: |
@@ -77,6 +77,7 @@ jobs:
           run_browser_test tests/browser-table-ui.py
           run_browser_test tests/browser-declaration-bubbles.py
           run_browser_test tests/browser-declaration-gameplay.py
+          HEIBON_BROWSER=webkit run_browser_test tests/browser-declaration-gameplay.py
           run_browser_test tests/browser-round-end-ui.py
           run_browser_test tests/browser-dora-rows.py
           run_browser_test tests/browser-mobile-table-layout.py
