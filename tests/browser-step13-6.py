@@ -108,7 +108,7 @@ with sync_playwright() as p:
             assert result['redHan'] == 0, (width, name, result)
             summary = page.locator('.round-summary-yaku').first.inner_text()
             assert NAMES[expected_id][0] in summary, (width, name, summary)
-            assert page.locator('.round-summary-value').first.inner_text() == f'合計{result["totalHan"]}翻', (width, name, result)
+            assert page.locator('.round-summary-value').first.inner_text() == f'{result["totalHan"]}翻 {result["fu"]}符', (width, name, result)
             assert page.locator('.round-summary-points').first.inner_text() == f'{result["points"]:,}点', (width, name, result)
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, name, 'table horizontal overflow')
             assert page.locator('.round-win-summary').evaluate('element => element.scrollWidth <= element.clientWidth'), (width, name, 'summary overflow')

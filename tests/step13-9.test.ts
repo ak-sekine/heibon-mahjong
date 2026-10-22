@@ -329,10 +329,8 @@ test('ロンなしの最後の打牌後は通常流局し、テンパイ罰符�
 });
 
 test('役名は概要と詳細で日本語表示され、物理牌IDと入力局面を維持する', () => {
-  assert.equal(yakuDisplayName('haitei', 'summary'), '海底摸月');
-  assert.equal(yakuDisplayName('haitei', 'detail'), '海底摸月');
-  assert.equal(yakuDisplayName('houtei', 'summary'), '河底撈魚');
-  assert.equal(yakuDisplayName('houtei', 'detail'), '河底撈魚');
+  assert.equal(yakuDisplayName('haitei'), '海底摸月');
+  assert.equal(yakuDisplayName('houtei'), '河底撈魚');
 
   const game = finalDiscardGame({ dealerId: 2, winners: [{ id: 0, hand: ['123m', '456m', '789p', '22p', '34s'] }], winningKey: 'sou-5' });
   const snapshot = structuredClone(game);

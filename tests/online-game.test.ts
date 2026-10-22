@@ -5,7 +5,7 @@ import { discardTileForOnline } from '../src/game/discard.ts';
 import { getKanOptions } from '../src/game/kan.ts';
 import { getRiichiDiscardOptions } from '../src/game/riichi.ts';
 import { canDeclareTsumo, declareTsumo } from '../src/game/tsumo.ts';
-import { markRonPassed } from '../src/game/ron.ts';
+import { declareRon, markRonPassed } from '../src/game/ron.ts';
 import { startMatch } from '../src/game/match.ts';
 import { tileKindKey } from '../src/model/tile.ts';
 import type { GameState, PlayerId, PlayerState } from '../src/model/game.ts';
@@ -32,6 +32,7 @@ import {
   type PlayerDecisionWindow,
 } from '../src/online/game-view.ts';
 import { ronGame, ronStart } from './ron-fixture.ts';
+import { renderOnlineWinSummary } from '../src/online/result-content.ts';
 
 const allTiles = (game: GameState) => [
   ...game.liveWall,
@@ -182,6 +183,47 @@ test('online round results include only the public scoring and winning-hand deta
   assert.equal('deadWall' in view, false);
   assert.equal('analysis' in winner, false);
   assert.equal('candidate' in winner, false);
+});
+
+test('online ron and tsumo summaries use Japanese yaku names and omit round and payment details', () => {
+  class Node {
+    textContent = '';
+    className = '';
+    hidden = true;
+    children: Node[] = [];
+    append(...children: Node[]) { this.children.push(...children); }
+  }
+  const original = globalThis.document;
+  globalThis.document = { createElement: () => new Node() } as unknown as Document;
+  try {
+    const scenarios = [
+      { method: 'tsumo', game: declareTsumo(tsumoGame(), 0) },
+      { method: 'ron', game: declareRon(ronGame(1, [0]), 0) },
+    ] as const;
+    for (const { method, game } of scenarios) {
+      const session = sessionForGame(game, [0]);
+      const view = createPlayerGameView(session, 1, 'A2CDEF', new Set([0]));
+      const winner = view.result!.winners[0];
+      const summary = new Node();
+      assert.equal(renderOnlineWinSummary(summary as unknown as HTMLElement, view), true);
+      assert.equal(summary.hidden, false);
+      assert.equal(summary.children.length, 1);
+      const section = summary.children[0];
+      assert.equal(section.children.length, 2);
+      const resultLine = section.children[0];
+      assert.equal(resultLine.className, 'round-summary-winner');
+      assert.equal(resultLine.children.map(node => node.textContent).join(''),
+        `Host ${method === 'tsumo' ? 'ツモ' : 'ロン'}・${winner.yakumanCount > 0 ? `${winner.yakumanCount}役満` : `${winner.han}翻 ${winner.fu}符`}・${winner.totalPoints.toLocaleString('ja-JP')}点`);
+      const yakuLine = section.children[1];
+      assert.equal(yakuLine.className, 'round-summary-yaku');
+      assert.deepEqual(yakuLine.textContent, winner.yaku.map(yaku => ({
+        riichi: '立直', 'menzen-tsumo': '門前清自摸和', pinfu: '平和', tanyao: '断么九',
+        'yakuhai-white': '役牌：白', 'yakuhai-green': '役牌：發', 'yakuhai-red': '役牌：中',
+      } as Record<string, string>)[yaku.id] ?? yaku.id).join('・'));
+      assert.ok(!section.children.some(node => /東\d局|本場|支払|点数：|増減/.test(node.textContent)));
+      assert.ok(yakuLine.textContent !== winner.yaku.map(yaku => yaku.id).join('・'));
+    }
+  } finally { globalThis.document = original; }
 });
 
 test('an exhaustive draw never exposes another human hand without a declaration', () => {

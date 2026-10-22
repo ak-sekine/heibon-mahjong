@@ -7,13 +7,15 @@ import type { ScoreTier } from '../analysis/score.ts';
 import type { GameState, PlayerId, PlayerState, PhysicalTile, SeatWind, TsumoResult, RonCandidate } from '../model/game.ts';
 import { HONORS, SUITS, type Tile } from '../model/tile.ts';
 import { createTileElement, tileLabel } from './tile-svg.ts';
-import type { YakuId } from '../analysis/yaku.ts';
 import { canDiscard } from '../game/discard.ts';
 import { exposedDoraIndicators } from '../game/dora.ts';
 import { renderDoraIndicators, createResultDoraRow } from './dora.ts';
 import { applyRiverLayout, applyRiverTilePlacement, calculateRiverLayout, riverPositionFor } from './river-layout.ts';
 import type { RoundSettlement } from '../model/match.ts';
 import { renderSeatLabel, renderWallCount } from './shared-table-components.ts';
+import { renderRoundWinSummary } from './round-win-summary.ts';
+import { yakuDisplayName } from './yaku-names.ts';
+export { yakuDisplayName } from './yaku-names.ts';
 
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
 const seatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
@@ -138,34 +140,6 @@ export function renderSelection(game: GameState, selectedTileId: string | null, 
   }
 }
 
-const yakuNames: Record<YakuId, string> = {
-  rinshan:'嶺上開花', chankan:'槍槓', sankantsu:'三槓子', suukantsu:'四槓子',
-  haitei:'海底摸月', houtei:'河底撈魚',
-  riichi: '立直', ippatsu: '一発', 'double-riichi': 'ダブル立直', 'menzen-tsumo': '門前清自摸和', tanyao: '断么九',
-  'yakuhai-white': '役牌：白', 'yakuhai-green': '役牌：發', 'yakuhai-red': '役牌：中',
-  'yakuhai-seat-wind': '役牌：自風', 'yakuhai-round-wind': '役牌：場風',
-  pinfu: '平和', iipeikou: '一盃口', ryanpeikou: '二盃口', sanankou: '三暗刻',
-  chiitoitsu: '七対子', toitoi: '対々和', shousangen: '小三元', honroutou: '混老頭',
-  chanta: '混全帯么九', junchan: '純全帯么九', 'sanshoku-doukou': '三色同刻',
-  'sanshoku-doujun': '三色同順', ittsu: '一気通貫', honitsu: '混一色', chinitsu: '清一色',
-  'kokushi-musou': '国士無双', suuankou: '四暗刻', daisangen: '大三元', tsuuiisou: '字一色',
-  ryuuiisou: '緑一色', chinroutou: '清老頭', shousuushii: '小四喜', daisuushii: '大四喜',
-  'chuuren-poutou': '九蓮宝燈', tenhou: '天和', chiihou: '地和',
-};
-const roundSummaryYakuOverrides: Partial<Record<YakuId, string>> = {
-  'menzen-tsumo': 'ツモ',
-  'yakuhai-white': '白',
-  'yakuhai-green': '發',
-  'yakuhai-red': '中',
-  'yakuhai-seat-wind': '自風',
-  'yakuhai-round-wind': '場風',
-  tanyao: 'タンヤオ',
-};
-
-export function yakuDisplayName(id: YakuId, view: 'summary' | 'detail'): string {
-  return view === 'summary' ? roundSummaryYakuOverrides[id] ?? yakuNames[id] : yakuNames[id];
-}
-
 function renderRoundSummary(game: GameState, settlement: RoundSettlement | null): void {
   const summary = document.querySelector<HTMLElement>('#round-result-summary');
   if (!summary) return;
@@ -179,43 +153,21 @@ function renderRoundSummary(game: GameState, settlement: RoundSettlement | null)
     summary.hidden = false;
     const winners = game.winResult.winMethod === 'ron' ? game.winResult.winners : [game.winResult];
     for (const result of winners) {
-      const section = document.createElement('section');
-      section.className = 'round-win-summary';
       const player = game.players[result.winnerId];
-      const heading = result.winMethod === 'ron'
-        ? `${seatNames[player.id]} ロン（${seatNames[result.discarderId]}から）`
-        : `${seatNames[player.id]} ツモ`;
-      section.append(text('p', heading, 'round-summary-winner'));
-      const yaku = result.candidate.yaku.map(entry => yakuDisplayName(entry.id, 'summary'));
-      if (result.yakumanCount === 0) {
-        if (result.doraHan > 0) yaku.push(`ドラ${result.doraHan}`);
-        if (result.uraDoraHan > 0) yaku.push(`裏ドラ${result.uraDoraHan}`);
-        if (result.redDoraHan > 0) yaku.push(`赤ドラ${result.redDoraHan}`);
-      }
-      section.append(text('p', yaku.join('・'), 'round-summary-yaku'));
-      const total = text('p', '', 'round-summary-total');
-      total.append(text('span', result.yakumanCount > 0
-        ? `${result.yakumanCount}役満`
-        : `合計${result.totalHanIncludingDora}翻`, 'round-summary-value'));
-      total.append(text('span', `${result.totalPoints.toLocaleString('en-US')}点`, 'round-summary-points'));
-      section.append(total);
       const settledPayments = settlement?.payments.filter(payment => payment.recipientId === result.winnerId) ?? [];
       const depositPoints = settlement?.deposits?.recipientId === result.winnerId ? settlement.deposits.points : 0;
       const receivedPoints = result.yakumanCount > 0 && settledPayments.length
         ? settledPayments.reduce((sum, payment) => sum + payment.points, 0) + depositPoints
         : result.totalPoints;
-      total.querySelector('.round-summary-points')!.textContent = `${receivedPoints.toLocaleString('en-US')}点`;
-      if (result.yakumanCount > 0) {
-        const payments = settledPayments.length
-          ? settledPayments.map(payment =>
-            `${seatNames[payment.payerId]}（${payment.payerId === game.dealerId ? '親' : '子'}）→${seatNames[result.winnerId]} ${payment.points.toLocaleString('en-US')}点（本場${payment.honbaPoints}点）`)
-          : result.payments.map(payment =>
-            `${seatNames[payment.playerId]}（${payment.playerId === game.dealerId ? '親' : '子'}）→${seatNames[result.winnerId]} ${payment.points.toLocaleString('en-US')}点`);
-        section.append(text('p', `支払：${payments.join('・')}`, 'round-summary-payments'));
-        if (depositPoints > 0) section.append(text('p', `供託 ${depositPoints.toLocaleString('en-US')}点を獲得`, 'round-summary-payments'));
-      }
-      section.append(text('p', winners.some(winner => winner.winnerId === game.dealerId) ? '親連荘' : '親交代', 'round-summary-next'));
-      summary.append(section);
+      renderRoundWinSummary(summary, [{
+        winnerName: seatNames[player.id],
+        method: result.winMethod,
+        han: result.totalHanIncludingDora,
+        fu: result.fu,
+        yakumanCount: result.yakumanCount,
+        points: receivedPoints,
+        yaku: result.candidate.yaku.map(entry => entry.id),
+      }]);
     }
     return;
   }
@@ -335,7 +287,7 @@ function renderWinResult(game: GameState, settlement: RoundSettlement | null): v
     section.append(text('p', '今回対応している役の判定結果'));
     const list = document.createElement('ul');
     for (const yaku of result.candidate.yaku) list.append(text('li',
-      `${yakuDisplayName(yaku.id, 'detail')} ${yaku.yakuman > 0 ? `${yaku.yakuman}役満` : `${yaku.han}翻`}`));
+      `${yakuDisplayName(yaku.id)} ${yaku.yakuman > 0 ? `${yaku.yakuman}役満` : `${yaku.han}翻`}`));
     section.append(list);
     if (result.yakumanCount > 0) {
       section.append(text('p', `役満：${result.yakumanCount}役満`));

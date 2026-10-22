@@ -9,6 +9,7 @@ import { TILE_KINDS, tileKindKey } from '../model/tile.ts';
 import { ActionPanel, type ActionPanelEvent } from '../ui/action-panel.ts';
 import { ResultDialog } from '../ui/result-dialog.ts';
 import { createOnlineActionPanelState } from './action-panel-state.ts';
+import { renderOnlineWinSummary } from './result-content.ts';
 
 type ActionSender = (action: GameActionPayload, expectedGameRevision: number) => void;
 type DecisionAction = { type: 'declare-ron' } | { type: 'pass-ron' } | { type: 'declare-call'; optionId: string } | { type: 'pass-call' };
@@ -406,12 +407,8 @@ export class OnlineGameController {
     section.replaceChildren();
     section.hidden = !result;
     if (!result) return;
+    if (renderOnlineWinSummary(section, view)) return;
     section.append(text('h2', `東${result.roundNumber}局 ${result.honba}本場 · ${result.reason === 'draw' ? '流局' : result.reason === 'ron' ? 'ロン' : result.reason === 'tsumo' ? 'ツモ' : result.reason === 'nagashi-mangan' ? '流し満貫' : '途中流局'}`));
-    for (const winner of result.winners) {
-      const seat = view.seats[winner.winnerId];
-      section.append(text('p', `${this.displayName(view, seat)} ${winner.method === 'tsumo' ? 'ツモ' : `ロン（${this.displayName(view, view.seats[winner.discarderId ?? 0])}から）`} · ${winner.yakumanCount ? `${winner.yakumanCount}役満` : `${winner.han}翻 ${winner.fu ?? '—'}符`} · ${winner.totalPoints.toLocaleString('ja-JP')}点`));
-      section.append(text('p', winner.yaku.map(yaku => yaku.id).join('・')));
-    }
     section.append(text('p', `点数：${result.after.map((points, seat) => `${this.displayName(view, view.seats[seat])} ${points.toLocaleString('ja-JP')}点 (${result.deltas[seat] >= 0 ? '+' : ''}${result.deltas[seat].toLocaleString('ja-JP')})`).join(' · ')}`));
     for (const payment of result.payments) {
       section.append(text('p', `${this.displayName(view, view.seats[payment.payerId])} → ${this.displayName(view, view.seats[payment.recipientId])}：${payment.points.toLocaleString('ja-JP')}点`));

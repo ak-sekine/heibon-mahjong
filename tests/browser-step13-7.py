@@ -54,7 +54,7 @@ with sync_playwright() as p:
       ])];
       return { role: win.candidate.yaku.find(yaku => yaku.id === 'ryanpeikou')?.id,
         roleHan: win.candidate.yaku.find(yaku => yaku.id === 'ryanpeikou')?.han,
-        shape: win.candidate.shape, totalHan: win.totalHanIncludingDora, points: win.totalPoints,
+        shape: win.candidate.shape, totalHan: win.totalHanIncludingDora, points: win.totalPoints, fu: win.fu,
         yaku: win.candidate.yaku.map(yaku => ({ id: yaku.id, han: yaku.han })),
         privateIds: game.players.slice(1).flatMap(player => [...player.hand,
           ...(player.drawnTile ? [player.drawnTile] : [])]).map(tile => tile.id),
@@ -65,7 +65,7 @@ with sync_playwright() as p:
     assert result['idsUnique'], result
     summary = page.locator('.round-summary-yaku').first.inner_text()
     assert '二盃口' in summary, summary
-    assert page.locator('.round-summary-value').first.inner_text() == f'合計{result["totalHan"]}翻', result
+    assert page.locator('.round-summary-value').first.inner_text() == f'{result["totalHan"]}翻 {result["fu"]}符', result
     assert page.locator('.round-summary-points').first.inner_text() == f'{result["points"]:,}点', result
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'table horizontal overflow'
     assert page.locator('.round-win-summary').evaluate('element => element.scrollWidth <= element.clientWidth'), 'summary overflow'

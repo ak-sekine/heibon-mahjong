@@ -74,9 +74,7 @@ with sync_playwright() as p:
         assert expected_name in summary, summary
         assert page.locator('.round-summary-value').first.inner_text() == count_label, result
         assert page.locator('.round-summary-points').first.inner_text() == f'{expected_points:,}点', result
-        assert '子' in page.locator('.round-summary-payments').first.inner_text(), 'parent/child payment not shown'
-        if scenario == 'step13-8-multiple-yakuman':
-            assert '親' in page.locator('.round-summary-payments').first.inner_text(), 'dealer payment not shown'
+        assert page.locator('.round-summary-payments').count() == 0, 'win summary must omit payment details'
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'table horizontal overflow'
         assert page.locator('.round-win-summary').evaluate('element => element.scrollWidth <= element.clientWidth'), 'summary overflow'
         public_html = page.locator('main').inner_html()

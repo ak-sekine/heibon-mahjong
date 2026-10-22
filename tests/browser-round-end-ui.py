@@ -10,14 +10,14 @@ OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-round-end-u
 OUT.mkdir(parents=True, exist_ok=True)
 WIDTHS = [(320, 568), (355, 700), (375, 812), (390, 844), (430, 932), (1280, 800)]
 SUMMARY_YAKU_NAMES = {
-    'menzen-tsumo': 'ツモ',
-    'yakuhai-white': '白',
-    'yakuhai-green': '發',
-    'yakuhai-red': '中',
-    'yakuhai-seat-wind': '自風',
-    'yakuhai-round-wind': '場風',
+    'menzen-tsumo': '門前清自摸和',
+    'yakuhai-white': '役牌：白',
+    'yakuhai-green': '役牌：發',
+    'yakuhai-red': '役牌：中',
+    'yakuhai-seat-wind': '役牌：自風',
+    'yakuhai-round-wind': '役牌：場風',
     'double-riichi': 'ダブル立直',
-    'tanyao': 'タンヤオ',
+    'tanyao': '断么九',
     'riichi': '立直', 'ippatsu': '一発', 'pinfu': '平和', 'iipeikou': '一盃口',
     'chiitoitsu': '七対子', 'toitoi': '対々和', 'rinshan': '嶺上開花', 'chankan': '槍槓',
     'sankantsu': '三槓子', 'suukantsu': '四槓子', 'kokushi-musou': '国士無双',
@@ -359,30 +359,23 @@ with sync_playwright() as p:
                 for result in meta['winners']:
                     section = page.locator(f'.winner-result[data-winner-id="{result["winnerId"]}"]')
                     winner_summary = page.locator(f'.round-win-summary').nth(meta['winners'].index(result))
-                    if result['winMethod'] == 'ron':
-                        expected_heading = f'{seat_names[result["winnerId"]]} ロン（{seat_names[result["discarderId"]]}から）'
-                    else:
-                        expected_heading = f'{seat_names[result["winnerId"]]} ツモ'
+                    method = 'ツモ' if result['winMethod'] == 'tsumo' else 'ロン'
+                    score = f'{result["yakumanCount"]}役満' if result['yakumanCount'] else f'{result["totalHanIncludingDora"]}翻 {result["fu"]}符'
+                    expected_heading = f'{seat_names[result["winnerId"]]} {method}・{score}・{result["totalPoints"]:,}点'
                     assert winner_summary.locator('.round-summary-winner').inner_text() == expected_heading, (width, scenario, expected_heading)
                     yaku_lines = section.locator('ul').first.locator('li').all_inner_texts()
                     detail_yaku = [re.sub(r'\s+\d+(?:翻|役満)$', '', line) for line in yaku_lines]
                     assert detail_yaku == [DETAIL_YAKU_NAMES[yaku_id] for yaku_id in result['yaku']], (width, scenario, detail_yaku, result['yaku'])
                     summary_yaku = winner_summary.locator('.round-summary-yaku').inner_text()
                     expected_summary_parts = [SUMMARY_YAKU_NAMES[yaku_id] for yaku_id in result['yaku']]
-                    if not result['yakumanCount']:
-                        for label, han in [('ドラ',result['doraHan']),('裏ドラ',result['uraDoraHan']),('赤ドラ',result['redDoraHan'])]:
-                            if han > 0:
-                                expected_summary_parts.append(f'{label}{han}')
                     assert summary_yaku == '・'.join(expected_summary_parts), (width, scenario, expected_summary_parts, summary_yaku)
                     assert winner_summary.evaluate('element => element.scrollWidth <= element.clientWidth'), (width, scenario, 'summary overflows horizontally')
                     assert winner_summary.locator('.round-summary-yaku').evaluate('element => element.scrollWidth <= element.clientWidth'), (width, scenario, 'yaku line overflows horizontally')
-                    if scenario == 'ura-tsumo':
-                        assert result['uraDoraHan'] > 0 and f'裏ドラ{result["uraDoraHan"]}' in summary_yaku, (width, scenario, result, summary_yaku)
                     total = winner_summary.locator('.round-summary-value').inner_text()
                     if result['yakumanCount']:
                         assert total == f'{result["yakumanCount"]}役満' and '翻' not in total, (width, scenario, total)
                     else:
-                        assert total == f'合計{result["totalHanIncludingDora"]}翻', (width, scenario, total)
+                        assert total == f'{result["totalHanIncludingDora"]}翻 {result["fu"]}符', (width, scenario, total)
                         assert f'合計：{result["totalHanIncludingDora"]}翻' in section.inner_text(), (width, scenario)
                     points = f'{result["totalPoints"]:,}点'
                     points_node = winner_summary.locator('.round-summary-points')
@@ -390,7 +383,7 @@ with sync_playwright() as p:
                     detail_score = section.locator('.win-score').inner_text()
                     detail_points = re.search(r'獲得点数：.*?([\d,]+)点', detail_score)
                     assert detail_points and int(detail_points.group(1).replace(',', '')) == result['totalPoints'], (width, scenario, result, detail_score)
-                    total_layout = winner_summary.locator('.round-summary-total')
+                    total_layout = winner_summary.locator('.round-summary-winner')
                     assert total_layout.evaluate('element => element.scrollWidth <= element.clientWidth'), (width, scenario, 'summary total overflows horizontally')
                     assert total_layout.evaluate('''element => {
                       const left=element.querySelector('.round-summary-value').getBoundingClientRect();
@@ -398,6 +391,7 @@ with sync_playwright() as p:
                       return Math.abs(left.top-right.top)<1 && left.left>=element.getBoundingClientRect().left && right.right<=element.getBoundingClientRect().right;
                     }'''), (width, scenario, 'han/yakuman and points must share one line')
                     assert 'ドラ込み' not in winner_summary.inner_text(), (width, scenario)
+                    assert not re.search(r'東\d局|本場|支払|供託|親連荘|親交代', winner_summary.inner_text()), (width, scenario, winner_summary.inner_text())
                 cpu_winners = [result['winnerId'] for result in meta['winners'] if result['winnerId'] != 0]
                 for player in meta['players'][1:]:
                     seat = page.locator(f'.concealed-hand[data-player-id="{player["id"]}"]')

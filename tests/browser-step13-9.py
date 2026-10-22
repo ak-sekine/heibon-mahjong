@@ -77,7 +77,7 @@ with sync_playwright() as p:
           ])];
           return { winMethod: win.winMethod, winners: winners.map(winner => ({ id: winner.winnerId,
               yaku: winner.candidate.yaku.map(yaku => ({ id: yaku.id, han: yaku.han })),
-              totalHan: winner.totalHanIncludingDora, points: winner.totalPoints })),
+              totalHan: winner.totalHanIncludingDora, points: winner.totalPoints, fu: winner.fu })),
             idsUnique: physical.length === 136 && new Set(physical.map(tile => tile.id)).size === 136,
             privateIds: game.players.slice(2).flatMap(player => [...player.hand,
               ...(player.drawnTile ? [player.drawnTile] : [])]).map(tile => tile.id) };
@@ -90,7 +90,7 @@ with sync_playwright() as p:
         assert result['idsUnique'], result
         summary = page.locator('.round-summary-yaku').first.inner_text()
         assert expected_name in summary, summary
-        assert page.locator('.round-summary-value').first.inner_text() == f'合計{result["winners"][0]["totalHan"]}翻', result
+        assert page.locator('.round-summary-value').first.inner_text() == f'{result["winners"][0]["totalHan"]}翻 {result["winners"][0]["fu"]}符', result
         assert page.locator('.round-summary-points').first.inner_text() == f'{result["winners"][0]["points"]:,}点', result
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'result horizontal overflow'
         assert page.locator('.round-win-summary').evaluate('element => element.scrollWidth <= element.clientWidth'), 'summary overflow'

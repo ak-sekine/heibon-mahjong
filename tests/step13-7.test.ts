@@ -266,8 +266,7 @@ test('result labels include all seven additions', () => {
     ['sanshoku-doukou', '三色同刻'],
   ];
   for (const [id, name] of names) {
-    assert.equal(yakuDisplayName(id, 'summary'), name);
-    assert.equal(yakuDisplayName(id, 'detail'), name);
+    assert.equal(yakuDisplayName(id), name);
   }
 });
 

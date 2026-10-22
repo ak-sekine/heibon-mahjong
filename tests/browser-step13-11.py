@@ -62,16 +62,8 @@ with sync_playwright() as p:
         summary = page.locator('#round-result-summary').inner_text()
         assert all(name in summary for name in expected_names) and expected_count in summary, summary
         assert f'{expected_points:,}点' in summary, summary
-        assert dealer_status in summary, summary
-        assert page.locator('.round-summary-payments').count() >= 1, summary
-        if scenario == 'chiihou':
-            assert 'CPU1（親）→自分 16,000点' in summary, summary
-            assert 'CPU2（子）→自分 8,000点' in summary, summary
-            assert 'CPU3（子）→自分 8,000点' in summary, summary
-        else:
-            assert 'CPU1（子）→自分 32,000点' in summary, summary
-            assert 'CPU2（子）→自分 32,000点' in summary, summary
-            assert 'CPU3（子）→自分 32,000点' in summary, summary
+        assert page.locator('.round-summary-payments').count() == 0, summary
+        assert not any(label in summary for label in ('本場', '支払', '供託', '親連荘', '親交代')), summary
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'result horizontal overflow'
         assert page.locator('.round-win-summary').evaluate('element => element.scrollWidth <= element.clientWidth'), 'summary overflow'
 

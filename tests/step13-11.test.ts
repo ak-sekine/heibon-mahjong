@@ -236,10 +236,8 @@ test('役満候補では一般役・ドラ・赤ドラを翻に加えない', ()
 });
 
 test('天和・地和の表示名を概要と詳細で同じ表記にする', () => {
-  assert.equal(yakuDisplayName('tenhou', 'summary'), '天和');
-  assert.equal(yakuDisplayName('tenhou', 'detail'), '天和');
-  assert.equal(yakuDisplayName('chiihou', 'summary'), '地和');
-  assert.equal(yakuDisplayName('chiihou', 'detail'), '地和');
+  assert.equal(yakuDisplayName('tenhou'), '天和');
+  assert.equal(yakuDisplayName('chiihou'), '地和');
 });
 
 test('1・2・3役満の既存点数計算は親子別のツモ支払いを返す', () => {

@@ -346,7 +346,6 @@ test('yaku names include all eight new yakuman in summary and details', () => {
     ['chinroutou', '清老頭'], ['shousuushii', '小四喜'], ['daisuushii', '大四喜'], ['chuuren-poutou', '九蓮宝燈'],
   ];
   for (const [id, name] of names) {
-    assert.equal(yakuDisplayName(id, 'summary'), name);
-    assert.equal(yakuDisplayName(id, 'detail'), name);
+    assert.equal(yakuDisplayName(id), name);
   }
 });

@@ -4,7 +4,8 @@ import { HONORS, SUITS, ordinaryTile, type Tile } from '../model/tile.ts';
 import type { PublicMeld, PlayerGameView, PublicWinSummary } from './game-view.ts';
 import { createResultDoraRow } from '../rendering/dora.ts';
 import { createTileElement, tileLabel } from '../rendering/tile-svg.ts';
-import { yakuDisplayName } from '../rendering/table.ts';
+import { yakuDisplayName } from '../rendering/yaku-names.ts';
+import { renderRoundWinSummary } from '../rendering/round-win-summary.ts';
 
 const winds = { east: '東', south: '南', west: '西', north: '北' } as const;
 const abortiveNames = {
@@ -36,6 +37,24 @@ function playerName(view: PlayerGameView, playerId: number): string {
   if (player.control !== 'cpu') return player.name;
   const cpuSeats = view.seats.filter(seat => seat.control === 'cpu').sort((a, b) => a.seat - b.seat);
   return `CPU${cpuSeats.findIndex(seat => seat.seat === playerId) + 1}`;
+}
+
+/** Render the compact online win overview shared with the local table. */
+export function renderOnlineWinSummary(container: HTMLElement, view: PlayerGameView): boolean {
+  const winners = view.result?.winners;
+  if (!winners?.length) return false;
+
+  container.hidden = false;
+  renderRoundWinSummary(container, winners.map(winner => ({
+    winnerName: playerName(view, winner.winnerId),
+    method: winner.method,
+    han: winner.han,
+    fu: winner.fu,
+    yakumanCount: winner.yakumanCount,
+    points: winner.totalPoints,
+    yaku: winner.yaku.map(yaku => yaku.id as YakuId),
+  })));
+  return true;
 }
 
 function fuEntryLabel(entry: FuEntry): string {
@@ -126,7 +145,7 @@ function renderWin(container: HTMLElement, view: PlayerGameView, winner: PublicW
   section.append(text('p', '今回対応している役の判定結果'));
   const yakuList = document.createElement('ul');
   for (const yaku of winner.yaku) {
-    const name = yakuDisplayName(yaku.id as YakuId, 'detail') || yaku.id;
+    const name = yakuDisplayName(yaku.id as YakuId) || yaku.id;
     yakuList.append(text('li', `${name} ${yaku.yakuman ? '役満' : `${yaku.han}翻`}`));
   }
   section.append(yakuList);

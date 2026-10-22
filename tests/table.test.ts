@@ -40,37 +40,34 @@ class ElementStub {
   append(...children: ElementStub[]) { this.children.push(...children); }
 }
 
-test('round summaries abbreviate selected yaku while detail names stay official', () => {
+test('the shared yaku name table uses official Japanese names', () => {
   const cases = [
-    { id: 'menzen-tsumo', summary: 'ツモ', detail: '門前清自摸和' },
-    { id: 'yakuhai-white', summary: '白', detail: '役牌：白' },
-    { id: 'yakuhai-green', summary: '發', detail: '役牌：發' },
-    { id: 'yakuhai-red', summary: '中', detail: '役牌：中' },
-    { id: 'yakuhai-seat-wind', summary: '自風', detail: '役牌：自風' },
-    { id: 'yakuhai-round-wind', summary: '場風', detail: '役牌：場風' },
-    { id: 'double-riichi', summary: 'ダブル立直', detail: 'ダブル立直' },
-    { id: 'tanyao', summary: 'タンヤオ', detail: '断么九' },
-    { id: 'riichi', summary: '立直', detail: '立直' },
-    { id: 'ippatsu', summary: '一発', detail: '一発' },
-    { id: 'pinfu', summary: '平和', detail: '平和' },
-    { id: 'iipeikou', summary: '一盃口', detail: '一盃口' },
-    { id: 'chiitoitsu', summary: '七対子', detail: '七対子' },
-    { id: 'toitoi', summary: '対々和', detail: '対々和' },
-    { id: 'sanshoku-doujun', summary: '三色同順', detail: '三色同順' },
-    { id: 'ittsu', summary: '一気通貫', detail: '一気通貫' },
-    { id: 'honitsu', summary: '混一色', detail: '混一色' },
-    { id: 'chinitsu', summary: '清一色', detail: '清一色' },
-    { id: 'rinshan', summary: '嶺上開花', detail: '嶺上開花' },
-    { id: 'chankan', summary: '槍槓', detail: '槍槓' },
-    { id: 'sankantsu', summary: '三槓子', detail: '三槓子' },
-    { id: 'suukantsu', summary: '四槓子', detail: '四槓子' },
-    { id: 'kokushi-musou', summary: '国士無双', detail: '国士無双' },
-  ] as const satisfies readonly { id: YakuId; summary: string; detail: string }[];
+    { id: 'menzen-tsumo', name: '門前清自摸和' },
+    { id: 'yakuhai-white', name: '役牌：白' },
+    { id: 'yakuhai-green', name: '役牌：發' },
+    { id: 'yakuhai-red', name: '役牌：中' },
+    { id: 'yakuhai-seat-wind', name: '役牌：自風' },
+    { id: 'yakuhai-round-wind', name: '役牌：場風' },
+    { id: 'double-riichi', name: 'ダブル立直' },
+    { id: 'tanyao', name: '断么九' },
+    { id: 'riichi', name: '立直' },
+    { id: 'ippatsu', name: '一発' },
+    { id: 'pinfu', name: '平和' },
+    { id: 'iipeikou', name: '一盃口' },
+    { id: 'chiitoitsu', name: '七対子' },
+    { id: 'toitoi', name: '対々和' },
+    { id: 'sanshoku-doujun', name: '三色同順' },
+    { id: 'ittsu', name: '一気通貫' },
+    { id: 'honitsu', name: '混一色' },
+    { id: 'chinitsu', name: '清一色' },
+    { id: 'rinshan', name: '嶺上開花' },
+    { id: 'chankan', name: '槍槓' },
+    { id: 'sankantsu', name: '三槓子' },
+    { id: 'suukantsu', name: '四槓子' },
+    { id: 'kokushi-musou', name: '国士無双' },
+  ] as const satisfies readonly { id: YakuId; name: string }[];
 
-  for (const { id, summary, detail } of cases) {
-    assert.equal(yakuDisplayName(id, 'summary'), summary, `${id} summary`);
-    assert.equal(yakuDisplayName(id, 'detail'), detail, `${id} detail`);
-  }
+  for (const { id, name } of cases) assert.equal(yakuDisplayName(id), name, id);
 });
 
 for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'normal-multiple', 'ura', 'yakuman'] as const) test(`result separates yaku and bonuses: ${count}`, () => {
@@ -129,23 +126,27 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'normal-multiple', 'u
     assert.equal(output.includes('符の内訳'), count !== 'yakuman');
     const summary = nodes.get('#round-result-summary')!;
     const win = won.winResult!;
-    const yaku = win.candidate.yaku.map(entry => yakuDisplayName(entry.id, 'summary'));
-    if (win.yakumanCount === 0) {
-      if (win.doraHan > 0) yaku.push(`ドラ${win.doraHan}`);
-      if (win.uraDoraHan > 0) yaku.push(`裏ドラ${win.uraDoraHan}`);
-      if (win.redDoraHan > 0) yaku.push(`赤ドラ${win.redDoraHan}`);
-    }
-    assert.equal(summary.children[0].children.find(child => child.className === 'round-summary-yaku')!.textContent, yaku.join('・'));
-    const summaryTotal = summary.children[0].children.find(child => child.className === 'round-summary-total')!;
-    assert.equal(summaryTotal.children[0].textContent,
-      win.yakumanCount > 0 ? `${win.yakumanCount}役満` : `合計${win.totalHanIncludingDora}翻`);
-    assert.equal(summaryTotal.children[1].textContent, `${win.totalPoints.toLocaleString('en-US')}点`);
-    assert.ok(!summary.children[0].textContent.includes('ドラ込み'));
+    const yaku = win.candidate.yaku.map(entry => yakuDisplayName(entry.id));
+    const summarySection = summary.children[0];
+    const summaryLine = summarySection.children.find(child => child.className === 'round-summary-winner')!;
+    const summaryValue = win.yakumanCount > 0 ? `${win.yakumanCount}役満`
+      : `${win.totalHanIncludingDora}翻${win.fu === null ? '' : ` ${win.fu}符`}`;
+    const settlement = startMatch(won).lastSettlement!;
+    const settledPayments = settlement.payments.filter(payment => payment.recipientId === win.winnerId);
+    const depositPoints = settlement.deposits?.recipientId === win.winnerId ? settlement.deposits.points : 0;
+    const displayedPoints = win.yakumanCount > 0 && settledPayments.length
+      ? settledPayments.reduce((sum, payment) => sum + payment.points, 0) + depositPoints
+      : win.totalPoints;
+    assert.equal(summaryLine.children.map(child => child.textContent).join(''),
+      `自分 ツモ・${summaryValue}・${displayedPoints.toLocaleString('ja-JP')}点`);
+    assert.equal(summarySection.children.find(child => child.className === 'round-summary-yaku')!.textContent, yaku.join('・'));
+    assert.equal(summarySection.children.length, 2);
+    assert.ok(!summarySection.children.some(child => /支払|供託|親連荘|親交代|本場/.test(child.textContent)));
     if (count === 'yakuman') {
       assert.ok(output.includes('国士無双 1役満'));
       assert.ok(output.includes('役満：1役満'));
       assert.ok(!output.some(s => s.includes('翻') || s.includes('合計：') || s.includes('赤ドラ')));
-      assert.ok(!summary.children[0].children.find(child => child.className === 'round-summary-yaku')!.textContent.includes('ドラ'));
+      assert.ok(!summarySection.children.find(child => child.className === 'round-summary-yaku')!.textContent.includes('ドラ'));
     } else {
       const expectedYaku = count === 'normal-multiple' || count === 'ura' ? list.children.map(c => c.textContent).sort()
         : ['三色同順 2翻', '平和 1翻', '門前清自摸和 1翻'];
@@ -478,14 +479,15 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     const summary = nodes.get('#round-result-summary')!;
     assert.equal(summary.hidden, false);
     const summaryText = descend(summary).map(n => n.textContent).join(' ');
-    assert.ok(summaryText.includes(`CPU${id} ツモ`));
-    assert.ok(summaryText.includes(`合計${won.winResult!.totalHanIncludingDora}翻`));
+    const summaryLine = summary.children[0].children.find(n => n.className === 'round-summary-winner')!;
+    assert.equal(summaryLine.children.map(n => n.textContent).join(''),
+      `CPU${id} ツモ・${won.winResult!.totalHanIncludingDora}翻 ${won.winResult!.fu}符・${won.winResult!.totalPoints.toLocaleString('ja-JP')}点`);
     assert.ok(summaryText.includes(`${won.winResult!.totalPoints.toLocaleString('en-US')}点`));
     assert.ok(!summaryText.includes('ドラ込み'));
     const summaryYaku = summary.children[0].children.find(n => n.className === 'round-summary-yaku')!.textContent;
-    assert.equal(summaryYaku, [...won.winResult!.candidate.yaku.map(entry => yakuDisplayName(entry.id, 'summary')), 'ドラ1', '赤ドラ2'].join('・'));
-    assert.ok(summaryYaku.includes('ツモ') && summaryYaku.includes('平和'));
-    assert.ok(!summaryYaku.includes('門前清自摸和'));
+    assert.equal(summaryYaku, won.winResult!.candidate.yaku.map(entry => yakuDisplayName(entry.id)).join('・'));
+    assert.ok(summaryYaku.includes('門前清自摸和') && summaryYaku.includes('平和'));
+    assert.ok(!summaryText.includes('支払') && !summaryText.includes('本場') && !summaryText.includes('赤ドラ'));
     assert.ok(!descend(hand).some(n => n.tagName === 'button'));
     for (const other of [1, 2, 3].filter(seat => seat !== id)) {
       const concealed = nodes.get(`.concealed-hand[data-player-id="${other}"]`)!;
@@ -559,6 +561,18 @@ for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','f
       assert.equal(summary.hidden, game.phase !== 'won');
       assert.equal(summary.children.length, actualWinners.length);
       const ronResult = game.winResult?.winMethod === 'ron' ? game.winResult : null;
+      for (const winnerId of actualWinners) {
+        const winner = ronResult!.winners.find(entry => entry.winnerId === winnerId)!;
+        const summarySection = summary.children.find(section => section.children[0].children[0].textContent === `CPU${winnerId} ロン・`)
+          ?? summary.children.find(section => section.children[0].children[0].textContent === `自分 ロン・`);
+        assert.ok(summarySection, `missing ${winnerId} ron summary`);
+        const firstLine = summarySection.children.find(child => child.className === 'round-summary-winner')!;
+        assert.match(firstLine.children.map(child => child.textContent).join(''), / ロン・\d+翻 \d+符・[\d,]+点$/);
+        assert.equal(summarySection.children.find(child => child.className === 'round-summary-yaku')!.textContent,
+          winner.candidate.yaku.map(entry => yakuDisplayName(entry.id)).join('・'));
+        assert.equal(summarySection.children.length, 2);
+      }
+      if (actualWinners.length) assert.ok(!descend(summary).some(node => /東\d局|本場|支払|供託|親連荘|親交代/.test(node.textContent)));
       for (const id of [1,2,3]) {
         const concealed = nodes.get(`.concealed-hand[data-player-id="${id}"]`)!;
         if (actualWinners.includes(id)) {
