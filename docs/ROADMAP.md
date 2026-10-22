@@ -135,6 +135,6 @@ Step 13.8までの役満10種類に、Step 13.11で天和・地和を加え、�
 | Step 14.3：対局UI共通化、河間隔、CPU表示名 | 完了 | 共通操作・点数・卓中央コンポーネント、コンパクトな河座標、ドロップダウンメニュー、オンラインCPU番号を実装しました。ローカル50テスト、build、およびActionsのBrowser UI・Worker deploy・production test・Pages build/deployが成功しました。iPhone Safari実機確認は未実施です。[開発・設計記録](development/step-14.3.md) · [検証記録](verification/step14.3/README.md) |
 | Step 14.4：メニューとオンラインダイアログの分離 | 完了 | 作成・参加の入力フォームを分離し、ActionsのChromium、Worker本番通信、Pages build/deployまで成功しました。iPhone Safari実機確認は未実施です。[開発記録](development/step-14.4.md) · [検証記録](verification/step14.4/README.md) · [処理時間記録](verification/codex-performance/step14-4-menu-dialog-separation.md) |
 | Step 14.5：操作欄のソースコード共通化 | 完了 | 共通ActionPanel、ローカル／オンライン状態アダプター、モード別操作委譲、ActionPanel単体テストを追加しました。mainでBrowser UI、Worker deploy、本番通信検証、Pages build/deployが成功しました。iPhone Safari実機確認は未実施です。[検証記録](verification/step14.5/README.md) · [開発記録](development/step-14.5.md) · [処理時間記録](verification/codex-performance/step14-5-action-panel.md) |
-| Step 14.6：対局中の退出者をCPUへ引き継ぎ | 完了 | 対局状態を保ったCPU交代、判断窓の継続、ホスト交代、退出後の認証失効、最後の人間退出時のルーム終了を実装しました。[開発記録](development/step-14.6.md) · [検証記録](verification/step14.6/README.md) |
+| Step 14.6：対局中の退出者をCPUへ引き継ぎ | 完了 | 対局状態を保ったCPU交代、判断窓の継続、ホスト交代、退出後の認証失効、最後の人間退出時のルーム終了を実装し、53件のテスト、Browser UI、本番通信、Pagesデプロイを確認しました。iPhone Safari実機確認は未実施です。[開発記録](development/step-14.6.md) · [検証記録](verification/step14.6/README.md) |
 
 各項目を着手する際は、実装範囲を決めてからこの表と[SPEC.md](SPEC.md)を更新します。

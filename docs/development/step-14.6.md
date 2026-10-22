@@ -3,6 +3,7 @@
 **実施日:** 2026-10-21
 **対象:** オンライン対局の明示的退出、Durable Objectの状態遷移と退出表示
 **検証記録:** [Step 14.6 検証](../verification/step14.6/README.md)
+**状態:** 実装・ローカル検証・Actions検証完了。main commit `77c7eac0fb274512f524522aa6404c978c6a6aaf`
 
 ## 目的
 
@@ -25,4 +26,4 @@
 
 ## 検証
 
-自動テストとWorker状態遷移、ブラウザーUI、本番通信、GitHub Actionsの確認結果は[検証記録](../verification/step14.6/README.md)にまとめます。
+ローカルの`npm test`（53/53）、build、Worker型検査とGitHub ActionsのBrowser UI、本番通信、Pages build/deployが成功しました。Actions初回はブラウザーモックが退出後の閉じたルームを再利用して失敗したため、次の参加時に待機ルームを作るよう修正して再実行し、全ジョブ成功を確認しました。iPhone Safari実機確認は未実施です。詳細は[検証記録](../verification/step14.6/README.md)を参照してください。

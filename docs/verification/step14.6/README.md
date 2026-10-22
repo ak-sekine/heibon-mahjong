@@ -18,6 +18,8 @@ Workerテストは、ゲームセッションとルーム席を永続化したDu
 
 ## ブラウザー・本番通信
 
-`tests/browser-online-waiting-room.py`には、退出者をCPUに置き換えた状態、既存のCPU1〜CPU3名、公開手牌の伏せ表示、残存ホストへの退出通知、新ホストの表示、最後の人間の退出通知を確認するシナリオを追加しました。Codex Cloud内のChromium起動は行っていません。Browser UI Actionsでの実行結果はmain反映後に追記します。
+`tests/browser-online-waiting-room.py`はBrowser UI Actionsで成功しました。320、375、390、430、1280pxの各幅で、CPU交代通知、新ホスト表示、CPU席の表示と非公開手牌の伏せ表示、最後の人間の退出通知を確認しています。
 
-この環境では`ONLINE_API_URL`が設定されていないため、`npm run test:online:production`とCloudflare本番通信は実行していません。本番通信結果はGitHub Actionsで実際に確認できた場合だけ記録します。iPhone Safari実機確認も未実施です。
+GitHub Actionsの[最終実行](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39695865519)（`77c7eac0fb274512f524522aa6404c978c6a6aaf`）は全ジョブ成功しました。Workerのデプロイと本番通信テストも実行され、`https://heibon-mahjong-online.ak-sekine.workers.dev`で以下のシナリオが成功しています：`two-human-game-host-cpu-handoff-reconnect`、`disconnect-reconnect`、`host-handoff-one-human-three-cpu`、`four-humans-zero-cpu`、`three-humans-one-cpu`。Pages build/deployも成功し、公開先は`https://ak-sekine.github.io/heibon-mahjong/`です。
+
+初回Actions実行（[39694858060](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39694858060)）では、ブラウザーモックが退出後に閉じたルームを再利用したためUI検証が失敗しました。次の参加時に新しい待機ルームを作るよう修正し、最終実行で成功を確認しています。iPhone Safari実機確認は未実施です。
