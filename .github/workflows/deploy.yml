@@ -7,6 +7,7 @@ on:
     paths-ignore:
       - '.github/workflows/deploy.yml'
       - '.github/workflows/production-diagnostics.yml'
+      - 'docs/verification/production-timeout-diagnostics.md'
       - 'tests/online-production.mjs'
   workflow_dispatch:
 
