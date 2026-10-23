@@ -16,7 +16,7 @@ import {
   hydrateOnlineGame,
   markOnlineGameAborted,
   onlineIdentitiesFromSeats,
-  startNextOnlineRound,
+  readyForNextOnlineRound,
   startOnlineGame,
   transferOnlineSeatToCpu,
   timeoutOnlineDecision,
@@ -954,12 +954,7 @@ export class RoomDurableObject {
           } else {
             if (!previousSession) throw new OnlineGameRuleError('game_not_started');
             if (action.type === 'next-round') {
-              if (room.host_seat !== actor.seat) throw new OnlineGameRuleError('not_host');
-              if (action.expectedGameRevision !== previousSession.gameRevision) throw new OnlineGameRuleError('stale_revision');
-              if ([...previousSession.identities].some(identity => identity.control === 'human' && !connected.has(identity.seat))) {
-                throw new OnlineGameRuleError('player_disconnected');
-              }
-              nextSession = startNextOnlineRound(previousSession);
+              nextSession = readyForNextOnlineRound(previousSession, actor.seat as PlayerId, action.expectedGameRevision);
             } else {
               nextSession = applyOnlineGameAction(previousSession, actor.seat as PlayerId, action, connected);
             }

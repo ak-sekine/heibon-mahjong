@@ -224,3 +224,14 @@ test('nine kinds state is derived locally and online buttons use only the matchi
   assertSharedButtons(local, online, ['kyuushu']);
   assert.equal(online.buttons.kyuushu.visible, true);
 });
+
+test('online guests can confirm while disconnected peers wait, and results remain available after confirming', () => {
+  const initial = startMatch(riichiStart('tsumo'));
+  const view = onlineViewFor(initial.game, { status: 'round-ended', host: false });
+  const before = createOnlineActionPanelState(view, null, false, false, false, null);
+  assert.equal(before.buttons['next-round'].enabled, true);
+  const after = createOnlineActionPanelState({ ...view, self: { ...view.self, nextRoundReady: true } }, null, false, false, false, null);
+  assert.equal(after.buttons['next-round'].visible, false);
+  assert.equal(after.buttons['show-result'].enabled, true);
+  assert.equal(after.actionStatus, '他のプレイヤーを待っています');
+});

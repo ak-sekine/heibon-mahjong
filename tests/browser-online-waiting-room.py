@@ -1139,6 +1139,41 @@ with sync_playwright() as p:
     page.set_viewport_size({'width': 390, 'height': 844})
     page.evaluate("window.onlineMock.setResultScenario('self-tsumo', 0)")
     wait_for("document.querySelector('#online-show-result').hidden === false")
+    page.set_viewport_size({'width': 390, 'height': 320})
+    page.locator('#online-show-result').click()
+    page.evaluate("""() => {
+      const controller = window.onlineUiTest.onlineGameController;
+      const original = structuredClone(controller.view);
+      const dialog = document.querySelector('#result-dialog');
+      const body = document.querySelector('#result-body');
+      const content = document.querySelector('#online-result-content');
+      const firstChild = content.firstChild;
+      body.scrollTop = 80;
+      const scroll = body.scrollTop;
+      if (scroll <= 0) throw new Error('Result fixture must overflow to verify scroll retention');
+      const observer = new MutationObserver(() => {});
+      observer.observe(content, { childList: true, subtree: true, characterData: true });
+      controller.receive({ type: 'game-state', view: { ...original, gameRevision: original.gameRevision + 1 } });
+      if (!dialog.open || body.scrollTop !== scroll || content.firstChild !== firstChild || observer.takeRecords().length) {
+        throw new Error('Peer readiness rebuilt or closed the result dialog or changed its scroll');
+      }
+      controller.receive({ type: 'game-state', view: {
+        ...original, gameRevision: original.gameRevision + 2,
+        self: { ...original.self, nextRoundReady: true },
+      } });
+      if (!dialog.open || body.scrollTop !== scroll || content.firstChild !== firstChild || observer.takeRecords().length) {
+        throw new Error('Own readiness rebuilt the result dialog');
+      }
+      observer.disconnect();
+      if (!document.querySelector('#online-next-round').hidden) throw new Error('Ready button remained visible');
+      window.readyOriginalView = original;
+    }""")
+    page.locator('#view-table').click()
+    page.locator('#online-show-result').click()
+    assert page.locator('#result-dialog').evaluate('element => element.open'), 'ready players could not reopen results'
+    page.locator('#view-table').click()
+    page.evaluate("window.onlineUiTest.onlineGameController.receive({ type: 'game-started', view: window.readyOriginalView })")
+    page.set_viewport_size({'width': 390, 'height': 844})
     page.locator('#online-next-round').click()
     wait_for("document.querySelector('#online-table-round').innerText.includes('東2局')")
     assert page.locator('#online-round-result').is_hidden(), 'the old round result remained after next-round transition'

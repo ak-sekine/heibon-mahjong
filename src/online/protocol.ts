@@ -75,6 +75,7 @@ export type GameActionPayload =
   | { type: 'pass-call'; windowId: string }
   | { type: 'declare-kan'; optionId: string }
   | { type: 'declare-kyuushu-kyuuhai' }
+  /** Confirm this result. expectedGameRevision must fall within the current result's revisions. */
   | { type: 'next-round' };
 
 export type GameMutationMessage = GameActionPayload & {

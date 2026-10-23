@@ -111,6 +111,7 @@ export type PlayerGameView = Readonly<{
   self: Readonly<{
     seat: PlayerId;
     isHost: boolean;
+    nextRoundReady?: boolean;
     discardableTileIds: readonly string[];
     riichiTileIds: readonly string[];
     canTsumo: boolean;
@@ -157,6 +158,8 @@ export type OnlineGameSession = Readonly<{
   identities: readonly [OnlineSeatIdentity, OnlineSeatIdentity, OnlineSeatIdentity, OnlineSeatIdentity];
   hostSeat: PlayerId;
   decision: PlayerDecisionWindow | null;
+  /** Stable revision at settlement; readiness updates retain this round boundary. */
+  roundReady?: Readonly<{ baseGameRevision: number; seats: readonly PlayerId[] }>;
   /** Missing only on sessions persisted before declaration events were added. */
   declarations?: readonly PublicDeclarationEvent[];
   abortReason?: 'participant-left';
@@ -327,6 +330,7 @@ export function createPlayerGameView(
     self: {
       seat: viewerSeat,
       isHost: session.hostSeat === viewerSeat,
+      nextRoundReady: session.status === 'round-ended' && (session.roundReady?.seats.includes(viewerSeat) ?? false),
       discardableTileIds: canDiscard(game, viewerSeat)
         ? [...selfPlayer.hand, ...(selfPlayer.drawnTile ? [selfPlayer.drawnTile] : [])]
           .filter(tile => !selfPlayer.riichi || tile.id === selfPlayer.drawnTile?.id)

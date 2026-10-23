@@ -1000,6 +1000,103 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.ok(Array.isArray(seatZero.melds) && (seatZero.melds as unknown[]).length > 0);
   });
 
+  for (const count of [1, 2, 4]) await t.test(`${count} humans confirm once, persist and start only after everyone`, async () => {
+    const fixture = await makeRoom('Ready host', token('a'));
+    const participants = [await connectParticipant(fixture, fixture.hostToken)];
+    const tokens = [fixture.hostToken];
+    for (let i = 1; i < count; i++) {
+      const joined = await joinRoom(fixture, `Ready ${i}`, token(String(i)));
+      tokens.push(joined.token);
+      participants.push(await connectParticipant(fixture, joined.token));
+    }
+    await readyAndFinalize(fixture, participants);
+    await sendGameAction(fixture, participants[0], { type: 'start-game', requestId: 'ready-start', expectedGameRevision: 0 });
+    const active = onlineSessionForGame(fixture, tsumoGame(undefined, true), 80);
+    const ended = applyOnlineGameAction(active, 0, {
+      type: 'declare-tsumo', requestId: 'ready-tsumo', expectedGameRevision: 80,
+    }, new Set(participants.map(p => p.seat as PlayerId)), 1000);
+    saveGameSession(fixture, ended);
+    if (count > 1) {
+      participants[0].server.close(1000, 'unready refresh');
+      fixture.room.webSocketClose(participants[0].server as unknown as WebSocket);
+      fixture.room = new RoomDurableObject(fixture.ctx as unknown as DurableObjectState, {} as Env);
+      participants[0] = await connectParticipant(fixture, tokens[0]);
+      assert.equal((latestGameView(participants[0]).self as Record<string, unknown>).nextRoundReady, false);
+      assert.equal(persistedGame(fixture).status, 'round-ended');
+    }
+    const stale = await sendGameAction(fixture, participants[0], {
+      type: 'next-round', requestId: 'old-round-ready', expectedGameRevision: 80,
+    });
+    assert.equal(stale.code, 'stale_revision');
+    // Guests can confirm first, all with the same snapshot revision.
+    const order = [...participants.keys()].reverse();
+    for (const [index, seat] of order.entries()) {
+      const action = { type: 'next-round', requestId: `ready-${seat}`, expectedGameRevision: ended.gameRevision };
+      const result = await sendGameAction(fixture, participants[seat], action);
+      assert.equal(result.ok, true);
+      const saved = persistedGame(fixture) as unknown as OnlineGameSession;
+      await sendGameAction(fixture, participants[seat], action);
+      assert.deepEqual(persistedGame(fixture), saved, 'request ID replay must not apply twice');
+      if (index < count - 1) {
+        assert.equal(saved.status, 'round-ended');
+        assert.deepEqual(saved.match, ended.match);
+        const duplicate = await sendGameAction(fixture, participants[seat], { ...action, requestId: `repeat-${seat}` });
+        assert.equal(duplicate.ok, true);
+        assert.deepEqual(persistedGame(fixture), saved);
+        participants[seat].server.close(1000, 'refresh');
+        fixture.room.webSocketClose(participants[seat].server as unknown as WebSocket);
+        fixture.room = new RoomDurableObject(fixture.ctx as unknown as DurableObjectState, {} as Env);
+        participants[seat] = await connectParticipant(fixture, tokens[seat]);
+        assert.equal((latestGameView(participants[seat]).self as Record<string, unknown>).nextRoundReady, true);
+        assert.deepEqual((persistedGame(fixture) as unknown as OnlineGameSession).roundReady, saved.roundReady);
+      } else {
+        assert.equal(saved.status, 'playing');
+        assert.equal(saved.match.roundNumber, 2);
+        const old = await sendGameAction(fixture, participants[seat], { ...action, requestId: 'late-old-ready' });
+        assert.equal(old.ok, false);
+        assert.deepEqual(persistedGame(fixture), saved);
+      }
+    }
+    if (count === 2) {
+      const second = applyOnlineGameAction(onlineSessionForGame(fixture, tsumoGame(undefined, true), 120), 0, {
+        type: 'declare-tsumo', requestId: 'second-tsumo', expectedGameRevision: 120,
+      }, new Set<PlayerId>([0, 1]), 1000);
+      saveGameSession(fixture, second);
+      assert.equal((await sendGameAction(fixture, participants[0], {
+        type: 'next-round', requestId: 'previous-round', expectedGameRevision: ended.gameRevision,
+      })).code, 'stale_revision');
+      const simultaneous = await Promise.all(participants.map((participant, seat) => sendGameAction(fixture, participant, {
+        type: 'next-round', requestId: `simultaneous-${seat}`, expectedGameRevision: second.gameRevision,
+      })));
+      assert.ok(simultaneous.every(result => result.ok));
+      const next = persistedGame(fixture) as unknown as OnlineGameSession;
+      assert.equal(next.status, 'playing');
+      assert.equal(next.gameRevision, second.gameRevision + 3, 'two confirmations plus one start');
+      assert.equal(next.roundReady, undefined);
+    }
+  });
+
+  await t.test('leaving the last unready human starts the next round for ready survivors', async () => {
+    const fixture = await makeRoom('Leaving host', token('a'));
+    const info = await joinRoom(fixture, 'Ready guest', token('b'));
+    const host = await connectParticipant(fixture, fixture.hostToken);
+    const guest = await connectParticipant(fixture, info.token);
+    await readyAndFinalize(fixture, [host, guest]);
+    await sendGameAction(fixture, host, { type: 'start-game', requestId: 'leave-start', expectedGameRevision: 0 });
+    const ended = applyOnlineGameAction(onlineSessionForGame(fixture, tsumoGame(undefined, true), 90), 0, {
+      type: 'declare-tsumo', requestId: 'leave-tsumo', expectedGameRevision: 90,
+    }, new Set<PlayerId>([0, 1]), 1000);
+    saveGameSession(fixture, ended);
+    await sendGameAction(fixture, guest, { type: 'next-round', requestId: 'guest-ready', expectedGameRevision: ended.gameRevision });
+    const room = await readState(fixture);
+    assert.equal(sendAction(fixture, host, { type: 'leave-room', requestId: 'unready-leaves', expectedRevision: room.revision }).ok, true);
+    const next = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.equal(next.status, 'playing');
+    assert.equal(next.hostSeat, 1);
+    assert.equal(next.identities[0].control, 'cpu');
+    assert.equal(next.match.roundNumber, 2);
+  });
+
   await t.test('a round-result exit preserves settlement and lets the successor start the next round', async () => {
     const fixture = await makeRoom('Round host', token('c'));
     const guestInfo = await joinRoom(fixture, 'Round guest', token('d'));

@@ -180,6 +180,8 @@ function advanceDecision(
     gameRevision: revision,
     match: currentMatch,
     status: setStatus(session, currentMatch),
+    roundReady: currentMatch.status === 'round-ended'
+      ? session.roundReady ?? { baseGameRevision: revision, seats: [] } : undefined,
     decision,
   };
 }
@@ -275,7 +277,7 @@ export function transferOnlineSeatToCpu(
 
   const decision = session.decision;
   if (!decision || !decision.requiredSeats.includes(seat)) {
-    return { ...converted, gameRevision: session.gameRevision + 1 };
+    return startOnlineRoundIfReady({ ...converted, gameRevision: session.gameRevision + 1 });
   }
 
   const responses = { ...decision.responses };
@@ -405,6 +407,37 @@ export function timeoutOnlineDecision(session: OnlineGameSession, now = Date.now
   return finishDecision(session, expired, now);
 }
 
+/** Only human seats participate, regardless of transient WebSocket connectivity. */
+export function startOnlineRoundIfReady(session: OnlineGameSession): OnlineGameSession {
+  const humans = humanSeats(session);
+  if (session.status !== 'round-ended' || !humans.length ||
+      !humans.every(seat => session.roundReady?.seats.includes(seat))) return session;
+  return startNextOnlineRound(session);
+}
+
+export function readyForNextOnlineRound(
+  session: OnlineGameSession,
+  seat: PlayerId,
+  expectedGameRevision: number,
+): OnlineGameSession {
+  if (session.identities[seat]?.control !== 'human') throw new OnlineGameRuleError('unauthorized');
+  if (session.status !== 'round-ended' || session.match.status !== 'round-ended') {
+    throw new OnlineGameRuleError('round_not_ended');
+  }
+  const ready = session.roundReady ?? { baseGameRevision: session.gameRevision, seats: [] };
+  // Accept simultaneous confirmations from snapshots of this result, but never
+  // a request from before settlement or a future revision.
+  if (expectedGameRevision < ready.baseGameRevision || expectedGameRevision > session.gameRevision) {
+    throw new OnlineGameRuleError('stale_revision');
+  }
+  if (ready.seats.includes(seat)) return session;
+  return startOnlineRoundIfReady({
+    ...session,
+    gameRevision: session.gameRevision + 1,
+    roundReady: { ...ready, seats: [...ready.seats, seat] },
+  });
+}
+
 export function startNextOnlineRound(
   session: OnlineGameSession,
   random: RandomSource = secureRandomSource,
@@ -420,6 +453,7 @@ export function startNextOnlineRound(
     match,
     status: 'playing',
     decision: null,
+    roundReady: undefined,
   };
 }
 
@@ -504,7 +538,12 @@ export function hydrateOnlineGame(serialized: string): OnlineGameSession | null 
     assertPointConservation(session.match);
     if (session.match.game.players.length !== 4 || session.match.game.players.some((player: PlayerState, seat: number) =>
       player.id !== seat || !['human', 'cpu'].includes(player.control))) return null;
-    return session as OnlineGameSession;
+    if (session.roundReady && (!Number.isSafeInteger(session.roundReady.baseGameRevision) ||
+        session.roundReady.baseGameRevision < 0 || session.roundReady.baseGameRevision > session.gameRevision! ||
+        !Array.isArray(session.roundReady.seats) || session.roundReady.seats.some(seat =>
+          !Number.isInteger(seat) || seat < 0 || seat > 3))) return null;
+    return { ...session, roundReady: session.status === 'round-ended'
+      ? session.roundReady ?? { baseGameRevision: session.gameRevision!, seats: [] } : undefined } as OnlineGameSession;
   } catch {
     return null;
   }

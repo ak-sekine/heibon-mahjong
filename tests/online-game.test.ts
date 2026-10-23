@@ -6,7 +6,8 @@ import { getKanOptions } from '../src/game/kan.ts';
 import { getRiichiDiscardOptions } from '../src/game/riichi.ts';
 import { canDeclareTsumo, declareTsumo } from '../src/game/tsumo.ts';
 import { declareRon, markRonPassed } from '../src/game/ron.ts';
-import { startMatch } from '../src/game/match.ts';
+import { startMatch, settleRound } from '../src/game/match.ts';
+import { fixedRon } from './match-fixture.ts';
 import { tileKindKey } from '../src/model/tile.ts';
 import type { GameState, PlayerId, PlayerState } from '../src/model/game.ts';
 import { isForbiddenDiscard } from '../src/game/melds.ts';
@@ -20,6 +21,7 @@ import {
   advanceOnlineCpu,
   startOnlineGame,
   startNextOnlineRound,
+  readyForNextOnlineRound,
   transferOnlineSeatToCpu,
   timeoutOnlineDecision,
   hydrateOnlineGame,
@@ -639,4 +641,20 @@ test('a deterministic human-plus-CPU online match settles through East 4', { tim
   assert.equal(session.match.lastSettlement?.matchEnded, true);
   assert.equal(session.match.points.reduce((sum, points) => sum + points, 0) + session.match.depositSticks * 1000, 100_000);
   assert.ok(operations < 3000);
+});
+
+test('legacy readiness restores conservatively and match end never advances', () => {
+  const active = sessionForGame(tsumoGame(undefined, true), [0, 1], 30);
+  const ended = applyOnlineGameAction(active, 0, { type: 'declare-tsumo', requestId: 'end', expectedGameRevision: 30 }, new Set<PlayerId>([0, 1]));
+  const { roundReady, ...legacy } = ended;
+  const restored = hydrateOnlineGame(JSON.stringify(legacy))!;
+  assert.deepEqual(restored.roundReady, { baseGameRevision: ended.gameRevision, seats: [] });
+  assert.throws(() => readyForNextOnlineRound(restored, 2, ended.gameRevision), /unauthorized/);
+  const finalMatch = settleRound({ ...active.match, game: fixedRon(3, [0], 2), roundNumber: 4, dealerId: 3 });
+  assert.equal(finalMatch.status, 'match-ended');
+  assert.throws(() => readyForNextOnlineRound({ ...restored, match: finalMatch, status: 'match-ended' }, 0, ended.gameRevision), /round_not_ended/);
+  const ready = readyForNextOnlineRound(restored, 1, restored.gameRevision);
+  assert.equal(ready.match, restored.match);
+  assert.equal(createPlayerGameView(ready, 0, 'ABCDEF', new Set()).self.nextRoundReady, false);
+  assert.equal(createPlayerGameView(ready, 1, 'ABCDEF', new Set()).self.nextRoundReady, true);
 });

@@ -63,7 +63,7 @@ export class ResultDialog {
       if (this.dialog.open) this.close();
       return;
     }
-    const key = `${view.gameRevision}:${view.status}:${JSON.stringify(view.result)}`;
+    const key = `${view.roomCode}:${view.status}:${JSON.stringify(view.result)}`;
     if (key === this.onlineKey) return;
     this.onlineKey = key;
     this.resultAvailable = true;
