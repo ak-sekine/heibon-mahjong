@@ -67,9 +67,9 @@ summary { cursor:pointer; padding:4px; }
 @media (min-width:351px) and (max-width:390px) {
   h1 { font-size:16px; }
 }
-.winning-hand,.public-winning-hand { display:grid; grid-template-columns:repeat(13,minmax(0,1fr)) minmax(0,1.25fr); gap:1px; padding:0; margin:8px 0; list-style:none; width:100%; max-width:560px; }
-.winning-hand li,.public-winning-hand li { min-width:0; }
-.winning-hand .winning-draw,.public-winning-hand .winning-draw { padding-left:20%; }
+.winning-hand,.public-winning-hand { display:grid; grid-template-columns:repeat(14,minmax(0,1fr)); gap:1px; padding:0; margin:8px 0; list-style:none; width:100%; max-width:560px; }
+.winning-hand li,.public-winning-hand li { min-width:0; aspect-ratio:60/84; }
+.winning-hand .tile-svg,.public-winning-hand .tile-svg { width:100%; height:100%; }
 .ron-pending .action-status,
 .ron-pending .action-buttons > [data-panel-part="discard"],
 .ron-pending .action-buttons > [data-panel-part="tsumo"],
