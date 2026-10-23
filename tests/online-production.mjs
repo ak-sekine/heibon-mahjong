@@ -16,7 +16,7 @@ const roomsForCleanup = [];
 
 function diagnostic(event, details = {}) {
   if (!diagnosticsEnabled) return;
-  const record = { elapsedMs: Date.now() - diagnosticsStartedAt, event, ...details };
+  const record = { ...details, event, elapsedMs: Date.now() - diagnosticsStartedAt };
   if (event === 'websocket-game-state') {
     diagnosticHistory.push(record);
     if (diagnosticHistory.length > diagnosticHistoryLimit) diagnosticHistory.shift();
@@ -141,7 +141,7 @@ function waitForMessage(client, predicate, afterIndex = 0, timeoutMs = 10000, de
         client: client.diagnosticLabel,
         description,
         timeoutMs,
-        elapsedMs: Date.now() - waitStartedAt,
+        waitElapsedMs: Date.now() - waitStartedAt,
         recentTypes,
       });
       reject(new Error(`Timed out waiting for ${description}; recent protocol message types: ${recentTypes}.`));
@@ -165,7 +165,7 @@ function waitForGameState(client, predicate, afterIndex = 0, timeoutMs = 15000, 
   return waitForMessage(client, message => {
     const matches = (message.type === 'game-state' || message.type === 'game-started') && predicate(message.view);
     if (matches) {
-      diagnostic('wait-for-game-state-satisfied', {
+      const details = {
         client: client.diagnosticLabel,
         description,
         waitElapsedMs: Date.now() - waitStartedAt,
@@ -173,7 +173,8 @@ function waitForGameState(client, predicate, afterIndex = 0, timeoutMs = 15000, 
         status: message.view?.status ?? null,
         phase: message.view?.phase ?? null,
         turnPlayerId: message.view?.turnPlayerId ?? null,
-      });
+      };
+      if (diagnosticsEnabled) queueMicrotask(() => diagnostic('wait-for-game-state-satisfied', details));
     }
     return matches;
   }, afterIndex, timeoutMs, description);
@@ -352,7 +353,7 @@ function connect(url, ticket, privateValues, diagnosticLabel = 'participant') {
           ok: Boolean(message.ok),
           code: message.code ?? null,
           gameRevision: Number.isSafeInteger(message.gameRevision) ? message.gameRevision : null,
-          elapsedMs: Date.now() - pending.sentAt,
+          responseElapsedMs: Date.now() - pending.sentAt,
         };
         client.lastActionResult = result;
         client.pendingGameActions.delete(message.requestId);
