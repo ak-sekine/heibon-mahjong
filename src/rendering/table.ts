@@ -15,6 +15,7 @@ import type { RoundSettlement } from '../model/match.ts';
 import { renderSeatLabel, renderWallCount } from './shared-table-components.ts';
 import { renderRoundWinSummary } from './round-win-summary.ts';
 import { yakuDisplayName } from './yaku-names.ts';
+import { pendingDiscardTarget } from './pending-discard.ts';
 export { yakuDisplayName } from './yaku-names.ts';
 
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
@@ -58,6 +59,7 @@ function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement
 }
 
 export function renderTable(game: GameState, points?: readonly number[], settlement: RoundSettlement | null = null): void {
+  const pendingDiscard = pendingDiscardTarget(game);
   renderWinResult(game, settlement);
   renderRoundSummary(game, settlement);
   const winningResults = game.winResult
@@ -112,7 +114,8 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
     river.replaceChildren(...player.river.map((physical, index) => {
       const position = layout.placements[index];
       const item = document.createElement('div');
-      item.className = 'river-tile';
+      item.className = pendingDiscard?.seat === id && pendingDiscard.riverIndex === index
+        ? 'river-tile pending-discard-target' : 'river-tile';
       item.dataset.tileId = physical.id;
       item.dataset.riichiDeclaration = String(player.riichi?.declarationTileId === physical.id);
       applyRiverTilePlacement(item, position);

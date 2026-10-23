@@ -11,6 +11,7 @@ with sync_playwright() as p:
         page.evaluate('''async()=>{
           window.renderer=await import('/heibon-mahjong/src/rendering/table.ts');
           window.base=(await import('/heibon-mahjong/src/game/start.ts')).startGame();
+          window.tileTools=await import('/heibon-mahjong/src/model/tile.ts');
           window.mobileFixtures=[1,4].map(meldCount=>{
             let tileIndex=0;
             const melds=Array.from({length:meldCount},(_,i)=>{
@@ -73,6 +74,46 @@ with sync_playwright() as p:
         assert all(r['count']==18 and ((r['rows'],r['cols']) in [(3,6),(6,3)]) for r in river_metrics['rivers']), f'river must remain 6x3, rotated for side seats, at {width}px: {river_metrics}'
         assert all(min(r['gaps'])>=.8 and r['rowAlignment']<.35 for r in river_metrics['rivers']), f'river tracks overlap or drift at {width}px: {river_metrics}'
         assert river_metrics['riichiTileWidth']>0, f'riichi tile should retain a cell at {width}px: {river_metrics}'
+        for seat in range(4):
+            target = page.evaluate('''seat=>{
+              const source=mobileFixtures[0].players[seat], targetTile=source.river.at(-1);
+              const duplicate={id:`visual-duplicate-${seat}`,tile:targetTile.tile};
+              const players=mobileFixtures[0].players.map(player=>player.id===seat
+                ? {...player,river:[duplicate,...player.river.slice(1)],riichi:{declarationTileId:targetTile.id}}
+                : {...player,riichi:null});
+              const preview={...mobileFixtures[0],players,phase:'awaiting-discard',ronWindow:null};
+              renderer.renderTable(preview,[25000,25000,25000,25000]);
+              const river=document.querySelector(`.river[data-player-id="${seat}"]`);
+              const beforeItem=[...river.children].find(item=>item.dataset.tileId===targetTile.id);
+              const beforeRect=beforeItem.getBoundingClientRect();
+              const beforeFaceTransform=getComputedStyle(beforeItem.querySelector('svg')).transform;
+              const active={...preview,phase:'awaiting-call',turnPlayerId:seat,
+                ronWindow:{discarderId:seat,tileId:targetTile.id}};
+              renderer.renderTable(active,[25000,25000,25000,25000]);
+              const markers=[...document.querySelectorAll('.river-tile.pending-discard-target')];
+              const marked=markers[0];
+              const afterRect=marked.getBoundingClientRect();
+              const style=getComputedStyle(marked);
+              const declaration=marked.dataset.riichiDeclaration;
+              const transform=getComputedStyle(marked.querySelector('svg')).transform;
+              const sameKindCount=preview.players[seat].river.filter(tile=>
+                tileTools.tileKindKey(tile.tile)===tileTools.tileKindKey(targetTile.tile)).length;
+              const result={seat,markerCount:markers.length,targetId:marked.dataset.tileId,
+                sameKindCount,declared:declaration==='true',sameGeometry:['left','top','width','height'].every(key=>Math.abs(beforeRect[key]-afterRect[key])<.01),
+                sameFaceTransform:beforeFaceTransform===transform,outlineWidth:style.outlineWidth,
+                outlineStyle:style.outlineStyle,outlineColor:style.outlineColor,outlineOffset:style.outlineOffset,
+                pointerEvents:style.pointerEvents,noHorizontalScroll:document.documentElement.scrollWidth<=innerWidth};
+              renderer.renderTable(preview,[25000,25000,25000,25000]);
+              result.cleared=document.querySelectorAll('.pending-discard-target').length===0;
+              return result;
+            }''', seat)
+            assert target['markerCount']==1 and target['targetId'], f'one exact target discard must be outlined for seat {seat} at {width}px: {target}'
+            assert target['sameKindCount']>=2, f'fixture must include duplicate tile kinds for seat {seat}: {target}'
+            assert target['declared'], f'riichi declaration orientation must remain on the target for seat {seat}: {target}'
+            assert target['sameGeometry'] and target['sameFaceTransform'], f'the target outline must not change tile geometry or direction for seat {seat}: {target}'
+            assert (target['outlineWidth'],target['outlineStyle'],target['outlineColor'],target['outlineOffset'])==('3px','solid','rgb(255, 215, 0)','0px'), f'wrong target outline at {width}px: {target}'
+            assert target['pointerEvents']=='none' and target['noHorizontalScroll'], f'target outline must not affect input or mobile width at {width}px: {target}'
+            assert target['cleared'], f'target outline must clear after the decision closes for seat {seat}: {target}'
         print(f'{width}px mobile layout passed: rivers={river_metrics}')
         page.close()
     browser.close()

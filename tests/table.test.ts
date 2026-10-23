@@ -16,6 +16,7 @@ import { SUITS, tileKindKey } from '../src/model/tile.ts';
 import { tileSvgMarkup, tileLabel } from '../src/rendering/tile-svg.ts';
 import { doraKindFromIndicator } from '../src/analysis/dora.ts';
 import { ordinaryTile } from '../src/model/tile.ts';
+import type { GameState, PlayerState } from '../src/model/game.ts';
 import { allTiles, inventory } from './helpers.ts';
 
 class ElementStub {
@@ -509,7 +510,7 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
   } finally { globalThis.document = original; }
 });
 
-for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','furiten','CPU1','CPU2','CPU3'] as const) {
+for (const scenario of ['waiting','same-kind','call-waiting','human','double','triple','pass','pass-cpu','furiten','CPU1','CPU2','CPU3'] as const) {
   test(`ron DOM: ${scenario}, dedicated controls, shared red tile, independent winners and hidden others`, async () => {
     const { ronStart, ronGame, withRiverTile } = await import('./ron-fixture.ts');
     const { declareRon, passRon } = await import('../src/game/ron.ts');
@@ -531,7 +532,21 @@ for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','f
     const descend = (n:ElementStub):ElementStub[]=>[n,...n.children.flatMap(descend)];
     try {
       const winners = scenario === 'triple' ? [0,2,3] as const : scenario === 'double' || scenario === 'pass-cpu' ? [0,2] as const : [0] as const;
-      let game = ronGame(1,winners);
+      let game: GameState;
+      if (scenario === 'call-waiting') {
+        const { callStart } = await import('./calls-fixture.ts');
+        const initial = callStart(3);
+        game = discardTile(initial, 3, initial.players[3].drawnTile!.id);
+        assert.equal(game.phase, 'awaiting-call');
+      } else game = ronGame(1,winners);
+      if (scenario === 'same-kind') {
+        const source = game.players[1];
+        const current = source.river.at(-1)!;
+        const duplicate = game.liveWall.find(tile => tileKindKey(tile.tile) === tileKindKey(current.tile))!;
+        const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
+        players[1] = { ...source, river: [duplicate, ...source.river] };
+        game = { ...game, players, liveWall: game.liveWall.filter(tile => tile.id !== duplicate.id) };
+      }
       if (scenario === 'furiten') {
         const initial = withRiverTile(ronStart(),0,'sou-2');
         game = discardTile(initial,1,initial.players[1].drawnTile!.id);
@@ -539,16 +554,33 @@ for (const scenario of ['waiting','human','double','triple','pass','pass-cpu','f
         const winner = Number(scenario.at(-1)) as 1|2|3;
         game = ronGame(((winner+3)%4) as 0|1|2,[winner]);
       } else if (scenario === 'pass' || scenario === 'pass-cpu') game = passRon(game,0);
-      else if (scenario !== 'waiting') game = declareRon(game,0);
+      else if (scenario !== 'waiting' && scenario !== 'same-kind' && scenario !== 'call-waiting') game = declareRon(game,0);
       const snapshot = structuredClone(game);
       renderTable(game, undefined, game.phase === 'won' ? startMatch(game).lastSettlement : null); renderSelection(game,null,true);
       assert.deepEqual(game,snapshot);
-      const pending = scenario === 'waiting';
-      const panelState = createLocalActionPanelState(startMatch(game), null, false, false);
-      assert.equal(panelState.ronGroup.visible,pending);
-      assert.equal(panelState.buttons.ron.enabled,pending);
-      assert.equal(panelState.buttons['pass-ron'].enabled,pending);
+      const pendingRon = scenario === 'waiting' || scenario === 'same-kind';
+      const pendingCall = scenario === 'call-waiting';
+      const pending = pendingRon || pendingCall;
+      const highlighted = [0,1,2,3].flatMap(id => nodes.get(`.river[data-player-id="${id}"]`)!.children
+        .filter(tile => tile.className.includes('pending-discard-target')));
+      assert.equal(highlighted.length, pending ? 1 : 0);
       if (pending) {
+        const target = game.ronWindow!;
+        assert.equal(highlighted[0].dataset.tileId, target.tileId);
+      }
+      if (scenario === 'same-kind') {
+        const river = nodes.get('.river[data-player-id="1"]')!;
+        assert.equal(river.children.length, 2);
+        assert.equal(tileKindKey(game.players[1].river[0].tile), tileKindKey(game.players[1].river[1].tile));
+        assert.equal(river.children[0].className, 'river-tile');
+        assert.equal(river.children[1].className, 'river-tile pending-discard-target');
+      }
+      const panelState = createLocalActionPanelState(startMatch(game), null, false, false);
+      assert.equal(panelState.ronGroup.visible,pendingRon);
+      assert.equal(panelState.buttons.ron.enabled,pendingRon);
+      assert.equal(panelState.buttons['pass-ron'].enabled,pendingRon);
+      assert.equal(panelState.callGroup.visible,pendingCall);
+      if (pendingRon) {
         assert.match(panelState.ronGroup.status,/CPU1が赤5索を捨てました/);
         assert.equal(panelState.ronGroup.target?.tile.category,'suited');
       }

@@ -12,6 +12,7 @@ import { getRiichiDiscardOptions } from '../game/riichi.ts';
 import { canDeclareKyuushuKyuuhai } from '../game/special-draws.ts';
 import { canDeclareTsumo } from '../game/tsumo.ts';
 import { getRonCandidates, getRonTile } from '../game/ron.ts';
+import { pendingDiscardTarget, type PendingDiscardTarget } from '../rendering/pending-discard.ts';
 
 export type PublicTile = Readonly<{ id: string; tile: Tile }>;
 export type PublicMeld = Readonly<{
@@ -83,6 +84,8 @@ export type PlayerGameView = Readonly<{
   }>;
   phase: GameState['phase'];
   turnPlayerId: PlayerId;
+  /** Public river position while an online ron or call response window is open. */
+  pendingDiscard: PendingDiscardTarget | null;
   liveWallCount: number;
   seats: readonly Readonly<{
     seat: PlayerId;
@@ -253,6 +256,10 @@ export function createPlayerGameView(
   const publicTenpai = match.lastSettlement?.reason === 'draw' ? match.lastSettlement.tenpai : null;
   const revealUra = winningResults.some(result => Boolean(game.players[result.winnerId].riichi));
   const selfPlayer = game.players[viewerSeat];
+  const decisionMatchesPhase = decision?.type === 'ron' ? game.phase === 'awaiting-ron'
+    : decision?.type === 'call' ? game.phase === 'awaiting-call' : false;
+  const pendingDiscard = session.status === 'playing' && decisionMatchesPhase
+    ? pendingDiscardTarget(game) : null;
   const eligible = decision?.requiredSeats.includes(viewerSeat) ?? false;
   const answered = eligible && decision?.responses[viewerSeat] !== 'pending';
   const ownCallOptions = game.phase === 'awaiting-call' ? getCallOptions(game, viewerSeat) : [];
@@ -312,6 +319,7 @@ export function createPlayerGameView(
     },
     phase: game.phase,
     turnPlayerId: game.turnPlayerId,
+    pendingDiscard,
     liveWallCount: game.liveWall.length,
     seats,
     doraIndicators: exposedDoraIndicators(game).map(publicTile),

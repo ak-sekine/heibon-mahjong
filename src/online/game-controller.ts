@@ -427,7 +427,8 @@ export class OnlineGameController {
       applyRiverLayout(river, layout);
       river.replaceChildren(...seat.river.map((tile, index) => {
         const item = document.createElement('div');
-        item.className = 'river-tile';
+        item.className = view.pendingDiscard?.seat === seat.seat && view.pendingDiscard.riverIndex === index
+          ? 'river-tile pending-discard-target' : 'river-tile';
         const placement = layout.placements[index];
         applyRiverTilePlacement(item, placement);
         item.dataset.tileId = tile.id;

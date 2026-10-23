@@ -131,6 +131,7 @@ test('every player view allowlists only that viewer hand, with no wall or CPU de
     const view = createPlayerGameView(session, viewer, 'A2CDEF', new Set([0, 1]));
     const wire = JSON.stringify({ type: 'game-state', view });
     assert.deepEqual(view.declarations, []);
+    assert.equal(view.pendingDiscard, null);
     assert.equal(view.self.seat, viewer);
     assert.equal(view.seats[viewer].hand?.length, 13);
     assert.equal('drawnTile' in view.seats[viewer], true);
@@ -156,6 +157,39 @@ test('every player view allowlists only that viewer hand, with no wall or CPU de
         `seat ${seat}'s tile kind crossed viewer ${viewer}'s view boundary`);
     }
   }
+});
+
+test('online views keep the exact pending discard highlighted for every viewer until the decision window closes', () => {
+  const game = ronGame(3, [0, 2]);
+  const ron = ronDecision([0, 2], 30);
+  const pendingRon = sessionForGame(game, [0, 2], 30, ron);
+  const target = game.players[3].river.at(-1)!;
+
+  for (const viewer of [0, 1, 2, 3] as const) {
+    const view = createPlayerGameView(pendingRon, viewer, 'A2CDEF', new Set([0, 2]));
+    assert.deepEqual(view.pendingDiscard, { seat: 3, riverIndex: 0 });
+    assert.equal(view.seats[3].river[view.pendingDiscard!.riverIndex].id, target.id);
+  }
+
+  const oneAnswered = {
+    ...pendingRon,
+    decision: { ...ron, responses: { ...ron.responses, 0: 'yes' as const } },
+  };
+  assert.deepEqual(createPlayerGameView(oneAnswered, 1, 'A2CDEF', new Set([0, 2])).pendingDiscard,
+    { seat: 3, riverIndex: 0 }, 'a viewer who is not responding still sees the shared decision target');
+
+  const callGame = { ...game, phase: 'awaiting-call' as const };
+  const call: PlayerDecisionWindow = {
+    ...ron,
+    type: 'call',
+    responses: { 0: 'pending', 2: 'pending' },
+  };
+  const pendingCall = sessionForGame(callGame, [0, 2], 31, call);
+  assert.deepEqual(createPlayerGameView(pendingCall, 1, 'A2CDEF', new Set([0, 2])).pendingDiscard,
+    { seat: 3, riverIndex: 0 });
+
+  const closedWindow = { ...pendingRon, decision: null };
+  assert.equal(createPlayerGameView(closedWindow, 1, 'A2CDEF', new Set([0, 2])).pendingDiscard, null);
 });
 
 test('online round results include only the public scoring and winning-hand details', () => {
