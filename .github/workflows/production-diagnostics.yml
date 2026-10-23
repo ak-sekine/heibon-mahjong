@@ -1,0 +1,39 @@
+name: Production Worker diagnostics
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/production-diagnostics.yml'
+      - 'tests/online-production.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Record diagnostic target
+        env:
+          ONLINE_API_URL: https://heibon-mahjong-online.ak-sekine.workers.dev
+        run: |
+          echo "Test commit: $GITHUB_SHA"
+          echo "Production Worker: $ONLINE_API_URL"
+      - run: npm ci
+      - name: Verify production Worker with state diagnostics
+        env:
+          ONLINE_API_URL: https://heibon-mahjong-online.ak-sekine.workers.dev
+          ONLINE_TEST_ORIGIN: https://ak-sekine.github.io
+          PRODUCTION_TEST_DIAGNOSTICS: '1'
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: npm run test:online:production

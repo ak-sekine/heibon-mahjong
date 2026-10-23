@@ -7,8 +7,93 @@ const protocolName = 'heibon-mahjong.v1';
 const privateSentinel = 'PRIVATE_TILE_DATA_MUST_NOT_LEAK';
 const privateValues = [privateSentinel];
 const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+const diagnosticsEnabled = process.env.PRODUCTION_TEST_DIAGNOSTICS === '1';
+const diagnosticsStartedAt = Date.now();
+const diagnosticHistory = [];
+const diagnosticHistoryLimit = 60;
 let requestNumber = 0;
 const roomsForCleanup = [];
+
+function diagnostic(event, details = {}) {
+  if (!diagnosticsEnabled) return;
+  const record = { elapsedMs: Date.now() - diagnosticsStartedAt, event, ...details };
+  if (event === 'websocket-game-state') {
+    diagnosticHistory.push(record);
+    if (diagnosticHistory.length > diagnosticHistoryLimit) diagnosticHistory.shift();
+  }
+  console.log(`[production-diagnostic] ${JSON.stringify(record)}`);
+}
+
+function decisionInfo(view) {
+  const decision = view?.self?.decision;
+  return {
+    pending: Boolean(decision && !decision.answered),
+    type: decision?.type ?? null,
+    windowIdSuffix: typeof decision?.windowId === 'string' ? decision.windowId.slice(-6) : null,
+    answered: decision ? Boolean(decision.answered) : null,
+    remainingMs: decision && Number.isFinite(decision.expiresAt)
+      ? Math.max(0, Math.round(decision.expiresAt - Date.now()))
+      : null,
+  };
+}
+
+function socketState(client) {
+  return ['connecting', 'open', 'closing', 'closed'][client.socket.readyState] ?? 'unknown';
+}
+
+function currentGameRevision(client) {
+  const revision = latestGameMessage(client)?.view?.gameRevision;
+  return Number.isSafeInteger(revision) ? revision : null;
+}
+
+function logGameState(client, message) {
+  const view = message.view;
+  const turnControl = view?.seats?.[view?.turnPlayerId]?.control ?? null;
+  const decision = decisionInfo(view);
+  diagnostic('websocket-game-state', {
+    client: client.diagnosticLabel,
+    messageType: message.type,
+    gameRevision: Number.isSafeInteger(view?.gameRevision) ? view.gameRevision : null,
+    status: view?.status ?? null,
+    phase: view?.phase ?? null,
+    turnPlayerId: view?.turnPlayerId ?? null,
+    turnControl,
+    turnIsHuman: turnControl === 'human' ? true : turnControl === 'cpu' ? false : null,
+    decisionPending: decision.pending,
+    decisionType: decision.type,
+    decisionWindowIdSuffix: decision.windowIdSuffix,
+    decisionAnswered: decision.answered,
+    decisionRemainingMs: decision.remainingMs,
+    socketState: socketState(client),
+  });
+}
+
+function logHumanTurnTimeout(clients, afterRevision, timeoutMs) {
+  if (!diagnosticsEnabled) return;
+  const elapsedMs = Date.now() - diagnosticsStartedAt;
+  console.error(`[production-diagnostic +${elapsedMs}ms] waitForHumanTurn timed out (afterRevision=${afterRevision}, timeoutMs=${timeoutMs})`);
+  for (const client of clients) {
+    const view = latestGameMessage(client)?.view;
+    const decision = decisionInfo(view);
+    const turnControl = view?.seats?.[view?.turnPlayerId]?.control ?? null;
+    const decisionText = decision.type ? `${decision.type} (window …${decision.windowIdSuffix})` : 'none';
+    console.error(`Client: ${client.diagnosticLabel}`);
+    console.error(`revision: ${Number.isSafeInteger(view?.gameRevision) ? view.gameRevision : 'none'}`);
+    console.error(`status: ${view?.status ?? 'none'}`);
+    console.error(`phase: ${view?.phase ?? 'none'}`);
+    console.error(`turnPlayerId: ${view?.turnPlayerId ?? 'none'}`);
+    console.error(`turnControl: ${turnControl ?? 'unknown'}`);
+    console.error(`decision: ${decisionText}`);
+    console.error(`decisionAnswered: ${decision.answered ?? 'n/a'}`);
+    console.error(`lastAction: ${client.lastAction ? JSON.stringify(client.lastAction) : 'none'}`);
+    console.error(`lastActionResult: ${client.lastActionResult ? JSON.stringify(client.lastActionResult) : 'none'}`);
+    console.error(`socketState: ${socketState(client)}`);
+  }
+  console.error('Recent game-state transitions:');
+  for (const transition of diagnosticHistory.slice(-30)) {
+    console.error(`[production-diagnostic] ${JSON.stringify(transition)}`);
+  }
+}
 
 function check(condition, message) {
   if (!condition) throw new Error(message);
@@ -45,12 +130,20 @@ async function request(path, { method = 'GET', body, token, origin = pageOrigin 
 }
 
 function waitForMessage(client, predicate, afterIndex = 0, timeoutMs = 10000, description = 'protocol response') {
+  const waitStartedAt = Date.now();
   const existing = client.messages.slice(afterIndex).find(predicate);
   if (existing) return Promise.resolve(existing);
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       client.waiters.delete(onMessage);
       const recentTypes = client.messages.slice(afterIndex).slice(-8).map(message => message.type).join(', ') || 'none';
+      diagnostic('wait-for-message-timeout', {
+        client: client.diagnosticLabel,
+        description,
+        timeoutMs,
+        elapsedMs: Date.now() - waitStartedAt,
+        recentTypes,
+      });
       reject(new Error(`Timed out waiting for ${description}; recent protocol message types: ${recentTypes}.`));
     }, timeoutMs);
     const onMessage = message => {
@@ -68,8 +161,22 @@ function waitForRoomState(client, predicate, afterIndex = 0, timeoutMs = 10000, 
 }
 
 function waitForGameState(client, predicate, afterIndex = 0, timeoutMs = 15000, description = 'game-state update') {
-  return waitForMessage(client, message =>
-    (message.type === 'game-state' || message.type === 'game-started') && predicate(message.view), afterIndex, timeoutMs, description);
+  const waitStartedAt = Date.now();
+  return waitForMessage(client, message => {
+    const matches = (message.type === 'game-state' || message.type === 'game-started') && predicate(message.view);
+    if (matches) {
+      diagnostic('wait-for-game-state-satisfied', {
+        client: client.diagnosticLabel,
+        description,
+        waitElapsedMs: Date.now() - waitStartedAt,
+        gameRevision: Number.isSafeInteger(message.view?.gameRevision) ? message.view.gameRevision : null,
+        status: message.view?.status ?? null,
+        phase: message.view?.phase ?? null,
+        turnPlayerId: message.view?.turnPlayerId ?? null,
+      });
+    }
+    return matches;
+  }, afterIndex, timeoutMs, description);
 }
 
 function latestGameMessage(client) {
@@ -80,6 +187,11 @@ async function sendGameAction(client, payload, expectedGameRevision, prefix = 'g
   check(client.socket.readyState === WebSocket.OPEN, 'A WebSocket client needed for game action is closed.');
   const requestId = payload.requestId ?? nextRequestId(prefix);
   const before = client.messages.length;
+  const action = { type: payload.type, expectedGameRevision };
+  const sentAt = Date.now();
+  client.lastAction = action;
+  client.pendingGameActions.set(requestId, { type: payload.type, expectedGameRevision, sentAt });
+  diagnostic('game-action-sent', { client: client.diagnosticLabel, ...action });
   client.socket.send(JSON.stringify({ ...payload, requestId, expectedGameRevision }));
   const result = await waitForMessage(client,
     message => message.type === 'game-action-result' && message.requestId === requestId, before, 10000, `game-action-result for ${payload.type}`);
@@ -98,11 +210,20 @@ async function discardAtCurrentRevision(client, tileId, expectedGameRevision, pr
 }
 
 async function passGameDecisions(clients) {
+  diagnostic('pass-game-decisions-start', {
+    clientRevisions: clients.map(client => ({ client: client.diagnosticLabel, gameRevision: currentGameRevision(client) })),
+  });
   for (let turn = 0; turn < 4; turn++) {
     let sent = false;
     for (const client of clients) {
       const view = latestGameMessage(client)?.view;
       const decision = view?.self?.decision;
+      diagnostic('pass-game-decisions-check', {
+        turn: turn + 1,
+        client: client.diagnosticLabel,
+        gameRevision: Number.isSafeInteger(view?.gameRevision) ? view.gameRevision : null,
+        decision: decisionInfo(view),
+      });
       if (!decision || decision.answered) continue;
       sent = true;
       await sendGameAction(client, {
@@ -110,21 +231,59 @@ async function passGameDecisions(clients) {
         windowId: decision.windowId,
       }, decision.expectedGameRevision, 'game-pass');
     }
-    if (!sent) return;
+    if (!sent) {
+      diagnostic('pass-game-decisions-end', {
+        outcome: 'no-pending-decision',
+        clientRevisions: clients.map(client => ({ client: client.diagnosticLabel, gameRevision: currentGameRevision(client) })),
+      });
+      return;
+    }
   }
   throw new Error('Too many consecutive game decision windows.');
 }
 
 async function waitForHumanTurn(clients, afterRevision, timeoutMs = 20000) {
+  diagnostic('wait-for-human-turn-start', {
+    afterRevision,
+    timeoutMs,
+    clients: clients.map(client => ({
+      client: client.diagnosticLabel,
+      gameRevision: currentGameRevision(client),
+      decision: decisionInfo(latestGameMessage(client)?.view),
+    })),
+  });
   const qualifies = view => Number(view?.gameRevision) > afterRevision && (
     view?.status !== 'playing' ||
     view?.phase === 'awaiting-discard' && view.viewerSeat === view.turnPlayerId &&
       view.seats?.[view.turnPlayerId]?.control === 'human'
   );
-  const existing = clients.map(client => latestGameMessage(client)?.view).find(qualifies);
-  if (existing) return existing;
-  return Promise.race(clients.map(client => waitForGameState(client, qualifies, 0, timeoutMs, 'authenticated human turn view')
-    .then(message => message.view)));
+  const existingClient = clients.find(client => qualifies(latestGameMessage(client)?.view));
+  if (existingClient) {
+    const existing = latestGameMessage(existingClient).view;
+    diagnostic('wait-for-human-turn-satisfied', {
+      client: existingClient.diagnosticLabel,
+      gameRevision: existing.gameRevision,
+      status: existing.status,
+      phase: existing.phase,
+      turnPlayerId: existing.turnPlayerId,
+    });
+    return existing;
+  }
+  const wait = Promise.race(clients.map(client => waitForGameState(client, qualifies, 0, timeoutMs, 'authenticated human turn view')
+    .then(message => {
+      diagnostic('wait-for-human-turn-satisfied', {
+        client: client.diagnosticLabel,
+        gameRevision: Number.isSafeInteger(message.view?.gameRevision) ? message.view.gameRevision : null,
+        status: message.view?.status ?? null,
+        phase: message.view?.phase ?? null,
+        turnPlayerId: message.view?.turnPlayerId ?? null,
+      });
+      return message.view;
+    })));
+  return wait.catch(error => {
+    logHumanTurnTimeout(clients, afterRevision, timeoutMs);
+    throw error;
+  });
 }
 
 async function waitForCpuProgress(clients, afterRevision, previousRivers, timeoutMs = 15000) {
@@ -160,12 +319,21 @@ function inspectGameView(client, expectedSeat, privateValues, expectedRoomCode) 
   return view;
 }
 
-function connect(url, ticket, privateValues) {
+function connect(url, ticket, privateValues, diagnosticLabel = 'participant') {
   const socket = new WebSocket(url, [protocolName, `ticket.${ticket}`], {
     headers: { Origin: pageOrigin },
     handshakeTimeout: 10000,
   });
-  const client = { socket, messages: [], waiters: new Set(), privacyLeak: false };
+  const client = {
+    socket,
+    messages: [],
+    waiters: new Set(),
+    privacyLeak: false,
+    diagnosticLabel,
+    pendingGameActions: new Map(),
+    lastAction: null,
+    lastActionResult: null,
+  };
   socket.on('message', data => {
     const serialized = data.toString();
     if (privateValues.some(value => serialized.includes(value))) {
@@ -176,7 +344,33 @@ function connect(url, ticket, privateValues) {
     try { message = JSON.parse(serialized); } catch { return; }
     client.messages.push(message);
     client.waiters.forEach(waiter => waiter(message));
+    if (message.type === 'game-state' || message.type === 'game-started') logGameState(client, message);
+    if (message.type === 'game-action-result') {
+      const pending = client.pendingGameActions.get(message.requestId);
+      if (pending) {
+        const result = {
+          ok: Boolean(message.ok),
+          code: message.code ?? null,
+          gameRevision: Number.isSafeInteger(message.gameRevision) ? message.gameRevision : null,
+          elapsedMs: Date.now() - pending.sentAt,
+        };
+        client.lastActionResult = result;
+        client.pendingGameActions.delete(message.requestId);
+        diagnostic('game-action-result', {
+          client: client.diagnosticLabel,
+          actionType: pending.type,
+          expectedGameRevision: pending.expectedGameRevision,
+          ...result,
+        });
+      }
+    }
   });
+  socket.on('open', () => diagnostic('websocket-open', { client: client.diagnosticLabel }));
+  socket.on('close', code => diagnostic('websocket-close', {
+    client: client.diagnosticLabel,
+    code,
+    socketState: socketState(client),
+  }));
   const opened = new Promise((resolve, reject) => {
     socket.once('open', resolve);
     socket.once('error', () => reject(new Error('WebSocket connection failed.')));
@@ -184,7 +378,7 @@ function connect(url, ticket, privateValues) {
       reject(new Error(`WebSocket handshake was rejected with status ${response.statusCode}.`));
     });
   });
-  socket.on('error', () => {});
+  socket.on('error', () => diagnostic('websocket-error', { client: client.diagnosticLabel }));
   client.opened = opened;
   return client;
 }
@@ -196,9 +390,9 @@ async function issueTicket(roomCode, token) {
   return result.value.ticket;
 }
 
-async function connectParticipant(roomCode, token) {
+async function connectParticipant(roomCode, token, diagnosticLabel = 'participant') {
   const wsUrl = `${apiUrl.replace(/^https:/u, 'wss:').replace(/^http:/u, 'ws:')}/api/rooms/${roomCode}/socket`;
-  const client = connect(wsUrl, await issueTicket(roomCode, token), privateValues);
+  const client = connect(wsUrl, await issueTicket(roomCode, token), privateValues, diagnosticLabel);
   await client.opened;
   await waitForRoomState(client, state => state.roomCode === roomCode && Array.isArray(state.seats));
   return client;
@@ -299,8 +493,8 @@ async function createAndConnectTwo(label) {
   const room = await createRoom(label);
   const guest = await joinRoom(room, testName(label, 'B'));
   room.guestToken = guest.token;
-  room.host = await connectParticipant(room.roomCode, room.hostToken);
-  room.guest = await connectParticipant(room.roomCode, room.guestToken);
+  room.host = await connectParticipant(room.roomCode, room.hostToken, 'host');
+  room.guest = await connectParticipant(room.roomCode, room.guestToken, 'guest');
   room.sockets.push(room.host, room.guest);
   return room;
 }
@@ -461,7 +655,7 @@ async function main() {
       state => state.seats.some(seat => seat.seat === 1 && !seat.connected), disconnectAt);
     two.guest.socket.close(1000, 'online game reconnect test');
     await disconnected;
-    const gameReconnect = await connectParticipant(two.roomCode, two.guestToken);
+    const gameReconnect = await connectParticipant(two.roomCode, two.guestToken, 'guest-reconnected');
     two.sockets.push(gameReconnect);
     two.guest = gameReconnect;
     const resumedGame = await waitForGameState(gameReconnect, view => view.viewerSeat === 1 && view.status !== 'aborted');
