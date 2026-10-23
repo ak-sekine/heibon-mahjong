@@ -14,4 +14,6 @@
 - `npm run build`: 成功。
 - `git diff --check`: 成功。
 - `tests/browser-result-hand-layout.py` をBrowser UI verificationへ追加しました。添付例の6筒・末尾の北を含む14枚、萬子・筒子・索子・字牌34種、結果表示のローカル／オンライン領域を確認し、セル・SVG・外枠の実寸と下端が揃うこと、横はみ出しがないことを検査します。Chromiumは320・375・390・414・1280px、WebKitは320・375・390・414pxで実行します。
-- Browser UI verificationはmain push後に実行されます。iPhone Safari実機では未確認です。
+- [Browser UI verification run 39956868118](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39956868118): commit `f4e403d` で成功。追加した寸法検証を含む既存UI回帰が通過しました。
+- [Deploy run 39956868090](https://github.com/ak-sekine/heibon-mahjong/actions/runs/39956868090): commit `f4e403d` で成功。GitHub PagesとCloudflare Workersへのdeployが完了しました。
+- WebKitの狭幅検証は成功しました。iPhone Safari実機では未確認です。
