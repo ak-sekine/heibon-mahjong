@@ -89,6 +89,6 @@
 
 ### deploy workflowの誤起動
 
-同期テスト専用の変更にもかかわらず、push時にDeploy workflow [run 40044828792](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40044828792) が起動しました。元の `.github/workflows/deploy.yml` は従来の `tests/online-production.mjs` だけをignoreし、新規の同期ヘルパーとテストを除外していませんでした。
+同期テスト専用の変更にもかかわらず、push時にDeploy workflow [run 40044828792](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40044828792) が起動しました。元の `.github/workflows/deploy.yml` は従来の `tests/online-production.mjs` だけをignoreし、新規の同期ヘルパーとテストを除外していませんでした。このrunは最終的に成功し、Worker再デプロイとPages公開まで実行されました。Workerソースの変更はないため、この再デプロイは不要でした。再デプロイ後の本番テスト5シナリオも成功しました。
 
-再発防止として、コミット [`c81ed5a`](https://github.com/ak-sekine/heibon-mahjong/commit/c81ed5a) でこの2ファイルをdeploy workflowの `paths-ignore` に追加しました。この修正のpushではDeploy workflowは起動していません。今回誤起動したrunは最後の確認時点で `browser-ui` ジョブが実行中、`deploy-worker` ジョブは未開始でした。runの最終結果とWorker再デプロイの有無は未確認です。
+再発防止として、コミット [`c81ed5a`](https://github.com/ak-sekine/heibon-mahjong/commit/c81ed5a) でこの2ファイルをdeploy workflowの `paths-ignore` に追加しました。この修正のpushではDeploy workflowは起動していません。
