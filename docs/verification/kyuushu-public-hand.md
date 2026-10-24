@@ -13,6 +13,8 @@
 - `npm run typecheck:worker`：成功。
 - `git diff --check`：成功。
 - ブラウザースクリプトは `py_compile` 成功。対象コミット `6868f2f` のGitHub Actions Browser UI verification (`40061694152`) は再実行で成功。追加したChromium・WebKitシナリオを含むブラウザー回帰全体が成功した。
+- 最初のBrowser UI実行は `tests/step14-0-1.test.ts:753` のCPU手番進行待ちで失敗した。変更対象外の同期テストを含む再実行では全テストとブラウザー検証が成功した。
+- GitHub Actions Deploy run `40061694248`：回帰テスト、Worker型チェック、本番Workerデプロイ、本番HTTPS/WebSocket/再接続/プライバシーテスト、Pagesビルド、Pagesデプロイがすべて成功。
 - WebKit検証はPlaywrightのiPhone相当設定（タッチ・モバイル表示）で390px幅と320px幅を確認した。iPhone Safari実機の確認は未実施。
 
 ## ケース
