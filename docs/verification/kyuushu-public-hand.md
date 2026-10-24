@@ -12,8 +12,8 @@
 - `npm run build`：TypeScriptチェックとVite本番ビルド成功。
 - `npm run typecheck:worker`：成功。
 - `git diff --check`：成功。
-- ブラウザースクリプトは `py_compile` 成功。`Browser UI verification` にChromiumとWebKitの確認を登録した。結果はpush後の対象コミットで確認する。
-- WebKit検証はPlaywrightのiPhone相当設定（タッチ・モバイル表示）で390px幅と320px幅を確認する。iPhone Safari実機の確認は未実施。
+- ブラウザースクリプトは `py_compile` 成功。対象コミット `6868f2f` のGitHub Actions Browser UI verification (`40061694152`) は再実行で成功。追加したChromium・WebKitシナリオを含むブラウザー回帰全体が成功した。
+- WebKit検証はPlaywrightのiPhone相当設定（タッチ・モバイル表示）で390px幅と320px幅を確認した。iPhone Safari実機の確認は未実施。
 
 ## ケース
 
