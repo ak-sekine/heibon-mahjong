@@ -4,12 +4,14 @@
 
 ## 実機確認
 
+- [流局結果概要と操作ボタン配置 — iPhone Safari実機、2026-10-24](round-end-result-2026-10-24.md)。ユーザー報告の実機確認と、対象コミットの自動・ブラウザー検証／デプロイ結果を区別して記録しています。
 - [カン機能 — iPhone Safari実機、2026-10-18](kan-safari-2026-10-18.md)。ユーザー報告による総括記録です。シナリオ別ログやスクリーンショットの記録ではありません。
 
 ## 自動・ブラウザー検証
 
 | 記録 | 主な対象 |
 | --- | --- |
+| [流局結果概要と操作ボタン配置](round-end-result-2026-10-24.md) | 通常／途中流局の概要表示、Chromium / WebKitのモバイル表示、デプロイ結果、ユーザー報告のiPhone Safari実機確認。 |
 | [オンライン診断ログ](online-diagnostics.md) | ブラウザーのsessionStorageログ、Worker構造化ログ、Cloudflare確認方法、検証範囲。 |
 | [九種九牌の公開手牌](kyuushu-public-hand.md) | 宣言者14枚のオンライン・オフライン公開、非公開手牌保護、結果の再表示・再接続・次局解除。GitHub ActionsのChromium/WebKit確認成功。 |
 | [Heibon Mahjong テスト環境](test-environment.md) | オフライン固定局面の九種九牌4シナリオ、136枚整合性、公開範囲、320〜430px幅。 |
