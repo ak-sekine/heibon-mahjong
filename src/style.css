@@ -533,7 +533,7 @@ header > div { min-width:0; }
    and larger, 60:16 deposit sticks while keeping its text size unchanged. */
 .table .center-info { left:50%; top:calc(var(--cell)*4.15); transform:translateX(-50%); width:calc(var(--cell)*4.65 - 1px); height:auto; min-height:calc(var(--cell)*3 - 1px); padding:0 1px; gap:1px; }
 .table .center-info:has(.ura-indicator) { gap:1px; }
-.table .round-summary { display:flex; justify-content:center; align-items:baseline; gap:2px; letter-spacing:-.95px; white-space:nowrap; overflow-wrap:normal; font-size:clamp(12px,2.4cqw,15px); line-height:1.2; }
+.table .round-summary { display:flex; justify-content:center; align-items:flex-start; gap:2px; letter-spacing:-.95px; white-space:nowrap; overflow-wrap:normal; font-size:clamp(12px,2.4cqw,15px); line-height:1.2; }
 .table .round-label { white-space:nowrap; }
 .table .wall-count { display:block; }
 .table .center-info .deposit-sticks { margin-top:0; gap:2px; flex:none; }
