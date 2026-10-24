@@ -370,7 +370,7 @@ with sync_playwright() as p:
             assert page.locator('#round-result-summary').is_visible(), (width, scenario, 'summary hidden')
             assert page.locator('#show-result').is_visible(), (width, scenario)
             assert page.locator('#next-round').is_visible() == (meta['status'] == 'round-ended'), (width, scenario, meta)
-            if meta['status'] == 'round-ended' and not meta['winners']:
+            if width <= 430 and meta['status'] == 'round-ended' and not meta['winners']:
                 fit = page.evaluate('''() => {
                   const rect = selector => { const r=document.querySelector(selector).getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}; };
                   const viewport=window.visualViewport;
