@@ -13,13 +13,13 @@ with sync_playwright() as playwright:
     assert page.locator('.test-badge').inner_text() == 'TEST'
     assert page.locator('#player-hand button').count() == 14
     assert page.locator('.concealed-hand .revealed-tile').count() == 0
-    assert page.locator('#kyuushu').is_visible()
-    page.locator('#kyuushu').click()
+    assert page.locator('#kyuushu-kyuuhai').is_visible()
+    page.locator('#kyuushu-kyuuhai').click()
     page.wait_for_function("document.querySelector('#round-result-summary').innerText.includes('九種九牌')")
     expected_order = ['1萬', '2萬', '3萬', '4萬', '9萬', '1筒', '2筒', '3筒', '9筒', '1索', '9索', '東', '南', '西']
     page.locator('#repeat-scenario').click()
     assert page.locator('#player-hand button').count() == 14, 'repeat did not restore the same initial hand'
-    page.locator('#kyuushu').click()
+    page.locator('#kyuushu-kyuuhai').click()
     page.wait_for_function("document.querySelector('#round-result-summary').innerText.includes('九種九牌')")
     assert page.locator('#next-round').is_visible(), 'replayed declaration did not settle normally'
     page.locator('#next-round').click()
