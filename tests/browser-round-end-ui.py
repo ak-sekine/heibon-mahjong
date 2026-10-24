@@ -324,7 +324,7 @@ with sync_playwright() as p:
               // Compare untransformed CSS dimensions. getBoundingClientRect()
               // includes the 90/270 degree rotations on the side seats.
               const dimensions=e=>{const style=getComputedStyle(e);return {width:parseFloat(style.width),height:parseFloat(style.height)};};
-              const referenceBack=document.querySelector('.table .seat-top .concealed-hand .tile-back');
+              const referenceBack=document.querySelector('.table .concealed-hand .tile-back');
               const referenceSize=referenceBack?dimensions(referenceBack):null;
               const sizeDeltas=winnerFaces.map(face=>{const size=dimensions(face),b=referenceSize;return b?Math.max(Math.abs(size.width-b.width),Math.abs(size.height-b.height)):Infinity;});
               const privacy=[1,2,3].filter(id=>id!==winner).every(id=>[...document.querySelectorAll(`.concealed-hand[data-player-id="${id}"] .tile-back`)].length>0 && !document.querySelector(`.concealed-hand[data-player-id="${id}"] svg`));
