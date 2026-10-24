@@ -8,8 +8,10 @@ from playwright.sync_api import sync_playwright
 
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-round-end-ui'))
 OUT.mkdir(parents=True, exist_ok=True)
-WIDTHS = [(320, 568), (355, 700), (375, 667), (390, 844), (430, 932), (1280, 800)]
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
+WIDTHS = [(320, 568), (355, 700), (375, 667), (390, 844), (430, 932), (1280, 800)]
+if ENGINE == 'webkit':
+    WIDTHS += [(320, 480), (375, 547)]
 SUMMARY_YAKU_NAMES = {
     'menzen-tsumo': '門前清自摸和',
     'yakuhai-white': '役牌：白',
@@ -570,7 +572,7 @@ with sync_playwright() as p:
         assert not errors, errors
         reports.append({'viewport': [width, height], 'squareTable': True, 'meldLayouts': meld_cases,
             'roundVariants': variant_reports, 'nextRoundOnce': True, 'eastEndAndReset': True})
-        page.screenshot(path=str(OUT / f'{width}-round-end.png'), full_page=True)
+        page.screenshot(path=str(OUT / f'{ENGINE}-{width}x{height}-round-end.png'), full_page=True)
         page.close()
     browser.close()
 
