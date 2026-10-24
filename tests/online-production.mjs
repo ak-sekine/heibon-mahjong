@@ -1,5 +1,11 @@
 import { appendFileSync } from 'node:fs';
 import WebSocket from 'ws';
+import {
+  latestGameMessage,
+  waitForCpuProgress as waitForSynchronizedCpuProgress,
+  waitForClientMessage,
+  waitForHumanTurn as waitForSynchronizedHumanTurn,
+} from './online-production-sync.mjs';
 
 const apiUrl = (process.env.ONLINE_API_URL ?? '').replace(/\/+$/u, '');
 const pageOrigin = process.env.ONLINE_TEST_ORIGIN ?? 'https://ak-sekine.github.io';
@@ -68,10 +74,10 @@ function logGameState(client, message) {
   });
 }
 
-function logHumanTurnTimeout(clients, afterRevision, timeoutMs) {
+function logGameWaitTimeout(clients, waitKind, afterRevision, timeoutMs) {
   if (!diagnosticsEnabled) return;
   const elapsedMs = Date.now() - diagnosticsStartedAt;
-  console.error(`[production-diagnostic +${elapsedMs}ms] waitForHumanTurn timed out (afterRevision=${afterRevision}, timeoutMs=${timeoutMs})`);
+  console.error(`[production-diagnostic +${elapsedMs}ms] ${waitKind} timed out (afterRevision=${afterRevision}, timeoutMs=${timeoutMs})`);
   for (const client of clients) {
     const view = latestGameMessage(client)?.view;
     const decision = decisionInfo(view);
@@ -129,30 +135,13 @@ async function request(path, { method = 'GET', body, token, origin = pageOrigin 
   return { response, value };
 }
 
-function waitForMessage(client, predicate, afterIndex = 0, timeoutMs = 10000, description = 'protocol response') {
-  const waitStartedAt = Date.now();
-  const existing = client.messages.slice(afterIndex).find(predicate);
-  if (existing) return Promise.resolve(existing);
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      client.waiters.delete(onMessage);
-      const recentTypes = client.messages.slice(afterIndex).slice(-8).map(message => message.type).join(', ') || 'none';
-      diagnostic('wait-for-message-timeout', {
-        client: client.diagnosticLabel,
-        description,
-        timeoutMs,
-        waitElapsedMs: Date.now() - waitStartedAt,
-        recentTypes,
-      });
-      reject(new Error(`Timed out waiting for ${description}; recent protocol message types: ${recentTypes}.`));
-    }, timeoutMs);
-    const onMessage = message => {
-      if (!predicate(message)) return;
-      clearTimeout(timer);
-      client.waiters.delete(onMessage);
-      resolve(message);
-    };
-    client.waiters.add(onMessage);
+function waitForMessage(client, predicate, afterIndex = 0, timeoutMs = 10000, description = 'protocol response', signal) {
+  return waitForClientMessage(client, predicate, {
+    afterIndex,
+    timeoutMs,
+    description,
+    signal,
+    diagnostic,
   });
 }
 
@@ -160,7 +149,7 @@ function waitForRoomState(client, predicate, afterIndex = 0, timeoutMs = 10000, 
   return waitForMessage(client, message => message.type === 'room-state' && predicate(message), afterIndex, timeoutMs, description);
 }
 
-function waitForGameState(client, predicate, afterIndex = 0, timeoutMs = 15000, description = 'game-state update') {
+function waitForGameState(client, predicate, afterIndex = 0, timeoutMs = 15000, description = 'game-state update', signal) {
   const waitStartedAt = Date.now();
   return waitForMessage(client, message => {
     const matches = (message.type === 'game-state' || message.type === 'game-started') && predicate(message.view);
@@ -177,14 +166,10 @@ function waitForGameState(client, predicate, afterIndex = 0, timeoutMs = 15000, 
       if (diagnosticsEnabled) queueMicrotask(() => diagnostic('wait-for-game-state-satisfied', details));
     }
     return matches;
-  }, afterIndex, timeoutMs, description);
+  }, afterIndex, timeoutMs, description, signal);
 }
 
-function latestGameMessage(client) {
-  return client.messages.filter(message => message.type === 'game-state' || message.type === 'game-started').at(-1);
-}
-
-async function sendGameAction(client, payload, expectedGameRevision, prefix = 'game-ci') {
+async function sendGameAction(client, payload, expectedGameRevision, prefix = 'game-ci', { signal } = {}) {
   check(client.socket.readyState === WebSocket.OPEN, 'A WebSocket client needed for game action is closed.');
   const requestId = payload.requestId ?? nextRequestId(prefix);
   const before = client.messages.length;
@@ -193,59 +178,30 @@ async function sendGameAction(client, payload, expectedGameRevision, prefix = 'g
   client.lastAction = action;
   client.pendingGameActions.set(requestId, { type: payload.type, expectedGameRevision, sentAt });
   diagnostic('game-action-sent', { client: client.diagnosticLabel, ...action });
-  client.socket.send(JSON.stringify({ ...payload, requestId, expectedGameRevision }));
-  const result = await waitForMessage(client,
-    message => message.type === 'game-action-result' && message.requestId === requestId, before, 10000, `game-action-result for ${payload.type}`);
-  if (result.ok || result.code === 'stale_revision') await waitForGameState(client,
-    view => Number(view.gameRevision) >= Number(result.gameRevision), before, 15000, `game-state after ${payload.type}`);
-  return { result, requestId, before };
+  try {
+    client.socket.send(JSON.stringify({ ...payload, requestId, expectedGameRevision }));
+    const result = await waitForMessage(client,
+      message => message.type === 'game-action-result' && message.requestId === requestId, before, 10000, `game-action-result for ${payload.type}`, signal);
+    if (result.ok || result.code === 'stale_revision' || result.code === 'stale_decision') await waitForGameState(client,
+      view => Number(view.gameRevision) >= Number(result.gameRevision), before, 15000, `game-state after ${payload.type}`, signal);
+    return { result, requestId, before };
+  } finally {
+    client.pendingGameActions.delete(requestId);
+  }
 }
 
-async function discardAtCurrentRevision(client, tileId, expectedGameRevision, prefix) {
-  const first = await sendGameAction(client, { type: 'discard', tileId }, expectedGameRevision, prefix);
+async function discardAtCurrentRevision(client, tileId, expectedGameRevision, prefix, options) {
+  const first = await sendGameAction(client, { type: 'discard', tileId }, expectedGameRevision, prefix, options);
   if (first.result.code !== 'stale_revision') return first;
   const fresh = latestGameMessage(client)?.view;
   if (fresh?.phase !== 'awaiting-discard' || fresh.viewerSeat !== fresh.turnPlayerId ||
       !fresh.self.discardableTileIds.includes(tileId)) return null;
-  return sendGameAction(client, { type: 'discard', tileId }, fresh.gameRevision, `${prefix}-retry`);
+  return sendGameAction(client, { type: 'discard', tileId }, fresh.gameRevision, `${prefix}-retry`, options);
 }
 
-async function passGameDecisions(clients) {
-  diagnostic('pass-game-decisions-start', {
-    clientRevisions: clients.map(client => ({ client: client.diagnosticLabel, gameRevision: currentGameRevision(client) })),
-  });
-  for (let turn = 0; turn < 4; turn++) {
-    let sent = false;
-    for (const client of clients) {
-      const view = latestGameMessage(client)?.view;
-      const decision = view?.self?.decision;
-      diagnostic('pass-game-decisions-check', {
-        turn: turn + 1,
-        client: client.diagnosticLabel,
-        gameRevision: Number.isSafeInteger(view?.gameRevision) ? view.gameRevision : null,
-        decision: decisionInfo(view),
-      });
-      if (!decision || decision.answered) continue;
-      sent = true;
-      await sendGameAction(client, {
-        type: decision.type === 'ron' ? 'pass-ron' : 'pass-call',
-        windowId: decision.windowId,
-      }, decision.expectedGameRevision, 'game-pass');
-    }
-    if (!sent) {
-      diagnostic('pass-game-decisions-end', {
-        outcome: 'no-pending-decision',
-        clientRevisions: clients.map(client => ({ client: client.diagnosticLabel, gameRevision: currentGameRevision(client) })),
-      });
-      return;
-    }
-  }
-  throw new Error('Too many consecutive game decision windows.');
-}
-
-async function waitForHumanTurn(clients, afterRevision, timeoutMs = 20000) {
+async function waitForHumanTurn(clients, minimumRevision, timeoutMs = 20000) {
   diagnostic('wait-for-human-turn-start', {
-    afterRevision,
+    afterRevision: minimumRevision,
     timeoutMs,
     clients: clients.map(client => ({
       client: client.diagnosticLabel,
@@ -253,55 +209,29 @@ async function waitForHumanTurn(clients, afterRevision, timeoutMs = 20000) {
       decision: decisionInfo(latestGameMessage(client)?.view),
     })),
   });
-  const qualifies = view => Number(view?.gameRevision) > afterRevision && (
-    view?.status !== 'playing' ||
-    view?.phase === 'awaiting-discard' && view.viewerSeat === view.turnPlayerId &&
-      view.seats?.[view.turnPlayerId]?.control === 'human'
-  );
-  const existingClient = clients.find(client => qualifies(latestGameMessage(client)?.view));
-  if (existingClient) {
-    const existing = latestGameMessage(existingClient).view;
-    diagnostic('wait-for-human-turn-satisfied', {
-      client: existingClient.diagnosticLabel,
-      gameRevision: existing.gameRevision,
-      status: existing.status,
-      phase: existing.phase,
-      turnPlayerId: existing.turnPlayerId,
-    });
-    return existing;
-  }
-  const wait = Promise.race(clients.map(client => waitForGameState(client, qualifies, 0, timeoutMs, 'authenticated human turn view')
-    .then(message => {
-      diagnostic('wait-for-human-turn-satisfied', {
-        client: client.diagnosticLabel,
-        gameRevision: Number.isSafeInteger(message.view?.gameRevision) ? message.view.gameRevision : null,
-        status: message.view?.status ?? null,
-        phase: message.view?.phase ?? null,
-        turnPlayerId: message.view?.turnPlayerId ?? null,
-      });
-      return message.view;
-    })));
-  return wait.catch(error => {
-    logHumanTurnTimeout(clients, afterRevision, timeoutMs);
-    throw error;
+  return waitForSynchronizedHumanTurn(clients, minimumRevision, {
+    timeoutMs,
+    sendDecision: (client, payload, expectedGameRevision, signal) =>
+      sendGameAction(client, payload, expectedGameRevision, 'game-pass', { signal }),
+    diagnostic,
+    onTimeout: () => logGameWaitTimeout(clients, 'waitForHumanTurn', minimumRevision, timeoutMs),
   });
 }
 
 async function waitForCpuProgress(clients, afterRevision, previousRivers, timeoutMs = 15000) {
-  const progressed = view => {
-    if (!view || Number(view.gameRevision) <= afterRevision) return false;
-    if (view.status !== 'playing') return true;
-    return view.seats.some(seat => seat.control === 'cpu' && seat.river.length > (previousRivers[seat.seat] ?? 0));
-  };
-  for (let attempt = 0; attempt < 12; attempt++) {
-    await passGameDecisions(clients);
-    const current = clients.map(client => latestGameMessage(client)?.view).find(progressed);
-    if (current) return current;
-    const indexes = clients.map(client => client.messages.length);
-    await Promise.race(clients.map((client, index) => waitForGameState(client,
-      view => Number(view?.gameRevision) > afterRevision, indexes[index], timeoutMs, 'CPU progress update')));
-  }
-  throw new Error('The server did not advance an automatic CPU action.');
+  return waitForSynchronizedCpuProgress(clients, afterRevision, previousRivers, {
+    timeoutMs,
+    sendDecision: (client, payload, expectedGameRevision, signal) =>
+      sendGameAction(client, payload, expectedGameRevision, 'game-pass', { signal }),
+    handleHumanTurn: (client, view, signal) => discardAtCurrentRevision(
+      client, view.self.discardableTileIds[0], view.gameRevision, 'next-human-discard', { signal },
+    ).then(result => {
+      if (!result || result.result.code === 'stale_revision') return;
+      check(result.result.ok === true, `A later legal human discard was rejected (${result.result.code ?? 'unknown'}).`);
+    }),
+    diagnostic,
+    onTimeout: () => logGameWaitTimeout(clients, 'waitForCpuProgress', afterRevision, timeoutMs),
+  });
 }
 
 function inspectGameView(client, expectedSeat, privateValues, expectedRoomCode) {
@@ -329,6 +259,7 @@ function connect(url, ticket, privateValues, diagnosticLabel = 'participant') {
     socket,
     messages: [],
     waiters: new Set(),
+    decisionAttempts: new Set(),
     privacyLeak: false,
     diagnosticLabel,
     pendingGameActions: new Map(),
@@ -598,9 +529,8 @@ async function main() {
     const hostDiscard = await sendGameAction(two.host, { type: 'discard', tileId: hostDiscardId,
       requestId: nextRequestId('game-discard') }, revisionAfterStart, 'host-discard');
     check(hostDiscard.result.ok === true, 'A legal host discard was rejected.');
-    await passGameDecisions([two.host, two.guest]);
     const afterHostRevision = Math.max(Number(latestGameMessage(two.host).view.gameRevision), Number(latestGameMessage(two.guest).view.gameRevision));
-    const humanTurn = await waitForHumanTurn([two.host, two.guest], afterHostRevision - 1);
+    const humanTurn = await waitForHumanTurn([two.host, two.guest], afterHostRevision);
     check(humanTurn.status === 'playing' && humanTurn.phase === 'awaiting-discard', 'A human turn did not resume after the discard window.');
     const activeHuman = humanTurn.viewerSeat === 0 ? two.host : two.guest;
     const activeTileId = humanTurn.self.discardableTileIds[0];
@@ -609,43 +539,7 @@ async function main() {
     const cpuRiversBefore = Object.fromEntries(cpuBaselineView.seats.map(seat => [seat.seat, seat.river.length]));
     const humanDiscard = await sendGameAction(activeHuman, { type: 'discard', tileId: activeTileId }, humanTurn.gameRevision, 'human-discard');
     check(humanDiscard.result.ok === true, 'A legal human discard was not accepted.');
-    let cpuUpdate = null;
-    let lastGameRevision = Math.max(Number(latestGameMessage(two.host).view.gameRevision), Number(latestGameMessage(two.guest).view.gameRevision));
-    for (let step = 0; step < 20 && !cpuUpdate; step++) {
-      await passGameDecisions([two.host, two.guest]);
-      const current = latestGameMessage(two.host).view;
-      if (current.gameRevision > humanTurn.gameRevision && current.status !== 'playing' ||
-          current.status === 'playing' && current.seats.some(seat => seat.control === 'cpu' && seat.river.length > cpuRiversBefore[seat.seat])) {
-        cpuUpdate = current;
-        break;
-      }
-      if (current.status === 'playing' && current.phase === 'awaiting-discard' &&
-          current.seats[current.turnPlayerId].control === 'human') {
-        const client = current.turnPlayerId === 0 ? two.host : two.guest;
-        const humanViewMessage = await waitForGameState(client, view =>
-          Number(view?.gameRevision) >= Number(current.gameRevision) &&
-          view?.viewerSeat === current.turnPlayerId && view.viewerSeat === view.turnPlayerId &&
-          view.phase === 'awaiting-discard' &&
-          view.seats?.[view.turnPlayerId]?.control === 'human' &&
-          Array.isArray(view.self?.discardableTileIds) && view.self.discardableTileIds.length > 0, 0, 15000);
-        const legalId = humanViewMessage.view.self.discardableTileIds[0];
-        check(typeof legalId === 'string', 'A later human turn did not receive a legal discard candidate.');
-        const result = await discardAtCurrentRevision(client, legalId, humanViewMessage.view.gameRevision, 'next-human-discard');
-        if (!result || result.result.code === 'stale_revision') {
-          lastGameRevision = Math.max(lastGameRevision,
-            Number(latestGameMessage(two.host)?.view.gameRevision ?? 0),
-            Number(latestGameMessage(two.guest)?.view.gameRevision ?? 0));
-          continue;
-        }
-        check(result.result.ok === true, `A later legal human discard was rejected (${result.result.code ?? 'unknown'}).`);
-        continue;
-      }
-      const indexes = [two.host.messages.length, two.guest.messages.length];
-      await Promise.race([two.host, two.guest].map((client, index) => waitForGameState(client,
-        view => Number(view.gameRevision) > lastGameRevision, indexes[index], 15000)));
-      lastGameRevision = Math.max(Number(latestGameMessage(two.host).view.gameRevision), Number(latestGameMessage(two.guest).view.gameRevision));
-    }
-    check(cpuUpdate !== null, 'The server did not advance an automatic CPU action.');
+    const cpuUpdate = await waitForCpuProgress([two.host, two.guest], humanTurn.gameRevision, cpuRiversBefore);
     check(cpuUpdate.status !== 'playing' || cpuUpdate.seats.some(seat => seat.control === 'cpu' && seat.river.length > cpuRiversBefore[seat.seat]),
       'CPU auto progress was not visible to either client.');
 
