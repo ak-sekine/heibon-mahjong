@@ -14,27 +14,40 @@ with sync_playwright() as playwright:
     assert page.locator('#player-hand button').count() == 14
     assert page.locator('.concealed-hand .revealed-tile').count() == 0
     assert page.locator('#kyuushu-kyuuhai').is_visible()
-    page.locator('#kyuushu-kyuuhai').click()
-    page.wait_for_function("document.querySelector('#round-result-summary').innerText.includes('九種九牌')")
     expected_order = ['1萬', '2萬', '3萬', '4萬', '9萬', '1筒', '2筒', '3筒', '9筒', '1索', '9索', '東', '南', '西']
     page.locator('#repeat-scenario').click()
     assert page.locator('#player-hand button').count() == 14, 'repeat did not restore the same initial hand'
     page.locator('#kyuushu-kyuuhai').click()
     page.wait_for_function("document.querySelector('#round-result-summary').innerText.includes('九種九牌')")
-    assert page.locator('#next-round').is_visible(), 'replayed declaration did not settle normally'
+    assert page.locator('.revealed-tile').count() == 14, 'human declaration must reveal 14 tiles'
+    assert page.locator('#player-hand .tile-svg').evaluate_all('(tiles) => tiles.map(tile => tile.getAttribute("aria-label"))') == expected_order
+    for seat in range(1, 4):
+        assert page.locator(f'.concealed-hand[data-player-id="{seat}"] .revealed-tile').count() == 0
+    for width in [320, 375, 390, 430]:
+        page.set_viewport_size({'width': width, 'height': 844})
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), ('kyuushu-self', width, 'horizontal overflow')
+    page.locator('#show-result').click()
+    assert page.locator('#result-title').inner_text() == '途中流局（九種九牌）'
+    assert page.locator('#match-result .winning-hand li').count() == 14
+    assert page.locator('#match-result').inner_text().find('宣言者：自分') >= 0
+    assert page.locator('#match-result .winning-hand svg').evaluate_all('(tiles) => tiles.map(tile => tile.getAttribute("aria-label"))') == expected_order
+    page.locator('#view-table').click()
+    page.locator('#show-result').click()
+    assert page.locator('#result-dialog').is_visible(), 'human result did not reopen'
+    page.locator('#view-table').click()
     page.locator('#next-round').click()
     page.wait_for_function("document.querySelector('#round-result-summary').hidden")
+    assert page.locator('.revealed-tile').count() == 0, 'next round retained the human public hand'
 
-    cases = [('kyuushu-self', 0, '自分'), ('kyuushu-cpu1', 1, 'CPU1'),
-             ('kyuushu-cpu2', 2, 'CPU2'), ('kyuushu-cpu3', 3, 'CPU3')]
+    cases = [('kyuushu-cpu1', 1, 'CPU1'), ('kyuushu-cpu2', 2, 'CPU2'),
+             ('kyuushu-cpu3', 3, 'CPU3')]
     for scenario, seat, name in cases:
-        if scenario != 'kyuushu-self':
-            page.locator('#scenario').select_option(scenario)
-            page.locator('#load-scenario').click()
-            page.wait_for_function("document.querySelector('#test-status').innerText.includes('CPUの第一ツモ処理を実行中')")
-            assert page.locator('.revealed-tile').count() == 0, scenario + ': concealed hand exposed before declaration'
-            page.wait_for_function('''seat => document.querySelectorAll('.revealed-tile').length === 14 &&
-                document.querySelector('#round-result-summary').innerText.includes('九種九牌')''', seat)
+        page.locator('#scenario').select_option(scenario)
+        page.locator('#load-scenario').click()
+        page.wait_for_function("document.querySelector('#test-status').innerText.includes('CPUの第一ツモ処理を実行中')")
+        assert page.locator('.revealed-tile').count() == 0, scenario + ': concealed hand exposed before declaration'
+        page.wait_for_function('''seat => document.querySelectorAll('.revealed-tile').length === 14 &&
+            document.querySelector('#round-result-summary').innerText.includes('九種九牌')''', seat)
         assert page.locator('.revealed-tile').count() == 14, scenario
         for other_seat in range(1, 4):
             if other_seat != seat:
@@ -66,7 +79,7 @@ with sync_playwright() as playwright:
     page.goto(base + 'kan-test.html')
     assert page.locator('#scenario option').count() == 6, 'kan verification page changed'
     assert not errors, errors
-    print(json.dumps({'testPage': 'pass', 'scenarios': [case[0] for case in cases],
+    print(json.dumps({'testPage': 'pass', 'scenarios': ['kyuushu-self', *[case[0] for case in cases]],
                       'widths': [320, 375, 390, 430], 'regularPageIsolation': 'pass',
                       'kanPage': 'pass'}, ensure_ascii=False))
     browser.close()
