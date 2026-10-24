@@ -89,10 +89,12 @@ MOCK = r"""
     const viewer = viewerOverride === null ? socket.seat : viewerOverride;
     send(socket, { type, view: makeView(viewer) });
   });
-  const gameResult = (socket, message, ok, codeName) => send(socket, {
-    type: 'game-action-result', requestId: message.requestId, ok, gameRevision,
-    ...(codeName ? { code: codeName } : {}),
-  });
+  let dropNextGameResult = false;
+  const gameResult = (socket, message, ok, codeName) => {
+    if (dropNextGameResult) { dropNextGameResult = false; return; }
+    send(socket, { type: 'game-action-result', requestId: message.requestId, ok, gameRevision,
+      ...(codeName ? { code: codeName } : {}) });
+  };
   const sockets = [];
   const gameActions = [];
   let tickets = 0;
@@ -480,6 +482,7 @@ MOCK = r"""
         hands: JSON.parse(JSON.stringify(hands)), drawnTiles: JSON.parse(JSON.stringify(drawnTiles)) };
     },
     forceDisconnect() { sockets.filter(socket => socket.readyState === MockWebSocket.OPEN).at(-1)?.forceDisconnect(); },
+    dropNextGameResult() { dropNextGameResult = true; },
     get ticketRequests() { return tickets; },
     get gameActions() { return [...gameActions]; },
     get requests() { return requests; },
@@ -531,6 +534,12 @@ MOCK = r"""
     configurable: true,
     value: { writeText: async value => { copied = value; } },
   });
+  const nativeSetTimeout = window.setTimeout.bind(window);
+  window.__shortNextActionTimeout = false;
+  window.setTimeout = (callback, delay, ...args) => {
+    if (window.__shortNextActionTimeout && delay === 15000) { window.__shortNextActionTimeout = false; delay = 20; }
+    return nativeSetTimeout(callback, delay, ...args);
+  };
 })();
 """
 
@@ -683,8 +692,8 @@ with sync_playwright() as p:
     assert menu_metrics['gap'] == '0px' and menu_metrics['background'] in ('rgb(255, 253, 247)', 'rgb(255, 255, 255)'), menu_metrics
     assert all(button['height'] >= 44 and button['width'] >= 44 and button['background'] in ('rgba(0, 0, 0, 0)', 'transparent') for button in menu_metrics['buttons']), menu_metrics
     assert [item.inner_text() for item in page.locator('#main-menu-items button:not([hidden])').all()] == [
-      'オフラインで新規対局', '新しくルームを作る', 'ルームに参加する',
-    ], 'the menu did not show the three requested actions in order'
+      'オフラインで新規対局', '新しくルームを作る', 'ルームに参加する', '診断ログ',
+    ], 'the shared menu actions were not available in order'
     assert page.locator('#menu-room').is_hidden(), 'room operations were shown before joining a room'
     assert page.locator('#main-menu-toggle').get_attribute('aria-expanded') == 'true', 'menu expanded state was not announced'
     page.locator('#main-menu-toggle').click()
@@ -916,8 +925,8 @@ with sync_playwright() as p:
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'closing the room dialog did not restore focus to the visible menu button'
     assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') !== null"), 'closing the dialog discarded the session token'
     assert [item.inner_text() for item in page.locator('#main-menu-items button:not([hidden])').all()] == [
-      'オフラインで新規対局', '新しくルームを作る', 'ルームに参加する', 'ルーム操作',
-    ], 'the three menu actions and room operation were not available during a room session'
+      'オフラインで新規対局', '新しくルームを作る', 'ルームに参加する', 'ルーム操作', '診断ログ',
+    ], 'the shared menu actions and room operation were not available during a room session'
     request_count_before_blocked_actions = page.evaluate('window.onlineMock.requests.length')
     select_menu_item('#online-create-open')
     assert page.locator('#online-create').is_disabled(), 'a second room was allowed while a session was active'
@@ -1293,6 +1302,23 @@ with sync_playwright() as p:
     wait_for("document.querySelectorAll('#online-player-hand button[data-tile-id]').length === 14", timeout=10000)
     hand_after_reconnect = page.locator('#online-player-hand button[data-tile-id]').evaluate_all("nodes => nodes.map(node => node.dataset.tileId).join(',')")
     assert hand_after_reconnect == hand_before_reconnect, 'the online hand was not restored after reconnect'
+    page.evaluate('''() => {
+      window.onlineMock.dropNextGameResult();
+      window.__shortNextActionTimeout = true;
+      window.onlineUiTest.onlineGameController.send({ type: 'discard', tileId: 'diagnostic-invalid-tile' });
+    }''')
+    wait_for("sessionStorage.getItem('heibon-mahjong-diagnostics-v1')?.includes('game_action_response_timeout') === true", timeout=5000)
+    diagnostic_records = page.evaluate("JSON.parse(sessionStorage.getItem('heibon-mahjong-diagnostics-v1'))")
+    diagnostic_events = [entry['event'] for entry in diagnostic_records]
+    assert 'game_action_rejected' in diagnostic_events and 'game_state_sync_requested' in diagnostic_events, diagnostic_events
+    assert any(entry['event'] == 'game_action_response_timeout' and entry['details'].get('requestId') for entry in diagnostic_records), diagnostic_records
+    select_menu_item('#menu-diagnostics')
+    diagnostic_text = page.locator('#diagnostic-entries').inner_text()
+    assert 'game_action_completed' in diagnostic_text and 'actionType' in diagnostic_text and 'discard' in diagnostic_text, 'the completed online discard was not recorded'
+    assert 'websocket_disconnected' in diagnostic_text and 'reconnect_started' in diagnostic_text, 'disconnect and reconnect were not recorded'
+    assert 'game_state_updated' in diagnostic_text and 'requestId' in diagnostic_text, 'game revisions and request IDs were not recorded'
+    assert all(tile_id not in diagnostic_text for tile_id in hidden_guest_ids), 'a concealed tile identifier was recorded in diagnostics'
+    page.locator('#diagnostic-close').click()
 
     page.evaluate('''() => { window.onlineMock.setGuestAsHost(); window.onlineMock.simulateGuestExit(); }''')
     wait_for("document.querySelector('#online-game-action-status').innerText.includes('テスト参加者が退出し、CPU1が席を引き継ぎました。 新ホストはテストホストです。')")

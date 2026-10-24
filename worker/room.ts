@@ -37,6 +37,26 @@ const TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/u;
 const SEAT_LABELS = ['東', '南', '西', '北'] as const;
 
+type WorkerLog = {
+  event: string; level: 'INFO' | 'WARN' | 'ERROR'; actionType?: string; requestId?: string;
+  gameRevision?: number; revision?: number; result?: string; errorCode?: string; durationMs?: number;
+};
+function logWorker(value: WorkerLog): void {
+  try {
+    const safe: Record<string, string | number> = {
+      timestamp: new Date().toISOString(), level: value.level, event: value.event,
+    };
+    if (value.actionType && /^[a-z-]{1,40}$/u.test(value.actionType)) safe.actionType = value.actionType;
+    if (value.requestId && REQUEST_ID_PATTERN.test(value.requestId) && !/^[a-f0-9]{64}$/u.test(value.requestId)) safe.requestId = value.requestId;
+    for (const key of ['gameRevision', 'revision', 'durationMs'] as const) {
+      const number = value[key]; if (Number.isSafeInteger(number) && (number as number) >= 0) safe[key] = number as number;
+    }
+    if (value.result && /^[a-z-]{1,40}$/u.test(value.result)) safe.result = value.result;
+    if (value.errorCode && /^[a-z0-9_-]{1,60}$/u.test(value.errorCode)) safe.errorCode = value.errorCode;
+    console.log(JSON.stringify(safe));
+  } catch { /* Logging is best effort. */ }
+}
+
 type RoomRow = {
   code: string;
   created_at: number;
@@ -564,16 +584,16 @@ export class RoomDurableObject {
   }
 
   private async connectWebSocket(request: Request, origin?: string): Promise<Response> {
-    if (!origin) return json({ error: 'origin_required' }, 403);
+    if (!origin) { logWorker({ event: 'websocket_connect_failed', level: 'WARN', errorCode: 'origin_required' }); return json({ error: 'origin_required' }, 403); }
     const room = this.room();
-    if (!room) return json({ error: 'room_not_found' }, 404, origin);
-    if (room.status === 'closed') return json({ error: 'room_closed' }, 410, origin);
+    if (!room) { logWorker({ event: 'websocket_connect_failed', level: 'WARN', errorCode: 'room_not_found' }); return json({ error: 'room_not_found' }, 404, origin); }
+    if (room.status === 'closed') { logWorker({ event: 'websocket_connect_failed', level: 'WARN', errorCode: 'room_closed' }); return json({ error: 'room_closed' }, 410, origin); }
     const offered = (request.headers.get('Sec-WebSocket-Protocol') ?? '')
       .split(',').map(value => value.trim()).filter(Boolean);
-    if (!offered.includes(ONLINE_WS_PROTOCOL)) return json({ error: 'websocket_protocol_required' }, 400, origin);
+    if (!offered.includes(ONLINE_WS_PROTOCOL)) { logWorker({ event: 'websocket_connect_failed', level: 'WARN', errorCode: 'websocket_protocol_required' }); return json({ error: 'websocket_protocol_required' }, 400, origin); }
     const ticketProtocol = offered.find(value => value.startsWith('ticket.'));
     const ticket = ticketProtocol?.slice('ticket.'.length) ?? '';
-    if (!TOKEN_PATTERN.test(ticket)) return json({ error: 'invalid_ticket' }, 401, origin);
+    if (!TOKEN_PATTERN.test(ticket)) { logWorker({ event: 'websocket_connect_failed', level: 'WARN', errorCode: 'invalid_ticket' }); return json({ error: 'invalid_ticket' }, 401, origin); }
 
     const ticketDigest = await tokenHash(ticket);
     const row = this.ctx.storage.transactionSync(() => {
@@ -584,9 +604,10 @@ export class RoomDurableObject {
       this.ctx.storage.sql.exec('DELETE FROM tickets WHERE token_hash = ?', ticketDigest);
       return value;
     });
-    if (!row) return json({ error: 'invalid_ticket' }, 401, origin);
+    if (!row) { logWorker({ event: 'websocket_connect_failed', level: 'WARN', errorCode: 'invalid_ticket' }); return json({ error: 'invalid_ticket' }, 401, origin); }
     const player = this.seat(row.seat);
     if (!player || player.kind !== 'human' || (this.room()?.status ?? 'closed') === 'closed') {
+      logWorker({ event: 'websocket_connect_failed', level: 'WARN', errorCode: 'invalid_ticket' });
       return json({ error: 'invalid_ticket' }, 401, origin);
     }
 
@@ -604,6 +625,7 @@ export class RoomDurableObject {
       'UPDATE seats SET connected = 1, ready = 0, connection_id = ? WHERE seat = ?', connectionId, row.seat,
     );
     if (changed) this.incrementRevision();
+    logWorker({ event: 'websocket_connected', level: 'INFO', revision: this.room()?.revision });
     this.broadcast();
     const game = this.gameSession();
     if (game) this.broadcastGame(game);
@@ -717,12 +739,14 @@ export class RoomDurableObject {
       ).toArray()[0];
       if (previous) {
         if (previous.payload === payload) {
+          logWorker({ event: 'operation_duplicate_replayed', level: 'INFO', actionType: action.type, requestId: action.requestId, revision: this.room()?.revision, result: 'replayed' });
           return {
             result: JSON.parse(previous.response_json) as ActionResult,
             changed: false,
             sendState: true,
           };
         }
+        logWorker({ event: 'operation_duplicate_rejected', level: 'WARN', actionType: action.type, requestId: action.requestId, revision: this.room()?.revision, errorCode: 'request_id_reused' });
         return {
           result: { type: 'action-result', requestId: action.requestId, ok: false, revision: this.room()?.revision ?? 0, code: 'request_id_reused' },
           changed: false,
@@ -895,6 +919,7 @@ export class RoomDurableObject {
       const previousSession = this.gameSession();
       if (prior) {
         if (prior.payload === payload) {
+          logWorker({ event: 'game_operation_duplicate_replayed', level: 'INFO', actionType: action.type, requestId: action.requestId, gameRevision: previousSession?.gameRevision, result: 'replayed' });
           return {
             result: JSON.parse(prior.response_json) as GameActionResultMessage,
             changed: false,
@@ -903,6 +928,7 @@ export class RoomDurableObject {
             sendState: true,
           };
         }
+        logWorker({ event: 'game_operation_duplicate_rejected', level: 'WARN', actionType: action.type, requestId: action.requestId, gameRevision: previousSession?.gameRevision, errorCode: 'request_id_reused' });
         return {
           result: { type: 'game-action-result', requestId: action.requestId, ok: false,
             gameRevision: previousSession?.gameRevision ?? 0, code: 'request_id_reused' },
@@ -962,6 +988,7 @@ export class RoomDurableObject {
         } catch (error) {
           code = error instanceof OnlineGameRuleError ? error.code
             : error instanceof RangeError ? 'invalid_action' : 'game_unavailable';
+          if (!(error instanceof OnlineGameRuleError) && !(error instanceof RangeError)) logWorker({ event: 'server_internal_error', level: 'ERROR', actionType: action.type, requestId: action.requestId, errorCode: 'game_unavailable' });
           nextSession = previousSession;
         }
       }
@@ -1008,13 +1035,24 @@ export class RoomDurableObject {
         this.saveGameSession(updated);
         return updated;
       });
-      if (saved) this.broadcastGame(saved);
+      if (saved) {
+        logWorker({ event: 'game_state_updated', level: 'INFO', gameRevision: saved.gameRevision, result: 'automatic' });
+        this.broadcastGame(saved);
+      }
     } finally {
       this.cpuProgressing = false;
     }
   }
 
   async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    try { await this.processSocketMessage(socket, message); }
+    catch (error) {
+      logWorker({ event: 'server_internal_error', level: 'ERROR', errorCode: 'websocket_handler_failed' });
+      throw error;
+    }
+  }
+
+  private async processSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const attachment = this.attachment(socket);
     if (!attachment) {
       this.sendError(socket, 'unauthorized');
@@ -1022,6 +1060,7 @@ export class RoomDurableObject {
     }
     const rate = this.consumeSocketRateLimit(attachment.seat);
     if (!rate.allowed) {
+      logWorker({ event: 'operation_rejected', level: 'WARN', errorCode: 'rate_limited' });
       this.sendError(socket, 'rate_limited', undefined, rate.retryAfterMs);
       return;
     }
@@ -1049,24 +1088,29 @@ export class RoomDurableObject {
     }
     const action = this.parseSocketAction(decoded);
     if (!action) {
+      logWorker({ event: 'operation_rejected', level: 'WARN', errorCode: 'invalid_message' });
       this.sendError(socket, 'invalid_message');
       return;
     }
 
     if (action === 'request-state' || action === 'request-game-state') {
+      logWorker({ event: 'state_sync_requested', level: 'INFO' });
       const room = this.room();
       const participant = this.seat(attachment.seat);
       if (!participant || participant.kind !== 'human' || participant.token_hash !== attachment.participantId) {
+        logWorker({ event: 'state_sync_failed', level: 'WARN', errorCode: 'unauthorized' });
         this.sendError(socket, 'unauthorized');
         try { socket.close(4003, 'Participant is no longer in the room'); } catch { /* Already closed. */ }
         return;
       }
       if (participant.connection_id !== attachment.connectionId || participant.connected !== 1) {
+        logWorker({ event: 'state_sync_failed', level: 'WARN', errorCode: 'stale_connection' });
         this.sendError(socket, 'stale_connection');
         try { socket.close(4001, 'Reconnected elsewhere'); } catch { /* Already closed. */ }
         return;
       }
       if (!room || room.status === 'closed' || room.expires_at <= Date.now()) {
+        logWorker({ event: 'state_sync_failed', level: 'WARN', errorCode: 'room_closed' });
         this.sendError(socket, 'room_closed');
         try { socket.close(4002, 'Room closed or expired'); } catch { /* Already closed. */ }
         return;
@@ -1080,6 +1124,7 @@ export class RoomDurableObject {
         if (action === 'request-state') this.sendState(socket);
         else this.sendGameState(socket);
       }
+      logWorker({ event: 'state_sync_response_sent', level: 'INFO', gameRevision: this.gameSession()?.gameRevision, revision: this.room()?.revision });
       return;
     }
 
@@ -1090,7 +1135,11 @@ export class RoomDurableObject {
       if (session) this.broadcastGame(session);
     }
     if ('expectedGameRevision' in action) {
+      const startedAt = Date.now();
+      logWorker({ event: 'game_action_received', level: 'INFO', actionType: action.type, requestId: action.requestId, gameRevision: action.expectedGameRevision });
       const outcome = this.applyGameAction(attachment, action);
+      logWorker({ event: outcome.result.ok ? 'game_action_succeeded' : 'game_action_failed', level: outcome.result.ok ? 'INFO' : 'WARN', actionType: action.type, requestId: action.requestId, gameRevision: outcome.result.gameRevision, result: outcome.result.ok ? 'accepted' : 'rejected', errorCode: outcome.result.code, durationMs: Date.now() - startedAt });
+      if (outcome.changed) logWorker({ event: 'game_state_updated', level: 'INFO', actionType: action.type, requestId: action.requestId, gameRevision: outcome.result.gameRevision });
       try { socket.send(JSON.stringify(outcome.result)); } catch { /* Result remains durable for requestId replay. */ }
       if (outcome.changed && outcome.session) {
         if (outcome.started) this.broadcastGameStarted(outcome.session);
@@ -1100,7 +1149,10 @@ export class RoomDurableObject {
       return;
     }
 
+    const startedAt = Date.now();
+    logWorker({ event: 'operation_received', level: 'INFO', actionType: action.type, requestId: action.requestId, revision: action.expectedRevision });
     const outcome = this.applyAction(attachment, action);
+    logWorker({ event: outcome.result.ok ? 'operation_succeeded' : 'operation_failed', level: outcome.result.ok ? 'INFO' : 'WARN', actionType: action.type, requestId: action.requestId, revision: outcome.result.revision, result: outcome.result.ok ? 'accepted' : 'rejected', errorCode: outcome.result.code, durationMs: Date.now() - startedAt });
     try { socket.send(JSON.stringify(outcome.result)); } catch { /* Result remains durable for requestId replay. */ }
     if (outcome.changed) this.broadcast();
     else if (outcome.sendState) this.sendState(socket);
@@ -1125,6 +1177,7 @@ export class RoomDurableObject {
       'UPDATE seats SET connected = 0, ready = 0, connection_id = NULL WHERE seat = ?', attachment.seat,
     );
     if (changed) this.incrementRevision();
+    logWorker({ event: 'websocket_disconnected', level: 'WARN', revision: this.room()?.revision });
     this.broadcast(false);
     const session = this.gameSession();
     if (session) this.broadcastGame(session);
@@ -1135,10 +1188,19 @@ export class RoomDurableObject {
   }
 
   webSocketError(socket: WebSocket): void {
+    logWorker({ event: 'websocket_error', level: 'ERROR' });
     this.socketEnded(socket);
   }
 
   async alarm(): Promise<void> {
+    try { await this.processAlarm(); }
+    catch (error) {
+      logWorker({ event: 'server_internal_error', level: 'ERROR', errorCode: 'alarm_handler_failed' });
+      throw error;
+    }
+  }
+
+  private async processAlarm(): Promise<void> {
     const room = this.room();
     if (!room) return;
     const now = Date.now();
@@ -1158,6 +1220,7 @@ export class RoomDurableObject {
 
     let session = this.gameSession();
     if (session?.decision && session.decision.expiresAt <= now) {
+      logWorker({ event: 'decision_timeout', level: 'WARN', gameRevision: session.gameRevision });
       const expired = timeoutOnlineDecision(session, now);
       if (expired !== session) {
         const saved = this.ctx.storage.transactionSync(() => {
@@ -1169,6 +1232,7 @@ export class RoomDurableObject {
         });
         if (saved) {
           session = saved;
+          logWorker({ event: 'game_state_updated', level: 'INFO', gameRevision: saved.gameRevision, result: 'timeout' });
           this.broadcastGame(saved);
         }
       }

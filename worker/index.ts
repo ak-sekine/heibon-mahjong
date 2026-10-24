@@ -10,6 +10,11 @@ const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const ROOM_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/u;
 const PARTICIPANT_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 
+function logInternalError(errorCode: string): void {
+  try { console.log(JSON.stringify({ timestamp: new Date().toISOString(), level: 'ERROR', event: 'server_internal_error', errorCode })); }
+  catch { /* Logging must not alter request handling. */ }
+}
+
 const ratePolicies = {
   create: { limit: 10, windowMs: 10 * 60 * 1000 },
   join: { limit: 12, windowMs: 10 * 60 * 1000 },
@@ -220,6 +225,16 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    try {
+      return await handleFetch(request, env);
+    } catch (error) {
+      logInternalError('request_handler_failed');
+      throw error;
+    }
+  },
+};
+
+async function handleFetch(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get('Origin');
     if (!origin || !allowedOrigins.has(origin)) return new Response('Origin not allowed', { status: 403 });
 
@@ -233,7 +248,6 @@ export default {
     }
 
     return handleApi(request, env, origin);
-  },
-};
+}
 
 export { RateLimitDurableObject, RoomDurableObject };

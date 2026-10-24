@@ -10,6 +10,7 @@
 
 | 記録 | 主な対象 |
 | --- | --- |
+| [オンライン診断ログ](online-diagnostics.md) | ブラウザーのsessionStorageログ、Worker構造化ログ、Cloudflare確認方法、検証範囲。 |
 | [九種九牌の公開手牌](kyuushu-public-hand.md) | 宣言者14枚のオンライン・オフライン公開、非公開手牌保護、結果の再表示・再接続・次局解除。GitHub ActionsのChromium/WebKit確認成功。 |
 | [Heibon Mahjong テスト環境](test-environment.md) | オフライン固定局面の九種九牌4シナリオ、136枚整合性、公開範囲、320〜430px幅。 |
 | [Step 13.8](step13.8/README.md) | 主要役満8種類、候補単位の複合、点数、結果表示。Browser UI verification はGitHub Actionsで実施。 |

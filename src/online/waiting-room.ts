@@ -7,6 +7,7 @@ import {
   type RoomSocketError,
   type GameActionPayload,
 } from './protocol.ts';
+import { diagnosticLog } from './diagnostics.ts';
 
 type RoomSeat = OnlineRoomSeat;
 type RoomState = OnlineRoomState & { type?: string };
@@ -23,12 +24,16 @@ type PendingAction = {
   expectedRevision: number;
   payload: RoomActionPayload;
   sentGeneration: number | null;
+  startedAt: number;
+  sentAt: number | null;
 };
 type PendingGameAction = {
   requestId: string;
   expectedGameRevision: number;
   payload: GameActionPayload;
   sentGeneration: number | null;
+  startedAt: number;
+  sentAt: number | null;
 };
 type SocketActionResult = RoomActionResult;
 type SocketError = RoomSocketError;
@@ -129,6 +134,7 @@ export class OnlineWaitingRoom {
   private reconnectTimer: number | null = null;
   private stableConnectionTimer: number | null = null;
   private stateSyncTimer: number | null = null;
+  private stateSyncPending = false;
   private reconnectAttempt = 0;
   private automaticReconnectAllowed = true;
   private dialogWasClosedByUser = false;
@@ -191,13 +197,15 @@ export class OnlineWaitingRoom {
     this.dialog.addEventListener('cancel', event => { event.preventDefault(); this.closeDialog(); });
     window.addEventListener('online', () => this.resumeConnection());
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') this.resumeConnection();
+      if (document.visibilityState === 'visible') { diagnosticLog.record('INFO', 'page_resumed', { source: 'visibilitychange' }); this.resumeConnection(); }
       else {
         this.clearReconnectTimer();
         this.clearStateSyncTimer();
       }
     });
     window.addEventListener('pagehide', () => {
+      diagnosticLog.record('INFO', 'page_hidden', { source: 'pagehide' });
+      diagnosticLog.flush();
       this.clearReconnectTimer();
       this.clearStableConnectionTimer();
       this.clearStateSyncTimer();
@@ -481,6 +489,7 @@ export class OnlineWaitingRoom {
       return;
     }
     const generation = ++this.connectGeneration;
+    diagnosticLog.record('INFO', this.reconnectAttempt > 0 ? 'reconnect_started' : 'websocket_connect_started', { connectionGeneration: generation, attempt: this.reconnectAttempt });
     this.closeSocket(false);
     this.reconnectButton.hidden = true;
     this.setConnection('接続しています…');
@@ -507,6 +516,7 @@ export class OnlineWaitingRoom {
       this.socket = socket;
       socket.addEventListener('open', () => {
         if (!this.isCurrentSocket(socket, generation)) return;
+        diagnosticLog.record('INFO', this.reconnectAttempt > 0 ? 'reconnect_succeeded' : 'websocket_connected', { connectionGeneration: generation });
         this.stableConnectionTimer = window.setTimeout(() => {
           this.stableConnectionTimer = null;
           if (this.isCurrentSocket(socket, generation)) this.reconnectAttempt = 0;
@@ -523,6 +533,7 @@ export class OnlineWaitingRoom {
         this.clearStableConnectionTimer();
         this.clearStateSyncTimer();
         this.socket = null;
+        diagnosticLog.record('WARN', 'websocket_disconnected', { connectionGeneration: generation, closeCode: event.code });
         if (event.code === 4001) {
           this.automaticReconnectAllowed = false;
           this.reconnectButton.hidden = false;
@@ -543,10 +554,12 @@ export class OnlineWaitingRoom {
         this.scheduleReconnect();
       });
       socket.addEventListener('error', () => {
+        diagnosticLog.record('ERROR', 'websocket_error', { connectionGeneration: generation });
         if (this.isCurrentSocket(socket, generation)) this.setConnection('接続に問題があります。再接続を試みています…');
       });
     } catch (error) {
       if (generation !== this.connectGeneration) return;
+      diagnosticLog.record('ERROR', 'websocket_connect_failed', { connectionGeneration: generation, errorCode: error instanceof RoomApiError ? error.code : 'connection_failed' });
       if (error instanceof RoomApiError && (error.code === 'unauthorized' || error.code === 'room_closed' || error.code === 'room_expired')) {
         this.finishSession(error.message);
         return;
@@ -574,6 +587,9 @@ export class OnlineWaitingRoom {
       const roomState = this.normalizeState(message);
       if (!roomState || roomState.roomCode !== this.session?.roomCode) return;
       this.clearStateSyncTimer();
+      if (this.stateSyncPending) diagnosticLog.record('INFO', 'room_state_sync_response_received', { revision: roomState.revision });
+      this.stateSyncPending = false;
+      diagnosticLog.record('INFO', 'room_state_updated', { revision: roomState.revision });
       this.setConnection('接続中');
       this.renderState(roomState);
       if (this.pendingAction) this.sendPendingAction(socket, generation);
@@ -588,6 +604,11 @@ export class OnlineWaitingRoom {
         ? (message.view as Record<string, unknown>).status : undefined;
       this.gameTerminated = message.type === 'game-aborted' || message.type === 'match-ended' ||
         viewStatus === 'aborted' || viewStatus === 'match-ended';
+      const gameView = message.view && typeof message.view === 'object' ? message.view as Record<string, unknown> : null;
+      const gameRevision = Number.isSafeInteger(gameView?.gameRevision) ? gameView?.gameRevision as number : undefined;
+      diagnosticLog.record('INFO', message.type === 'game-state' ? 'game_state_updated' : message.type, { gameRevision });
+      if (this.stateSyncPending && message.type === 'game-state') { diagnosticLog.record('INFO', 'game_state_sync_response_received', { gameRevision }); this.stateSyncPending = false; }
+      if (message.type === 'game-state' && this.pendingGameAction) diagnosticLog.record('INFO', 'game_action_wait_released', { requestId: this.pendingGameAction.requestId, gameRevision });
       this.onGameMessage(message);
       if (message.type === 'game-started' && this.dialog.open) this.dialog.close();
       if (message.type === 'game-state' && this.pendingGameAction) this.sendPendingGameAction(socket, generation);
@@ -599,10 +620,12 @@ export class OnlineWaitingRoom {
       return;
     }
     if (message.type === 'action-result') {
+      diagnosticLog.record(message.ok === false ? 'WARN' : 'INFO', 'server_action_result_received', { requestId: typeof message.requestId === 'string' ? message.requestId : undefined, result: message.ok === false ? 'rejected' : 'accepted', errorCode: typeof message.code === 'string' ? message.code : undefined, revision: Number.isSafeInteger(message.revision) ? message.revision as number : undefined });
       this.receiveActionResult(message as unknown as SocketActionResult);
       return;
     }
     if (message.type === 'game-action-result') {
+      diagnosticLog.record(message.ok === false ? 'WARN' : 'INFO', 'server_game_action_result_received', { requestId: typeof message.requestId === 'string' ? message.requestId : undefined, result: message.ok === false ? 'rejected' : 'accepted', errorCode: typeof message.code === 'string' ? message.code : undefined, gameRevision: Number.isSafeInteger(message.gameRevision) ? message.gameRevision as number : undefined });
       this.receiveGameActionResult(message);
       return;
     }
@@ -732,7 +755,9 @@ export class OnlineWaitingRoom {
       expectedRevision: this.state.revision,
       payload,
       sentGeneration: null,
+      startedAt: Date.now(), sentAt: null,
     };
+    diagnosticLog.record('INFO', 'room_action_accepted', { actionType: payload.type, requestId: this.pendingAction.requestId, revision: this.state.revision });
     this.renderControls();
     this.sendPendingAction(this.socket, this.connectGeneration);
   }
@@ -749,7 +774,10 @@ export class OnlineWaitingRoom {
       expectedGameRevision,
       payload,
       sentGeneration: null,
+      startedAt: Date.now(), sentAt: null,
     };
+    diagnosticLog.record('INFO', 'game_action_accepted', { actionType: payload.type, requestId: this.pendingGameAction.requestId, gameRevision: expectedGameRevision });
+    diagnosticLog.record('INFO', 'operation_wait_started', { actionType: payload.type, requestId: this.pendingGameAction.requestId, gameRevision: expectedGameRevision });
     this.renderControls();
     this.sendPendingGameAction(this.socket, this.connectGeneration);
   }
@@ -758,7 +786,10 @@ export class OnlineWaitingRoom {
     const pending = this.pendingAction;
     if (!pending || pending.sentGeneration === generation || socket.readyState !== WebSocket.OPEN) return;
     pending.sentGeneration = generation;
-    socket.send(JSON.stringify({ ...pending.payload, requestId: pending.requestId, expectedRevision: pending.expectedRevision }));
+    pending.sentAt = Date.now();
+    try { socket.send(JSON.stringify({ ...pending.payload, requestId: pending.requestId, expectedRevision: pending.expectedRevision })); }
+    catch (error) { diagnosticLog.record('ERROR', 'action_send_failed', { actionType: pending.payload.type, requestId: pending.requestId, revision: pending.expectedRevision, errorCode: 'send_failed' }); throw error; }
+    diagnosticLog.record('INFO', 'action_sent', { actionType: pending.payload.type, requestId: pending.requestId, revision: pending.expectedRevision });
     this.armPendingActionTimer();
   }
 
@@ -766,8 +797,11 @@ export class OnlineWaitingRoom {
     const pending = this.pendingGameAction;
     if (!pending || pending.sentGeneration === generation || socket.readyState !== WebSocket.OPEN) return;
     pending.sentGeneration = generation;
-    socket.send(JSON.stringify({ ...pending.payload, requestId: pending.requestId,
-      expectedGameRevision: pending.expectedGameRevision }));
+    pending.sentAt = Date.now();
+    try { socket.send(JSON.stringify({ ...pending.payload, requestId: pending.requestId,
+      expectedGameRevision: pending.expectedGameRevision })); }
+    catch (error) { diagnosticLog.record('ERROR', 'game_action_send_failed', { actionType: pending.payload.type, requestId: pending.requestId, gameRevision: pending.expectedGameRevision, errorCode: 'send_failed' }); throw error; }
+    diagnosticLog.record('INFO', 'game_action_sent', { actionType: pending.payload.type, requestId: pending.requestId, gameRevision: pending.expectedGameRevision });
     this.armPendingGameActionTimer();
   }
 
@@ -776,7 +810,10 @@ export class OnlineWaitingRoom {
     this.pendingActionTimer = window.setTimeout(() => {
       this.pendingActionTimer = null;
       if (!this.pendingAction) return;
+      diagnosticLog.record('ERROR', 'action_response_timeout', { actionType: this.pendingAction.payload.type, requestId: this.pendingAction.requestId, revision: this.pendingAction.expectedRevision, durationMs: Date.now() - (this.pendingAction.sentAt ?? this.pendingAction.startedAt) });
       this.setError('サーバーの応答を待っています。再接続すると同じ操作IDで状態を確認します。');
+      diagnosticLog.record('WARN', 'room_state_sync_requested', { source: 'action_timeout' });
+      this.stateSyncPending = true;
       this.socket?.send(JSON.stringify({ type: 'request-state' }));
     }, 15_000);
   }
@@ -786,7 +823,10 @@ export class OnlineWaitingRoom {
     this.pendingGameActionTimer = window.setTimeout(() => {
       this.pendingGameActionTimer = null;
       if (!this.pendingGameAction) return;
+      diagnosticLog.record('ERROR', 'game_action_response_timeout', { actionType: this.pendingGameAction.payload.type, requestId: this.pendingGameAction.requestId, gameRevision: this.pendingGameAction.expectedGameRevision, durationMs: Date.now() - (this.pendingGameAction.sentAt ?? this.pendingGameAction.startedAt) });
       this.pendingGameAction.sentGeneration = null;
+      diagnosticLog.record('WARN', 'game_state_sync_requested', { requestId: this.pendingGameAction.requestId, source: 'action_timeout' });
+      this.stateSyncPending = true;
       this.socket?.send(JSON.stringify({ type: 'request-game-state' }));
       this.setError('サーバーの応答を待っています。状態を再同期しています。');
     }, 15_000);
@@ -795,13 +835,14 @@ export class OnlineWaitingRoom {
   private receiveActionResult(result: SocketActionResult): void {
     if (!this.pendingAction || result.requestId !== this.pendingAction.requestId || typeof result.ok !== 'boolean') return;
     const completed = this.pendingAction;
+    diagnosticLog.record(result.ok ? 'INFO' : 'WARN', result.ok ? 'room_action_completed' : 'room_action_rejected', { actionType: completed.payload.type, requestId: completed.requestId, revision: result.revision, errorCode: result.code, result: result.ok ? 'accepted' : 'rejected', durationMs: Date.now() - (completed.sentAt ?? completed.startedAt) });
     this.pendingAction = null;
     this.clearPendingActionTimer();
     this.renderControls();
     if (!result.ok) {
       const message = socketErrorMessages[result.code ?? ''] ?? '操作を適用できませんでした。';
       this.setError(message);
-      if (result.code === 'revision_conflict') this.socket?.send(JSON.stringify({ type: 'request-state' }));
+      if (result.code === 'revision_conflict') { diagnosticLog.record('WARN', 'room_state_sync_requested', { requestId: completed.requestId, source: 'revision_conflict' }); this.stateSyncPending = true; this.socket?.send(JSON.stringify({ type: 'request-state' })); }
       return;
     }
     this.setError();
@@ -815,6 +856,9 @@ export class OnlineWaitingRoom {
 
   private receiveGameActionResult(message: Record<string, unknown>): void {
     if (!this.pendingGameAction || message.requestId !== this.pendingGameAction.requestId || typeof message.ok !== 'boolean') return;
+    const completed = this.pendingGameAction;
+    diagnosticLog.record(message.ok === false ? 'WARN' : 'INFO', message.ok === false ? 'game_action_rejected' : 'game_action_completed', { actionType: completed.payload.type, requestId: completed.requestId, gameRevision: Number.isSafeInteger(message.gameRevision) ? message.gameRevision as number : undefined, errorCode: typeof message.code === 'string' ? message.code : undefined, result: message.ok === false ? 'rejected' : 'accepted', durationMs: Date.now() - (completed.sentAt ?? completed.startedAt) });
+    diagnosticLog.record('INFO', 'operation_wait_released', { actionType: completed.payload.type, requestId: completed.requestId, gameRevision: Number.isSafeInteger(message.gameRevision) ? message.gameRevision as number : undefined });
     this.pendingGameAction = null;
     this.clearPendingGameActionTimer();
     this.onGameMessage(message);
@@ -822,7 +866,7 @@ export class OnlineWaitingRoom {
     if (!message.ok) {
       const code = typeof message.code === 'string' ? message.code : '';
       this.setError(socketErrorMessages[code] ?? '対局操作を適用できませんでした。');
-      if (code === 'stale_revision' || code === 'stale_decision') this.socket?.send(JSON.stringify({ type: 'request-game-state' }));
+      if (code === 'stale_revision' || code === 'stale_decision') { diagnosticLog.record('WARN', 'game_state_sync_requested', { requestId: completed.requestId, source: code }); this.stateSyncPending = true; this.socket?.send(JSON.stringify({ type: 'request-game-state' })); }
       return;
     }
     this.setError();
@@ -832,12 +876,14 @@ export class OnlineWaitingRoom {
     const code = error.code ?? 'invalid_message';
     if ((error.requestId && this.pendingAction?.requestId === error.requestId) ||
         (code === 'rate_limited' && this.pendingAction !== null)) {
+      if (this.pendingAction) diagnosticLog.record('WARN', 'operation_wait_released', { actionType: this.pendingAction.payload.type, requestId: this.pendingAction.requestId, errorCode: code, result: 'rejected' });
       this.pendingAction = null;
       this.clearPendingActionTimer();
       this.renderControls();
     }
     if ((error.requestId && this.pendingGameAction?.requestId === error.requestId) ||
         (code === 'rate_limited' && this.pendingGameAction !== null)) {
+      if (this.pendingGameAction) diagnosticLog.record('WARN', 'operation_wait_released', { actionType: this.pendingGameAction.payload.type, requestId: this.pendingGameAction.requestId, errorCode: code, result: 'rejected' });
       this.pendingGameAction = null;
       this.clearPendingGameActionTimer();
       this.renderControls();
@@ -846,6 +892,7 @@ export class OnlineWaitingRoom {
     if (code === 'unauthorized' || code === 'room_closed') {
       this.finishSession(socketErrorMessages[code]);
     }
+    diagnosticLog.record('WARN', 'server_rejected_operation', { errorCode: code, requestId: error.requestId });
   }
 
   private async copyRoomCode(): Promise<void> {
@@ -969,6 +1016,7 @@ export class OnlineWaitingRoom {
       ? Math.min(30_000, Math.max(1_000, retryAfterMs))
       : Math.min(30_000, 1_000 * (2 ** this.reconnectAttempt++));
     const delay = retryAfterMs !== undefined ? base : Math.round(base * (0.8 + Math.random() * 0.4));
+    diagnosticLog.record('WARN', 'reconnect_scheduled', { attempt: this.reconnectAttempt, durationMs: delay });
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
       void this.connect();
@@ -983,6 +1031,8 @@ export class OnlineWaitingRoom {
       const generation = this.connectGeneration;
       try {
         this.setConnection('復帰後のルーム状態を確認しています…');
+        diagnosticLog.record('INFO', 'room_state_sync_requested', { source: 'page_resume' });
+        this.stateSyncPending = true;
         socket.send(JSON.stringify({ type: 'request-state' }));
       } catch {
         this.closeSocket();
@@ -993,6 +1043,7 @@ export class OnlineWaitingRoom {
       this.stateSyncTimer = window.setTimeout(() => {
         this.stateSyncTimer = null;
         if (!this.isCurrentSocket(socket, generation)) return;
+        diagnosticLog.record('ERROR', 'state_sync_timeout', { source: 'page_resume', durationMs: 8000 });
         this.setConnection('接続状態を確認できません。再接続します…');
         this.closeSocket();
         this.renderControls();

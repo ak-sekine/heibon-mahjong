@@ -16,6 +16,7 @@ import { mountScoreStrip, mountTableInfoPanel } from './ui/table-components.ts';
 import { declarationsBetween } from './model/declaration.ts';
 import { DeclarationBubbleRenderer } from './rendering/declaration-bubbles.ts';
 import { riverPositionFor } from './rendering/river-layout.ts';
+import { mountDiagnosticDialog } from './online/diagnostics.ts';
 
 const localScoreHost = document.querySelector<HTMLElement>('#local-score-strip-host');
 if (localScoreHost) mountScoreStrip(localScoreHost, 'local');
@@ -31,6 +32,7 @@ const onlineActionHost = document.querySelector<HTMLElement>('#online-action-pan
 const onlineActionRoot = onlineActionHost ? mountActionPanel(onlineActionHost, 'online') : null;
 installCallViewport();
 if (document.querySelector('#main-menu-toggle')) new MainMenu();
+mountDiagnosticDialog();
 const resultDialog = new ResultDialog();
 let onlineGameController: OnlineGameController | null = null;
 const localTable = document.querySelector<HTMLElement>('#local-table')!;

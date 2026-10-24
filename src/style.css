@@ -148,6 +148,21 @@ header > div { min-width:0; }
 .new-game-actions { display:flex; justify-content:space-between; gap:12px; }
 #new-game-dialog button { min-height:44px; padding:8px; border:1px solid #9dc5b2; border-radius:8px; font:inherit; font-weight:600; white-space:nowrap; background:#103e30; color:#fffdf7; touch-action:manipulation; cursor:pointer; }
 #new-game-dialog #confirm-new-game { background:#ffda7d; color:#154e3c; }
+#diagnostic-dialog { position:fixed; inset:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); box-sizing:border-box; width:min(720px,calc(100vw - 24px)); max-width:calc(100vw - 24px); max-height:calc(100dvh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom))); margin:auto; padding:12px; border:2px solid #ffda7d; border-radius:12px; background:#185640; color:#fffdf7; overflow:hidden; }
+#diagnostic-dialog[open] { display:flex; flex-direction:column; gap:8px; }
+#diagnostic-dialog::backdrop { background:rgb(0 0 0 / 65%); }
+.diagnostic-header,.diagnostic-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; flex:none; }
+.diagnostic-header h2,.diagnostic-header p { margin:0; }
+.diagnostic-header h2 { font-size:1.1rem; }
+.diagnostic-header p,#diagnostic-status { font-size:.82rem; }
+#diagnostic-dialog button { min-width:64px; min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; touch-action:manipulation; }
+#diagnostic-entries { flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; border:1px solid #63947a; border-radius:8px; padding:6px; }
+.diagnostic-entry { padding:7px 4px; border-bottom:1px solid #63947a; overflow-wrap:anywhere; }
+.diagnostic-entry p { margin:0 0 4px; font-size:.78rem; }
+.diagnostic-entry pre { margin:0; white-space:pre-wrap; font: .75rem ui-monospace,monospace; }
+.diagnostic-error p { color:#ffb4a2; }
+#diagnostic-status { min-height:1em; margin:0; }
+.diagnostic-footer { justify-content:flex-end; }
 #new-game-dialog button:focus-visible { outline:3px solid #82dcff; outline-offset:-3px; }
 .online-dialog { box-sizing:border-box; width:min(calc(100vw - 24px),520px); max-width:calc(100vw - 24px); max-height:calc(100svh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom))); overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; padding:clamp(12px,3.5vw,18px); border:2px solid #ffda7d; border-radius:12px; background:#185640; color:#fffdf7; }
 @supports (height:100dvh) { .online-dialog { max-height:calc(100dvh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom))); } }

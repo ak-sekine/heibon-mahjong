@@ -18,6 +18,7 @@
       <button id="online-create-open" type="button" aria-haspopup="dialog" aria-controls="online-create-dialog">新しくルームを作る</button>
       <button id="online-join-open" type="button" aria-haspopup="dialog" aria-controls="online-join-dialog">ルームに参加する</button>
       <button id="menu-room" type="button" aria-haspopup="dialog" aria-controls="online-dialog" hidden>ルーム操作</button>
+      <button id="menu-diagnostics" type="button" aria-haspopup="dialog" aria-controls="diagnostic-dialog">診断ログ</button>
     </nav>
   </div></header>
   <dialog id="online-create-dialog" class="online-dialog online-form-dialog" aria-labelledby="online-create-title">
@@ -28,6 +29,12 @@
       <p id="online-create-message" class="online-form-message" role="status" aria-live="polite" hidden></p>
       <button id="online-create" type="submit" disabled>ルームを作成</button>
     </form>
+  </dialog>
+  <dialog id="diagnostic-dialog" aria-labelledby="diagnostic-title">
+    <header class="diagnostic-header"><div><h2 id="diagnostic-title">診断ログ</h2><p id="diagnostic-count" aria-live="polite">0件</p></div><button id="diagnostic-close" type="button">閉じる</button></header>
+    <div id="diagnostic-entries" tabindex="0" role="region" aria-label="診断ログ一覧"></div>
+    <p id="diagnostic-status" role="status" aria-live="polite"></p>
+    <footer class="diagnostic-footer"><button id="diagnostic-copy" type="button">コピー</button><button id="diagnostic-clear" type="button">クリア</button></footer>
   </dialog>
   <dialog id="online-join-dialog" class="online-dialog online-form-dialog" aria-labelledby="online-join-title">
     <header class="online-dialog-header"><h2 id="online-join-title">ルームに参加する</h2><button id="online-join-close" class="online-dialog-close" type="button" aria-label="ルーム参加を閉じる">閉じる</button></header>
