@@ -752,7 +752,11 @@ with sync_playwright() as p:
     assert page.locator('#online-create-close').evaluate('element => document.activeElement === element'), 'opening the create dialog did not focus its close button'
     assert page.locator('#online-create-name').evaluate('element => document.activeElement !== element'), 'opening the create dialog focused its display-name input'
     page.keyboard.press('Tab')
-    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Tab did not move from the create close button to its display-name input'
+    assert page.locator('input[name="online-match-format"][value="tonpu"]').evaluate('element => document.activeElement === element'), 'Tab did not move from the create close button to match-format selection'
+    page.keyboard.press('Tab')
+    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Tab did not move from match-format selection to the create display-name input'
+    page.keyboard.press('Shift+Tab')
+    assert page.locator('input[name="online-match-format"][value="tonpu"]').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to match-format selection'
     page.keyboard.press('Shift+Tab')
     assert page.locator('#online-create-close').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to the create close button'
     assert page.locator('#online-create').is_disabled(), 'room creation was enabled without a display name'
