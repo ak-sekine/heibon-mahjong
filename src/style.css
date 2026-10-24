@@ -458,7 +458,7 @@ header > div { min-width:0; }
 .table .river-left .river-tile,.table .river-right .river-tile { width:var(--river-tile-height); height:var(--river-tile-width); }
 /* Both indicator rows use the same unrotated face size as river tiles. */
 .table .center-info { justify-content:center; gap:2px; font-size:clamp(8px,1.8cqw,11px); line-height:1.25; }
-.table .round-label { white-space:pre-line; }
+.table .round-label { white-space:nowrap; font-size:clamp(6px,1.6cqw,9px); line-height:1.1; }
 .table .center-info .dora-area { --dora-width:var(--river-tile-width); --dora-height:var(--river-tile-height); flex:none; }
 .table .center-info .dora-indicators { grid-template-columns:repeat(5,var(--dora-width)); grid-template-rows:none; grid-auto-rows:var(--dora-height); }
 .table .center-info .dora-slot,.table .center-info .dora-slot .tile-svg { width:var(--dora-width); height:var(--dora-height); }
