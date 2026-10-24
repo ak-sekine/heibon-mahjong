@@ -184,7 +184,7 @@ function renderRoundSummary(game: GameState, settlement: RoundSettlement | null)
   if (settlement?.reason === 'draw' && settlement.tenpai) {
     summary.hidden = false;
     const ready = settlement.tenpai.flatMap((isTenpai, id) => isTenpai ? [seatNames[id]] : []);
-    summary.append(text('p', `東${settlement.roundNumber}局 ${settlement.honba}本場・流局`, 'round-summary-winner'));
+    summary.append(text('p', `${settlement.roundWind === 'south' ? '南' : '東'}${settlement.roundNumber}局 ${settlement.honba}本場・流局`, 'round-summary-winner'));
     summary.append(text('p', `テンパイ：${ready.length === 0 ? 'なし' : ready.join('、')}`, 'round-summary-tenpai'));
     return;
   }
