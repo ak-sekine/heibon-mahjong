@@ -79,6 +79,7 @@ jobs:
           run_browser_test tests/browser-declaration-gameplay.py
           HEIBON_BROWSER=webkit run_browser_test tests/browser-declaration-gameplay.py
           run_browser_test tests/browser-round-end-ui.py
+          HEIBON_BROWSER=webkit run_browser_test tests/browser-round-end-ui.py
           run_browser_test tests/browser-result-hand-layout.py
           HEIBON_BROWSER=webkit run_browser_test tests/browser-result-hand-layout.py
           run_browser_test tests/browser-dora-rows.py

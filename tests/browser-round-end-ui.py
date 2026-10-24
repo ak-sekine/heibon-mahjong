@@ -9,6 +9,7 @@ from playwright.sync_api import sync_playwright
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-round-end-ui'))
 OUT.mkdir(parents=True, exist_ok=True)
 WIDTHS = [(320, 568), (355, 700), (375, 667), (390, 844), (430, 932), (1280, 800)]
+ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 SUMMARY_YAKU_NAMES = {
     'menzen-tsumo': '門前清自摸和',
     'yakuhai-white': '役牌：白',
@@ -32,10 +33,18 @@ DETAIL_YAKU_NAMES = {
 }
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'), args=['--no-sandbox'])
+    browser_type = getattr(p, ENGINE)
+    launch_options = {}
+    if ENGINE == 'chromium':
+        launch_options['executable_path'] = os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium')
+        launch_options['args'] = ['--no-sandbox']
+    browser = browser_type.launch(**launch_options)
     reports = []
     for width, height in WIDTHS:
-        page = browser.new_page(viewport={'width': width, 'height': height})
+        mobile = ENGINE == 'webkit' and width < 500
+        page = browser.new_page(viewport={'width': width, 'height': height},
+                                device_scale_factor=2 if mobile else 1,
+                                is_mobile=mobile, has_touch=mobile)
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
 
