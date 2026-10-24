@@ -16,6 +16,7 @@ import { callStart } from './calls-fixture.ts';
 import { riichiStart } from './riichi-fixture.ts';
 import { childKyuushuGame, parentKyuushuGame } from './step13-10-fixture.ts';
 import { tsumoGame } from './tsumo-fixture.ts';
+import { cpuRiichiStart } from './cpu-riichi-fixture.ts';
 import {
   applyOnlineGameAction,
   advanceOnlineCpu,
@@ -404,6 +405,33 @@ test('online action reducer validates riichi, tsumo, kan, kyuushu, and starts th
   assert.equal(next.match.roundNumber, tsumo.match.lastSettlement?.next?.roundNumber);
   assert.equal(next.gameRevision, tsumo.gameRevision + 1);
   assert.deepEqual(next.match.points, tsumo.match.points);
+});
+
+test('online CPU riichi settles before the next draw and advances the revision', async () => {
+  const groups = ['123m', '456p', '789s', '22p', '46m'];
+  const base = sessionForGame(cpuRiichiStart(2, [], 'north', groups), [0]);
+  const game = base.match.game;
+  const declarationTileId = getRiichiDiscardOptions(game, 2, 25_000)[0].tileId;
+  const discarded = discardTileForOnline(game, 2, declarationTileId);
+  const pendingGame = {
+    ...discarded,
+    phase: 'awaiting-draw' as const,
+    turnPlayerId: 3 as PlayerId,
+    ronWindow: null,
+    pendingRiichi: { playerId: 2 as PlayerId, declarationTileId, doubleRiichi: false },
+  };
+  const pendingMatch = { ...base.match, game: pendingGame };
+  const pending = { ...base, gameRevision: 5, match: pendingMatch, status: 'playing' as const };
+  const settled = await advanceOnlineCpu(pending, 6000);
+
+  assert.equal(settled.gameRevision, pending.gameRevision + 1);
+  assert.equal(settled.match.game.pendingRiichi, null);
+  assert.equal(settled.match.game.players[2].riichi?.declarationTileId, declarationTileId);
+  assert.equal(settled.match.points[2], 24_000);
+  assert.equal(settled.match.depositSticks, 1);
+  assert.equal(settled.match.points.reduce((sum, points) => sum + points, 0) + settled.match.depositSticks * 1000, 100_000);
+  const nextCpuTurn = await advanceOnlineCpu(settled, 6001);
+  assert.ok(nextCpuTurn.gameRevision > settled.gameRevision);
 });
 
 test('all ron candidates are collected, multiple ron resolves together, and only a passer becomes furiten', () => {

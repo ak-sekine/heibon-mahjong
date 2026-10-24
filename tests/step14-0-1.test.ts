@@ -740,17 +740,31 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.equal(guestDiscard.ok, true);
     await passVisibleDecisions(fixture, [host, guest]);
     let cpuProgressed = false;
+    let lastCpuProgressState = persistedGame(fixture);
     for (let step = 0; step < 12 && !cpuProgressed; step++) {
       await fixture.room.alarm();
       await passVisibleDecisions(fixture, [host, guest]);
       const state = persistedGame(fixture);
+      lastCpuProgressState = state;
       const match = state.match as Record<string, unknown>;
       const game = match.game as Record<string, unknown>;
       const players = game.players as Array<Record<string, unknown>>;
       cpuProgressed = Number(state.gameRevision) > beforeCpuRevision + 1 &&
         (Boolean((players[2].river as unknown[]).length) || state.status !== 'playing');
     }
-    assert.equal(cpuProgressed, true, 'the server did not advance a CPU turn after the human discard');
+    const failedGame = (lastCpuProgressState.match as Record<string, unknown>).game as Record<string, unknown>;
+    const failedPlayers = failedGame.players as Array<Record<string, unknown>>;
+    assert.equal(cpuProgressed, true, `the server did not advance a CPU turn after the human discard: ${JSON.stringify({
+      beforeCpuRevision,
+      gameRevision: lastCpuProgressState.gameRevision,
+      status: lastCpuProgressState.status,
+      decision: lastCpuProgressState.decision,
+      turnPlayerId: failedGame.turnPlayerId,
+      phase: failedGame.phase,
+      pendingRiichi: failedGame.pendingRiichi,
+      playerControls: failedPlayers.map(player => player.control),
+      player2RiverCount: (failedPlayers[2].river as unknown[]).length,
+    })}`);
 
     const roomBeforeLeave = await readState(fixture);
     const leave = sendAction(fixture, host, {

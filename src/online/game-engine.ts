@@ -3,8 +3,8 @@ import { getCallOptions, resolveCallResponses, type CallOption } from '../game/c
 import { drawOrStop } from '../game/draw.ts';
 import { discardTileForOnline, canDiscard } from '../game/discard.ts';
 import { declareKanForOnline, chooseCpuKan } from '../game/kan.ts';
-import { assertPointConservation, nextRound, startMatch, updateMatchGame } from '../game/match.ts';
-import { isClosedForRiichi, canDeclareRiichi } from '../game/riichi.ts';
+import { assertPointConservation, nextRound, settleRound, startMatch, updateMatchGame } from '../game/match.ts';
+import { isClosedForRiichi, canDeclareRiichi, resolvePendingRiichi } from '../game/riichi.ts';
 import { getRonCandidates, markRonPassed, resolveRonDeclarations } from '../game/ron.ts';
 import { isFourWindsDraw, canDeclareKyuushuKyuuhai, declareKyuushuKyuuhai } from '../game/special-draws.ts';
 import { canDeclareTsumo, declareTsumo } from '../game/tsumo.ts';
@@ -115,6 +115,13 @@ function setStatus(session: OnlineGameSession, match: MatchState): OnlineGameSes
   return 'playing';
 }
 
+function resolveOnlinePendingRiichi(session: OnlineGameSession): OnlineGameSession {
+  if (session.status !== 'playing' || session.decision || !session.match.game.pendingRiichi) return session;
+  const match = settleRound(resolvePendingRiichi(session.match));
+  if (match === session.match) return session;
+  return { ...session, match, status: setStatus(session, match) };
+}
+
 function openWindow(
   type: PlayerDecisionWindow['type'],
   seats: readonly PlayerId[],
@@ -197,9 +204,10 @@ function commitMatch(
   match: MatchState,
   now: number,
 ): OnlineGameSession {
+  const next = resolveOnlinePendingRiichi(advanceDecision(session, match, session.gameRevision + 1, now));
   return recordResolvedDeclarations(
     session,
-    advanceDecision(session, match, session.gameRevision + 1, now),
+    next,
     now,
   );
 }
@@ -237,7 +245,9 @@ function finishDecision(
     game = resolveCallResponses(game, selected);
   }
   const settled = updateMatchGame(match, game);
-  const next = advanceDecision({ ...session, decision: null }, settled, session.gameRevision + 1, now);
+  const next = resolveOnlinePendingRiichi(
+    advanceDecision({ ...session, decision: null }, settled, session.gameRevision + 1, now),
+  );
   return recordResolvedDeclarations(session, next, now);
 }
 
@@ -393,9 +403,6 @@ export function applyOnlineGameAction(
     default:
       throw new OnlineGameRuleError('invalid_action');
   }
-  if (updated.status === 'playing' && updated.game.pendingRiichi) {
-    updated = { ...updated, game: { ...updated.game, pendingRiichi: updated.game.pendingRiichi } };
-  }
   return commitMatch(session, updated, now);
 }
 
@@ -463,6 +470,11 @@ export async function advanceOnlineCpu(
   now = Date.now(),
 ): Promise<OnlineGameSession> {
   if (session.status !== 'playing' || session.decision) return session;
+  if (session.match.game.pendingRiichi) {
+    const match = settleRound(resolvePendingRiichi(session.match));
+    if (match === session.match) return session;
+    return commitMatch(session, match, now);
+  }
   const match = session.match;
   const game = match.game;
   if (game.phase === 'awaiting-draw') return commitMatch(session, updateMatchGame(match, drawOrStop(game)), now);
