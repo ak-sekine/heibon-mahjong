@@ -242,4 +242,11 @@ test('online guests can confirm while disconnected peers wait, and results remai
   assert.equal(waitingForServer.buttons['next-round'].visible, true);
   assert.equal(waitingForServer.buttons['next-round'].enabled, false);
   assert.equal(waitingForServer.buttons['next-round'].label, '次の局へ');
+  const rejected = createOnlineActionPanelState(
+    view, null, false, false, false, null,
+    '操作が受け付けられませんでした。最新状態を確認してください。',
+  );
+  assert.equal(rejected.buttons['next-round'].visible, true);
+  assert.equal(rejected.buttons['next-round'].enabled, true);
+  assert.match(rejected.actionStatus, /操作が受け付けられませんでした/);
 });
