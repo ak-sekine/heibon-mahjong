@@ -77,7 +77,8 @@ export function createOnlineActionPanelState(
 
   const resultAvailable = view.result !== null;
   const showResult = resultAvailable;
-  const nextRound = view.status === 'round-ended' && !view.self.nextRoundReady;
+  const nextRound = view.status === 'round-ended';
+  const nextRoundReady = view.self.nextRoundReady;
   const returnLocal = view.status === 'match-ended' || view.status === 'aborted';
 
   return {
@@ -94,7 +95,8 @@ export function createOnlineActionPanelState(
       'cancel-kan': button(kanChoicesOpen && ownTurn && kanChoices.length > 0,
         kanChoicesOpen && ownTurn && kanChoices.length > 0 && !actionPending, 'キャンセル'),
       'next-round': button(nextRound,
-        nextRound && !actionPending, '次の局へ'),
+        nextRound && !nextRoundReady && !actionPending,
+        nextRoundReady ? '他のプレイヤーを待っています…' : '次の局へ'),
       'show-result': button(showResult, showResult, '結果を見る'),
       'return-local': button(returnLocal, returnLocal, 'ローカル卓へ戻る'),
     },

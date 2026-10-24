@@ -230,8 +230,16 @@ test('online guests can confirm while disconnected peers wait, and results remai
   const view = onlineViewFor(initial.game, { status: 'round-ended', host: false });
   const before = createOnlineActionPanelState(view, null, false, false, false, null);
   assert.equal(before.buttons['next-round'].enabled, true);
+  assert.equal(before.buttons['next-round'].visible, true);
+  assert.equal(before.buttons['next-round'].label, '次の局へ');
   const after = createOnlineActionPanelState({ ...view, self: { ...view.self, nextRoundReady: true } }, null, false, false, false, null);
-  assert.equal(after.buttons['next-round'].visible, false);
+  assert.equal(after.buttons['next-round'].visible, true);
+  assert.equal(after.buttons['next-round'].enabled, false);
+  assert.equal(after.buttons['next-round'].label, '他のプレイヤーを待っています…');
   assert.equal(after.buttons['show-result'].enabled, true);
   assert.equal(after.actionStatus, '他のプレイヤーを待っています');
+  const waitingForServer = createOnlineActionPanelState(view, null, true, false, false, null);
+  assert.equal(waitingForServer.buttons['next-round'].visible, true);
+  assert.equal(waitingForServer.buttons['next-round'].enabled, false);
+  assert.equal(waitingForServer.buttons['next-round'].label, '次の局へ');
 });

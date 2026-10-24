@@ -1141,6 +1141,7 @@ with sync_playwright() as p:
     wait_for("document.querySelector('#online-show-result').hidden === false")
     page.set_viewport_size({'width': 390, 'height': 320})
     page.locator('#online-show-result').click()
+    page.set_viewport_size({'width': 320, 'height': 568})
     page.evaluate("""() => {
       const controller = window.onlineUiTest.onlineGameController;
       const original = structuredClone(controller.view);
@@ -1165,9 +1166,24 @@ with sync_playwright() as p:
         throw new Error('Own readiness rebuilt the result dialog');
       }
       observer.disconnect();
-      if (!document.querySelector('#online-next-round').hidden) throw new Error('Ready button remained visible');
+      const nextRound = document.querySelector('#online-next-round');
+      if (nextRound.hidden || !nextRound.disabled || nextRound.textContent !== '他のプレイヤーを待っています…') {
+        throw new Error('The ready state did not show a disabled waiting label');
+      }
+      const actionsBeforeDisabledClick = window.onlineMock.gameActions.length;
+      nextRound.click();
+      if (window.onlineMock.gameActions.length !== actionsBeforeDisabledClick) {
+        throw new Error('The disabled waiting label sent a game action');
+      }
+      const buttonBox = nextRound.getBoundingClientRect();
+      const resultBox = document.querySelector('#online-show-result').getBoundingClientRect();
+      if (buttonBox.width < resultBox.width - 1 || buttonBox.right > innerWidth + 1 || buttonBox.left < -1 ||
+          document.documentElement.scrollWidth > innerWidth) {
+        throw new Error('The waiting label button did not fit the mobile action row');
+      }
       window.readyOriginalView = original;
     }""")
+    page.set_viewport_size({'width': 390, 'height': 320})
     page.locator('#view-table').click()
     page.locator('#online-show-result').click()
     assert page.locator('#result-dialog').evaluate('element => element.open'), 'ready players could not reopen results'

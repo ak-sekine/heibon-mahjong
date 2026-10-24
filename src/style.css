@@ -111,6 +111,7 @@ header > div { min-width:0; }
 #online-start-game { min-height:44px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; cursor:pointer; touch-action:manipulation; }
 #online-start-game { padding:8px 12px; }
 #online-start-game:disabled { opacity:.55; cursor:default; }
+#online-next-round:disabled { white-space:normal; }
 @media (max-width:350px) {
   .action-status,.action-group-status { font-size:12px; }
 }
