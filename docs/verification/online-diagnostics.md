@@ -47,7 +47,20 @@ Worker独自ログは `worker/room.ts` の `logWorker` がフィールド許可�
 4. 新しい時間帯で `game_action_received`、`game_action_succeeded` / `game_action_failed` などを探す。操作の `requestId` で結果ログを照合する。
 5. 自動Invocation Logsが新規に作られず、上記の独自構造化ログは記録され、新規ログにticketや認証情報がないことを確認する。
 
-Cloudflare Dashboardへ接続できず、本番デプロイ後のログ確認は未実施。設定とローカル検証だけで実環境の記録を確認済みとはしていない。設定変更は将来のログに適用され、過去の保存済みログを消去しない。
+## 実環境での確認記録
+
+2026-10-24、対象コミット `089458331f4dbc52e8cd3693032fcdc49b4c1ac1` のデプロイ後、Cloudflare Workers本番環境の `heibon-mahjong-online` をDashboardの **Observability** で確認した。新しいWorkerデプロイ後に保存されたログを対象とし、すべてのログや過去の保存済みログを網羅した確認ではない。
+
+確認した範囲では、次の結果だった。
+
+- 保存された独自構造化ログを確認した。対象ログは `cf-worker` 形式で、自動Invocation Logsの `cf-worker-event` は含まれていなかった。
+- WebSocket認証ticket、Authorizationヘッダー、クライアントIPアドレスは、確認したログには含まれていなかった。
+- 操作の受信と結果を `requestId` で追跡できた。打牌、鳴き見送り、リーチ宣言の処理結果が記録され、確認範囲にエラーログはなかった。
+- リーチ宣言では、2026-10-24 19:58:07 JSTの操作で、開始時 `gameRevision` 74から `accepted` となり、終了時 `gameRevision` 75になったことを確認した。requestIdやログ原文は記録しない。
+
+この確認範囲で認証情報がログに含まれていなかったことをもって、実環境検証を完了とする。すべてのログに機密情報が存在しないことを保証するものではない。自動Invocation Logsは今回確認した範囲に含まれておらず、独自構造化ログの保存を確認した。本件のステータスは **実環境確認済み・完了**。
+
+設定変更は将来のログに適用され、過去の保存済みログを消去しない。
 
 ## 過去のログの保持・削除
 
@@ -65,7 +78,7 @@ Cloudflare公式の [Workers Logs資料](https://developers.cloudflare.com/worke
 - 独自ログの安全性: `worker/room.ts`、`worker/index.ts`、`src/online/diagnostics.ts`、オンライン通信・診断ログ呼び出しを確認。request/responseオブジェクト、例外文字列、認証情報、IP、非公開牌情報をログへ渡す実装は見つからなかった。内部例外の再throwもCloudflare側の追加例外記録を避けるため停止した。
 - `requestId`照合: Workerの操作受信/結果ログとブラウザー診断のrequestId保持を確認。テスト成功。
 - GitHub Actions run [40086380784](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40086380784)（commit `00ab5337672eab6583ba6d82021c7ea5d9b59e56`）: 全job成功。Worker deploy、HTTPS/WebSocket/再接続/認証/privacy本番テスト、Pages build/deployを確認。
-- Cloudflare DashboardのWorkers Logs、実環境での自動Invocation Logs停止と独自ログの表示: 未確認。production-testの成功はアプリ通信の検証であり、Workers Logs画面の確認とは区別する。
+- Cloudflare DashboardのObservabilityで、対象コミットの新しいデプロイ後に保存されたログを確認済み。独自構造化ログの保存、`cf-worker`形式、自動Invocation Logsの`cf-worker-event`が確認範囲に含まれないこと、requestIdによる操作追跡、確認した範囲で認証情報が含まれないことを確認した。範囲と限界は[実環境での確認記録](#実環境での確認記録)を参照。production-testの成功はアプリ通信の検証であり、Workers Logs画面の確認とは区別する。
 
 ## 関連資料
 
