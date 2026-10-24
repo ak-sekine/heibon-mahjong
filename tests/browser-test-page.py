@@ -15,6 +15,31 @@ with sync_playwright() as playwright:
     assert page.locator('.concealed-hand .revealed-tile').count() == 0
     assert page.locator('#kyuushu-kyuuhai').is_visible()
     expected_order = ['1萬', '2萬', '3萬', '4萬', '9萬', '1筒', '2筒', '3筒', '9筒', '1索', '9索', '東', '南', '西']
+
+    def assert_fixed_hand(selector, scenario, width):
+        layout = page.locator(selector).evaluate('''hand => {
+          const own = hand.id === 'player-hand';
+          const slots = [...hand.children];
+          const faces = own ? slots.map(slot => slot.querySelector('.revealed-tile')) : slots;
+          const style = getComputedStyle(hand);
+          const slotSizes = slots.map(slot => getComputedStyle(slot).width);
+          const faceSizes = faces.map(face => {
+            const tile = face.querySelector('.tile-svg');
+            const css = getComputedStyle(face);
+            return { width: css.width, height: css.height, flexShrink: css.flexShrink,
+              svgWidth: getComputedStyle(tile).width, svgHeight: getComputedStyle(tile).height };
+          });
+          return { count: faces.length, gap: style.columnGap, justifyContent: style.justifyContent,
+            flexDirection: style.flexDirection, width: style.width, clientWidth: hand.clientWidth,
+            scrollWidth: hand.scrollWidth, slotSizes, slotShrink: slots.map(slot => getComputedStyle(slot).flexShrink), faceSizes };
+        }''')
+        assert layout['count'] == 14, (scenario, width, layout)
+        assert layout['gap'] == '1px', (scenario, width, layout)
+        assert len(set(layout['slotSizes'])) == 1 and set(layout['slotShrink']) == {'0'}, (scenario, width, layout)
+        assert len({(face['width'], face['height'], face['svgWidth'], face['svgHeight']) for face in layout['faceSizes']}) == 1, (scenario, width, layout)
+        assert all(face['flexShrink'] == '0' for face in layout['faceSizes']), (scenario, width, layout)
+        assert layout['clientWidth'] == layout['scrollWidth'], (scenario, width, layout)
+
     page.locator('#repeat-scenario').click()
     assert page.locator('#player-hand button').count() == 14, 'repeat did not restore the same initial hand'
     page.locator('#kyuushu-kyuuhai').click()
@@ -26,6 +51,7 @@ with sync_playwright() as playwright:
     for width in [320, 375, 390, 430]:
         page.set_viewport_size({'width': width, 'height': 844})
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), ('kyuushu-self', width, 'horizontal overflow')
+        assert_fixed_hand('#player-hand', 'kyuushu-self', width)
     page.locator('#show-result').click()
     assert page.locator('#result-title').inner_text() == '途中流局（九種九牌）'
     assert page.locator('#match-result .winning-hand li').count() == 14
@@ -58,6 +84,7 @@ with sync_playwright() as playwright:
         for width in [320, 375, 390, 430]:
             page.set_viewport_size({'width': width, 'height': 844})
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (scenario, width, 'horizontal overflow')
+            assert_fixed_hand(f'.concealed-hand[data-player-id="{seat}"]', scenario, width)
             assert page.locator('.test-actions button').first.evaluate('(el) => el.getBoundingClientRect().height >= 44'), (scenario, width, 'small tap target')
         page.locator('#show-result').click()
         assert page.locator('#result-title').inner_text() == '途中流局（九種九牌）'
