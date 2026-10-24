@@ -274,11 +274,7 @@ with sync_playwright() as p:
           const html = document.querySelector('main').innerHTML;
           return { hidden: game.players.slice(1).flatMap(player => [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
             .map(tile => ({id: tile.id, exposed: html.includes(tile.id)}))),
-            faces: document.querySelectorAll('.concealed-hand .tile-svg').length,
-            backSizes: Object.fromEntries([1,2,3].map(id => {
-              const tile = document.querySelector(`.concealed-hand[data-player-id="${id}"] .tile-back`);
-              const r = tile.getBoundingClientRect(); return [id, {width:r.width,height:r.height}];
-            })) };
+            faces: document.querySelectorAll('.concealed-hand .tile-svg').length };
         }''')
         assert initial['faces'] == 0 and all(not tile['exposed'] for tile in initial['hidden']), initial
 
@@ -451,7 +447,7 @@ with sync_playwright() as p:
                         for tile_id in player['handIds'] + ([player['drawnId']] if player['drawnId'] else []):
                             assert tile_id not in page.locator('main').inner_html(), (width, scenario, player['id'], 'private tile ID leaked')
 
-                    geometry = page.evaluate('''baseline => {
+                    geometry = page.evaluate('''() => {
                       const rect = e => { const r=e.getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}; };
                       const overlaps = (a,b) => Math.min(a.right,b.right)>Math.max(a.left,b.left)+.05 && Math.min(a.bottom,b.bottom)>Math.max(a.top,b.top)+.05;
                       const table=rect(document.querySelector('.table'));
@@ -469,13 +465,20 @@ with sync_playwright() as p:
                         for(const meld of melds) if(overlaps(r,rect(meld))) violations.push({kind:'meld',rect:r,other:rect(meld)});
                         if(overlaps(r,center)) violations.push({kind:'center',rect:r,other:center});
                       }
-                      const sizes=faces.map(face=>{const r=rect(face),id=Number(face.closest('.concealed-hand').dataset.playerId),b=baseline[id];
-                        return Math.max(Math.abs(r.width-b.width),Math.abs(r.height-b.height));
+                      // A short viewport may scale the whole square table after
+                      // the initial deal. Compare current CSS dimensions against
+                      // another tile in the displayed table, before transforms.
+                      const reference=document.querySelector('.table .concealed-hand .tile-back')
+                        ?? document.querySelector('.table .river-tile .tile-svg');
+                      const dimensions=element=>{const style=getComputedStyle(element);return {width:parseFloat(style.width),height:parseFloat(style.height)};};
+                      const referenceSize=reference?dimensions(reference):null;
+                      const sizes=faces.map(face=>{const size=dimensions(face);return referenceSize
+                        ? Math.max(Math.abs(size.width-referenceSize.width),Math.abs(size.height-referenceSize.height)) : Infinity;
                       });
                       return {noHorizontalScroll:document.documentElement.scrollWidth<=innerWidth,
-                        tileSizeMatchesBack:sizes.every(delta=>delta<.2),violations,faces:faces.length};
-                    }''', initial['backSizes'])
-                    assert geometry['noHorizontalScroll'] and geometry['tileSizeMatchesBack'] and not geometry['violations'], (width, scenario, geometry)
+                        tileSizeMatchesDisplayedTable:sizes.every(delta=>delta<.2),violations,faces:faces.length};
+                    }''')
+                    assert geometry['noHorizontalScroll'] and geometry['tileSizeMatchesDisplayedTable'] and not geometry['violations'], (width, scenario, geometry)
                     assert geometry['faces'] == sum(player['handCount'] for player in meta['players'][1:] if meta['tenpai'][player['id']]), (width, scenario, geometry)
                 else:
                     assert summary_lines == [expected], (width, scenario, summary_lines)
