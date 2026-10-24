@@ -3,12 +3,14 @@ name: Deploy to GitHub Pages and Cloudflare Workers
 on:
   push:
     branches: [main]
-    # Test-only diagnostics have their own workflow and must not deploy the Worker.
+    # Test-only diagnostics and sync regressions must not deploy the Worker.
     paths-ignore:
       - '.github/workflows/deploy.yml'
       - '.github/workflows/production-diagnostics.yml'
       - 'docs/verification/production-timeout-diagnostics.md'
       - 'tests/online-production.mjs'
+      - 'tests/online-production-sync.mjs'
+      - 'tests/online-production-sync.test.ts'
   workflow_dispatch:
 
 permissions:
