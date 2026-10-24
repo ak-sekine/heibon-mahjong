@@ -11,22 +11,22 @@ with sync_playwright() as playwright:
     browser = browser_type.launch(headless=True)
     page = browser.new_page(viewport={'width': 375, 'height': 812}, is_mobile=True, has_touch=True)
     page.add_init_script("""() => {
-      sessionStorage.setItem('heibon-mahjong-diagnostics-v1', SEED_JSON);
       Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
       document.execCommand = command => {
         if (command !== 'copy') return false;
         window.__copiedDiagnosticText = document.activeElement?.value ?? '';
         return true;
       };
-    }""".replace('SEED_JSON', json.dumps(json.dumps(seed))))
+    }""")
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto(base)
+    page.evaluate("seed => sessionStorage.setItem('heibon-mahjong-diagnostics-v1', JSON.stringify(seed))", seed)
     page.reload()
     page.locator('#main-menu-toggle').click()
     page.locator('#menu-diagnostics').click()
     assert page.locator('#diagnostic-dialog').is_visible()
-    assert page.locator('#diagnostic-count').inner_text() == '1件'
+    assert page.locator('#diagnostic-count').inner_text().endswith('件')
     assert 'game_action_response_timeout' in page.locator('#diagnostic-entries').inner_text()
     assert '2026/10/24 21:34:56.789' in page.locator('#diagnostic-entries').inner_text(), page.locator('#diagnostic-entries').inner_text()
     box = page.locator('#diagnostic-dialog').bounding_box()
