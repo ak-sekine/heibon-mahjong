@@ -565,6 +565,16 @@ with sync_playwright() as p:
         except Exception as error:
             raise AssertionError(f'online browser UI wait timed out: {expression}') from error
 
+    def assert_no_private_cpu_tile_ids_in_main(message):
+        leaked_ids = page.evaluate('''() => {
+          const privateIds = window.onlineUiTest.controller.game.players.slice(1).flatMap(player => [
+            ...player.hand, ...(player.drawnTile ? [player.drawnTile] : []),
+          ]).map(tile => tile.id);
+          const html = document.querySelector('main').innerHTML;
+          return privateIds.filter(tileId => html.includes(tileId));
+        }''')
+        assert not leaked_ids, f'{message}: {leaked_ids}'
+
     def select_menu_item(selector):
         if page.locator('#main-menu-items').is_hidden():
             page.locator('#main-menu-toggle').click()
@@ -672,11 +682,8 @@ with sync_playwright() as p:
 
     page.wait_for_selector('#player-hand svg')
     wait_for('typeof window.onlineUiTest === "object"')
-    private_ids = page.evaluate('''() => window.onlineUiTest.controller.game.players.slice(1).flatMap(player => [
-      ...player.hand, ...(player.drawnTile ? [player.drawnTile] : []),
-    ]).map(tile => tile.id)''')
     assert page.locator('.table').is_visible() and page.locator('#player-hand svg').count() > 0, 'the existing mahjong table did not render'
-    assert all(tile_id not in page.locator('main').inner_html() for tile_id in private_ids), 'CPU private tile IDs leaked before opening the room'
+    assert_no_private_cpu_tile_ids_in_main('CPU private tile IDs leaked before opening the room')
 
     assert page.locator('#main-menu-toggle').is_visible(), 'the shared hamburger menu was not rendered'
     page.locator('#main-menu-toggle').click()
@@ -1001,7 +1008,7 @@ with sync_playwright() as p:
     page.locator('#online-copy-code').click()
     wait_for("window.onlineMock.copied === 'ABC234'")
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'online dialog causes horizontal overflow at 390px'
-    assert all(tile_id not in page.locator('main').inner_html() for tile_id in private_ids), 'CPU private tile IDs leaked while the waiting room was open'
+    assert_no_private_cpu_tile_ids_in_main('CPU private tile IDs leaked while the waiting room was open')
 
     page.locator('#online-start-game').click()
     wait_for("document.querySelector('#online-dialog').open === false && document.querySelector('#online-match').hidden === false")
@@ -1403,7 +1410,7 @@ with sync_playwright() as p:
     assert page.locator('#menu-room').is_hidden(), 'room operations remained in the menu after leaving'
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'exit notice causes horizontal overflow after leaving'
     assert page.locator('.table').is_visible() and page.locator('#player-hand svg').count() > 0, 'the existing mahjong table was changed by the waiting room flow'
-    assert all(tile_id not in page.locator('main').inner_html() for tile_id in private_ids), 'CPU private tile IDs leaked after leaving the room'
+    assert_no_private_cpu_tile_ids_in_main('CPU private tile IDs leaked after leaving the room')
 
     select_menu_item('#online-join-open')
     assert page.locator('#online-join-name').input_value() == 'テストホスト', 'the last display name was not shown when reopening the join form'
