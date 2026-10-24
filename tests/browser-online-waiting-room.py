@@ -780,7 +780,7 @@ with sync_playwright() as p:
           left: rect.left, right: rect.right, width: rect.width,
           dialogClientWidth: dialog.clientWidth, dialogScrollWidth: dialog.scrollWidth,
           formClientWidth: form.clientWidth, formScrollWidth: form.scrollWidth,
-          controls: [...form.querySelectorAll('input,button')].map(control => {
+          controls: [...form.querySelectorAll('.match-format-options label, #online-create-name, button')].map(control => {
             const box = control.getBoundingClientRect(); return {width: box.width, height: box.height};
           }),
         };
