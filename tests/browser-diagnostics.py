@@ -20,7 +20,7 @@ with sync_playwright() as playwright:
       Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
       document.execCommand = command => {
         if (command !== 'copy') return false;
-        window.__copiedDiagnosticText = document.activeElement?.value ?? '';
+        window.__copiedDiagnosticText = document.querySelector('textarea')?.value ?? '';
         return true;
       };
     })();""".replace('SEED_JSON', json.dumps(json.dumps(seed))))
