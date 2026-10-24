@@ -29,3 +29,14 @@
 - `npm test`（56件）、`npm run build`、`npm run typecheck:worker`、`git diff --check` が成功。
 - [Browser UI verification run 40076750925](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40076750925)：commit `087648e34ba7c021250259d2dcd35edd68efec29` で成功。ChromiumとWebKitの全ブラウザー回帰が成功し、和了手・流局テンパイ手牌を含む既存結果画面検証も通過。
 - Chromium／WebKitのブラウザー検証結果であり、iPhone Safari実機は未確認。
+
+## iPhone Safari 実機検証の追加報告（2026年10月24日）
+
+- 状態：**実機確認済み・完了**。
+- 確認者：ユーザー。
+- 環境：iPhone Safari。
+- 対象：コミット `05c73ae744bf1fc839c4a666177e6c8edae007dd` の九種九牌・公開手牌レイアウト修正。
+- 結果：問題なし（OK）。公開手牌の牌幅・牌間隔を修正した後、iPhoneで表示に問題がないとの報告を受けた。
+- 確認範囲：公開手牌のレイアウト表示。個別シナリオや表示項目ごとの確認は報告されていないため、全ケースの実機確認を示すものではない。
+- 検証方法の区別：自動テストの結果は「自動検証」、Chromium／WebKitの結果は上記ブラウザー検証の記録を参照。今回の結果は、それらとは別のiPhone Safari実機確認。
+- 上記の「実機は未確認」は、各ブラウザー検証記録時点の状態。今回の報告により、本件の現在の検証状態を実機確認済み・完了とする。
