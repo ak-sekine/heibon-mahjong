@@ -7,6 +7,7 @@ import type { Tile } from './tile.ts';
 export type PhysicalTile = Readonly<{ id: string; tile: Tile }>;
 export type PlayerId = 0 | 1 | 2 | 3;
 export type SeatWind = 'east' | 'south' | 'west' | 'north';
+export type RoundWind = 'east' | 'south';
 export interface RiichiState {
   readonly declarationTileId: string;
   /** Omitted legacy states mean false; never cleared by drawing. */
@@ -95,6 +96,8 @@ export interface PendingRiichi {
   readonly declarationTileId: string;
 }
 export interface GameState extends WallState {
+  /** Missing in legacy game states means east. */
+  readonly roundWind?: RoundWind;
   readonly abortiveDraw?: 'four-kans' | 'kyuushu-kyuuhai' | 'four-winds' | 'four-riichi';
   /** Set only when 九種九牌 is confirmed; identifies the hand made public. */
   readonly abortiveDrawPlayerId?: PlayerId;

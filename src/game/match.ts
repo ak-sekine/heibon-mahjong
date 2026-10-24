@@ -1,14 +1,14 @@
 import { winningMelds } from './melds.ts';
 import type { GameState, PlayerId } from '../model/game.ts';
-import type { MatchState, Points, RoundSettlement, SettlementPayment } from '../model/match.ts';
+import type { MatchState, MatchFormat, Points, RoundSettlement, SettlementPayment, RoundWind } from '../model/match.ts';
 import { calculateTsumoPayments } from '../analysis/score.ts';
 import { getWaitingTileKinds } from './ron.ts';
 import { resolvePendingRiichi } from './riichi.ts';
 import { startGame } from './start.ts';
 import { getNagashiManganWinners } from './special-draws.ts';
 const ids = [0, 1, 2, 3] as const;
-export function startMatch(game: GameState = startGame()): MatchState {
-  return settleRound({ roundWind: 'east', roundNumber: 1, dealerId: game.dealerId, honba: 0,
+export function startMatch(game: GameState = startGame(), format: MatchFormat = 'tonpu'): MatchState {
+  return settleRound({ format, roundWind: game.roundWind ?? 'east', roundNumber: 1, dealerId: game.dealerId, honba: 0,
     points: [25000,25000,25000,25000], depositSticks: 0, game, lastSettlement: null, status: 'playing' });
 }
 export function assertPointConservation(match: MatchState): void {
@@ -69,15 +69,20 @@ export function settleRound(match: MatchState): MatchState {
   const repeat = win ? winners.some(w=>w.winnerId===match.dealerId)
     : nagashiWinners.length ? nagashiWinners.includes(match.dealerId)
       : abortive || tenpai![match.dealerId];
-  const matchEnded = !repeat && match.roundNumber === 4;
-  const next = matchEnded ? null : { roundNumber: match.roundNumber + Number(!repeat),
+  const format: MatchFormat = match.format ?? 'tonpu';
+  const finalWind: RoundWind = format === 'tonnan' ? 'south' : 'east';
+  const matchEnded = !repeat && match.roundNumber === 4 && match.roundWind === finalWind;
+  const entersSouth = !repeat && match.roundNumber === 4 && match.roundWind === 'east' && format === 'tonnan';
+  const nextWind = entersSouth ? 'south' : match.roundWind;
+  const nextRoundNumber = entersSouth ? 1 : match.roundNumber + Number(!repeat);
+  const next = matchEnded ? null : { roundWind: nextWind, roundNumber: nextRoundNumber,
     dealerId: repeat ? match.dealerId : ((match.dealerId+1)%4) as PlayerId,
     honba: win ? (repeat ? match.honba+1 : 0)
       : nagashiWinners.length ? (repeat ? match.honba+1 : 0)
         : match.honba+1 };
   const freeze = <T extends object>(value: T): T => Object.freeze(value);
   const reason = win?.winMethod ?? (nagashiWinners.length ? 'nagashi-mangan' : match.game.abortiveDraw ?? 'draw');
-  const settlement: RoundSettlement = freeze({reason, roundNumber:match.roundNumber,
+  const settlement: RoundSettlement = freeze({format, reason, roundWind:match.roundWind, roundNumber:match.roundNumber,
     dealerId:match.dealerId,honba:match.honba,before:freeze([...match.points]) as Points,
     payments:freeze(payments.map(freeze)),deposits:deposits && freeze(deposits),tenpai:tenpai && freeze(tenpai),
     ...(nagashiWinners.length ? {nagashiManganWinners:freeze([...nagashiWinners])} : {}),
@@ -98,7 +103,8 @@ export function nextRound(match: MatchState, create: (dealerId: PlayerId)=>GameS
   const next = match.lastSettlement.next;
   const game = create(next.dealerId);
   if (game.dealerId !== next.dealerId) throw new RangeError('Wrong dealer for next round');
-  return {...match,...next,game,status:'playing',lastSettlement:null};
+  const gameWithWind = { ...game, roundWind: next.roundWind };
+  return {...match,...next,game:gameWithWind,status:'playing',lastSettlement:null};
 }
 export function rankPlayers(match: MatchState) {
   return ids.map(playerId=>({playerId,points:match.points[playerId]})).sort((a,b)=>b.points-a.points || a.playerId-b.playerId)

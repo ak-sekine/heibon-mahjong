@@ -125,7 +125,7 @@ async function consumeRateLimit(
   };
 }
 
-async function createRoom(env: Env, origin: string, displayName: string): Promise<Response> {
+async function createRoom(env: Env, origin: string, displayName: string, format: 'tonpu' | 'tonnan'): Promise<Response> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const code = randomRoomCode();
     const participantToken = randomToken();
@@ -133,16 +133,18 @@ async function createRoom(env: Env, origin: string, displayName: string): Promis
       code,
       displayName,
       participantToken,
+      format,
     }, { Origin: origin }));
     if (response.status === 409) continue;
     if (!response.ok) return json({ error: 'room_create_failed' }, 500, origin);
-    const room = await response.json() as { createdAt: number; expiresAt: number; seats: unknown[] };
+    const room = await response.json() as { createdAt: number; expiresAt: number; seats: unknown[]; format?: 'tonpu' | 'tonnan' };
     return json({
       roomCode: code,
       participantToken,
       playerSeat: 0,
       createdAt: room.createdAt,
       expiresAt: room.expiresAt,
+      format: room.format ?? format,
       seats: room.seats,
     }, 201, origin);
   }
@@ -161,7 +163,8 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
     const body = await parseJson(request);
     const displayName = cleanDisplayName(body?.displayName);
     if (!displayName) return json({ error: 'invalid_display_name' }, 400, origin);
-    return createRoom(env, origin, displayName);
+    const format = body?.format === 'tonnan' ? 'tonnan' : 'tonpu';
+    return createRoom(env, origin, displayName, format);
   }
 
   const match = path.match(/^\/api\/rooms\/([A-HJ-NP-Z2-9]{6})(?:\/(join|ticket|socket))?$/u);
@@ -188,7 +191,7 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
     if (!response.ok) return response;
     const room = await response.json() as {
       playerSeat: number; roomCode: string; status: string; hostSeat: number | null; revision: number;
-      createdAt: number; expiresAt: number; seats: unknown[];
+      createdAt: number; expiresAt: number; seats: unknown[]; format?: 'tonpu' | 'tonnan';
     };
     return json({
       roomCode: code,
@@ -196,6 +199,7 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
       playerSeat: room.playerSeat,
       createdAt: room.createdAt,
       expiresAt: room.expiresAt,
+      format: room.format ?? 'tonpu',
       seats: room.seats,
     }, 201, origin);
   }

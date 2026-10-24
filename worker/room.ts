@@ -39,6 +39,7 @@ const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/u;
 const SEAT_LABELS = ['東', '南', '西', '北'] as const;
 
 type RoomRow = {
+  format: 'tonpu' | 'tonnan';
   code: string;
   created_at: number;
   expires_at: number;
@@ -133,7 +134,8 @@ export class RoomDurableObject {
       expires_at INTEGER NOT NULL,
       status TEXT NOT NULL DEFAULT 'waiting',
       host_seat INTEGER,
-      revision INTEGER NOT NULL DEFAULT 0
+      revision INTEGER NOT NULL DEFAULT 0,
+      format TEXT NOT NULL DEFAULT 'tonpu'
     )`);
     this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS seats (
       seat INTEGER PRIMARY KEY,
@@ -155,6 +157,7 @@ export class RoomDurableObject {
     const addedHostSeat = this.ensureColumn('room', 'host_seat', 'INTEGER');
     this.ensureColumn('room', 'status', "TEXT NOT NULL DEFAULT 'waiting'");
     this.ensureColumn('room', 'revision', 'INTEGER NOT NULL DEFAULT 0');
+    this.ensureColumn('room', 'format', "TEXT NOT NULL DEFAULT 'tonpu'");
     this.ensureColumn('seats', 'kind', "TEXT NOT NULL DEFAULT 'human'");
     this.ensureColumn('seats', 'ready', 'INTEGER NOT NULL DEFAULT 0');
     this.ensureColumn('seats', 'connection_id', 'TEXT');
@@ -305,7 +308,7 @@ export class RoomDurableObject {
 
   private room(): RoomRow | undefined {
     return this.ctx.storage.sql.exec<RoomRow>(
-      'SELECT code, created_at, expires_at, status, host_seat, revision FROM room LIMIT 1',
+      'SELECT code, created_at, expires_at, status, host_seat, revision, format FROM room LIMIT 1',
     ).toArray()[0];
   }
 
@@ -340,6 +343,7 @@ export class RoomDurableObject {
     return {
       roomCode: room.code,
       status: room.status,
+      format: room.format === 'tonnan' ? 'tonnan' : 'tonpu',
       hostSeat: room.host_seat,
       revision: room.revision,
       createdAt: room.created_at,
@@ -475,7 +479,7 @@ export class RoomDurableObject {
       const body = await internalJson(request);
       const displayName = cleanDisplayName(body?.displayName);
       if (!body || !CODE_PATTERN.test(String(body.code ?? '')) || !displayName ||
-          !TOKEN_PATTERN.test(String(body.participantToken ?? ''))) {
+          !TOKEN_PATTERN.test(String(body.participantToken ?? '')) || !['tonpu','tonnan'].includes(String(body.format ?? 'tonpu'))) {
         return json({ error: 'invalid_room' }, 400, origin);
       }
       if (this.room()) return json({ error: 'room_exists' }, 409, origin);
@@ -485,8 +489,8 @@ export class RoomDurableObject {
       const created = this.ctx.storage.transactionSync(() => {
         if (this.room()) return false;
         this.ctx.storage.sql.exec(
-          "INSERT INTO room (code, created_at, expires_at, status, host_seat, revision) VALUES (?, ?, ?, 'waiting', 0, 0)",
-          body.code, now, expiresAt,
+          "INSERT INTO room (code, created_at, expires_at, status, host_seat, revision, format) VALUES (?, ?, ?, 'waiting', 0, 0, ?)",
+          body.code, now, expiresAt, body.format === 'tonnan' ? 'tonnan' : 'tonpu',
         );
         this.ctx.storage.sql.exec(
           'INSERT INTO seats (seat, name, token_hash, connected, kind, ready, connection_id) VALUES (0, ?, ?, 0, \'human\', 0, NULL)',
@@ -956,7 +960,7 @@ export class RoomDurableObject {
             if (identities.some(identity => identity.control === 'human' && !connected.has(identity.seat))) {
               throw new OnlineGameRuleError('player_disconnected');
             }
-            nextSession = startOnlineGame(identities, actor.seat as PlayerId);
+            nextSession = startOnlineGame(identities, actor.seat as PlayerId, undefined, room.format === 'tonnan' ? 'tonnan' : 'tonpu');
             started = true;
           } else {
             if (!previousSession) throw new OnlineGameRuleError('game_not_started');

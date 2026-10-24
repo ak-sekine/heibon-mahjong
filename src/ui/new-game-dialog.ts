@@ -2,11 +2,13 @@
 export class NewGameDialog {
   private readonly dialog = document.querySelector<HTMLDialogElement>('#new-game-dialog')!;
   private trigger: HTMLButtonElement | null = null;
-  constructor(start: () => void) {
+  constructor(start: (format: 'tonpu' | 'tonnan') => void) {
     for (const id of ['#new-game', '#result-new-game']) {
       const button = document.querySelector<HTMLButtonElement>(id)!;
       button.addEventListener('click', () => {
         if (this.dialog.open) return;
+        const defaultFormat = document.querySelector<HTMLInputElement>('input[name="offline-match-format"][value="tonpu"]');
+        if (defaultFormat) defaultFormat.checked = true;
         // The header action now lives in a menu that becomes hidden as soon as
         // it is selected, so restore focus to the menu button after dismissal.
         this.trigger = id === '#new-game'
@@ -27,7 +29,8 @@ export class NewGameDialog {
       const focusTarget = document.querySelector<HTMLButtonElement>('#main-menu-toggle') ?? this.trigger;
       this.trigger = null;
       this.dialog.close();
-      start();
+      const format = document.querySelector<HTMLInputElement>('input[name="offline-match-format"]:checked')?.value === 'tonnan' ? 'tonnan' : 'tonpu';
+      start(format);
       focusTarget?.focus({ preventScroll: true });
     });
   }

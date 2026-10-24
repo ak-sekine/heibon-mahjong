@@ -62,8 +62,10 @@ export type TableRoundView = Readonly<{
   deadWallCount?: number;
 }>;
 
-export function renderRoundLabel(roundLabel: HTMLElement, view: Pick<TableRoundView, 'roundNumber' | 'honba'>): void {
-  roundLabel.textContent = `東${view.roundNumber}局${view.honba > 0 ? ` ${view.honba}本場` : ''}`;
+export function renderRoundLabel(roundLabel: HTMLElement, view: Pick<TableRoundView, 'roundNumber' | 'honba'> & { roundWind?: 'east' | 'south'; format?: 'tonpu' | 'tonnan' }): void {
+  const wind = view.roundWind === 'south' ? '南' : '東';
+  const format = view.format === 'tonnan' ? '半荘戦' : '東風戦';
+  roundLabel.textContent = `${format}・${wind}${view.roundNumber}局${view.honba > 0 ? ` ${view.honba}本場` : ''}`;
 }
 
 export function renderWallCount(wallCount: HTMLElement, view: Pick<TableRoundView, 'liveWallCount' | 'deadWallCount'>): void {

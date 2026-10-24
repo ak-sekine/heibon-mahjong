@@ -146,6 +146,11 @@ header > div { min-width:0; }
 #new-game-dialog::backdrop { background:rgb(0 0 0 / 60%); }
 #new-game-question { margin:0 0 20px; }
 .new-game-actions { display:flex; justify-content:space-between; gap:12px; }
+.match-format-options { display:grid; gap:6px; margin:0 0 16px; padding:10px; border:1px solid #63947a; border-radius:8px; }
+.match-format-options legend { padding:0 4px; font-weight:700; }
+.match-format-options label { display:flex; align-items:center; gap:10px; min-height:44px; font-weight:600; touch-action:manipulation; }
+.match-format-options input[type="radio"],.online-entry-form .match-format-options input[type="radio"] { flex:none; width:22px; min-width:22px; min-height:22px; height:22px; margin:0; padding:0; accent-color:#ffda7d; }
+.online-entry-form .match-format-options { margin:0; }
 #new-game-dialog button { min-height:44px; padding:8px; border:1px solid #9dc5b2; border-radius:8px; font:inherit; font-weight:600; white-space:nowrap; background:#103e30; color:#fffdf7; touch-action:manipulation; cursor:pointer; }
 #new-game-dialog #confirm-new-game { background:#ffda7d; color:#154e3c; }
 #diagnostic-dialog { position:fixed; inset:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); box-sizing:border-box; width:min(720px,calc(100vw - 24px)); max-width:calc(100vw - 24px); max-height:calc(100dvh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom))); margin:auto; padding:12px; border:2px solid #ffda7d; border-radius:12px; background:#185640; color:#fffdf7; overflow:hidden; }

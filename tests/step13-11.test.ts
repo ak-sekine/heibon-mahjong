@@ -260,7 +260,7 @@ test('天和の本場・供託を既存精算で受け取り、親連荘と冪�
     [1,16000,200,16200], [2,16000,200,16200], [3,16000,200,16200],
   ]);
   assert.deepEqual(settlement.deposits, { recipientId:0, points:1000 });
-  assert.deepEqual(settlement.next, { roundNumber:1, dealerId:0, honba:3 });
+  assert.deepEqual(settlement.next, { roundWind:'east', roundNumber:1, dealerId:0, honba:3 });
   assert.equal(settlement.matchEnded, false);
   assert.equal(settled.depositSticks, 0);
   assert.equal(settled.points[0] - match.points[0], 49600);
@@ -277,7 +277,7 @@ test('地和＋国士無双は2役満の子支払いで親交代し、東4局の
   assert.deepEqual(settled.lastSettlement!.payments.map(payment => [payment.payerId,payment.points]), [
     [0,32000], [2,16000], [3,16000],
   ]);
-  assert.deepEqual(settled.lastSettlement!.next, { roundNumber:2, dealerId:1, honba:0 });
+  assert.deepEqual(settled.lastSettlement!.next, { roundWind:'east', roundNumber:2, dealerId:1, honba:0 });
   assertPointConservation(settled);
 
   const eastFour = updateMatchGame(matchFor(game, [25000,25000,25000,25000], 0, 0, 4), declareTsumo(game, 1));
@@ -302,7 +302,7 @@ test('親の東4局天和は連荘して次局へ進み、3役満の実手も候
   const eastFourGame = tenhouGame(0);
   const eastFour = updateMatchGame(matchFor(eastFourGame, [25000,25000,25000,25000], 0, 0, 4), declareTsumo(eastFourGame, 0));
   assert.equal(eastFour.status, 'round-ended');
-  assert.deepEqual(eastFour.lastSettlement!.next, { roundNumber:4, dealerId:0, honba:1 });
+  assert.deepEqual(eastFour.lastSettlement!.next, { roundWind:'east', roundNumber:4, dealerId:0, honba:1 });
   assertPointConservation(eastFour);
 });
 

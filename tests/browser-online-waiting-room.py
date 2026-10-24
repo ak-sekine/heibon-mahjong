@@ -16,7 +16,7 @@ MOCK = r"""
   const code = 'ABC234';
   const empty = seat => ({ seat, kind: 'empty', name: null, connected: false, ready: false, isHost: false });
   const state = {
-    roomCode: code, status: 'waiting', hostSeat: 0, revision: 0,
+    roomCode: code, status: 'waiting', hostSeat: 0, revision: 0, format: 'tonpu',
     createdAt: Date.now(), expiresAt: Date.now() + 86400000,
     seats: [
       { seat: 0, kind: 'human', name: 'テストホスト', connected: false, ready: false, isHost: true },
@@ -64,9 +64,9 @@ MOCK = r"""
     }));
     const callTiles = [hands[viewerSeat][0], hands[viewerSeat][1], makeTile('online-called', 8)];
     return {
-      type: 'game-state', roomCode: code, gameRevision, viewerSeat, status: gameStatus,
+      type: 'game-state', format: state.format, roomCode: code, gameRevision, viewerSeat, status: gameStatus,
       declarations: JSON.parse(JSON.stringify(declarations)),
-      round: { roundNumber, dealerId: 0, honba: roundResult?.honba ?? 0, points: roundResult?.after ?? [25000, 25000, 25000, 25000], depositSticks: roundResult?.reason === 'draw' ? 1 : 0 },
+      round: { format: state.format, roundWind: 'east', roundNumber, dealerId: 0, honba: roundResult?.honba ?? 0, points: roundResult?.after ?? [25000, 25000, 25000, 25000], depositSticks: roundResult?.reason === 'draw' ? 1 : 0 },
       phase, turnPlayerId, liveWallCount: 90 - gameRevision, seats: viewSeats,
       doraIndicators: [makeTile('online-dora', 4)],
       ...(roundResult?.winners?.length ? { uraDoraIndicators: [makeTile('online-ura-dora', 5)] } : {}),
@@ -495,12 +495,14 @@ MOCK = r"""
     requests.push({ path: requestUrl.pathname, body: init.body ? JSON.parse(init.body) : null });
     let value;
     if (requestUrl.pathname === '/api/rooms' && init.method === 'POST') {
-      value = { roomCode: code, participantToken: hostToken, playerSeat: 0, createdAt: state.createdAt, expiresAt: state.expiresAt, seats: state.seats };
+      state.format = JSON.parse(init.body).format ?? 'tonpu';
+      value = { roomCode: code, participantToken: hostToken, playerSeat: 0, createdAt: state.createdAt, expiresAt: state.expiresAt, format: state.format, seats: state.seats };
     } else if (requestUrl.pathname === `/api/rooms/${code}/ticket`) {
       tickets++;
       value = { ticket: 'c'.repeat(64), expiresAt: Date.now() + 60000 };
     } else if (requestUrl.pathname === `/api/rooms/${code}/join`) {
       const displayName = JSON.parse(init.body).displayName;
+      state.format = 'tonpu';
       state.status = 'waiting';
       state.hostSeat = 0;
       state.revision = 0;
@@ -523,7 +525,7 @@ MOCK = r"""
       drawnTiles = [makeTile('rejoined-0-draw', 7), null, null, null];
       gameRevision = 0;
       nextSocketSeat = 1;
-      value = { roomCode: code, participantToken: guestToken, playerSeat: 1, createdAt: state.createdAt, expiresAt: state.expiresAt, seats: state.seats };
+      value = { roomCode: code, participantToken: guestToken, playerSeat: 1, createdAt: state.createdAt, expiresAt: state.expiresAt, format: state.format, seats: state.seats };
     } else {
       value = { error: 'not_found' };
       return new Response(JSON.stringify(value), { status: 404, headers: { 'Content-Type': 'application/json' } });
@@ -709,8 +711,31 @@ with sync_playwright() as p:
     assert page.locator('#main-menu-items').is_hidden(), 'clicking outside did not close the menu'
     select_menu_item('#new-game')
     assert page.locator('#new-game-dialog').evaluate('element => element.open'), 'new-game menu item did not open the existing confirmation'
+    assert page.locator('input[name="offline-match-format"][value="tonpu"]').is_checked(), 'offline match format did not default to tonpu'
+    format_layouts = []
+    for width in [320, 375, 390, 430]:
+      page.set_viewport_size({'width': width, 'height': 812})
+      layout = page.evaluate('''() => {
+        const dialog = document.querySelector('#new-game-dialog');
+        const options = dialog.querySelector('.match-format-options').getBoundingClientRect();
+        const labels = [...dialog.querySelectorAll('.match-format-options label')].map(label => {
+          const box = label.getBoundingClientRect();
+          return {height: box.height, fits: box.left >= 0 && box.right <= innerWidth};
+        });
+        return {noHorizontalScroll: document.documentElement.scrollWidth <= innerWidth && dialog.scrollWidth <= dialog.clientWidth,
+          optionsVisible: options.width > 0 && options.bottom <= innerHeight, labels};
+      }''')
+      assert layout['noHorizontalScroll'] and layout['optionsVisible'] and all(label['fits'] and label['height'] >= 44 for label in layout['labels']), f'offline format chooser layout failed at {width}px: {layout}'
+      format_layouts.append({'width': width, **layout})
+    page.locator('input[name="offline-match-format"][value="tonnan"]').check()
+    assert page.locator('input[name="offline-match-format"][value="tonnan"]').is_checked(), 'offline match format selection did not respond'
     page.locator('#cancel-new-game').click()
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'dismissing the new-game dialog did not restore focus to the visible menu button'
+    select_menu_item('#new-game')
+    assert page.locator('input[name="offline-match-format"][value="tonpu"]').is_checked(), 'offline dialog did not restore the tonpu default on reopening'
+    page.locator('input[name="offline-match-format"][value="tonnan"]').check()
+    page.locator('#confirm-new-game').click()
+    assert page.evaluate('window.onlineUiTest.controller.match.format') == 'tonnan', 'offline selection was not stored in match state'
 
     assert page.locator('#online-create-name').count() == 1 and page.locator('#online-join-name').count() == 1, 'create and join must have separate display-name fields'
     assert page.evaluate('''() => { const ids = [...document.querySelectorAll('[id]')].map(node => node.id); return new Set(ids).size === ids.length; }'''), 'the UI contains duplicate DOM IDs'
@@ -848,11 +873,15 @@ with sync_playwright() as p:
     assert page.evaluate('window.onlineMock.requests.length') == before_empty_submit, 'an empty display name was sent to the server'
     page.locator('#online-create-name').fill('テストホスト')
     assert page.locator('#online-create').is_enabled(), 'room creation remained disabled after restoring a valid display name'
+    assert page.locator('input[name="online-match-format"][value="tonpu"]').is_checked(), 'online match format did not default to tonpu'
+    page.locator('input[name="online-match-format"][value="tonnan"]').check()
     page.locator('#online-create').click()
     wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234'")
     assert not page.locator('#online-create-dialog').evaluate('element => element.open'), 'room creation form remained open after success'
     assert not page.locator('#online-join-dialog').evaluate('element => element.open'), 'join form opened after room creation'
     assert page.locator('#online-dialog #online-create-form, #online-dialog #online-join-form').count() == 0, 'input forms were mixed into the room management screen'
+    assert page.evaluate("window.onlineMock.requests[0].body.format === 'tonnan'"), 'host match format was not sent to the server'
+    assert page.locator('#online-room-format').inner_text() == '対局形式：半荘戦', 'selected format was not shown in the waiting room'
     assert page.locator('#online-status').is_hidden(), 'room creation still displays a redundant permanent success message'
     assert page.evaluate("window.onlineMock.requests[0].body.displayName === 'テストホスト'"), 'room creation did not send the common display name'
     assert page.locator('#menu-room').evaluate('element => !element.hidden'), 'room operations were not added to the menu for an online participant'
@@ -1414,7 +1443,7 @@ with sync_playwright() as p:
     assert page.evaluate("localStorage.getItem('heibon-mahjong-online-session') === null"), 'online participant session was moved to localStorage'
     assert not errors, errors
 
-    report = {'step': '14.6', 'viewports': [[320,700],[375,812],[390,844],[430,932],[1280,900]], 'createFormViewports': create_form_layouts, 'joinFormViewports': join_form_layouts, 'scenario': 'separate create/join forms, close-button initial focus, Tab navigation, manual name/code input, shared display name, short-viewport scrolling, input-gated actions, session-safe menu actions, compact hamburger menu, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, surviving host notice after CPU takeover, last-human room close and exit notice', 'result': 'pass'}
+    report = {'step': '14.6', 'viewports': [[320,700],[375,812],[390,844],[430,932],[1280,900]], 'formatChooserViewports': format_layouts, 'createFormViewports': create_form_layouts, 'joinFormViewports': join_form_layouts, 'scenario': 'separate create/join forms, close-button initial focus, Tab navigation, manual name/code input, shared display name, host format propagation and waiting-room visibility, offline format selection at 320/375/390/430px, short-viewport scrolling, input-gated actions, session-safe menu actions, compact hamburger menu, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, surviving host notice after CPU takeover, last-human room close and exit notice', 'result': 'pass'}
     print(json.dumps(report, ensure_ascii=False), flush=True)
     (OUT / 'step14-6-online-room-ui.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     page.close()

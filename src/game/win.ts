@@ -8,7 +8,7 @@ import { countDora, countRedDora } from '../analysis/dora.ts';
 import { exposedDoraIndicators, uraDoraIndicators } from './dora.ts';
 import { isChiihouState, isTenhouState } from './first-turn-wins.ts';
 
-/** East-only match: the round wind stays east throughout all four rounds. */
+/** Default round wind for legacy game states without an explicit wind. */
 export const ROUND_WIND: SeatWind = 'east';
 
 /** Prefer yakuman, then supported han; ties use stable candidate IDs. No scoring. */
@@ -41,7 +41,7 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
       chankan: winMethod==='ron' && Boolean(ronWindow?.kan),
       haitei: winMethod==='tsumo' && player.drawnTileSource==='live-wall' && game.liveWall.length===0,
       houtei,
-      seatWind: player.wind, roundWind: ROUND_WIND, riichi: player.riichi !== null,
+      seatWind: player.wind, roundWind: game.roundWind ?? ROUND_WIND, riichi: player.riichi !== null,
       ippatsuEligible: player.riichi?.ippatsuEligible, doubleRiichi: player.riichi?.doubleRiichi });
     if (!analysis.isWinningShape || !analysis.hasSupportedYaku) return null;
     const doraCount = countDora(allFaces, exposedDoraIndicators(game).map(t => t.tile));
@@ -52,7 +52,7 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
       const uraDoraHan = candidate.yakumanCount > 0 ? 0 : uraDoraCount;
       const redDoraHan = candidate.yakumanCount > 0 ? 0 : redDoraCount;
       const totalHanIncludingDora = candidate.yakumanCount > 0 ? 0 : candidate.totalHan + doraHan + uraDoraHan + redDoraHan;
-      const fu = calculateFu(candidate, { isClosed, openMelds, winMethod, seatWind: player.wind, roundWind: ROUND_WIND });
+      const fu = calculateFu(candidate, { isClosed, openMelds, winMethod, seatWind: player.wind, roundWind: game.roundWind ?? ROUND_WIND });
       const score = calculateScore({ totalHanIncludingDora, fu: fu.fu, yakumanCount: candidate.yakumanCount,
         winnerId: playerId, dealerId: game.dealerId, winMethod,
         discarderId: winMethod === 'ron' ? game.ronWindow?.discarderId : undefined });

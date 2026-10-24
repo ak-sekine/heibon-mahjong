@@ -64,9 +64,9 @@ function render(): void {
   resultDialog.update(controller.match);
 }
 export function resetLocalActionChoices(): void { localKanChoicesOpen = false; }
-function newGame(): void {
+function newGame(format: 'tonpu' | 'tonnan' = 'tonpu'): void {
   localDeclarationBubbles.clearAll();
-  controller.newGame();
+  controller.newGame(format);
   window.scrollTo(0, 0);
 }
 new NewGameDialog(newGame);

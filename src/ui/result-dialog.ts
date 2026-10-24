@@ -43,7 +43,7 @@ export class ResultDialog {
       'four-winds': '四風連打',
       'four-riichi': '四家立直',
     } as const;
-    this.title.textContent = match.status === 'match-ended' ? '東風戦終了'
+    this.title.textContent = match.status === 'match-ended' ? `${match.format === 'tonnan' ? '半荘戦' : '東風戦'}終了`
       : result.reason === 'nagashi-mangan' ? '流し満貫'
         : result.reason in abortiveNames ? `途中流局（${abortiveNames[result.reason as keyof typeof abortiveNames]}）`
           : result.reason === 'draw' ? '荒牌流局'

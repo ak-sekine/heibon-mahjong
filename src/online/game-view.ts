@@ -1,7 +1,7 @@
 import type { FuEntry } from '../analysis/fu.ts';
 import type { ScoreTier } from '../analysis/score.ts';
 import type { GameState, OpenMeld, PhysicalTile, PlayerId, PlayerState, WinDetails } from '../model/game.ts';
-import type { MatchState, RoundSettlement } from '../model/match.ts';
+import type { MatchState, MatchFormat, RoundSettlement, RoundWind } from '../model/match.ts';
 import type { Tile } from '../model/tile.ts';
 import type { PublicDeclarationEvent } from '../model/declaration.ts';
 import { exposedDoraIndicators, uraDoraIndicators } from '../game/dora.ts';
@@ -53,6 +53,8 @@ export type PublicRoundResult = Readonly<{
   reason: RoundSettlement['reason'];
   /** Present only for a server-confirmed 九種九牌 declaration. */
   abortiveDrawPlayerId?: PlayerId;
+  format: MatchFormat;
+  roundWind: RoundWind;
   roundNumber: number;
   dealerId: PlayerId;
   honba: number;
@@ -70,6 +72,7 @@ export type PublicRoundResult = Readonly<{
 
 export type PlayerGameView = Readonly<{
   type: 'game-state';
+  format: MatchFormat;
   roomCode: string;
   gameRevision: number;
   /** Public declarations are retained so clients can catch up between snapshots. */
@@ -78,6 +81,8 @@ export type PlayerGameView = Readonly<{
   status: 'playing' | 'round-ended' | 'match-ended' | 'aborted';
   abortReason?: 'participant-left';
   round: Readonly<{
+    format: MatchFormat;
+    roundWind: RoundWind;
     roundNumber: number;
     dealerId: PlayerId;
     honba: number;
@@ -228,6 +233,8 @@ function publicResult(match: MatchState): PublicRoundResult | null {
       game.players[win.winnerId].hand.find(tile => tile.id === win.winningTileId)!)];
   return {
     reason: settlement.reason,
+    format: settlement.format ?? 'tonpu',
+    roundWind: settlement.roundWind ?? 'east',
     roundNumber: settlement.roundNumber,
     dealerId: settlement.dealerId,
     honba: settlement.honba,
@@ -314,6 +321,7 @@ export function createPlayerGameView(
 
   return {
     type: 'game-state',
+    format: match.format ?? 'tonpu',
     roomCode,
     gameRevision: session.gameRevision,
     declarations: session.declarations ?? [],
@@ -321,6 +329,8 @@ export function createPlayerGameView(
     status: session.status,
     ...(session.abortReason ? { abortReason: session.abortReason } : {}),
     round: {
+      format: match.format ?? 'tonpu',
+      roundWind: match.roundWind ?? 'east',
       roundNumber: match.roundNumber,
       dealerId: match.dealerId,
       honba: match.honba,

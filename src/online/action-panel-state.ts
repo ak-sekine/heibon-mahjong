@@ -65,7 +65,7 @@ export function createOnlineActionPanelState(
   else if (decision) actionStatus = decisionStatus;
   else if (view.status === 'round-ended') actionStatus = view.self.nextRoundReady
     ? '他のプレイヤーを待っています' : '局が終了しました。結果を確認してください。';
-  else if (view.status === 'match-ended') actionStatus = '東風戦が終了しました。最終結果を確認できます。';
+  else if (view.status === 'match-ended') actionStatus = `${view.format === 'tonnan' ? '半荘戦' : '東風戦'}が終了しました。最終結果を確認できます。`;
   else if (view.status === 'aborted') actionStatus = view.abortReason === 'participant-left'
     ? '参加者が明示的に退出したため、対局を中断しました。'
     : 'この対局は中断されました。';

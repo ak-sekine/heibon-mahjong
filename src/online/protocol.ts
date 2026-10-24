@@ -1,4 +1,5 @@
 /** Shared contract for the online waiting room and its server-owned game. */
+import type { MatchFormat } from '../model/match.ts';
 import type { PlayerId } from '../model/game.ts';
 import type { PlayerGameView, PublicRoundResult } from './game-view.ts';
 
@@ -19,6 +20,7 @@ export type OnlineRoomSeat = {
 export type OnlineRoomState = {
   roomCode: string;
   status: RoomStatus;
+  format: MatchFormat;
   hostSeat: number | null;
   revision: number;
   createdAt: number;

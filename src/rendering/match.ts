@@ -17,7 +17,7 @@ function tileOrder(tile: Tile): number {
 }
 export function renderMatch(match: MatchState): void {
   const round=document.querySelector<HTMLElement>('#table-round');
-  if(round) renderRoundLabel(round, { roundNumber: match.roundNumber, honba: match.honba });
+  if(round) renderRoundLabel(round, { format: match.format ?? 'tonpu', roundWind: match.roundWind, roundNumber: match.roundNumber, honba: match.honba });
   const deposits = document.querySelector<HTMLElement>('#deposit-sticks');
   if (deposits) renderDepositSticks(deposits, match.depositSticks);
   const panel = document.querySelector<HTMLElement>('#match-result')!;
@@ -32,7 +32,7 @@ export function renderMatch(match: MatchState): void {
     : result.reason === 'nagashi-mangan' ? '流し満貫'
       : result.reason in abortiveNames ? `途中流局（${abortiveNames[result.reason as keyof typeof abortiveNames]}）`
         : result.reason === 'ron' ? 'ロン和了' : 'ツモ和了';
-  panel.append(text('h2',`東${result.roundNumber}局 ${result.honba}本場 ${title}`));
+  panel.append(text('h2',`${result.roundWind === 'south' ? '南' : '東'}${result.roundNumber}局 ${result.honba}本場 ${title}`));
   if (result.reason === 'nagashi-mangan') {
     const winners = result.nagashiManganWinners ?? [];
     panel.append(text('p',`成立者：${winners.map(id=>names[id]).join('・')}`));
@@ -77,9 +77,9 @@ export function renderMatch(match: MatchState): void {
     const repeated = (result.nagashiManganWinners ?? []).includes(result.dealerId);
     panel.append(text('p', repeated ? '親：連荘' : '親：交代'));
   } else if (result.reason in abortiveNames) panel.append(text('p','親：連荘 · 本場＋1'));
-  if (result.next) panel.append(text('p',`次局：東${result.next.roundNumber}局 ${result.next.honba}本場 · 親：${names[result.next.dealerId]}`));
+  if (result.next) panel.append(text('p',`次局：${result.next.roundWind === 'south' ? '南' : '東'}${result.next.roundNumber}局 ${result.next.honba}本場 · 親：${names[result.next.dealerId]}`));
   if (result.matchEnded) {
-    panel.append(text('h2','東風戦終了'));
+    panel.append(text('h2', `${match.format === 'tonnan' ? '半荘戦' : '東風戦'}終了`));
     const ranking = document.createElement('ol');
     for (const player of rankPlayers(match)) ranking.append(text('li',`${player.rank}位 ${names[player.playerId]} ${player.points.toLocaleString('ja-JP')}点`));
     panel.append(ranking);

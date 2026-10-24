@@ -98,7 +98,7 @@ test('流し満貫 settles child and dealer payments, honba, deposits and dealer
   ]);
   assert.deepEqual(childResult.deposits, { recipientId:1, points:2000 });
   assert.equal(child.depositSticks, 0);
-  assert.deepEqual(childResult.next, { roundNumber:2, dealerId:1, honba:0 });
+  assert.deepEqual(childResult.next, { roundWind:'east', roundNumber:2, dealerId:1, honba:0 });
   assert.equal(childResult.matchEnded, false);
   assertPointConservation(child);
   assert.equal(settleRound(child), child, 'settlement is idempotent');
@@ -109,7 +109,7 @@ test('流し満貫 settles child and dealer payments, honba, deposits and dealer
   assert.deepEqual(dealer.lastSettlement!.payments.map(p => [p.payerId,p.recipientId,p.basePoints,p.honbaPoints,p.points]), [
     [1,0,4000,100,4100], [2,0,4000,100,4100], [3,0,4000,100,4100],
   ]);
-  assert.deepEqual(dealer.lastSettlement!.next, { roundNumber:1, dealerId:0, honba:2 });
+  assert.deepEqual(dealer.lastSettlement!.next, { roundWind:'east', roundNumber:1, dealerId:0, honba:2 });
   assertPointConservation(dealer);
   assert.deepEqual(calculateTsumoPayments(2000, 1, 0), [{ playerId:0, points:4000 }, { playerId:2, points:2000 }, { playerId:3, points:2000 }]);
 });
@@ -125,7 +125,7 @@ test('複数人の流し満貫は相互支払いを相殺し、供託は親か�
   assert.ok(result.payments.some(payment => payment.payerId === 1 && payment.recipientId === 2));
   assert.ok(result.payments.some(payment => payment.payerId === 2 && payment.recipientId === 1));
   assert.deepEqual(result.deposits, { recipientId:1, points:2000 });
-  assert.deepEqual(result.next, { roundNumber:2, dealerId:1, honba:0 });
+  assert.deepEqual(result.next, { roundWind:'east', roundNumber:2, dealerId:1, honba:0 });
   assert.equal(result.after.reduce((sum,points)=>sum+points,0) + settled.depositSticks * 1000, 100000);
   assertPointConservation(settled);
   const next = nextRound(settled);
@@ -249,7 +249,7 @@ test('四風連打: each of the four winds aborts after exactly four first disca
     assert.equal(match.lastSettlement?.tenpai,null);
     assert.equal(match.lastSettlement?.payments.length,0);
     assert.deepEqual(match.lastSettlement?.before,match.lastSettlement?.after);
-    assert.deepEqual(match.lastSettlement?.next,{roundNumber:1,dealerId:game.dealerId,honba:1});
+    assert.deepEqual(match.lastSettlement?.next,{roundWind:'east',roundNumber:1,dealerId:game.dealerId,honba:1});
     assertPointConservation(match);
   }
 });

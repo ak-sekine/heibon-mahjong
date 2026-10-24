@@ -18,7 +18,7 @@ type RoomSession = {
   displayName: string;
   expiresAt: number;
 };
-type ApiRoomResponse = RoomSession & { seats: RoomSeat[]; createdAt?: number };
+type ApiRoomResponse = RoomSession & { seats: RoomSeat[]; createdAt?: number; format?: 'tonpu' | 'tonnan' };
 type PendingAction = {
   requestId: string;
   expectedRevision: number;
@@ -112,6 +112,7 @@ export class OnlineWaitingRoom {
   private readonly seats = document.querySelector<HTMLOListElement>('#online-seats')!;
   private readonly codeOutput = document.querySelector<HTMLElement>('#online-room-code')!;
   private readonly expiryOutput = document.querySelector<HTMLElement>('#online-room-expiry')!;
+  private readonly formatOutput = document.querySelector<HTMLElement>('#online-room-format')!;
   private readonly errorOutput = document.querySelector<HTMLElement>('#online-error')!;
   private readonly finalizedMessage = document.querySelector<HTMLElement>('#online-finalized-message')!;
   private readonly roomPanel = document.querySelector<HTMLElement>('#online-room')!;
@@ -153,7 +154,11 @@ export class OnlineWaitingRoom {
       ? 'オンライン接続先はまだ設定されていません。'
       : !this.isSecureApiUrl(this.apiUrl) ? 'オンライン接続先の設定を確認してください。' : '';
     this.onGameMessage = onGameMessage;
-    document.querySelector<HTMLButtonElement>('#online-create-open')!.addEventListener('click', () => this.openEntryDialog(this.createDialog, this.createCloseButton));
+    document.querySelector<HTMLButtonElement>('#online-create-open')!.addEventListener('click', () => {
+      const defaultFormat = document.querySelector<HTMLInputElement>('input[name="online-match-format"][value="tonpu"]');
+      if (defaultFormat) defaultFormat.checked = true;
+      this.openEntryDialog(this.createDialog, this.createCloseButton);
+    });
     document.querySelector<HTMLButtonElement>('#online-join-open')!.addEventListener('click', () => this.openEntryDialog(this.joinDialog, this.joinCloseButton));
     this.roomMenuItem.addEventListener('click', () => this.openRoomDialog());
     this.createCloseButton.addEventListener('click', () => this.closeEntryDialog(this.createDialog));
@@ -379,7 +384,7 @@ export class OnlineWaitingRoom {
       const result = await this.request<ApiRoomResponse>('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName: name }),
+        body: JSON.stringify({ displayName: name, format: document.querySelector<HTMLInputElement>('input[name="online-match-format"]:checked')?.value === 'tonnan' ? 'tonnan' : 'tonpu' }),
       });
       this.closeEntryDialog(this.createDialog);
       this.setSession(result, name, '');
@@ -706,6 +711,7 @@ export class OnlineWaitingRoom {
     }
     this.codeOutput.textContent = state.roomCode;
     this.expiryOutput.textContent = new Date(state.expiresAt).toLocaleString();
+    this.formatOutput.textContent = `対局形式：${state.format === 'tonnan' ? '半荘戦' : '東風戦'}`;
     this.finalizedMessage.hidden = state.status !== 'finalized' || this.gameActive;
     if (state.status === 'finalized') {
       this.setStatus(this.gameActive ? 'オンライン対局を進行しています。' : '座席が確定しました。ホストはオンライン対局を開始できます。');

@@ -65,9 +65,10 @@ export function startOnlineGame(
   identities: OnlineGameSession['identities'],
   hostSeat: PlayerId,
   random: RandomSource = secureRandomSource,
+  format: import('../model/match.ts').MatchFormat = 'tonpu',
 ): OnlineGameSession {
   const game = nextSecureGame(0, identities, random);
-  const match = startMatch(game);
+  const match = startMatch(game, format);
   assertPointConservation(match);
   return {
     schemaVersion: 1,

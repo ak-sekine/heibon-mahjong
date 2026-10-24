@@ -1,7 +1,7 @@
 import { declareKan, getKanOptions } from '../game/kan.ts';
 import { declareCall, passCalls } from '../game/calls.ts';
 import { isForbiddenDiscard } from '../game/melds.ts';
-import type { MatchState } from '../model/match.ts';
+import type { MatchState, MatchFormat } from '../model/match.ts';
 import { startMatch, updateMatchGame, nextRound } from '../game/match.ts';
 import type { GameState, PlayerId } from '../model/game.ts';
 import { canDeclareTsumo, declareTsumo } from '../game/tsumo.ts';
@@ -119,9 +119,9 @@ export class GameController {
     this.onChange();
     return this.runner.runMatch(() => this.match, match => { this.match = match; this.onChange(); }, this.onChange);
   }
-  newGame(): void {
+  newGame(format: MatchFormat = 'tonpu'): void {
     this.runner.cancel();
-    this.match = startMatch(this.start());
+    this.match = startMatch(this.start(), format);
     this.selectedTileId = null;
     this.onChange();
   }

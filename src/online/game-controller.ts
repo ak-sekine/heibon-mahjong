@@ -456,7 +456,7 @@ export class OnlineGameController {
     if (!result) return;
     if (renderOnlineWinSummary(section, view)) return;
     if (result.reason === 'draw') {
-      section.append(text('h2', `東${result.roundNumber}局 ${result.honba}本場・流局`, 'round-summary-winner'));
+      section.append(text('h2', `${result.roundWind === 'south' ? '南' : '東'}${result.roundNumber}局 ${result.honba}本場・流局`, 'round-summary-winner'));
       const tenpai = result.tenpai?.map((ready, seat) => ready ? this.displayName(view, view.seats[seat]) : null).filter(Boolean) ?? [];
       section.append(text('p', `テンパイ：${tenpai.length === 0 ? 'なし' : tenpai.join('、')}`, 'round-summary-tenpai'));
       return;
@@ -471,7 +471,7 @@ export class OnlineGameController {
       section.append(text('h2', `途中流局（${abortiveNames[result.reason as keyof typeof abortiveNames]}）`, 'round-summary-winner'));
       return;
     }
-    section.append(text('h2', `東${result.roundNumber}局 ${result.honba}本場 · ${result.reason === 'nagashi-mangan' ? '流し満貫' : result.reason === 'ron' ? 'ロン' : 'ツモ'}`));
+    section.append(text('h2', `${result.roundWind === 'south' ? '南' : '東'}${result.roundNumber}局 ${result.honba}本場 · ${result.reason === 'nagashi-mangan' ? '流し満貫' : result.reason === 'ron' ? 'ロン' : 'ツモ'}`));
     section.append(text('p', `点数：${result.after.map((points, seat) => `${this.displayName(view, view.seats[seat])} ${points.toLocaleString('ja-JP')}点 (${result.deltas[seat] >= 0 ? '+' : ''}${result.deltas[seat].toLocaleString('ja-JP')})`).join(' · ')}`));
     for (const payment of result.payments) {
       section.append(text('p', `${this.displayName(view, view.seats[payment.payerId])} → ${this.displayName(view, view.seats[payment.recipientId])}：${payment.points.toLocaleString('ja-JP')}点`));
@@ -481,7 +481,7 @@ export class OnlineGameController {
       const ranks = this.finalRanks ?? view.round.points.map((points, playerId) => ({ playerId, points, rank: 0 }))
         .sort((a, b) => b.points - a.points || a.playerId - b.playerId)
         .map((player, index) => ({ ...player, rank: index + 1 }));
-      section.append(text('h3', `東風戦終了 · ${ranks.map(player => `${player.rank}位 ${this.displayName(view, view.seats[player.playerId])} ${player.points.toLocaleString('ja-JP')}点`).join(' · ')}`));
+      section.append(text('h3', `${view.format === 'tonnan' ? '半荘戦' : '東風戦'}終了 · ${ranks.map(player => `${player.rank}位 ${this.displayName(view, view.seats[player.playerId])} ${player.points.toLocaleString('ja-JP')}点`).join(' · ')}`));
     }
   }
 

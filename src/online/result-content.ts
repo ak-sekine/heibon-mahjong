@@ -200,7 +200,7 @@ function renderWin(container: HTMLElement, view: PlayerGameView, winner: PublicW
 export function onlineResultTitle(view: PlayerGameView): string {
   const result = view.result;
   if (!result) return '';
-  if (view.status === 'match-ended' || result.matchEnded) return '東風戦終了';
+  if (view.status === 'match-ended' || result.matchEnded) return `${view.format === 'tonnan' ? '半荘戦' : '東風戦'}終了`;
   return result.reason === 'nagashi-mangan' ? '流し満貫'
     : result.reason in abortiveNames ? `途中流局（${abortiveNames[result.reason as keyof typeof abortiveNames]}）`
       : result.reason === 'draw' ? '荒牌流局'
@@ -217,7 +217,7 @@ export function renderOnlineResultContent(container: HTMLElement, view: PlayerGa
   for (const winner of result.winners) renderWin(container, view, winner);
   const settlement = document.createElement('section');
   settlement.className = 'online-settlement';
-  settlement.append(text('h2', `東${result.roundNumber}局 ${result.honba}本場 · ${onlineResultTitle(view)}`));
+  settlement.append(text('h2', `${result.roundWind === 'south' ? '南' : '東'}${result.roundNumber}局 ${result.honba}本場 · ${onlineResultTitle(view)}`));
 
   if (result.reason === 'nagashi-mangan') {
     const winners = result.nagashiManganWinners ?? [];
@@ -277,9 +277,9 @@ export function renderOnlineResultContent(container: HTMLElement, view: PlayerGa
   if (result.reason === 'nagashi-mangan') {
     settlement.append(text('p', (result.nagashiManganWinners ?? []).includes(result.dealerId) ? '親：連荘' : '親：交代'));
   } else if (result.reason in abortiveNames) settlement.append(text('p', '親：連荘 · 本場＋1'));
-  if (result.next) settlement.append(text('p', `次局：東${result.next.roundNumber}局 ${result.next.honba}本場 · 親：${playerName(view, result.next.dealerId)}`));
+  if (result.next) settlement.append(text('p', `次局：${result.next.roundWind === 'south' ? '南' : '東'}${result.next.roundNumber}局 ${result.next.honba}本場 · 親：${playerName(view, result.next.dealerId)}`));
   if (view.status === 'match-ended' || result.matchEnded) {
-    settlement.append(text('h2', '東風戦終了'));
+    settlement.append(text('h2', `${view.format === 'tonnan' ? '半荘戦' : '東風戦'}終了`));
     const rankings = [...view.seats].map(seat => ({ seat, points: result.after[seat.seat] }))
       .sort((a, b) => b.points - a.points || a.seat.seat - b.seat.seat);
     const ranking = document.createElement('ol');

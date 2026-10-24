@@ -54,7 +54,7 @@ export function createLocalActionPanelState(
   let actionStatus: string;
   if (progressing) actionStatus = '局を進めています。';
   else if (match.status === 'round-ended') actionStatus = '局が終了しました。結果を確認してください。';
-  else if (match.status === 'match-ended') actionStatus = '東風戦が終了しました。最終結果を確認できます。';
+  else if (match.status === 'match-ended') actionStatus = `${match.format === 'tonnan' ? '半荘戦' : '東風戦'}が終了しました。最終結果を確認できます。`;
   else if (game.phase === 'wall-exhausted') actionStatus = '牌山がなくなりました。';
   else if (game.phase === 'awaiting-call') actionStatus = '鳴き判断を待っています。';
   else if (game.phase === 'awaiting-ron') actionStatus = 'ロン判断を待っています。';
