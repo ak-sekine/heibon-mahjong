@@ -1,5 +1,6 @@
 import { RateLimitDurableObject } from './rate-limit.ts';
 import { RoomDurableObject } from './room.ts';
+import { logWorker } from './diagnostics.ts';
 
 const allowedOrigins = new Set([
   'https://ak-sekine.github.io',
@@ -9,11 +10,6 @@ const allowedOrigins = new Set([
 const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const ROOM_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/u;
 const PARTICIPANT_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
-
-function logInternalError(errorCode: string): void {
-  try { console.log(JSON.stringify({ timestamp: new Date().toISOString(), level: 'ERROR', event: 'server_internal_error', errorCode })); }
-  catch { /* Logging must not alter request handling. */ }
-}
 
 const ratePolicies = {
   create: { limit: 10, windowMs: 10 * 60 * 1000 },
@@ -227,9 +223,12 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       return await handleFetch(request, env);
-    } catch (error) {
-      logInternalError('request_handler_failed');
-      throw error;
+    } catch {
+      logWorker({ event: 'server_internal_error', level: 'ERROR', errorCode: 'request_handler_failed' });
+      return new Response(JSON.stringify({ error: 'internal_error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+      });
     }
   },
 };

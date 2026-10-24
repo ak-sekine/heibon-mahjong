@@ -24,6 +24,7 @@ import {
   OnlineGameRuleError,
 } from '../src/online/game-engine.ts';
 import { createPlayerGameView, type OnlineGameSession } from '../src/online/game-view.ts';
+import { logWorker } from './diagnostics.ts';
 
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 const TICKET_TTL_MS = 60 * 1000;
@@ -36,26 +37,6 @@ const CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/u;
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/u;
 const SEAT_LABELS = ['東', '南', '西', '北'] as const;
-
-type WorkerLog = {
-  event: string; level: 'INFO' | 'WARN' | 'ERROR'; actionType?: string; requestId?: string;
-  gameRevision?: number; revision?: number; result?: string; errorCode?: string; durationMs?: number;
-};
-function logWorker(value: WorkerLog): void {
-  try {
-    const safe: Record<string, string | number> = {
-      timestamp: new Date().toISOString(), level: value.level, event: value.event,
-    };
-    if (value.actionType && /^[a-z-]{1,40}$/u.test(value.actionType)) safe.actionType = value.actionType;
-    if (value.requestId && REQUEST_ID_PATTERN.test(value.requestId) && !/^[a-f0-9]{64}$/u.test(value.requestId)) safe.requestId = value.requestId;
-    for (const key of ['gameRevision', 'revision', 'durationMs'] as const) {
-      const number = value[key]; if (Number.isSafeInteger(number) && (number as number) >= 0) safe[key] = number as number;
-    }
-    if (value.result && /^[a-z-]{1,40}$/u.test(value.result)) safe.result = value.result;
-    if (value.errorCode && /^[a-z0-9_-]{1,60}$/u.test(value.errorCode)) safe.errorCode = value.errorCode;
-    console.log(JSON.stringify(safe));
-  } catch { /* Logging is best effort. */ }
-}
 
 type RoomRow = {
   code: string;
@@ -1046,9 +1027,8 @@ export class RoomDurableObject {
 
   async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
     try { await this.processSocketMessage(socket, message); }
-    catch (error) {
+    catch {
       logWorker({ event: 'server_internal_error', level: 'ERROR', errorCode: 'websocket_handler_failed' });
-      throw error;
     }
   }
 
@@ -1184,19 +1164,20 @@ export class RoomDurableObject {
   }
 
   webSocketClose(socket: WebSocket): void {
-    this.socketEnded(socket);
+    try { this.socketEnded(socket); }
+    catch { logWorker({ event: 'server_internal_error', level: 'ERROR', errorCode: 'websocket_close_handler_failed' }); }
   }
 
   webSocketError(socket: WebSocket): void {
     logWorker({ event: 'websocket_error', level: 'ERROR' });
-    this.socketEnded(socket);
+    try { this.socketEnded(socket); }
+    catch { logWorker({ event: 'server_internal_error', level: 'ERROR', errorCode: 'websocket_error_handler_failed' }); }
   }
 
   async alarm(): Promise<void> {
     try { await this.processAlarm(); }
-    catch (error) {
+    catch {
       logWorker({ event: 'server_internal_error', level: 'ERROR', errorCode: 'alarm_handler_failed' });
-      throw error;
     }
   }
 
