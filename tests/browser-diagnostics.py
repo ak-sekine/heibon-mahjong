@@ -11,17 +11,22 @@ with sync_playwright() as playwright:
     browser = browser_type.launch(headless=True)
     page = browser.new_page(viewport={'width': 375, 'height': 812}, is_mobile=True, has_touch=True)
     page.add_init_script("""(() => {
+      try {
+        if (location.origin !== 'null' && sessionStorage.getItem('heibon-mahjong-diagnostics-seeded') !== '1') {
+          sessionStorage.setItem('heibon-mahjong-diagnostics-v1', SEED_JSON);
+          sessionStorage.setItem('heibon-mahjong-diagnostics-seeded', '1');
+        }
+      } catch {}
       Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
       document.execCommand = command => {
         if (command !== 'copy') return false;
         window.__copiedDiagnosticText = document.activeElement?.value ?? '';
         return true;
       };
-    })();""")
+    })();""".replace('SEED_JSON', json.dumps(json.dumps(seed))))
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto(base)
-    page.evaluate("seed => sessionStorage.setItem('heibon-mahjong-diagnostics-v1', JSON.stringify(seed))", seed)
     page.reload()
     page.locator('#main-menu-toggle').click()
     page.locator('#menu-diagnostics').click()
