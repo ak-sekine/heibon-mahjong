@@ -11,6 +11,7 @@
 | 記録 | 主な対象 |
 | --- | --- |
 | [九種九牌の公開手牌](kyuushu-public-hand.md) | 宣言者14枚のオンライン・オフライン公開、非公開手牌保護、結果の再表示・再接続・次局解除。GitHub ActionsのChromium/WebKit確認成功。 |
+| [Heibon Mahjong テスト環境](test-environment.md) | オフライン固定局面の九種九牌4シナリオ、136枚整合性、公開範囲、320〜430px幅。 |
 | [Step 13.8](step13.8/README.md) | 主要役満8種類、候補単位の複合、点数、結果表示。Browser UI verification はGitHub Actionsで実施。 |
 | [Step 13.9](step13.9/README.md) | 海底摸月・河底撈魚、最終通常ツモ／打牌の局進行。Browser UI verification はGitHub Actionsで実施。 |
 | [Step 13.10](step13.10/README.md) | 流し満貫、九種九牌、四風連打、四家立直と局精算。Browser UI verification はGitHub Actionsで実施。 |
