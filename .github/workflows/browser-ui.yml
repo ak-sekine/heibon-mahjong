@@ -94,6 +94,8 @@ jobs:
           HEIBON_BROWSER=webkit run_browser_test tests/browser-step13-10.py
           run_browser_test tests/browser-step13-11.py
           run_browser_test tests/browser-online-waiting-room.py
+          run_browser_test tests/browser-test-page.py
+          HEIBON_BROWSER=webkit run_browser_test tests/browser-test-page.py
       - name: Save browser results and screenshots
         if: always()
         uses: actions/upload-artifact@v4

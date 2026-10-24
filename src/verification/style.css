@@ -4,3 +4,14 @@
 .kan-lab select { font: inherit; font-size: 16px; min-height: 44px; width: 100%; max-width: 100%; margin-bottom: 8px; }
 .kan-lab button { min-height: 44px; max-width: 100%; white-space: normal; touch-action: manipulation; }
 .kan-lab a { min-height: 44px; display: flex; align-items: center; color: inherit; }
+.test-lab { box-sizing: border-box; padding: 12px; border: 2px solid #b84a32; border-radius: 8px; margin-bottom: 12px; overflow-wrap: anywhere; }
+.test-heading { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.test-heading h2 { margin: 0; font-size: 1.25rem; }
+.test-badge { flex: 0 0 auto; padding: 4px 8px; color: #fff; background: #b12b20; border-radius: 4px; font-weight: 800; letter-spacing: .08em; }
+.test-lab label { display: block; margin: 8px 0; font-weight: 700; }
+.test-lab select { box-sizing: border-box; display: block; font: inherit; font-size: 16px; min-height: 44px; width: 100%; max-width: 100%; margin-bottom: 8px; }
+.test-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.test-actions button, .test-actions a { box-sizing: border-box; min-height: 44px; max-width: 100%; padding: 8px; font: inherit; font-size: 15px; white-space: normal; touch-action: manipulation; }
+.test-actions a { grid-column: 1 / -1; display: flex; align-items: center; color: inherit; }
+.test-lab p { margin: 8px 0; }
+@media (max-width: 360px) { .test-actions { grid-template-columns: 1fr; } .test-actions a { grid-column: auto; } }

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="Heibon Mahjong の公開オフライン検証ページ" />
+  <meta name="theme-color" content="#185640" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>テスト環境 — Heibon Mahjong</title>
+</head>
+<body>
+<main>
+  <section class="test-lab" aria-labelledby="test-title">
+    <div class="test-heading"><span class="test-badge">TEST</span><h2 id="test-title">Heibon Mahjong テスト環境</h2></div>
+    <p>公開アクセス可能なオフライン検証ページです。個人情報や認証情報は入力しないでください。</p>
+    <label for="scenario">テストシナリオ</label>
+    <select id="scenario">
+      <option value="kyuushu-self">九種九牌（自分）</option>
+      <option value="kyuushu-cpu1">九種九牌（CPU1）</option>
+      <option value="kyuushu-cpu2">九種九牌（CPU2）</option>
+      <option value="kyuushu-cpu3">九種九牌（CPU3）</option>
+    </select>
+    <div class="test-actions">
+      <button id="load-scenario" type="button">テスト開始</button>
+      <button id="repeat-scenario" type="button">同じシナリオを再実行</button>
+      <a href="./">通常版へ戻る</a>
+    </div>
+    <p id="scenario-help" role="status"></p>
+    <p id="test-status" role="status" aria-live="polite"></p>
+  </section>
+  <header><div><h1>Heibon Mahjong</h1></div><button id="new-game" type="button">新しい対局</button></header>
+  <div id="local-score-strip-host"></div>
+  <section id="local-table" class="table" aria-label="4人麻雀卓">
+    <section class="seat seat-top" data-player-id="2" aria-label="CPU2の席"><div class="concealed-hand" data-player-id="2" role="img"></div><div class="open-melds" data-player-id="2"></div></section>
+    <section class="seat seat-right" data-player-id="1" aria-label="CPU1の席"><div class="concealed-hand" data-player-id="1" role="img"></div><div class="open-melds" data-player-id="1"></div></section>
+    <section class="seat seat-left" data-player-id="3" aria-label="CPU3の席"><div class="concealed-hand" data-player-id="3" role="img"></div><div class="open-melds" data-player-id="3"></div></section>
+    <section class="rivers" aria-label="4人の河">
+      <div class="river river-top" data-player-id="2" aria-label="CPU2の河"></div>
+      <div class="river river-right" data-player-id="1" aria-label="CPU1の河"></div>
+      <div class="river river-bottom" data-player-id="0" aria-label="自分の河"></div>
+      <div class="river river-left" data-player-id="3" aria-label="CPU3の河"></div>
+      <div id="local-table-info-host"></div>
+    </section>
+    <section class="seat seat-bottom" data-player-id="0" aria-label="自分の席"><div class="open-melds" data-player-id="0"></div><ul id="player-hand" aria-label="自分の手牌"></ul></section>
+  </section>
+  <section id="round-result-summary" aria-label="局結果の概要" aria-live="polite" hidden></section>
+  <div id="local-action-panel-host"></div>
+  <template id="score-strip-template">
+    <section class="table-summary">
+      <div class="score-strip">
+        <p class="seat-label" data-seat-position="top"></p><p class="seat-label" data-seat-position="right"></p>
+        <p class="seat-label" data-seat-position="bottom"></p><p class="seat-label" data-seat-position="left"></p>
+      </div>
+    </section>
+  </template>
+  <template id="table-info-template">
+    <div class="center-info">
+      <div class="round-summary"><div class="round-label" data-table-info-part="round"></div><div class="wall-count" data-table-info-part="wall" role="status" aria-live="polite"></div></div>
+      <section class="dora-area" aria-label="ドラ表示">
+        <div class="dora-indicators" data-table-info-part="dora" role="group" aria-label="ドラ表示牌と対応するドラ牌種"></div>
+      </section>
+      <div class="deposit-sticks" data-table-info-part="deposits" hidden></div>
+    </div>
+  </template>
+  <template id="game-controls-template">
+    <section class="discard-controls" data-panel-part="root">
+      <div class="action-choice-group" data-panel-part="call-controls" role="group" aria-label="ポン・チーの選択" hidden>
+        <p class="action-group-status" data-panel-part="call-status"></p>
+        <div class="action-option-list" data-panel-part="call-options"></div>
+        <button class="control-action-button" data-panel-part="pass-call" type="button">見送る</button>
+      </div>
+      <div class="action-choice-group" data-panel-part="kan-controls" role="group" aria-label="暗カン・加カンの選択" hidden>
+        <p class="action-group-status" data-panel-part="kan-status">カンする面子を選択</p>
+        <div class="action-option-list" data-panel-part="kan-options"></div>
+        <button class="control-action-button" data-panel-part="cancel-kan" type="button">キャンセル</button>
+      </div>
+      <div class="action-choice-group" data-panel-part="ron-controls" role="group" aria-label="ロン判断" hidden>
+        <p class="action-group-status" data-panel-part="ron-status"></p>
+        <div class="ron-target" data-panel-part="ron-target"></div>
+        <button class="control-action-button" data-panel-part="ron" type="button">ロン和了</button>
+        <button class="control-action-button" data-panel-part="pass-ron" type="button">見逃す</button>
+      </div>
+      <p class="action-status" data-panel-part="action-status" role="status" aria-live="polite"></p>
+      <div class="action-buttons">
+        <button class="control-action-button" data-panel-part="discard" type="button" disabled>打牌する</button>
+        <button class="control-action-button" data-panel-part="riichi" type="button" disabled>リーチ</button>
+        <button class="control-action-button" data-panel-part="kan-toggle" type="button" hidden>カン</button>
+        <button class="control-action-button" data-panel-part="tsumo" type="button" disabled>ツモ和了</button>
+        <button class="control-action-button" data-panel-part="kyuushu" type="button" hidden disabled>九種九牌</button>
+        <div class="round-result-actions" data-panel-part="round-actions" role="group" aria-label="局終了後の操作" hidden>
+          <button class="control-action-button" data-panel-part="show-result" type="button" hidden>結果を見る</button>
+          <button class="control-action-button" data-panel-part="next-round" type="button" hidden>次の局へ</button>
+          <button class="control-action-button" data-panel-part="return-local" type="button" hidden>ローカル卓へ戻る</button>
+        </div>
+      </div>
+      <p class="keyboard-help">Tabで牌とボタンへ移動、Enter／Spaceで選択・確定</p>
+    </section>
+  </template>
+  <dialog id="result-dialog" aria-labelledby="result-title">
+    <header class="result-header"><h2 id="result-title"></h2></header>
+    <div id="result-body" tabindex="0" role="region" aria-label="結果の詳細">
+      <section id="win-result" hidden></section>
+      <section id="match-result" hidden></section>
+      <section id="online-result-content" aria-label="オンライン対局の結果" hidden></section>
+    </div>
+    <footer class="result-footer">
+      <button id="view-table" type="button" autofocus>卓を見る</button>
+      <button id="result-new-game" type="button" hidden>新しい対局</button>
+    </footer>
+  </dialog>
+  <dialog id="new-game-dialog" aria-labelledby="new-game-question">
+    <p id="new-game-question">現在の対局を終了して、最初から始めますか？</p>
+    <div class="new-game-actions">
+      <button id="cancel-new-game" type="button" autofocus>キャンセル</button>
+      <button id="confirm-new-game" type="button">新しい対局を開始</button>
+    </div>
+  </dialog>
+  <details class="catalog"><summary>開発用：全34種類と赤5を見る</summary><ul id="tile-gallery" aria-label="全牌種と赤5の一覧"></ul></details>
+</main>
+<script type="module" src="/src/verification/test-page.ts"></script>
+</body>
+</html>

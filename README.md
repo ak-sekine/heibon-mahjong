@@ -11,6 +11,7 @@ Heibon Mahjong は、CPU 3人と遊ぶ日本式リーチ麻雀のブラウザー
 - ツモ・ロン、フリテン、リーチ・ダブル立直・一発、ポン・チー、暗カン・大明カン・加カンに対応しています。
 - 対応役、符・点数、ドラ・裏ドラ・赤ドラ、局結果を表示します。
 - カン機能の公開検証ページ: [kan-test.html](https://ak-sekine.github.io/heibon-mahjong/kan-test.html)。
+- オフライン検証シナリオのページ: [test.html](https://ak-sekine.github.io/heibon-mahjong/test.html)。
 
 ## 現在実装されている主な機能
 
@@ -84,6 +85,8 @@ npm run build
 - 槍槓
 - 嶺上開花
 - 複数カン
+
+[テスト環境](https://ak-sekine.github.io/heibon-mahjong/test.html)では、九種九牌（自分／CPU1／CPU2／CPU3）を確認できます。シナリオを選び「テスト開始」を押してください。「同じシナリオを再実行」で同じ局面を再生成できます。CPUケースは既存のCPU自動処理で宣言し、自分のケースは卓の「九種九牌」ボタンで宣言します。ページは公開アクセス可能なため、個人情報や認証情報を入力しないでください。
 
 自動テストやChromiumの検証と、iPhone Safari実機での確認は区別して記録します。2026年10月18日のユーザーによる実機確認は[検証記録](docs/verification/kan-safari-2026-10-18.md)にあります。
 
