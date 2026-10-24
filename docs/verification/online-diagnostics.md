@@ -64,7 +64,8 @@ Cloudflare公式の [Workers Logs資料](https://developers.cloudflare.com/worke
 - `git diff --check`: 成功。
 - 独自ログの安全性: `worker/room.ts`、`worker/index.ts`、`src/online/diagnostics.ts`、オンライン通信・診断ログ呼び出しを確認。request/responseオブジェクト、例外文字列、認証情報、IP、非公開牌情報をログへ渡す実装は見つからなかった。内部例外の再throwもCloudflare側の追加例外記録を避けるため停止した。
 - `requestId`照合: Workerの操作受信/結果ログとブラウザー診断のrequestId保持を確認。テスト成功。
-- Cloudflare本番Logs、Dashboard上の自動Invocation Logs停止、GitHub Actionsのこの変更に対するデプロイ結果: 未確認。
+- GitHub Actions run [40086380784](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40086380784)（commit `00ab5337672eab6583ba6d82021c7ea5d9b59e56`）: 全job成功。Worker deploy、HTTPS/WebSocket/再接続/認証/privacy本番テスト、Pages build/deployを確認。
+- Cloudflare DashboardのWorkers Logs、実環境での自動Invocation Logs停止と独自ログの表示: 未確認。production-testの成功はアプリ通信の検証であり、Workers Logs画面の確認とは区別する。
 
 ## 関連資料
 
