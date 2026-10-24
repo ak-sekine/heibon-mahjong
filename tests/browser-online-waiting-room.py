@@ -861,8 +861,11 @@ with sync_playwright() as p:
     page.evaluate('window.onlineMock.addGuest()')
     wait_for("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
     seat_text = page.locator('#online-seats').inner_text()
-    assert '東' in seat_text and 'テストホスト（自分・ホスト）' in seat_text, 'the current player and host were not identified in the seat list'
-    assert '接続中・未準備' in seat_text, 'the connection and ready state were not displayed in the seat list'
+    host_row = page.locator('#online-seats li').nth(0)
+    assert host_row.locator('.online-seat-wind').inner_text() == '東', 'the host was not shown in the east seat'
+    assert host_row.locator('.online-seat-name').inner_text() == 'テストホスト', 'the current player name was not shown in the seat list'
+    assert host_row.locator('.online-seat-role').inner_text() == '（自分・ホスト）', 'the current player and host roles were not identified in the seat list'
+    assert host_row.locator('.online-seat-status').inner_text() == '接続中・未準備', 'the connection and ready state were not displayed in the seat list'
     assert '南' in seat_text and 'テスト参加者' in seat_text, 'the guest seat or name was not displayed'
     assert page.locator('#online-my-seat, #online-host').count() == 0, 'self and host are still shown in separate fields'
     assert page.locator('#online-finalize').is_visible() and not page.locator('#online-finalize').is_enabled(), 'host finalize was enabled before both players were ready'
