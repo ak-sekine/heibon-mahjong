@@ -107,8 +107,6 @@ export class OnlineWaitingRoom {
   private readonly seats = document.querySelector<HTMLOListElement>('#online-seats')!;
   private readonly codeOutput = document.querySelector<HTMLElement>('#online-room-code')!;
   private readonly expiryOutput = document.querySelector<HTMLElement>('#online-room-expiry')!;
-  private readonly selfOutput = document.querySelector<HTMLElement>('#online-my-seat')!;
-  private readonly hostOutput = document.querySelector<HTMLElement>('#online-host')!;
   private readonly errorOutput = document.querySelector<HTMLElement>('#online-error')!;
   private readonly finalizedMessage = document.querySelector<HTMLElement>('#online-finalized-message')!;
   private readonly roomPanel = document.querySelector<HTMLElement>('#online-room')!;
@@ -294,6 +292,7 @@ export class OnlineWaitingRoom {
 
   private setConnection(message: string): void {
     this.connection.textContent = message;
+    this.connection.hidden = message === '接続中';
   }
 
   private openEntryDialog(dialog: HTMLDialogElement, closeButton: HTMLButtonElement): void {
@@ -375,7 +374,7 @@ export class OnlineWaitingRoom {
         body: JSON.stringify({ displayName: name }),
       });
       this.closeEntryDialog(this.createDialog);
-      this.setSession(result, name, 'ルームを作成しました。');
+      this.setSession(result, name, '');
       await this.connect();
     } catch (error) {
       this.setFormMessage(this.createMessage, error instanceof Error ? error.message : 'ルームを作成できませんでした。');
@@ -640,35 +639,50 @@ export class OnlineWaitingRoom {
     if (this.state && state.revision < this.state.revision) return;
     this.state = state;
     const bySeat = new Map(state.seats.map(seat => [seat.seat, seat]));
-    const self = bySeat.get(this.session?.playerSeat ?? -1);
     this.seats.replaceChildren();
     for (const seatNumber of [0, 1, 2, 3]) {
       const participant = bySeat.get(seatNumber)!;
       const item = document.createElement('li');
       item.dataset.kind = participant.kind;
-      const label = document.createElement('span');
-      const detail = document.createElement('span');
-      const markers = [
-        participant.kind === 'human' ? '人間' : participant.kind === 'cpu' ? 'CPU' : '空席',
-        participant.kind === 'human' ? (participant.connected ? '接続中' : '切断中') : '',
-        participant.kind === 'human' ? (participant.ready ? '準備完了' : '未準備') : '',
-        participant.isHost ? 'ホスト' : '',
-        seatNumber === this.session?.playerSeat && participant.kind === 'human' ? '自分' : '',
-      ].filter(Boolean);
-      label.textContent = `${SEAT_NAMES[seatNumber]}：${participant.name ?? '参加者なし'}`;
-      detail.textContent = markers.join(' · ');
-      item.append(label, detail);
+      const wind = document.createElement('span');
+      wind.className = 'online-seat-wind';
+      wind.textContent = SEAT_NAMES[seatNumber];
+      const content = document.createElement('div');
+      content.className = 'online-seat-content';
+      if (participant.kind === 'empty') {
+        content.classList.add('is-empty');
+        content.textContent = '空席';
+      } else {
+        const playerLine = document.createElement('div');
+        playerLine.className = 'online-seat-player-line';
+        const name = document.createElement('span');
+        name.className = 'online-seat-name';
+        name.textContent = participant.name ?? (participant.kind === 'cpu' ? 'CPU' : '参加者');
+        name.title = name.textContent;
+        const roles = [
+          seatNumber === this.session?.playerSeat && participant.kind === 'human' ? '自分' : '',
+          participant.isHost ? 'ホスト' : '',
+        ].filter(Boolean);
+        playerLine.append(name);
+        if (roles.length) {
+          const role = document.createElement('span');
+          role.className = 'online-seat-role';
+          role.textContent = `（${roles.join('・')}）`;
+          playerLine.append(role);
+        }
+        content.append(playerLine);
+        if (participant.kind === 'human') {
+          const status = document.createElement('span');
+          status.className = 'online-seat-status';
+          status.textContent = `${participant.connected ? '接続中' : '切断中'}・${participant.ready ? '準備完了' : '未準備'}`;
+          content.append(status);
+        }
+      }
+      item.append(wind, content);
       this.seats.append(item);
     }
     this.codeOutput.textContent = state.roomCode;
     this.expiryOutput.textContent = new Date(state.expiresAt).toLocaleString();
-    this.selfOutput.textContent = self?.kind === 'human'
-      ? `自分の席：${SEAT_NAMES[self.seat]}（${self.name ?? this.session?.displayName ?? '参加者'}）`
-      : '自分の席：確認できません';
-    const host = state.hostSeat === null ? undefined : bySeat.get(state.hostSeat);
-    this.hostOutput.textContent = host?.kind === 'human'
-      ? `ホスト：${host.name ?? '参加者'}${host.seat === this.session?.playerSeat ? '（あなた）' : ''}`
-      : 'ホスト：なし';
     this.finalizedMessage.hidden = state.status !== 'finalized' || this.gameActive;
     if (state.status === 'finalized') {
       this.setStatus(this.gameActive ? 'オンライン対局を進行しています。' : '座席が確定しました。ホストはオンライン対局を開始できます。');

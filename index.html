@@ -41,17 +41,19 @@
     </form>
   </dialog>
   <dialog id="online-dialog" class="online-dialog" aria-labelledby="online-title">
-    <header class="online-dialog-header"><h2 id="online-title">オンライン待機</h2><button id="online-close" type="button" aria-label="オンライン待機を閉じる">閉じる</button></header>
+    <header class="online-dialog-header"><h2 id="online-title">オンライン待機</h2><button id="online-close" class="online-dialog-close" type="button" aria-label="オンライン待機を閉じる">閉じる</button></header>
     <p id="online-status" role="status" aria-live="polite" hidden></p>
     <section id="online-room" aria-label="ルームの座席" hidden>
-      <p>ルームコード：<strong id="online-room-code">—</strong> <button id="online-copy-code" type="button">コードをコピー</button></p>
-      <p>有効期限：<time id="online-room-expiry">—</time></p>
-      <p id="online-connection" role="status" aria-live="polite">接続状態を確認しています。</p>
-      <p id="online-my-seat">自分の席：—</p>
-      <p id="online-host">ホスト：—</p>
-      <ol id="online-seats" aria-label="東・南・西・北の席"></ol>
-      <p id="online-finalized-message" role="status" hidden>座席が確定しました。ホストはオンライン対局を開始できます。</p>
-      <p id="online-error" role="alert" hidden></p>
+      <div id="online-room-content">
+        <div class="online-room-info">
+          <p class="online-room-code-row"><span>ルームコード</span><strong id="online-room-code">—</strong><button id="online-copy-code" type="button">コピー</button></p>
+          <p class="online-room-expiry-row">有効期限：<time id="online-room-expiry">—</time></p>
+        </div>
+        <p id="online-connection" role="status" aria-live="polite" hidden>接続状態を確認しています。</p>
+        <ol id="online-seats" aria-label="東・南・西・北の席"></ol>
+        <p id="online-finalized-message" role="status" hidden>座席が確定しました。ホストはオンライン対局を開始できます。</p>
+        <p id="online-error" role="alert" hidden></p>
+      </div>
       <div id="online-actions" aria-label="待機ルームの操作">
         <button id="online-ready" type="button" hidden>準備完了</button>
         <button id="online-finalize" type="button" hidden>座席を確定</button>

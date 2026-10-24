@@ -292,6 +292,18 @@ MOCK = r"""
       broadcast();
       return guestToken;
     },
+    setAdditionalGuests() {
+      state.seats[2] = { seat: 2, kind: 'human', name: '参加者名がとても長いテスト表示用の名前', connected: true, ready: false, isHost: false };
+      state.seats[3] = { seat: 3, kind: 'human', name: 'もう一人の長い参加者表示名テスト', connected: true, ready: true, isHost: false };
+      state.revision++;
+      broadcast();
+    },
+    clearAdditionalGuests() {
+      state.seats[2] = empty(2);
+      state.seats[3] = empty(3);
+      state.revision++;
+      broadcast();
+    },
     setGuestReady(ready) {
       state.seats[1].ready = ready;
       state.revision++;
@@ -814,16 +826,70 @@ with sync_playwright() as p:
     assert not page.locator('#online-create-dialog').evaluate('element => element.open'), 'room creation form remained open after success'
     assert not page.locator('#online-join-dialog').evaluate('element => element.open'), 'join form opened after room creation'
     assert page.locator('#online-dialog #online-create-form, #online-dialog #online-join-form').count() == 0, 'input forms were mixed into the room management screen'
-    assert page.locator('#online-status').is_visible() and page.locator('#online-status').inner_text().strip(), 'the created room did not show its waiting-room status'
+    assert page.locator('#online-status').is_hidden(), 'room creation still displays a redundant permanent success message'
     assert page.evaluate("window.onlineMock.requests[0].body.displayName === 'テストホスト'"), 'room creation did not send the common display name'
     assert page.locator('#menu-room').evaluate('element => !element.hidden'), 'room operations were not added to the menu for an online participant'
     wait_for("document.querySelector('#online-seats').children.length === 4 && document.querySelector('#online-seats').innerText.includes('テストホスト')")
+    layout_results = []
+    for width, height in [(375, 667), (375, 812), (390, 844), (414, 896), (1280, 900)]:
+      page.set_viewport_size({'width': width, 'height': height})
+      layout = page.evaluate('''() => {
+        const dialog = document.querySelector('#online-dialog');
+        const close = document.querySelector('#online-close').getBoundingClientRect();
+        const actions = document.querySelector('#online-actions').getBoundingClientRect();
+        const dialogBox = dialog.getBoundingClientRect();
+        const buttons = [...document.querySelectorAll('#online-actions button:not([hidden])')].map(button => button.getBoundingClientRect());
+        return {
+          dialogFits: dialogBox.top >= 0 && dialogBox.bottom <= innerHeight,
+          noDialogScroll: dialog.scrollHeight <= dialog.clientHeight,
+          actionsVisible: actions.top >= 0 && actions.bottom <= innerHeight && buttons.every(box => box.top >= 0 && box.bottom <= innerHeight),
+          closeTarget: close.width >= 44 && close.height >= 44,
+          noHorizontalScroll: document.documentElement.scrollWidth <= innerWidth && dialog.scrollWidth <= dialog.clientWidth,
+        };
+      }''')
+      assert layout['dialogFits'], f'online waiting dialog exceeds {width}x{height}: {layout}'
+      assert layout['actionsVisible'], f'online waiting actions are not visible at {width}x{height}: {layout}'
+      assert layout['closeTarget'], f'online waiting close target is under 44px at {width}x{height}: {layout}'
+      assert layout['noHorizontalScroll'], f'online waiting dialog overflows horizontally at {width}x{height}: {layout}'
+      if (width, height) != (375, 667):
+        assert layout['noDialogScroll'], f'newly created room requires dialog scrolling at {width}x{height}: {layout}'
+      layout_results.append({'viewport': f'{width}x{height}', **layout})
+      if (width, height) == (375, 812):
+        page.screenshot(path=str(OUT / 'online-waiting-375x812-created.png'))
+    print(json.dumps({'onlineWaitingRoomLayouts': layout_results}, ensure_ascii=False))
+    page.set_viewport_size({'width': 390, 'height': 844})
     page.evaluate('window.onlineMock.addGuest()')
     wait_for("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
-    assert 'ホスト（あなた）' in page.locator('#online-host').inner_text(), 'the host was not identified in the UI'
-    assert '東（テストホスト）' in page.locator('#online-my-seat').inner_text(), 'the current player seat was not identified'
+    seat_text = page.locator('#online-seats').inner_text()
+    assert '東' in seat_text and 'テストホスト（自分・ホスト）' in seat_text, 'the current player and host were not identified in the seat list'
+    assert '接続中・未準備' in seat_text, 'the connection and ready state were not displayed in the seat list'
+    assert '南' in seat_text and 'テスト参加者' in seat_text, 'the guest seat or name was not displayed'
+    assert page.locator('#online-my-seat, #online-host').count() == 0, 'self and host are still shown in separate fields'
     assert page.locator('#online-finalize').is_visible() and not page.locator('#online-finalize').is_enabled(), 'host finalize was enabled before both players were ready'
-    assert 'テスト参加者' in page.locator('#online-seats').inner_text() and '人間' in page.locator('#online-seats').inner_text(), 'human seat was not described in text'
+    assert '人間' not in seat_text and '空席' in seat_text, 'seat rows still contain redundant participant types or omit empty seats'
+    page.evaluate('window.onlineMock.setAdditionalGuests()')
+    wait_for("document.querySelector('#online-seats').innerText.includes('もう一人の長い参加者表示名テスト')")
+    page.set_viewport_size({'width': 375, 'height': 812})
+    full_seat_layout = page.evaluate('''() => {
+      const dialog = document.querySelector('#online-dialog');
+      const actions = document.querySelector('#online-actions').getBoundingClientRect();
+      const seats = document.querySelector('#online-seats');
+      const longNames = [...seats.querySelectorAll('.online-seat-name')];
+      return {
+        noHorizontalScroll: document.documentElement.scrollWidth <= innerWidth && dialog.scrollWidth <= dialog.clientWidth && seats.scrollWidth <= seats.clientWidth,
+        actionsVisible: actions.bottom <= innerHeight && [...document.querySelectorAll('#online-actions button:not([hidden])')].every(button => button.getBoundingClientRect().bottom <= innerHeight),
+        longNamesEllipsized: longNames.filter(name => name.scrollWidth > name.clientWidth && getComputedStyle(name).textOverflow === 'ellipsis').length >= 2,
+        order: [...seats.children].map(item => item.querySelector('.online-seat-wind').textContent),
+      };
+    }''')
+    assert full_seat_layout['noHorizontalScroll'], f'long names caused horizontal scrolling: {full_seat_layout}'
+    assert full_seat_layout['actionsVisible'], f'actions are hidden with four occupied seats: {full_seat_layout}'
+    assert full_seat_layout['longNamesEllipsized'], f'long seat names were not ellipsized: {full_seat_layout}'
+    assert full_seat_layout['order'] == ['東', '南', '西', '北'], f'seat order changed: {full_seat_layout}'
+    page.screenshot(path=str(OUT / 'online-waiting-375x812-four-players.png'))
+    page.evaluate('window.onlineMock.clearAdditionalGuests()')
+    wait_for("document.querySelector('#online-seats').innerText.includes('西') && document.querySelector('#online-seats').innerText.includes('空席')")
+    page.set_viewport_size({'width': 390, 'height': 844})
 
     page.locator('#online-close').click()
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'closing the room dialog did not restore focus to the visible menu button'
