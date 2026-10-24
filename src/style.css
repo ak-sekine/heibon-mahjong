@@ -249,12 +249,11 @@ header > div { min-width:0; }
  .round-result-actions button { min-width:0; }
  .discard-controls.result-available { padding:4px 6px; gap:4px; }
 }
-@media (max-width:599px) and (max-height:760px) {
+@media (max-width:599px) and (max-height:552px) {
  main:has(.discard-controls.result-available) > #local-table,
  #online-match:has(.discard-controls.result-available) #online-table {
-   --result-table-size:min(calc(100% + 8px),calc(100dvh - 240px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));
-   width:var(--result-table-size);
-   margin-inline:calc((100% - var(--result-table-size))/2);
+   width:min(calc(100% + 8px),calc(100dvh - 240px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));
+   margin-inline:auto;
  }
 }
 

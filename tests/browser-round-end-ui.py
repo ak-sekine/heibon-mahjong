@@ -326,7 +326,9 @@ with sync_playwright() as p:
                 if(overlaps(r,center)) violations.push({kind:'center',seat:face.closest('.concealed-hand').dataset.playerId,rect:r,other:center});
               }
               const winnerFaces=faces.filter(face=>face.closest('.concealed-hand').dataset.playerId===String(winner));
-              const sizeDeltas=winnerFaces.map(face=>{const r=rect(face),b=baseline[winner];return Math.max(Math.abs(r.width-b.width),Math.abs(r.height-b.height));});
+              const referenceBack=document.querySelector('.table .concealed-hand .tile-back');
+              const referenceSize=referenceBack?rect(referenceBack):null;
+              const sizeDeltas=winnerFaces.map(face=>{const r=rect(face),b=referenceSize;return b?Math.max(Math.abs(r.width-b.width),Math.abs(r.height-b.height)):Infinity;});
               const privacy=[1,2,3].filter(id=>id!==winner).every(id=>[...document.querySelectorAll(`.concealed-hand[data-player-id="${id}"] .tile-back`)].length>0 && !document.querySelector(`.concealed-hand[data-player-id="${id}"] svg`));
               return {square:Math.abs(table.width-table.height)<.5,noHorizontalScroll:document.documentElement.scrollWidth<=innerWidth,
                 tileSizeMatchesBack:sizeDeltas.every(delta=>delta<.2),maxSizeDelta:Math.max(0,...sizeDeltas),
