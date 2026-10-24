@@ -10,14 +10,14 @@ with sync_playwright() as playwright:
     browser_type = getattr(playwright, os.environ.get('HEIBON_BROWSER', 'chromium'))
     browser = browser_type.launch(headless=True)
     page = browser.new_page(viewport={'width': 375, 'height': 812}, is_mobile=True, has_touch=True)
-    page.add_init_script("""() => {
+    page.add_init_script("""(() => {
       Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
       document.execCommand = command => {
         if (command !== 'copy') return false;
         window.__copiedDiagnosticText = document.activeElement?.value ?? '';
         return true;
       };
-    }""")
+    })();""")
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto(base)
