@@ -47,7 +47,7 @@ with sync_playwright() as playwright:
         page.wait_for_function("document.querySelector('#test-status').innerText.includes('CPUの第一ツモ処理を実行中')")
         assert page.locator('.revealed-tile').count() == 0, scenario + ': concealed hand exposed before declaration'
         page.wait_for_function('''seat => document.querySelectorAll('.revealed-tile').length === 14 &&
-            document.querySelector('#round-result-summary').innerText.includes('九種九牌')''', seat)
+            document.querySelector('#round-result-summary').innerText.includes('九種九牌')''', arg=seat)
         assert page.locator('.revealed-tile').count() == 14, scenario
         for other_seat in range(1, 4):
             if other_seat != seat:
