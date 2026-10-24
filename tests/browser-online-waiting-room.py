@@ -1242,7 +1242,15 @@ with sync_playwright() as p:
       page.set_viewport_size(viewport)
       if scenario_index:
         page.evaluate('args => window.onlineMock.setResultScenario(args.scenario, args.viewer)', {'scenario': scenario, 'viewer': viewer})
-      wait_for(f"document.querySelector('#online-show-result').hidden === false && document.querySelector('#result-dialog').open === false")
+      expected_status = 'match-ended' if scenario == 'match-ended' else 'round-ended'
+      expected_reason = 'draw' if scenario == 'draw' else 'kyuushu-kyuuhai' if scenario == 'kyuushu' else 'ron' if scenario.endswith('ron') else 'tsumo'
+      expected_winner = None if scenario in ('draw', 'kyuushu') else 3 if scenario == 'opponent-tsumo' else 0
+      wait_for(f"""(() => {{
+        const view = window.onlineUiTest.onlineGameController.view;
+        return view?.status === '{expected_status}' && view.result?.reason === '{expected_reason}' &&
+          ({'true' if expected_winner is None else f'view.result.winners?.[0]?.winnerId === {expected_winner}'}) &&
+          document.querySelector('#online-show-result').hidden === false && document.querySelector('#result-dialog').open === false;
+      }})()""")
       if scenario in ('draw', 'kyuushu'):
         overview = page.evaluate('''() => {
           const view=window.onlineUiTest.onlineGameController.view, result=view.result;
