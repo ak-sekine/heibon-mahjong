@@ -1201,6 +1201,29 @@ with sync_playwright() as p:
       if scenario_index:
         page.evaluate('args => window.onlineMock.setResultScenario(args.scenario, args.viewer)', {'scenario': scenario, 'viewer': viewer})
       wait_for(f"document.querySelector('#online-show-result').hidden === false && document.querySelector('#result-dialog').open === false")
+      if scenario in ('draw', 'kyuushu'):
+        overview = page.evaluate('''() => {
+          const view=window.onlineUiTest.onlineGameController.view, result=view.result;
+          const text=selector=>[...document.querySelector(selector).querySelectorAll('h2,p')].map(node=>node.innerText);
+          const rect=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
+          const table=rect('#online-table'), summary=rect('#online-round-result'), controls=rect('#online-game-controls');
+          const show=rect('#online-show-result'), next=rect('#online-next-round'), visual=window.visualViewport;
+          const ready=result.tenpai?.map((yes,seat)=>yes?view.seats[seat].control==='cpu'
+            ? `CPU${view.seats.filter(s=>s.control==='cpu').sort((a,b)=>a.seat-b.seat).findIndex(s=>s.seat===seat)+1}`
+            : view.seats[seat].name:null).filter(Boolean) ?? [];
+          const expected=result.reason==='draw'
+            ? [`東${result.roundNumber}局 ${result.honba}本場・流局`,`テンパイ：${ready.length?ready.join('、'):'なし'}`]
+            : ['途中流局（九種九牌）'];
+          const bottom=(visual?.offsetTop??0)+(visual?.height??innerHeight);
+          return {lines:text('#online-round-result'),expected,table,summary,controls,show,next,bottom,
+            square:Math.abs(table.width-table.height)<1,
+            actionsVisible:show.bottom<=bottom&&next.bottom<=bottom,
+            actionsBeside:Math.abs(show.top-next.top)<1&&show.right<=next.left+1,
+            belowTable:summary.top>=table.bottom-1&&controls.top>=summary.bottom-1&&show.top>=table.bottom,
+            noForbidden:/点数：|支払い|持ち点|増減/.test(document.querySelector('#online-round-result').innerText)};
+        }''')
+        assert overview['lines'] == overview['expected'], f'{scenario}: inconsistent compact online overview: {overview}'
+        assert overview['square'] and overview['actionsVisible'] and overview['actionsBeside'] and overview['belowTable'] and not overview['noForbidden'], f'{scenario}: online result layout: {overview}'
       if scenario == 'kyuushu':
         assert page.locator('#online-match .public-hand-tile').count() == 14, 'online 九種九牌 must reveal exactly 14 tiles on the table'
         assert page.locator('#online-result-content .winning-hand li').count() == 14, 'online result must contain 14 declared tiles'

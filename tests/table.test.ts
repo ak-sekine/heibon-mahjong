@@ -367,11 +367,12 @@ test('confirmed draw publishes only tenpai CPU hands, summarizes settlement and 
       renderTable(match.game, match.points, settlement);
       renderMatch(match);
 
-      const expectedNames = ready.length === 0 ? 'なし' : ready.length === 4 ? '全員'
-        : ready.map(id => ['自分', 'CPU1', 'CPU2', 'CPU3'][id]).join('・');
       const summary = nodes.get('#round-result-summary')!;
       assert.equal(summary.hidden, false);
-      assert.deepEqual(summary.children.map(child => child.textContent), ['流局', `テンパイ：${expectedNames}`]);
+      const actualNames = ready.length === 0 ? 'なし' : ready.map(id => ['自分', 'CPU1', 'CPU2', 'CPU3'][id]).join('、');
+      assert.deepEqual(summary.children.map(child => child.textContent),
+        [`東${settlement.roundNumber}局 ${settlement.honba}本場・流局`, `テンパイ：${actualNames}`]);
+      assert.ok(summary.children.every(child => !/点|支払い|増減/.test(child.textContent)));
 
       for (const id of [1, 2, 3]) {
         const hand = nodes.get(`.concealed-hand[data-player-id="${id}"]`)!;

@@ -8,7 +8,7 @@ from playwright.sync_api import sync_playwright
 
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-round-end-ui'))
 OUT.mkdir(parents=True, exist_ok=True)
-WIDTHS = [(320, 568), (355, 700), (375, 812), (390, 844), (430, 932), (1280, 800)]
+WIDTHS = [(320, 568), (355, 700), (375, 667), (390, 844), (430, 932), (1280, 800)]
 SUMMARY_YAKU_NAMES = {
     'menzen-tsumo': '門前清自摸和',
     'yakuhai-white': '役牌：白',
@@ -49,7 +49,7 @@ with sync_playwright() as p:
         page.wait_for_selector('#player-hand svg')
         page.wait_for_function('typeof window.roundEndTest === "object"')
         page.evaluate('''async () => {
-          const [matches, ron, tsumo, fixed, ronFixture, cpu, red, wall, tsumoFixture, tileSvg, tileModel] = await Promise.all([
+          const [matches, ron, tsumo, fixed, ronFixture, cpu, red, wall, tsumoFixture, tileSvg, tileModel, kyuushu, specialDraws] = await Promise.all([
             import('/heibon-mahjong/src/game/match.ts'),
             import('/heibon-mahjong/src/game/ron.ts'),
             import('/heibon-mahjong/src/game/tsumo.ts'),
@@ -61,6 +61,8 @@ with sync_playwright() as p:
             import('/heibon-mahjong/tests/tsumo-fixture.ts'),
             import('/heibon-mahjong/src/rendering/tile-svg.ts'),
             import('/heibon-mahjong/src/model/tile.ts'),
+            import('/heibon-mahjong/tests/step13-10-fixture.ts'),
+            import('/heibon-mahjong/src/game/special-draws.ts'),
           ]);
           const roundTest = window.roundEndTest;
           const { controller, render } = roundTest;
@@ -158,6 +160,10 @@ with sync_playwright() as p:
               return { pre: null, win: { ...game, players: game.players.map(player => ({ ...player, river: player.river.slice(0, 18) })) } };
             }
             if (name === 'four-kans') return { pre: null, win: { ...shortRivers(fixed.fixedRound(0, [0, 2])), abortiveDraw: 'four-kans', kanCount: 4 } };
+            if (name === 'kyuushu') {
+              const pre = kyuushu.childKyuushuGame();
+              return { pre: null, win: specialDraws.declareKyuushuKyuuhai(pre, pre.turnPlayerId) };
+            }
             if (name === 'match-end') return { pre: null, win: shortRivers(fixed.fixedRound(0, [2])), matchEnd: true };
             throw new Error(`Unknown round-end scenario ${name}`);
           };
@@ -332,10 +338,10 @@ with sync_playwright() as p:
         variants = ['human-tsumo','human-ron','yakuman-tsumo','yakuman-ron','haneman-tsumo','ura-tsumo','cpu1-tsumo','cpu2-tsumo','cpu3-tsumo',
             'cpu1-ron','cpu2-ron','cpu3-ron','double-cpu-ron','triple-cpu-ron',
             'double-mixed-ron','triple-mixed-ron','adjusted-cpu1-ron','draw','draw-0','draw-1','draw-2','draw-3','draw-4',
-            'draw-self','draw-cpu1','draw-cpu2','draw-cpu3','draw-cpu-only','four-kans']
+            'draw-self','draw-cpu1','draw-cpu2','draw-cpu3','draw-cpu-only','four-kans','kyuushu']
         variant_reports = []
         for scenario in variants:
-            if scenario.startswith('draw-') or scenario == 'four-kans':
+            if scenario.startswith('draw-') or scenario in ('four-kans', 'kyuushu'):
                 pre = page.evaluate('(name) => window.roundEndTest.prepare(name, "pre")', scenario)
                 assert pre['status'] == 'playing' and pre['tenpai'] is None, (width, scenario, pre)
                 assert page.locator('#round-result-summary').is_hidden() and page.locator('#match-result').is_hidden(), (width, scenario, 'unconfirmed result visible')
@@ -353,6 +359,20 @@ with sync_playwright() as p:
             assert page.locator('#round-result-summary').is_visible(), (width, scenario, 'summary hidden')
             assert page.locator('#show-result').is_visible(), (width, scenario)
             assert page.locator('#next-round').is_visible() == (meta['status'] == 'round-ended'), (width, scenario, meta)
+            if meta['status'] == 'round-ended' and not meta['winners']:
+                fit = page.evaluate('''() => {
+                  const rect = selector => { const r=document.querySelector(selector).getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}; };
+                  const viewport=window.visualViewport;
+                  const table=rect('#local-table'), summary=rect('#round-result-summary'), controls=rect('#local-game-controls');
+                  const show=rect('#show-result'), next=rect('#next-round');
+                  const visibleBottom=(viewport?.offsetTop ?? 0)+(viewport?.height ?? innerHeight);
+                  return {table,summary,controls,show,next,visibleBottom,
+                    square:Math.abs(table.width-table.height)<1,
+                    actionsVisible:show.top>=0&&next.top>=0&&show.bottom<=visibleBottom&&next.bottom<=visibleBottom,
+                    actionsBeside:Math.abs(show.top-next.top)<1&&show.right<=next.left+1,
+                    belowTable:summary.top>=table.bottom-1&&controls.top>=summary.bottom-1&&show.top>=table.bottom};
+                }''')
+                assert fit['square'] and fit['actionsVisible'] and fit['actionsBeside'] and fit['belowTable'], (width, scenario, fit)
             if meta['winners']:
                 assert page.locator('.round-win-summary').count() == len(meta['winners']), (width, scenario, meta)
                 seat_names = ['自分', 'CPU1', 'CPU2', 'CPU3']
@@ -401,13 +421,14 @@ with sync_playwright() as p:
                     else:
                         assert seat.locator('.tile-back').count() > 0 and seat.locator('svg').count() == 0, (width, scenario, player)
             else:
-                expected = '途中流局（四開槓）' if meta['reason'] == 'four-kans' else '流局'
+                expected = {'four-kans':'途中流局（四開槓）','kyuushu-kyuuhai':'途中流局（九種九牌）'}.get(meta['reason'], '流局')
                 summary_lines = page.locator('#round-result-summary').locator('p').all_inner_texts()
                 if meta['reason'] == 'draw':
                     names = ['自分','CPU1','CPU2','CPU3']
                     ready = [names[id] for id, value in enumerate(meta['tenpai']) if value]
-                    ready_text = 'なし' if not ready else '全員' if len(ready) == 4 else '・'.join(ready)
-                    assert summary_lines == ['流局', f'テンパイ：{ready_text}'], (width, scenario, summary_lines)
+                    ready_text = 'なし' if not ready else '、'.join(ready)
+                    round_number = page.evaluate('window.roundEndTest.controller.match.roundNumber')
+                    assert summary_lines == [f'東{round_number}局 {meta["settlement"]["honba"]}本場・流局', f'テンパイ：{ready_text}'], (width, scenario, summary_lines)
                     for player in meta['players'][1:]:
                         seat = page.locator(f'.concealed-hand[data-player-id="{player["id"]}"]')
                         if meta['tenpai'][player['id']]:
@@ -523,7 +544,7 @@ with sync_playwright() as p:
         final = page.evaluate('(name) => window.roundEndTest.prepare(name, "finish", false, true)', 'match-end')
         assert final['status'] == 'match-ended' and not page.locator('#result-dialog').is_visible()
         assert not page.locator('#next-round').is_visible()
-        assert page.locator('#round-result-summary').locator('p').all_inner_texts() == ['流局', 'テンパイ：CPU2']
+        assert page.locator('#round-result-summary').locator('p').all_inner_texts() == ['東4局 0本場・流局', 'テンパイ：CPU2']
         page.locator('#show-result').click()
         assert page.locator('#result-title').inner_text() == '東風戦終了'
         assert not page.locator('#next-round').is_visible()

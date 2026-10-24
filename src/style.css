@@ -234,6 +234,29 @@ header > div { min-width:0; }
 .action-choice-group[hidden] { display:none !important; }
 .round-result-actions:not([hidden]) { display:flex; }
 
+/* A settled round keeps its summary directly above the action buttons. Leave
+   the square table intact, reducing only its width when the visible mobile
+   viewport cannot fit the regular table and controls. */
+@media (max-width:599px) {
+ main:has(.discard-controls.result-available) { gap:4px; padding-top:max(4px,env(safe-area-inset-top,0px)); padding-bottom:max(4px,env(safe-area-inset-bottom,0px)); }
+ #round-result-summary { padding:4px 8px; line-height:1.2; }
+ #round-result-summary p { margin:0; }
+ #online-match:has(.discard-controls.result-available) { gap:4px; }
+ #online-match:has(.discard-controls.result-available) #online-round-result { padding:4px 8px; }
+ #online-match:has(.discard-controls.result-available) #online-round-result .round-summary-winner,
+ #online-match:has(.discard-controls.result-available) #online-round-result .round-summary-tenpai { margin:0; font-size:14px; line-height:1.2; }
+ .round-result-actions { flex:0 0 100%; width:100%; }
+ .round-result-actions button { min-width:0; }
+ .discard-controls.result-available { padding:4px 6px; gap:4px; }
+}
+@media (max-width:599px) and (max-height:760px) {
+ main:has(.discard-controls.result-available) > #local-table,
+ #online-match:has(.discard-controls.result-available) #online-table {
+   width:min(calc(100% + 8px),calc(100dvh - 256px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));
+   margin-inline:auto;
+ }
+}
+
 /* Match the unchanged 14-column hand. CPU hands and melds use the smaller
    river-face variables below, in one player-relative row at every seat. */
 .table { container-type:normal; position:relative; display:grid; grid-template-columns:calc(var(--table-tile-width) * 2.5 + 2px) minmax(0,1fr) calc(var(--table-tile-width) * 2.5 + 2px); grid-template-rows:auto auto auto; grid-template-areas:'. top .' 'left rivers right' 'bottom bottom bottom'; gap:3px; padding:6px 2px; border:2px solid #39765e; border-radius:16px; background:radial-gradient(ellipse at center,#287a5a,#1c6048); --table-tile-width:min(42px,round(down,calc((100cqw - 21px) / 14),1px)); --table-tile-height:calc(var(--table-tile-width) * 1.4); --meld-headroom:calc(var(--table-tile-width) + 2px); }
