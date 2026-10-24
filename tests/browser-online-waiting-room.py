@@ -66,7 +66,7 @@ MOCK = r"""
     return {
       type: 'game-state', format: state.format, roomCode: code, gameRevision, viewerSeat, status: gameStatus,
       declarations: JSON.parse(JSON.stringify(declarations)),
-      round: { format: state.format, roundWind: 'east', roundNumber, dealerId: 0, honba: roundResult?.honba ?? 0, points: roundResult?.after ?? [25000, 25000, 25000, 25000], depositSticks: roundResult?.reason === 'draw' ? 1 : 0 },
+      round: { format: state.format, roundWind: gameStatus === 'match-ended' && state.format === 'tonnan' ? 'south' : 'east', roundNumber, dealerId: 0, honba: roundResult?.honba ?? 0, points: roundResult?.after ?? [25000, 25000, 25000, 25000], depositSticks: roundResult?.reason === 'draw' ? 1 : 0 },
       phase, turnPlayerId, liveWallCount: 90 - gameRevision, seats: viewSeats,
       doraIndicators: [makeTile('online-dora', 4)],
       ...(roundResult?.winners?.length ? { uraDoraIndicators: [makeTile('online-ura-dora', 5)] } : {}),
@@ -442,7 +442,7 @@ MOCK = r"""
       const after = [...before];
       for (const payment of payments) { after[payment.payerId] -= payment.points; after[payment.recipientId] += payment.points; }
       const honba = 1;
-      roundResult = { reason: kind === 'draw' ? 'draw' : method, roundNumber, dealerId: 0, honba, before, after,
+      roundResult = { reason: kind === 'draw' ? 'draw' : method, roundWind: matchEnded && state.format === 'tonnan' ? 'south' : 'east', roundNumber, dealerId: 0, honba, before, after,
         deltas: after.map((points, seat) => points - before[seat]), payments, deposits: null, tenpai, winners,
         matchEnded, next: matchEnded ? null : { roundNumber: roundNumber + 1, dealerId: 1, honba: 0 } };
       gameRevision++;
@@ -1235,7 +1235,7 @@ with sync_playwright() as p:
       ('self-ron', 0, ['ロン和了！', '和了者：テストホスト', '放銃者：テスト参加者', '局終了後の持ち点']),
       ('draw', 1, ['荒牌流局', 'テスト参加者：ノーテン', '供託：1本を次局へ持ち越し', '局終了後の持ち点']),
       ('kyuushu', 1, ['途中流局（九種九牌）', '宣言者：CPU1', '局終了後の持ち点']),
-      ('match-ended', 1, ['東風戦終了', '1位 テストホスト', '局終了後の持ち点']),
+      ('match-ended', 1, ['南4局 1本場', '半荘戦終了', '1位 テストホスト', '局終了後の持ち点']),
     ]
     for scenario_index, (scenario, viewer, expected) in enumerate(result_scenarios):
       viewport = {'width': 375, 'height': 667} if scenario_index == 0 else {'width': 320, 'height': 568}
