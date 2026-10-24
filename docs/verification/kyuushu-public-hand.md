@@ -21,3 +21,11 @@
 
 - ローカル：人間宣言とCPU宣言、卓上14枚、他家の非公開、結果の再表示、次局での公開解除。
 - オンライン：人間宣言とCPU宣言、宣言確定前の手牌非配信、確定後の全席公開、14枚の結果詳細、保存・再接続後の復元、次局での公開解除。
+
+## 公開牌の間隔再確認（2026-10-24）
+
+- 卓上の公開手牌コンテナを内容幅で配置し、通常手牌と同じ1px gapおよび固定牌幅を維持するよう修正。自分の公開手牌も通常手牌の固定セル幅・高さで描画する。
+- `tests/browser-test-page.py` に公開14枚の牌サイズ一致、固定gap、flex縮小なし、列幅の不自然な伸長なしの検査を追加。test.htmlで自分・CPU1・CPU2・CPU3を320px・375px・390px・430pxで確認し、通常版へのテスト操作混入と既存カン検証ページも確認。
+- `npm test`（56件）、`npm run build`、`npm run typecheck:worker`、`git diff --check` が成功。
+- [Browser UI verification run 40076750925](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40076750925)：commit `087648e34ba7c021250259d2dcd35edd68efec29` で成功。ChromiumとWebKitの全ブラウザー回帰が成功し、和了手・流局テンパイ手牌を含む既存結果画面検証も通過。
+- Chromium／WebKitのブラウザー検証結果であり、iPhone Safari実機は未確認。
