@@ -296,18 +296,13 @@ with sync_playwright() as p:
                 assert seat.locator('.tile-back').count() == player['handCount'] and seat.locator('svg').count() == 0, (width, scenario, player)
                 for tile_id in player['handIds'] + ([player['drawnId']] if player['drawnId'] else []):
                     assert tile_id not in pre_html, (width, scenario, player['id'], tile_id)
-            baseline = page.evaluate('''() => Object.fromEntries([1,2,3].map(id => {
-              const tile = document.querySelector(`.concealed-hand[data-player-id="${id}"] .tile-back`);
-              if (!tile) return [id, null];
-              const r = tile.getBoundingClientRect(); return [id, {width:r.width,height:r.height}];
-            }))''')
             meta = page.evaluate('(name) => window.roundEndTest.renderFullGeometry(name, "finish")', scenario)
             assert meta['status'] == 'round-ended' and len(meta['winners']) == 1, (width, scenario, meta)
             winner = meta['winners'][0]['winnerId']
             assert meta['meldCount'] == meld_count, (width, scenario, meta)
             assert page.locator(f'.concealed-hand[data-player-id="{winner}"] .revealed-tile').count() == meta['players'][winner]['handCount'], (width, scenario)
             assert page.locator(f'.concealed-hand[data-player-id="{winner}"] .revealed-tile svg[aria-label^="赤"]').count() == 1, (width, scenario)
-            geometry = page.evaluate('''({winner, baseline}) => {
+            geometry = page.evaluate('''winner => {
               const rect = e => { const r=e.getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}; };
               const overlaps = (a,b) => Math.min(a.right,b.right)>Math.max(a.left,b.left)+.05 && Math.min(a.bottom,b.bottom)>Math.max(a.top,b.top)+.05;
               const table=rect(document.querySelector('.table'));
@@ -326,15 +321,18 @@ with sync_playwright() as p:
                 if(overlaps(r,center)) violations.push({kind:'center',seat:face.closest('.concealed-hand').dataset.playerId,rect:r,other:center});
               }
               const winnerFaces=faces.filter(face=>face.closest('.concealed-hand').dataset.playerId===String(winner));
-              const referenceBack=document.querySelector('.table .concealed-hand .tile-back');
-              const referenceSize=referenceBack?rect(referenceBack):null;
-              const sizeDeltas=winnerFaces.map(face=>{const r=rect(face),b=referenceSize;return b?Math.max(Math.abs(r.width-b.width),Math.abs(r.height-b.height)):Infinity;});
+              // Compare untransformed CSS dimensions. getBoundingClientRect()
+              // includes the 90/270 degree rotations on the side seats.
+              const dimensions=e=>{const style=getComputedStyle(e);return {width:parseFloat(style.width),height:parseFloat(style.height)};};
+              const referenceBack=document.querySelector('.table .seat-top .concealed-hand .tile-back');
+              const referenceSize=referenceBack?dimensions(referenceBack):null;
+              const sizeDeltas=winnerFaces.map(face=>{const size=dimensions(face),b=referenceSize;return b?Math.max(Math.abs(size.width-b.width),Math.abs(size.height-b.height)):Infinity;});
               const privacy=[1,2,3].filter(id=>id!==winner).every(id=>[...document.querySelectorAll(`.concealed-hand[data-player-id="${id}"] .tile-back`)].length>0 && !document.querySelector(`.concealed-hand[data-player-id="${id}"] svg`));
               return {square:Math.abs(table.width-table.height)<.5,noHorizontalScroll:document.documentElement.scrollWidth<=innerWidth,
                 tileSizeMatchesBack:sizeDeltas.every(delta=>delta<.2),maxSizeDelta:Math.max(0,...sizeDeltas),
                 winnersOnly:privacy,violations,publicCount:winnerFaces.length,
                 rivers:[...document.querySelectorAll('.table .river')].map(river=>river.children.length)};
-            }''', {'winner': winner, 'baseline': baseline})
+            }''', winner)
             assert geometry['square'] and geometry['noHorizontalScroll'] and geometry['tileSizeMatchesBack'] and geometry['winnersOnly'], (width, scenario, geometry)
             assert not geometry['violations'], (width, scenario, geometry)
             assert geometry['rivers'] == [18,18,18,18], (width, scenario, geometry)
