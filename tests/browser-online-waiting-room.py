@@ -57,6 +57,8 @@ MOCK = r"""
       ...(roundResult?.winners?.some(winner => winner.winnerId === seat) ? {
         revealedHand: [...Array.from({ length: 13 }, (_, i) => makeTile(`online-result-hand-${seat}-${i}`, seat + i)), roundResult.winners.find(winner => winner.winnerId === seat).winningTile],
       } : {}),
+      ...(roundResult?.reason === 'kyuushu-kyuuhai' && roundResult.abortiveDrawPlayerId === seat
+        ? { revealedHand: [...hands[seat], ...(drawnTiles[seat] ? [drawnTiles[seat]] : [])] } : {}),
       river: rivers[seat],
       melds: [],
     }));
@@ -393,6 +395,21 @@ MOCK = r"""
     },
     setResultScenario(kind, viewerSeat) {
       if (!gameStarted) return;
+      if (kind === 'kyuushu') {
+        roundNumber = 1;
+        gameStatus = 'round-ended';
+        phase = 'wall-exhausted';
+        decision = null;
+        viewerOverride = viewerSeat;
+        drawnTiles[2] = makeTile('online-kyuushu-draw', 7);
+        roundResult = { reason: 'kyuushu-kyuuhai', abortiveDrawPlayerId: 2, roundNumber, dealerId: 0, honba: 0,
+          before: [25000,25000,25000,25000], after: [25000,25000,25000,25000], deltas: [0,0,0,0],
+          payments: [], deposits: null, tenpai: null, winners: [], matchEnded: false,
+          next: { roundNumber: 1, dealerId: 0, honba: 1 } };
+        gameRevision++;
+        broadcastGame('game-state');
+        return;
+      }
       const winnerId = kind === 'opponent-tsumo' ? 3 : 0;
       const method = kind.endsWith('ron') ? 'ron' : 'tsumo';
       const discarderId = method === 'ron' ? (kind === 'self-ron' ? 1 : 2) : undefined;
@@ -452,6 +469,7 @@ MOCK = r"""
     },
     hiddenNonWinnerTileIds(viewerSeat) {
       const winners = new Set(roundResult?.winners?.map(winner => winner.winnerId) ?? []);
+      if (roundResult?.reason === 'kyuushu-kyuuhai') winners.add(roundResult.abortiveDrawPlayerId);
       return hands.flatMap((hand, seat) => seat === viewerSeat || winners.has(seat) ? [] : [
         ...hand.map(tile => tile.id), ...(drawnTiles[seat] ? [drawnTiles[seat].id] : []),
       ]);
@@ -1165,6 +1183,7 @@ with sync_playwright() as p:
       ('opponent-tsumo', 1, ['ツモ和了！', '和了者：CPU2', '局終了後の持ち点']),
       ('self-ron', 0, ['ロン和了！', '和了者：テストホスト', '放銃者：テスト参加者', '局終了後の持ち点']),
       ('draw', 1, ['荒牌流局', 'テスト参加者：ノーテン', '供託：1本を次局へ持ち越し', '局終了後の持ち点']),
+      ('kyuushu', 1, ['途中流局（九種九牌）', '宣言者：CPU1', '局終了後の持ち点']),
       ('match-ended', 1, ['東風戦終了', '1位 テストホスト', '局終了後の持ち点']),
     ]
     for scenario_index, (scenario, viewer, expected) in enumerate(result_scenarios):
@@ -1173,13 +1192,17 @@ with sync_playwright() as p:
       if scenario_index:
         page.evaluate('args => window.onlineMock.setResultScenario(args.scenario, args.viewer)', {'scenario': scenario, 'viewer': viewer})
       wait_for(f"document.querySelector('#online-show-result').hidden === false && document.querySelector('#result-dialog').open === false")
+      if scenario == 'kyuushu':
+        assert page.locator('#online-match .public-hand-tile').count() == 14, 'online 九種九牌 must reveal exactly 14 tiles on the table'
+        assert page.locator('#online-result-content .winning-hand li').count() == 14, 'online result must contain 14 declared tiles'
+        assert page.locator('#online-result-content').inner_text().count('宣言者：CPU1') == 1
       before_result_open = page.evaluate('JSON.stringify(window.onlineUiTest.onlineGameController.view)')
       before_action_count = page.evaluate('window.onlineMock.gameActions.length')
       page.locator('#online-show-result').click()
       assert page.locator('#result-dialog').evaluate('element => element.open'), f'{scenario}: actual online result button click did not open the shared dialog'
       result_text = page.locator('#online-result-content').inner_text()
       assert all(label in result_text for label in expected), f'{scenario}: expected result detail was missing: {expected}; got {result_text}'
-      assert page.locator('#online-result-content .result-dora').count() == (0 if scenario == 'draw' else 2), f'{scenario}: public dora rows did not match the result'
+      assert page.locator('#online-result-content .result-dora').count() == (0 if scenario in ('draw', 'kyuushu') else 2), f'{scenario}: public dora rows did not match the result'
       assert page.locator('#result-new-game').is_hidden(), f'{scenario}: the offline new-game action appeared during an online match'
       assert page.evaluate('''() => {
         const dialog = document.querySelector('#result-dialog').getBoundingClientRect();

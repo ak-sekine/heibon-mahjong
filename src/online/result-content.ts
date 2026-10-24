@@ -224,6 +224,20 @@ export function renderOnlineResultContent(container: HTMLElement, view: PlayerGa
     settlement.append(text('p', `成立者：${winners.map(playerId => playerName(view, playerId)).join('・') || 'なし'}`));
     settlement.append(text('p', `満貫相当・${result.honba}本場（支払者1人につき100点を加算）`));
   }
+  if (result.reason === 'kyuushu-kyuuhai' && result.abortiveDrawPlayerId !== undefined) {
+    const declarer = view.seats[result.abortiveDrawPlayerId];
+    settlement.append(text('p', `宣言者：${playerName(view, declarer.seat)}`));
+    const hand = document.createElement('ol');
+    hand.className = 'winning-hand';
+    hand.setAttribute('aria-label', `${playerName(view, declarer.seat)}の九種九牌公開手牌`);
+    for (const tile of [...(declarer.revealedHand ?? [])].sort((a, b) =>
+      tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id))) {
+      const item = document.createElement('li');
+      item.append(createTileElement(tile.tile));
+      hand.append(item);
+    }
+    settlement.append(hand);
+  }
   if (result.tenpai) {
     for (const seat of view.seats) {
       settlement.append(text('p', `${playerName(view, seat.seat)}：${result.tenpai[seat.seat] ? 'テンパイ' : 'ノーテン'}`));

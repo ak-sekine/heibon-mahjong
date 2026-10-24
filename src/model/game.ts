@@ -96,6 +96,8 @@ export interface PendingRiichi {
 }
 export interface GameState extends WallState {
   readonly abortiveDraw?: 'four-kans' | 'kyuushu-kyuuhai' | 'four-winds' | 'four-riichi';
+  /** Set only when 九種九牌 is confirmed; identifies the hand made public. */
+  readonly abortiveDrawPlayerId?: PlayerId;
   readonly callsMade?: boolean;
   readonly pendingRiichi: PendingRiichi | null;
   readonly ronWindow: RonWindow | null;

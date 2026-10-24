@@ -14,7 +14,7 @@ import { isForbiddenDiscard } from '../src/game/melds.ts';
 import { ankanGame } from './kan-fixture.ts';
 import { callStart } from './calls-fixture.ts';
 import { riichiStart } from './riichi-fixture.ts';
-import { parentKyuushuGame } from './step13-10-fixture.ts';
+import { childKyuushuGame, parentKyuushuGame } from './step13-10-fixture.ts';
 import { tsumoGame } from './tsumo-fixture.ts';
 import {
   applyOnlineGameAction,
@@ -333,7 +333,7 @@ test('server action reducer rejects wrong turns, opponent tile IDs, and stale re
   }, connected), error => error instanceof OnlineGameRuleError && error.code === 'stale_revision');
 });
 
-test('online action reducer validates riichi, tsumo, kan, kyuushu, and starts the next round', () => {
+test('online action reducer validates riichi, tsumo, kan, kyuushu, and starts the next round', async () => {
   const connected = new Set<PlayerId>([0]);
   const riichiGame = riichiStart();
   const riichiSession = sessionForGame(riichiGame, [0]);
@@ -369,6 +369,28 @@ test('online action reducer validates riichi, tsumo, kan, kyuushu, and starts th
   }, connected, 3000);
   assert.equal(kyuushu.status, 'round-ended');
   assert.equal(kyuushu.match.lastSettlement?.reason, 'kyuushu-kyuuhai');
+  assert.equal(kyuushu.match.game.abortiveDrawPlayerId, 0);
+  const concealedBefore = createPlayerGameView(sessionForGame(kyuushuGame, [0]), 1, 'A2CDEF', new Set([0]));
+  assert.equal(concealedBefore.seats[0].revealedHand, undefined);
+  const declarerTileIds = [...kyuushuGame.players[0].hand, kyuushuGame.players[0].drawnTile!].map(tile => tile.id);
+  assert.ok(declarerTileIds.every(id => !JSON.stringify(concealedBefore).includes(id)));
+  for (const viewer of [0, 1, 2, 3] as const) {
+    const publicView = createPlayerGameView(kyuushu, viewer, 'A2CDEF', new Set([0]));
+    assert.equal(publicView.result?.abortiveDrawPlayerId, 0);
+    assert.deepEqual(publicView.seats[0].revealedHand?.map(tile => tile.id).sort(),
+      [...kyuushuGame.players[0].hand, kyuushuGame.players[0].drawnTile!].map(tile => tile.id).sort());
+    assert.equal(publicView.seats[0].revealedHand?.length, 14);
+    assert.deepEqual(publicView.seats.slice(1).map(seat => seat.revealedHand), [undefined, undefined, undefined]);
+  }
+  const restoredKyuushu = hydrateOnlineGame(JSON.stringify(kyuushu));
+  assert.ok(restoredKyuushu);
+  assert.deepEqual(createPlayerGameView(restoredKyuushu, 3, 'A2CDEF', new Set()).seats[0].revealedHand?.map(tile => tile.id).sort(),
+    declarerTileIds.sort());
+  const nextKyuushu = startNextOnlineRound(kyuushu, () => 0.25);
+  assert.equal(createPlayerGameView(nextKyuushu, 1, 'A2CDEF', connected).seats[0].revealedHand, undefined);
+  const cpuKyuushu = await advanceOnlineCpu(sessionForGame(childKyuushuGame(9), [0]), 3500);
+  assert.equal(cpuKyuushu.match.game.abortiveDrawPlayerId, 1);
+  assert.equal(createPlayerGameView(cpuKyuushu, 2, 'A2CDEF', connected).seats[1].revealedHand?.length, 14);
 
   const tsumoGameState = tsumoGame();
   assert.equal(canDeclareTsumo(tsumoGameState, 0), true);

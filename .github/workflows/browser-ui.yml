@@ -91,6 +91,7 @@ jobs:
           run_browser_test tests/browser-step13-8.py
           run_browser_test tests/browser-step13-9.py
           run_browser_test tests/browser-step13-10.py
+          HEIBON_BROWSER=webkit run_browser_test tests/browser-step13-10.py
           run_browser_test tests/browser-step13-11.py
           run_browser_test tests/browser-online-waiting-room.py
       - name: Save browser results and screenshots

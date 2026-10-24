@@ -51,6 +51,8 @@ export type PublicWinSummary = Readonly<{
 
 export type PublicRoundResult = Readonly<{
   reason: RoundSettlement['reason'];
+  /** Present only for a server-confirmed 九種九牌 declaration. */
+  abortiveDrawPlayerId?: PlayerId;
   roundNumber: number;
   dealerId: PlayerId;
   honba: number;
@@ -236,6 +238,8 @@ function publicResult(match: MatchState): PublicRoundResult | null {
     deposits: settlement.deposits,
     tenpai: settlement.tenpai,
     ...(settlement.nagashiManganWinners ? { nagashiManganWinners: settlement.nagashiManganWinners } : {}),
+    ...(settlement.reason === 'kyuushu-kyuuhai' && game.abortiveDrawPlayerId !== undefined
+      ? { abortiveDrawPlayerId: game.abortiveDrawPlayerId } : {}),
     winners,
     matchEnded: settlement.matchEnded,
     next: settlement.next,
@@ -283,6 +287,9 @@ export function createPlayerGameView(
     // The existing local table only reveals CPU hands on an exhaustive draw.
     // Human tenpai is scored by the shared rules, but there is no explicit
     // human tenpai declaration in the protocol, so their concealed hand stays private.
+    } else if (match.lastSettlement?.reason === 'kyuushu-kyuuhai' &&
+      game.abortiveDrawPlayerId === player.id) {
+      revealedHand = concealed.map(publicTile);
     } else if (player.control === 'cpu' && publicTenpai?.[player.id]) {
       revealedHand = concealed.map(publicTile);
     }

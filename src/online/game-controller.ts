@@ -329,10 +329,13 @@ export class OnlineGameController {
       if (!handNode || !meldNode || !seatNode) continue;
       seatNode.className = `seat ${position === 'bottom' ? 'seat-bottom' : position === 'right' ? 'seat-right' : position === 'left' ? 'seat-left' : 'seat-top'}`;
       handNode.className = 'concealed-hand';
+      const visible = seat.revealedHand;
+      handNode.hidden = position === 'bottom' && !visible;
+      this.playerHand.hidden = position === 'bottom' && Boolean(visible);
       meldNode.className = 'open-melds';
       meldNode.replaceChildren(...seat.melds.map(meld => this.renderMeld(meld, seat.seat)));
       handNode.replaceChildren();
-      if (position === 'bottom' && seat.hand) {
+      if (position === 'bottom' && seat.hand && !visible) {
         const sorted = [...seat.hand].sort((a, b) =>
           (this.tileOrder.get(tileKindKey(a.tile)) ?? 99) - (this.tileOrder.get(tileKindKey(b.tile)) ?? 99) ||
           Number(a.tile.isRed) - Number(b.tile.isRed) || a.id.localeCompare(b.id));
@@ -345,7 +348,6 @@ export class OnlineGameController {
         }
         continue;
       }
-      const visible = seat.revealedHand;
       const tiles = visible ?? Array.from({ length: seat.concealedCount }, () => null);
       handNode.setAttribute('aria-label', `${this.displayName(view, seat)}の${visible ? '公開手牌' : '裏向き手牌'} ${tiles.length}枚`);
       for (const tile of tiles) {

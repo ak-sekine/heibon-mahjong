@@ -87,11 +87,18 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
       isRiichi: Boolean(player.riichi),
       isConnected: true,
     });
-    if (id === 0) renderSelf(player, canDiscard(game, 0));
+    if (id === 0) {
+      renderSelf(player, canDiscard(game, 0));
+      if (settlement?.reason === 'kyuushu-kyuuhai' && game.abortiveDrawPlayerId === id) {
+        renderRevealedOwnHand(document.querySelector<HTMLUListElement>('#player-hand')!, player);
+      }
+    }
     else {
       const backHand = document.querySelector<HTMLElement>(`.concealed-hand[data-player-id="${id}"]`);
       if (backHand) {
-        if (winningResult && player.control === 'cpu') renderPublicCpuHand(backHand, game, winningResult);
+        if (settlement?.reason === 'kyuushu-kyuuhai' && game.abortiveDrawPlayerId === id) {
+          renderPublicCpuDrawHand(backHand, player);
+        } else if (winningResult && player.control === 'cpu') renderPublicCpuHand(backHand, game, winningResult);
         else if (player.control === 'cpu' && settlement?.reason === 'draw' && settlement.tenpai?.[id]) {
           renderPublicCpuDrawHand(backHand, player);
         } else {
@@ -233,6 +240,21 @@ function renderPublicCpuDrawHand(container: HTMLElement, player: PlayerState): v
   const tiles = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
     .sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
   renderRevealedCpuHand(container, player, tiles);
+}
+
+function renderRevealedOwnHand(container: HTMLUListElement, player: PlayerState): void {
+  const tiles = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
+    .sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
+  container.setAttribute('aria-label', `自分の公開手牌 ${tiles.map(tile => tileLabel(tile.tile)).join('・')}`);
+  container.replaceChildren(...tiles.map(physical => {
+    const item = document.createElement('li');
+    const tile = document.createElement('span');
+    tile.className = 'revealed-tile';
+    tile.setAttribute('aria-hidden', 'true');
+    tile.append(createTileElement(physical.tile));
+    item.append(tile);
+    return item;
+  }));
 }
 
 function renderRevealedCpuHand(container: HTMLElement, player: PlayerState, tiles: readonly PhysicalTile[], winningTileId?: string): void {

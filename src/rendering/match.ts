@@ -38,6 +38,21 @@ export function renderMatch(match: MatchState): void {
     panel.append(text('p',`成立者：${winners.map(id=>names[id]).join('・')}`));
     panel.append(text('p',`満貫相当・${result.honba}本場（支払者1人につき100点を加算）`));
   }
+  if (result.reason === 'kyuushu-kyuuhai' && match.game.abortiveDrawPlayerId !== undefined) {
+    const player = match.game.players[match.game.abortiveDrawPlayerId];
+    panel.append(text('p', `宣言者：${names[player.id]}`));
+    const hand = document.createElement('ol');
+    hand.className = 'winning-hand';
+    hand.setAttribute('aria-label', `${names[player.id]}の九種九牌公開手牌`);
+    const tiles = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
+      .sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
+    for (const tile of tiles) {
+      const item = document.createElement('li');
+      item.append(createTileElement(tile.tile));
+      hand.append(item);
+    }
+    panel.append(hand);
+  }
   if (result.tenpai) {
     for (const player of match.game.players) {
       panel.append(text('p',`${names[player.id]}：${result.tenpai[player.id] ? 'テンパイ' : 'ノーテン'}`));

@@ -157,6 +157,7 @@ test('九種九牌: declaration is optional, immediate, free and keeps point/dea
   const declared = declareKyuushuKyuuhai(game,0);
   assert.equal(declared.phase,'wall-exhausted');
   assert.equal(declared.abortiveDraw,'kyuushu-kyuuhai');
+  assert.equal(declared.abortiveDrawPlayerId,0);
   assert.equal(declared.winResult,null);
   inventory(declared,game);
   const match = updateMatchGame(startMatch(game),declared);
@@ -174,6 +175,7 @@ test('九種九牌: declaration is optional, immediate, free and keeps point/dea
   assert.equal(controller.canKyuushuKyuuhai,true);
   controller.declareKyuushuKyuuhai();
   assert.equal(controller.match.lastSettlement?.reason,'kyuushu-kyuuhai');
+  assert.equal(controller.game.abortiveDrawPlayerId,0);
   assert.equal(controller.canNextRound,true);
   await controller.nextRound();
   assert.equal(controller.match.status,'playing');
@@ -183,6 +185,16 @@ test('九種九牌: declaration is optional, immediate, free and keeps point/dea
   const noDeclare = discardTile(game,0,game.players[0].drawnTile!.id);
   assert.notEqual(noDeclare.phase,'wall-exhausted');
   assert.equal(startMatch(noDeclare).status,'playing');
+});
+
+test('九種九牌: CPU declaration records the declaring seat for the public hand', () => {
+  const game = childKyuushuGame(9);
+  const declared = declareKyuushuKyuuhai(game, 1);
+  assert.equal(declared.abortiveDrawPlayerId, 1);
+  assert.equal(declared.players[1].hand.length + Number(Boolean(declared.players[1].drawnTile)), 14);
+  const match = updateMatchGame(startMatch(game), declared);
+  assert.equal(match.game.abortiveDrawPlayerId, 1);
+  assert.equal(match.lastSettlement?.reason, 'kyuushu-kyuuhai');
 });
 
 test('九種九牌: prior discard, a call/kan, meld, pending window and wrong turn reject it', () => {

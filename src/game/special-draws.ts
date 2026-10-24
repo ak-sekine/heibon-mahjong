@@ -56,5 +56,5 @@ export function canDeclareKyuushuKyuuhai(game: GameState, playerId: PlayerId): b
 
 export function declareKyuushuKyuuhai(game: GameState, playerId: PlayerId): GameState {
   if (!canDeclareKyuushuKyuuhai(game, playerId)) throw new RangeError('九種九牌 is not allowed now');
-  return { ...game, phase: 'wall-exhausted', abortiveDraw: 'kyuushu-kyuuhai', ronWindow: null, pendingRiichi: null };
+  return { ...game, phase: 'wall-exhausted', abortiveDraw: 'kyuushu-kyuuhai', abortiveDrawPlayerId: playerId, ronWindow: null, pendingRiichi: null };
 }
