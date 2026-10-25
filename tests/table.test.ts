@@ -281,8 +281,10 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
       assert.deepEqual(items.map(item => item.dataset.tileId), tiles.map(tile => tile.id));
       assert.equal(new Set(items.map(item => `${item.dataset.riverRow},${item.dataset.riverColumn}`)).size, 18);
       for (const [index, item] of items.entries()) {
-        const row = Math.floor(index / 6), col = index % 6;
-        const expected = [[row+1,col+1], [6-col,row+1], [3-row,6-col], [col+1,3-row]][id];
+        const mainRow = Math.floor(index / 6), mainColumn = index % 6;
+        const sideRow = Math.floor(index / 8), sideColumn = index % 8;
+        const expected = [[mainRow+1,mainColumn+1], [8-sideColumn,sideRow+1],
+          [3-mainRow,6-mainColumn], [sideColumn+1,3-sideRow]][id];
         assert.deepEqual([Number(item.dataset.riverRow), Number(item.dataset.riverColumn)], expected.map(value => value - 1));
       }
     }

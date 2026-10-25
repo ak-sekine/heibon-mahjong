@@ -20,35 +20,41 @@ export type RiverTilePlacement = Readonly<{
 
 export type RiverLayout = Readonly<{
   rows: number;
+  tileScale: number;
   width: string;
   height: string;
   placements: readonly RiverTilePlacement[];
 }>;
 
 const GAP = 1;
-const COLUMNS = 6;
+const MAIN_COLUMNS = 6;
+const SIDE_COLUMNS = 8;
 const MIN_ROWS = 3;
+
+function columnsFor(position: RiverPosition): number {
+  return position === 'right' || position === 'left' ? SIDE_COLUMNS : MAIN_COLUMNS;
+}
 
 function compactOffset(index: number, declarationFirst: boolean, declarationBefore: boolean): string {
   const inset = declarationFirst ? '' : ' + var(--river-tile-height) * .5 - var(--river-tile-width) * .5';
   const declarationLength = declarationBefore ? ' + var(--river-tile-height) - var(--river-tile-width)' : '';
   if (index === 0 && declarationFirst) return '0px';
-  return `calc(var(--river-tile-width) * ${index} + ${index * GAP}px${inset}${declarationLength})`;
+  return `calc(var(--river-tile-width) * ${index} + var(--river-gap, ${GAP}px) * ${index}${inset}${declarationLength})`;
 }
 
 function fullOffset(index: number): string {
-  return index === 0 ? '0px' : `calc(var(--river-tile-height) * ${index} + ${index * GAP}px)`;
+  return index === 0 ? '0px' : `calc(var(--river-tile-height) * ${index} + var(--river-gap, ${GAP}px) * ${index})`;
 }
 
 function compactSpan(cellCount: number): string {
   const intervals = cellCount - 1;
-  // Reserve the widest possible line: six tiles, including one sideways
+  // Reserve the widest possible line, including one sideways
   // declaration between the two end half-cells.
-  return `calc(var(--river-tile-height) * 2 + var(--river-tile-width) * ${cellCount - 2} + ${intervals * GAP}px)`;
+  return `calc(var(--river-tile-height) * 2 + var(--river-tile-width) * ${cellCount - 2} + var(--river-gap, ${GAP}px) * ${intervals})`;
 }
 
 function fullSpan(cellCount: number): string {
-  return `calc(var(--river-tile-height) * ${cellCount} + ${(cellCount - 1) * GAP}px)`;
+  return `calc(var(--river-tile-height) * ${cellCount} + var(--river-gap, ${GAP}px) * ${cellCount - 1})`;
 }
 
 /**
@@ -69,26 +75,32 @@ export function calculateRiverLayout(
   }
 
   const side = position === 'right' || position === 'left';
+  const columns = columnsFor(position);
   // Eighteen is the usual exhaustive-draw river length. Calls can alter turn
   // distribution, so the layout grows by rows instead of enforcing a game cap.
-  const rows = Math.max(MIN_ROWS, Math.ceil(discardCount / COLUMNS));
-  const width = side ? fullSpan(rows) : compactSpan(COLUMNS);
-  const height = side ? compactSpan(COLUMNS) : fullSpan(rows);
+  const rows = Math.max(MIN_ROWS, Math.ceil(discardCount / columns));
+  // A fourth side lane begins only after the 24 regular slots. Scale both the
+  // tiles and gaps together so exceptional rivers stay within the three-lane
+  // footprint instead of reaching the rotated side seat.
+  const tileScale = side && rows > MIN_ROWS ? 2.9 / rows
+    : !side && rows > 4 ? Math.min(4 / rows, 1.15 / (.76 * (rows - 3))) : 1;
+  const width = side ? fullSpan(rows) : compactSpan(MAIN_COLUMNS);
+  const height = side ? compactSpan(SIDE_COLUMNS) : fullSpan(rows);
   const centerInSlot = (face: string): string => `calc((var(--river-tile-height) - var(${face})) * .5)`;
   const add = (offset: string, centered: string): string => offset === '0px'
     ? centered
     : `calc(${offset} + ${centered})`;
 
   const slots = Array.from({ length: discardCount }, (_, index) => {
-    const row = Math.floor(index / COLUMNS);
-    const column = index % COLUMNS;
-    // Keep the traditional three rows exactly where they have always been.
-    // Additional coordinates continue each river in its seat-relative direction.
-    const screenRow = position === 'right' ? 5 - column
+    const row = Math.floor(index / columns);
+    const column = index % columns;
+    // Side rivers use eight tiles along the table edge and three lanes across
+    // it. Right and left are mirrored; the self and opposite rivers keep six.
+    const screenRow = position === 'right' ? SIDE_COLUMNS - 1 - column
       : position === 'left' ? column
         : position === 'top' ? 2 - row : row;
     const screenColumn = position === 'right' ? row
-      : position === 'left' ? 2 - row
+      : position === 'left' ? (rows > MIN_ROWS ? rows - 1 - row : MIN_ROWS - 1 - row)
         : position === 'top' ? 5 - column : column;
     const declaration = index === declarationIndex;
     const widthFace = side
@@ -132,7 +144,7 @@ export function calculateRiverLayout(
       top: topInSlot,
     };
   });
-  return { rows, width, height, placements };
+  return { rows, tileScale, width, height, placements };
 }
 
 export function applyRiverLayout(container: HTMLElement, layout: RiverLayout): void {
@@ -140,15 +152,14 @@ export function applyRiverLayout(container: HTMLElement, layout: RiverLayout): v
   container.style.gridTemplateColumns = '';
   container.style.gridTemplateRows = '';
   container.dataset.riverRows = String(layout.rows);
-  if (layout.rows > 4) {
-    // Keep exceptional long rivers inside roughly the four-row footprint.
-    // Normal 1–24 tile rivers retain their original face dimensions.
-    const scale = Math.min(4 / layout.rows, 1.15 / (.76 * (layout.rows - 3)));
-    container.style.setProperty('--river-tile-width', `calc(var(--table-tile-width) * .76 * ${scale})`);
-    container.style.setProperty('--river-tile-height', `calc(var(--table-tile-height) * .76 * ${scale})`);
+  if (layout.tileScale < 1) {
+    container.style.setProperty('--river-tile-width', `calc(var(--table-tile-width) * .76 * ${layout.tileScale})`);
+    container.style.setProperty('--river-tile-height', `calc(var(--table-tile-height) * .76 * ${layout.tileScale})`);
+    container.style.setProperty('--river-gap', `${layout.tileScale}px`);
   } else {
     container.style.removeProperty('--river-tile-width');
     container.style.removeProperty('--river-tile-height');
+    container.style.removeProperty('--river-gap');
   }
   container.style.width = layout.width;
   container.style.height = layout.height;

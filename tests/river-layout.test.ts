@@ -14,8 +14,8 @@ test('online seat rotation puts each viewer at the bottom and rotates all other 
   }
 });
 
-test('1–18 discards keep their existing ordered slots in all four directions', () => {
-  for (const direction of directions) {
+test('1–18 self and opposite discards keep their established six-column order', () => {
+  for (const direction of ['bottom', 'top'] as const) {
     for (const count of [1, 6, 7, 12, 18]) {
       const { placements } = calculateRiverLayout(direction, count);
       assert.equal(placements.length, count);
@@ -74,14 +74,14 @@ test('riichi adds its extra face length only to later tiles on the same line', (
   }
 });
 
-test('19–24 discards occupy a fourth row and larger rivers grow without a fixed cap', () => {
-  const fourthRowStart: Readonly<Record<RiverPosition, readonly [number, number]>> = {
-    bottom: [3, 0], right: [5, 3], top: [-1, 5], left: [0, -1],
+test('self and opposite rivers preserve six-by-four placement beyond 18 discards', () => {
+  const fourthRowStart: Readonly<Record<'bottom' | 'top', readonly [number, number]>> = {
+    bottom: [3, 0], top: [-1, 5],
   };
-  const fourthRowEnd: Readonly<Record<RiverPosition, readonly [number, number]>> = {
-    bottom: [3, 5], right: [0, 3], top: [-1, 0], left: [5, -1],
+  const fourthRowEnd: Readonly<Record<'bottom' | 'top', readonly [number, number]>> = {
+    bottom: [3, 5], top: [-1, 0],
   };
-  for (const direction of directions) {
+  for (const direction of ['bottom', 'top'] as const) {
     for (const count of [19, 20, 23, 24, 25, 30, 70]) {
       const layout = calculateRiverLayout(direction, count);
       assert.equal(layout.placements.length, count);
@@ -101,6 +101,51 @@ test('19–24 discards occupy a fourth row and larger rivers grow without a fixe
         [layout.placements[23].row, layout.placements[23].column], fourthRowEnd[direction]);
     }
   }
+});
+
+test('side rivers pack eight ordered tiles across three mirrored lanes', () => {
+  const expected: Readonly<Record<'right' | 'left', readonly [number, number][]>> = {
+    right: [
+      ...Array.from({ length: 8 }, (_, index) => [7 - index, 0] as const),
+      ...Array.from({ length: 8 }, (_, index) => [7 - index, 1] as const),
+      ...Array.from({ length: 8 }, (_, index) => [7 - index, 2] as const),
+    ],
+    left: [
+      ...Array.from({ length: 8 }, (_, index) => [index, 2] as const),
+      ...Array.from({ length: 8 }, (_, index) => [index, 1] as const),
+      ...Array.from({ length: 8 }, (_, index) => [index, 0] as const),
+    ],
+  };
+  for (const direction of ['right', 'left'] as const) {
+    for (const count of [8, 9, 16, 17, 18, 19, 20, 23, 24]) {
+      const layout = calculateRiverLayout(direction, count);
+      assert.equal(layout.rows, 3);
+      assert.equal(layout.placements.length, count);
+      assert.deepEqual(layout.placements.map(({ row, column }) => [row, column]), expected[direction].slice(0, count));
+      assert.equal(new Set(layout.placements.map(({ row, column }) => `${row},${column}`)).size, count);
+      assert.match(layout.width, /var\(--river-tile-height\) \* 3/);
+      assert.match(layout.height, /var\(--river-tile-width\) \* 6/);
+    }
+  }
+  assert.deepEqual([
+    calculateRiverLayout('right', 19).placements[18].row,
+    calculateRiverLayout('right', 19).placements[18].column,
+  ], [5, 2]);
+  assert.deepEqual([
+    calculateRiverLayout('left', 19).placements[18].row,
+    calculateRiverLayout('left', 19).placements[18].column,
+  ], [2, 0]);
+  assert.match(calculateRiverLayout('right', 24).width, /\* 3/);
+  assert.match(calculateRiverLayout('right', 24).height, /\* 6/);
+  for (const direction of ['right', 'left'] as const) {
+    const thirtyTwo = calculateRiverLayout(direction, 32);
+    const thirtyThree = calculateRiverLayout(direction, 33);
+    assert.equal(thirtyTwo.rows, 4);
+    assert.equal(thirtyThree.rows, 5);
+    assert.equal(thirtyTwo.placements.length, 32);
+    assert.equal(thirtyThree.placements.length, 33);
+    assert.ok(thirtyThree.tileScale < thirtyTwo.tileScale);
+  }
   const eighteen = calculateRiverLayout('bottom', 18);
   const twentyFour = calculateRiverLayout('bottom', 24);
   assert.equal(twentyFour.placements[18].row, 3);
@@ -113,11 +158,11 @@ test('19–24 discards occupy a fourth row and larger rivers grow without a fixe
   assert.throws(() => calculateRiverLayout('bottom', 1, 1), RangeError);
 });
 
-test('CPU1 right river preserves its first 18 positions and gives discard 19 a rotated fourth line slot', () => {
+test('CPU1 right river preserves its first 18 positions and gives discard 19 an eighth-column third-lane slot', () => {
   const before = calculateRiverLayout('right', 18);
   const after = calculateRiverLayout('right', 19);
   assert.deepEqual(after.placements.slice(0, 18), before.placements);
-  assert.deepEqual([after.placements[18].row, after.placements[18].column], [5, 3]);
+  assert.deepEqual([after.placements[18].row, after.placements[18].column], [5, 2]);
   assert.deepEqual([after.placements[18].width, after.placements[18].height], [
     'var(--river-tile-height)', 'var(--river-tile-width)',
   ]);

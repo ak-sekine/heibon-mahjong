@@ -29,8 +29,9 @@ def verify_original_river_positions(baselines, mode, declaration_seat, count, ce
 with sync_playwright() as p:
     browser_type = getattr(p, os.environ.get('HEIBON_BROWSER', 'chromium'))
     browser = browser_type.launch(headless=True)
-    for width in [320, 355, 375, 390, 430]:
-        page = browser.new_page(viewport={'width': width, 'height': 844})
+    viewports = [(320, 568), (355, 812), (375, 812), (390, 844), (430, 932)]
+    for width, height in viewports:
+        page = browser.new_page(viewport={'width': width, 'height': height})
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(base)
         page.wait_for_selector('#online-game-controls', state='attached')
@@ -46,7 +47,7 @@ with sync_playwright() as p:
           window.riverFixture={renderer,base,pool,OnlineGameController,ActionPanel,ResultDialog,startMatch,createPlayerGameView,
             online:new OnlineGameController(new ActionPanel(document.querySelector('#online-game-controls')),new ResultDialog())};
         }''')
-        for count in range(18, 25):
+        for count in [18, 19, 20, 23, 24, 25, 32, 33]:
             for declaration_seat in [0, 1, 2, 3]:
                 page.evaluate('''({count,declarationSeat})=>{
                   const {renderer,base,pool,online}=window.riverFixture;
@@ -68,15 +69,27 @@ with sync_playwright() as p:
                   const rivers=[...table.querySelectorAll('.river')];
                   const faces=[...table.querySelectorAll('.river .tile-svg')];
                   const hand=[...table.querySelectorAll(handSelector+' .tile-svg')];
+                  const seatTiles=[...table.querySelectorAll('.seat .tile-back,.seat .open-meld .tile-svg,.seat .revealed-tile .tile-svg,.seat-bottom #player-hand .tile-svg,.online-concealed-hand .tile-back,.online-open-melds .tile-svg,.online-seat-bottom #online-player-hand .tile-svg')];
                   const center=table.querySelector('.center-info'),dora=[...center.querySelectorAll('.dora-area .tile-svg')];
                   const riverPairs=faces.every((a,i)=>faces.slice(i+1).every(b=>separate(rect(a),rect(b))));
                   const handClear=faces.every(a=>hand.every(b=>separate(rect(a),rect(b))));
                   const centerClear=faces.every(a=>separate(rect(a),rect(center)));
                   const doraClear=faces.every(a=>dora.every(b=>separate(rect(a),rect(b))));
+                  const seatClear=faces.every(a=>seatTiles.every(b=>separate(rect(a),rect(b))));
+                  const sideRivers=table.id==='online-table'
+                    ?[table.querySelector('.river-right'),table.querySelector('.river-left')]
+                    :[table.querySelector('.river[data-player-id="1"]'),table.querySelector('.river[data-player-id="3"]')];
+                  const sideScaleCorrect=sideRivers.every(r=>count<=24
+                    ?r.style.getPropertyValue('--river-tile-width')===''&&r.style.getPropertyValue('--river-tile-height')===''
+                    :r.style.getPropertyValue('--river-tile-width')!==''&&r.style.getPropertyValue('--river-tile-height')!=='');
                   const tileBounds=faces.every(a=>inside(rect(a),t));
                   const riverBounds=rivers.every(a=>inside(rect(a),t));
                   const box=e=>{const b=rect(e);return [b.left,b.top,b.right,b.bottom].map(v=>Math.round(v*10)/10);};
-                  const owner=e=>{const r=e.closest('.river');return r.dataset.playerId??r.dataset.onlineRiver;};
+                  const seatOfRiver=r=>r.dataset.playerId??({bottom:0,right:1,top:2,left:3}[['bottom','right','top','left'].find(position=>r.classList.contains(`river-${position}`))]);
+                  const riverAt=seat=>table.id==='online-table'
+                    ?table.querySelector(`.river-${({0:'bottom',1:'right',2:'top',3:'left'})[seat]}`)
+                    :table.querySelector(`.river[data-player-id="${seat}"]`);
+                  const owner=e=>seatOfRiver(e.closest('.river'));
                   const prefixCenters=rivers.map(r=>[...r.children].slice(0,18).map(e=>{
                     const b=rect(e.querySelector('.tile-svg'));
                     return [Math.round((b.left+b.right)*5)/10,Math.round((b.top+b.bottom)*5)/10];
@@ -90,12 +103,33 @@ with sync_playwright() as p:
                   const handOverlaps=[];
                   for(const a of faces)for(const b of hand)if(!separate(rect(a),rect(b)))
                     handOverlaps.push([owner(a),[...a.closest('.river').children].indexOf(a.closest('.river-tile')),box(a),box(b)]);
+                  const seatOverlaps=[];
+                  for(const a of faces)for(const b of seatTiles)if(!separate(rect(a),rect(b)))
+                    seatOverlaps.push([owner(a),[...a.closest('.river').children].indexOf(a.closest('.river-tile')),
+                      b.closest('.seat')?.dataset.playerId??b.closest('.online-seat')?.dataset.onlineSeat,box(a),box(b)]);
+                  const criticalSlotsCorrect=[1,3].every(seat=>{
+                    const river=riverAt(seat);
+                    const expected=seat===1?[[5,2],[4,2],[1,2],[0,2]]:[[2,0],[3,0],[6,0],[7,0]];
+                    return [18,19,22,23].every((index,n)=>{
+                      const tile=river?.children[index];
+                      return count<index+1||Boolean(tile&&Number(tile.dataset.riverRow)===expected[n][0]&&
+                        Number(tile.dataset.riverColumn)===expected[n][1]);
+                    });
+                  });
+                  const criticalRects=[1,3].flatMap(seat=>{
+                    const river=riverAt(seat);
+                    return [18,19,22,23].filter(index=>count>index).map(index=>{
+                      const tile=river.children[index];return {seat,index:index+1,slot:[Number(tile.dataset.riverRow),Number(tile.dataset.riverColumn)],rect:box(tile.querySelector('.tile-svg'))};
+                    });
+                  });
+                  const expectedRows=river=>[1,3].includes(Number(seatOfRiver(river)))
+                    ?Math.max(3,Math.ceil(count/8)):Math.max(3,Math.ceil(count/6));
                   return {tileCounts:rivers.map(e=>e.children.length),correctCount:rivers.every(e=>e.children.length===count),
-                    allFourPositions:rivers.length===4,riverPairs,handClear,centerClear,doraClear,tileBounds,riverBounds,
+                    allFourPositions:rivers.length===4,riverPairs,handClear,centerClear,doraClear,seatClear,sideScaleCorrect,criticalSlotsCorrect,tileBounds,riverBounds,
                     noPageOverflow:document.documentElement.scrollWidth<=innerWidth,
-                    fourthRow:count<19||rivers.every(r=>Number(r.dataset.riverRows)>=4&&
+                    fourthRow:rivers.every(r=>Number(r.dataset.riverRows)===expectedRows(r)&&
                       new Set([...r.children].map(e=>`${e.dataset.riverRow},${e.dataset.riverColumn}`)).size===count),
-                    riverOverlaps,centerOverlaps,handOverlaps,prefixCenters,
+                    riverOverlaps,centerOverlaps,handOverlaps,seatOverlaps,criticalRects,prefixCenters,
                     declarationCount:table.querySelectorAll('.river-tile[data-riichi-declaration="true"]').length,
                     declarationRotated:(()=>{const d=table.querySelector('.river-tile[data-riichi-declaration="true"] .tile-svg');
                       const n=d?.closest('.river')?.querySelector('.river-tile:not([data-riichi-declaration="true"]) .tile-svg');
@@ -106,8 +140,8 @@ with sync_playwright() as p:
                     ('offline', '#local-table', '#player-hand'),
                 ]:
                     result = page.evaluate(measure, {'count': count, 'tableSelector': selector, 'handSelector': hand_selector})
-                    assert all(value is True for key, value in result.items() if key not in ('tileCounts','declarationCount','riverOverlaps','centerOverlaps','handOverlaps','prefixCenters')) and not result['riverOverlaps'] and not result['centerOverlaps'] and not result['handOverlaps'], (
-                        width, count, declaration_seat, mode, result)
+                    assert all(value is True for key, value in result.items() if key not in ('tileCounts','declarationCount','riverOverlaps','centerOverlaps','handOverlaps','seatOverlaps','criticalRects','prefixCenters')) and not result['riverOverlaps'] and not result['centerOverlaps'] and not result['handOverlaps'] and not result['seatOverlaps'], (
+                        width, height, count, declaration_seat, mode, result)
                     assert result['declarationCount'] == 1, (width, count, declaration_seat, mode, result)
                     del result['prefixCenters']
                     reports.append({'width': width, 'count': count, 'declarationSeat': declaration_seat, 'mode': mode, **result})
@@ -125,8 +159,8 @@ with sync_playwright() as p:
                   online.receive({type:'game-state',view});
                 }''', {'count': count, 'declarationSeat': declaration_seat})
                 result = page.evaluate(measure, {'count': count, 'tableSelector': '#online-table', 'handSelector': '#online-player-hand'})
-                assert all(value is True for key, value in result.items() if key not in ('tileCounts','declarationCount','riverOverlaps','centerOverlaps','handOverlaps','prefixCenters')) and not result['riverOverlaps'] and not result['centerOverlaps'] and not result['handOverlaps'], (
-                    width, count, declaration_seat, 'online', result)
+                assert all(value is True for key, value in result.items() if key not in ('tileCounts','declarationCount','riverOverlaps','centerOverlaps','handOverlaps','seatOverlaps','criticalRects','prefixCenters')) and not result['riverOverlaps'] and not result['centerOverlaps'] and not result['handOverlaps'] and not result['seatOverlaps'], (
+                    width, height, count, declaration_seat, 'online', result)
                 assert result['declarationCount'] == 1, (width, count, declaration_seat, 'online', result)
                 del result['prefixCenters']
                 reports.append({'width': width, 'count': count, 'declarationSeat': declaration_seat, 'mode': 'online', **result})
@@ -169,5 +203,10 @@ with sync_playwright() as p:
 (out / f"river-capacity-{os.environ.get('HEIBON_BROWSER', 'chromium')}.json").write_text(
     json.dumps(reports, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 print(json.dumps({'browser': os.environ.get('HEIBON_BROWSER', 'chromium'), 'checks': len(reports),
-                  'widths': [320, 355, 375, 390, 430], 'riverCounts': list(range(18, 25)),
-                  'modes': ['offline', 'online'], 'failures': 0}, ensure_ascii=False))
+                  'viewports': viewports, 'riverCounts': [18, 19, 20, 23, 24, 25, 32, 33],
+                  'modes': ['offline', 'online'], 'criticalRectSamples': [
+                    {'width': r['width'], 'height': r['height'], 'count': r['count'], 'mode': r['mode'],
+                     'tiles': r['criticalRects']}
+                    for r in reports if r['width'] in (320, 390) and r['count'] in (19, 20, 24) and
+                    r['declarationSeat'] == 0 and r['mode'] == 'offline'
+                  ], 'failures': 0}, ensure_ascii=False))

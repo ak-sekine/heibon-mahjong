@@ -25,7 +25,8 @@ def verify_cpu1_river_geometry(page, width, stage):
         transform: getComputedStyle(element).transform,
       }));
       const others = [...document.querySelectorAll('.river:not([data-player-id="1"]) .river-tile .tile-svg')].map(rect);
-      return {table,center,cpu1,others,riverRows:document.querySelector('.river[data-player-id="1"]').dataset.riverRows};
+      const cpu1Seat = [...document.querySelectorAll('.seat[data-player-id="1"] .concealed-hand .tile-back,.seat[data-player-id="1"] .open-melds .tile-svg')].map(rect);
+      return {table,center,cpu1,others,cpu1Seat,riverRows:document.querySelector('.river[data-player-id="1"]').dataset.riverRows};
     }''')
     assert len(metrics['cpu1']) in (18, 19, 20), (width, stage, len(metrics['cpu1']))
     table = metrics['table']
@@ -38,6 +39,7 @@ def verify_cpu1_river_geometry(page, width, stage):
         assert face['x'] >= table['x'] - 1 and face['y'] >= table['y'] - 1 and face['right'] <= table['right'] + 1 and face['bottom'] <= table['bottom'] + 1, (width, stage, 'tile outside table', index, face, table)
         assert not overlaps(face, metrics['center']), (width, stage, 'tile overlaps table center', index, face, metrics['center'])
         assert not any(overlaps(face, other) for other in metrics['others']), (width, stage, 'tile overlaps another river', index, face)
+        assert not any(overlaps(face, other) for other in metrics['cpu1Seat']), (width, stage, 'tile overlaps CPU1 hand or melds', index, face)
         assert not any(overlaps(face, other) for other in faces[index + 1:]), (width, stage, 'CPU1 river tiles overlap', index)
 
     last = metrics['cpu1'][-1]
@@ -56,8 +58,9 @@ with sync_playwright() as playwright:
     page = browser.new_page(viewport={'width': 390, 'height': 844})
     page.on('pageerror', lambda error: errors.append(str(error)))
 
-    for width in [320, 355, 375, 390, 430]:
-        page.set_viewport_size({'width': width, 'height': 844})
+    viewports = [(320, 568), (355, 812), (375, 812), (390, 844), (430, 932)]
+    for width, height in viewports:
+        page.set_viewport_size({'width': width, 'height': height})
         page.goto(base + 'test.html?debug=river')
         page.wait_for_selector('#river-test-badge', state='visible')
         assert page.locator('#scenario').input_value() == 'river-test'
@@ -110,7 +113,7 @@ with sync_playwright() as playwright:
         page.wait_for_function("document.querySelector('.river[data-player-id=\\\"1\\\"]')?.children.length === 19", timeout=15000)
         assert cpu1.locator('.river-tile').count() == 19, (width, 'CPU1 19th discard')
         newest = cpu1.locator('.river-tile').nth(18)
-        assert (newest.get_attribute('data-river-row'), newest.get_attribute('data-river-column')) == ('5', '3'), (width, 'CPU1 19th tile fourth line')
+        assert (newest.get_attribute('data-river-row'), newest.get_attribute('data-river-column')) == ('5', '2'), (width, 'CPU1 19th tile eighth-column third lane')
         after_positions = cpu1.locator('.river-tile').evaluate_all('els=>els.slice(0,18).map(e=>{const r=e.querySelector("svg").getBoundingClientRect();return [r.x,r.y,r.width,r.height]})')
         initial_origin = initial_positions[0]
         after_origin = after_positions[0]
@@ -121,7 +124,7 @@ with sync_playwright() as playwright:
             for before,after in zip(initial_positions,after_positions)
         ), (width, 'CPU1 original 18 tile arrangement changed')
         cpu1_metrics = verify_cpu1_river_geometry(page, width, '19')
-        assert cpu1_metrics['riverRows'] == '4', (width, 'CPU1 river did not use four lines', cpu1_metrics['riverRows'])
+        assert cpu1_metrics['riverRows'] == '3', (width, 'CPU1 river did not remain within three lanes', cpu1_metrics['riverRows'])
         page.wait_for_function("document.querySelector('#label-0')?.dataset.active === 'true' && document.querySelector('.river[data-player-id=\\\"2\\\"] .river-tile')?.parentElement.children.length > 0", timeout=15000)
         assert all(page.locator(f'.river[data-player-id="{seat}"] .river-tile').count() > count for seat,count in initial_counts.items()), (width, 'normal next CPU turns did not progress')
         page.wait_for_function("document.querySelector('#test-status')?.textContent.includes('19枚目')", timeout=5000)
@@ -132,7 +135,7 @@ with sync_playwright() as playwright:
         page.wait_for_function("document.querySelector('.river[data-player-id=\\\"1\\\"]')?.children.length === 20", timeout=15000)
         assert cpu1.locator('.river-tile').count() == 20, (width, 'CPU1 20th discard')
         twentieth = cpu1.locator('.river-tile').nth(19)
-        assert (twentieth.get_attribute('data-river-row'), twentieth.get_attribute('data-river-column')) == ('4', '3'), (width, 'CPU1 20th tile fourth line')
+        assert (twentieth.get_attribute('data-river-row'), twentieth.get_attribute('data-river-column')) == ('4', '2'), (width, 'CPU1 20th tile eighth-column third lane')
         verify_cpu1_river_geometry(page, width, '20')
         assert '19枚目' in page.locator('#test-status').inner_text(), (width, 'CPU1 completion status missing')
         if width == 390:
