@@ -49,7 +49,7 @@ with sync_playwright() as p:
                   const svgs=items.map(e=>rect(e.querySelector('svg')));
                   const lineGroups=items.reduce((result,item,index)=>{
                     const line=side?item.dataset.riverColumn:item.dataset.riverRow;
-                    (result[line]??=[]).push(svgs[index]);return result;
+                    (result[line]??=[]).push(rect(item));return result;
                   },{});
                   const lineOrigins=Object.values(lineGroups).map(line=>side
                     ? seat===1?Math.max(...line.map(r=>r.top+r.height/2)):Math.min(...line.map(r=>r.top+r.height/2))
