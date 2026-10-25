@@ -34,12 +34,12 @@
         <option value="17">A：17枚</option>
         <option value="18" selected>B：18枚</option>
         <option value="19">C：19枚</option>
-        <option value="23" disabled>D：23枚（到達局面未確認）</option>
-        <option value="24" disabled>E：24枚（到達局面未確認）</option>
-        <option value="25" disabled>F：25枚（到達局面未確認）</option>
+        <option value="23">D：23枚</option>
+        <option value="24" disabled>E：24枚（打牌待ち不可）</option>
+        <option value="25" disabled>F：25枚（打牌待ち不可）</option>
       </select>
       <button id="start-river-test" type="button">選択した局面から開始</button>
-      <p>17〜19枚は牌山から合法に進行した固定シードの局面を使います。23・24・25枚は合法な開始局面を確認できていないため選べません。</p>
+      <p>17〜19枚は固定シード、23枚は固定配牌から合法な鳴き・ツモ・打牌を進めた局面です。23枚は最後のツモ後の局面で、打牌すると荒牌になります。24・25枚は打牌待ちの局面として到達できません。</p>
     </section>
   </section>
   <header><div><h1>Heibon Mahjong</h1></div><button id="new-game" type="button">新しい対局</button></header>

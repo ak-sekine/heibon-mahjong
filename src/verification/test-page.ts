@@ -25,7 +25,7 @@ function startRiverScenario(count: number): void {
   resetLocalActionChoices();
   activeScenarioId = 'river-test';
   document.querySelector('#scenario-help')!.textContent =
-    `合法な一局の進行から、自分の河が${count}枚で打牌待ちになる局面を再現しました。打牌すると${count + 1}枚目が追加されます。`;
+    `合法な一局の進行から、自分の河が${count}枚で打牌待ちになる局面を再現しました。打牌すると${count + 1}枚目が追加されます。${count === 23 ? '最後のツモ後のため、打牌後に荒牌します。' : ''}`;
   document.querySelector('#test-status')!.textContent = '手牌を選び、「打牌する」を押してください。';
   render();
 }

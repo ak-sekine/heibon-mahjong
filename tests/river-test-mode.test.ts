@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { discardTile } from '../src/game/discard.ts';
+import { drawOrStop } from '../src/game/draw.ts';
 import { GameController } from '../src/ui/controller.ts';
 import { createWall } from '../src/game/wall.ts';
 import type { GameState } from '../src/model/game.ts';
@@ -28,7 +29,7 @@ function assertPhysicalInventory(game: GameState, requireSelfDraw = true): void 
   }
 }
 
-for (const count of [17, 18, 19]) {
+for (const count of [17, 18, 19, 23]) {
   test(`river test ${count} starts from a legal human discard turn and can append one real tile`, () => {
     const game = createRiverTestState(count);
     assert.equal(game.phase, 'awaiting-discard');
@@ -46,11 +47,15 @@ for (const count of [17, 18, 19]) {
     assert.ok(updated.players[0].river.length === count || updated.players[0].river.length === count + 1,
       'an automatically called discard is retained in history and moved to the caller meld');
     assertPhysicalInventory(updated, false);
+    if (count === 23) {
+      assert.equal(updated.players[0].river.length, 24);
+      assert.equal(drawOrStop(updated).phase, 'wall-exhausted');
+    }
   });
 }
 
-test('23, 24, and 25 tile river states are not fabricated without a verified legal fixture', () => {
-  for (const count of [23, 24, 25]) assert.throws(() => createRiverTestState(count), RangeError);
+test('24 and 25 tile actionable river states are rejected because 23 is the legal maximum', () => {
+  for (const count of [24, 25]) assert.throws(() => createRiverTestState(count), RangeError);
 });
 
 test('18 tile start runs CPU turns and returns to the human for a 20th discard', async () => {

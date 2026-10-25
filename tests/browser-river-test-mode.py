@@ -6,7 +6,7 @@ base = os.environ.get('HEIBON_BASE_URL', 'http://127.0.0.1:4173/heibon-mahjong/'
 browser_name = os.environ.get('HEIBON_BROWSER', 'chromium')
 reports = []
 errors = []
-concealed_hand_counts = {17: 8, 18: 5, 19: 8}
+concealed_hand_counts = {17: 8, 18: 5, 19: 8, 23: 2}
 
 with sync_playwright() as playwright:
     browser = getattr(playwright, browser_name).launch(headless=True)
@@ -20,7 +20,7 @@ with sync_playwright() as playwright:
         assert page.locator('#scenario').input_value() == 'river-test'
         assert page.locator('#river-count').input_value() == '18'
 
-        for start_count in [17, 18, 19]:
+        for start_count in [17, 18, 19, 23]:
             page.locator('#river-count').select_option(str(start_count))
             page.locator('#start-river-test').click()
             river = page.locator('.river[data-player-id="0"]')
@@ -56,7 +56,7 @@ with sync_playwright() as playwright:
             reports.append({'width': width, 'start': start_count, 'result': start_count + 1,
                             'riverRows': river.get_attribute('data-river-rows')})
 
-    assert page.locator('#river-count option:disabled').count() == 3
+    assert page.locator('#river-count option:disabled').count() == 2
     page.goto(base)
     page.locator('#main-menu-toggle').click()
     assert page.locator('#river-test-open').is_visible(), 'development menu does not expose 河テスト'
