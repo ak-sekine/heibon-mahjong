@@ -27,11 +27,13 @@
 
 ### Browser UIの実測範囲
 
-mainのコードコミット [`5320045`](https://github.com/ak-sekine/heibon-mahjong/commit/53200453ba55cbb1669487b73ec3a6cc27f9d899) に対する [Deploy to GitHub Pages and Cloudflare Workers run 40184366032](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40184366032) は成功しました。内包するBrowser UI jobは13分48秒で完了し、ChromiumとWebKitの両方で既存のBrowser UI検査も成功しました。
+最終コードコミット [`af32ffa`](https://github.com/ak-sekine/heibon-mahjong/commit/af32ffa33bb713dea2c4a57fdd94aea032665f66) に対する [Deploy to GitHub Pages and Cloudflare Workers run 40186531250](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40186531250) は全job成功で完了しました。verify、Chromium / WebKit Browser UI（12分51秒）、Worker deploy、production test、Pages build、Pages deployを確認しました。同じコミットの独立した [Browser UI run 40186531306](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40186531306) も成功しました。
 
-追加した河検査は各ブラウザーで280状態（5幅 × 7枚数 × 4宣言席 × オンライン/オフライン）を確認します。各状態で320、355、375、390、430pxの表示に対し、四方向の河、18〜24枚の配置、4段目、リーチ牌の回転、牌同士・手牌・中央表示・ドラ・卓枠との実際の矩形重なり、画面横はみ出しを測定します。該当runではこの検査と既存のUI回帰が成功しました。
+追加した河検査は各ブラウザーで280状態（5幅 × 7枚数 × 4宣言席 × オンライン/オフライン）を確認します。各状態で320、355、375、390、430pxの表示に対し、四方向の河、18〜24枚の配置、4段目、リーチ牌の回転、牌同士・手牌・中央表示・ドラ・卓枠との実際の矩形重なり、画面横はみ出しを測定します。最終コードコミットでは、リーチ宣言牌位置を固定した18枚と24枚の表示を比較し、先頭18枚の座標も照合しました。該当runではこの検査と既存のUI回帰が成功しました。
 
-同じコミットに対する独立した [Browser UI verification run 40184366006](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40184366006) は、ブラウザーを起動する前の `npm test` で失敗しました。1203件中2件が失敗し、その中には `step14-0-1.test.ts` の二人オンライン対局で人間の打牌後にCPU手番が進まないというassertionが含まれます。一方、同じコミットのdeploy workflow内のverify jobとBrowser UI jobでは `npm test` が成功し、Chromium / WebKit検査も完了しています。この単独失敗の原因と修正との因果関係は確認できていません。
+以前のコードコミット [`5320045`](https://github.com/ak-sekine/heibon-mahjong/commit/53200453ba55cbb1669487b73ec3a6cc27f9d899) に対する独立した [Browser UI verification run 40184366006](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40184366006) は、ブラウザーを起動する前の `npm test` で失敗しました。1203件中2件が失敗し、その中には `step14-0-1.test.ts` の二人オンライン対局で人間の打牌後にCPU手番が進まないというassertionが含まれます。一方、同じ5320045コミットのdeploy workflow内のverify jobとBrowser UI jobでは `npm test` が成功し、Chromium / WebKit検査も完了しています。この単独失敗の原因と修正との因果関係は確認できていません。最終コードコミット `af32ffa` のdeploy workflowと独立Browser UI runでは失敗はありませんでした。
+
+検証記録コミット [`e77a2c4`](https://github.com/ak-sekine/heibon-mahjong/commit/e77a2c4fb729c726903b6bee7e155a4061b1cc63) のworkflow [40185614833](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40185614833) でも、Browser UIの `npm test` が同じ `step14-0-1.test.ts` で失敗し、actual `round-ended` / expected `playing` となりました。同コミットの独立Browser UI run [40185614841](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40185614841) は成功しました。これはコードを含む最終コミット `af32ffa` の両成功runとは別の実行結果であり、原因と修正との因果関係は特定できていません。
 
 公開WebSocketのproduction testでは再接続などを確認しましたが、公開ルームを使って19枚目を実際に打つ手順は実行していません。19枚目のサーバー受理はWorkerが使う共有 `applyOnlineGameAction` のテストで確認し、オンライン各クライアントの18〜24枚描画は実ブラウザー内のオンラインコントローラーで別に確認しています。
 
