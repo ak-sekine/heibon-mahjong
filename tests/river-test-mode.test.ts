@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { discardTile } from '../src/game/discard.ts';
+import { canDiscard, discardTile } from '../src/game/discard.ts';
 import { drawOrStop } from '../src/game/draw.ts';
+import { AutomaticTurnRunner } from '../src/game/automatic-turns.ts';
+import { startMatch, updateMatchGame } from '../src/game/match.ts';
 import { GameController } from '../src/ui/controller.ts';
 import { createWall } from '../src/game/wall.ts';
 import type { GameState } from '../src/model/game.ts';
 import { tileKindKey } from '../src/model/tile.ts';
 import { createRiverTestState } from '../src/verification/river-test-fixture.ts';
 
-function assertPhysicalInventory(game: GameState, requireSelfDraw = true): void {
+function assertPhysicalInventory(game: GameState, drawnPlayerId = 0, requireDraw = true): void {
   const tiles = [...game.liveWall, ...game.deadWall, ...game.players.flatMap(player => [
     ...player.hand,
     ...(player.drawnTile ? [player.drawnTile] : []),
@@ -21,8 +23,7 @@ function assertPhysicalInventory(game: GameState, requireSelfDraw = true): void 
   for (const tile of tiles) assert.equal(canonical.get(tile.id), tileKindKey(tile.tile));
   assert.equal(game.deadWall.length, 14);
   assert.ok(game.players.every(player => player.hand.length === 13 - 3 * (player.melds?.length ?? 0) + Number(Boolean(player.callDiscard))));
-  assert.equal(game.players[0].hand.length, 13 - 3 * (game.players[0].melds?.length ?? 0));
-  if (requireSelfDraw) assert.ok(game.players[0].drawnTile);
+  if (requireDraw) assert.ok(game.players[drawnPlayerId].drawnTile);
   for (const player of game.players) {
     const history = new Set((player.discardHistory ?? []).map(tile => tile.id));
     assert.ok(player.river.every(tile => history.has(tile.id)));
@@ -46,7 +47,7 @@ for (const count of [17, 18, 19, 23]) {
     assert.equal(updated.players[0].discardHistory!.at(-1)?.id, drawn.id);
     assert.ok(updated.players[0].river.length === count || updated.players[0].river.length === count + 1,
       'an automatically called discard is retained in history and moved to the caller meld');
-    assertPhysicalInventory(updated, false);
+    assertPhysicalInventory(updated, 0, false);
     if (count === 23) {
       assert.equal(updated.players[0].river.length, 24);
       assert.equal(drawOrStop(updated).phase, 'wall-exhausted');
@@ -70,11 +71,56 @@ test('18 tile start runs CPU turns and returns to the human for a 20th discard',
     assert.equal(controller.canConfirm, true);
     await controller.confirm();
     assert.equal(controller.game.players[0].river.length, expectedRiverCount);
-    assertPhysicalInventory(controller.game, false);
+    assertPhysicalInventory(controller.game, 0, false);
     if (expectedRiverCount === 19) {
       assert.equal(controller.game.turnPlayerId, 0);
       assert.equal(controller.game.phase, 'awaiting-discard');
       assert.ok(controller.game.players[0].drawnTile);
     }
   }
+});
+
+test('CPU1 reaches a legal 18-tile discard turn and its ordinary CPU runner makes the 19th discard', async () => {
+  const initial = createRiverTestState(18, 1);
+  assert.equal(initial.phase, 'awaiting-discard');
+  assert.equal(initial.dealerId, 0);
+  assert.equal(initial.turnPlayerId, 1);
+  assert.equal(initial.players[1].wind, 'south');
+  assert.deepEqual(initial.players.map(player => player.control), ['human', 'cpu', 'cpu', 'cpu']);
+  assert.equal(initial.players[1].river.length, 18);
+  assert.equal(canDiscard(initial, 1), true);
+  assertPhysicalInventory(initial, 1);
+
+  let match = startMatch(initial);
+  const transitions: Array<{ turn: number; phase: string; cpu1River: number }> = [];
+  const runner = new AutomaticTurnRunner({ wait: async () => {} });
+  await runner.runMatch(() => match, next => {
+    transitions.push({
+      turn: next.game.turnPlayerId,
+      phase: next.game.phase,
+      cpu1River: next.game.players[1].river.length,
+    });
+    match = next;
+  });
+
+  assert.equal(transitions[0]?.cpu1River, 19);
+  assert.equal(transitions[0]?.turn, 2);
+  assert.equal(transitions[0]?.phase, 'awaiting-draw');
+  assert.equal(match.status, 'playing');
+  assert.equal(match.game.players[1].river.length, 19);
+  assert.equal(match.game.players[2].river.length, initial.players[2].river.length + 1);
+  assert.equal(match.game.players[3].river.length, initial.players[3].river.length + 1);
+  assert.equal(match.game.turnPlayerId, 0);
+  assert.equal(match.game.phase, 'awaiting-discard');
+  assertPhysicalInventory(match.game);
+
+  const humanDiscard = match.game.players[0].drawnTile!;
+  match = updateMatchGame(match, discardTile(match.game, 0, humanDiscard.id));
+  await runner.runMatch(() => match, next => { match = next; });
+  assert.equal(match.game.players[1].river.length, 20);
+  assert.equal(match.game.players[1].discardHistory!.at(-1)?.id, match.game.players[1].river.at(-1)?.id);
+  assert.equal(match.game.players[2].river.length, initial.players[2].river.length + 2);
+  assert.equal(match.game.phase, 'wall-exhausted');
+  assert.equal(match.status, 'round-ended');
+  assertPhysicalInventory(match.game, 0, false);
 });

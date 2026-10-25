@@ -9,6 +9,7 @@ import type { GameState, PhysicalTile, PlayerId } from '../model/game.ts';
 import { tileKindKey } from '../model/tile.ts';
 
 const fixtureSeeds: Readonly<Record<number, number>> = { 17: 1, 18: 276, 19: 5 };
+const cpu1River18Seed = 7;
 const river23CallTypes = {
   playerOne: ['white', 'green', 'red', 'east'],
   playerTwo: ['man-1', 'man-3', 'man-5', 'pin-1'],
@@ -219,9 +220,15 @@ function createRiver23State(): GameState {
   throw new RangeError('合法な河23テスト局面を固定進行から再現できませんでした。');
 }
 
-export function createRiverTestState(discardCount: number): GameState {
+export function createRiverTestState(discardCount: number, targetPlayerId: PlayerId = 0): GameState {
+  if (targetPlayerId === 1 && discardCount !== 18) {
+    throw new RangeError('CPU1の河テストは18枚の打牌待ち局面のみ生成できます。');
+  }
+  if (targetPlayerId !== 0 && targetPlayerId !== 1) {
+    throw new RangeError('河テストの対象席が不正です。');
+  }
   if (discardCount === 23) return createRiver23State();
-  const seed = fixtureSeeds[discardCount];
+  const seed = targetPlayerId === 1 ? cpu1River18Seed : fixtureSeeds[discardCount];
   if (seed === undefined) throw new RangeError(riverTestUnsupportedReason);
 
   const choice = seeded(seed * 9973 + 23);
@@ -230,7 +237,8 @@ export function createRiverTestState(discardCount: number): GameState {
   let game: GameState = { ...dealt, players };
 
   for (let operation = 0; operation < 400; operation++) {
-    if (game.phase === 'awaiting-discard' && game.turnPlayerId === 0 && game.players[0].river.length === discardCount) {
+    if (game.phase === 'awaiting-discard' && game.turnPlayerId === targetPlayerId &&
+        game.players[targetPlayerId].river.length === discardCount) {
       const cpuSeats = game.players.map(player => ({
         ...player,
         control: player.id === 0 ? 'human' as const : 'cpu' as const,

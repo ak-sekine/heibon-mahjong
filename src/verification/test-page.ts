@@ -1,23 +1,32 @@
 import { controller, render, resetLocalActionChoices } from '../main.ts';
 import { startMatch } from '../game/match.ts';
-import { AutomaticTurnRunner } from '../game/automatic-turns.ts';
+import { AutomaticTurnRunner, waitForTurn } from '../game/automatic-turns.ts';
 import { getTestScenario } from './test-scenarios.ts';
 import { createRiverTestState } from './river-test-fixture.ts';
 import './style.css';
 
 const select = document.querySelector<HTMLSelectElement>('#scenario')!;
-const scenarioCpuRunner = new AutomaticTurnRunner();
+let cpu1InspectionDelay = false;
+const scenarioCpuRunner = new AutomaticTurnRunner({
+  wait: (milliseconds, signal) => {
+    const delay = cpu1InspectionDelay ? 1500 : milliseconds;
+    cpu1InspectionDelay = false;
+    return waitForTurn(delay, signal);
+  },
+});
 let activeScenarioId = select.value;
 const riverControls = document.querySelector<HTMLElement>('#river-test-controls')!;
 const riverCountSelect = document.querySelector<HTMLSelectElement>('#river-count')!;
 const riverBadge = document.querySelector<HTMLElement>('#river-test-badge')!;
 
-function startRiverScenario(count: number): void {
+function startRiverScenario(selection: string): void {
   scenarioCpuRunner.cancel();
   controller.newGame();
   controller.selectedTileId = null;
+  const cpu1 = selection === 'cpu1-18';
+  const count = cpu1 ? 18 : Number(selection);
   try {
-    controller.match = startMatch(createRiverTestState(count));
+    controller.match = startMatch(createRiverTestState(count, cpu1 ? 1 : 0));
   } catch (error) {
     document.querySelector('#test-status')!.textContent = error instanceof Error ? error.message : '局面を生成できませんでした。';
     return;
@@ -25,9 +34,25 @@ function startRiverScenario(count: number): void {
   resetLocalActionChoices();
   activeScenarioId = 'river-test';
   document.querySelector('#scenario-help')!.textContent =
-    `合法な一局の進行から、自分の河が${count}枚で打牌待ちになる局面を再現しました。打牌すると${count + 1}枚目が追加されます。${count === 23 ? '最後のツモ後のため、打牌後に荒牌します。' : ''}`;
-  document.querySelector('#test-status')!.textContent = '手牌を選び、「打牌する」を押してください。';
+    cpu1
+      ? '固定シード7の合法な一局から、CPU1（右）が河18枚で打牌待ちになる局面を再現しました。通常のCPU判断で19枚目を打ち、次のCPUの手番へ進みます。'
+      : `合法な一局の進行から、自分の河が${count}枚で打牌待ちになる局面を再現しました。打牌すると${count + 1}枚目が追加されます。${count === 23 ? '最後のツモ後のため、打牌後に荒牌します。' : ''}`;
+  document.querySelector('#test-status')!.textContent = cpu1
+    ? 'CPU1が通常の思考・打牌処理を開始します。'
+    : '手牌を選び、「打牌する」を押してください。';
   render();
+  if (cpu1) {
+    cpu1InspectionDelay = true;
+    void scenarioCpuRunner.runMatch(
+      () => controller.match,
+      match => { controller.match = match; render(); },
+      render,
+    ).then(() => {
+      document.querySelector('#test-status')!.textContent = controller.game.players[1].river.length >= 19
+        ? 'CPU1が19枚目を打牌し、対局が次の手番へ進みました。'
+        : 'CPU1の自動処理が終了しました。局面を再実行してください。';
+    });
+  }
 }
 
 function startScenario(id: string): void {
@@ -35,7 +60,7 @@ function startScenario(id: string): void {
   riverBadge.hidden = id !== 'river-test';
   if (id === 'river-test') {
     activeScenarioId = id;
-    startRiverScenario(Number(riverCountSelect.value));
+    startRiverScenario(riverCountSelect.value);
     return;
   }
   const scenario = getTestScenario(id);
@@ -64,7 +89,7 @@ function startScenario(id: string): void {
 }
 
 document.querySelector('#load-scenario')!.addEventListener('click', () => startScenario(select.value));
-document.querySelector('#start-river-test')!.addEventListener('click', () => startRiverScenario(Number(riverCountSelect.value)));
+document.querySelector('#start-river-test')!.addEventListener('click', () => startRiverScenario(riverCountSelect.value));
 document.querySelector('#repeat-scenario')!.addEventListener('click', () => {
   select.value = activeScenarioId;
   startScenario(activeScenarioId);

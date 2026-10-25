@@ -7,6 +7,7 @@ import { renderMatch } from './rendering/match.ts';
 import { ResultDialog } from './ui/result-dialog.ts';
 import { NewGameDialog } from './ui/new-game-dialog.ts';
 import { GameController } from './ui/controller.ts';
+import { waitForTurn } from './game/automatic-turns.ts';
 import { OnlineWaitingRoom } from './online/waiting-room.ts';
 import { OnlineGameController } from './online/game-controller.ts';
 import { MainMenu } from './ui/main-menu.ts';
@@ -46,7 +47,12 @@ const resultDialog = new ResultDialog();
 let onlineGameController: OnlineGameController | null = null;
 const localTable = document.querySelector<HTMLElement>('#local-table')!;
 const localDeclarationBubbles = new DeclarationBubbleRenderer(localTable);
-const controller = new GameController(undefined, { onChange: render });
+const riverDebugMode = window.location.pathname.endsWith('/test.html') &&
+  new URLSearchParams(window.location.search).get('debug') === 'river';
+const controller = new GameController(undefined, {
+  onChange: render,
+  wait: (milliseconds, signal) => waitForTurn(riverDebugMode ? 800 : milliseconds, signal),
+});
 let previouslyRenderedGame: typeof controller.game | null = null;
 let previouslyRenderedMatchStatus = controller.match.status;
 let localKanChoicesOpen = false;

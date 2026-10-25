@@ -29,17 +29,18 @@
     <p id="scenario-help" role="status"></p>
     <p id="test-status" role="status" aria-live="polite"></p>
     <section id="river-test-controls" aria-label="河テストの設定" hidden>
-      <label for="river-count">開始時の自分の河</label>
+      <label for="river-count">テスト対象・開始時の河</label>
       <select id="river-count">
         <option value="17">A：17枚</option>
         <option value="18" selected>B：18枚</option>
         <option value="19">C：19枚</option>
         <option value="23">D：23枚</option>
+        <option value="cpu1-18">CPU1（右）：18枚</option>
         <option value="24" disabled>E：24枚（打牌待ち不可）</option>
         <option value="25" disabled>F：25枚（打牌待ち不可）</option>
       </select>
       <button id="start-river-test" type="button">選択した局面から開始</button>
-      <p>17〜19枚は固定シード、23枚は固定配牌から合法な鳴き・ツモ・打牌を進めた局面です。23枚は最後のツモ後の局面で、打牌すると荒牌になります。24・25枚は打牌待ちの局面として到達できません。</p>
+      <p>17〜19枚は固定シード、23枚は固定配牌から合法な鳴き・ツモ・打牌を進めた局面です。CPU1（右）：18枚は固定シード7の合法な局面から通常のCPU判断で19枚目を打牌し、次のCPUへ手番を進めます。23枚は最後のツモ後の局面で、打牌すると荒牌になります。24・25枚は打牌待ちの局面として到達できません。</p>
     </section>
   </section>
   <header><div><h1>Heibon Mahjong</h1></div><button id="new-game" type="button">新しい対局</button></header>

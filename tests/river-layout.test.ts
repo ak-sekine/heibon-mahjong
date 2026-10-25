@@ -112,3 +112,18 @@ test('19–24 discards occupy a fourth row and larger rivers grow without a fixe
   assert.throws(() => calculateRiverLayout('bottom', -1), RangeError);
   assert.throws(() => calculateRiverLayout('bottom', 1, 1), RangeError);
 });
+
+test('CPU1 right river preserves its first 18 positions and gives discard 19 a rotated fourth line slot', () => {
+  const before = calculateRiverLayout('right', 18);
+  const after = calculateRiverLayout('right', 19);
+  assert.deepEqual(after.placements.slice(0, 18), before.placements);
+  assert.deepEqual([after.placements[18].row, after.placements[18].column], [5, 3]);
+  assert.deepEqual([after.placements[18].width, after.placements[18].height], [
+    'var(--river-tile-height)', 'var(--river-tile-width)',
+  ]);
+  const riichi = calculateRiverLayout('right', 19, 18).placements[18];
+  assert.equal(riichi.declaration, true);
+  assert.deepEqual([riichi.width, riichi.height], [
+    'var(--river-tile-width)', 'var(--river-tile-height)',
+  ]);
+});
