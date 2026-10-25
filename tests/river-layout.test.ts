@@ -98,6 +98,7 @@ test('self and opposite rivers preserve six-by-four placement beyond 18 discards
       const layout = calculateRiverLayout(direction, count);
       assert.equal(layout.placements.length, count);
       assert.equal(new Set(layout.placements.map(({ row, column }) => `${row},${column}`)).size, count);
+      if (count > 24) assert.ok(layout.tileScale < 1, `${direction} overflow rivers shrink after 24 discards`);
       for (let index = 0; index < Math.min(count, 18); index++) {
         const row = Math.floor(index / 6);
         const column = index % 6;

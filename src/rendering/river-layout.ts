@@ -19,6 +19,7 @@ export type RiverTilePlacement = Readonly<{
 }>;
 
 export type RiverLayout = Readonly<{
+  position: RiverPosition;
   rows: number;
   tileScale: number;
   width: string;
@@ -83,7 +84,7 @@ export function calculateRiverLayout(
   // tiles and gaps together so exceptional rivers stay within the three-lane
   // footprint instead of reaching the rotated side seat.
   const tileScale = side && rows > MIN_ROWS ? 2.9 / rows
-    : !side && rows > 4 ? Math.min(4 / rows, 1.15 / (.76 * (rows - 3))) : 1;
+    : !side && rows > 4 ? Math.min(4 / rows, 1.03 / (.76 * (rows - 3))) : 1;
   const width = side ? fullSpan(rows) : compactSpan(MAIN_COLUMNS);
   const height = side ? compactSpan(SIDE_COLUMNS) : fullSpan(rows);
   const centerInSlot = (face: string): string => `calc((var(--river-tile-height) - var(${face})) * .5)`;
@@ -144,7 +145,7 @@ export function calculateRiverLayout(
       top: topInSlot,
     };
   });
-  return { rows, tileScale, width, height, placements };
+  return { position, rows, tileScale, width, height, placements };
 }
 
 export function applyRiverLayout(container: HTMLElement, layout: RiverLayout): void {
@@ -152,6 +153,11 @@ export function applyRiverLayout(container: HTMLElement, layout: RiverLayout): v
   container.style.gridTemplateColumns = '';
   container.style.gridTemplateRows = '';
   container.dataset.riverRows = String(layout.rows);
+  if (layout.position === 'top' && layout.rows > 4) {
+    container.dataset.riverOverflow = 'true';
+  } else {
+    delete container.dataset.riverOverflow;
+  }
   if (layout.tileScale < 1) {
     container.style.setProperty('--river-tile-width', `calc(var(--table-tile-width) * .76 * ${layout.tileScale})`);
     container.style.setProperty('--river-tile-height', `calc(var(--table-tile-height) * .76 * ${layout.tileScale})`);

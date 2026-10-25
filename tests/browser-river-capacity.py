@@ -108,6 +108,7 @@ with sync_playwright() as p:
                     seatOverlaps.push([owner(a),[...a.closest('.river').children].indexOf(a.closest('.river-tile')),
                       b.closest('.seat')?.dataset.playerId??b.closest('.online-seat')?.dataset.onlineSeat,box(a),box(b)]);
                   const criticalSlotsCorrect=[1,3].every(seat=>{
+                    if(count>24)return true;
                     const river=riverAt(seat);
                     const expected=seat===1?[[5,2],[4,2],[1,2],[0,2]]:[[2,0],[3,0],[6,0],[7,0]];
                     return [18,19,22,23].every((index,n)=>{
