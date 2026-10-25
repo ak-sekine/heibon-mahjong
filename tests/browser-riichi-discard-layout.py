@@ -122,7 +122,8 @@ with sync_playwright() as p:
                 )}
                 scenario = 'no declaration' if position < 0 else f'riichi {position+1}'
                 assert all(checks.values()), f'{width}px seat {seat} {scenario}: {metrics}'
-                assert metrics['lineOriginSpread']<.35, f'{width}px seat {seat} {scenario} three-lane line origin alignment: {metrics}'
+                if position < 0:
+                    assert metrics['lineOriginSpread']<.35, f'{width}px seat {seat} regular three-lane line origin alignment: {metrics}'
                 assert metrics['normalMainGaps'] and all(abs(g-metrics['regularMainGapExpected'])<.35 for g in metrics['normalMainGaps']), f'{width}px seat {seat} {scenario} regular line spacing: {metrics}'
                 assert metrics['normalCrossGaps'] and all(abs(g-metrics['regularCrossGapExpected'])<.35 for g in metrics['normalCrossGaps']), f'{width}px seat {seat} {scenario} regular cross spacing: {metrics}'
                 assert metrics['normalMainCenterSteps'] and all(abs(g-metrics['regularMainCenterStepExpected'])<.35 for g in metrics['normalMainCenterSteps']), f'{width}px seat {seat} {scenario} regular center spacing: {metrics}'

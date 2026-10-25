@@ -74,6 +74,18 @@ test('riichi adds its extra face length only to later tiles on the same line', (
   }
 });
 
+test('the first riichi tile preserves its start slot in reversed rivers', () => {
+  for (const direction of ['right', 'top'] as const) {
+    const layout = calculateRiverLayout(direction, 18, 0);
+    const declaration = layout.placements[0];
+    const nextLaneStart = layout.placements[direction === 'right' ? 8 : 6];
+
+    assert.equal(declaration.declaration, true);
+    assert.equal(direction === 'right' ? declaration.top : declaration.left,
+      direction === 'right' ? nextLaneStart.top : nextLaneStart.left);
+  }
+});
+
 test('self and opposite rivers preserve six-by-four placement beyond 18 discards', () => {
   const fourthRowStart: Readonly<Record<'bottom' | 'top', readonly [number, number]>> = {
     bottom: [3, 0], top: [-1, 5],
