@@ -146,7 +146,7 @@ with sync_playwright() as p:
                         width, height, count, declaration_seat, mode, result)
                     assert result['declarationCount'] == 1, (width, count, declaration_seat, mode, result)
                     del result['prefixCenters']
-                    reports.append({'width': width, 'count': count, 'declarationSeat': declaration_seat, 'mode': mode, **result})
+                    reports.append({'width': width, 'height': height, 'count': count, 'declarationSeat': declaration_seat, 'mode': mode, **result})
                     if count in [18, 24] and declaration_seat == 3:
                         page.screenshot(path=str(out / f"river-capacity-{os.environ.get('HEIBON_BROWSER', 'chromium')}-{width}-{count}-{mode}.png"), full_page=True)
 
@@ -165,7 +165,7 @@ with sync_playwright() as p:
                     width, height, count, declaration_seat, 'online', result)
                 assert result['declarationCount'] == 1, (width, count, declaration_seat, 'online', result)
                 del result['prefixCenters']
-                reports.append({'width': width, 'count': count, 'declarationSeat': declaration_seat, 'mode': 'online', **result})
+                reports.append({'width': width, 'height': height, 'count': count, 'declarationSeat': declaration_seat, 'mode': 'online', **result})
                 if count in [18, 24] and declaration_seat == 3:
                     page.screenshot(path=str(out / f"river-capacity-{os.environ.get('HEIBON_BROWSER', 'chromium')}-{width}-{count}-online.png"), full_page=True)
                 page.evaluate("window.riverFixture.online.receive({type:'online-session-ended'})")
