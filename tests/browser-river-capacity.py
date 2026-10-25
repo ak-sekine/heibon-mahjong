@@ -16,7 +16,7 @@ with sync_playwright() as p:
         page = browser.new_page(viewport={'width': width, 'height': 844})
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(base)
-        page.wait_for_selector('#online-game-controls')
+        page.wait_for_selector('#online-game-controls', state='attached')
         page.evaluate('''async()=>{
           const renderer=await import('/heibon-mahjong/src/rendering/table.ts');
           const base=(await import('/heibon-mahjong/src/game/start.ts')).startGame();
