@@ -52,12 +52,13 @@ with sync_playwright() as p:
                     (result[line]??=[]).push(svgs[index]);return result;
                   },{});
                   const lineOrigins=Object.values(lineGroups).map(line=>side
-                    ? Math.min(...line.map(r=>r.top+r.height/2))
+                    ? seat===1?Math.max(...line.map(r=>r.top+r.height/2)):Math.min(...line.map(r=>r.top+r.height/2))
                     : Math.min(...line.map(r=>r.left+r.width/2)));
                   const lineOriginSpread=Math.max(...lineOrigins)-Math.min(...lineOrigins);
                   const preservesPerspectiveOrder=items.every((item,index)=>{
-                    const row=Math.floor(index/6),column=index%6;
-                    const screenRow=seat===1?5-column:seat===3?column:seat===2?2-row:row;
+                    const columns=side?8:6;
+                    const row=Math.floor(index/columns),column=index%columns;
+                    const screenRow=seat===1?7-column:seat===3?column:seat===2?2-row:row;
                     const screenColumn=seat===1?row:seat===3?2-row:seat===2?5-column:column;
                     return +item.dataset.riverRow===screenRow&&+item.dataset.riverColumn===screenColumn;
                   });
@@ -104,7 +105,7 @@ with sync_playwright() as p:
                     riichiMainGapExpected,regularMainCenterStepExpected,riichiMainCenterStepExpected,
                     lineOriginSpread:+lineOriginSpread.toFixed(3),
                     order:items.every((e,i)=>e.dataset.tileId===shown.players[seat].river[i].id),
-                    cellsSixByThree:items.length===18&&preservesPerspectiveOrder,
+                    cellsExpectedBySeat:items.length===18&&preservesPerspectiveOrder,
                     noScroll:document.documentElement.scrollWidth<=innerWidth,
                     viewport:{scrollWidth:document.documentElement.scrollWidth,innerWidth,outsideViewport},
                     inTable:allRiverSvgs.every(a=>a.left>=table.left-.2&&a.right<=table.right+.2&&a.top>=table.top-.2&&a.bottom<=table.bottom+.2),
@@ -121,7 +122,7 @@ with sync_playwright() as p:
                 )}
                 scenario = 'no declaration' if position < 0 else f'riichi {position+1}'
                 assert all(checks.values()), f'{width}px seat {seat} {scenario}: {metrics}'
-                assert metrics['lineOriginSpread']<.35, f'{width}px seat {seat} {scenario} six-discard origin alignment: {metrics}'
+                assert metrics['lineOriginSpread']<.35, f'{width}px seat {seat} {scenario} three-lane line origin alignment: {metrics}'
                 assert metrics['normalMainGaps'] and all(abs(g-metrics['regularMainGapExpected'])<.35 for g in metrics['normalMainGaps']), f'{width}px seat {seat} {scenario} regular line spacing: {metrics}'
                 assert metrics['normalCrossGaps'] and all(abs(g-metrics['regularCrossGapExpected'])<.35 for g in metrics['normalCrossGaps']), f'{width}px seat {seat} {scenario} regular cross spacing: {metrics}'
                 assert metrics['normalMainCenterSteps'] and all(abs(g-metrics['regularMainCenterStepExpected'])<.35 for g in metrics['normalMainCenterSteps']), f'{width}px seat {seat} {scenario} regular center spacing: {metrics}'
