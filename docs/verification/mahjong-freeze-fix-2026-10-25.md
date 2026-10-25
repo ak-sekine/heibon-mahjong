@@ -18,8 +18,20 @@
 | `npm run build` | **成功**。TypeScriptとVite production build |
 | `npm run typecheck:worker` | **成功** |
 | `git diff --check` | **成功** |
-| Chromium / WebKit | Codex Cloudでは起動せず、追加したBrowser UI workflowで検証予定 |
-| iPhone Safari実機 | 未確認。公開後に実機確認が必要 |
-| オンライン実通信・再接続 | Reducer単体テストと実ブラウザーのオンライン表示を分けて記録予定。Durable Objectを介した公開環境の通信は別途確認 |
+| Chromium / WebKit | **成功**。GitHub Actions のBrowser UI jobで既存UI検査と追加河検査を実行 |
+| iPhone Safari実機 | **未確認**。公開後にユーザーの実機確認が必要 |
+| オンライン処理 | **成功**。サーバー側 `applyOnlineGameAction` が自然な局面から19枚目を受け付けるテストと、オンライン描画コントローラーの18〜24枚表示を確認 |
+| 公開環境の通信・再接続 | **成功**。Workerのproduction testでHTTPS、ルーム、WebSocket、再接続、認証、プライバシーを確認 |
+| Worker / Pages | **成功**。Worker deploy、デプロイ先URLを使ったPages build、Pages deployの各jobを確認 |
 
-Browser UIはCodex Cloudの既知のChromium起動制限によりローカル起動していません。workflowへ追加したChromium / WebKitの実行結果は、push後に対象SHAを確認して追記します。iPhone Safari実機の結果はユーザー確認後にのみ記載します。
+### Browser UIの実測範囲
+
+mainのコードコミット [`5320045`](https://github.com/ak-sekine/heibon-mahjong/commit/53200453ba55cbb1669487b73ec3a6cc27f9d899) に対する [Deploy to GitHub Pages and Cloudflare Workers run 40184366032](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40184366032) は成功しました。内包するBrowser UI jobは13分48秒で完了し、ChromiumとWebKitの両方で既存のBrowser UI検査も成功しました。
+
+追加した河検査は各ブラウザーで280状態（5幅 × 7枚数 × 4宣言席 × オンライン/オフライン）を確認します。各状態で320、355、375、390、430pxの表示に対し、四方向の河、18〜24枚の配置、4段目、リーチ牌の回転、牌同士・手牌・中央表示・ドラ・卓枠との実際の矩形重なり、画面横はみ出しを測定します。該当runではこの検査と既存のUI回帰が成功しました。
+
+同じコミットに対する独立した [Browser UI verification run 40184366006](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40184366006) は、ブラウザーを起動する前の `npm test` で失敗しました。1203件中2件が失敗し、その中には `step14-0-1.test.ts` の二人オンライン対局で人間の打牌後にCPU手番が進まないというassertionが含まれます。一方、同じコミットのdeploy workflow内のverify jobとBrowser UI jobでは `npm test` が成功し、Chromium / WebKit検査も完了しています。この単独失敗の原因と修正との因果関係は確認できていません。
+
+公開WebSocketのproduction testでは再接続などを確認しましたが、公開ルームを使って19枚目を実際に打つ手順は実行していません。19枚目のサーバー受理はWorkerが使う共有 `applyOnlineGameAction` のテストで確認し、オンライン各クライアントの18〜24枚描画は実ブラウザー内のオンラインコントローラーで別に確認しています。
+
+iPhone Safari実機は未確認です。公開後に320px相当の縦画面を含め、19〜24枚の河、4段目と手牌、左右の河と中央表示、対面の河とドラ、河同士、リーチ牌の向き、卓枠からのはみ出しを確認してください。実機結果はユーザー確認後にのみ記録します。
