@@ -38,7 +38,8 @@ with sync_playwright() as p:
         page.evaluate('''async()=>{
           const renderer=await import('/heibon-mahjong/src/rendering/table.ts');
           const base=(await import('/heibon-mahjong/src/game/start.ts')).startGame();
-          const pool=[...base.liveWall,...base.deadWall,...base.players.slice(1).flatMap(p=>[...p.hand,...(p.drawnTile?[p.drawnTile]:[])])];
+          const tiles=(await import('/heibon-mahjong/src/game/wall.ts')).createWall();
+          const pool=tiles.map((tile,index)=>({...tile,id:`river-capacity-${index}`}));
           const {OnlineGameController}=await import('/heibon-mahjong/src/online/game-controller.ts');
           const {ActionPanel}=await import('/heibon-mahjong/src/ui/action-panel.ts');
           const {ResultDialog}=await import('/heibon-mahjong/src/ui/result-dialog.ts');
