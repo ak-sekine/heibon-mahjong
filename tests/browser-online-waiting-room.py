@@ -701,7 +701,7 @@ with sync_playwright() as p:
     assert menu_metrics['gap'] == '0px' and menu_metrics['background'] in ('rgb(255, 253, 247)', 'rgb(255, 255, 255)'), menu_metrics
     assert all(button['height'] >= 44 and button['width'] >= 44 and button['background'] in ('rgba(0, 0, 0, 0)', 'transparent') for button in menu_metrics['buttons']), menu_metrics
     assert [item.inner_text() for item in page.locator('#main-menu-items button:not([hidden])').all()] == [
-      'オフラインで新規対局', '新しくルームを作る', 'ルームに参加する', '診断ログ',
+      'オフラインで新規対局', '河テスト', '新しくルームを作る', 'ルームに参加する', '診断ログ',
     ], 'the shared menu actions were not available in order'
     assert page.locator('#menu-room').is_hidden(), 'room operations were shown before joining a room'
     assert page.locator('#main-menu-toggle').get_attribute('aria-expanded') == 'true', 'menu expanded state was not announced'
@@ -710,7 +710,7 @@ with sync_playwright() as p:
     page.locator('#main-menu-toggle').press('Enter')
     assert page.locator('#new-game').evaluate('element => document.activeElement === element'), 'keyboard open did not focus the first menu item'
     page.keyboard.press('ArrowDown')
-    assert page.locator('#online-create-open').evaluate('element => document.activeElement === element'), 'arrow navigation did not move through menu items'
+    assert page.locator('#river-test-open').evaluate('element => document.activeElement === element'), 'arrow navigation did not move through menu items'
     page.keyboard.press('Escape')
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'Escape did not return focus to the menu button'
     page.locator('#main-menu-toggle').click()
