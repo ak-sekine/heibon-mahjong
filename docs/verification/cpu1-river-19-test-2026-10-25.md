@@ -30,7 +30,8 @@ CPU1の19枚目は `AutomaticTurnRunner.runMatch` の通常経路で追加しま
 - `npm run typecheck:worker`: 成功。Workerの型検査のみ実行し、Workerコードは変更していません。
 - `git diff --check`: 成功。
 - PlaywrightスクリプトのPython構文検査: 成功。
-- Chromium / WebKit: 対象コミットのGitHub Actions結果待ちです。追加したブラウザー検査は320、355、375、390、430pxでCPU1の18・19・20枚目を描画し、河中央・他家の河・卓枠との矩形交差、18枚目までの相対配置、4列目の座標、牌の向きを実測します。ChromiumとWebKitの両方で実行します。
+- Chromium / WebKit: [Browser UI #40237095444](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40237095444) 成功（対象コミット `3c0a3b48b56582664b1c1532c49694d079f4758a`）。CPU1の18・19・20枚目を320、355、375、390、430pxで両エンジン検証しました。中央・他家河との矩形交差なし、卓枠内、18枚目までの相対配置維持、19枚目の4本目のライン配置、牌向きの各assertionがすべて成功しました。既存の河テストケースを含むBrowser UI workflow全体も成功しました。
+- Pages / Worker: [Deploy #40237095426](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40237095426) 成功。verify、Worker型検査、Pages build、Worker deploy、本番オンライン回帰、Pages deployがすべて成功しました。Workerソースは変更していません。
 - Codex Cloud内では既知のCrashpad `SO_PASSCRED` seccomp制限があるため、ローカルブラウザーを起動せず、既存のGitHub Actionsブラウザー検証を実行先にしています。
 
 ## iPhone Safari実機
@@ -39,5 +40,4 @@ CPU1の19枚目は `AutomaticTurnRunner.runMatch` の通常経路で追加しま
 
 ## 未確認事項
 
-- GitHub ActionsのChromium / WebKit結果とPagesデプロイ結果は、対象コミットの実行後に追記します。
 - iPhone Safari実機表示はユーザーから報告を受けるまで未確認です。本件は実機確認待ちです。
