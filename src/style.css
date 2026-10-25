@@ -434,7 +434,7 @@ header > div { min-width:0; }
 .table .river-left { left:calc(var(--cell)*1.2); top:50%; bottom:auto; transform:translateY(-50%); }
 /* Keep the first three rows fixed when rivers grow. Extra bottom rows extend
    toward the outer seat; extra right columns extend toward the right border. */
-.table .river-bottom[data-river-rows]:not([data-river-rows='3']) { top:calc(100% - var(--cell)*1.8 - var(--table-tile-height)*.76*3 - 2px); bottom:auto; }
+.table .river-bottom[data-river-rows]:not([data-river-rows='3']) { top:calc(100% - var(--cell)*1.8 - var(--table-tile-height)*.76*3 - 5px); bottom:auto; }
 .table .river-right[data-river-rows]:not([data-river-rows='3']) { left:calc(100% - var(--cell)*1.2 - var(--table-tile-height)*.76*3 - 2px); right:auto; }
 .table .center-info { position:absolute; left:calc(var(--cell)*4.325); top:calc(var(--cell)*4.25); width:calc(var(--cell)*3 - 1px); height:calc(var(--cell)*3 - 1px); padding:2px; gap:2px; font-size:9px; }
 .table .wall-count { gap:2px; }
