@@ -9,6 +9,23 @@ out = Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 out.mkdir(parents=True, exist_ok=True)
 reports = []
 errors = []
+
+
+def verify_original_river_positions(baselines, mode, declaration_seat, count, centers, width):
+    key = (mode, declaration_seat)
+    if count == 18:
+        baselines[key] = centers
+    elif count == 24:
+        baseline = baselines[key]
+        assert len(centers) == len(baseline) == 4, (width, mode, declaration_seat, centers)
+        for river_index, (current_river, original_river) in enumerate(zip(centers, baseline)):
+            assert len(current_river) == len(original_river) == 18, (
+                width, mode, declaration_seat, river_index, current_river, original_river)
+            for tile_index, (current, original) in enumerate(zip(current_river, original_river)):
+                assert all(abs(a - b) <= 0.15 for a, b in zip(current, original)), (
+                    width, mode, declaration_seat, river_index, tile_index, current, original)
+
+
 with sync_playwright() as p:
     browser_type = getattr(p, os.environ.get('HEIBON_BROWSER', 'chromium'))
     browser = browser_type.launch(headless=True)
@@ -60,6 +77,10 @@ with sync_playwright() as p:
                   const riverBounds=rivers.every(a=>inside(rect(a),t));
                   const box=e=>{const b=rect(e);return [b.left,b.top,b.right,b.bottom].map(v=>Math.round(v*10)/10);};
                   const owner=e=>{const r=e.closest('.river');return r.dataset.playerId??r.dataset.onlineRiver;};
+                  const prefixCenters=rivers.map(r=>[...r.children].slice(0,18).map(e=>{
+                    const b=rect(e.querySelector('.tile-svg'));
+                    return [Math.round((b.left+b.right)*5)/10,Math.round((b.top+b.bottom)*5)/10];
+                  }));
                   const riverOverlaps=[];
                   for(let i=0;i<faces.length;i++)for(let j=i+1;j<faces.length;j++)if(!separate(rect(faces[i]),rect(faces[j])))
                     riverOverlaps.push({a:[owner(faces[i]),[...faces[i].closest('.river').children].indexOf(faces[i].closest('.river-tile')),box(faces[i])],
@@ -74,7 +95,7 @@ with sync_playwright() as p:
                     noPageOverflow:document.documentElement.scrollWidth<=innerWidth,
                     fourthRow:count<19||rivers.every(r=>Number(r.dataset.riverRows)>=4&&
                       new Set([...r.children].map(e=>`${e.dataset.riverRow},${e.dataset.riverColumn}`)).size===count),
-                    riverOverlaps,centerOverlaps,handOverlaps,
+                    riverOverlaps,centerOverlaps,handOverlaps,prefixCenters,
                     declarationCount:table.querySelectorAll('.river-tile[data-riichi-declaration="true"]').length,
                     declarationRotated:(()=>{const d=table.querySelector('.river-tile[data-riichi-declaration="true"] .tile-svg');
                       const n=d?.closest('.river')?.querySelector('.river-tile:not([data-riichi-declaration="true"]) .tile-svg');
@@ -85,9 +106,10 @@ with sync_playwright() as p:
                     ('offline', '#local-table', '#player-hand'),
                 ]:
                     result = page.evaluate(measure, {'count': count, 'tableSelector': selector, 'handSelector': hand_selector})
-                    assert all(value is True for key, value in result.items() if key not in ('tileCounts','declarationCount','riverOverlaps','centerOverlaps','handOverlaps')) and not result['riverOverlaps'] and not result['centerOverlaps'] and not result['handOverlaps'], (
+                    assert all(value is True for key, value in result.items() if key not in ('tileCounts','declarationCount','riverOverlaps','centerOverlaps','handOverlaps','prefixCenters')) and not result['riverOverlaps'] and not result['centerOverlaps'] and not result['handOverlaps'], (
                         width, count, declaration_seat, mode, result)
                     assert result['declarationCount'] == 1, (width, count, declaration_seat, mode, result)
+                    del result['prefixCenters']
                     reports.append({'width': width, 'count': count, 'declarationSeat': declaration_seat, 'mode': mode, **result})
                     if count in [18, 24] and declaration_seat == 3:
                         page.screenshot(path=str(out / f"river-capacity-{os.environ.get('HEIBON_BROWSER', 'chromium')}-{width}-{count}-{mode}.png"), full_page=True)
@@ -103,13 +125,44 @@ with sync_playwright() as p:
                   online.receive({type:'game-state',view});
                 }''', {'count': count, 'declarationSeat': declaration_seat})
                 result = page.evaluate(measure, {'count': count, 'tableSelector': '#online-table', 'handSelector': '#online-player-hand'})
-                assert all(value is True for key, value in result.items() if key not in ('tileCounts','declarationCount','riverOverlaps','centerOverlaps','handOverlaps')) and not result['riverOverlaps'] and not result['centerOverlaps'] and not result['handOverlaps'], (
+                assert all(value is True for key, value in result.items() if key not in ('tileCounts','declarationCount','riverOverlaps','centerOverlaps','handOverlaps','prefixCenters')) and not result['riverOverlaps'] and not result['centerOverlaps'] and not result['handOverlaps'], (
                     width, count, declaration_seat, 'online', result)
                 assert result['declarationCount'] == 1, (width, count, declaration_seat, 'online', result)
+                del result['prefixCenters']
                 reports.append({'width': width, 'count': count, 'declarationSeat': declaration_seat, 'mode': 'online', **result})
                 if count in [18, 24] and declaration_seat == 3:
                     page.screenshot(path=str(out / f"river-capacity-{os.environ.get('HEIBON_BROWSER', 'chromium')}-{width}-{count}-online.png"), full_page=True)
                 page.evaluate("window.riverFixture.online.receive({type:'online-session-ended'})")
+        for mode, table_selector, hand_selector in [
+            ('offline', '#local-table', '#player-hand'),
+            ('online', '#online-table', '#online-player-hand'),
+        ]:
+            stable_centers = {}
+            for count in [18, 24]:
+                page.evaluate('''({count,mode})=>{
+                  const {renderer,base,pool,online,startMatch,createPlayerGameView}=window.riverFixture;
+                  online.receive({type:'online-session-ended'});
+                  const players=base.players.map((player,seat)=>{
+                    const river=pool.slice(seat*count,(seat+1)*count);
+                    return {...player,river,discardHistory:river,
+                      riichi:seat===0?{declarationTileId:river[5].id,ippatsuEligible:false}:null,
+                      control:'human'};
+                  });
+                  const game={...base,players};
+                  if(mode==='offline')renderer.renderTable(game,[25000,25000,25000,25000]);
+                  else {
+                    const match={...startMatch(game),game};
+                    const identities=players.map(player=>({seat:player.id,name:`Player ${player.id}`,control:'human',connected:true}));
+                    const session={schemaVersion:1,gameRevision:count,match,status:'playing',identities,hostSeat:0,decision:null,declarations:[]};
+                    const view=createPlayerGameView(session,0,'RIVER1',new Set([0,1,2,3]));
+                    online.receive({type:'game-state',view});
+                  }
+                }''', {'count': count, 'mode': mode})
+                result = page.evaluate(measure, {'count': count, 'tableSelector': table_selector, 'handSelector': hand_selector})
+                verify_original_river_positions(stable_centers, mode, 0, count, result['prefixCenters'], width)
+                assert all(value is True for key, value in result.items() if key not in ('tileCounts','declarationCount','riverOverlaps','centerOverlaps','handOverlaps','prefixCenters')) and not result['riverOverlaps'] and not result['centerOverlaps'] and not result['handOverlaps'], (
+                    width, count, mode, 'stable-riichi-prefix', result)
+            page.evaluate("window.riverFixture.online.receive({type:'online-session-ended'})")
         assert not errors, errors
         page.close()
     browser.close()
