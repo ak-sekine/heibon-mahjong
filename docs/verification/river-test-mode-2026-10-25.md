@@ -27,9 +27,9 @@
 
 - 自動テスト: `npm test`成功（61テストファイル、失敗0）。追加の河テストは6ケース成功し、23枚局面から24枚への打牌と荒牌を確認しました。
 - 型チェック・本番ビルド: `npm run build`成功（`tsc --noEmit`を含む）。
-- 差分検査・ブラウザースクリプト構文: `git diff --check`と`python -m py_compile tests/browser-river-test-mode.py`を更新後に実行します。
-- Chromium/WebKitの320・375・390・430px画面幅: 17・18・19・23枚の選択・打牌、19枚目以降の4段目表示、CPU後の再手番・20枚目、開発メニュー遷移、オンラインUI非表示をブラウザーテストで確認します。23枚ケースのGitHub Actions結果はpush後に追記します。
-- 公開ワークフロー: 前回の[Deploy #40200270666](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40200270666)は`fca83c8`で成功しています。23枚fixture追加後の検証・Pages deploy結果はpush後に追記します。
+- ブラウザースクリプト構文: `python -m py_compile tests/browser-river-test-mode.py tests/browser-online-waiting-room.py`成功。実装差分の`git diff --check`も成功しました。
+- Chromium/WebKitの320・375・390・430px画面幅: [Browser UI #40204621357](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40204621357)と[Deploy内 browser-ui #40204621382](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40204621382)が成功しました。17・18・19・23枚の選択・打牌、19枚目以降の4段目表示、18枚からCPU後の再手番・20枚目、開発メニュー遷移、オンラインUI非表示を自動テストに含みます。
+- 公開ワークフロー: [Deploy #40204621382](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40204621382)が成功しました。テスト、Worker型チェック・デプロイ、本番オンライン回帰、Pagesビルド・デプロイがすべて成功しています。実行環境から公開URLを直接取得する試行はネットワークプロキシの403で拒否されたため、URL応答の直接確認はしていません。
 - iPhone Safari実機: ユーザーからの実機報告待ち。未確認です。
 
 ## iPhone Safariでの確認手順
