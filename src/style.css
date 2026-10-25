@@ -42,6 +42,12 @@ ul { list-style:none; padding:0; margin:0; }
 .keyboard-help { width:100%; margin:0; font-size:11px; color:#d4e5db; }
 .tile-svg { display:block; width:100%; height:auto; aspect-ratio:60/84; }
 .catalog { width:100%; padding:0 6px; font-size:12px; }
+.test-heading { flex-wrap:wrap; }
+.river-test-badge { margin-left:auto; padding:2px 7px; border:1px solid #ffda7d; border-radius:999px; color:#ffda7d; font-size:11px; }
+#river-test-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:8px; padding:8px; border:1px solid #63947a; border-radius:8px; background:#123f32; }
+#river-test-controls label { font-size:13px; }
+#river-test-controls select,#river-test-controls button { min-height:44px; }
+#river-test-controls p { flex:1 1 100%; margin:0; color:#d4e5db; font-size:12px; }
 summary { cursor:pointer; padding:4px; }
 #tile-gallery { display:grid; grid-template-columns:repeat(auto-fit,minmax(46px,1fr)); gap:10px; margin-top:10px; }
 #tile-gallery li { text-align:center; }

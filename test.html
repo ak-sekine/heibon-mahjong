@@ -11,7 +11,7 @@
 <body>
 <main>
   <section class="test-lab" aria-labelledby="test-title">
-    <div class="test-heading"><span class="test-badge">TEST</span><h2 id="test-title">Heibon Mahjong テスト環境</h2></div>
+    <div class="test-heading"><span class="test-badge">TEST</span><h2 id="test-title">Heibon Mahjong テスト環境</h2><span id="river-test-badge" class="river-test-badge" hidden>河テスト</span></div>
     <p>公開アクセス可能なオフライン検証ページです。個人情報や認証情報は入力しないでください。</p>
     <label for="scenario">テストシナリオ</label>
     <select id="scenario">
@@ -19,6 +19,7 @@
       <option value="kyuushu-cpu1">九種九牌（CPU1）</option>
       <option value="kyuushu-cpu2">九種九牌（CPU2）</option>
       <option value="kyuushu-cpu3">九種九牌（CPU3）</option>
+      <option value="river-test">河テスト（合法局面）</option>
     </select>
     <div class="test-actions">
       <button id="load-scenario" type="button">テスト開始</button>
@@ -27,6 +28,19 @@
     </div>
     <p id="scenario-help" role="status"></p>
     <p id="test-status" role="status" aria-live="polite"></p>
+    <section id="river-test-controls" aria-label="河テストの設定" hidden>
+      <label for="river-count">開始時の自分の河</label>
+      <select id="river-count">
+        <option value="17">A：17枚</option>
+        <option value="18" selected>B：18枚</option>
+        <option value="19">C：19枚</option>
+        <option value="23" disabled>D：23枚（到達局面未確認）</option>
+        <option value="24" disabled>E：24枚（到達局面未確認）</option>
+        <option value="25" disabled>F：25枚（到達局面未確認）</option>
+      </select>
+      <button id="start-river-test" type="button">選択した局面から開始</button>
+      <p>17〜19枚は牌山から合法に進行した固定シードの局面を使います。23・24・25枚は合法な開始局面を確認できていないため選べません。</p>
+    </section>
   </section>
   <header><div><h1>Heibon Mahjong</h1></div><button id="new-game" type="button">新しい対局</button></header>
   <div id="local-score-strip-host"></div>

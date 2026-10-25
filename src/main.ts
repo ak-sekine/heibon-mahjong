@@ -31,7 +31,16 @@ const localActionRoot = localActionHost ? mountActionPanel(localActionHost, 'loc
 const onlineActionHost = document.querySelector<HTMLElement>('#online-action-panel-host');
 const onlineActionRoot = onlineActionHost ? mountActionPanel(onlineActionHost, 'online') : null;
 installCallViewport();
-if (document.querySelector('#main-menu-toggle')) new MainMenu();
+if (document.querySelector('#main-menu-toggle')) {
+  const riverTestMenuItem = document.querySelector<HTMLButtonElement>('#river-test-open');
+  if (riverTestMenuItem && import.meta.env.DEV) {
+    riverTestMenuItem.hidden = false;
+    riverTestMenuItem.addEventListener('click', () => {
+      window.location.assign(new URL('test.html?debug=river', window.location.href));
+    });
+  }
+  new MainMenu();
+}
 mountDiagnosticDialog();
 const resultDialog = new ResultDialog();
 let onlineGameController: OnlineGameController | null = null;
