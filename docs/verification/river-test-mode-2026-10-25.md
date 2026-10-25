@@ -27,5 +27,14 @@
 - 自動テスト: `npm test`成功（61テストファイル、失敗0）。追加の河テストは5ケース成功。
 - 型チェック・本番ビルド: `npm run build`成功（`tsc --noEmit`を含む）。
 - 差分検査・ブラウザースクリプト構文: `git diff --check`、`python -m py_compile tests/browser-river-test-mode.py`成功。
-- Chromium/WebKitの320・375・390・430px画面幅: 既存の`Browser UI verification`へ追加。GitHub Actions実行結果はpush後に確認します。
+- Chromium/WebKitの320・375・390・430px画面幅: GitHub Actionsの[Browser UI verification #40200270636](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40200270636)成功（対象コミット`fca83c8`）。河テストページでの選択・打牌・19枚目以降の4段目表示・CPU後の再手番・20枚目の打牌、開発メニュー遷移、オンラインUI非表示を確認しました。
+- 公開ワークフロー: [Deploy #40200270666](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40200270666)成功。回帰テスト、Worker型チェック、Pages build、Chromium/WebKitブラウザー検証、Worker deploy、本番疎通検証、Pages deployがすべて成功しました。
 - iPhone Safari実機: ユーザーからの実機報告待ち。未確認です。
+
+## iPhone Safariでの確認手順
+
+1. iPhone Safariで`https://ak-sekine.github.io/heibon-mahjong/test.html?debug=river`を開きます。
+2. 初期選択の18枚から開始し、自分の手牌をタップして選択後、「打牌する」を押します。
+3. 19枚目が自分の河の4段目に現れ、CPUの打牌後に自分へ手番が戻ることを確認して、20枚目も打牌します。
+4. 画面幅に応じて手牌、対面・左右の河、ドラ表示、卓枠の重なりとはみ出しを確認します。17枚・19枚の状態やり直しも同ページで選択できます。
+5. 実機の結果は、この記録とは別にユーザー報告後に追記します。
