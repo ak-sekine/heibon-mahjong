@@ -65,8 +65,9 @@ with sync_playwright() as p:
                       new Set([...r.children].map(e=>`${e.dataset.riverRow},${e.dataset.riverColumn}`)).size===count),
                     declarationCount:table.querySelectorAll('.river-tile[data-riichi-declaration="true"]').length,
                     declarationRotated:(()=>{const d=table.querySelector('.river-tile[data-riichi-declaration="true"] .tile-svg');
-                      const n=table.querySelector('.river-tile:not([data-riichi-declaration="true"]) .tile-svg');
-                      return Boolean(d&&n&&getComputedStyle(d).transform!==getComputedStyle(n).transform);})()};
+                      const n=d?.closest('.river')?.querySelector('.river-tile:not([data-riichi-declaration="true"]) .tile-svg');
+                      if(!d||!n)return false;const a=rect(d),b=rect(n);
+                      return Math.abs(a.width-b.height)<.35&&Math.abs(a.height-b.width)<.35;})()};
                 }'''
                 for mode, selector, hand_selector in [
                     ('offline', '#local-table', '#player-hand'),
