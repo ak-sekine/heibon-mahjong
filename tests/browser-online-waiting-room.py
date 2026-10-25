@@ -967,7 +967,7 @@ with sync_playwright() as p:
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'closing the room dialog did not restore focus to the visible menu button'
     assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') !== null"), 'closing the dialog discarded the session token'
     assert [item.inner_text() for item in page.locator('#main-menu-items button:not([hidden])').all()] == [
-      'オフラインで新規対局', '新しくルームを作る', 'ルームに参加する', 'ルーム操作', '診断ログ',
+      'オフラインで新規対局', '河テスト', '新しくルームを作る', 'ルームに参加する', 'ルーム操作', '診断ログ',
     ], 'the shared menu actions and room operation were not available during a room session'
     request_count_before_blocked_actions = page.evaluate('window.onlineMock.requests.length')
     select_menu_item('#online-create-open')
