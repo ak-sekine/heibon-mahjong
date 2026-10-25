@@ -8,7 +8,7 @@ import { cpuRiichiStart } from './cpu-riichi-fixture.ts';
 import { inventory } from './helpers.ts';
 import type { GameState, PlayerState } from '../src/model/game.ts';
 class Node {
-  children:Node[]=[];dataset:Record<string,string>={};style={};className='';textContent='';innerHTML='';hidden=false;
+  children:Node[]=[];dataset:Record<string,string>={};style=Object.assign({} as Record<string,string>,{setProperty(name:string,value:string){this[name]=value;},removeProperty(name:string){delete this[name];}});className='';textContent='';innerHTML='';hidden=false;
   attributes:Record<string,string>={};content={firstElementChild:this};title={textContent:''};
   append(...nodes:Node[]){this.children.push(...nodes);} replaceChildren(...nodes:Node[]){this.children=nodes;}
   setAttribute(k:string,v:string){this.attributes[k]=v;}querySelector(){return this.title;}

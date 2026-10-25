@@ -48,7 +48,16 @@ function render(): void {
     localDeclarationBubbles.clearAll();
   }
   const declarations = declarationsBetween(previouslyRenderedGame, game);
-  renderTable(game, controller.match.points, controller.match.lastSettlement);
+  try {
+    renderTable(game, controller.match.points, controller.match.lastSettlement);
+  } catch (error) {
+    console.error('Local table river layout failed before DOM update', {
+      turnPlayerId: game.turnPlayerId,
+      riverLengths: game.players.map(player => player.river.length),
+      error,
+    });
+    throw error;
+  }
   for (const declaration of declarations) {
     const position = riverPositionFor(0, declaration.seat);
     const river = localTable.querySelector<HTMLElement>(`.river[data-player-id="${declaration.seat}"]`);

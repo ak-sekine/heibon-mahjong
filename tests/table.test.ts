@@ -25,7 +25,10 @@ class ElementStub {
   children: ElementStub[] = [];
   dataset: Record<string, string> = {};
   className = '';
-  style = Object.assign({} as Record<string, string>, { setProperty(name: string, value: string) { this[name] = value; } });
+  style = Object.assign({} as Record<string, string>, {
+    setProperty(name: string, value: string) { this[name] = value; },
+    removeProperty(name: string) { delete this[name]; },
+  });
   textContent = '';
   disabled = false;
   hidden = false;

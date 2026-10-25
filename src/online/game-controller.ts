@@ -262,6 +262,25 @@ export class OnlineGameController {
   private render(): void {
     const view = this.view;
     if (!view) return;
+    let riverLayouts: ReturnType<typeof calculateRiverLayout>[];
+    try {
+      riverLayouts = view.seats.map(seat => {
+        const position = riverPositionFor(view.viewerSeat, seat.seat);
+        const declarationIndex = seat.riichiDeclarationTileId
+          ? seat.river.findIndex(tile => tile.id === seat.riichiDeclarationTileId)
+          : -1;
+        if (seat.riichiDeclarationTileId && declarationIndex < 0) {
+          throw new RangeError(`Riichi declaration tile is missing from online seat ${seat.seat}'s river`);
+        }
+        return calculateRiverLayout(position, seat.river.length, declarationIndex);
+      });
+    } catch (error) {
+      console.error('Online table river layout failed before DOM update', {
+        gameRevision: view.gameRevision,
+        error,
+      });
+      throw error;
+    }
     renderTableRoundInfo(
       document.querySelector<HTMLElement>('#online-table-round')!,
       document.querySelector<HTMLElement>('#online-wall-count')!,
@@ -269,7 +288,7 @@ export class OnlineGameController {
     );
     this.renderSeatLabels(view);
     this.renderHandsAndMelds(view);
-    this.renderRivers(view);
+    this.renderRivers(view, riverLayouts);
     this.renderDeclarationEvents(view);
     this.renderDora(view);
     this.renderResult(view);
@@ -416,16 +435,13 @@ export class OnlineGameController {
     return group;
   }
 
-  private renderRivers(view: PlayerGameView): void {
-    for (const seat of view.seats) {
+  private renderRivers(view: PlayerGameView, layouts: readonly ReturnType<typeof calculateRiverLayout>[]): void {
+    for (const [seatIndex, seat] of view.seats.entries()) {
       const position = riverPositionFor(view.viewerSeat, seat.seat);
       const river = document.querySelector<HTMLElement>(`[data-online-river="${position}"]`);
       if (!river) continue;
       river.className = `river river-${position}`;
-      const declarationIndex = seat.riichiDeclarationTileId
-        ? seat.river.findIndex(tile => tile.id === seat.riichiDeclarationTileId)
-        : -1;
-      const layout = calculateRiverLayout(position, seat.river.length, declarationIndex);
+      const layout = layouts[seatIndex];
       applyRiverLayout(river, layout);
       river.replaceChildren(...seat.river.map((tile, index) => {
         const item = document.createElement('div');

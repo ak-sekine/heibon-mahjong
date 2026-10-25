@@ -432,6 +432,9 @@ header > div { min-width:0; }
 .table .river-right { right:calc(var(--cell)*1.2); top:50%; transform:translateY(-50%); }
 .table .river-bottom { left:50%; bottom:calc(var(--cell)*1.8); right:auto; transform:translateX(-50%); }
 .table .river-left { left:calc(var(--cell)*1.2); top:50%; bottom:auto; transform:translateY(-50%); }
+/* The fourth left-side row extends just beyond its usual three-column origin;
+   keep its tiles inside the square table border. */
+.table .river-left .river-tile[data-river-column='-1'] { transform:translateX(calc(var(--cell)*.2)); }
 .table .center-info { position:absolute; left:calc(var(--cell)*4.325); top:calc(var(--cell)*4.25); width:calc(var(--cell)*3 - 1px); height:calc(var(--cell)*3 - 1px); padding:2px; gap:2px; font-size:9px; }
 .table .wall-count { gap:2px; }
 .table #player-hand { display:flex; width:auto; max-width:100%; align-self:center; container-type:normal; }

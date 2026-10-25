@@ -103,18 +103,38 @@ test('legal round replay appends discards 17 through 20 to the model river', () 
   }
 });
 
-test('18th through 20th legal discards reach the renderer boundary and layout rejects 19+', () => {
+test('18th through 20th legal discards and all 19–136 tile layouts are accepted', () => {
   for (const count of [18, 19, 20]) {
     const { after } = riverAfterSeatZeroDiscard(8, count);
-    if (count === 18) {
-      for (const position of ['bottom', 'right', 'top', 'left'] as const) {
-        assert.equal(calculateRiverLayout(position, count).placements.length, count);
-      }
-    } else {
-      assert.throws(() => calculateRiverLayout('bottom', count), RangeError);
-      assert.throws(() => calculateRiverLayout('right', count), RangeError);
-    }
     assert.equal(after.players[0].river.length, count);
+  }
+  for (const count of [17, 18, 19, 20, 23, 24, 25, 30, 136]) {
+    for (const position of ['bottom', 'right', 'top', 'left'] as const) {
+      const layout = calculateRiverLayout(position, count, count ? count - 1 : -1);
+      assert.equal(layout.placements.length, count);
+      assert.equal(new Set(layout.placements.map(tile => `${tile.row},${tile.column}`)).size, count,
+        `${position} ${count} tiles must keep unique positions`);
+    }
+  }
+  const fourRows = calculateRiverLayout('bottom', 24);
+  assert.deepEqual([fourRows.placements[18].row, fourRows.placements[18].column], [3, 0]);
+  assert.deepEqual([fourRows.placements[23].row, fourRows.placements[23].column], [3, 5]);
+});
+
+test('shared discard transition keeps appending when a river already contains 17–24 tiles', () => {
+  for (const count of [17, 18, 19, 20, 23, 24]) {
+    const initial = startGame(seeded(90 + count));
+    const existingRiver = initial.liveWall.slice(0, count);
+    const players = [...initial.players] as GameState['players'];
+    players[0] = { ...players[0], river: existingRiver, discardHistory: existingRiver };
+    const before = { ...initial, liveWall: initial.liveWall.slice(count), players };
+    const discardId = before.players[0].drawnTile!.id;
+    const after = discardTileForOnline(before, 0, discardId);
+    assert.equal(after.players[0].river.length, count + 1);
+    assert.deepEqual(after.players[0].river.slice(0, count), existingRiver);
+    assert.equal(after.players[0].river.at(-1)?.id, discardId);
+    inventory(after, initial);
+    assert.equal(calculateRiverLayout('bottom', after.players[0].river.length).placements.length, count + 1);
   }
 });
 
@@ -131,7 +151,7 @@ test('offline CPU turn can make the 19th discard from a naturally reached 18-til
   assert.equal(updated.players[0].river.length, 19);
   assert.equal(updated.players[0].river.at(-1)?.id, expected);
   inventory(updated, initial);
-  assert.throws(() => calculateRiverLayout('bottom', updated.players[0].river.length), RangeError);
+  assert.equal(calculateRiverLayout('bottom', updated.players[0].river.length).placements.length, 19);
 });
 
 test('online reducer accepts the 19th discard through the same state transition', () => {
@@ -144,7 +164,7 @@ test('online reducer accepts the 19th discard through the same state transition'
   assert.equal(next.match.game.players[0].river.length, 19);
   assert.equal(next.match.game.players[0].river.at(-1)?.id, tileId);
   inventory(next.match.game, initial);
-  assert.throws(() => calculateRiverLayout('bottom', next.match.game.players[0].river.length), RangeError);
+  assert.equal(calculateRiverLayout('bottom', next.match.game.players[0].river.length).placements.length, 19);
 });
 
 test('last live-wall draw permits a legal 19th discard with the last-discard marker', () => {

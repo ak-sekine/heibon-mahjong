@@ -60,6 +60,18 @@ function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement
 
 export function renderTable(game: GameState, points?: readonly number[], settlement: RoundSettlement | null = null): void {
   const pendingDiscard = pendingDiscardTarget(game);
+  // Validate every river before touching the current DOM. A malformed
+  // declaration reference must leave the prior frame intact and be reported by
+  // the caller, rather than rendering a half-updated table.
+  const riverLayouts = new Map(game.players.map(player => {
+    const declarationIndex = player.riichi
+      ? player.river.findIndex(tile => tile.id === player.riichi!.declarationTileId)
+      : -1;
+    if (player.riichi && declarationIndex < 0) {
+      throw new RangeError(`Riichi declaration tile is missing from player ${player.id}'s river`);
+    }
+    return [player.id, calculateRiverLayout(riverPositionFor(0, player.id), player.river.length, declarationIndex)] as const;
+  }));
   renderWinResult(game, settlement);
   renderRoundSummary(game, settlement);
   const winningResults = game.winResult
@@ -113,10 +125,7 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
     const melds = document.querySelector<HTMLElement>(`.open-melds[data-player-id="${id}"]`);
     if (melds) renderMelds(melds, player, game);
     const river = document.querySelector<HTMLElement>(`.river[data-player-id="${id}"]`)!;
-    const declarationIndex = player.riichi
-      ? player.river.findIndex(tile => tile.id === player.riichi!.declarationTileId)
-      : -1;
-    const layout = calculateRiverLayout(riverPositionFor(0, id), player.river.length, declarationIndex);
+    const layout = riverLayouts.get(id)!;
     applyRiverLayout(river, layout);
     river.replaceChildren(...player.river.map((physical, index) => {
       const position = layout.placements[index];
