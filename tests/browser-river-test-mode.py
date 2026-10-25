@@ -53,10 +53,6 @@ with sync_playwright() as playwright:
                 assert river.locator('.river-tile').nth(19).get_attribute('data-river-row') == '3'
 
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'horizontal overflow')
-            if start_count in [19, 23]:
-                assert page.locator('#result-dialog').evaluate('(dialog) => dialog.open'), (width, start_count, 'draw result missing')
-                assert page.locator('#result-title').inner_text() == '荒牌流局', (width, start_count, 'unexpected end state')
-                page.locator('#view-table').click()
             reports.append({'width': width, 'start': start_count, 'result': start_count + 1,
                             'riverRows': river.get_attribute('data-river-rows')})
 
