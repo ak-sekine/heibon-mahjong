@@ -58,11 +58,20 @@ with sync_playwright() as p:
                   const doraClear=faces.every(a=>dora.every(b=>separate(rect(a),rect(b))));
                   const tileBounds=faces.every(a=>inside(rect(a),t));
                   const riverBounds=rivers.every(a=>inside(rect(a),t));
+                  const box=e=>{const b=rect(e);return [b.left,b.top,b.right,b.bottom].map(v=>Math.round(v*10)/10);};
+                  const owner=e=>{const r=e.closest('.river');return r.dataset.playerId??r.dataset.onlineRiver;};
+                  const riverOverlaps=[];
+                  for(let i=0;i<faces.length;i++)for(let j=i+1;j<faces.length;j++)if(!separate(rect(faces[i]),rect(faces[j])))
+                    riverOverlaps.push({a:[owner(faces[i]),[...faces[i].closest('.river').children].indexOf(faces[i].closest('.river-tile')),box(faces[i])],
+                      b:[owner(faces[j]),[...faces[j].closest('.river').children].indexOf(faces[j].closest('.river-tile')),box(faces[j])]});
+                  const centerOverlaps=faces.filter(a=>!separate(rect(a),rect(center))).map(a=>
+                    [owner(a),[...a.closest('.river').children].indexOf(a.closest('.river-tile')),box(a),box(center)]);
                   return {tileCounts:rivers.map(e=>e.children.length),correctCount:rivers.every(e=>e.children.length===count),
                     allFourPositions:rivers.length===4,riverPairs,handClear,centerClear,doraClear,tileBounds,riverBounds,
                     noPageOverflow:document.documentElement.scrollWidth<=innerWidth,
                     fourthRow:count<19||rivers.every(r=>Number(r.dataset.riverRows)>=4&&
                       new Set([...r.children].map(e=>`${e.dataset.riverRow},${e.dataset.riverColumn}`)).size===count),
+                    riverOverlaps,centerOverlaps,
                     declarationCount:table.querySelectorAll('.river-tile[data-riichi-declaration="true"]').length,
                     declarationRotated:(()=>{const d=table.querySelector('.river-tile[data-riichi-declaration="true"] .tile-svg');
                       const n=d?.closest('.river')?.querySelector('.river-tile:not([data-riichi-declaration="true"]) .tile-svg');
@@ -73,7 +82,7 @@ with sync_playwright() as p:
                     ('offline', '#local-table', '#player-hand'),
                 ]:
                     result = page.evaluate(measure, {'count': count, 'tableSelector': selector, 'handSelector': hand_selector})
-                    assert all(value is True for key, value in result.items() if key != 'tileCounts' and key != 'declarationCount'), (
+                    assert all(value is True for key, value in result.items() if key not in ('tileCounts','declarationCount','riverOverlaps','centerOverlaps')) and not result['riverOverlaps'] and not result['centerOverlaps'], (
                         width, count, declaration_seat, mode, result)
                     assert result['declarationCount'] == 1, (width, count, declaration_seat, mode, result)
                     reports.append({'width': width, 'count': count, 'declarationSeat': declaration_seat, 'mode': mode, **result})
@@ -91,7 +100,7 @@ with sync_playwright() as p:
                   online.receive({type:'game-state',view});
                 }''', {'count': count, 'declarationSeat': declaration_seat})
                 result = page.evaluate(measure, {'count': count, 'tableSelector': '#online-table', 'handSelector': '#online-player-hand'})
-                assert all(value is True for key, value in result.items() if key != 'tileCounts' and key != 'declarationCount'), (
+                assert all(value is True for key, value in result.items() if key not in ('tileCounts','declarationCount','riverOverlaps','centerOverlaps')) and not result['riverOverlaps'] and not result['centerOverlaps'], (
                     width, count, declaration_seat, 'online', result)
                 assert result['declarationCount'] == 1, (width, count, declaration_seat, 'online', result)
                 reports.append({'width': width, 'count': count, 'declarationSeat': declaration_seat, 'mode': 'online', **result})
