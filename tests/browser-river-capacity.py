@@ -196,7 +196,7 @@ with sync_playwright() as p:
                 }''', {'count': count, 'mode': mode})
                 result = page.evaluate(measure, {'count': count, 'tableSelector': table_selector, 'handSelector': hand_selector})
                 verify_original_river_positions(stable_centers, mode, 0, count, result['prefixCenters'], width)
-                assert all(value is True for key, value in result.items() if key not in ('tileCounts','declarationCount','riverOverlaps','centerOverlaps','handOverlaps','prefixCenters')) and not result['riverOverlaps'] and not result['centerOverlaps'] and not result['handOverlaps'], (
+                assert all(value is True for key, value in result.items() if key not in ('tileCounts','declarationCount','riverOverlaps','centerOverlaps','handOverlaps','seatOverlaps','criticalRects','prefixCenters')) and not result['riverOverlaps'] and not result['centerOverlaps'] and not result['handOverlaps'] and not result['seatOverlaps'], (
                     width, count, mode, 'stable-riichi-prefix', result)
             page.evaluate("window.riverFixture.online.receive({type:'online-session-ended'})")
         assert not errors, errors
