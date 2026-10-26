@@ -55,8 +55,12 @@ export function recordLocalGameTransition(previous: GameState, next: GameState, 
   } else if (previousDecision && nextDecision && previous.phase !== next.phase) {
     diagnosticLog.record('INFO', 'local_decision_wait_transition', { seat: next.turnPlayerId, previousPhase: previous.phase, nextPhase: next.phase, decisionPending: true, source });
   }
-  if (previous.players[previous.turnPlayerId].control === 'cpu' && next.players[next.turnPlayerId].control === 'human') {
-    diagnosticLog.record('INFO', 'local_cpu_to_human_wait', { seat: next.turnPlayerId, phase: next.phase, source });
+  const previousTurnWasCpu = previous.players[previous.turnPlayerId].control === 'cpu';
+  const nextTurnIsHuman = next.players[next.turnPlayerId].control === 'human';
+  if (previousTurnWasCpu && (nextTurnIsHuman || nextDecision)) {
+    diagnosticLog.record('INFO', 'local_cpu_to_human_wait', {
+      seat: next.turnPlayerId, phase: next.phase, decisionPending: nextDecision, source,
+    });
   }
   if (next.phase === 'won' || next.phase === 'wall-exhausted') {
     diagnosticLog.record('INFO', 'local_round_ended', { seat: next.turnPlayerId, phase: next.phase, source });

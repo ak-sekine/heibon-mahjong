@@ -94,6 +94,7 @@ test('CPU2 riichi declaration claimed by CPU1 pon renders and advances the offli
   assert.equal(panel.callGroup.visible,true);
   assert.equal(panel.buttons.discard.visible,false);
   assert.ok(diagnosticLog.all().some(entry=>entry.event==='local_cpu_turn_completed'));
+  assert.ok(diagnosticLog.all().some(entry=>entry.event==='local_cpu_to_human_wait'&&entry.details.phase==='awaiting-call'&&entry.details.decisionPending===true));
   assert.ok(!diagnosticLog.all().some(entry=>entry.event==='local_game_render_failed'));
 }));
 
