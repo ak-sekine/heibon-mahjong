@@ -435,7 +435,7 @@ header > div { min-width:0; }
 .table .rivers { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:calc(var(--cell)*11.65); height:calc(var(--cell)*11.65); display:block; }
 .table .river { position:absolute; gap:0; }
 .table .river-top { left:50%; top:calc(var(--cell)*1.8); transform:translateX(-50%); }
-.table .river-top[data-river-overflow='true'] { top:calc(var(--cell)*1.8 + 2px); }
+.table .river-top[data-river-overflow='true'] { top:calc(var(--cell)*1.8 + 3px); }
 .table .river-right { right:calc(var(--cell)*1.2); top:50%; transform:translateY(-50%); }
 .table .river-bottom { left:50%; bottom:calc(var(--cell)*1.8); right:auto; transform:translateX(-50%); }
 .table .river-left { left:calc(var(--cell)*1.2); top:50%; bottom:auto; transform:translateY(-50%); }
