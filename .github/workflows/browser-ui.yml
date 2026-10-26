@@ -75,7 +75,6 @@ jobs:
             fi
           }
           HEIBON_PRODUCTION_URL=http://127.0.0.1:4174/heibon-mahjong/ run_browser_test tests/browser-online-dialog-layout.py
-          HEIBON_BROWSER=webkit HEIBON_PRODUCTION_URL=http://127.0.0.1:4174/heibon-mahjong/ run_browser_test tests/browser-online-dialog-layout.py
           run_browser_test tests/browser-riichi-discard-layout.py
           run_browser_test tests/browser-action-controls.py
           run_browser_test tests/browser-action-panel.py

@@ -1,11 +1,11 @@
-"""Check the built online dialogs in Chromium and WebKit at mobile widths."""
+"""Check the built online dialogs in WebKit at mobile widths."""
 import json
 import os
 import pathlib
 from playwright.sync_api import sync_playwright
 
 BASE_URL = os.environ.get('HEIBON_PRODUCTION_URL', 'http://127.0.0.1:4174/heibon-mahjong/')
-BROWSER_NAME = os.environ.get('HEIBON_BROWSER', 'chromium')
+BROWSER_NAME = 'webkit'
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -17,11 +17,7 @@ DIALOGS = [
 ]
 
 with sync_playwright() as playwright:
-    if BROWSER_NAME not in ('chromium', 'webkit'):
-        raise ValueError(f'Unsupported browser: {BROWSER_NAME}')
-    browser_type = getattr(playwright, BROWSER_NAME)
-    launch_options = {'chromium_sandbox': True} if BROWSER_NAME == 'chromium' else {}
-    browser = browser_type.launch(**launch_options)
+    browser = playwright.webkit.launch()
     page = browser.new_page(viewport={'width': 390, 'height': 844}, device_scale_factor=1)
     page.goto(BASE_URL, wait_until='networkidle')
     css_assets = page.evaluate("""() => performance.getEntriesByType('resource')

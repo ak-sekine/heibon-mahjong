@@ -20,7 +20,7 @@
 ## 変更・検証
 
 - CSSは `64c4713` の共通オンラインダイアログ修正を維持。オフラインCSSは変更していない。
-- `tests/browser-online-dialog-layout.py` を追加。Vite Previewで公開用ビルドを開き、実際にロードしたhashed CSS asset、computed style、文字Rangeと各文字の画面上の行位置、タイトルとの非重複、ダイアログ・ボタンの画面内配置を320/375/390/414pxで確認する。ChromiumとWebKitで実行し、各画面のスクリーンショットとJSON計測結果をActions artifactへ保存する。
+- `tests/browser-online-dialog-layout.py` を追加。Vite Previewで公開用ビルドを開き、実際にロードしたhashed CSS asset、computed style、文字Rangeと各文字の画面上の行位置、タイトルとの非重複、ダイアログ・ボタンの画面内配置を320/375/390/414pxでWebKit検査する。各画面のスクリーンショットとJSON計測結果をActions artifactへ保存する。通常のオンライン対局フローは既存のChromium検査で継続する。
 - `npm test`、`npm run build`、`npm run typecheck:worker`、`git diff --check` は成功。ビルド済みCSSに `width:max-content` と `white-space:nowrap` が含まれることを確認。
 - コミット `25fcf3f` のGitHub Actions Browser UI / deploy結果は確認中。
 - iPhone Safari実機での修正後の再確認は未実施。本件を実機確認済みとは扱わない。
