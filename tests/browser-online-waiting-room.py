@@ -814,7 +814,7 @@ with sync_playwright() as p:
         return {
           left: rect.left, right: rect.right, width: rect.width,
           dialogClientWidth: dialog.clientWidth, dialogScrollWidth: dialog.scrollWidth,
-          formClientWidth: form.clientWidth, formScrollWidth: form.scrollWidth,
+          formClientWidth: form.clientWidth, formWidth: form.getBoundingClientRect().width, formScrollWidth: form.scrollWidth,
           controls: [...form.querySelectorAll('.match-format-options label, #online-create-name, button')].map(control => {
             const box = control.getBoundingClientRect(); return {width: box.width, height: box.height};
           }),
@@ -823,7 +823,7 @@ with sync_playwright() as p:
       assert layout['left'] >= 0 and layout['right'] <= width, (width, layout)
       assert layout['dialogScrollWidth'] <= layout['dialogClientWidth'], (width, layout)
       assert layout['formScrollWidth'] <= layout['formClientWidth'], (width, layout)
-      assert all(control['width'] <= layout['formClientWidth'] and control['height'] >= 44 for control in layout['controls']), (width, layout)
+      assert all(control['width'] <= layout['formWidth'] and control['height'] >= 44 for control in layout['controls']), (width, layout)
       assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'create dialog caused horizontal overflow')
       create_form_layouts.append([width, round(layout['width'], 2)])
     page.set_viewport_size({'width': 390, 'height': 320})
@@ -876,7 +876,7 @@ with sync_playwright() as p:
         const form = dialog.querySelector('#online-join-form');
         return {left: rect.left, right: rect.right, width: rect.width,
           dialogClientWidth: dialog.clientWidth, dialogScrollWidth: dialog.scrollWidth,
-          formClientWidth: form.clientWidth, formScrollWidth: form.scrollWidth,
+          formClientWidth: form.clientWidth, formWidth: form.getBoundingClientRect().width, formScrollWidth: form.scrollWidth,
           controls: [...form.querySelectorAll('input,button')].map(control => {
             const box = control.getBoundingClientRect(); return {width: box.width, height: box.height};
           })};
@@ -884,7 +884,7 @@ with sync_playwright() as p:
       assert layout['left'] >= 0 and layout['right'] <= width, (width, layout)
       assert layout['dialogScrollWidth'] <= layout['dialogClientWidth'], (width, layout)
       assert layout['formScrollWidth'] <= layout['formClientWidth'], (width, layout)
-      assert all(control['width'] <= layout['formClientWidth'] and control['height'] >= 44 for control in layout['controls']), (width, layout)
+      assert all(control['width'] <= layout['formWidth'] and control['height'] >= 44 for control in layout['controls']), (width, layout)
       assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'join dialog caused horizontal overflow')
       join_form_layouts.append([width, round(layout['width'], 2)])
     page.set_viewport_size({'width': 390, 'height': 320})
