@@ -11,6 +11,9 @@ const MAX_ENTRIES = 200;
 const allowedKeys = new Set([
   'actionType', 'requestId', 'gameRevision', 'revision', 'errorCode', 'result', 'durationMs',
   'connectionGeneration', 'attempt', 'closeCode', 'messageType', 'status', 'reason', 'source',
+  'turnId', 'seat', 'phase', 'startPhase', 'endPhase', 'plannedMs', 'elapsedMs', 'timerType',
+  'riverCounts', 'errorName', 'errorMessage', 'errorId', 'runnerState', 'waitingState',
+  'decisionPending', 'previousPhase', 'nextPhase', 'warningAfterMs',
 ]);
 
 /** Small, allowlist-only session diagnostic buffer. Logging must never affect game flow. */
@@ -46,13 +49,20 @@ export class DiagnosticLog {
           if (key === 'requestId' && (!/^[A-Za-z0-9_-]{1,64}$/u.test(value) || /^[a-f0-9]{64}$/u.test(value))) continue;
           if (key === 'errorCode' && !/^[a-z0-9_-]{1,60}$/u.test(value)) continue;
           if (key === 'actionType' && !/^[a-z-]{1,40}$/u.test(value)) continue;
-          details[key] = value.slice(0, 120);
+          if (key === 'errorName' && !/^[A-Za-z0-9_.-]{1,60}$/u.test(value)) continue;
+          details[key] = key === 'errorMessage' || key === 'source'
+            ? sanitizeDiagnosticMessage(value).slice(0, 120) : value.slice(0, 120);
         }
         else if (typeof value === 'number' && Number.isFinite(value)) details[key] = value;
         else if (typeof value === 'boolean' || value === null) details[key] = value;
       }
-      this.entries.push({ timestamp: new Date().toISOString(), level, event: event.slice(0, 80), details });
-      if (this.entries.length > MAX_ENTRIES) this.entries.splice(0, this.entries.length - MAX_ENTRIES);
+      const entry: DiagnosticEntry = { timestamp: new Date().toISOString(), level, event: event.slice(0, 80), details };
+      if (this.entries.length >= MAX_ENTRIES) {
+        // Keep recent anomalies when frequent normal CPU progress fills the buffer.
+        const oldestRoutine = this.entries.findIndex(value => value.level === 'INFO');
+        this.entries.splice(oldestRoutine >= 0 ? oldestRoutine : 0, 1);
+      }
+      this.entries.push(entry);
       this.queueSave();
       if (this.listeners.size && !this.refreshQueued) {
         this.refreshQueued = true;
@@ -116,7 +126,9 @@ function scrubDetails(values: Record<string, unknown>): DiagnosticEntry['details
       if (key === 'requestId' && (!/^[A-Za-z0-9_-]{1,64}$/u.test(value) || /^[a-f0-9]{64}$/u.test(value))) continue;
       if (key === 'errorCode' && !/^[a-z0-9_-]{1,60}$/u.test(value)) continue;
       if (key === 'actionType' && !/^[a-z-]{1,40}$/u.test(value)) continue;
-      details[key] = value.slice(0, 120);
+      if (key === 'errorName' && !/^[A-Za-z0-9_.-]{1,60}$/u.test(value)) continue;
+      details[key] = key === 'errorMessage' || key === 'source'
+        ? sanitizeDiagnosticMessage(value).slice(0, 120) : value.slice(0, 120);
     } else if (typeof value === 'number' && Number.isFinite(value)) details[key] = value;
     else if (typeof value === 'boolean' || value === null) details[key] = value;
   }
@@ -124,6 +136,94 @@ function scrubDetails(values: Record<string, unknown>): DiagnosticEntry['details
 }
 
 export const diagnosticLog = new DiagnosticLog();
+
+const seenErrors = new WeakSet<object>();
+const errorIds = new WeakMap<object, string>();
+const recentErrorKeys = new Map<string, number>();
+let nextErrorId = 1;
+
+/** Remove likely identifiers, credentials and URLs before retaining exception text. */
+export function sanitizeDiagnosticMessage(message: string): string {
+  return message.slice(0, 300)
+    .replace(/https?:\/\/\S+/giu, '[url]')
+    .replace(/\b(token|ticket|authorization|cookie|password|secret)\s*[:=]\s*\S+/giu, '$1=[redacted]')
+    .replace(/\b(?:man|pin|sou|east|south|west|north|white|green|red|honor|tile)[-_][A-Za-z0-9_-]+\b/giu, '[tile]')
+    .replace(/\b(?:[1-9][mps]|[1-7]z)\b/giu, '[tile]')
+    .replace(/[1-9](?:萬|筒|索)|[東南西北白發中]/gu, '[tile]')
+    .replace(/\b[a-f0-9]{32,}\b/giu, '[id]')
+    .replace(/\b(?:[A-Za-z0-9_-]{36,})\b/gu, '[id]');
+}
+
+export function safeErrorInfo(error: unknown): { errorName: string; errorMessage: string; errorCode: string } {
+  let rawName: unknown;
+  let rawMessage: unknown;
+  let explicitCode: unknown;
+  try {
+    if (error && typeof error === 'object') {
+      const object = error as { name?: unknown; message?: unknown; code?: unknown };
+      rawName = object.name;
+      rawMessage = object.message;
+      explicitCode = object.code;
+    }
+  } catch { /* Proxies or custom getters can fail while an exception is already being reported. */ }
+  const errorName = typeof rawName === 'string' ? rawName.replace(/[^A-Za-z0-9_.-]/gu, '').slice(0, 60) || 'Error' : 'Error';
+  const message = typeof rawMessage === 'string' ? rawMessage : typeof error === 'string' ? error : 'Unknown error';
+  const errorCode = typeof explicitCode === 'string' && /^[A-Za-z0-9_-]{1,60}$/u.test(explicitCode)
+    ? explicitCode.toLowerCase()
+    : errorName.toLowerCase().replace(/[^a-z0-9_-]/gu, '_').slice(0, 60) || 'error';
+  return { errorName, errorMessage: sanitizeDiagnosticMessage(message), errorCode };
+}
+
+export function markDiagnosticError(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const current = errorIds.get(error);
+    if (current) return current;
+    const id = `exception-${nextErrorId++}`;
+    errorIds.set(error, id);
+    seenErrors.add(error);
+    return id;
+  }
+  return `exception-${nextErrorId++}`;
+}
+
+export function recordGameRenderFailure(
+  log: DiagnosticLog,
+  context: { seat: number; phase: string; riverCounts: string; turnId?: string },
+  error: unknown,
+  source: string,
+): void {
+  try { log.record('ERROR', 'local_game_render_failed', { ...context, ...safeErrorInfo(error), errorId: markDiagnosticError(error), source }); }
+  catch { /* A rendering diagnostic must never escape into the rendering path. */ }
+}
+
+/** Installs once; it observes but never suppresses browser error events. */
+export function installGlobalErrorDiagnostics(log: DiagnosticLog = diagnosticLog): void {
+  if (typeof window === 'undefined' || window.__heibonErrorDiagnosticsInstalled) return;
+  window.__heibonErrorDiagnosticsInstalled = true;
+  const record = (event: string, error: unknown, source: string) => {
+    try {
+      const object = error && typeof error === 'object' ? error : null;
+      if (object && seenErrors.has(object)) return;
+      const info = safeErrorInfo(error);
+      const fingerprint = `${info.errorName}:${info.errorMessage}:${source}`;
+      const now = Date.now();
+      if ((recentErrorKeys.get(fingerprint) ?? 0) > now - 3000) return;
+      recentErrorKeys.set(fingerprint, now);
+      if (recentErrorKeys.size > 40) for (const [key, time] of recentErrorKeys) if (time <= now - 3000) recentErrorKeys.delete(key);
+      log.record('ERROR', event, { ...info, errorId: markDiagnosticError(error), source });
+    } catch { /* Error reporting cannot escape into application event handling. */ }
+  };
+  window.addEventListener('error', event => {
+    try { record('window_error', event.error ?? event.message, 'window.error'); }
+    catch { /* Error observers cannot interfere with the event or application. */ }
+  });
+  window.addEventListener('unhandledrejection', event => {
+    try { record('unhandled_rejection', event.reason, 'unhandledrejection'); }
+    catch { /* Error observers cannot interfere with the event or application. */ }
+  });
+}
+
+declare global { interface Window { __heibonErrorDiagnosticsInstalled?: boolean } }
 
 export function mountDiagnosticDialog(log: DiagnosticLog = diagnosticLog): void {
   const dialog = document.querySelector<HTMLDialogElement>('#diagnostic-dialog');

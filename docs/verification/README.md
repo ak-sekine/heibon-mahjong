@@ -14,6 +14,7 @@
 | --- | --- |
 | [流局結果概要と操作ボタン配置](round-end-result-2026-10-24.md) | 通常／途中流局の概要表示、Chromium / WebKitのモバイル表示、デプロイ結果、ユーザー報告のiPhone Safari実機確認。 |
 | [オンライン診断ログ](online-diagnostics.md) | ブラウザーのsessionStorageログ、Worker構造化ログ、Cloudflare確認方法、検証範囲。 |
+| [CPU手番・描画診断の強化](cpu-turn-render-diagnostics-2026-10-26.md) | 鳴かれたリーチ宣言牌の描画、オフラインCPU進行・Runner停滞・描画例外ログ、容量と秘匿項目の回帰検証。iPhone Safari実機確認項目を含む。 |
 | [九種九牌の公開手牌](kyuushu-public-hand.md) | 宣言者14枚のオンライン・オフライン公開、非公開手牌保護、結果の再表示・再接続・次局解除。GitHub ActionsのChromium/WebKit確認成功。 |
 | [Heibon Mahjong テスト環境](test-environment.md) | オフライン固定局面の九種九牌4シナリオ、136枚整合性、公開範囲、320〜430px幅。 |
 | [Step 13.8](step13.8/README.md) | 主要役満8種類、候補単位の複合、点数、結果表示。Browser UI verification はGitHub Actionsで実施。 |

@@ -75,6 +75,8 @@ jobs:
           run_browser_test tests/browser-action-controls.py
           run_browser_test tests/browser-action-panel.py
           run_browser_test tests/browser-table-ui.py
+          run_browser_test tests/browser-riichi-claimed-discard.py
+          HEIBON_BROWSER=webkit run_browser_test tests/browser-riichi-claimed-discard.py
           run_browser_test tests/browser-river-capacity.py
           HEIBON_BROWSER=webkit run_browser_test tests/browser-river-capacity.py
           run_browser_test tests/browser-declaration-bubbles.py

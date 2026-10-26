@@ -202,14 +202,13 @@ export class OnlineWaitingRoom {
     this.dialog.addEventListener('cancel', event => { event.preventDefault(); this.closeDialog(); });
     window.addEventListener('online', () => this.resumeConnection());
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') { diagnosticLog.record('INFO', 'page_resumed', { source: 'visibilitychange' }); this.resumeConnection(); }
+      if (document.visibilityState === 'visible') this.resumeConnection();
       else {
         this.clearReconnectTimer();
         this.clearStateSyncTimer();
       }
     });
     window.addEventListener('pagehide', () => {
-      diagnosticLog.record('INFO', 'page_hidden', { source: 'pagehide' });
       diagnosticLog.flush();
       this.clearReconnectTimer();
       this.clearStableConnectionTimer();

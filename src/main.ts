@@ -17,8 +17,9 @@ import { mountScoreStrip, mountTableInfoPanel } from './ui/table-components.ts';
 import { declarationsBetween } from './model/declaration.ts';
 import { DeclarationBubbleRenderer } from './rendering/declaration-bubbles.ts';
 import { riverPositionFor } from './rendering/river-layout.ts';
-import { mountDiagnosticDialog } from './online/diagnostics.ts';
+import { diagnosticLog, installGlobalErrorDiagnostics, mountDiagnosticDialog, recordGameRenderFailure } from './online/diagnostics.ts';
 
+installGlobalErrorDiagnostics();
 const localScoreHost = document.querySelector<HTMLElement>('#local-score-strip-host');
 if (localScoreHost) mountScoreStrip(localScoreHost, 'local');
 const onlineScoreHost = document.querySelector<HTMLElement>('#online-score-strip-host');
@@ -53,39 +54,60 @@ const controller = new GameController(undefined, {
   onChange: render,
   wait: (milliseconds, signal) => waitForTurn(riverDebugMode ? 800 : milliseconds, signal),
 });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    diagnosticLog.record('INFO', 'page_resumed', { source: 'visibilitychange' });
+    controller.reportIfStalled('page-resumed');
+  }
+});
+window.addEventListener('pagehide', () => {
+  diagnosticLog.record('INFO', 'page_hidden', { source: 'pagehide' });
+  diagnosticLog.flush();
+});
 let previouslyRenderedGame: typeof controller.game | null = null;
 let previouslyRenderedMatchStatus = controller.match.status;
 let localKanChoicesOpen = false;
 let localActionPanel: ActionPanel | null = null;
 function render(): void {
   const game = controller.game;
-  if (previouslyRenderedMatchStatus !== 'playing' && controller.match.status === 'playing') {
-    localDeclarationBubbles.clearAll();
-  }
-  const declarations = declarationsBetween(previouslyRenderedGame, game);
+  let renderStage = 'prepare';
   try {
+    if (previouslyRenderedMatchStatus !== 'playing' && controller.match.status === 'playing') {
+      localDeclarationBubbles.clearAll();
+    }
+    const declarations = declarationsBetween(previouslyRenderedGame, game);
+    renderStage = 'renderTable';
     renderTable(game, controller.match.points, controller.match.lastSettlement);
+    renderStage = 'declarationBubbles';
+    for (const declaration of declarations) {
+      const position = riverPositionFor(0, declaration.seat);
+      const river = localTable.querySelector<HTMLElement>(`.river[data-player-id="${declaration.seat}"]`);
+      if (river) localDeclarationBubbles.show(declaration.seat, declaration.kind, position, river);
+    }
+    previouslyRenderedGame = game;
+    previouslyRenderedMatchStatus = controller.match.status;
+    renderStage = 'renderMatch';
+    renderMatch(controller.match);
+    renderStage = 'renderSelection';
+    renderSelection(controller.game, controller.selectedTileId, controller.progressing);
+    renderStage = 'localActionPanel';
+    localActionPanel?.update(createLocalActionPanelState(
+      controller.match, controller.selectedTileId, controller.progressing, localKanChoicesOpen,
+    ));
+    renderStage = 'resultDialog';
+    resultDialog.update(controller.match);
   } catch (error) {
-    console.error('Local table river layout failed before DOM update', {
+    recordGameRenderFailure(diagnosticLog, {
+      seat: game.turnPlayerId, phase: game.phase,
+      riverCounts: game.players.map(player => player.river.length).join(','),
+    }, error, `main.render>${renderStage}`);
+    console.error('Local game render failed', {
       turnPlayerId: game.turnPlayerId,
       riverLengths: game.players.map(player => player.river.length),
-      error,
+      stage: renderStage,
     });
     throw error;
   }
-  for (const declaration of declarations) {
-    const position = riverPositionFor(0, declaration.seat);
-    const river = localTable.querySelector<HTMLElement>(`.river[data-player-id="${declaration.seat}"]`);
-    if (river) localDeclarationBubbles.show(declaration.seat, declaration.kind, position, river);
-  }
-  previouslyRenderedGame = game;
-  previouslyRenderedMatchStatus = controller.match.status;
-  renderMatch(controller.match);
-  renderSelection(controller.game, controller.selectedTileId, controller.progressing);
-  localActionPanel?.update(createLocalActionPanelState(
-    controller.match, controller.selectedTileId, controller.progressing, localKanChoicesOpen,
-  ));
-  resultDialog.update(controller.match);
 }
 export function resetLocalActionChoices(): void { localKanChoicesOpen = false; }
 function newGame(format: 'tonpu' | 'tonnan' = 'tonpu'): void {

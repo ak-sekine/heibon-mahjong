@@ -4,9 +4,9 @@
 
 ## ブラウザー診断ログ
 
-右上の三本線メニューから「診断ログ」を開く。日時は日本時間で表示し、コピーされる日時はISO 8601 UTC（ミリ秒精度）。同じタブの `sessionStorage` に最新200件を保持する。保存領域が無効・満杯の場合でもゲーム処理は継続し、ログが失われることがある。ブラウザー診断ログはCloudflareへ送信せず、Worker Logsとは保存先が異なる。
+右上の三本線メニューから「診断ログ」を開く。日時は日本時間で表示し、コピーされる日時はISO 8601 UTC（ミリ秒精度）。同じタブの `sessionStorage` に最大200件を保持する。満杯時はINFOよりWARN/ERRORを優先して残し、INFOだけの場合は古い順に入れ替える。保存領域が無効・満杯の場合でもゲーム処理は継続し、ログが失われることがある。ブラウザー診断ログはCloudflareへ送信せず、Worker Logsとは保存先が異なる。
 
-`src/online/diagnostics.ts` は既存の許可リストを使う。操作ログには操作種別、`requestId`、送信時revision、結果、エラーコード、応答時間を記録する。参加トークン、WebSocket ticket、Authorization、Cookie、IPアドレス、HTTPヘッダー、牌ID、鳴き候補ID、ゲーム状態、生のリクエスト/レスポンス本文、例外内容は記録しない。requestIdに64桁の16進数文字列（トークン形式）が渡された場合は出力しない。
+`src/online/diagnostics.ts` は許可リストを使う。オンライン操作ログには操作種別、`requestId`、送信時revision、結果、エラーコード、応答時間を記録する。2026-10-26からはオフラインCPU進行と共通描画処理の例外について、秘匿候補を除いた例外名・短いメッセージ・エラーIDも記録する。参加トークン、WebSocket ticket、Authorization、Cookie、IPアドレス、HTTPヘッダー、牌ID、鳴き候補ID、手牌・牌山、ゲーム状態、生のリクエスト/レスポンス本文は記録しない。requestIdに64桁の16進数文字列（トークン形式）が渡された場合は出力しない。
 
 ## Cloudflare Workers Logs
 
@@ -75,7 +75,7 @@ Cloudflare公式の [Workers Logs資料](https://developers.cloudflare.com/worke
 - `npm test`: 58件成功。クライアント/Worker診断ログの許可リスト、秘匿項目の除外、requestId保持のテストを含む。
 - `npm run build`: 成功。
 - `git diff --check`: 成功。
-- 独自ログの安全性: `worker/room.ts`、`worker/index.ts`、`src/online/diagnostics.ts`、オンライン通信・診断ログ呼び出しを確認。request/responseオブジェクト、例外文字列、認証情報、IP、非公開牌情報をログへ渡す実装は見つからなかった。内部例外の再throwもCloudflare側の追加例外記録を避けるため停止した。
+- 独自ログの安全性（2026-10-24時点）: `worker/room.ts`、`worker/index.ts`、当時の `src/online/diagnostics.ts`、オンライン通信・診断ログ呼び出しを確認。request/responseオブジェクト、生の例外文字列、認証情報、IP、非公開牌情報をWorker Logsへ渡す実装は見つからなかった。2026-10-26以降のブラウザー側での秘匿候補を除去した例外ログと、そのテストは[CPU手番・描画診断記録](cpu-turn-render-diagnostics-2026-10-26.md)を参照。
 - `requestId`照合: Workerの操作受信/結果ログとブラウザー診断のrequestId保持を確認。テスト成功。
 - GitHub Actions run [40086380784](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40086380784)（commit `00ab5337672eab6583ba6d82021c7ea5d9b59e56`）: 全job成功。Worker deploy、HTTPS/WebSocket/再接続/認証/privacy本番テスト、Pages build/deployを確認。
 - Cloudflare DashboardのObservabilityで、対象コミットの新しいデプロイ後に保存されたログを確認済み。独自構造化ログの保存、`cf-worker`形式、自動Invocation Logsの`cf-worker-event`が確認範囲に含まれないこと、requestIdによる操作追跡、確認した範囲で認証情報が含まれないことを確認した。範囲と限界は[実環境での確認記録](#実環境での確認記録)を参照。production-testの成功はアプリ通信の検証であり、Workers Logs画面の確認とは区別する。

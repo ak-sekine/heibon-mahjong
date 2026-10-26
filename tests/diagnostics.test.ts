@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DiagnosticLog } from '../src/online/diagnostics.ts';
+import { DiagnosticLog, installGlobalErrorDiagnostics, recordGameRenderFailure, safeErrorInfo, sanitizeDiagnosticMessage } from '../src/online/diagnostics.ts';
 
 class MemoryStorage {
   value: string | null = null;
@@ -37,4 +37,63 @@ test('diagnostic logging safely ignores unavailable and throwing storage', async
   await new Promise(resolve => queueMicrotask(resolve));
   assert.equal(log.all().length, 1);
   assert.doesNotThrow(() => log.clear());
+});
+
+test('diagnostic buffer protects warnings and errors from frequent CPU progress events',()=>{
+  const log=new DiagnosticLog(null);
+  for(let index=0;index<200;index++)log.record('INFO','local_cpu_turn_completed',{turnId:`local-${index}`,seat:index%4,phase:'awaiting-discard'});
+  log.record('ERROR','local_game_render_failed',{errorName:'RangeError',errorMessage:'layout failed',source:'renderTable'});
+  for(let index=0;index<500;index++)log.record('INFO','local_cpu_turn_completed',{turnId:`later-${index}`,seat:index%4,phase:'awaiting-discard'});
+  assert.equal(log.all().length,200);
+  assert.ok(log.all().some(entry=>entry.event==='local_game_render_failed'));
+  assert.equal(log.all().at(-1)?.details.turnId,'later-499');
+});
+
+test('exception text is scrubbed before it enters diagnostic entries',()=>{
+  const log=new DiagnosticLog(null);
+  const info=safeErrorInfo(new Error('failed tile-man-5 token=secret123 at https://private.example/path'));
+  log.record('ERROR','window_error',{...info,source:'window.error'});
+  const serialized=JSON.stringify(log.all());
+  assert.equal(serialized.includes('man-5'),false);
+  assert.equal(serialized.includes('secret123'),false);
+  assert.equal(serialized.includes('private.example'),false);
+  assert.match(sanitizeDiagnosticMessage('failed [ticket: value]'),/redacted/u);
+  assert.equal(log.all()[0]?.details.errorName,'Error');
+});
+
+test('diagnostic error extraction does not throw on hostile error getters',()=>{
+  const error=new Proxy({}, {get(){throw new Error('private getter failure');}});
+  assert.doesNotThrow(()=>safeErrorInfo(error));
+  assert.doesNotThrow(()=>recordGameRenderFailure(new DiagnosticLog(null),{seat:0,phase:'awaiting-discard',riverCounts:'0,0,0,0'},error,'main.render'));
+});
+
+test('render failure records safe turn, phase, river counts, and failure location',()=>{
+  const log=new DiagnosticLog(null);
+  recordGameRenderFailure(log,{turnId:'local-4',seat:2,phase:'awaiting-discard',riverCounts:'9,8,9,7'},
+    new RangeError('Riichi declaration tile is missing from player 2 river'),'main.render>renderTable');
+  const details=log.all()[0]?.details;
+  const {errorId,...safeDetails}=details!;
+  assert.deepEqual(safeDetails,{turnId:'local-4',seat:2,phase:'awaiting-discard',riverCounts:'9,8,9,7',errorName:'RangeError',errorMessage:'Riichi declaration tile is missing from player 2 river',errorCode:'rangeerror',source:'main.render>renderTable'});
+  assert.match(String(errorId),/^exception-\d+$/u);
+});
+
+test('global error and rejection listeners record once without suppressing the events',()=>{
+  const log=new DiagnosticLog(null);
+  const listeners=new Map<string,(event:any)=>void>();
+  const original=globalThis.window;
+  globalThis.window={
+    addEventListener:(type:string,listener:EventListenerOrEventListenerObject)=>listeners.set(type,listener as (event:any)=>void),
+    setTimeout:(callback:TimerHandler,delay?:number)=>setTimeout(callback,delay),
+    clearTimeout:(id:number)=>clearTimeout(id),
+  } as unknown as Window;
+  try {
+    installGlobalErrorDiagnostics(log);
+    const error=new Error('tile-man-5 token=private-value');
+    listeners.get('error')!({error,message:error.message});
+    listeners.get('unhandledrejection')!({reason:error});
+    listeners.get('unhandledrejection')!({reason:new Error('async failure')});
+    assert.deepEqual(log.all().map(entry=>entry.event),['window_error','unhandled_rejection']);
+    assert.equal(JSON.stringify(log.all()).includes('private-value'),false);
+    assert.equal(JSON.stringify(log.all()).includes('man-5'),false);
+  } finally { globalThis.window=original; }
 });

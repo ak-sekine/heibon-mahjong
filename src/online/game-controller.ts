@@ -13,6 +13,8 @@ import { renderOnlineWinSummary } from './result-content.ts';
 import { DeclarationBubbleRenderer } from '../rendering/declaration-bubbles.ts';
 import type { PublicDeclarationEvent } from '../model/declaration.ts';
 import { collectRecentDeclarations } from './declaration-cursor.ts';
+import { riichiRiverReference } from '../rendering/riichi-river-reference.ts';
+import { diagnosticLog, recordGameRenderFailure } from './diagnostics.ts';
 
 type ActionSender = (action: GameActionPayload, expectedGameRevision: number) => void;
 type DecisionAction = { type: 'declare-ron' } | { type: 'pass-ron' } | { type: 'declare-call'; optionId: string } | { type: 'pass-call' };
@@ -262,38 +264,52 @@ export class OnlineGameController {
   private render(): void {
     const view = this.view;
     if (!view) return;
-    let riverLayouts: ReturnType<typeof calculateRiverLayout>[];
+    let renderStage = 'riverLayout';
     try {
-      riverLayouts = view.seats.map(seat => {
+      const riverLayouts: ReturnType<typeof calculateRiverLayout>[] = view.seats.map(seat => {
         const position = riverPositionFor(view.viewerSeat, seat.seat);
-        const declarationIndex = seat.riichiDeclarationTileId
-          ? seat.river.findIndex(tile => tile.id === seat.riichiDeclarationTileId)
-          : -1;
-        if (seat.riichiDeclarationTileId && declarationIndex < 0) {
+        if (seat.riichi && !seat.riichiDeclarationTileId) {
+          throw new RangeError(`Riichi declaration tile reference is missing from online seat ${seat.seat}`);
+        }
+        const declaration = riichiRiverReference(seat.seat, seat.river, seat.riichiDeclarationTileId,
+          view.seats.flatMap(owner => owner.melds.map(meld => ({
+            ownerSeat: owner.seat, type: meld.type, calledTileId: meld.calledTileId, fromPlayerId: meld.fromPlayerId, tiles: meld.tiles,
+          }))));
+        if (declaration.state === 'inconsistent') {
           throw new RangeError(`Riichi declaration tile is missing from online seat ${seat.seat}'s river`);
         }
-        return calculateRiverLayout(position, seat.river.length, declarationIndex);
+        return calculateRiverLayout(position, seat.river.length, declaration.index);
       });
+      renderStage = 'roundInfo';
+      renderTableRoundInfo(
+        document.querySelector<HTMLElement>('#online-table-round')!,
+        document.querySelector<HTMLElement>('#online-wall-count')!,
+        { ...view.round, liveWallCount: view.liveWallCount },
+      );
+      renderStage = 'seatLabels';
+      this.renderSeatLabels(view);
+      renderStage = 'handsAndMelds';
+      this.renderHandsAndMelds(view);
+      renderStage = 'rivers';
+      this.renderRivers(view, riverLayouts);
+      renderStage = 'declarationEvents';
+      this.renderDeclarationEvents(view);
+      renderStage = 'dora';
+      this.renderDora(view);
+      renderStage = 'result';
+      this.renderResult(view);
+      renderStage = 'actions';
+      this.renderActions(view);
+      renderStage = 'resultDialog';
+      this.resultDialog.updateOnline(view);
     } catch (error) {
-      console.error('Online table river layout failed before DOM update', {
-        gameRevision: view.gameRevision,
-        error,
-      });
+      recordGameRenderFailure(diagnosticLog, {
+        turnId: `online-${view.gameRevision}`, seat: view.turnPlayerId, phase: view.phase,
+        riverCounts: view.seats.map(seat => seat.river.length).join(','),
+      }, error, `OnlineGameController.render>${renderStage}`);
+      console.error('Online game render failed', { gameRevision: view.gameRevision, stage: renderStage });
       throw error;
     }
-    renderTableRoundInfo(
-      document.querySelector<HTMLElement>('#online-table-round')!,
-      document.querySelector<HTMLElement>('#online-wall-count')!,
-      { ...view.round, liveWallCount: view.liveWallCount },
-    );
-    this.renderSeatLabels(view);
-    this.renderHandsAndMelds(view);
-    this.renderRivers(view, riverLayouts);
-    this.renderDeclarationEvents(view);
-    this.renderDora(view);
-    this.renderResult(view);
-    this.renderActions(view);
-    this.resultDialog.updateOnline(view);
   }
 
   private renderDeclarationEvents(view: PlayerGameView): void {

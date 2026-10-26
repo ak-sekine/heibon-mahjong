@@ -16,6 +16,7 @@ import { renderSeatLabel, renderWallCount } from './shared-table-components.ts';
 import { renderRoundWinSummary } from './round-win-summary.ts';
 import { yakuDisplayName } from './yaku-names.ts';
 import { pendingDiscardTarget } from './pending-discard.ts';
+import { riichiRiverReference } from './riichi-river-reference.ts';
 export { yakuDisplayName } from './yaku-names.ts';
 
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
@@ -64,13 +65,19 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
   // declaration reference must leave the prior frame intact and be reported by
   // the caller, rather than rendering a half-updated table.
   const riverLayouts = new Map(game.players.map(player => {
-    const declarationIndex = player.riichi
-      ? player.river.findIndex(tile => tile.id === player.riichi!.declarationTileId)
-      : -1;
-    if (player.riichi && declarationIndex < 0) {
+    if (player.riichi && !player.riichi.declarationTileId) {
+      throw new RangeError(`Riichi declaration tile reference is missing for player ${player.id}`);
+    }
+    const declaration = riichiRiverReference(
+      player.id, player.river, player.riichi?.declarationTileId,
+      game.players.flatMap(owner => (owner.melds ?? []).map(meld => ({
+        ownerSeat: owner.id, type: meld.type, calledTileId: meld.calledTileId, fromPlayerId: meld.fromPlayerId, tiles: meld.tiles,
+      }))), player.discardHistory,
+    );
+    if (declaration.state === 'inconsistent') {
       throw new RangeError(`Riichi declaration tile is missing from player ${player.id}'s river`);
     }
-    return [player.id, calculateRiverLayout(riverPositionFor(0, player.id), player.river.length, declarationIndex)] as const;
+    return [player.id, calculateRiverLayout(riverPositionFor(0, player.id), player.river.length, declaration.index)] as const;
   }));
   renderWinResult(game, settlement);
   renderRoundSummary(game, settlement);
