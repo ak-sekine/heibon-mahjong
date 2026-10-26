@@ -397,6 +397,8 @@ MOCK = r"""
     },
     setResultScenario(kind, viewerSeat) {
       if (!gameStarted) return;
+      rivers = [[], [], [], []];
+      declarationIndexes = [-1, -1, -1, -1];
       if (kind === 'kyuushu') {
         roundNumber = 1;
         gameStatus = 'round-ended';
@@ -421,7 +423,6 @@ MOCK = r"""
       phase = kind === 'draw' ? 'wall-exhausted' : 'won';
       decision = null;
       viewerOverride = viewerSeat;
-      declarationIndexes = [-1, -1, -1, -1];
       const before = [25000, 25000, 25000, 25000];
       let payments = [];
       let tenpai = null;
@@ -438,6 +439,8 @@ MOCK = r"""
           totalPoints: payment * payers.length, han: method === 'ron' ? 4 : 4, yakuHan: 1, fu: 30, rawFu: 27, scoreTier: 'normal',
           yakumanCount: 0, yaku: [{ id: 'riichi', han: 1, yakuman: false }],
           dora: { normal: 1, ura: 1, red: 1 }, doraCounts: { normal: 1, ura: 1, red: 1 }, fuEntries: [] }];
+        declarationIndexes[winnerId] = 0;
+        rivers[winnerId] = [makeTile(`online-result-riichi-${kind}-${gameRevision + 1}`, winnerId)];
       }
       const after = [...before];
       for (const payment of payments) { after[payment.payerId] -= payment.points; after[payment.recipientId] += payment.points; }
