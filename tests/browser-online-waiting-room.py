@@ -361,8 +361,12 @@ MOCK = r"""
       broadcastGame('game-state');
     },
     setSeatPresentation(seat, riichi, connected) {
+      if (riichi && rivers[seat].length === 0) {
+        rivers[seat] = [makeTile(`online-seat-riichi-${seat}-${gameRevision + 1}`, seat)];
+      }
       declarationIndexes[seat] = riichi ? 0 : -1;
       state.seats[seat].connected = connected;
+      gameRevision++;
       broadcastGame('game-state');
     },
     advanceCpu() {
