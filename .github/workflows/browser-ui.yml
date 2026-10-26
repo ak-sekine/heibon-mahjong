@@ -45,14 +45,17 @@ jobs:
         run: |
           VITE_ONLINE_API_URL=https://online-mock.invalid npm run dev -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/heibon-vite.log 2>&1 &
           vite_pid=$!
-          trap 'kill "$vite_pid" 2>/dev/null || true' EXIT
+          npm run preview -- --host 127.0.0.1 --port 4174 --strictPort > /tmp/heibon-preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$vite_pid" "$preview_pid" 2>/dev/null || true' EXIT
           for attempt in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:4173/heibon-mahjong/ > /dev/null; then
+            if curl --fail --silent http://127.0.0.1:4173/heibon-mahjong/ > /dev/null && curl --fail --silent http://127.0.0.1:4174/heibon-mahjong/ > /dev/null; then
               break
             fi
             sleep 1
           done
           curl --fail --silent http://127.0.0.1:4173/heibon-mahjong/ > /dev/null
+          curl --fail --silent http://127.0.0.1:4174/heibon-mahjong/ > /dev/null
           export HEIBON_CHROMIUM="$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
           export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
           run_browser_test() {
@@ -71,6 +74,8 @@ jobs:
               return "$browser_status"
             fi
           }
+          HEIBON_PRODUCTION_URL=http://127.0.0.1:4174/heibon-mahjong/ run_browser_test tests/browser-online-dialog-layout.py
+          HEIBON_BROWSER=webkit HEIBON_PRODUCTION_URL=http://127.0.0.1:4174/heibon-mahjong/ run_browser_test tests/browser-online-dialog-layout.py
           run_browser_test tests/browser-riichi-discard-layout.py
           run_browser_test tests/browser-action-controls.py
           run_browser_test tests/browser-action-panel.py
@@ -114,4 +119,5 @@ jobs:
           path: |
             /tmp/heibon-table-ui
             /tmp/heibon-vite.log
+            /tmp/heibon-preview.log
             docs/verification/step13.5.5

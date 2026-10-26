@@ -184,6 +184,7 @@ MOCK = r"""
       if (message.type === 'next-round') {
         if (this.seat !== 0 || gameStatus !== 'round-ended') return gameResult(this, message, false, 'round_not_ended');
         gameStatus = 'playing'; phase = 'awaiting-discard'; roundNumber++; turnPlayerId = 0; decision = null; roundResult = null;
+        declarationIndexes = [-1, -1, -1, -1];
         hands = [0, 1, 2, 3].map(seat => Array.from({ length: 13 }, (_, i) => makeTile(`online-r${roundNumber}-${seat}-${i}`, seat + i)));
         drawnTiles = [makeTile(`online-r${roundNumber}-0-draw`, 7), null, null, null];
         rivers = [[], [], [], []];
