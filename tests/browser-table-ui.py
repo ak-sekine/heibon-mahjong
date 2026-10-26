@@ -67,7 +67,9 @@ with sync_playwright() as p:
                 # Fill each river with 18 tiles and put riichi at row boundaries.
                 for riichi in [-1,0,5,6,17]:
                     page.evaluate('''index=>{
-                      const pool=[...game.liveWall,...game.deadWall];
+                      const meldTileIds=new Set(game.players.flatMap(p=>p.melds.flatMap(m=>m.tiles.filter(Boolean).map(t=>t.id))));
+                      const pool=[...game.liveWall,...game.deadWall].filter(tile=>!meldTileIds.has(tile.id));
+                      if(pool.length<72) throw new RangeError('Not enough unique tiles for synthetic rivers');
                       window.shown={...game,players:game.players.map((p,id)=>({...p,river:pool.slice(id*18,id*18+18),riichi:index<0?null:{declarationTileId:pool[id*18+index].id}}))};
                       app.controller.match={...match,game:shown,depositSticks:index===17?17:0,honba:index===17?10:0};
                       app.render();
