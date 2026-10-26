@@ -33,8 +33,8 @@ with sync_playwright() as p:
      const seats=Object.fromEntries([...document.querySelectorAll('.table .seat')].map(e=>[e.dataset.playerId,r(e)]));
      const dirs=rivers.every(e=>{const a=r(e),id=e.dataset.playerId;return id==='0'?a.top>=c.bottom-.5&&a.bottom<=seats[id].top+.5:id==='2'?a.bottom<=c.top+.5&&a.top>=seats[id].bottom-.5:id==='1'?a.left>=c.right-.5&&a.right<=seats[id].left+.5:id==='3'?a.right<=c.left+.5&&a.left>=seats[id].right-.5:false});
      const order=rivers.every(e=>[...e.children].every((tile,i)=>{
-      const row=Math.floor(i/6),col=i%6,id=e.dataset.playerId;
-      return +tile.dataset.riverRow===(id==='1'?5-col:id==='3'?col:id==='2'?2-row:row)&&+tile.dataset.riverColumn===(id==='1'?row:id==='3'?2-row:id==='2'?5-col:col);
+      const id=e.dataset.playerId,columns=id==='1'||id==='3'?8:6,row=Math.floor(i/columns),col=i%columns;
+      return +tile.dataset.riverRow===(id==='1'?7-col:id==='3'?col:id==='2'?2-row:row)&&+tile.dataset.riverColumn===(id==='1'?row:id==='3'?2-row:id==='2'?5-col:col);
      }));
      const hands=[...document.querySelectorAll('.concealed-hand,#player-hand')];
      const perimeter=hands.every(e=>{const a=r(e),s=e.closest('.seat');return inside(a,t)&&(s.classList.contains('seat-top')?a.bottom<t.top+t.height*.15:s.classList.contains('seat-bottom')?a.top>t.bottom-t.height*.16:s.classList.contains('seat-left')?a.right<t.left+t.width*.15:a.left>t.right-t.width*.15)});

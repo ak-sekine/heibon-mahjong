@@ -42,7 +42,7 @@ def geometry(page):
     # Check every tile's coordinates and scroll dimensions, not merely SVG counts.
     report = page.locator('.river').evaluate_all("""els => els.map(el => {
         const r = el.getBoundingClientRect();
-        const columns = el.matches('.river-left,.river-right') ? 3 : 6;
+        const columns = el.matches('.river-left,.river-right') ? 8 : 6;
         const tiles = [...el.querySelectorAll('.river-tile')].map(tile => {
             const t = tile.getBoundingClientRect();
             const svg = tile.querySelector('svg').getBoundingClientRect();
@@ -70,8 +70,9 @@ def geometry(page):
             assert min(tile['width'],tile['height']) >= 12, tile
             assert tile['x'] >= 0 and tile['x']+tile['width'] <= page.viewport_size['width'], tile
             player = int(river['player'])
-            row, column = divmod(i, 6)
-            expected = {0:(row,column),1:(5-column,row),2:(2-row,5-column),3:(column,2-row)}[player]
+            columns = 8 if player in [1,3] else 6
+            row, column = divmod(i, columns)
+            expected = {0:(row,column),1:(7-column,row),2:(2-row,5-column),3:(column,2-row)}[player]
             assert (tile['row'],tile['column']) == expected, (player,i,tile)
             matrix = {0:'matrix(1, 0, 0, 1,',1:'matrix(0, -1, 1, 0,',2:'matrix(-1, 0, 0, -1,',3:'matrix(0, 1, -1, 0,'}[player]
             if not tile['declaration']: assert tile['transform'].startswith(matrix), tile

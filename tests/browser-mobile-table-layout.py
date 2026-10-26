@@ -34,8 +34,9 @@ with sync_playwright() as p:
           const rect=e=>e.getBoundingClientRect();
           const rivers=[...document.querySelectorAll('.table .river')].map(river=>{
             const cells=[...river.children].map(item=>rect(item.querySelector('svg')));
-            const cols=river.classList.contains('river-left')||river.classList.contains('river-right')?3:6;
-            const rows=18/cols;
+            const side=river.classList.contains('river-left')||river.classList.contains('river-right');
+            const cols=side?3:6;
+            const rows=side?8:3;
             const gaps=[];
             const rowCenters={};
             for(const item of river.children){
@@ -71,7 +72,7 @@ with sync_playwright() as p:
             assert metrics['seatHandClear'], f'CPU1 concealed hand overlaps human meld at {width}px: {metrics}'
             assert metrics['selfMeldGap']>=7.8, f'human hand-to-meld gap is below 8px at {width}px: {metrics}'
             assert metrics['noHorizontalScroll'], f'horizontal scroll at {width}px: {metrics}'
-        assert all(r['count']==18 and ((r['rows'],r['cols']) in [(3,6),(6,3)]) for r in river_metrics['rivers']), f'river must remain 6x3, rotated for side seats, at {width}px: {river_metrics}'
+        assert all(r['count']==18 and ((r['rows'],r['cols']) in [(3,6),(8,3)]) for r in river_metrics['rivers']), f'rivers must remain 6x3 for self/opposite and 8x3 for side seats at {width}px: {river_metrics}'
         assert all(min(r['gaps'])>=.8 and r['rowAlignment']<.35 for r in river_metrics['rivers']), f'river tracks overlap or drift at {width}px: {river_metrics}'
         assert river_metrics['riichiTileWidth']>0, f'riichi tile should retain a cell at {width}px: {river_metrics}'
         for seat in range(4):
