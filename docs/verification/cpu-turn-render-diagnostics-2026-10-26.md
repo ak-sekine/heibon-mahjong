@@ -167,8 +167,9 @@ CPU各手番に `cpuTurnId` を割り当て、開始・段階境界・失敗・�
 ### テスト・未確認範囲
 
 - `tests/automatic-turn-diagnostics.test.ts` と `tests/diagnostics.test.ts` で、同じCPU手番ID、処理順、非同期待機、同期例外、チェックポイント復元、500件上限、重要ログ保持、render例外情報を確認。
-- `tests/browser-diagnostics.py` はlocalStorage再読み込み後のログ、ビルド情報表示、全文コピーを確認するよう更新。Chromium/WebKitの実行結果は後続CIで確認する。
+- `tests/browser-diagnostics.py` はlocalStorage再読み込み後のログ、ビルド情報表示、全文コピー、復帰スナップショットを確認するよう更新。GitHub Actions [Browser UI run 40407016036](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40407016036) はChromiumとWebKitを含む全Browser UIシナリオで成功。
 - 最終ローカル検証：`npm test` 成功（63/63）、`npm run build` 成功、`npm run typecheck:worker` 成功、`git diff --check` 成功。Browser UIはCodex Cloud内で起動せず、push後のGitHub Actionsで確認する。
+- Deploy workflow [run 40407014493](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40407014493) はverify、Browser UI、Cloudflare Worker deploy、本番production test、Pages build、Pages deployがすべて成功（commit `5f5a592ffc5cdb8c5efc929dd6dff70be5eaeaa3`）。
 - iPhone Safari実機での新診断イベント、ページ復帰、localStorage利用可能量、実際のフリーズ記録は未確認。
 - JavaScriptメインスレッドが永久停止し、その後ページも復帰しない場合、その停止中にタイマー・画面操作・ログ処理は実行できない。最後の同期チェックポイントが保存されている場合に停止直前の段階を推定できるが、最後の処理が完了したか、Safariプロセスが落ちたか、同期処理の内部どこで止まったかは特定できない。
 - SafariがlocalStorageへの書き込みを拒否・破棄した場合、永続ログは残らない可能性がある。実機での確認手順は本記録冒頭のログ取得手順と併せ、診断ログ画面のビルドID・全文コピーを確認する。
