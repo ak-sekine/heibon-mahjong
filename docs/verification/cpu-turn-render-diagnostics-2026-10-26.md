@@ -173,3 +173,88 @@ CPU各手番に `cpuTurnId` を割り当て、開始・段階境界・失敗・�
 - iPhone Safari実機での新診断イベント、ページ復帰、localStorage利用可能量、実際のフリーズ記録は未確認。
 - JavaScriptメインスレッドが永久停止し、その後ページも復帰しない場合、その停止中にタイマー・画面操作・ログ処理は実行できない。最後の同期チェックポイントが保存されている場合に停止直前の段階を推定できるが、最後の処理が完了したか、Safariプロセスが落ちたか、同期処理の内部どこで止まったかは特定できない。
 - SafariがlocalStorageへの書き込みを拒否・破棄した場合、永続ログは残らない可能性がある。実機での確認手順は本記録冒頭のログ取得手順と併せ、診断ログ画面のビルドID・全文コピーを確認する。
+
+## 2026-10-27 iPhone Safari実機検証（診断schema 2）
+
+### 検証環境とビルド識別
+
+- 検証者：ユーザー
+- 端末・ブラウザー：iPhone・Safari
+- 対局：オフライン、プレイヤーはユーザー1人とCPU3人、東風戦、東1局
+- 診断schema：2
+- アプリバージョン：0.1.0
+- 実行モード：production
+- 実機確認Git SHA：`5f5a592ffc5cdb8c5efc929dd6dff70be5eaeaa3`
+- ビルド日時：`2026-10-26T21:59:32.965Z`
+- ビルドID：`5f5a592ffc5cdb8c5efc929dd6dff70be5eaeaa3@2026-10-26T21:59:32.965Z`
+
+診断画面のスクリーンショットとユーザーがコピーした診断ログで確認した。ビルドIDは診断画面と `app_build_info` イベントの両方に表示されていた。これはユーザーによる実機確認であり、CodexがiPhone Safariを操作した記録ではない。
+
+### CPU手番と処理段階
+
+ユーザーが対局を操作し、CPUの連続手番と鳴き後の手番を確認した。次の4手番について、すべて `local_cpu_turn_started` と `local_cpu_turn_completed` の対応が記録されていた。
+
+| CPU手番ID | 座席 | 所要時間 | 結果 |
+| --- | ---: | ---: | --- |
+| `local-1` | 1 | 400ms | 正常終了 |
+| `local-2` | 2 | 353ms | 正常終了 |
+| `local-3` | 3 | 409ms | 正常終了 |
+| `local-4` | 3 | 362ms | 正常終了 |
+
+次のイベントが記録され、CPU処理段階ごとの開始・終了と所要時間をログで確認できた。
+
+- `local_cpu_stage_started`、`local_cpu_stage_completed`
+- `local_cpu_wait_timer_started`、`local_cpu_wait_timer_fired`
+- `local_cpu_turn_started`、`local_cpu_turn_completed`
+- `local_runner_started`、`local_runner_completed`
+
+確認できた処理段階は `draw_processing`、`state_transition`、`wait_timer`、`tsumo_judgment`、`kyuushu_judgment`、`kan_judgment`、`riichi_judgment`、`discard_selection`、`discard_commit`。CPU待機タイマーは予定300msに対して実測301〜305msで発火していた。
+
+### 鳴き判断・解決
+
+次の鳴き関連イベントが記録されていた。
+
+- `local_cpu_call_judgment_started`
+- `local_cpu_call_judgment_completed`
+- `local_cpu_call_resolution_started`
+- `local_cpu_call_resolution_completed`
+
+`local-call-5` では判断結果が `outcome: selected`、`selectedSeats: "3"`。続く鳴き解決では `outcome: called`、`nextPhase: awaiting-discard`、`seat: 3` が記録されていた。その後の `local-4` でCPU3が打牌するまでの処理も記録されていた。提示ログから鳴きの具体的な種類は確認できないため、種類は特定しない。
+
+### 状態遷移・描画と診断スナップショット
+
+CPU手番終了後にユーザーの手番へ戻る過程で、`local_game_state_transition`、`local_cpu_to_human_wait`、`local_game_render_started`、`local_action_panel_updated`、`local_game_render_succeeded` が記録されていた。
+
+最終描画は `renderId: 14`。成功時の状態は `seat: 0`、`phase: awaiting-discard`、`runnerState: idle`、`remainingTiles: 64`、`actionPanelUpdated: true`。その後の診断スナップショットでも `runnerState: idle`、`currentTurn: 0`、`phase: awaiting-discard`、`remainingTiles: 64`、`lastSuccessfulRenderId: 14` を確認した。CPU処理終了、状態遷移、操作欄更新、描画成功はログ上で対応していた。
+
+### Safari復帰時の診断
+
+`page_resumed` と `local_runner_resume_snapshot` を確認した。復帰時のRunner状態は `idle` で、現在の手番・フェーズ・山の残り枚数などが記録されていた。`local_game_diagnostic_snapshot` でもゲーム状態を確認した。
+
+CPU手番の非同期待機中にSafariをバックグラウンドへ移したケースは今回確認していない。このため、CPU処理中断・復帰の正常性は確認済みとしない。
+
+### 確認結果
+
+| 項目 | 判定 |
+| --- | --- |
+| ビルドID表示 | OK |
+| `app_build_info` 記録 | OK |
+| CPU手番開始・終了ログ | OK |
+| CPU処理段階ログ | OK |
+| 待機タイマーのログ | OK |
+| 鳴き判断・解決ログ | OK |
+| 状態遷移ログ | OK |
+| 描画成功ログ | OK |
+| 操作欄更新ログ | OK |
+| 診断スナップショット | OK |
+| Safari復帰時のスナップショット | OK |
+| フリーズ時の停滞検知 | 未確認 |
+| 描画例外発生時の診断 | 未確認 |
+| CPU処理中のSafari中断・復帰 | 未確認 |
+| CPU手番フリーズ原因 | 未特定 |
+
+今回の範囲について、schema 2診断機能の正常動作をユーザーがiPhone Safari実機で確認した。診断機能全体のすべての異常経路を確認したものではない。
+
+### 未解決事項と完了範囲
+
+2026-10-27時点でCPU手番フリーズの原因は未特定であり、今回の実機検証ではフリーズは発生していない。したがって、完了扱いにする範囲は今回確認した診断機能の正常動作に限る。停滞検知・描画例外など異常時の診断確認は未完了で、CPU処理中のSafari中断・復帰も未確認。CPU手番フリーズの原因調査は継続中であり、フリーズ修正は未完了である。

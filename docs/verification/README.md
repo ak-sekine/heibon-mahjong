@@ -4,6 +4,7 @@
 
 ## 実機確認
 
+- [CPU手番診断 — iPhone Safari実機、2026-10-27](cpu-turn-render-diagnostics-2026-10-26.md)。schema 2の正常なCPU手番、鳴き、状態遷移・描画、復帰スナップショットをユーザーが確認。停滞検知・描画例外・CPU処理中断復帰は未確認で、フリーズ原因は未特定です。
 - [オンラインダイアログ「閉じる」ボタン — iPhone Safari実機、2026-10-26](online-dialog-close-2026-10-26.md)。新しくルームを作る／ルームに参加する／オンライン待機の3画面すべてで1行表示をユーザーが確認済みです。関連する自動検証とPages deploymentの記録も同じファイルにあります。
 - [左右の河19枚目以降のレイアウト — iPhone Safari実機、2026-10-26追記](side-river-8x3-2026-10-25.md)。CPU1（右）の18→19→20枚目と荒牌流局までをユーザーが実機確認。CPU3（左）、オンライン対局、25枚目以降は未確認です。自動テスト・Chromium・WebKit結果と分けて記録しています。
 - [流局結果概要と操作ボタン配置 — iPhone Safari実機、2026-10-24](round-end-result-2026-10-24.md)。ユーザー報告の実機確認と、対象コミットの自動・ブラウザー検証／デプロイ結果を区別して記録しています。
@@ -16,7 +17,7 @@
 | [オンラインダイアログの閉じるボタン修正](online-dialog-close-2026-10-26.md) | 修正履歴、公開用ビルド／WebKitの12条件、Pages deployment、ユーザーによる3画面のiPhone Safari実機確認（完了）。 |
 | [流局結果概要と操作ボタン配置](round-end-result-2026-10-24.md) | 通常／途中流局の概要表示、Chromium / WebKitのモバイル表示、デプロイ結果、ユーザー報告のiPhone Safari実機確認。 |
 | [オンライン診断ログ](online-diagnostics.md) | ブラウザーのlocalStorageログ、Worker構造化ログ、Cloudflare確認方法、保存範囲と検証制限。 |
-| [CPU手番フリーズ原因未特定・診断強化](cpu-turn-render-diagnostics-2026-10-26.md) | CPU段階、Runner停滞・Safari復帰、描画失敗、ビルド識別ログの実装と検証。実機記録は未確認で、フリーズ原因は未特定。 |
+| [CPU手番フリーズ原因未特定・診断強化](cpu-turn-render-diagnostics-2026-10-26.md) | CPU段階、Runner停滞・Safari復帰、描画失敗、ビルド識別ログの実装と検証。2026-10-27に通常動作の一部をiPhone Safari実機で確認。異常経路は未確認で、フリーズ原因は未特定。 |
 | [九種九牌の公開手牌](kyuushu-public-hand.md) | 宣言者14枚のオンライン・オフライン公開、非公開手牌保護、結果の再表示・再接続・次局解除。GitHub ActionsのChromium/WebKit確認成功。 |
 | [Heibon Mahjong テスト環境](test-environment.md) | オフライン固定局面の九種九牌4シナリオ、136枚整合性、公開範囲、320〜430px幅。 |
 | [Step 13.8](step13.8/README.md) | 主要役満8種類、候補単位の複合、点数、結果表示。Browser UI verification はGitHub Actionsで実施。 |
