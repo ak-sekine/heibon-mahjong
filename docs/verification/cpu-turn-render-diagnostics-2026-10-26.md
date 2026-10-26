@@ -62,7 +62,13 @@
 
 ## ブラウザー検証
 
-Codex Cloud内のChromium/WebKitは未実施。リポジトリの [`AGENTS.md`](../../AGENTS.md) と[環境既知制限](codex-cloud-chromium.md)に記録された、この環境のChromium Crashpad初期化時 `SO_PASSCRED` の `EPERM`／ページを開く前の `SIGTRAP` 制約があるため、同一条件での起動は繰り返さない。今回の正確なCPU2→CPU1ポン描画ケースは既存のGitHub Actions Browser UI verificationへ追加済み。push後にChromium/WebKit CI結果を確認して追記する。CI結果はiPhone Safari実機結果と区別する。
+Codex Cloud内ではブラウザーを起動していない。リポジトリの [`AGENTS.md`](../../AGENTS.md) と[環境既知制限](codex-cloud-chromium.md)に記録された、この環境のChromium Crashpad初期化時 `SO_PASSCRED` の `EPERM`／ページを開く前の `SIGTRAP` 制約があるため、同一条件での起動は繰り返さない。
+
+- GitHub Actions Browser UI run [40315925328](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40315925328)、commit `3004ead02eb84703323925713596320dd75e7721`: `browser-table-ui.py` の300 sceneと今回追加したCPU2リーチ牌ポンの専用シナリオが成功。専用シナリオはChromiumとWebKitの両方で成功し、CPU1の手番・供託・非公開手牌のDOM非表示を確認した。
+- 同runの後半で `browser-online-waiting-room.py` が結果表示を待つテストに失敗した。mockが和了者をリーチ中として返しながら公開宣言牌をriverに含めていなかったため、共通描画処理が不整合を検出した。mock fixtureを[commit `70173e7`](https://github.com/ak-sekine/heibon-mahjong/commit/70173e7450f2f56e151ef18e34a95ccc5d5048c4)で修正し、和了者の公開宣言牌を含めた。
+- 最終fixture修正後のrun [40317932010](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40317932010)、commit `70173e7450f2f56e151ef18e34a95ccc5d5048c4`: `npm test`とproduction buildは成功。記録時点（2026-10-26 12:00 UTC）で、開始から約10分経過した `playwright install --with-deps chromium webkit` がまだ実行中のため、その後の全Browser UI suite結果は未確定。
+
+上記のChromium/WebKit確認はGitHub ActionsのLinux browser CIであり、iPhone Safari実機確認とは区別する。
 
 ## 未確認事項
 
