@@ -68,12 +68,17 @@ Codex Cloud内ではブラウザーを起動していない。リポジトリの
 - 同runの後半で `browser-online-waiting-room.py` が結果表示を待つテストに失敗した。mockが和了者をリーチ中として返しながら公開宣言牌をriverに含めていなかったため、共通描画処理が不整合を検出した。mock fixtureを[commit `70173e7`](https://github.com/ak-sekine/heibon-mahjong/commit/70173e7450f2f56e151ef18e34a95ccc5d5048c4)で修正し、和了者の公開宣言牌を含めた。
 - 最終fixture修正後のrun [40317932010](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40317932010)、commit `70173e7450f2f56e151ef18e34a95ccc5d5048c4`: `npm test`とproduction buildは成功。記録時点（2026-10-26 12:00 UTC）で、開始から約10分経過した `playwright install --with-deps chromium webkit` がまだ実行中のため、その後の全Browser UI suite結果は未確定。
 
+2026-10-26にGitHub Actionsの実際の最終状態を確認した。修正コミット `ed5033a15a2d10d23fa825200e8b05a0bfc4e251` が `main` の先頭で、このコミット自体は `[skip ci]` のためActions runはない。直前のfixture修正コミット `70173e7450f2f56e151ef18e34a95ccc5d5048c4` のBrowser UI run [40317932010](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40317932010) は **failure** で終了した。`npm test`、production build、PlaywrightのChromium/WebKit installは成功したが、`browser-online-waiting-room.py` が結果後の `東2局` 表示を30秒待ってタイムアウトした。専用のリーチ宣言牌ポンシナリオの成功を含む前段のシナリオ記録は残っているが、このrun全体を成功とは扱わない。関連するDeploy run [40317931989](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40317931989) では `npm test`、Worker型チェック、Pages buildを含むverify jobは成功し、Browser UI jobは同じ理由で失敗、後続のdeploy jobはskipされた。
+
 上記のChromium/WebKit確認はGitHub ActionsのLinux browser CIであり、iPhone Safari実機確認とは区別する。
 
 ## 未確認事項
 
 - 2026-10-25の実機フリーズがリーチ宣言牌の描画例外と同一原因だったかは未確定。
-- iPhone Safari実機、オフライン対局での実操作、バックグラウンド復帰時の実機タイマー遅延は未確認。
+- CPU2のリーチ宣言牌をCPU1が鳴く特定局面のiPhone Safari実機確認は未実施。今回の半荘戦実機確認ではこの局面を再現していない。
+- 強化したCPU手番・Runner・状態遷移の診断イベントがiPhone Safari実機で記録されることは未確認。今回提示されたログにはこれらのイベントが含まれていない。
+- バックグラウンド復帰時の実機タイマー遅延と、実機でのCPU診断イベントの記録動作は未確認。
+- 最新のBrowser UI Actions runは[失敗](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40317932010)。結果後の局表示待ちタイムアウトであり、全Browser UI suite成功とは確認できていない。
 - 診断ログの例外メッセージ除去は既知のID・牌表記パターンと長い識別子を対象にする。Safariが生成したすべての例外文字列を網羅する保証はない。
 
 ## iPhone Safari実機確認項目
@@ -85,4 +90,52 @@ Codex Cloud内ではブラウザーを起動していない。リポジトリの
 5. 対局中にSafariをバックグラウンドへ移動して復帰する。停止があれば `page_resumed`、未完了手番、待機中／処理中、停滞警告の前後関係を保存する。
 6. 描画例外が発生した場合は、画面を握りつぶさず `local_game_render_failed` にフェーズ・河枚数・エラー名・発生箇所・エラーIDが残る。
 
-実機確認前のため、iPhone Safari実機確認済み・完了とはしていない。
+実機確認前に作成した当時の記録。現在の判定は次の追記で更新する。
+
+## 2026-10-26 実機検証・完了判定の追記
+
+### ユーザー報告によるiPhone Safari実機検証
+
+- 検証日：2026-10-26
+- 検証者：ユーザー（ユーザーからの実機確認報告）
+- 環境：iPhone Safari
+- 対局：オフライン、CPU3人
+- 対局形式：半荘戦
+- 結果：半荘戦を最後まで正常にプレイできた。対局進行に問題はなく、CPU手番中のフリーズは再発しなかった。
+
+これはユーザーによるiPhone Safari実機確認であり、Codexが端末を操作・検証したものではない。CPU2のリーチ宣言牌をCPU1がポンする特定局面は実機で再現していないため、その個別ケースのiPhone Safari実機確認済みとはしない。
+
+### 提示された診断ログ
+
+```text
+2026-10-26T12:23:38.077Z INFO page_resumed {"source":"visibilitychange"}
+2026-10-26T12:23:41.242Z INFO page_hidden {"source":"pagehide"}
+2026-10-26T13:01:59.150Z INFO page_resumed {"source":"visibilitychange"}
+2026-10-26T13:07:13.512Z INFO page_resumed {"source":"visibilitychange"}
+2026-10-26T13:25:27.932Z INFO page_resumed {"source":"visibilitychange"}
+```
+
+- INFOは5件。`page_resumed` は4件、`page_hidden` は1件。
+- 提示されたログにWARN・ERRORは含まれていない。これは実行中に例外が一切発生しなかったことの証拠とは扱わない。
+- CPU手番・Runner・状態遷移の診断イベントは提示ログに含まれていない。このログだけでは、追加したCPU診断ログの実機記録動作が正常であることまでは確認できない。
+
+### 完了判定
+
+状態：**暫定原因への修正済み・iPhone Safari半荘戦実機確認済み・対応完了**
+
+完了の根拠：
+
+1. リーチ宣言牌を鳴いた後の描画例外は、実ゲーム経路を使った自動回帰テストで修正確認済み。
+2. 既存の自動テスト、ビルド、Worker型チェックは成功したと報告されている。直前のActions runでもverify jobのテスト、Worker型チェック、Pages buildの成功を確認した。
+3. CPU手番・Runner・状態遷移・タイマー・描画例外等の診断ログ強化は実装済み。
+4. ユーザーがiPhone SafariでオフラインCPU3人の半荘戦を最後まで正常にプレイし、CPU手番フリーズの再発がなかったと報告した。
+
+完了判定にあたっての留保事項：
+
+- 2026-10-25の実機フリーズと描画例外が同一原因だったかは未確定。
+- リーチ宣言牌をCPUが鳴く特定ケースのiPhone Safari実機確認は未実施。
+- 強化したCPU診断ログの実機記録動作は未確認。
+- Browser UIの最新Actions runは失敗で終了している。run [40317932010](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40317932010) の全suite成功は確認できていない。
+- 今後フリーズが再発した場合は、強化された診断ログを取得して再調査する。
+
+これらの留保事項を残したうえで、今回の暫定原因への修正対応は完了扱いとする。過去の実機フリーズの真因が確定したという意味ではない。
