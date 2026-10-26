@@ -70,6 +70,8 @@ Codex Cloud内ではブラウザーを起動していない。リポジトリの
 
 2026-10-26にGitHub Actionsの実際の最終状態を確認した。修正コミット `ed5033a15a2d10d23fa825200e8b05a0bfc4e251` が `main` の先頭で、このコミット自体は `[skip ci]` のためActions runはない。直前のfixture修正コミット `70173e7450f2f56e151ef18e34a95ccc5d5048c4` のBrowser UI run [40317932010](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40317932010) は **failure** で終了した。`npm test`、production build、PlaywrightのChromium/WebKit installは成功したが、`browser-online-waiting-room.py` が結果後の `東2局` 表示を30秒待ってタイムアウトした。専用のリーチ宣言牌ポンシナリオの成功を含む前段のシナリオ記録は残っているが、このrun全体を成功とは扱わない。関連するDeploy run [40317931989](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40317931989) では `npm test`、Worker型チェック、Pages buildを含むverify jobは成功し、Browser UI jobは同じ理由で失敗、後続のdeploy jobはskipされた。
 
+この記録を反映した文書のみのコミット `5c56604e1cc0e2842d2c75de2287c8dee02d4f26` に対してもActions run [40331396230](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40331396230)（Browser UI）と[40331396181](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40331396181)（Deploy）が起動した。2026-10-26 13:38 UTC時点では両方in progressで、Browser UIは「Vite and browser regressions」を実行中だったため、最終結果は未確認。このrunは検証記録・README・ROADMAPのみを変更したコミットに対するもので、ゲーム本体・テスト・診断ログ実装を変更していない。
+
 上記のChromium/WebKit確認はGitHub ActionsのLinux browser CIであり、iPhone Safari実機確認とは区別する。
 
 ## 未確認事項
@@ -78,7 +80,7 @@ Codex Cloud内ではブラウザーを起動していない。リポジトリの
 - CPU2のリーチ宣言牌をCPU1が鳴く特定局面のiPhone Safari実機確認は未実施。今回の半荘戦実機確認ではこの局面を再現していない。
 - 強化したCPU手番・Runner・状態遷移の診断イベントがiPhone Safari実機で記録されることは未確認。今回提示されたログにはこれらのイベントが含まれていない。
 - バックグラウンド復帰時の実機タイマー遅延と、実機でのCPU診断イベントの記録動作は未確認。
-- 最新のBrowser UI Actions runは[失敗](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40317932010)。結果後の局表示待ちタイムアウトであり、全Browser UI suite成功とは確認できていない。
+- 修正コードを含む直前のBrowser UI Actions runは[失敗](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40317932010)。結果後の局表示待ちタイムアウトであり、全Browser UI suite成功とは確認できていない。文書のみの後続runは進行中で、[実行状況](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40331396230)の最終結果は未確認（2026-10-26 13:38 UTC時点）。
 - 診断ログの例外メッセージ除去は既知のID・牌表記パターンと長い識別子を対象にする。Safariが生成したすべての例外文字列を網羅する保証はない。
 
 ## iPhone Safari実機確認項目
