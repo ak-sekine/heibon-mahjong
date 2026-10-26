@@ -583,6 +583,30 @@ with sync_playwright() as p:
             page.locator('#main-menu-toggle').click()
         page.locator(selector).click()
 
+    def assert_online_dialog_header(dialog_selector, close_selector, width):
+        layout = page.evaluate('''({dialogSelector, closeSelector}) => {
+          const dialog = document.querySelector(dialogSelector);
+          const title = dialog.querySelector('h2').getBoundingClientRect();
+          const close = dialog.querySelector(closeSelector);
+          const closeBox = close.getBoundingClientRect();
+          const dialogBox = dialog.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(close);
+          return {
+            titleRight: title.right, closeLeft: closeBox.left, closeRight: closeBox.right,
+            dialogLeft: dialogBox.left, dialogRight: dialogBox.right,
+            closeWidth: closeBox.width, closeHeight: closeBox.height,
+            textLines: range.getClientRects().length,
+            whiteSpace: getComputedStyle(close).whiteSpace,
+            noHorizontalOverflow: dialog.scrollWidth <= dialog.clientWidth && document.documentElement.scrollWidth <= innerWidth,
+          };
+        }''', {'dialogSelector': dialog_selector, 'closeSelector': close_selector})
+        assert layout['whiteSpace'] == 'nowrap' and layout['textLines'] == 1, f'{close_selector} wraps at {width}px: {layout}'
+        assert layout['closeHeight'] >= 44, f'{close_selector} touch target is under 44px at {width}px: {layout}'
+        assert layout['closeLeft'] >= layout['dialogLeft'] and layout['closeRight'] <= layout['dialogRight'], f'{close_selector} exceeds its dialog at {width}px: {layout}'
+        assert layout['titleRight'] <= layout['closeLeft'], f'{dialog_selector} title overlaps close button at {width}px: {layout}'
+        assert layout['noHorizontalOverflow'], f'{dialog_selector} has horizontal overflow at {width}px: {layout}'
+
     def measure_shared_layout():
         return page.evaluate('''() => {
           const rect = (element, origin) => {
@@ -723,7 +747,7 @@ with sync_playwright() as p:
     assert page.locator('#new-game-dialog').evaluate('element => element.open'), 'new-game menu item did not open the existing confirmation'
     assert page.locator('input[name="offline-match-format"][value="tonpu"]').is_checked(), 'offline match format did not default to tonpu'
     format_layouts = []
-    for width in [320, 375, 390, 430]:
+    for width in [320, 375, 390, 414]:
       page.set_viewport_size({'width': width, 'height': 812})
       layout = page.evaluate('''() => {
         const dialog = document.querySelector('#new-game-dialog');
@@ -781,8 +805,9 @@ with sync_playwright() as p:
     assert page.locator('#online-create-name').input_value() == 'テストホスト', 'typing a valid create name did not update the input'
     assert page.locator('#online-join-name').input_value() == 'テストホスト', 'the display name was not shared with the join form'
     create_form_layouts = []
-    for width, height in [[320,700],[375,812],[390,844],[430,932]]:
+    for width, height in [[320,700],[375,812],[390,844],[414,896]]:
       page.set_viewport_size({'width': width, 'height': height})
+      assert_online_dialog_header('#online-create-dialog', '#online-create-close', width)
       layout = page.locator('#online-create-dialog').evaluate('''dialog => {
         const rect = dialog.getBoundingClientRect();
         const form = dialog.querySelector('#online-create-form');
@@ -843,8 +868,9 @@ with sync_playwright() as p:
     page.keyboard.press('Backspace')
     assert page.locator('#online-join').is_disabled(), 'room joining was enabled without a room code'
     join_form_layouts = []
-    for width, height in [[320,700],[375,812],[390,844],[430,932]]:
+    for width, height in [[320,700],[375,812],[390,844],[414,896]]:
       page.set_viewport_size({'width': width, 'height': height})
+      assert_online_dialog_header('#online-join-dialog', '#online-join-close', width)
       layout = page.locator('#online-join-dialog').evaluate('''dialog => {
         const rect = dialog.getBoundingClientRect();
         const form = dialog.querySelector('#online-join-form');
@@ -903,8 +929,9 @@ with sync_playwright() as p:
     assert page.locator('#menu-room').evaluate('element => !element.hidden'), 'room operations were not added to the menu for an online participant'
     wait_for("document.querySelector('#online-seats').children.length === 4 && document.querySelector('#online-seats').innerText.includes('テストホスト')")
     layout_results = []
-    for width, height in [(375, 667), (375, 812), (390, 844), (414, 896), (1280, 900)]:
+    for width, height in [(320, 700), (375, 667), (375, 812), (390, 844), (414, 896), (1280, 900)]:
       page.set_viewport_size({'width': width, 'height': height})
+      assert_online_dialog_header('#online-dialog', '#online-close', width)
       layout = page.evaluate('''() => {
         const dialog = document.querySelector('#online-dialog');
         const close = document.querySelector('#online-close').getBoundingClientRect();
@@ -1467,7 +1494,7 @@ with sync_playwright() as p:
     assert page.evaluate("localStorage.getItem('heibon-mahjong-online-session') === null"), 'online participant session was moved to localStorage'
     assert not errors, errors
 
-    report = {'step': '14.6', 'viewports': [[320,700],[375,812],[390,844],[430,932],[1280,900]], 'formatChooserViewports': format_layouts, 'createFormViewports': create_form_layouts, 'joinFormViewports': join_form_layouts, 'scenario': 'separate create/join forms, close-button initial focus, Tab navigation, manual name/code input, shared display name, host format propagation and waiting-room visibility, offline format selection at 320/375/390/430px, short-viewport scrolling, input-gated actions, session-safe menu actions, compact hamburger menu, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, surviving host notice after CPU takeover, last-human room close and exit notice', 'result': 'pass'}
+    report = {'step': '14.6', 'viewports': [[320,700],[375,812],[390,844],[414,896],[1280,900]], 'formatChooserViewports': format_layouts, 'createFormViewports': create_form_layouts, 'joinFormViewports': join_form_layouts, 'scenario': 'separate create/join forms, close-button single-line layout and title spacing at mobile viewport widths, close-button initial focus, Tab navigation, manual name/code input, shared display name, host format propagation and waiting-room visibility, offline format selection at 320/375/390/414px, short-viewport scrolling, input-gated actions, session-safe menu actions, compact hamburger menu, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, surviving host notice after CPU takeover, last-human room close and exit notice', 'result': 'pass'}
     print(json.dumps(report, ensure_ascii=False), flush=True)
     (OUT / 'step14-6-online-room-ui.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     page.close()
