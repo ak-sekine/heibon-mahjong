@@ -20,7 +20,7 @@ with sync_playwright() as playwright:
     if BROWSER_NAME not in ('chromium', 'webkit'):
         raise ValueError(f'Unsupported browser: {BROWSER_NAME}')
     browser_type = getattr(playwright, BROWSER_NAME)
-    launch_options = {'args': ['--no-sandbox']} if BROWSER_NAME == 'chromium' else {}
+    launch_options = {'chromium_sandbox': True} if BROWSER_NAME == 'chromium' else {}
     browser = browser_type.launch(**launch_options)
     page = browser.new_page(viewport={'width': 390, 'height': 844}, device_scale_factor=1)
     page.goto(BASE_URL, wait_until='networkidle')
@@ -38,7 +38,35 @@ with sync_playwright() as playwright:
                     page.locator('#main-menu-toggle').click()
                 page.locator(open_selector).click()
             else:
-                page.locator(dialog_selector).evaluate('dialog => dialog.showModal()')
+                page.locator(dialog_selector).evaluate('''dialog => {
+                  dialog.querySelector('#online-status').hidden = true;
+                  dialog.querySelector('#online-room').hidden = false;
+                  dialog.querySelector('#online-room-code').textContent = 'ABC234';
+                  dialog.querySelector('#online-room-format').textContent = '対局形式：東風戦';
+                  dialog.querySelector('#online-connection').hidden = false;
+                  dialog.querySelector('#online-connection').textContent = '接続中';
+                  const seats = dialog.querySelector('#online-seats');
+                  seats.replaceChildren();
+                  for (const [wind, name] of [['東', 'テストホスト'], ['南', 'テスト参加者'], ['西', '空席'], ['北', '空席']]) {
+                    const row = document.createElement('li');
+                    const windLabel = document.createElement('span');
+                    windLabel.className = 'online-seat-wind';
+                    windLabel.textContent = wind;
+                    const content = document.createElement('div');
+                    content.className = `online-seat-content${name === '空席' ? ' is-empty' : ''}`;
+                    const playerName = document.createElement('span');
+                    playerName.className = 'online-seat-name';
+                    playerName.textContent = name;
+                    content.append(playerName);
+                    row.append(windLabel, content);
+                    seats.append(row);
+                  }
+                  dialog.querySelector('#online-ready').hidden = false;
+                  dialog.querySelector('#online-finalize').hidden = false;
+                  dialog.querySelector('#online-finalize').disabled = true;
+                  dialog.querySelector('#online-room-expiry').textContent = '2026/10/27 14:00';
+                  dialog.showModal();
+                }''')
 
             layout = page.locator(dialog_selector).evaluate('''dialog => {
               const close = dialog.querySelector('.online-dialog-close');
@@ -66,6 +94,10 @@ with sync_playwright() as playwright:
               const titleStyle = getComputedStyle(title);
               const contentWidth = buttonBox.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth);
               const textBox = range.getBoundingClientRect();
+              const visibleButtons = [...dialog.querySelectorAll('button:not([hidden])')].map(button => {
+                const box = button.getBoundingClientRect();
+                return {id: button.id, left: box.left, right: box.right, width: box.width, height: box.height};
+              });
               return {
                 label: text.textContent,
                 lineBoxes: textRects.length,
@@ -96,6 +128,8 @@ with sync_playwright() as playwright:
                 titleDoesNotOverlap: titleTextRects.length > 0 && titleTextRects.every(rect => rect.right <= buttonBox.left),
                 dialogInsideViewport: dialogBox.left >= 0 && dialogBox.right <= innerWidth && dialogBox.top >= 0 && dialogBox.bottom <= innerHeight,
                 noHorizontalOverflow: dialog.scrollWidth <= dialog.clientWidth && document.documentElement.scrollWidth <= innerWidth,
+                visibleButtonsFit: visibleButtons.every(button => button.left >= dialogBox.left && button.right <= dialogBox.right && button.height >= 44),
+                visibleButtons,
               };
             }''')
             assert layout['label'] == '閉じる', f'{name} close button label changed at {width}px: {layout}'
@@ -108,6 +142,7 @@ with sync_playwright() as playwright:
             assert layout['titleDoesNotOverlap'], f'{name} title overlaps its close button at {width}px: {layout}'
             assert layout['dialogInsideViewport'], f'{name} dialog exceeds the viewport at {width}px: {layout}'
             assert layout['noHorizontalOverflow'], f'{name} dialog overflows horizontally at {width}px: {layout}'
+            assert layout['visibleButtonsFit'], f'{name} operation button does not fit at {width}px: {layout}'
 
             page.screenshot(path=str(OUT / f'online-dialog-{name}-{width}-{BROWSER_NAME}.png'))
             reports.append({'dialog': name, 'viewport': f'{width}x{height}', **layout})

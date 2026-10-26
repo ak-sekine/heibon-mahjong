@@ -12,6 +12,7 @@
 
 | 記録 | 主な対象 |
 | --- | --- |
+| [オンラインダイアログの閉じるボタン再調査](online-dialog-close-2026-10-26.md) | 未デプロイ原因、Chromium開発サーバー検査と公開ビルド／WebKit検査の差、修正後のPages配信確認。 |
 | [流局結果概要と操作ボタン配置](round-end-result-2026-10-24.md) | 通常／途中流局の概要表示、Chromium / WebKitのモバイル表示、デプロイ結果、ユーザー報告のiPhone Safari実機確認。 |
 | [オンライン診断ログ](online-diagnostics.md) | ブラウザーのsessionStorageログ、Worker構造化ログ、Cloudflare確認方法、検証範囲。 |
 | [CPU手番フリーズ修正・描画診断の強化](cpu-turn-render-diagnostics-2026-10-26.md) | 暫定原因への修正済み・対応完了。ユーザーがiPhone SafariでオフラインCPU3人の半荘戦を完走し、フリーズ再発なしと報告。特定のリーチ宣言牌を鳴く局面とCPU診断ログの実機記録は未確認。Browser UI Actions runは失敗で終了したため、検証記録を参照。 |
