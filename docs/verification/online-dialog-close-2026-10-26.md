@@ -20,9 +20,25 @@
 
 ## 変更・検証
 
-- CSSは `64c4713` の共通オンラインダイアログ修正を維持。オフラインCSSは変更していない。
+- 原因は閉じるボタンの幅が44px固定で、「閉じる」の文字幅を確保できず折り返せたこと。`64c4713` でボタンに `width:max-content`、`flex:none`、`white-space:nowrap`、タイトルに `min-width:0` を指定した。オフライン側のCSSは変更していない。
 - `tests/browser-online-dialog-layout.py` を追加。Vite Previewで公開用ビルドを開き、実際にロードしたhashed CSS asset、computed style、文字Rangeと各文字の画面上の行位置、タイトルとの非重複、ダイアログ・ボタンの画面内配置を320/375/390/414pxでWebKit検査する。各画面のスクリーンショットとJSON計測結果をActions artifactへ保存する。通常のオンライン対局フローは既存のChromium検査で継続する。
 - 待機室mockで立直ありを設定するとき河牌も生成するよう修正し、参照切れエラーを解消した。
-- `npm test`（62/62）、`npm run build`、`npm run typecheck:worker` は成功。ビルド済みCSSに `width:max-content` と `white-space:nowrap` が含まれることを確認。
-- 今回の修正を含むBrowser UI / Pages deploy結果は確認中。
-- iPhone Safari実機での修正後の再確認は未実施。本件を実機確認済みとは扱わない。
+- Git履歴で確認した関連コミット：`64c4713`（共通オンラインCSS修正）、`3bca908`（フォーム幅比較の先行検査調整）、`25fcf3f`（公開用ビルドでのオンラインダイアログWebKit検査を追加）、`92117bd`・`b0bc079`（実際の待機ダイアログと検査実行の調整）、`c21526d`（待機室の立直fixture修正）。コミット実体を優先し、`c21526d` はBrowser UI全体を強化したコミットではなくfixture修正として記録する。
+- 先行作業での自動検証結果：`npm test` 62件成功、`npm run build` 成功、`npm run typecheck:worker` 成功。Browser UI成功、公開用ビルドのWebKit検査は3画面×4画面幅（320/375/390/414px）の計12条件すべて成功。これらは今回再実行した結果ではない。
+- GitHub Actions [run 40349629551](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40349629551) は成功し、Pages deploymentも成功。対象SHAは `c21526d1ec3919efd067afff24f8ad5b61036c4a`。これらも先行作業の結果であり、この記録作業では再実行していない。
+
+## iPhone Safari実機確認
+
+2026-10-26、ユーザーがiPhone Safari実機で修正後の次の3画面を確認し、すべて「閉じる」ボタンが1行表示だったと報告しました。
+
+| 画面 | ユーザー報告 |
+| --- | --- |
+| 新しくルームを作る | OK：1行表示 |
+| ルームに参加する | OK：1行表示 |
+| オンライン待機 | OK：1行表示 |
+
+これはユーザーによる実機確認結果です。CodexがiPhoneを操作して確認したものではありません。記録対象は上記3画面のボタン表示に限ります。
+
+## 完了判定
+
+対象3画面の修正後の自動検証・Pages deployment成功と、ユーザーによるiPhone Safari実機確認を記録しました。本件は **実機確認済み・完了** です。
