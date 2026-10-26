@@ -1,4 +1,4 @@
-# CPU手番フリーズ修正・診断ログ強化（2026-10-26）
+# CPU手番フリーズ原因未特定・診断記録（2026-10-26）
 
 ## 発生状況
 
@@ -25,7 +25,7 @@
 - 宣言牌が河に重複する、履歴が重複する、対応する公開副露がない、または副露内の物理IDが一致しない場合は不整合とし、既存の `RangeError` を維持する。描画呼出元で位置・エラー名・短い秘匿除去済みメッセージ・エラーIDを記録して例外を再送出する。
 - `riichi`、供託、点数、打牌履歴、鳴き状態、手番を描画処理から変更しない。オンラインの公開View描画も同じ参照判定を使う。
 
-## 追加した診断ログ
+## 前回作業時点の診断ログ（schema 1）
 
 ブラウザーの既存診断ログ（同一タブの `sessionStorage`、最大200件）を利用する。満杯時はINFOから先に退避し、WARN/ERRORを優先する。描画例外のメッセージは牌種・牌ID候補、URL、長い識別子、token等をマスクする。非公開手牌、牌山、リクエスト本文、認証情報は記録しない。
 
@@ -94,7 +94,7 @@ Codex Cloud内ではブラウザーを起動していない。リポジトリの
 
 実機確認前に作成した当時の記録。現在の判定は次の追記で更新する。
 
-## 2026-10-26 実機検証・完了判定の追記
+## 前回作業時点のiPhone Safari実機検証と判定
 
 ### ユーザー報告によるiPhone Safari実機検証
 
@@ -123,7 +123,7 @@ Codex Cloud内ではブラウザーを起動していない。リポジトリの
 
 ### 完了判定
 
-状態：**暫定原因への修正済み・iPhone Safari半荘戦実機確認済み・対応完了**
+前回作業時点の状態：**暫定描画経路への対応とiPhone Safari半荘戦確認。2026-10-25のフリーズ原因は未確定。**
 
 完了の根拠：
 
@@ -140,4 +140,35 @@ Codex Cloud内ではブラウザーを起動していない。リポジトリの
 - Browser UIの最新Actions runは失敗で終了している。run [40317932010](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40317932010) の全suite成功は確認できていない。
 - 今後フリーズが再発した場合は、強化された診断ログを取得して再調査する。
 
-これらの留保事項を残したうえで、今回の暫定原因への修正対応は完了扱いとする。過去の実機フリーズの真因が確定したという意味ではない。
+これは前回作業時点の記録である。次の節で追加した診断機能は、フリーズ原因の修正や真因特定を示すものではない。
+
+## 2026-10-26 診断ログ拡張（schema 2）
+
+今回の作業範囲は診断・観測・テスト・ドキュメント。CPU判断方針、麻雀ルール、CPU待機時間、非同期処理順序、ゲーム状態の自動修復、タイムアウト終了、オンライン通信仕様は変更していない。フリーズ原因は引き続き未特定であり、修正完了とは扱わない。
+
+### ビルド識別
+
+Vite設定がビルド時に `git rev-parse HEAD`、UTC時刻、`package.json` version、Vite modeを埋め込む。Git情報がない開発環境ではSHAを `unknown` とし、ビルドを止めない。起動時の `app_build_info` と診断ログ画面上部に、SHA・UTC日時・version・mode・診断schema version（2）を表示する。GitHub APIは呼び出さない。
+
+### CPU処理・Runner・描画イベント
+
+CPU各手番に `cpuTurnId` を割り当て、開始・段階境界・失敗・終了・停滞ログを結ぶ。段階ログは席、局、本場、フェーズ、残り山、Runner状態、手番開始からの経過時間を含める。内部候補のログは出さない。
+
+追加イベントは `local_cpu_stage_started`、`local_cpu_stage_completed`、`local_cpu_stage_failed`、`local_cpu_stage_skipped`、`local_cpu_call_judgment_*`、`local_cpu_call_resolution_*`、`local_runner_stalled`、`local_runner_resume_snapshot`、`local_game_diagnostic_snapshot`、`local_game_render_started`、`local_game_render_succeeded`、`local_action_panel_updated`、`local_action_panel_update_failed`。既存のCPU手番・wait timer・state transition・runner・window errorイベントは継続する。描画成功・開始と操作欄成功は最新1件だけの揮発ログとして残し、描画例外は `local_game_render_failed` にrender ID、失敗段階、エラー名・メッセージ・stack、直前の成功render ID、ゲーム状態要約、Runner状態を保存する。描画例外は再送出し、ゲーム状態を変更しない。
+
+### 停滞、バックグラウンド復帰、保存
+
+30秒停滞判定は手番開始後の合計時間ではなく最後に進行した時刻から数える。同期処理が30秒以上メインスレッドを塞いだ場合は、その処理から戻った直後に `local_runner_stalled` と処理時間を記録する。処理中にブラウザーのタイマーが止まっても、CPU段階の開始時に最大1イベントの小さな同期チェックポイントをlocalStorageへ記録する。ページ復帰時は進行中のオフライン対局について `local_runner_resume_snapshot` を記録して停滞判定を行うが、ゲーム進行を呼び出さない。
+
+ログ本体はlocalStorage最大500件。通常INFOは古いものから入れ替え、異常、ビルド情報、CPU開始イベントを優先する。CPU処理段階の開始・完了は小さなチェックポイントに同期記録し、通常ログは約200ms後にまとめて保存する。ビルド識別情報も1件の別キーに保存する。ストレージ利用不可・容量超過は握りつぶして診断保存だけを諦め、ゲーム処理には例外を返さない。コピー機能はログ全件を維持する。保存は同一ブラウザープロファイル内で、利用者がログをクリアするかブラウザーデータを消去するまで残る可能性がある。最大500件、ブラウザーの容量制限に従う。
+
+例外文とstackはURL、token等の秘密らしい値、牌表記、長いIDを除去する。非公開手牌、牌山内容・順序、牌ID、ルームトークン、秘密情報は許可リスト対象外。例外文字列のマスキングは既知パターンに基づき、すべての秘密形式を識別できる保証はない。
+
+### テスト・未確認範囲
+
+- `tests/automatic-turn-diagnostics.test.ts` と `tests/diagnostics.test.ts` で、同じCPU手番ID、処理順、非同期待機、同期例外、チェックポイント復元、500件上限、重要ログ保持、render例外情報を確認。
+- `tests/browser-diagnostics.py` はlocalStorage再読み込み後のログ、ビルド情報表示、全文コピーを確認するよう更新。Chromium/WebKitの実行結果は後続CIで確認する。
+- 最終ローカル検証：`npm test` 成功（63/63）、`npm run build` 成功、`npm run typecheck:worker` 成功、`git diff --check` 成功。Browser UIはCodex Cloud内で起動せず、push後のGitHub Actionsで確認する。
+- iPhone Safari実機での新診断イベント、ページ復帰、localStorage利用可能量、実際のフリーズ記録は未確認。
+- JavaScriptメインスレッドが永久停止し、その後ページも復帰しない場合、その停止中にタイマー・画面操作・ログ処理は実行できない。最後の同期チェックポイントが保存されている場合に停止直前の段階を推定できるが、最後の処理が完了したか、Safariプロセスが落ちたか、同期処理の内部どこで止まったかは特定できない。
+- SafariがlocalStorageへの書き込みを拒否・破棄した場合、永続ログは残らない可能性がある。実機での確認手順は本記録冒頭のログ取得手順と併せ、診断ログ画面のビルドID・全文コピーを確認する。

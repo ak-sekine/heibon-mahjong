@@ -54,8 +54,9 @@ test('stall monitor warns after a long CPU turn and leaves game state untouched'
   const realNow=Date.now;
   try { Date.now=()=>realNow()+31_000; runner.reportIfStalled('page-resumed'); }
   finally { Date.now=realNow; }
-  const warning=diagnosticLog.all().find(entry=>entry.event==='local_cpu_turn_stalled');
+  const warning=diagnosticLog.all().find(entry=>entry.event==='local_runner_stalled');
   assert.ok(warning);assert.equal(warning.details.runnerState,'running');assert.equal(warning.details.waitingState,'waiting');
+  assert.equal(warning.details.cpuTurnId,warning.details.turnId);
   assert.equal(runner.running,true);assert.equal(game.phase,'awaiting-discard');
   runner.cancel();release();await pending;
   assert.equal(runner.running,false);assert.equal(game.phase,'awaiting-discard');

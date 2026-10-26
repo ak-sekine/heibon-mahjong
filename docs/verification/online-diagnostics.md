@@ -4,7 +4,9 @@
 
 ## ブラウザー診断ログ
 
-右上の三本線メニューから「診断ログ」を開く。日時は日本時間で表示し、コピーされる日時はISO 8601 UTC（ミリ秒精度）。同じタブの `sessionStorage` に最大200件を保持する。満杯時はINFOよりWARN/ERRORを優先して残し、INFOだけの場合は古い順に入れ替える。保存領域が無効・満杯の場合でもゲーム処理は継続し、ログが失われることがある。ブラウザー診断ログはCloudflareへ送信せず、Worker Logsとは保存先が異なる。
+右上の三本線メニューから「診断ログ」を開く。日時は日本時間で表示し、コピーされる日時はISO 8601 UTC（ミリ秒精度）。ブラウザーでは `localStorage` に最大500件を保持し、再読み込み後も確認できる。満杯時は通常INFOより異常・ビルド識別・CPU開始チェックポイントを優先する。CPU処理開始は小さなチェックポイントとして同期保存し、通常ログは約200ms後にまとめて保存する。エラーとスナップショットは即時保存する。保存領域が無効・満杯の場合でもゲーム処理は継続し、ログが失われることがある。ブラウザー診断ログはCloudflareへ送信せず、Worker Logsとは保存先が異なる。
+
+起動時の `app_build_info` と画面上部にGit SHA、UTCビルド日時、package version、Vite mode、診断schema versionを表示する。SHAはVite起動・ビルド時に `git rev-parse HEAD` から埋め込み、取得できない場合は `unknown` を使う。ログの許可リストはエラーstack traceを最大1000文字まで秘匿除去後に保存する。手牌、牌山、牌ID、ルーム認証情報は記録しない。
 
 `src/online/diagnostics.ts` は許可リストを使う。オンライン操作ログには操作種別、`requestId`、送信時revision、結果、エラーコード、応答時間を記録する。2026-10-26からはオフラインCPU進行と共通描画処理の例外について、秘匿候補を除いた例外名・短いメッセージ・エラーIDも記録する。参加トークン、WebSocket ticket、Authorization、Cookie、IPアドレス、HTTPヘッダー、牌ID、鳴き候補ID、手牌・牌山、ゲーム状態、生のリクエスト/レスポンス本文は記録しない。requestIdに64桁の16進数文字列（トークン形式）が渡された場合は出力しない。
 
@@ -83,5 +85,5 @@ Cloudflare公式の [Workers Logs資料](https://developers.cloudflare.com/worke
 ## 関連資料
 
 - Cloudflare公式: [Workers Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/) — Invocation Logsの内容と無効化、Dashboardでの閲覧、最大保持期間。
-- `tests/diagnostics.test.ts`: 200件リングバッファ、sessionStorageからの復元、許可リスト除外、storage例外の非伝播。
+- `tests/diagnostics.test.ts`: 500件リングバッファ、localStorage相当ストレージからの復元、CPU開始チェックポイント、重要ログ保持、許可リスト除外、storage例外の非伝播。
 - `tests/browser-diagnostics.py`: 375×812のモバイル表示、再読み込み後の保持、日本時間表示、コピーのフォールバック、クリア確認。CIのChromium/WebKitはSafari実機確認とは異なる。

@@ -13,7 +13,7 @@ with sync_playwright() as playwright:
     page.add_init_script("""(() => {
       try {
         if (location.origin !== 'null' && sessionStorage.getItem('heibon-mahjong-diagnostics-seeded') !== '1') {
-          sessionStorage.setItem('heibon-mahjong-diagnostics-v1', SEED_JSON);
+          localStorage.setItem('heibon-mahjong-diagnostics-v2', SEED_JSON);
           sessionStorage.setItem('heibon-mahjong-diagnostics-seeded', '1');
         }
       } catch {}
@@ -28,9 +28,13 @@ with sync_playwright() as playwright:
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto(base)
     page.reload()
+    page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+    page.wait_for_function("localStorage.getItem('heibon-mahjong-diagnostics-v2')?.includes('local_runner_resume_snapshot') === true")
     page.locator('#main-menu-toggle').click()
     page.locator('#menu-diagnostics').click()
     assert page.locator('#diagnostic-dialog').is_visible()
+    build_info = page.locator('#diagnostic-build-info').inner_text()
+    assert 'schema 2' in build_info and 'unknown' not in build_info, build_info
     assert page.locator('#diagnostic-count').inner_text().endswith('件')
     assert 'game_action_response_timeout' in page.locator('#diagnostic-entries').inner_text()
     assert '2026/10/24 21:34:56.789' in page.locator('#diagnostic-entries').inner_text(), page.locator('#diagnostic-entries').inner_text()
@@ -41,10 +45,12 @@ with sync_playwright() as playwright:
     page.locator('#diagnostic-copy').click()
     assert page.locator('#diagnostic-status').inner_text() == 'コピーしました。'
     assert 'request-example' in page.evaluate('window.__copiedDiagnosticText')
+    assert 'app_build_info' in page.evaluate('window.__copiedDiagnosticText')
+    assert 'local_game_render_succeeded' in page.evaluate('window.__copiedDiagnosticText')
     page.once('dialog', lambda dialog: dialog.accept())
     page.locator('#diagnostic-clear').click()
     assert page.locator('#diagnostic-count').inner_text() == '0件'
     assert not errors, errors
-    print(json.dumps({'diagnosticsDialog': 'pass', 'viewport': '375x812', 'sessionReload': 'pass',
+    print(json.dumps({'diagnosticsDialog': 'pass', 'viewport': '375x812', 'persistentReload': 'pass', 'buildInfo': 'pass',
                       'copyFallback': 'pass', 'clearConfirmation': 'pass'}, ensure_ascii=False))
     browser.close()

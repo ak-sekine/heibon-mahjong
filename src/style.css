@@ -164,6 +164,8 @@ header > div { min-width:0; }
 #diagnostic-dialog::backdrop { background:rgb(0 0 0 / 65%); }
 .diagnostic-header,.diagnostic-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; flex:none; }
 .diagnostic-header h2,.diagnostic-header p { margin:0; }
+.diagnostic-header > div { min-width:0; }
+.diagnostic-header #diagnostic-build-info { overflow-wrap:anywhere; }
 .diagnostic-header h2 { font-size:1.1rem; }
 .diagnostic-header p,#diagnostic-status { font-size:.82rem; }
 #diagnostic-dialog button { min-width:64px; min-height:44px; padding:8px 12px; border:1px solid #fff5d7; border-radius:8px; background:#ffda7d; color:#154e3c; font:inherit; font-weight:600; touch-action:manipulation; }

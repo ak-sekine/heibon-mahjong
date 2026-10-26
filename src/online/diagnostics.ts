@@ -6,17 +6,36 @@ export type DiagnosticEntry = {
   details: Record<string, string | number | boolean | null>;
 };
 
-const STORAGE_KEY = 'heibon-mahjong-diagnostics-v1';
-const MAX_ENTRIES = 200;
+const STORAGE_KEY = 'heibon-mahjong-diagnostics-v2';
+const LEGACY_STORAGE_KEY = 'heibon-mahjong-diagnostics-v1';
+const CHECKPOINT_KEY = 'heibon-mahjong-diagnostics-checkpoint-v1';
+const BUILD_INFO_KEY = 'heibon-mahjong-diagnostics-build-v1';
+const MAX_ENTRIES = 500;
 const allowedKeys = new Set([
   'actionType', 'requestId', 'gameRevision', 'revision', 'errorCode', 'result', 'durationMs',
   'connectionGeneration', 'attempt', 'closeCode', 'messageType', 'status', 'reason', 'source',
   'turnId', 'seat', 'phase', 'startPhase', 'endPhase', 'plannedMs', 'elapsedMs', 'timerType',
   'riverCounts', 'errorName', 'errorMessage', 'errorId', 'runnerState', 'waitingState',
   'decisionPending', 'previousPhase', 'nextPhase', 'warningAfterMs',
+  'cpuTurnId', 'stage', 'lastCompletedStage', 'currentStage', 'lastProgressElapsedMs',
+  'remainingTiles', 'honba', 'round', 'displayState', 'waitingAsync', 'lastProgressAt', 'startedAt',
+  'renderId', 'failedStage', 'stack', 'lastSuccessfulRenderId', 'lastSuccessfulRenderAt', 'runnerState',
+  'buildId', 'gitSha', 'buildTimeUtc', 'appVersion', 'mode', 'schemaVersion', 'gameMode', 'lastTransition',
+  'renderStage', 'operation', 'outcome', 'lastCompletedAt', 'currentTurn', 'selectedSeats',
+  'actionPanelUpdated', 'roundInfo', 'buildMode',
+  'executionMode', 'lastSuccessfulRenderPhase', 'lastSuccessfulRenderSeat', 'lastSuccessfulRenderRunnerState',
 ]);
 
-/** Small, allowlist-only session diagnostic buffer. Logging must never affect game flow. */
+function appendBounded(entries: DiagnosticEntry[], entry: DiagnosticEntry): void {
+  if (entries.length >= MAX_ENTRIES) {
+    const routine = entries.findIndex(value => value.level === 'INFO' && !isPriorityEvent(value.event));
+    const anyInfo = entries.findIndex(value => value.level === 'INFO');
+    entries.splice(routine >= 0 ? routine : anyInfo >= 0 ? anyInfo : 0, 1);
+  }
+  entries.push(entry);
+}
+
+/** Bounded allowlist-only diagnostic buffer. Logging must never affect game flow. */
 export class DiagnosticLog {
   private entries: DiagnosticEntry[] = [];
   private saveQueued = false;
@@ -25,22 +44,38 @@ export class DiagnosticLog {
   private readonly listeners = new Set<() => void>();
   private readonly storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null;
 
-  constructor(storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null = safeSessionStorage()) {
+  constructor(storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null = safePersistentStorage()) {
     this.storage = storage;
     if (typeof window !== 'undefined') window.addEventListener('pagehide', () => this.flushSave());
     try {
-      const raw = storage?.getItem(STORAGE_KEY);
+      const current = storage?.getItem(STORAGE_KEY);
+      const raw = current ?? storage?.getItem(LEGACY_STORAGE_KEY) ?? safeLegacySessionLog();
       if (raw) {
         const parsed: unknown = JSON.parse(raw);
         if (Array.isArray(parsed)) this.entries = parsed.filter(isEntry).slice(-MAX_ENTRIES).map(entry => ({
           timestamp: entry.timestamp, level: entry.level, event: entry.event,
           details: scrubDetails(entry.details as Record<string, unknown>),
         }));
+        if (current === null && this.entries.length) this.queueSave();
+      }
+      const checkpoint = storage?.getItem(CHECKPOINT_KEY);
+      if (checkpoint) {
+        const parsed: unknown = JSON.parse(checkpoint);
+        if (isEntry(parsed) && !this.entries.some(entry => entry.event === parsed.event && entry.timestamp === parsed.timestamp)) {
+          appendBounded(this.entries, { ...parsed, details: scrubDetails(parsed.details) });
+        }
+      }
+      const build = storage?.getItem(BUILD_INFO_KEY);
+      if (build) {
+        const parsed: unknown = JSON.parse(build);
+        if (isEntry(parsed) && !this.entries.some(entry => entry.event === parsed.event && entry.timestamp === parsed.timestamp)) {
+          appendBounded(this.entries, { ...parsed, details: scrubDetails(parsed.details) });
+        }
       }
     } catch { /* Storage may be disabled or full. */ }
   }
 
-  record(level: DiagnosticLevel, event: string, values: Record<string, unknown> = {}): void {
+  record(level: DiagnosticLevel, event: string, values: Record<string, unknown> = {}, options: { persist?: boolean; replace?: boolean } = {}): void {
     try {
       const details: DiagnosticEntry['details'] = {};
       for (const [key, value] of Object.entries(values)) {
@@ -50,20 +85,21 @@ export class DiagnosticLog {
           if (key === 'errorCode' && !/^[a-z0-9_-]{1,60}$/u.test(value)) continue;
           if (key === 'actionType' && !/^[a-z-]{1,40}$/u.test(value)) continue;
           if (key === 'errorName' && !/^[A-Za-z0-9_.-]{1,60}$/u.test(value)) continue;
-          details[key] = key === 'errorMessage' || key === 'source'
-            ? sanitizeDiagnosticMessage(value).slice(0, 120) : value.slice(0, 120);
+          details[key] = key === 'errorMessage' || key === 'source' || key === 'stack'
+            ? sanitizeDiagnosticMessage(value, key === 'stack' ? 1000 : 300).slice(0, key === 'stack' ? 1000 : 120) : value.slice(0, key === 'buildTimeUtc' || key === 'lastProgressAt' ? 40 : 120);
         }
         else if (typeof value === 'number' && Number.isFinite(value)) details[key] = value;
         else if (typeof value === 'boolean' || value === null) details[key] = value;
       }
       const entry: DiagnosticEntry = { timestamp: new Date().toISOString(), level, event: event.slice(0, 80), details };
-      if (this.entries.length >= MAX_ENTRIES) {
-        // Keep recent anomalies when frequent normal CPU progress fills the buffer.
-        const oldestRoutine = this.entries.findIndex(value => value.level === 'INFO');
-        this.entries.splice(oldestRoutine >= 0 ? oldestRoutine : 0, 1);
+      if (options.replace) this.entries = this.entries.filter(value => value.event !== event);
+      appendBounded(this.entries, entry);
+      if (options.persist !== false) {
+        if (event === 'local_cpu_stage_started' || event === 'local_cpu_stage_completed' || event === 'local_cpu_wait_timer_started' || event === 'local_cpu_call_judgment_started' || event === 'local_cpu_call_resolution_started') this.writeCheckpoint(entry);
+        if (event === 'app_build_info') this.writeBuildInfo(entry);
+        if (level !== 'INFO' || /_failed$|_stalled$|diagnostic_snapshot/u.test(event)) this.flushSave();
+        else this.queueSave();
       }
-      this.entries.push(entry);
-      this.queueSave();
       if (this.listeners.size && !this.refreshQueued) {
         this.refreshQueued = true;
         window.setTimeout(() => {
@@ -84,6 +120,8 @@ export class DiagnosticLog {
     this.saveTimer = null;
     this.saveQueued = false;
     try { this.storage?.removeItem(STORAGE_KEY); } catch { /* Storage is optional. */ }
+    try { this.storage?.removeItem(CHECKPOINT_KEY); } catch { /* Storage is optional. */ }
+    try { this.storage?.removeItem(BUILD_INFO_KEY); } catch { /* Storage is optional. */ }
     for (const listener of this.listeners) { try { listener(); } catch { /* UI is isolated. */ } }
   }
 
@@ -99,14 +137,23 @@ export class DiagnosticLog {
     else queueMicrotask(() => this.flushSave());
   }
 
+  private writeCheckpoint(entry: DiagnosticEntry): void {
+    try { this.storage?.setItem(CHECKPOINT_KEY, JSON.stringify(entry)); } catch { /* Minimal synchronous checkpoint is best effort. */ }
+  }
+  private writeBuildInfo(entry: DiagnosticEntry): void {
+    try { this.storage?.setItem(BUILD_INFO_KEY, JSON.stringify(entry)); } catch { /* Build identity is also best effort. */ }
+  }
+
   private flushSave(): void {
+    if (this.saveTimer !== null && typeof window !== 'undefined') window.clearTimeout(this.saveTimer);
     this.saveQueued = false;
     this.saveTimer = null;
     try { this.storage?.setItem(STORAGE_KEY, JSON.stringify(this.entries)); } catch { /* Quota/disabled storage is non-fatal. */ }
   }
 }
 
-function safeSessionStorage(): Storage | null {
+function safePersistentStorage(): Storage | null {
+  try { if (typeof localStorage !== 'undefined') return localStorage; } catch { /* Private browsing may deny local storage. */ }
   try { return typeof sessionStorage === 'undefined' ? null : sessionStorage; } catch { return null; }
 }
 
@@ -118,6 +165,14 @@ function isEntry(value: unknown): value is DiagnosticEntry {
     ['INFO', 'WARN', 'ERROR'].includes(String(entry.level)) && !!entry.details && typeof entry.details === 'object';
 }
 
+function isPriorityEvent(event: string): boolean {
+  return /(?:_failed|_stalled|diagnostic_snapshot|app_build_info|runner_resume_snapshot|cpu_turn_started|cpu_stage_started|cpu_wait_timer_started|cpu_call_(?:judgment|resolution)_started)$/u.test(event);
+}
+
+function safeLegacySessionLog(): string | null {
+  try { return typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(LEGACY_STORAGE_KEY); } catch { return null; }
+}
+
 function scrubDetails(values: Record<string, unknown>): DiagnosticEntry['details'] {
   const details: DiagnosticEntry['details'] = {};
   for (const [key, value] of Object.entries(values)) {
@@ -127,8 +182,8 @@ function scrubDetails(values: Record<string, unknown>): DiagnosticEntry['details
       if (key === 'errorCode' && !/^[a-z0-9_-]{1,60}$/u.test(value)) continue;
       if (key === 'actionType' && !/^[a-z-]{1,40}$/u.test(value)) continue;
       if (key === 'errorName' && !/^[A-Za-z0-9_.-]{1,60}$/u.test(value)) continue;
-      details[key] = key === 'errorMessage' || key === 'source'
-        ? sanitizeDiagnosticMessage(value).slice(0, 120) : value.slice(0, 120);
+      details[key] = key === 'errorMessage' || key === 'source' || key === 'stack'
+        ? sanitizeDiagnosticMessage(value, key === 'stack' ? 1000 : 300).slice(0, key === 'stack' ? 1000 : 120) : value.slice(0, key === 'buildTimeUtc' || key === 'lastProgressAt' ? 40 : 120);
     } else if (typeof value === 'number' && Number.isFinite(value)) details[key] = value;
     else if (typeof value === 'boolean' || value === null) details[key] = value;
   }
@@ -136,6 +191,19 @@ function scrubDetails(values: Record<string, unknown>): DiagnosticEntry['details
 }
 
 export const diagnosticLog = new DiagnosticLog();
+const restoredRender = [...diagnosticLog.all()].reverse().find(entry => entry.event === 'local_game_render_succeeded');
+let lastSuccessfulRender: Record<string, unknown> | null = restoredRender ? { ...restoredRender.details } : null;
+let renderSequence = typeof restoredRender?.details.renderId === 'number' ? restoredRender.details.renderId : 0;
+export function recordRenderStarted(log: DiagnosticLog, details: Record<string, unknown>): number {
+  const renderId = ++renderSequence;
+  log.record('INFO', 'local_game_render_started', { ...details, renderId }, { persist: false, replace: true });
+  return renderId;
+}
+export function recordRenderSucceeded(log: DiagnosticLog, details: Record<string, unknown>): void {
+  lastSuccessfulRender = { ...details };
+  log.record('INFO', 'local_game_render_succeeded', details, { persist: false, replace: true });
+}
+export function getLastSuccessfulRender(): Record<string, unknown> | null { return lastSuccessfulRender ? { ...lastSuccessfulRender } : null; }
 
 const seenErrors = new WeakSet<object>();
 const errorIds = new WeakMap<object, string>();
@@ -143,8 +211,8 @@ const recentErrorKeys = new Map<string, number>();
 let nextErrorId = 1;
 
 /** Remove likely identifiers, credentials and URLs before retaining exception text. */
-export function sanitizeDiagnosticMessage(message: string): string {
-  return message.slice(0, 300)
+export function sanitizeDiagnosticMessage(message: string, maxLength = 300): string {
+  return message.slice(0, maxLength)
     .replace(/https?:\/\/\S+/giu, '[url]')
     .replace(/\b(token|ticket|authorization|cookie|password|secret)\s*[:=]\s*\S+/giu, '$1=[redacted]')
     .replace(/\b(?:man|pin|sou|east|south|west|north|white|green|red|honor|tile)[-_][A-Za-z0-9_-]+\b/giu, '[tile]')
@@ -188,11 +256,19 @@ export function markDiagnosticError(error: unknown): string {
 
 export function recordGameRenderFailure(
   log: DiagnosticLog,
-  context: { seat: number; phase: string; riverCounts: string; turnId?: string },
+  context: Record<string, unknown>,
   error: unknown,
   source: string,
 ): void {
-  try { log.record('ERROR', 'local_game_render_failed', { ...context, ...safeErrorInfo(error), errorId: markDiagnosticError(error), source }); }
+  try {
+    const info = safeErrorInfo(error);
+    let stack = '';
+    try {
+      const errorStack = error && typeof error === 'object' ? (error as { stack?: unknown }).stack : undefined;
+      if (typeof errorStack === 'string') stack = sanitizeDiagnosticMessage(errorStack, 1000).slice(0, 1000);
+    } catch { /* Keep stack optional. */ }
+    log.record('ERROR', 'local_game_render_failed', { ...context, ...info, ...(stack ? { stack } : {}), errorId: markDiagnosticError(error), source });
+  }
   catch { /* A rendering diagnostic must never escape into the rendering path. */ }
 }
 
@@ -225,12 +301,15 @@ export function installGlobalErrorDiagnostics(log: DiagnosticLog = diagnosticLog
 
 declare global { interface Window { __heibonErrorDiagnosticsInstalled?: boolean } }
 
-export function mountDiagnosticDialog(log: DiagnosticLog = diagnosticLog): void {
+export function mountDiagnosticDialog(log: DiagnosticLog = diagnosticLog, snapshot?: () => Record<string, unknown> | null): void {
   const dialog = document.querySelector<HTMLDialogElement>('#diagnostic-dialog');
   const list = document.querySelector<HTMLElement>('#diagnostic-entries');
   const count = document.querySelector<HTMLElement>('#diagnostic-count');
   const status = document.querySelector<HTMLElement>('#diagnostic-status');
+  const build = document.querySelector<HTMLElement>('#diagnostic-build-info');
   if (!dialog || !list || !count || !status) return;
+  const buildInfo = getBuildInfo();
+  if (build) build.textContent = `ビルド ${buildInfo.gitSha} · ${buildInfo.buildTimeUtc} · v${buildInfo.appVersion} · ${buildInfo.mode} · schema ${buildInfo.schemaVersion}`;
   const render = () => {
     const entries = log.all();
     const wasAtBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
@@ -253,6 +332,7 @@ export function mountDiagnosticDialog(log: DiagnosticLog = diagnosticLog): void 
   };
   let unsub: (() => void) | null = null;
   document.querySelector<HTMLButtonElement>('#menu-diagnostics')?.addEventListener('click', () => {
+    try { const state = snapshot?.(); if (state) log.record('INFO', 'local_game_diagnostic_snapshot', state); } catch { /* Snapshot collection is observational and isolated. */ }
     render(); status.textContent = ''; dialog.showModal(); unsub = log.subscribe(render);
   });
   document.querySelector<HTMLButtonElement>('#diagnostic-close')?.addEventListener('click', () => dialog.close());
@@ -266,6 +346,12 @@ export function mountDiagnosticDialog(log: DiagnosticLog = diagnosticLog): void 
     const text = log.all().map(entry => `${entry.timestamp} ${entry.level} ${entry.event} ${JSON.stringify(entry.details)}`).join('\n');
     void copyText(text).then(ok => { status.textContent = ok ? 'コピーしました。' : 'コピーできませんでした。'; });
   });
+}
+
+export type AppBuildInfo = { gitSha: string; buildTimeUtc: string; appVersion: string; mode: string; schemaVersion: number; buildId: string };
+declare const __APP_BUILD_INFO__: AppBuildInfo;
+export function getBuildInfo(): AppBuildInfo {
+  try { return __APP_BUILD_INFO__; } catch { return { gitSha: 'unknown', buildTimeUtc: 'unknown', appVersion: 'unknown', mode: 'development', schemaVersion: 2, buildId: 'unknown' }; }
 }
 
 async function copyText(text: string): Promise<boolean> {

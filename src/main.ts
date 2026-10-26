@@ -7,7 +7,7 @@ import { renderMatch } from './rendering/match.ts';
 import { ResultDialog } from './ui/result-dialog.ts';
 import { NewGameDialog } from './ui/new-game-dialog.ts';
 import { GameController } from './ui/controller.ts';
-import { waitForTurn } from './game/automatic-turns.ts';
+import { getLastLocalGameTransition, waitForTurn } from './game/automatic-turns.ts';
 import { OnlineWaitingRoom } from './online/waiting-room.ts';
 import { OnlineGameController } from './online/game-controller.ts';
 import { MainMenu } from './ui/main-menu.ts';
@@ -17,7 +17,7 @@ import { mountScoreStrip, mountTableInfoPanel } from './ui/table-components.ts';
 import { declarationsBetween } from './model/declaration.ts';
 import { DeclarationBubbleRenderer } from './rendering/declaration-bubbles.ts';
 import { riverPositionFor } from './rendering/river-layout.ts';
-import { diagnosticLog, installGlobalErrorDiagnostics, mountDiagnosticDialog, recordGameRenderFailure } from './online/diagnostics.ts';
+import { diagnosticLog, getBuildInfo, getLastSuccessfulRender, installGlobalErrorDiagnostics, mountDiagnosticDialog, recordGameRenderFailure, recordRenderStarted, recordRenderSucceeded, safeErrorInfo } from './online/diagnostics.ts';
 
 installGlobalErrorDiagnostics();
 const localScoreHost = document.querySelector<HTMLElement>('#local-score-strip-host');
@@ -43,7 +43,6 @@ if (document.querySelector('#main-menu-toggle')) {
   }
   new MainMenu();
 }
-mountDiagnosticDialog();
 const resultDialog = new ResultDialog();
 let onlineGameController: OnlineGameController | null = null;
 const localTable = document.querySelector<HTMLElement>('#local-table')!;
@@ -52,11 +51,24 @@ const riverDebugMode = window.location.pathname.endsWith('/test.html') &&
   new URLSearchParams(window.location.search).get('debug') === 'river';
 const controller = new GameController(undefined, {
   onChange: render,
-  wait: (milliseconds, signal) => waitForTurn(riverDebugMode ? 800 : milliseconds, signal),
+  wait: (milliseconds, signal, context) => waitForTurn(riverDebugMode ? 800 : milliseconds, signal, context),
 });
+mountDiagnosticDialog(diagnosticLog, () => ({
+  ...controller.diagnosticSnapshot(), buildId: getBuildInfo().buildId, gameMode: controller.match.format ?? 'tonpu',
+  executionMode: 'offline',
+  lastSuccessfulRenderId: getLastSuccessfulRender()?.renderId ?? null,
+  lastSuccessfulRenderAt: getLastSuccessfulRender()?.timestamp ?? null,
+  lastSuccessfulRenderPhase: getLastSuccessfulRender()?.phase ?? null,
+  lastSuccessfulRenderSeat: getLastSuccessfulRender()?.seat ?? null,
+  lastSuccessfulRenderRunnerState: getLastSuccessfulRender()?.runnerState ?? null,
+}));
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     diagnosticLog.record('INFO', 'page_resumed', { source: 'visibilitychange' });
+    if (controller.match.status === 'playing') diagnosticLog.record('WARN', 'local_runner_resume_snapshot', {
+      ...controller.diagnosticSnapshot(),
+      displayState: document.visibilityState, gameMode: controller.match.format ?? 'tonpu',
+    });
     controller.reportIfStalled('page-resumed');
   }
 });
@@ -70,6 +82,10 @@ let localKanChoicesOpen = false;
 let localActionPanel: ActionPanel | null = null;
 function render(): void {
   const game = controller.game;
+  const renderId = recordRenderStarted(diagnosticLog, {
+    seat: game.turnPlayerId, phase: game.phase, runnerState: controller.progressing ? 'running' : 'idle',
+    currentTurn: game.turnPlayerId, remainingTiles: game.liveWall.length, displayState: document.visibilityState,
+  });
   let renderStage = 'prepare';
   try {
     if (previouslyRenderedMatchStatus !== 'playing' && controller.match.status === 'playing') {
@@ -91,14 +107,27 @@ function render(): void {
     renderStage = 'renderSelection';
     renderSelection(controller.game, controller.selectedTileId, controller.progressing);
     renderStage = 'localActionPanel';
-    localActionPanel?.update(createLocalActionPanelState(
-      controller.match, controller.selectedTileId, controller.progressing, localKanChoicesOpen,
-    ));
+    try {
+      localActionPanel?.update(createLocalActionPanelState(
+        controller.match, controller.selectedTileId, controller.progressing, localKanChoicesOpen,
+      ));
+      diagnosticLog.record('INFO', 'local_action_panel_updated', { renderId }, { persist: false, replace: true });
+    } catch (error) {
+      diagnosticLog.record('ERROR', 'local_action_panel_update_failed', { renderId, failedStage: renderStage, ...safeErrorInfo(error) });
+      throw error;
+    }
     renderStage = 'resultDialog';
     resultDialog.update(controller.match);
+    recordRenderSucceeded(diagnosticLog, { renderId, timestamp: new Date().toISOString(), seat: controller.game.turnPlayerId,
+      phase: controller.game.phase, runnerState: controller.progressing ? 'running' : 'idle', actionPanelUpdated: true,
+      remainingTiles: controller.game.liveWall.length });
   } catch (error) {
     recordGameRenderFailure(diagnosticLog, {
-      seat: game.turnPlayerId, phase: game.phase,
+      renderId, failedStage: renderStage, lastSuccessfulRenderId: getLastSuccessfulRender()?.renderId ?? null,
+      lastSuccessfulRenderAt: getLastSuccessfulRender()?.timestamp ?? null,
+      seat: game.turnPlayerId, currentTurn: game.turnPlayerId, phase: game.phase, remainingTiles: game.liveWall.length,
+      round: `${controller.match.roundWind}${controller.match.roundNumber}`, honba: controller.match.honba,
+      lastTransition: getLastLocalGameTransition(), runnerState: controller.progressing ? 'running' : 'idle',
       riverCounts: game.players.map(player => player.river.length).join(','),
     }, error, `main.render>${renderStage}`);
     console.error('Local game render failed', {
@@ -109,6 +138,12 @@ function render(): void {
     throw error;
   }
 }
+const buildInfo = getBuildInfo();
+diagnosticLog.record('INFO', 'app_build_info', {
+  buildId: buildInfo.buildId, gitSha: buildInfo.gitSha, buildTimeUtc: buildInfo.buildTimeUtc,
+  appVersion: buildInfo.appVersion, mode: buildInfo.mode, schemaVersion: buildInfo.schemaVersion,
+  executionMode: 'offline',
+});
 export function resetLocalActionChoices(): void { localKanChoicesOpen = false; }
 function newGame(format: 'tonpu' | 'tonnan' = 'tonpu'): void {
   localDeclarationBubbles.clearAll();

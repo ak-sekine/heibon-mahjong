@@ -29,6 +29,7 @@ export class GameController {
   }
   get progressing(): boolean { return this.runner.running; }
   reportIfStalled(source?: string): void { this.runner.reportIfStalled(source); }
+  diagnosticSnapshot(): Record<string, unknown> { return this.runner.diagnosticSnapshot(this.game, this.match); }
   select(tileId: string): void {
     const player = this.game.players[0];
     if (isForbiddenDiscard(player,tileId)) return;

@@ -5,6 +5,9 @@ import { concealedSize, winningMelds } from './melds.ts';
 import { cancelAllIppatsu } from './ippatsu.ts';
 import { calculateShanten } from '../analysis/shanten.ts';
 import { isFourWindsDraw } from './special-draws.ts';
+import { diagnosticLog, markDiagnosticError, safeErrorInfo } from '../online/diagnostics.ts';
+
+let nextCpuCallDiagnosticId = 0;
 
 export type CallOption = OpenMeld & {
   readonly playerId: PlayerId;
@@ -86,7 +89,17 @@ export function compareCallPriority(game:GameState,a:CallOption,b:CallOption):nu
   return Number(a.type==='chi')-Number(b.type==='chi') || (a.playerId-d+4)%4-(b.playerId-d+4)%4 || a.id.localeCompare(b.id);
 }
 function cpuOptions(game:GameState):CallOption[] {
-  return game.players.flatMap(p=>{const c=chooseCpuCall(p,getCallOptions(game,p.id));return c?[c]:[];});
+  const startedAt=Date.now(), operation=`local-call-${++nextCpuCallDiagnosticId}`;
+  const context={operation,phase:game.phase,seat:game.turnPlayerId,remainingTiles:game.liveWall.length};
+  diagnosticLog.record('INFO','local_cpu_call_judgment_started',context);
+  try {
+    const result=game.players.flatMap(p=>{const c=chooseCpuCall(p,getCallOptions(game,p.id));return c?[c]:[];});
+    diagnosticLog.record('INFO','local_cpu_call_judgment_completed',{...context,elapsedMs:Date.now()-startedAt,outcome:result.length?'selected':'none',selectedSeats:result.map(option=>option.playerId).join(',')});
+    return result;
+  } catch(error) {
+    diagnosticLog.record('ERROR','local_cpu_call_judgment_failed',{...context,...safeErrorInfo(error),errorId:markDiagnosticError(error)});
+    throw error;
+  }
 }
 /** Automatic choices for online resolution; only the CPU's own hand and legal options are used. */
 export function getCpuCallOptions(game: GameState): readonly CallOption[] {
@@ -105,8 +118,17 @@ function apply(game:GameState,option:CallOption):GameState {
   return cancelAllIppatsu({...game,players,callsMade:true,phase:'awaiting-discard',turnPlayerId:p.id,ronWindow:null});
 }
 function finish(game:GameState,selected:readonly CallOption[]):GameState {
-  const winner=[...selected].sort((a,b)=>compareCallPriority(game,a,b))[0];
-  return winner?apply(game,winner):{...game,phase:'awaiting-draw',turnPlayerId:((game.ronWindow!.discarderId+1)%4) as PlayerId,ronWindow:null};
+  const startedAt=Date.now(), context={phase:game.phase,seat:game.turnPlayerId,remainingTiles:game.liveWall.length};
+  diagnosticLog.record('INFO','local_cpu_call_resolution_started',context);
+  try {
+    const winner=[...selected].sort((a,b)=>compareCallPriority(game,a,b))[0];
+    const result=winner?apply(game,winner):{...game,phase:'awaiting-draw' as const,turnPlayerId:((game.ronWindow!.discarderId+1)%4) as PlayerId,ronWindow:null};
+    diagnosticLog.record('INFO','local_cpu_call_resolution_completed',{...context,elapsedMs:Date.now()-startedAt,outcome:winner?'called':'passed',nextPhase:result.phase,seat:result.turnPlayerId});
+    return result;
+  } catch(error) {
+    diagnosticLog.record('ERROR','local_cpu_call_resolution_failed',{...context,...safeErrorInfo(error),errorId:markDiagnosticError(error)});
+    throw error;
+  }
 }
 /** Applies the collected human responses together with the existing CPU policy. */
 export function resolveCallResponses(game: GameState, selected: readonly CallOption[]): GameState {

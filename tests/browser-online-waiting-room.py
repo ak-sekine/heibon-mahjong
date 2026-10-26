@@ -1415,8 +1415,8 @@ with sync_playwright() as p:
       window.__shortNextActionTimeout = true;
       window.onlineUiTest.onlineGameController.send({ type: 'discard', tileId: 'diagnostic-invalid-tile' });
     }''')
-    wait_for("sessionStorage.getItem('heibon-mahjong-diagnostics-v1')?.includes('game_action_response_timeout') === true", timeout=5000)
-    diagnostic_records = page.evaluate("JSON.parse(sessionStorage.getItem('heibon-mahjong-diagnostics-v1'))")
+    wait_for("localStorage.getItem('heibon-mahjong-diagnostics-v2')?.includes('game_action_response_timeout') === true", timeout=5000)
+    diagnostic_records = page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-diagnostics-v2'))")
     diagnostic_events = [entry['event'] for entry in diagnostic_records]
     assert 'game_action_rejected' in diagnostic_events and 'game_state_sync_requested' in diagnostic_events, diagnostic_events
     assert any(entry['event'] == 'game_action_response_timeout' and entry['details'].get('requestId') for entry in diagnostic_records), diagnostic_records
