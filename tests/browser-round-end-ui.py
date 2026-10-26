@@ -362,6 +362,47 @@ with sync_playwright() as p:
                 meta = page.evaluate('(name) => window.roundEndTest.prepare(name)', scenario)
             except Exception as error:
                 raise RuntimeError(f'{width}px result scenario failed before assertions: {scenario}') from error
+            orientation = page.evaluate('''() => {
+              const faces=[...document.querySelectorAll('.table .seat .revealed-tile, .table #player-hand .revealed-tile')];
+              const backs=[...document.querySelectorAll('.table .seat .tile-back')];
+              const ownTiles=[...document.querySelectorAll('.table .seat-bottom #player-hand .tile-choice')];
+              const badFaces=faces.filter(tile => getComputedStyle(tile).rotate !==
+                (tile.closest('.seat-top') ? '180deg' : 'none'));
+              const badBacks=backs.filter(tile => getComputedStyle(tile).rotate !== 'none');
+              const badOwnTiles=ownTiles.filter(tile=>getComputedStyle(tile).rotate!=='none');
+              const badContainers=[...document.querySelectorAll('.table .seat,.table .concealed-hand')]
+                .filter(node => getComputedStyle(node).rotate !== 'none');
+              const topHands=[...document.querySelectorAll('.table .seat-top .concealed-hand')]
+                .filter(hand => hand.querySelector('.revealed-tile'));
+              const reference=document.querySelector('.table .seat .tile-back') ?? document.querySelector('.table .river-tile .tile-svg');
+              const dimensions=e=>{const s=getComputedStyle(e);return [parseFloat(s.width),parseFloat(s.height)];};
+              const referenceSize=reference?dimensions(reference):null;
+              const topMetrics=topHands.map(hand=>{
+                const tiles=[...hand.querySelectorAll(':scope > .revealed-tile')];
+                const sizeDeltas=tiles.map(tile=>referenceSize
+                  ? Math.max(...dimensions(tile).map((value,index)=>Math.abs(value-referenceSize[index]))) : Infinity);
+                const rects=tiles.map(tile=>tile.getBoundingClientRect());
+                const gaps=rects.slice(1).map((rect,index)=>({actual:rect.left-rects[index].right,
+                  expected:(parseFloat(getComputedStyle(hand).columnGap)||parseFloat(getComputedStyle(hand).gap)||0)+
+                    (parseFloat(getComputedStyle(tiles[index+1]).marginLeft)||0)}));
+                return {seat:hand.dataset.playerId,count:tiles.length,sizeDeltas,
+                  gaps,order:tiles.map(tile=>tile.querySelector('svg')?.getAttribute('aria-label'))};
+              });
+              const unrotatedMelds=[...document.querySelectorAll('.table .open-meld,.table .open-meld .tile-svg')]
+                .every(node=>getComputedStyle(node).rotate==='none');
+              const unrotatedRivers=[...document.querySelectorAll('.table .river .river-tile .tile-svg')]
+                .every(node=>getComputedStyle(node).rotate==='none');
+              return {badFaces:badFaces.length,badBacks:badBacks.length,badOwnTiles:badOwnTiles.length,badContainers:badContainers.length,
+                topMetrics,unrotatedMelds,unrotatedRivers};
+            }''')
+            assert orientation['badFaces'] == orientation['badBacks'] == orientation['badOwnTiles'] == orientation['badContainers'] == 0, (width, scenario, orientation)
+            assert orientation['unrotatedMelds'] and orientation['unrotatedRivers'], (width, scenario, orientation)
+            for hand in orientation['topMetrics']:
+                assert max(hand['sizeDeltas'], default=0) < .2, (width, scenario, hand)
+                assert all(abs(pair['actual']-pair['expected']) < .2 for pair in hand['gaps']), (width, scenario, hand)
+                assert all(pair['actual'] >= .9 for pair in hand['gaps']), (width, scenario, hand)
+                if scenario.startswith('draw') and int(hand['seat']) == 2:
+                    assert hand['order'] == meta['players'][2]['handLabels'], (width, scenario, hand, meta['players'][2]['handLabels'])
             assert not page.locator('#result-dialog').is_visible(), (width, scenario, 'result auto-opened')
             assert page.locator('#round-result-summary').is_visible(), (width, scenario, 'summary hidden')
             assert page.locator('#show-result').is_visible(), (width, scenario)

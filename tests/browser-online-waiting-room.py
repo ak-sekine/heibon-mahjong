@@ -1269,7 +1269,7 @@ with sync_playwright() as p:
       ('opponent-tsumo', 1, ['ツモ和了！', '和了者：CPU2', '局終了後の持ち点']),
       ('self-ron', 0, ['ロン和了！', '和了者：テストホスト', '放銃者：テスト参加者', '局終了後の持ち点']),
       ('draw', 1, ['荒牌流局', 'テスト参加者：ノーテン', '供託：1本を次局へ持ち越し', '局終了後の持ち点']),
-      ('kyuushu', 1, ['途中流局（九種九牌）', '宣言者：CPU1', '局終了後の持ち点']),
+      ('kyuushu', 0, ['途中流局（九種九牌）', '宣言者：CPU1', '局終了後の持ち点']),
       ('match-ended', 1, ['南4局 1本場', '半荘戦終了', '1位 テストホスト', '局終了後の持ち点']),
     ]
     for scenario_index, (scenario, viewer, expected) in enumerate(result_scenarios):
@@ -1286,6 +1286,51 @@ with sync_playwright() as p:
           ({'true' if expected_winner is None else f'view.result.winners?.[0]?.winnerId === {expected_winner}'}) &&
           document.querySelector('#online-show-result').hidden === false && document.querySelector('#result-dialog').open === false;
       }})()""")
+      orientation = page.evaluate('''() => {
+        const faces=[...document.querySelectorAll('#online-table .public-hand-tile')];
+        const backs=[...document.querySelectorAll('#online-table .tile-back')];
+        const ownTiles=[...document.querySelectorAll('#online-match .seat-bottom #online-player-hand .tile-choice')];
+        const badFaces=faces.filter(tile=>getComputedStyle(tile).rotate!==
+          (tile.closest('.seat-top')?'180deg':'none'));
+        const badBacks=backs.filter(tile=>getComputedStyle(tile).rotate!=='none');
+        const badOwnTiles=ownTiles.filter(tile=>getComputedStyle(tile).rotate!=='none');
+        const hands=[...document.querySelectorAll('#online-table .seat-top .concealed-hand')]
+          .filter(hand=>hand.querySelector('.public-hand-tile'));
+        const reference=document.querySelector('#online-table .tile-back');
+        const dimensions=e=>{const s=getComputedStyle(e);return [parseFloat(s.width),parseFloat(s.height)];};
+        const referenceSize=reference?dimensions(reference):null;
+        const topMetrics=hands.map(hand=>{
+          const tiles=[...hand.querySelectorAll(':scope > .public-hand-tile')];
+          const sizeDeltas=tiles.map(tile=>referenceSize
+            ?Math.max(...dimensions(tile).map((value,index)=>Math.abs(value-referenceSize[index]))):Infinity);
+          const rects=tiles.map(tile=>tile.getBoundingClientRect());
+          const gaps=rects.slice(1).map((rect,index)=>({actual:rect.left-rects[index].right,
+            expected:parseFloat(getComputedStyle(hand).columnGap)||parseFloat(getComputedStyle(hand).gap)||0}));
+          return {seat:hand.dataset.playerId,count:tiles.length,sizeDeltas,gaps,
+            order:tiles.map(tile=>tile.querySelector('svg')?.getAttribute('aria-label'))};
+        });
+        const unrotatedMelds=[...document.querySelectorAll('#online-table .open-meld,#online-table .open-meld .tile-svg')]
+          .every(node=>getComputedStyle(node).rotate==='none');
+        const unrotatedRivers=[...document.querySelectorAll('#online-table .river .river-tile .tile-svg')]
+          .every(node=>getComputedStyle(node).rotate==='none');
+        return {badFaces:badFaces.length,badBacks:badBacks.length,badOwnTiles:badOwnTiles.length,
+          topMetrics,unrotatedMelds,unrotatedRivers};
+      }''')
+      assert orientation['badFaces'] == orientation['badBacks'] == orientation['badOwnTiles'] == 0, f'{scenario}: public tile orientation: {orientation}'
+      assert orientation['unrotatedMelds'] and orientation['unrotatedRivers'], f'{scenario}: meld or river rotation changed: {orientation}'
+      for hand in orientation['topMetrics']:
+        assert hand['count'] == 14 if scenario == 'kyuushu' else hand['count'] > 0, f'{scenario}: top hand missing tiles: {hand}'
+        assert max(hand['sizeDeltas'], default=0) < .2, f'{scenario}: public tile dimensions changed: {hand}'
+        assert all(abs(pair['actual']-pair['expected']) < .2 and pair['actual'] >= .9 for pair in hand['gaps']), f'{scenario}: public hand spacing changed: {hand}'
+        if scenario == 'kyuushu':
+          expected_labels = page.evaluate('''() => {
+            const tileLabel=tile=>tile.category==='honor'
+              ?({east:'東',south:'南',west:'西',north:'北',white:'白',green:'發',red:'中'}[tile.honor])
+              :`${tile.isRed?'赤':''}${tile.rank}${{man:'萬',pin:'筒',sou:'索'}[tile.suit]}`;
+            return window.onlineUiTest.onlineGameController.view.seats.find(seat=>seat.seat===2)
+              .revealedHand.map(publicTile=>tileLabel(publicTile.tile));
+          }''')
+          assert hand['order'] == expected_labels, f'{scenario}: visible hand order changed: {hand}, expected {expected_labels}'
       if scenario in ('draw', 'kyuushu'):
         overview = page.evaluate('''() => {
           const view=window.onlineUiTest.onlineGameController.view, result=view.result;

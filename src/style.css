@@ -457,6 +457,9 @@ header > div { min-width:0; }
 .table .seat .revealed-tile { display:block; flex:none; width:var(--river-tile-width); height:var(--river-tile-height); }
 .table .seat .revealed-tile .tile-svg { width:100%; height:100%; }
 .table .seat .revealed-tile.winning-tile { margin-left:4px; }
+/* Public hands face the player sitting opposite the viewer. Use the individual
+   rotate property so existing transforms on hands, melds, and rivers remain intact. */
+.table .seat-top .revealed-tile,#online-match .seat-top .public-hand-tile { rotate:180deg; }
 
 @media (max-height:650px) and (max-width:599px) {
  .table .seat-bottom { gap:8px; padding:0; }
