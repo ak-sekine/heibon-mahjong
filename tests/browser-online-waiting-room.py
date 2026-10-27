@@ -8,6 +8,7 @@ from playwright.sync_api import sync_playwright
 BASE_URL = os.environ.get('HEIBON_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
+PUBLIC_HAND_ONLY = os.environ.get('HEIBON_ONLINE_PUBLIC_HAND_ONLY') == '1'
 OUT.mkdir(parents=True, exist_ok=True)
 
 MOCK = r"""
@@ -1060,6 +1061,63 @@ with sync_playwright() as p:
     assert page.locator('#online-score-strip').inner_text().count('CPU') == 2, 'the two CPU seats were not shown at the table'
     assert page.locator('[data-online-hand="right"] .tile-back').count() == 13, 'the other human hand was not shown as backs'
     assert page.locator('[data-online-hand="top"] .tile-back').count() == 13, 'the CPU hand was not shown as backs'
+    if PUBLIC_HAND_ONLY:
+        for scenario, viewer in [('kyuushu', 0), ('opponent-tsumo', 1), ('opponent-ron', 1), ('self-tsumo', 0)]:
+            page.evaluate('args => window.onlineMock.setResultScenario(args.scenario, args.viewer)',
+                          {'scenario': scenario, 'viewer': viewer})
+            wait_for(f"""(() => {{
+              const view=window.onlineUiTest.onlineGameController.view;
+              return view?.status==='round-ended' && view.result?.reason &&
+                document.querySelector('#online-show-result')?.hidden===false;
+            }})()""")
+            orientation = page.evaluate('''() => {
+              const faces=[...document.querySelectorAll('#online-table .public-hand-tile')];
+              const backs=[...document.querySelectorAll('#online-table .tile-back')];
+              const ownTiles=[...document.querySelectorAll('#online-match .seat-bottom #online-player-hand .tile-choice')];
+              const badFaces=faces.filter(tile=>getComputedStyle(tile).rotate!==
+                (tile.closest('.seat-top')?'180deg':'none'));
+              const badBacks=backs.filter(tile=>getComputedStyle(tile).rotate!=='none');
+              const badOwnTiles=ownTiles.filter(tile=>getComputedStyle(tile).rotate!=='none');
+              const hands=[...document.querySelectorAll('#online-table .seat-top .concealed-hand')]
+                .filter(hand=>hand.querySelector('.public-hand-tile'));
+              const reference=document.querySelector('#online-table .tile-back');
+              const dimensions=e=>{const s=getComputedStyle(e);return [parseFloat(s.width),parseFloat(s.height)];};
+              const referenceSize=reference?dimensions(reference):null;
+              const topMetrics=hands.map(hand=>{
+                const tiles=[...hand.querySelectorAll(':scope > .public-hand-tile')];
+                const sizeDeltas=tiles.map(tile=>referenceSize
+                  ?Math.max(...dimensions(tile).map((value,index)=>Math.abs(value-referenceSize[index]))):Infinity);
+                const rects=tiles.map(tile=>tile.getBoundingClientRect());
+                const gaps=rects.slice(1).map((rect,index)=>rect.left-rects[index].right);
+                return {seat:hand.dataset.playerId,count:tiles.length,sizeDeltas,gaps,
+                  order:tiles.map(tile=>tile.querySelector('svg')?.getAttribute('aria-label'))};
+              });
+              const unrotatedMelds=[...document.querySelectorAll('#online-table .open-meld,#online-table .open-meld .tile-svg')]
+                .every(node=>getComputedStyle(node).rotate==='none');
+              const unrotatedRivers=[...document.querySelectorAll('#online-table .river .river-tile .tile-svg')]
+                .every(node=>getComputedStyle(node).rotate==='none');
+              return {badFaces:badFaces.length,badBacks:badBacks.length,badOwnTiles:badOwnTiles.length,
+                topMetrics,unrotatedMelds,unrotatedRivers};
+            }''')
+            assert orientation['badFaces'] == orientation['badBacks'] == orientation['badOwnTiles'] == 0, (ENGINE, scenario, orientation)
+            assert orientation['unrotatedMelds'] and orientation['unrotatedRivers'], (ENGINE, scenario, orientation)
+            for hand in orientation['topMetrics']:
+                assert hand['count'] == 14 if scenario == 'kyuushu' else hand['count'] > 0, (ENGINE, scenario, hand)
+                assert max(hand['sizeDeltas'], default=0) < .2, (ENGINE, scenario, hand)
+                assert all(abs(gap-1) < .2 for gap in hand['gaps']), (ENGINE, scenario, hand)
+                if scenario == 'kyuushu':
+                    expected_labels = page.evaluate('''() => {
+                      const tileLabel=tile=>tile.category==='honor'
+                        ?({east:'東',south:'南',west:'西',north:'北',white:'白',green:'發',red:'中'}[tile.honor])
+                        :`${tile.isRed?'赤':''}${tile.rank}${{man:'萬',pin:'筒',sou:'索'}[tile.suit]}`;
+                      return window.onlineUiTest.onlineGameController.view.seats.find(seat=>seat.seat===2)
+                        .revealedHand.map(publicTile=>tileLabel(publicTile.tile));
+                    }''')
+                    assert hand['order'] == expected_labels, (ENGINE, scenario, hand, expected_labels)
+        assert not errors, f'{ENGINE} online public-hand browser errors: {errors}'
+        print(json.dumps({'browser': ENGINE, 'onlinePublicHandScenarios': ['kyuushu','opponent-tsumo','opponent-ron','self-tsumo'], 'result': 'pass'}), flush=True)
+        browser.close()
+        raise SystemExit(0)
     page.evaluate("window.onlineMock.showDeclarations([{seat: 0, kind: 'riichi'}, {seat: 2, kind: 'ron'}])")
     wait_for("document.querySelectorAll('#online-table .declaration-bubble').length === 2")
     online_bubbles = page.locator('#online-table .declaration-bubble').evaluate_all('''nodes => Object.fromEntries(nodes.map(node => [node.dataset.seat, {
