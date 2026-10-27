@@ -548,8 +548,10 @@ MOCK = r"""
   });
   const nativeSetTimeout = window.setTimeout.bind(window);
   window.__shortNextActionTimeout = false;
+  window.__shortExitNoticeTimeout = false;
   window.setTimeout = (callback, delay, ...args) => {
     if (window.__shortNextActionTimeout && delay === 15000) { window.__shortNextActionTimeout = false; delay = 20; }
+    if (window.__shortExitNoticeTimeout && delay === 8000) { window.__shortExitNoticeTimeout = false; delay = 5000; }
     return nativeSetTimeout(callback, delay, ...args);
   };
 })();
@@ -1570,6 +1572,7 @@ with sync_playwright() as p:
 
     select_menu_item('#menu-room')
     before_exit = page.evaluate('window.onlineMock.snapshot()')
+    page.evaluate('window.__shortExitNoticeTimeout = true')
     page.locator('#online-leave').click()
     wait_for("!document.querySelector('#online-dialog').open && sessionStorage.getItem('heibon-mahjong-online-session') === null && !document.querySelector('#online-exit-notice').hidden")
     after_exit = page.evaluate('window.onlineMock.snapshot()')
@@ -1578,6 +1581,29 @@ with sync_playwright() as p:
     assert after_exit['points'] == before_exit['points'] and after_exit['rivers'] == before_exit['rivers'], 'the explicit exit changed public game state'
     assert after_exit['hands'] == before_exit['hands'] and after_exit['drawnTiles'] == before_exit['drawnTiles'], 'the explicit exit changed a concealed hand or draw'
     assert page.locator('#online-exit-notice').inner_text() == 'ルームを退出しました。', 'the departing player was not told that they left the room'
+
+    notice_viewports = []
+    for width, height in [(320,700),(375,812),(390,844),(414,896)]:
+      page.set_viewport_size({'width': width, 'height': height})
+      notice_layout = page.evaluate('''() => {
+        const header = document.querySelector('.app-header').getBoundingClientRect();
+        const notice = document.querySelector('#online-exit-notice');
+        const box = notice.getBoundingClientRect();
+        return {headerBottom: header.bottom, top: box.top, left: box.left, right: box.right,
+          width: box.width, pointerEvents: getComputedStyle(notice).pointerEvents,
+          scrollWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth};
+      }''')
+      assert notice_layout['top'] >= notice_layout['headerBottom'] + 7, (width, notice_layout)
+      assert notice_layout['left'] >= 0 and notice_layout['right'] <= width, (width, notice_layout)
+      assert notice_layout['scrollWidth'] <= notice_layout['viewportWidth'], (width, notice_layout)
+      assert notice_layout['pointerEvents'] == 'none', (width, notice_layout)
+      notice_viewports.append({'width': width, **notice_layout})
+
+    page.set_viewport_size({'width': 390, 'height': 844})
+    page.locator('#main-menu-toggle').click()
+    assert page.locator('#main-menu-toggle').get_attribute('aria-expanded') == 'true', 'the menu button could not be operated while the exit notice was visible'
+    page.locator('#main-menu-toggle').click()
+    wait_for("document.querySelector('#online-exit-notice').hidden && document.querySelector('#online-exit-notice').textContent === ''", timeout=8000)
 
     assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') === null"), 'successful leave did not remove the session'
     assert page.locator('#menu-room').is_hidden(), 'room operations remained in the menu after leaving'
@@ -1631,7 +1657,7 @@ with sync_playwright() as p:
     assert page.evaluate("localStorage.getItem('heibon-mahjong-online-session') === null"), 'online participant session was moved to localStorage'
     assert not errors, errors
 
-    report = {'step': '14.6', 'viewports': [[320,700],[375,812],[390,844],[414,896],[1280,900]], 'formatChooserViewports': format_layouts, 'createFormViewports': create_form_layouts, 'joinFormViewports': join_form_layouts, 'scenario': 'separate create/join forms, close-button single-line layout and title spacing at mobile viewport widths, close-button initial focus, Tab navigation, manual name/code input, shared display name, host format propagation and waiting-room visibility, offline format selection at 320/375/390/414px, short-viewport scrolling, input-gated actions, session-safe menu actions, compact hamburger menu, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, surviving host notice after CPU takeover, last-human room close and exit notice', 'result': 'pass'}
+    report = {'step': '14.6', 'viewports': [[320,700],[375,812],[390,844],[414,896],[1280,900]], 'formatChooserViewports': format_layouts, 'createFormViewports': create_form_layouts, 'joinFormViewports': join_form_layouts, 'exitNoticeViewports': notice_viewports, 'scenario': 'separate create/join forms, close-button single-line layout and title spacing at mobile viewport widths, close-button initial focus, Tab navigation, manual name/code input, shared display name, host format propagation and waiting-room visibility, offline format selection at 320/375/390/414px, short-viewport scrolling, input-gated actions, session-safe menu actions, compact hamburger menu, 4-seat river rotation, 1/6/7/18 discards, riichi spacing, action layout, private hands, sync, result, next round, reconnect, surviving host notice after CPU takeover, last-human room close and exit notice placement, menu interaction and auto-dismiss at 320/375/390/414px', 'result': 'pass'}
     print(json.dumps(report, ensure_ascii=False), flush=True)
     (OUT / 'step14-6-online-room-ui.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     page.close()
