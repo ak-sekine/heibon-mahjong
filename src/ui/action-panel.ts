@@ -168,6 +168,20 @@ export class ActionPanel {
     this.handler = handler;
   }
 
+  clear(): void {
+    for (const part of ['discard', 'riichi', 'tsumo', 'kyuushu', 'kan-toggle', 'ron', 'pass-ron', 'pass-call', 'cancel-kan', 'next-round', 'show-result', 'return-local']) {
+      const button = this.part(part) as HTMLButtonElement;
+      button.hidden = true;
+      button.disabled = true;
+      button.textContent = '';
+    }
+    for (const part of ['call-controls', 'kan-controls', 'ron-controls', 'round-actions']) this.part(part).hidden = true;
+    for (const part of ['call-options', 'kan-options', 'ron-target']) this.part(part).replaceChildren();
+    for (const part of ['call-status', 'kan-status', 'ron-status', 'action-status']) this.part(part).textContent = '';
+    this.choiceSignatures.clear();
+    this.root.classList.remove('ron-pending', 'game-ended', 'result-available');
+  }
+
   update(state: ActionPanelState): void {
     const wasRonHidden = this.part('ron-controls').hidden;
     for (const [name, buttonState] of Object.entries(state.buttons) as [ActionPanelPart, ActionButtonState][]) {

@@ -1,0 +1,42 @@
+"""Verify the application starts idle and offline play only starts on request."""
+import os
+from playwright.sync_api import sync_playwright
+
+BASE_URL = os.environ.get('HEIBON_PRODUCTION_URL', 'http://127.0.0.1:4174/heibon-mahjong/')
+
+with sync_playwright() as playwright:
+    browser = getattr(playwright, os.environ.get('HEIBON_BROWSER', 'chromium')).launch()
+    page = browser.new_page(viewport={'width': 320, 'height': 700}, device_scale_factor=1)
+    page.goto(BASE_URL, wait_until='networkidle')
+
+    def assert_waiting(label):
+        assert page.locator('body').get_attribute('data-game-mode') == 'none', f'{label}: app mode is not none'
+        assert page.locator('#app-idle').is_visible(), f'{label}: idle state is not visible'
+        assert page.locator('#app-idle').inner_text() == '対局待機中\nメニューから対局を開始してください'
+        assert page.locator('#local-table').is_hidden(), f'{label}: offline table is visible'
+        assert page.locator('#local-game-controls').is_hidden(), f'{label}: offline operation controls are visible'
+        assert page.locator('#local-game-controls button:visible').count() == 0
+        width = page.evaluate('({viewport: innerWidth, document: document.documentElement.scrollWidth})')
+        assert width['document'] <= width['viewport'], f'{label}: horizontal overflow at 320px: {width}'
+
+    assert_waiting('first load')
+    page.reload(wait_until='networkidle')
+    assert_waiting('reload')
+
+    page.locator('#main-menu-toggle').click()
+    page.locator('#new-game').click()
+    page.locator('#confirm-new-game').click()
+    page.locator('#local-table').wait_for(state='visible')
+    assert page.locator('body').get_attribute('data-game-mode') == 'offline'
+    assert page.locator('#table-round').get_attribute('data-format-label') == '東風戦'
+    assert page.locator('#player-hand li').count() == 14
+
+    page.locator('#main-menu-toggle').click()
+    page.locator('#new-game').click()
+    page.locator('input[name="offline-match-format"][value="tonnan"]').check()
+    page.locator('#confirm-new-game').click()
+    assert page.locator('body').get_attribute('data-game-mode') == 'offline'
+    assert page.locator('#table-round').get_attribute('data-format-label') == '半荘戦'
+    assert page.locator('#player-hand li').count() == 14
+    print('Initial load and reload stay idle at 320px; explicit menu starts create Tonpu and Tonnan matches.')
+    browser.close()

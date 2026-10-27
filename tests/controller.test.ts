@@ -1,6 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameController } from '../src/ui/controller.ts';
+import { startGame } from '../src/game/start.ts';
+
+test('deferred controller has no offline match until an explicit start', () => {
+  let starts = 0;
+  const ui = new GameController(() => { starts++; return startGame(); }, { startImmediately: false });
+  assert.equal(starts, 0);
+  assert.equal(ui.hasGame, false);
+  ui.newGame('tonnan');
+  assert.equal(starts, 1);
+  assert.equal(ui.hasGame, true);
+  assert.equal(ui.match.format, 'tonnan');
+  ui.clearGame();
+  assert.equal(ui.hasGame, false);
+});
 
 test('selection toggles by physical ID without changing game; confirmation is single-use and reset is fresh', () => {
   const ui = new GameController();

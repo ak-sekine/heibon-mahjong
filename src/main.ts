@@ -21,11 +21,11 @@ import { diagnosticLog, getBuildInfo, getLastSuccessfulRender, installGlobalErro
 
 installGlobalErrorDiagnostics();
 const localScoreHost = document.querySelector<HTMLElement>('#local-score-strip-host');
-if (localScoreHost) mountScoreStrip(localScoreHost, 'local');
+const localScoreRoot = localScoreHost ? mountScoreStrip(localScoreHost, 'local') : null;
 const onlineScoreHost = document.querySelector<HTMLElement>('#online-score-strip-host');
 if (onlineScoreHost) mountScoreStrip(onlineScoreHost, 'online');
 const localTableInfoHost = document.querySelector<HTMLElement>('#local-table-info-host');
-if (localTableInfoHost) mountTableInfoPanel(localTableInfoHost, 'local');
+const localTableInfoRoot = localTableInfoHost ? mountTableInfoPanel(localTableInfoHost, 'local') : null;
 const onlineTableInfoHost = document.querySelector<HTMLElement>('#online-table-info-host');
 if (onlineTableInfoHost) mountTableInfoPanel(onlineTableInfoHost, 'online');
 const localActionHost = document.querySelector<HTMLElement>('#local-action-panel-host');
@@ -46,16 +46,18 @@ if (document.querySelector('#main-menu-toggle')) {
 const resultDialog = new ResultDialog();
 let onlineGameController: OnlineGameController | null = null;
 const localTable = document.querySelector<HTMLElement>('#local-table')!;
+const idleState = document.querySelector<HTMLElement>('#app-idle')!;
 const localDeclarationBubbles = new DeclarationBubbleRenderer(localTable);
 const riverDebugMode = window.location.pathname.endsWith('/test.html') &&
   new URLSearchParams(window.location.search).get('debug') === 'river';
 const controller = new GameController(undefined, {
+  startImmediately: false,
   onChange: render,
   wait: (milliseconds, signal, context) => waitForTurn(riverDebugMode ? 800 : milliseconds, signal, context),
 });
 mountDiagnosticDialog(diagnosticLog, () => ({
-  ...controller.diagnosticSnapshot(), buildId: getBuildInfo().buildId, gameMode: controller.match.format ?? 'tonpu',
-  executionMode: 'offline',
+  ...(controller.hasGame ? controller.diagnosticSnapshot() : { gameMode: 'none' }),
+  buildId: getBuildInfo().buildId, executionMode: controller.hasGame ? 'offline' : 'none',
   lastSuccessfulRenderId: getLastSuccessfulRender()?.renderId ?? null,
   lastSuccessfulRenderAt: getLastSuccessfulRender()?.timestamp ?? null,
   lastSuccessfulRenderPhase: getLastSuccessfulRender()?.phase ?? null,
@@ -65,7 +67,7 @@ mountDiagnosticDialog(diagnosticLog, () => ({
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     diagnosticLog.record('INFO', 'page_resumed', { source: 'visibilitychange' });
-    if (controller.match.status === 'playing') diagnosticLog.record('WARN', 'local_runner_resume_snapshot', {
+    if (controller.hasGame && controller.match.status === 'playing') diagnosticLog.record('WARN', 'local_runner_resume_snapshot', {
       ...controller.diagnosticSnapshot(),
       displayState: document.visibilityState, gameMode: controller.match.format ?? 'tonpu',
     });
@@ -77,10 +79,41 @@ window.addEventListener('pagehide', () => {
   diagnosticLog.flush();
 });
 let previouslyRenderedGame: typeof controller.game | null = null;
-let previouslyRenderedMatchStatus = controller.match.status;
+let previouslyRenderedMatchStatus: string = 'playing';
 let localKanChoicesOpen = false;
 let localActionPanel: ActionPanel | null = null;
 function render(): void {
+  if (!controller.hasGame) {
+    document.body.dataset.gameMode = 'none';
+    localDeclarationBubbles.clearAll();
+    idleState.hidden = false;
+    localScoreRoot!.hidden = true;
+    localTableInfoRoot!.hidden = true;
+    localTable.hidden = true;
+    document.querySelector<HTMLElement>('#round-result-summary')!.hidden = true;
+    localActionRoot!.hidden = true;
+    document.querySelector<HTMLElement>('#match-result')!.replaceChildren();
+    localTable.querySelectorAll<HTMLElement>('.concealed-hand, .open-melds, .river, #player-hand, #dora-indicators, #wall-count, #deposit-sticks').forEach(node => node.replaceChildren());
+    localScoreRoot!.querySelectorAll<HTMLElement>('.seat-label').forEach(node => node.replaceChildren());
+    localTableInfoRoot!.querySelectorAll<HTMLElement>('#table-round').forEach(node => {
+      node.textContent = '';
+      node.removeAttribute('aria-label');
+      node.removeAttribute('title');
+      delete node.dataset.formatLabel;
+    });
+    localActionPanel?.clear();
+    previouslyRenderedGame = null;
+    previouslyRenderedMatchStatus = 'playing';
+    localKanChoicesOpen = false;
+    return;
+  }
+  document.body.dataset.gameMode = 'offline';
+  idleState.hidden = true;
+  localScoreRoot!.hidden = false;
+  localTableInfoRoot!.hidden = false;
+  localTable.hidden = false;
+  document.querySelector<HTMLElement>('#round-result-summary')!.hidden = false;
+  localActionRoot!.hidden = false;
   const game = controller.game;
   const renderId = recordRenderStarted(diagnosticLog, {
     seat: game.turnPlayerId, phase: game.phase, runnerState: controller.progressing ? 'running' : 'idle',
@@ -142,7 +175,7 @@ const buildInfo = getBuildInfo();
 diagnosticLog.record('INFO', 'app_build_info', {
   buildId: buildInfo.buildId, gitSha: buildInfo.gitSha, buildTimeUtc: buildInfo.buildTimeUtc,
   appVersion: buildInfo.appVersion, mode: buildInfo.mode, schemaVersion: buildInfo.schemaVersion,
-  executionMode: 'offline',
+  executionMode: 'none',
 });
 export function resetLocalActionChoices(): void { localKanChoicesOpen = false; }
 function newGame(format: 'tonpu' | 'tonnan' = 'tonpu'): void {
@@ -150,7 +183,7 @@ function newGame(format: 'tonpu' | 'tonnan' = 'tonpu'): void {
   controller.newGame(format);
   window.scrollTo(0, 0);
 }
-new NewGameDialog(newGame);
+new NewGameDialog(newGame, () => controller.hasGame);
 if (localActionRoot) localActionPanel = new ActionPanel(localActionRoot, event => {
   switch (event.type) {
     case 'discard':
@@ -199,7 +232,10 @@ if (localActionRoot) localActionPanel = new ActionPanel(localActionRoot, event =
 });
 if (document.querySelector('#online-create-open')) {
   if (!onlineActionRoot) throw new Error('Online action panel host is missing');
-  onlineGameController = new OnlineGameController(new ActionPanel(onlineActionRoot), resultDialog);
+  onlineGameController = new OnlineGameController(new ActionPanel(onlineActionRoot), resultDialog, () => {
+    controller.clearGame();
+    render();
+  });
   const waitingRoom = new OnlineWaitingRoom(import.meta.env.VITE_ONLINE_API_URL, message => onlineGameController?.receive(message));
   onlineGameController.setActionSender((action, expectedGameRevision) => waitingRoom.sendGameAction(action, expectedGameRevision));
 }

@@ -582,9 +582,16 @@ with sync_playwright() as p:
         except Exception as error:
             raise AssertionError(f'online browser UI wait timed out: {expression}') from error
 
+    wait_for('typeof window.onlineUiTest === "object"')
+    assert page.locator('#app-idle').is_visible(), 'application did not open in the idle state'
+    assert page.locator('body').get_attribute('data-game-mode') == 'none', 'initial app mode was not none'
+    page.evaluate('window.onlineUiTest.controller.newGame()')
+
     def assert_no_private_cpu_tile_ids_in_main(message):
         leaked_ids = page.evaluate('''() => {
-          const privateIds = window.onlineUiTest.controller.game.players.slice(1).flatMap(player => [
+          const controller = window.onlineUiTest.controller;
+          if (!controller.hasGame) return [];
+          const privateIds = controller.game.players.slice(1).flatMap(player => [
             ...player.hand, ...(player.drawnTile ? [player.drawnTile] : []),
           ]).map(tile => tile.id);
           const html = document.querySelector('main').innerHTML;
@@ -1517,8 +1524,10 @@ with sync_playwright() as p:
     hand_before_reconnect = page.locator('#online-player-hand button[data-tile-id]').evaluate_all("nodes => nodes.map(node => node.dataset.tileId).join(',')")
     tickets_before_reconnect = page.evaluate('window.onlineMock.ticketRequests')
     page.evaluate('window.onlineMock.forceDisconnect()')
+    assert page.locator('body').get_attribute('data-game-mode') == 'online', 'a temporary disconnection left online mode'
     wait_for(f'window.onlineMock.ticketRequests > {tickets_before_reconnect}', timeout=10000)
     wait_for("document.querySelectorAll('#online-player-hand button[data-tile-id]').length === 14", timeout=10000)
+    assert page.locator('body').get_attribute('data-game-mode') == 'online', 'reconnection switched into another game mode'
     hand_after_reconnect = page.locator('#online-player-hand button[data-tile-id]').evaluate_all("nodes => nodes.map(node => node.dataset.tileId).join(',')")
     assert hand_after_reconnect == hand_before_reconnect, 'the online hand was not restored after reconnect'
     page.evaluate('''() => {
@@ -1549,6 +1558,13 @@ with sync_playwright() as p:
     assert page.locator('#online-match').is_visible() and page.locator('[data-online-hand="right"] .tile-back').count() == 13, 'the replacement CPU hand was shown in public'
     assert all(tile_id not in page.locator('#online-match').inner_html() for tile_id in hidden_guest_ids), 'the replacement CPU private hand leaked after handoff'
 
+    page.evaluate("window.onlineMock.setResultScenario('match-ended', 0)")
+    wait_for("window.onlineUiTest.onlineGameController.view?.status === 'match-ended' && document.querySelector('#online-return-local').hidden === false")
+    page.locator('#online-return-local').click()
+    assert page.locator('body').get_attribute('data-game-mode') == 'none', 'returning from online match results started offline play'
+    assert page.locator('#app-idle').is_visible(), 'returning from online match results did not restore the idle screen'
+    assert page.locator('#online-match').is_hidden() and page.locator('#online-game-controls').is_hidden(), 'online game content remained visible after returning to idle'
+
     select_menu_item('#menu-room')
     before_exit = page.evaluate('window.onlineMock.snapshot()')
     page.locator('#online-leave').click()
@@ -1562,8 +1578,10 @@ with sync_playwright() as p:
 
     assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') === null"), 'successful leave did not remove the session'
     assert page.locator('#menu-room').is_hidden(), 'room operations remained in the menu after leaving'
+    wait_for("document.body.dataset.gameMode === 'none' && document.querySelector('#app-idle').hidden === false")
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'exit notice causes horizontal overflow after leaving'
-    assert page.locator('.table').is_visible() and page.locator('#player-hand svg').count() > 0, 'the existing mahjong table was changed by the waiting room flow'
+    assert page.locator('#local-table').is_hidden() and page.locator('#local-game-controls').is_hidden(), 'offline play or its controls remained active after online exit'
+    assert page.locator('#app-idle').inner_text() == '対局待機中\nメニューから対局を開始してください'
     assert_no_private_cpu_tile_ids_in_main('CPU private tile IDs leaked after leaving the room')
 
     select_menu_item('#online-join-open')

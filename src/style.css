@@ -4,6 +4,12 @@ body { margin:0; }
 main { container-type:inline-size; width:min(100%,620px); min-height:100vh; min-height:100svh; margin:auto; padding:max(8px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom, 0px) + var(--call-viewport-inset, 0px)) max(4px,env(safe-area-inset-left)); display:flex; flex-direction:column; gap:8px; }
 header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 6px; }
 .app-header { min-height:44px; }
+.app-idle { display:flex; min-height:clamp(180px,42vh,360px); flex-direction:column; align-items:center; justify-content:center; padding:24px 16px; text-align:center; }
+.app-idle[hidden] { display:none; }
+.app-idle h2 { margin:0 0 8px; font-size:clamp(1.15rem,5vw,1.5rem); }
+.app-idle p { margin:0; line-height:1.6; overflow-wrap:anywhere; }
+.online-game-active #app-idle { display:none; }
+#local-table[hidden], #local-table-summary[hidden], #local-game-controls[hidden], #local-table .center-info[hidden] { display:none !important; }
 h1 { margin:0; font-size:clamp(1rem,5vw,1.5rem); white-space:nowrap; }
 .main-menu-shell { position:relative; z-index:8; flex:none; }
 .main-menu-toggle { display:grid; align-content:center; justify-items:center; gap:4px; width:44px; height:44px; padding:8px; border:1px solid #63947a; border-radius:8px; background:#123f32; color:#fff1cc; cursor:pointer; touch-action:manipulation; }

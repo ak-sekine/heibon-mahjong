@@ -95,7 +95,11 @@ export class OnlineGameController {
     });
   }
 
-  constructor(actionPanel: ActionPanel, private readonly resultDialog: ResultDialog) {
+  constructor(
+    actionPanel: ActionPanel,
+    private readonly resultDialog: ResultDialog,
+    private readonly onSessionEnded: () => void = () => {},
+  ) {
     this.actionPanel = actionPanel;
     this.actionPanel.setHandler(event => this.handleAction(event));
     this.playerHand.addEventListener('click', event => {
@@ -144,6 +148,7 @@ export class OnlineGameController {
       this.stopDecisionCountdown();
       this.clearRoomNotice();
       this.declarationBubbles.clearAll();
+      this.clearRenderedGame();
       this.view = null;
       this.declarationCursor = null;
       this.finalRanks = null;
@@ -156,6 +161,7 @@ export class OnlineGameController {
       document.body.classList.remove('online-game-active');
       this.resultDialog.updateOnline(null);
       document.querySelector<HTMLButtonElement>('#new-game')!.disabled = false;
+      this.onSessionEnded();
       return;
     }
     if (message.type === 'seat-taken-over') {
@@ -226,6 +232,7 @@ export class OnlineGameController {
     this.setTableClasses(true);
     this.root.hidden = false;
     document.body.classList.add('online-game-active');
+    document.body.dataset.gameMode = 'online';
     document.querySelector<HTMLButtonElement>('#new-game')!.disabled = true;
     this.render();
   }
@@ -535,6 +542,7 @@ export class OnlineGameController {
     this.stopDecisionCountdown();
     this.clearRoomNotice();
     this.declarationBubbles.clearAll();
+    this.clearRenderedGame();
     this.view = null;
     this.declarationCursor = null;
     this.finalRanks = null;
@@ -546,6 +554,17 @@ export class OnlineGameController {
     document.body.classList.remove('online-game-active');
     this.resultDialog.updateOnline(null);
     document.querySelector<HTMLButtonElement>('#new-game')!.disabled = false;
+    this.onSessionEnded();
+  }
+
+  private clearRenderedGame(): void {
+    this.playerHand.replaceChildren();
+    this.root.querySelectorAll<HTMLElement>('[data-online-hand], [data-online-melds], [data-online-river]').forEach(node => node.replaceChildren());
+    this.scores.querySelectorAll<HTMLElement>('.seat-label').forEach(node => node.replaceChildren());
+    this.table.querySelectorAll<HTMLElement>('.round-label, .wall-count, .dora-indicators, .deposit-sticks').forEach(node => node.replaceChildren());
+    const result = this.root.querySelector<HTMLElement>('#online-round-result');
+    if (result) { result.replaceChildren(); result.hidden = true; }
+    this.actionPanel.clear();
   }
 
   private clearRoomNotice(): void {

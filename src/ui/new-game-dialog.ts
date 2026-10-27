@@ -2,7 +2,7 @@
 export class NewGameDialog {
   private readonly dialog = document.querySelector<HTMLDialogElement>('#new-game-dialog')!;
   private trigger: HTMLButtonElement | null = null;
-  constructor(start: (format: 'tonpu' | 'tonnan') => void) {
+  constructor(start: (format: 'tonpu' | 'tonnan') => void, hasActiveGame: () => boolean = () => true) {
     for (const id of ['#new-game', '#result-new-game']) {
       const button = document.querySelector<HTMLButtonElement>(id)!;
       button.addEventListener('click', () => {
@@ -14,6 +14,10 @@ export class NewGameDialog {
         this.trigger = id === '#new-game'
           ? document.querySelector<HTMLButtonElement>('#main-menu-toggle') ?? button
           : button;
+        const question = document.querySelector<HTMLElement>('#new-game-question');
+        if (question) question.textContent = hasActiveGame()
+          ? '現在の対局を終了して、最初から始めますか？'
+          : '対局形式を選んで、オフライン対局を開始します。';
         this.dialog.showModal();
         document.querySelector<HTMLButtonElement>('#cancel-new-game')!.focus({ preventScroll: true });
       });

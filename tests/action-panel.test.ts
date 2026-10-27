@@ -17,6 +17,7 @@ class FakeClassList {
     if (force ?? !this.values.has(name)) this.values.add(name);
     else this.values.delete(name);
   }
+  remove(...names: string[]): void { names.forEach(name => this.values.delete(name)); }
 }
 
 class FakeElement {
@@ -234,5 +235,23 @@ test('ActionPanel manages ron focus and result actions centrally', () => {
     fixture.panel.update(state());
     assert.equal(fixture.parts.get('ron-controls')!.hidden, true);
     assert.equal(fixture.parts.get('ron')!.focused, false);
+  } finally { fixture.restore(); }
+});
+
+test('ActionPanel clears stale operation state and can render the same choices again', () => {
+  const fixture = panelFixture();
+  try {
+    const options: ActionChoiceOption[] = [{ id: 'call-1', label: 'ポン', tiles: [], enabled: true }];
+    fixture.panel.update(state({
+      buttons: { ...state().buttons, discard: { visible: true, enabled: true, label: '打牌する' } },
+      callGroup: { visible: true, status: '鳴き判断です。', options },
+    }));
+    assert.equal(fixture.parts.get('call-options')!.children.length, 1);
+    fixture.panel.clear();
+    assert.equal(fixture.parts.get('discard')!.hidden, true);
+    assert.equal(fixture.parts.get('call-controls')!.hidden, true);
+    assert.equal(fixture.parts.get('call-options')!.children.length, 0);
+    fixture.panel.update(state({ callGroup: { visible: true, status: '', options } }));
+    assert.equal(fixture.parts.get('call-options')!.children.length, 1);
   } finally { fixture.restore(); }
 });

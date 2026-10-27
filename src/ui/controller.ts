@@ -14,17 +14,24 @@ import { canDeclareKyuushuKyuuhai, declareKyuushuKyuuhai } from '../game/special
 
 /** UI selection is separate from the immutable game state. */
 export class GameController {
-  match: MatchState;
+  private matchState: MatchState | null = null;
+  get hasGame(): boolean { return this.matchState !== null; }
+  get match(): MatchState {
+    if (!this.matchState) throw new Error('No offline match is active');
+    return this.matchState;
+  }
+  set match(match: MatchState) { this.matchState = match; }
   get game(): GameState { return this.match.game; }
   set game(game: GameState) { this.match = updateMatchGame(this.match, game); }
   selectedTileId: string | null = null;
   private readonly start: (dealerId?: PlayerId) => GameState;
   private readonly runner: AutomaticTurnRunner;
   private readonly onChange: () => void;
-  constructor(start: (dealerId?: PlayerId) => GameState = id => startGame(Math.random, id), options: AutomaticTurnOptions & { onChange?: () => void } = {}) {
+  constructor(start: (dealerId?: PlayerId) => GameState = id => startGame(Math.random, id), options: AutomaticTurnOptions & { onChange?: () => void; startImmediately?: boolean } = {}) {
     this.start = start;
-    this.match = startMatch(start());
-    this.runner = new AutomaticTurnRunner(options);
+    const { startImmediately = true, ...runnerOptions } = options;
+    if (startImmediately) this.match = startMatch(start());
+    this.runner = new AutomaticTurnRunner(runnerOptions);
     this.onChange = options.onChange ?? (() => {});
   }
   get progressing(): boolean { return this.runner.running; }
@@ -142,10 +149,18 @@ export class GameController {
     return this.runner.runMatch(() => this.match, match => { this.match = match; this.onChange(); }, this.onChange);
   }
   newGame(format: MatchFormat = 'tonpu'): void {
-    const previous = this.game;
+    const previous = this.matchState?.game ?? null;
     this.runner.cancel();
     this.match = startMatch(this.start(), format);
-    recordLocalGameTransition(previous, this.game, 'GameController.newGame');
+    if (previous) recordLocalGameTransition(previous, this.game, 'GameController.newGame');
+    this.selectedTileId = null;
+    this.onChange();
+  }
+
+  clearGame(): void {
+    if (!this.matchState) return;
+    this.runner.cancel();
+    this.matchState = null;
     this.selectedTileId = null;
     this.onChange();
   }
