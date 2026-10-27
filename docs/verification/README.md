@@ -4,6 +4,7 @@
 
 ## 実機確認
 
+- [対面プレイヤー公開手牌の180度回転 — iPhone Safari実機、2026-10-27](online-opponent-public-hand-orientation-2026-10-27.md)。和了・流局時は正常、九種九牌は実機未確認です。自動テスト／WebKit結果と区別しています。
 - [CPU手番診断 — iPhone Safari実機、2026-10-27](cpu-turn-render-diagnostics-2026-10-26.md)。schema 2の正常なCPU手番、鳴き、状態遷移・描画、復帰スナップショットをユーザーが確認。停滞検知・描画例外・CPU処理中断復帰は未確認で、フリーズ原因は未特定です。
 - [オンラインダイアログ「閉じる」ボタン — iPhone Safari実機、2026-10-26](online-dialog-close-2026-10-26.md)。新しくルームを作る／ルームに参加する／オンライン待機の3画面すべてで1行表示をユーザーが確認済みです。関連する自動検証とPages deploymentの記録も同じファイルにあります。
 - [左右の河19枚目以降のレイアウト — iPhone Safari実機、2026-10-26追記](side-river-8x3-2026-10-25.md)。CPU1（右）の18→19→20枚目と荒牌流局までをユーザーが実機確認。CPU3（左）、オンライン対局、25枚目以降は未確認です。自動テスト・Chromium・WebKit結果と分けて記録しています。
@@ -19,6 +20,7 @@
 | [オンライン診断ログ](online-diagnostics.md) | ブラウザーのlocalStorageログ、Worker構造化ログ、Cloudflare確認方法、保存範囲と検証制限。 |
 | [CPU手番フリーズ原因未特定・診断強化](cpu-turn-render-diagnostics-2026-10-26.md) | CPU段階、Runner停滞・Safari復帰、描画失敗、ビルド識別ログの実装と検証。2026-10-27に通常動作の一部をiPhone Safari実機で確認。異常経路は未確認で、フリーズ原因は未特定。 |
 | [九種九牌の公開手牌](kyuushu-public-hand.md) | 宣言者14枚のオンライン・オフライン公開、非公開手牌保護、結果の再表示・再接続・次局解除。GitHub ActionsのChromium/WebKit確認成功。 |
+| [対面プレイヤー公開手牌の180度回転](online-opponent-public-hand-orientation-2026-10-27.md) | 自動WebKitの4シナリオは成功。iPhone Safari実機では和了・流局を確認済み、九種九牌は未確認。別のDeploy workflowでオンラインCPU手番テストが失敗し、デプロイ工程は未実施。 |
 | [Heibon Mahjong テスト環境](test-environment.md) | オフライン固定局面の九種九牌4シナリオ、136枚整合性、公開範囲、320〜430px幅。 |
 | [Step 13.8](step13.8/README.md) | 主要役満8種類、候補単位の複合、点数、結果表示。Browser UI verification はGitHub Actionsで実施。 |
 | [Step 13.9](step13.9/README.md) | 海底摸月・河底撈魚、最終通常ツモ／打牌の局進行。Browser UI verification はGitHub Actionsで実施。 |
