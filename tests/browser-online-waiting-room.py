@@ -616,6 +616,8 @@ with sync_playwright() as p:
               inline: {width: item.style.width, height: item.style.height, left: item.style.left, top: item.style.top},
               box: rect(item), face: rect(item.querySelector('svg')),
               faceTransform: getComputedStyle(item.querySelector('svg')).transform,
+              faceTransformOrigin: getComputedStyle(item.querySelector('svg')).transformOrigin,
+              faceTransformBox: getComputedStyle(item.querySelector('svg')).transformBox,
             })),
           })),
           stability: JSON.parse((table || document.documentElement).dataset.riverStability || 'null'),

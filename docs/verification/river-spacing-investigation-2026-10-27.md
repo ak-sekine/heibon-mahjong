@@ -4,9 +4,11 @@
 
 初回失敗では、Chromiumが390×844pxのオンライン対局画面で、6枚目をリーチ宣言牌にした河の牌面間隔を0.53125pxと測定しました。期待値1pxとの差0.46875pxが既存許容差0.35pxを超えています。中心間隔も実測21.5px、牌面寸法からの期待値21.96875pxでした。
 
-**元の0.53125px測定の原因は未特定です。** 同じ失敗commitの再実行でも同じgapとcenter stepが出ており、実際の配置違反を排除できません。元のテストはviewportの`resize`後に安定を確認せず測定していましたが、これだけで今回の値を説明する根拠はありません。後から追加した安定待ちには別のAPI呼び出し不具合があり、初期の3回のBrowser UI実行では間隔assertion自体が実行されていませんでした。修正後の間隔測定が通っても、それだけで元の原因解決とはしません。
+0.53125pxの差は、河のlayout cell間隔ではなく、宣言牌と隣牌のSVG面rectが各cell中心から逆方向にずれて発生したことをWebKitの安定測定で確認しました。layout cell自体は1px離れていましたが、宣言牌のface rectはcell中心より右に0.234375px、隣牌のface rectは左に0.234375px寄り、実測face gapは0.53125pxでした。既存CSSはSVGを`left/top:50%`と`translate(-50%,-50%)`で配置し、その同じtransformで回転していましたが、SVGのtransform reference boxとoriginを明示していませんでした。CSSのtransform boxを`border-box`、originを`center`に固定する修正を加え、厳しいgap assertionでActions検証中です。
 
-描画コードと間隔許容値は変更していません。1px±0.35pxの測定、中心間隔、重なり、卓内配置のアサーションを維持しています。
+**元のChromium runがこのSVGずれを測った直接の画面記録はありません。** 元の失敗は同じcommitの再実行でも同値でしたが、後続のWebKit安定測定で同じ0.53125pxを再現しました。初回の失敗画像を取得できず、Chromiumで同じDOM状態だったかの直接照合はできません。元の測定原因は特定でき、初回Chromiumでの発生契機には不確実性が残ります。
+
+河layoutの計算式と1px±0.35pxの許容値は変更していません。SVG面の中央配置CSSのみを修正し、gap、center step、重なり、卓内配置のアサーションを維持しています。
 
 関連する既存記録：[オンライン退出通知の配置検証](online-exit-notice-layout-2026-10-27.md)。
 
@@ -47,26 +49,27 @@ run `40522323858`は後続commitの別runで、Browser UI job全体が成功し�
 - Browser UI workflow内の各Pythonスクリプトは逐次起動され、河測定スクリプトも新しいPlaywright browser/pageを作成します。スクリプト内のシナリオ間では同じpageを使いますが、mockが毎回4席の河・viewer・宣言indexを上書きし、rendererが河classと子DOM、layout由来inline styleを更新します。並列実行による干渉はありません。初回artifactが取得できず、失敗時のclass／DOM残留やCSS実測値は確認できていません。
 - `river-layout.test.ts`、`river-capacity-flow.test.ts`、`browser-riichi-discard-layout.py`、`browser-river-capacity.py`を確認しました。今回の失敗測定は、失敗時点で現実の表示不具合である可能性を排除できません。
 - ローカルで容量Browser UI回帰を初めて実測した際、offlineケースの牌面rectが全て`[0,0,0,0]`なのに384 checksが成功しました。idle画面では`#local-table`がhiddenで、従来テストはオフライン河のDOM位置を検査できていませんでした。容量テストの開始時に実際の新規offline対局をUIから開始し、卓サイズ、牌面数、各牌面の非ゼロ寸法も検査するよう修正しました。修正後の384 checksはChromiumで成功し、19枚目／24枚目の左右CPU牌面rectも320px・390px幅で非ゼロ値を確認しています。これはテストの検出漏れ修正で、元の0.53125pxを説明するものではありません。
-- この変更では本番CSS／描画コードを変えていません。19枚目／24枚目の配置仕様も変更していません。
+- 本番CSSはSVG牌面の`transform-box:border-box`と`transform-origin:center`を明示し、cell内のface中心を合わせる修正を加えました。`calculateRiverLayout`の配置計算、河gap、6×4／8×3の列構成、19枚目／24枚目の配置仕様は変更していません。
 
 ## 対策と再現検証
 
 - オンライン河測定前に、viewport寸法、4河の枚数・宣言牌数、卓サイズ、河内の牌面相対rectが50ms間隔のpollingで連続3回一致することを最大3秒で確認するよう変更しました。未安定なら失敗し診断を保存します。固定sleep、失敗時の再試行、アサーション緩和は使いません。
 - gap／中心間隔の失敗では、対象河、牌index、セル座標、各牌面rect、viewport、DPR、visual viewport、卓・河CSS変数、pageerror／console errorをJSONに保存し、同じ条件のスクリーンショットを撮ります。通常の大容量artifactと別artifactにも診断ファイルをアップロードします。
-- `HEIBON_ONLINE_RIVER_SPACING_ONLY=1`は対象6枚・6枚目宣言牌を320/375/390/414px、4席回転で3周し、失敗を隠さず即時失敗します（48 scenario cases、合計960隣接牌面ペアの測定予定）。
+- `HEIBON_ONLINE_RIVER_SPACING_ONLY=1`は対象6枚・6枚目宣言牌を320/375/390/414px、4席回転で3周します（48 scenario cases、960隣接牌面ペア／browser）。
 - 河間隔の回帰、18→19枚目、23→24枚目、左右CPUの確認幅に414pxを加え、Chromium／WebKitの既存Browser UI workflowで実行します。
 - Browser UI run `40588289896`（commit `8315d004`）は間隔測定前に止まりました。timeout時のartifact画像・JSON（ID `12773760863`）には固定fixture設定前の実対局DOM（上1枚、右2枚、下1枚、左0枚）、320×568px、DPR 1、pageerror/console errorなしが記録されています。ただし、後続runで同じ待機呼び出しのTypeErrorが判明したため、これは「3秒間レイアウトが不安定だった」証拠ではありません。
 - Browser UI run `40590397325`（commit `36863eda`）の診断artifact（ID `12773429233`）では、fixture反映後の4河各6枚・宣言牌各1枚が保存され、最終DOMRectから再計算したgapは1.0–1.015625pxでした。しかし、後続runで待機呼び出しがTypeErrorで止まっていたことが判明したため、これも反復assertionの結果ではありません。run `40591929025`（commit `5b037727`）も同じ誤った呼び出し方をしており、以上3 runのspacing assertionはすべて0件です。
 - Browser UIを含むrun `40594213336`（commit `63c266fa`）のログで、wait helperが`TypeError: Page.wait_for_function() takes 2 positional arguments but 3 positional arguments ...`を出していたことが判明しました。インストール済みPlaywright Pythonでは`arg`がkeyword-onlyですが、コードは第2引数として位置渡ししていました。さらに広い`except Exception`がTypeErrorをlayout timeoutとして包み、原因を隠していました。同じ呼び出し方が前の修正commitにも入っていたため、run `40588289896`、`40590397325`、`40591929025`はいずれもspacing assertionを実行していません。run `40594213091`の初回attemptでは、これに先立ち`npm test`内の既存online CPU turn testも失敗し、Browser UIまで到達しませんでした。ローカルの同じ`npm test`は63/63 test filesで成功しています。
 - `arg=`で渡し、timeout catchをPlaywrightの`TimeoutError`だけに限定しています。一般wait helperもtimeoutだけを捕捉し、それ以外のAPI／プログラムエラーはそのまま露出するようにしました。最新コードでのActions結果は後続更新に追記します。
+- 安定待ちAPI修正後のActions run `40595972735`（commit `0fa9333`）では、Chromium focused runは48 scenarios／960 pairs成功、WebKitは390×844px・viewer0・6枚・宣言index5の上河で失敗し、gap `0.53125px`を再現しました。WebKitのpageerror／console errorは空、DPR1、visual viewport scale1で、安定待ちは通過済みでした。診断artifact `river-spacing-diagnostics-0fa93334245d37ac411208834254e929d675ab07`（ID `12776068020`）のJSONとスクリーンショットを確認し、cell間隔とSVG面rectの逆方向0.234375pxずれを記録しました。transform-box/origin修正後のActions結果を次のrunで確認します。
 
 ## 検証結果
 
-作業中です。次の実行結果を取得後に追記します。
+Chromiumのローカルfocused spacing／capacity検証は成功しました。transform-box/origin修正後のChromium／WebKit GitHub Actions結果は実行中です。
 
-- 同じ初回Actions runのfailed job再実行：実行中。
-- 対象Browser UI testの新規単独・反復実行：commit後のActionsで確認予定。
-- Chromium／WebKit、320/375/390/414px、18→19・23→24、通常河・左右CPU河：commit後のActionsで確認予定。
+- Chromiumローカルfocused test：48 scenarios／960 pairs、失敗0。WebKit pre-fix Actions：390pxでgap assertion失敗1件。
+- transform-box/origin修正後のBrowser UI Actions：commit後に確認予定。
+- Chromiumローカルcapacity test：384 checks成功。WebKitの18→19・23→24、320/375/390/414px：Actionsで確認予定。
 - `npm test`：63件成功。
 - `npm run build`：成功。
 - `npm run typecheck:worker`：成功。
@@ -78,6 +81,6 @@ run `40522323858`は後続commitの別runで、Browser UI job全体が成功し�
 
 ## 未解決・未確認事項
 
-- 0.53125px測定が一時的な描画状態だったのか、安定したCSSレイアウトの実表示異常だったのかは未確定です。失敗画像を取得できず、初回のDPR・console errorも未記録です。
-- 安定待ちを入れた後の反復結果だけで、初回の原因が解決したとは結論しません。新しい失敗の診断値と画像を使い、必要なら描画処理を再調査します。
+- 初回Chromium failureのスクリーンショットは大容量artifactの32MiB取得上限で確認できず、同じSVGずれが初回にもあったか直接比較できません。初回DPR、zoom、console errorも未記録です。
+- CSS修正後のWebKit安定測定が成功しても、初回Chromium runの発生契機が同じtransformずれだったことの直接証明にはなりません。
 - Actions結果、成功回数・失敗回数、commit/push後のmain SHAは最終更新します。
