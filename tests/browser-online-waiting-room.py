@@ -3,7 +3,7 @@ import json
 import os
 import pathlib
 import shutil
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
 BASE_URL = os.environ.get('HEIBON_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
@@ -585,8 +585,8 @@ with sync_playwright() as p:
     def wait_for(expression, **kwargs):
         try:
             return page.wait_for_function(expression, **kwargs)
-        except Exception as error:
-            raise AssertionError(f'online browser UI wait timed out: {expression}') from error
+        except PlaywrightTimeoutError as error:
+            raise AssertionError(f'online browser UI wait timed out: {expression}: {error}') from error
 
     def capture_river_diagnostics(label, width, height, viewer, count, declaration_index):
       details = page.evaluate('''() => {
@@ -618,7 +618,7 @@ with sync_playwright() as p:
               faceTransform: getComputedStyle(item.querySelector('svg')).transform,
             })),
           })),
-          stability: table ? JSON.parse(table.dataset.riverStability || 'null') : null,
+          stability: JSON.parse((table || document.documentElement).dataset.riverStability || 'null'),
         };
       }''')
       screenshot = OUT / f'river-spacing-failure-{ENGINE}-{label}-{width}x{height}-viewer-{viewer}-count-{count}-declaration-{declaration_index}.png'
@@ -694,8 +694,8 @@ with sync_playwright() as p:
           if (state.samples.length > 6) state.samples.shift();
           stateElement.dataset.riverStability = JSON.stringify(state);
           return state.stableFrames >= 2;
-        }''', {'width': width, 'height': height, 'count': count, 'declarationIndex': declaration_index}, timeout=3000, polling=50)
-      except Exception as error:
+        }''', arg={'width': width, 'height': height, 'count': count, 'declarationIndex': declaration_index}, timeout=3000, polling=50)
+      except PlaywrightTimeoutError as error:
         diagnostics = capture_river_diagnostics(label + '-layout-timeout', width, height, viewer, count, declaration_index)
         raise AssertionError(f'online river layout did not stabilize within 3000ms: {json.dumps(diagnostics, ensure_ascii=False)}') from error
       page.evaluate("document.querySelector('#online-table')?.removeAttribute('data-river-stability')")
