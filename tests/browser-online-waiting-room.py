@@ -7,6 +7,7 @@ from playwright.sync_api import sync_playwright
 
 BASE_URL = os.environ.get('HEIBON_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
+ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 OUT.mkdir(parents=True, exist_ok=True)
 
 MOCK = r"""
@@ -554,7 +555,14 @@ MOCK = r"""
 """
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'), args=['--no-sandbox'])
+    browser_type = getattr(p, ENGINE)
+    launch_options = {}
+    if ENGINE == 'chromium':
+        launch_options = {
+            'executable_path': os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'),
+            'args': ['--no-sandbox'],
+        }
+    browser = browser_type.launch(**launch_options)
     page = browser.new_page(viewport={'width': 390, 'height': 844})
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
