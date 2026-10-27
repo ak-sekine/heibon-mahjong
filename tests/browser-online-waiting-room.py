@@ -585,7 +585,10 @@ with sync_playwright() as p:
     wait_for('typeof window.onlineUiTest === "object"')
     assert page.locator('#app-idle').is_visible(), 'application did not open in the idle state'
     assert page.locator('body').get_attribute('data-game-mode') == 'none', 'initial app mode was not none'
-    page.evaluate('window.onlineUiTest.controller.newGame()')
+    page.locator('#main-menu-toggle').click()
+    page.locator('#new-game').click()
+    page.locator('#confirm-new-game').click()
+    wait_for("document.body.dataset.gameMode === 'offline'")
 
     def assert_no_private_cpu_tile_ids_in_main(message):
         leaked_ids = page.evaluate('''() => {
