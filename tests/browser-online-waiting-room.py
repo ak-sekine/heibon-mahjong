@@ -1396,7 +1396,6 @@ with sync_playwright() as p:
     for repetition in range(spacing_repeats):
       for width, height in spacing_viewports:
         page.set_viewport_size({'width': width, 'height': height})
-        wait_for_stable_river_layout(f'resize-repeat-{repetition + 1}', width, height)
         for count in ([6] if RIVER_SPACING_ONLY else [1, 6, 7, 12, 18]):
           declaration_cases = [5] if RIVER_SPACING_ONLY else ([-1, count-1] if count < 18 else [-1, 0, 5, 6, 17])
           for viewer in range(4):

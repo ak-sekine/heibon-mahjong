@@ -27,13 +27,15 @@
 - テストは`page.set_viewport_size()`後に`resize`イベントを待ち、その直後にテスト用WebSocket mockで河を更新し、`getBoundingClientRect()`でSVG牌面を測定します。初回の失敗経路ではDOM矩形の連続安定性を待っていませんでした。
 - `devicePixelRatio`、ブラウザーzoom、失敗時の全DOM状態・console出力は初回ログに保存されていません。テストは`pageerror`を配列に記録しますが、失敗時には最終報告まで到達せず、その配列の値もログにありません。console errorの有無は未確認です。
 - workflowは単一job内の逐次実行です。失敗前に`browser-riichi-discard-layout.py`、`browser-river-capacity.py`（Chromium/WebKit）などの河・配置検証は成功しています。その後、`browser-online-waiting-room.py`の全フローで失敗しました。後続のWebKit online waiting-room全検証やriver test mode等はこの失敗で未実行です。
+- 初回runのworkflow上の実行順は次のとおりです（記載のないブラウザー指定はChromium）。`browser-online-dialog-layout.py`、`browser-app-idle.py`（Chromium、WebKit）、`browser-riichi-discard-layout.py`、`browser-action-controls.py`、`browser-action-panel.py`、`browser-table-ui.py`、`browser-riichi-claimed-discard.py`（Chromium、WebKit）、`browser-river-capacity.py`（Chromium、WebKit）、`browser-declaration-bubbles.py`、`browser-declaration-gameplay.py`（Chromium、WebKit）、`browser-round-end-ui.py`（Chromium、WebKit）、`browser-result-hand-layout.py`（Chromium、WebKit）、`browser-dora-rows.py`、`browser-mobile-table-layout.py`、`browser-seat-kan-overlap.py`、`browser-step13-5-5.py`、`browser-step13-5-5-kan.py`、`browser-step13-6.py`、`browser-step13-7.py`、`browser-step13-8.py`、`browser-step13-9.py`、`browser-step13-10.py`（Chromium、WebKit）、`browser-step13-11.py`、`browser-online-waiting-room.py`（Chromium、ここで失敗）。後続のWebKit online waiting-room、test-page、river-test-mode、diagnostics検証は実行されていません。
 - runのartifact `browser-ui-20169c95a00fee957eb11d04a2f97167b8795771`（ID `12742830202`）はアップロード成功、ZIPサイズ`35,268,777` bytesでした。GitHub connectorからZIP取得はできましたが、この実行環境のファイル転送上限32MiBを超えたため展開できませんでした。したがって、失敗時スクリーンショットは実際には確認できていません。
+- 調査中にこのrunのfailed jobを同じcommitで再実行しました（job ID `122482490677`）。同じテスト順で`browser-online-waiting-room.py`まで進み、同じ390px／viewer 0／6枚／宣言index 5で再度失敗し、gap `0.53125px`、center step `21.5px`、期待center step `21.96875px`を記録しました。これは同じレイアウト違反が再現した証拠ですが、gapを生じさせる原因（配置CSSか期待値／測定の解釈か）はまだ絞れていません。再実行jobのartifact（ID `12771883944`、`35,229,006` bytes）も32MiBを超え、初回失敗時の画像はどちらのrunでも保存・確認できていません。
 
 ## 再実行との差
 
 run `40522323858`は後続commitの別runで、Browser UI job全体が成功しています。河レイアウト実装、失敗したChromium測定経路、viewport、アサーション、許容差は初回runから変更されていません。差分commitは退出通知の検証追加とworkflow上の追加呼び出しを含みます。したがって、実行全体は異なりますが、失敗したfull Chromium河測定経路は同じでした。
 
-この差だけでは、viewport再配置等のタイミング差、ブラウザー描画の一時状態、実際のレイアウト差のいずれかを特定できません。再現しなかったことを原因解決の根拠にはしません。
+この後続runだけを見れば失敗は再現していませんが、failed jobを同じcommitで明示的に再実行したrun `40519653129`では同じ値で再失敗しました。したがって、単発の一時的な描画揺れだけを原因とは扱えません。実表示の配置違反か、期待するgapと測定対象の幾何の不一致がある可能性を調べますが、原因の断定は修正後の診断値とレイアウト計算の照合後に行います。
 
 ## 河レイアウト実装の確認
 
@@ -49,6 +51,7 @@ run `40522323858`は後続commitの別runで、Browser UI job全体が成功し�
 - gap／中心間隔の失敗では、対象河、牌index、セル座標、各牌面rect、viewport、DPR、visual viewport、卓・河CSS変数、pageerror／console errorをJSONに保存し、同じ条件のスクリーンショットを撮ります。通常の大容量artifactと別artifactにも診断ファイルをアップロードします。
 - `HEIBON_ONLINE_RIVER_SPACING_ONLY=1`は対象6枚・6枚目宣言牌を320/375/390/414px、4席回転で3周し、失敗を隠さず即時失敗します（48 scenario cases、合計960隣接牌面ペアの測定予定）。
 - 河間隔の回帰、18→19枚目、23→24枚目、左右CPUの確認幅に414pxを加え、Chromium／WebKitの既存Browser UI workflowで実行します。
+- 初回の修正commit `8315d004` のBrowser UI run `40588289896` は、対象間隔測定に入る前、320×568pxへのresize直後に3秒のレイアウト安定待ちがtimeoutして失敗しました。診断artifact `river-spacing-diagnostics-8315d004607b951dca4ff42d682a0843e017c216`（ID `12773760863`）の画像・JSONでは、まだ固定テストシナリオを設定する前の実対局DOM（上1枚、右2枚、下1枚、左0枚）が記録され、pageerror/console errorは空、DPRは1でした。元の対局DOMを固定シナリオへ置き換える前に牌矩形全体の安定を要求した待機順が不適切でした。この待機を外し、各幅で固定シナリオを反映した後に、期待枚数と牌rectが連続2フレーム安定したことを確認してから測定するよう修正しています。このrunではspacing scenarioは0件で、通過扱いにしません。
 
 ## 検証結果
 
