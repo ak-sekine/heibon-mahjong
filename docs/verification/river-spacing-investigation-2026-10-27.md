@@ -53,6 +53,7 @@ run `40522323858`は後続commitの別runで、Browser UI job全体が成功し�
 - 河間隔の回帰、18→19枚目、23→24枚目、左右CPUの確認幅に414pxを加え、Chromium／WebKitの既存Browser UI workflowで実行します。
 - 初回の修正commit `8315d004` のBrowser UI run `40588289896` は、対象間隔測定に入る前、320×568pxへのresize直後に3秒のレイアウト安定待ちがtimeoutして失敗しました。診断artifact `river-spacing-diagnostics-8315d004607b951dca4ff42d682a0843e017c216`（ID `12773760863`）の画像・JSONでは、まだ固定テストシナリオを設定する前の実対局DOM（上1枚、右2枚、下1枚、左0枚）が記録され、pageerror/console errorは空、DPRは1でした。元の対局DOMを固定シナリオへ置き換える前に牌矩形全体の安定を要求した待機順が不適切でした。この待機を外し、各幅で固定シナリオを反映した後に、期待枚数と牌rectが連続2フレーム安定したことを確認してから測定するよう修正しています。このrunではspacing scenarioは0件で、通過扱いにしません。
 - 次の修正commit `36863eda` のBrowser UI run `40590397325` では、シナリオ反映後の3秒待機が320×568pxでtimeoutしました。artifact `river-spacing-diagnostics-36863edaa4133ced644271011bf2bebf2baa0e89`（ID `12773429233`）には4河それぞれ6枚と宣言牌1枚、viewport 320×568、DPR 1、pageerror/console errorなしが記録されています。最終DOMRectから隣接牌面のgapを再計算すると1.0–1.015625pxでしたが、測定関数自体はtimeoutしており、これは反復assertionの結果ではありません。旧実装はフレームごとの変化を保存していなかったため、座標が変わり続けた理由は未確認です。安定条件から絶対画面位置を外し、河コンテナ内の牌面相対rect・サイズだけを比較し、timeout時に直近6フレームの比較値も保存するよう修正します。このrunの間隔scenarioは0測定です。
+- 相対rect版commit `5b037727` のBrowser UI run `40591929025` でも同じscenario waitがtimeoutしました。artifactのJSONでは最終rectは前回と同じですが、`stableFrames: 0`／`samples: []`で、timeout中の比較値を得られていません。フレーム履歴をwindow propertyだけに保存していたため、診断関数から読めない状態の可能性も残ります。次の修正では履歴をDOMの一時data属性へ保存し、`requestAnimationFrame` pollingではなく50msごとの状態pollingで連続3回一致を確認します。最大待機は3秒のままです。このrunもspacing assertionは0件です。
 
 ## 検証結果
 

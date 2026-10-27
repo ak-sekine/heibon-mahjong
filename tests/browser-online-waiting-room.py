@@ -597,6 +597,7 @@ with sync_playwright() as p:
         const table = document.querySelector('#online-table');
         return {
           readyState: document.readyState,
+          visibilityState: document.visibilityState,
           userAgent: navigator.userAgent,
           viewport: {innerWidth, innerHeight, devicePixelRatio, screen: {width: screen.width, height: screen.height, availWidth: screen.availWidth, availHeight: screen.availHeight}, visualViewport: window.visualViewport ? {
             width: window.visualViewport.width, height: window.visualViewport.height, scale: window.visualViewport.scale,
@@ -617,7 +618,7 @@ with sync_playwright() as p:
               faceTransform: getComputedStyle(item.querySelector('svg')).transform,
             })),
           })),
-          stability: window.__onlineRiverStableDiagnostics ?? null,
+          stability: table ? JSON.parse(table.dataset.riverStability || 'null') : null,
         };
       }''')
       screenshot = OUT / f'river-spacing-failure-{ENGINE}-{label}-{width}x{height}-viewer-{viewer}-count-{count}-declaration-{declaration_index}.png'
@@ -643,20 +644,34 @@ with sync_playwright() as p:
       return diagnostics
 
     def wait_for_stable_river_layout(label, width, height, viewer=None, count=None, declaration_index=None):
-      page.evaluate('''() => {
-        window.__onlineRiverStableDiagnostics = {stableFrames: 0, samples: []};
-      }''')
+      page.evaluate("document.querySelector('#online-table')?.removeAttribute('data-river-stability')")
       try:
         page.wait_for_function('''expected => {
-          if (innerWidth !== expected.width || innerHeight !== expected.height) return false;
           const table = document.querySelector('#online-table');
+          const stateElement = table || document.documentElement;
+          let state;
+          try { state = JSON.parse(stateElement.dataset.riverStability || 'null'); } catch { state = null; }
+          if (!state) state = {stableFrames: 0, lastSignature: null, samples: []};
           const rivers = [...document.querySelectorAll('[data-online-river]')];
-          if (!table || rivers.length !== 4 || table.getBoundingClientRect().width <= 0) return false;
-          if (expected.count !== null && rivers.some(river => {
+          const counts = rivers.map(river => {
             const items = [...river.querySelectorAll('.river-tile')];
-            const declarations = items.filter(item => item.dataset.riichiDeclaration === 'true').length;
-            return items.length !== expected.count || declarations !== (expected.declarationIndex >= 0 ? 1 : 0);
-          })) return false;
+            return {position: river.dataset.onlineRiver, count: items.length,
+              declarations: items.filter(item => item.dataset.riichiDeclaration === 'true').length};
+          });
+          const sample = {time: performance.now(), viewport: [innerWidth, innerHeight], counts};
+          const recordBlocked = reason => {
+            sample.blocked = reason;
+            state.stableFrames = 0;
+            state.lastSignature = null;
+            state.samples.push(sample);
+            if (state.samples.length > 6) state.samples.shift();
+            stateElement.dataset.riverStability = JSON.stringify(state);
+            return false;
+          };
+          if (innerWidth !== expected.width || innerHeight !== expected.height) return recordBlocked('viewport');
+          if (!table || rivers.length !== 4 || table.getBoundingClientRect().width <= 0) return recordBlocked('table-or-rivers');
+          if (expected.count !== null && counts.some(river => river.count !== expected.count ||
+              river.declarations !== (expected.declarationIndex >= 0 ? 1 : 0))) return recordBlocked('scenario-counts');
           const tableRect = table.getBoundingClientRect();
           const signature = JSON.stringify([
             [tableRect.width, tableRect.height],
@@ -671,16 +686,19 @@ with sync_playwright() as p:
                 })];
             }),
           ]);
-          const diagnostics = window.__onlineRiverStableDiagnostics;
-          diagnostics.stableFrames = signature === diagnostics.lastSignature ? diagnostics.stableFrames + 1 : 0;
-          diagnostics.lastSignature = signature;
-          diagnostics.samples.push({time: performance.now(), stableFrames: diagnostics.stableFrames, signature: JSON.parse(signature)});
-          if (diagnostics.samples.length > 6) diagnostics.samples.shift();
-          return diagnostics.stableFrames >= 2;
-        }''', {'width': width, 'height': height, 'count': count, 'declarationIndex': declaration_index}, timeout=3000, polling='raf')
+          state.stableFrames = signature === state.lastSignature ? state.stableFrames + 1 : 0;
+          state.lastSignature = signature;
+          sample.stableFrames = state.stableFrames;
+          sample.signature = JSON.parse(signature);
+          state.samples.push(sample);
+          if (state.samples.length > 6) state.samples.shift();
+          stateElement.dataset.riverStability = JSON.stringify(state);
+          return state.stableFrames >= 2;
+        }''', {'width': width, 'height': height, 'count': count, 'declarationIndex': declaration_index}, timeout=3000, polling=50)
       except Exception as error:
         diagnostics = capture_river_diagnostics(label + '-layout-timeout', width, height, viewer, count, declaration_index)
         raise AssertionError(f'online river layout did not stabilize within 3000ms: {json.dumps(diagnostics, ensure_ascii=False)}') from error
+      page.evaluate("document.querySelector('#online-table')?.removeAttribute('data-river-stability')")
 
     wait_for('typeof window.onlineUiTest === "object"')
     assert page.locator('#app-idle').is_visible(), 'application did not open in the idle state'
