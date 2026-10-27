@@ -615,9 +615,19 @@ with sync_playwright() as p:
               declaration: item.dataset.riichiDeclaration,
               inline: {width: item.style.width, height: item.style.height, left: item.style.left, top: item.style.top},
               box: rect(item), face: rect(item.querySelector('svg')),
-              faceTransform: getComputedStyle(item.querySelector('svg')).transform,
-              faceTransformOrigin: getComputedStyle(item.querySelector('svg')).transformOrigin,
-              faceTransformBox: getComputedStyle(item.querySelector('svg')).transformBox,
+              faceStyle: (() => {
+                const style = getComputedStyle(item.querySelector('svg'));
+                return {position: style.position, left: style.left, top: style.top, width: style.width,
+                  height: style.height, transform: style.transform, transformOrigin: style.transformOrigin,
+                  transformBox: style.transformBox};
+              })(),
+              faceWrapper: (() => {
+                const wrapper = item.querySelector('.river-tile-face');
+                if (!wrapper) return null;
+                const style = getComputedStyle(wrapper);
+                return {rect: rect(wrapper), position: style.position, left: style.left, top: style.top,
+                  width: style.width, height: style.height, transform: style.transform};
+              })(),
             })),
           })),
           stability: JSON.parse((table || document.documentElement).dataset.riverStability || 'null'),

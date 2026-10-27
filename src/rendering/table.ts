@@ -6,7 +6,7 @@ import type { FuEntry } from '../analysis/fu.ts';
 import type { ScoreTier } from '../analysis/score.ts';
 import type { GameState, PlayerId, PlayerState, PhysicalTile, SeatWind, TsumoResult, RonCandidate } from '../model/game.ts';
 import { HONORS, SUITS, type Tile } from '../model/tile.ts';
-import { createTileElement, tileLabel } from './tile-svg.ts';
+import { createTileElement, tileLabel, wrapRiverTileFace } from './tile-svg.ts';
 import { canDiscard } from '../game/discard.ts';
 import { exposedDoraIndicators } from '../game/dora.ts';
 import { renderDoraIndicators, createResultDoraRow } from './dora.ts';
@@ -148,7 +148,7 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
         tile.setAttribute('aria-label', description);
         tile.querySelector('title')!.textContent = description;
       }
-      item.append(tile);
+      item.append(wrapRiverTileFace(tile));
       return item;
     }));
   }

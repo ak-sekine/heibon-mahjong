@@ -308,8 +308,9 @@ header > div { min-width:0; }
 .river-tile.pending-discard-target { outline:3px solid #FFD700; outline-offset:0; border-radius:2px; pointer-events:none; z-index:1; }
 .river-left .river-tile { width:var(--table-tile-height); height:var(--table-tile-height); }
 .river-right .river-tile { width:var(--table-tile-height); height:var(--table-tile-height); }
-.river-tile .tile-svg { position:absolute; width:var(--river-tile-width); height:var(--river-tile-height); left:calc((100% - var(--river-tile-width)) / 2); top:calc((100% - var(--river-tile-height)) / 2); transform-box:border-box; transform-origin:center; transform:rotate(var(--face-angle,0deg)); }
-.river-tile[data-riichi-declaration='true'] .tile-svg { transform:rotate(calc(var(--face-angle,0deg) + 90deg)); }
+.river-tile-face { position:absolute; display:block; width:var(--river-tile-width); height:var(--river-tile-height); left:50%; top:50%; transform:translate(-50%,-50%); }
+.river-tile-face .tile-svg { display:block; width:100%; height:100%; transform-box:border-box; transform-origin:center; transform:rotate(var(--face-angle,0deg)); }
+.river-tile[data-riichi-declaration='true'] .river-tile-face .tile-svg { transform:rotate(calc(var(--face-angle,0deg) + 90deg)); }
 .center-info { grid-area:info; align-self:stretch; width:100%; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:4px; padding:3px 0; border-radius:6px; background:#123f32; font-size:12px; line-height:1.35; text-align:center; overflow-wrap:anywhere; }
 .round-label { font-weight:700; }
 .wall-count { display:flex; flex-direction:column; gap:1px; }

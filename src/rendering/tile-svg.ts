@@ -110,3 +110,10 @@ export function createTileElement(tile: Tile): SVGSVGElement {
   template.innerHTML = tileSvgMarkup(tile);
   return template.content.firstElementChild as SVGSVGElement;
 }
+
+export function wrapRiverTileFace(face: SVGSVGElement): HTMLSpanElement {
+  const wrapper = document.createElement('span');
+  wrapper.className = 'river-tile-face';
+  wrapper.append(face);
+  return wrapper;
+}

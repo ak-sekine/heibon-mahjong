@@ -1,6 +1,6 @@
 import type { GameActionPayload } from './protocol.ts';
 import type { PlayerGameView, PublicMeld, PublicTile } from './game-view.ts';
-import { createTileElement, tileLabel } from '../rendering/tile-svg.ts';
+import { createTileElement, tileLabel, wrapRiverTileFace } from '../rendering/tile-svg.ts';
 import { renderDepositSticks } from '../rendering/deposit-sticks.ts';
 import { applyRiverLayout, applyRiverTilePlacement, calculateRiverLayout, riverPositionFor } from '../rendering/river-layout.ts';
 import { renderDoraIndicators } from '../rendering/dora.ts';
@@ -474,7 +474,7 @@ export class OnlineGameController {
         applyRiverTilePlacement(item, placement);
         item.dataset.tileId = tile.id;
         item.dataset.riichiDeclaration = String(placement.declaration);
-        item.append(face(tile));
+        item.append(wrapRiverTileFace(face(tile)));
         return item;
       }));
     }
