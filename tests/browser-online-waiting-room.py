@@ -10,6 +10,7 @@ OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 PUBLIC_HAND_ONLY = os.environ.get('HEIBON_ONLINE_PUBLIC_HAND_ONLY') == '1'
 EXIT_NOTICE_ONLY = os.environ.get('HEIBON_ONLINE_EXIT_NOTICE_ONLY') == '1'
+RIVER_SPACING_ONLY = os.environ.get('HEIBON_ONLINE_RIVER_SPACING_ONLY') == '1'
 OUT.mkdir(parents=True, exist_ok=True)
 
 MOCK = r"""
@@ -569,7 +570,9 @@ with sync_playwright() as p:
     browser = browser_type.launch(**launch_options)
     page = browser.new_page(viewport={'width': 390, 'height': 844})
     errors = []
+    console_errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
+    page.on('console', lambda message: console_errors.append(message.text) if message.type == 'error' else None)
     page.on('dialog', lambda dialog: dialog.accept())
     page.add_init_script(MOCK)
 
@@ -584,6 +587,87 @@ with sync_playwright() as p:
             return page.wait_for_function(expression, **kwargs)
         except Exception as error:
             raise AssertionError(f'online browser UI wait timed out: {expression}') from error
+
+    def capture_river_diagnostics(label, width, height, viewer, count, declaration_index):
+      details = page.evaluate('''() => {
+        const rect = element => {
+          const box = element.getBoundingClientRect();
+          return Object.fromEntries(['x','y','left','top','right','bottom','width','height'].map(key => [key, box[key]]));
+        };
+        const table = document.querySelector('#online-table');
+        return {
+          readyState: document.readyState,
+          userAgent: navigator.userAgent,
+          viewport: {innerWidth, innerHeight, devicePixelRatio, screen: {width: screen.width, height: screen.height, availWidth: screen.availWidth, availHeight: screen.availHeight}, visualViewport: window.visualViewport ? {
+            width: window.visualViewport.width, height: window.visualViewport.height, scale: window.visualViewport.scale,
+            offsetLeft: window.visualViewport.offsetLeft, offsetTop: window.visualViewport.offsetTop,
+          } : null},
+          table: table ? {rect: rect(table), tileWidth: getComputedStyle(table).getPropertyValue('--table-tile-width').trim(), tileHeight: getComputedStyle(table).getPropertyValue('--table-tile-height').trim()} : null,
+          rivers: [...document.querySelectorAll('[data-online-river]')].map(river => ({
+            position: river.dataset.onlineRiver,
+            rect: rect(river),
+            riverTileWidth: getComputedStyle(river).getPropertyValue('--river-tile-width').trim(),
+            riverTileHeight: getComputedStyle(river).getPropertyValue('--river-tile-height').trim(),
+            riverGap: getComputedStyle(river).getPropertyValue('--river-gap').trim(),
+            tiles: [...river.querySelectorAll('.river-tile')].map((item, index) => ({
+              index, row: item.dataset.riverRow, column: item.dataset.riverColumn,
+              declaration: item.dataset.riichiDeclaration,
+              inline: {width: item.style.width, height: item.style.height, left: item.style.left, top: item.style.top},
+              box: rect(item), face: rect(item.querySelector('svg')),
+              faceTransform: getComputedStyle(item.querySelector('svg')).transform,
+            })),
+          })),
+        };
+      }''')
+      screenshot = OUT / f'river-spacing-failure-{ENGINE}-{label}-{width}x{height}-viewer-{viewer}-count-{count}-declaration-{declaration_index}.png'
+      try:
+        page.screenshot(path=str(screenshot), full_page=True, timeout=5000)
+      except Exception as error:
+        screenshot_error = str(error)
+      else:
+        screenshot_error = None
+      diagnostics = {
+        'browser': ENGINE, 'stage': label, 'expectedViewport': [width, height],
+        'viewer': viewer, 'count': count, 'declarationIndex': declaration_index,
+        'pageErrors': errors, 'consoleErrors': console_errors,
+        'screenshot': str(screenshot), 'screenshotError': screenshot_error,
+        'dom': details,
+      }
+      diagnostics_file = screenshot.with_suffix('.json')
+      diagnostics['diagnosticsFile'] = str(diagnostics_file)
+      try:
+        diagnostics_file.write_text(json.dumps(diagnostics, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+      except OSError as error:
+        diagnostics['diagnosticsFileError'] = str(error)
+      return diagnostics
+
+    def wait_for_stable_river_layout(label, width, height, viewer=None, count=None, declaration_index=None):
+      page.evaluate('delete window.__onlineRiverStableSignature; delete window.__onlineRiverStableFrames')
+      try:
+        page.wait_for_function('''expected => {
+          if (innerWidth !== expected.width || innerHeight !== expected.height) return false;
+          const table = document.querySelector('#online-table');
+          const rivers = [...document.querySelectorAll('[data-online-river]')];
+          if (!table || rivers.length !== 4 || table.getBoundingClientRect().width <= 0) return false;
+          if (expected.count !== null && rivers.some(river => {
+            const items = [...river.querySelectorAll('.river-tile')];
+            const declarations = items.filter(item => item.dataset.riichiDeclaration === 'true').length;
+            return items.length !== expected.count || declarations !== (expected.declarationIndex >= 0 ? 1 : 0);
+          })) return false;
+          const signature = JSON.stringify([
+            table.getBoundingClientRect().toJSON(),
+            getComputedStyle(table).getPropertyValue('--table-tile-width'),
+            getComputedStyle(table).getPropertyValue('--table-tile-height'),
+            ...rivers.map(river => [river.dataset.onlineRiver, river.getBoundingClientRect().toJSON(),
+              ...[...river.querySelectorAll('.river-tile svg')].map(tile => tile.getBoundingClientRect().toJSON())]),
+          ]);
+          if (signature === window.__onlineRiverStableSignature) window.__onlineRiverStableFrames++;
+          else { window.__onlineRiverStableSignature = signature; window.__onlineRiverStableFrames = 0; }
+          return window.__onlineRiverStableFrames >= 2;
+        }''', {'width': width, 'height': height, 'count': count, 'declarationIndex': declaration_index}, timeout=3000, polling='raf')
+      except Exception as error:
+        diagnostics = capture_river_diagnostics(label + '-layout-timeout', width, height, viewer, count, declaration_index)
+        raise AssertionError(f'online river layout did not stabilize within 3000ms: {json.dumps(diagnostics, ensure_ascii=False)}') from error
 
     wait_for('typeof window.onlineUiTest === "object"')
     assert page.locator('#app-idle').is_visible(), 'application did not open in the idle state'
@@ -1305,67 +1389,88 @@ with sync_playwright() as p:
     assert option_sizes['#call-options'] == option_sizes['#online-call-options'], f'call option buttons do not share dimensions: {option_sizes}'
     assert option_sizes['#kan-options'] == option_sizes['#online-kan-options'], f'kan option buttons do not share dimensions: {option_sizes}'
 
-    page.evaluate("window.onlineLayoutResizeCount = 0; window.addEventListener('resize', () => window.onlineLayoutResizeCount++)")
-    for width, height in [(320,700),(355,812),(375,812),(390,844),(430,932),(1280,900)]:
-      resize_count = page.evaluate('window.onlineLayoutResizeCount')
-      page.set_viewport_size({'width': width, 'height': height})
-      page.wait_for_function(f'window.onlineLayoutResizeCount > {resize_count}')
-      for count in [1, 6, 7, 12, 18]:
-        declaration_cases = [-1, count-1] if count < 18 else [-1, 0, 5, 6, 17]
-        for viewer in range(4):
-          for declaration_index in declaration_cases:
-            page.evaluate('args => window.onlineMock.showRiverScenario(args.viewer, args.count, args.declaration)', {
-              'viewer': viewer, 'count': count, 'declaration': declaration_index,
-            })
-            metrics = page.evaluate('''() => {
-              const overlaps = (a,b) => a.left < b.right - .5 && b.left < a.right - .5 && a.top < b.bottom - .5 && b.top < a.bottom - .5;
-              const info = document.querySelector('[data-online-center-info]').getBoundingClientRect();
-              const rivers = [...document.querySelectorAll('[data-online-river]')].map(river => {
-                const rect = river.getBoundingClientRect();
-                const items = [...river.querySelectorAll('.river-tile')];
-                const tiles = items.map(item => item.querySelector('svg').getBoundingClientRect());
-                let tileOverlap = false;
-                for (let i=0; i<tiles.length; i++) for (let j=i+1; j<tiles.length; j++) tileOverlap ||= overlaps(tiles[i],tiles[j]);
-                const declaration = river.querySelector('[data-riichi-declaration="true"] svg');
-                const declarationRect = declaration?.getBoundingClientRect();
-                const side = river.dataset.onlineRiver === 'left' || river.dataset.onlineRiver === 'right';
-                const declarationDirection = !declarationRect || (side ? declarationRect.width < declarationRect.height : declarationRect.width > declarationRect.height);
-                const mainSpacing = [];
-                for (let i=0; i<items.length; i++) for (let j=i+1; j<items.length; j++) {
-                  const rowI=+items[i].dataset.riverRow, columnI=+items[i].dataset.riverColumn;
-                  const rowJ=+items[j].dataset.riverRow, columnJ=+items[j].dataset.riverColumn;
-                  const axisI=side?rowI:columnI, axisJ=side?rowJ:columnJ;
-                  const lineI=side?columnI:rowI, lineJ=side?columnJ:rowJ;
-                  if (lineI!==lineJ || Math.abs(axisI-axisJ)!==1) continue;
-                  const [first,second,firstIndex,secondIndex]=axisI<axisJ
-                    ? [tiles[i],tiles[j],i,j] : [tiles[j],tiles[i],j,i];
-                  const gap=side?second.top-first.bottom:second.left-first.right;
-                  const firstSize=side?first.height:first.width, secondSize=side?second.height:second.width;
-                  mainSpacing.push({
-                    gap, centerStep:side?second.top+second.height/2-first.top-first.height/2:second.left+second.width/2-first.left-first.width/2,
-                    expectedCenterStep:(firstSize+secondSize)/2+1,
-                    hasDeclaration:items[firstIndex].dataset.riichiDeclaration==='true'||items[secondIndex].dataset.riichiDeclaration==='true',
-                  });
-                }
-                return {count: tiles.length, infoOverlap: overlaps(rect,info), tileOverlap, declarationDirection, mainSpacing, tilesInRiver: tiles.every(tile =>
-                  tile.left >= rect.left - 1 && tile.top >= rect.top - 1 && tile.right <= rect.right + 1 && tile.bottom <= rect.bottom + 1)};
-              });
-              const table = document.querySelector('#online-table').getBoundingClientRect();
-              const overflow = document.documentElement.scrollWidth > innerWidth;
-              const overflowElements = overflow ? [...document.querySelectorAll('body *')].map(element => {
-                const rect = element.getBoundingClientRect();
-                return {tag: element.tagName, id: element.id, className: typeof element.className === 'string' ? element.className : '', left: rect.left, right: rect.right};
-              }).filter(element => element.left < -.1 || element.right > innerWidth + .1).sort((a,b) => b.right - a.right).slice(0,12) : [];
-              return {overflow, documentWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth, overflowElements, tableInsideViewport: table.left >= -1 && table.right <= innerWidth + 1, rivers};
-            }''')
-            assert not metrics['overflow'] and metrics['tableInsideViewport'], f'online table overflow at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {metrics}'
-            assert all(river['count'] == count for river in metrics['rivers']), f'online river count failed at {width}px: {metrics}'
-            assert all(not river['infoOverlap'] and not river['tileOverlap'] and river['declarationDirection'] and river['tilesInRiver'] for river in metrics['rivers']), f'online river geometry overlapped at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {metrics}'
-            for river in metrics['rivers']:
-              for pair in river['mainSpacing']:
-                assert abs(pair['gap']-1)<.35, f'online main-axis edge gap is not 1px at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {pair}'
-                assert abs(pair['centerStep']-pair['expectedCenterStep'])<.35, f'online main-axis center spacing does not match displayed face sizes at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {pair}'
-      page.screenshot(path=str(OUT / f'step14-2-online-rivers-{width}.png'), full_page=True)
+    spacing_viewports = [(320,568),(375,812),(390,844),(414,896)] if RIVER_SPACING_ONLY else [(320,700),(355,812),(375,812),(390,844),(414,896),(430,932),(1280,900)]
+    spacing_repeats = 3 if RIVER_SPACING_ONLY else 1
+    spacing_cases = 0
+    spacing_measurements = 0
+    for repetition in range(spacing_repeats):
+      for width, height in spacing_viewports:
+        page.set_viewport_size({'width': width, 'height': height})
+        wait_for_stable_river_layout(f'resize-repeat-{repetition + 1}', width, height)
+        for count in ([6] if RIVER_SPACING_ONLY else [1, 6, 7, 12, 18]):
+          declaration_cases = [5] if RIVER_SPACING_ONLY else ([-1, count-1] if count < 18 else [-1, 0, 5, 6, 17])
+          for viewer in range(4):
+            for declaration_index in declaration_cases:
+              page.evaluate('args => window.onlineMock.showRiverScenario(args.viewer, args.count, args.declaration)', {
+                'viewer': viewer, 'count': count, 'declaration': declaration_index,
+              })
+              wait_for_stable_river_layout(f'scenario-repeat-{repetition + 1}', width, height, viewer, count, declaration_index)
+              metrics = page.evaluate('''() => {
+                const overlaps = (a,b) => a.left < b.right - .5 && b.left < a.right - .5 && a.top < b.bottom - .5 && b.top < a.bottom - .5;
+                const info = document.querySelector('[data-online-center-info]').getBoundingClientRect();
+                const rivers = [...document.querySelectorAll('[data-online-river]')].map(river => {
+                  const rect = river.getBoundingClientRect();
+                  const items = [...river.querySelectorAll('.river-tile')];
+                  const tiles = items.map(item => item.querySelector('svg').getBoundingClientRect());
+                  let tileOverlap = false;
+                  for (let i=0; i<tiles.length; i++) for (let j=i+1; j<tiles.length; j++) tileOverlap ||= overlaps(tiles[i],tiles[j]);
+                  const declaration = river.querySelector('[data-riichi-declaration="true"] svg');
+                  const declarationRect = declaration?.getBoundingClientRect();
+                  const side = river.dataset.onlineRiver === 'left' || river.dataset.onlineRiver === 'right';
+                  const declarationDirection = !declarationRect || (side ? declarationRect.width < declarationRect.height : declarationRect.width > declarationRect.height);
+                  const mainSpacing = [];
+                  for (let i=0; i<items.length; i++) for (let j=i+1; j<items.length; j++) {
+                    const rowI=+items[i].dataset.riverRow, columnI=+items[i].dataset.riverColumn;
+                    const rowJ=+items[j].dataset.riverRow, columnJ=+items[j].dataset.riverColumn;
+                    const axisI=side?rowI:columnI, axisJ=side?rowJ:columnJ;
+                    const lineI=side?columnI:rowI, lineJ=side?columnJ:rowJ;
+                    if (lineI!==lineJ || Math.abs(axisI-axisJ)!==1) continue;
+                    const [first,second,firstIndex,secondIndex]=axisI<axisJ
+                      ? [tiles[i],tiles[j],i,j] : [tiles[j],tiles[i],j,i];
+                    const gap=side?second.top-first.bottom:second.left-first.right;
+                    const firstSize=side?first.height:first.width, secondSize=side?second.height:second.width;
+                    mainSpacing.push({
+                      river: river.dataset.onlineRiver,
+                      firstIndex, secondIndex,
+                      firstCell: {row: items[firstIndex].dataset.riverRow, column: items[firstIndex].dataset.riverColumn},
+                      secondCell: {row: items[secondIndex].dataset.riverRow, column: items[secondIndex].dataset.riverColumn},
+                      firstFace: {left: first.left, top: first.top, width: first.width, height: first.height},
+                      secondFace: {left: second.left, top: second.top, width: second.width, height: second.height},
+                      gap, centerStep:side?second.top+second.height/2-first.top-first.height/2:second.left+second.width/2-first.left-first.width/2,
+                      expectedCenterStep:(firstSize+secondSize)/2+1,
+                      hasDeclaration:items[firstIndex].dataset.riichiDeclaration==='true'||items[secondIndex].dataset.riichiDeclaration==='true',
+                    });
+                  }
+                  return {position: river.dataset.onlineRiver, count: tiles.length, infoOverlap: overlaps(rect,info), tileOverlap, declarationDirection, mainSpacing, tilesInRiver: tiles.every(tile =>
+                    tile.left >= rect.left - 1 && tile.top >= rect.top - 1 && tile.right <= rect.right + 1 && tile.bottom <= rect.bottom + 1)};
+                });
+                const table = document.querySelector('#online-table').getBoundingClientRect();
+                const overflow = document.documentElement.scrollWidth > innerWidth;
+                const overflowElements = overflow ? [...document.querySelectorAll('body *')].map(element => {
+                  const rect = element.getBoundingClientRect();
+                  return {tag: element.tagName, id: element.id, className: typeof element.className === 'string' ? element.className : '', left: rect.left, right: rect.right};
+                }).filter(element => element.left < -.1 || element.right > innerWidth + .1).sort((a,b) => b.right - a.right).slice(0,12) : [];
+                return {overflow, documentWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth, overflowElements, tableInsideViewport: table.left >= -1 && table.right <= innerWidth + 1, rivers};
+              }''')
+              spacing_cases += 1
+              spacing_measurements += sum(len(river['mainSpacing']) for river in metrics['rivers'])
+              assert not metrics['overflow'] and metrics['tableInsideViewport'], f'online table overflow at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {metrics}'
+              assert all(river['count'] == count for river in metrics['rivers']), f'online river count failed at {width}px: {metrics}'
+              assert all(not river['infoOverlap'] and not river['tileOverlap'] and river['declarationDirection'] and river['tilesInRiver'] for river in metrics['rivers']), f'online river geometry overlapped at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {metrics}'
+              for river in metrics['rivers']:
+                for pair in river['mainSpacing']:
+                  if abs(pair['gap']-1) >= .35 or abs(pair['centerStep']-pair['expectedCenterStep']) >= .35:
+                    diagnostics = capture_river_diagnostics(f'repeat-{repetition + 1}-{river["position"]}', width, height, viewer, count, declaration_index)
+                    raise AssertionError(f'online river spacing failed: {json.dumps({"metrics": pair, "diagnostics": diagnostics}, ensure_ascii=False)}')
+                  assert abs(pair['gap']-1)<.35, f'online main-axis edge gap is not 1px at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {pair}'
+                  assert abs(pair['centerStep']-pair['expectedCenterStep'])<.35, f'online main-axis center spacing does not match displayed face sizes at {width}px, viewer {viewer}, {count} discards, declaration {declaration_index}: {pair}'
+      if not RIVER_SPACING_ONLY:
+        page.screenshot(path=str(OUT / f'step14-2-online-rivers-{width}.png'), full_page=True)
+    if RIVER_SPACING_ONLY:
+      assert not errors, f'{ENGINE} online river spacing page errors: {errors}'
+      print(json.dumps({'browser': ENGINE, 'riverSpacing': {'viewports': spacing_viewports, 'repetitions': spacing_repeats, 'scenarioCases': spacing_cases, 'measuredPairs': spacing_measurements, 'consoleErrors': console_errors, 'result': 'pass'}}, ensure_ascii=False), flush=True)
+      browser.close()
+      raise SystemExit(0)
     page.set_viewport_size({'width': 390, 'height': 844})
     page.evaluate('window.onlineMock.resetRivers()')
     page.evaluate("window.onlineMock.setGameDisplayName(0, 'テストホスト')")

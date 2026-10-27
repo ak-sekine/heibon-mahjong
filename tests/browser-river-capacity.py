@@ -29,7 +29,7 @@ def verify_original_river_positions(baselines, mode, declaration_seat, count, ce
 with sync_playwright() as p:
     browser_type = getattr(p, os.environ.get('HEIBON_BROWSER', 'chromium'))
     browser = browser_type.launch(headless=True)
-    viewports = [(320, 568), (355, 812), (375, 812), (390, 844), (430, 932)]
+    viewports = [(320, 568), (355, 812), (375, 812), (390, 844), (414, 896), (430, 932)]
     for width, height in viewports:
         page = browser.new_page(viewport={'width': width, 'height': height})
         page.on('pageerror', lambda error: errors.append(str(error)))

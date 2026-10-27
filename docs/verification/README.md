@@ -17,6 +17,7 @@
 | 記録 | 主な対象 |
 | --- | --- |
 | [オンライン退出通知の配置修正](online-exit-notice-layout-2026-10-27.md) | Chromium／WebKitの退出フロー・モバイル配置・操作・自動消去、2026-10-28のユーザーによるiPhone Safari実機確認（完了）。 |
+| [Browser UI河間隔測定の調査](river-spacing-investigation-2026-10-27.md) | 390px・6枚河の初回0.53125px測定、同期・DPR・console・artifactの確認状況、安定待ち・失敗時diagnostics、Chromium／WebKitの反復検証。原因未特定の事項と実行結果を明記。 |
 | [オンラインダイアログの閉じるボタン修正](online-dialog-close-2026-10-26.md) | 修正履歴、公開用ビルド／WebKitの12条件、Pages deployment、ユーザーによる3画面のiPhone Safari実機確認（完了）。 |
 | [流局結果概要と操作ボタン配置](round-end-result-2026-10-24.md) | 通常／途中流局の概要表示、Chromium / WebKitのモバイル表示、デプロイ結果、ユーザー報告のiPhone Safari実機確認。 |
 | [オンライン診断ログ](online-diagnostics.md) | ブラウザーのlocalStorageログ、Worker構造化ログ、Cloudflare確認方法、保存範囲と検証制限。 |

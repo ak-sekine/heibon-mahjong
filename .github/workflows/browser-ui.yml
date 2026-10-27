@@ -106,6 +106,8 @@ jobs:
           run_browser_test tests/browser-step13-10.py
           HEIBON_BROWSER=webkit run_browser_test tests/browser-step13-10.py
           run_browser_test tests/browser-step13-11.py
+          HEIBON_ONLINE_RIVER_SPACING_ONLY=1 run_browser_test tests/browser-online-waiting-room.py
+          HEIBON_BROWSER=webkit HEIBON_ONLINE_RIVER_SPACING_ONLY=1 run_browser_test tests/browser-online-waiting-room.py
           run_browser_test tests/browser-online-waiting-room.py
           HEIBON_BROWSER=webkit HEIBON_ONLINE_PUBLIC_HAND_ONLY=1 run_browser_test tests/browser-online-waiting-room.py
           run_browser_test tests/browser-test-page.py
@@ -125,3 +127,12 @@ jobs:
             /tmp/heibon-vite.log
             /tmp/heibon-preview.log
             docs/verification/step13.5.5
+      - name: Save river spacing failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: river-spacing-diagnostics-${{ github.sha }}
+          if-no-files-found: ignore
+          path: |
+            /tmp/heibon-table-ui/river-spacing-failure-*.png
+            /tmp/heibon-table-ui/river-spacing-failure-*.json

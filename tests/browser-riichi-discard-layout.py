@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright
 
 screenshots = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 screenshots.mkdir(parents=True, exist_ok=True)
-widths = [(320, 568), (355, 812), (375, 812), (390, 844), (430, 932), (1280, 900)]
+widths = [(320, 568), (355, 812), (375, 812), (390, 844), (414, 896), (430, 932), (1280, 900)]
 positions = [-1, *range(18)]
 
 with sync_playwright() as p:
