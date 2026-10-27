@@ -617,6 +617,7 @@ with sync_playwright() as p:
               faceTransform: getComputedStyle(item.querySelector('svg')).transform,
             })),
           })),
+          stability: window.__onlineRiverStableDiagnostics ?? null,
         };
       }''')
       screenshot = OUT / f'river-spacing-failure-{ENGINE}-{label}-{width}x{height}-viewer-{viewer}-count-{count}-declaration-{declaration_index}.png'
@@ -642,7 +643,9 @@ with sync_playwright() as p:
       return diagnostics
 
     def wait_for_stable_river_layout(label, width, height, viewer=None, count=None, declaration_index=None):
-      page.evaluate('delete window.__onlineRiverStableSignature; delete window.__onlineRiverStableFrames')
+      page.evaluate('''() => {
+        window.__onlineRiverStableDiagnostics = {stableFrames: 0, samples: []};
+      }''')
       try:
         page.wait_for_function('''expected => {
           if (innerWidth !== expected.width || innerHeight !== expected.height) return false;
@@ -654,16 +657,26 @@ with sync_playwright() as p:
             const declarations = items.filter(item => item.dataset.riichiDeclaration === 'true').length;
             return items.length !== expected.count || declarations !== (expected.declarationIndex >= 0 ? 1 : 0);
           })) return false;
+          const tableRect = table.getBoundingClientRect();
           const signature = JSON.stringify([
-            table.getBoundingClientRect().toJSON(),
+            [tableRect.width, tableRect.height],
             getComputedStyle(table).getPropertyValue('--table-tile-width'),
             getComputedStyle(table).getPropertyValue('--table-tile-height'),
-            ...rivers.map(river => [river.dataset.onlineRiver, river.getBoundingClientRect().toJSON(),
-              ...[...river.querySelectorAll('.river-tile svg')].map(tile => tile.getBoundingClientRect().toJSON())]),
+            ...rivers.map(river => {
+              const riverRect = river.getBoundingClientRect();
+              return [river.dataset.onlineRiver, [riverRect.width, riverRect.height],
+                ...[...river.querySelectorAll('.river-tile svg')].map(tile => {
+                  const box = tile.getBoundingClientRect();
+                  return [box.left - riverRect.left, box.top - riverRect.top, box.width, box.height];
+                })];
+            }),
           ]);
-          if (signature === window.__onlineRiverStableSignature) window.__onlineRiverStableFrames++;
-          else { window.__onlineRiverStableSignature = signature; window.__onlineRiverStableFrames = 0; }
-          return window.__onlineRiverStableFrames >= 2;
+          const diagnostics = window.__onlineRiverStableDiagnostics;
+          diagnostics.stableFrames = signature === diagnostics.lastSignature ? diagnostics.stableFrames + 1 : 0;
+          diagnostics.lastSignature = signature;
+          diagnostics.samples.push({time: performance.now(), stableFrames: diagnostics.stableFrames, signature: JSON.parse(signature)});
+          if (diagnostics.samples.length > 6) diagnostics.samples.shift();
+          return diagnostics.stableFrames >= 2;
         }''', {'width': width, 'height': height, 'count': count, 'declarationIndex': declaration_index}, timeout=3000, polling='raf')
       except Exception as error:
         diagnostics = capture_river_diagnostics(label + '-layout-timeout', width, height, viewer, count, declaration_index)
