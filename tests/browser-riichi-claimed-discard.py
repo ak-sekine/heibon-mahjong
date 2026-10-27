@@ -20,6 +20,7 @@ with sync_playwright() as playwright:
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto('http://localhost:4173/heibon-mahjong/')
+    page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => app.controller.newGame())")
     page.wait_for_selector('#player-hand svg')
     result = page.evaluate('''async()=>{
       const app=await import('/heibon-mahjong/src/main.ts');

@@ -11,7 +11,9 @@ with sync_playwright() as p:
   for w,h in [(320,568),(375,547),(375,667),(390,844),(414,896),(430,844),(1280,800)]:
    page=b.new_page(viewport={'width':w,'height':h});errors=[]
    page.on('pageerror',lambda e:errors.append(str(e)))
-   page.goto('http://localhost:4173/heibon-mahjong/'+entry);page.wait_for_selector('#player-hand svg')
+   page.goto('http://localhost:4173/heibon-mahjong/'+entry)
+   if not entry:page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => app.controller.newGame())")
+   page.wait_for_selector('#player-hand svg')
    hand_size=page.locator('#player-hand svg').first.evaluate('e=>{const r=e.getBoundingClientRect();return [r.width,r.height]}')
    name=f'{"kan" if entry else "normal"}-{w}x{h}'
    page.screenshot(path=str(out/f'{name}-initial.png'),full_page=True)

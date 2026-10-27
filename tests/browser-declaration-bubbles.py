@@ -16,6 +16,7 @@ with sync_playwright() as p:
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(BASE_URL)
+        page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => app.controller.newGame())")
         page.wait_for_selector('#player-hand svg')
         page.evaluate('''async()=>{
           const bubbleModule=await import('/heibon-mahjong/src/rendering/declaration-bubbles.ts');

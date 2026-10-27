@@ -11,6 +11,8 @@ with sync_playwright() as p:
         for width in [320, 375, 390, 430, 1280]:
             page = browser.new_page(viewport={'width': width, 'height': 844})
             page.goto('http://localhost:4173/heibon-mahjong/' + entry)
+            if not entry:
+                page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => app.controller.newGame())")
             page.wait_for_selector('#player-hand svg')
             page.evaluate('''async()=>{
               window.dr=await import('/heibon-mahjong/src/rendering/dora.ts');

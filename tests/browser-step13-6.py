@@ -42,6 +42,7 @@ with sync_playwright() as p:
 
             page.route('**/src/main.ts', expose_app)
             page.goto(BASE_URL)
+            page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => app.controller.newGame())")
             page.wait_for_selector('#player-hand svg')
             page.wait_for_function('typeof window.step136Test === "object"')
             pre = page.evaluate('''async name => {
