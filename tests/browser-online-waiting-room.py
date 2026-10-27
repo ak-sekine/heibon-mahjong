@@ -9,6 +9,7 @@ BASE_URL = os.environ.get('HEIBON_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 PUBLIC_HAND_ONLY = os.environ.get('HEIBON_ONLINE_PUBLIC_HAND_ONLY') == '1'
+EXIT_NOTICE_ONLY = os.environ.get('HEIBON_ONLINE_EXIT_NOTICE_ONLY') == '1'
 OUT.mkdir(parents=True, exist_ok=True)
 
 MOCK = r"""
@@ -954,6 +955,40 @@ with sync_playwright() as p:
     assert page.evaluate("window.onlineMock.requests[0].body.displayName === 'テストホスト'"), 'room creation did not send the common display name'
     assert page.locator('#menu-room').evaluate('element => !element.hidden'), 'room operations were not added to the menu for an online participant'
     wait_for("document.querySelector('#online-seats').children.length === 4 && document.querySelector('#online-seats').innerText.includes('テストホスト')")
+    if EXIT_NOTICE_ONLY:
+      wait_for("document.querySelector('#online-leave').hidden === false")
+      page.evaluate('window.__shortExitNoticeTimeout = true')
+      page.locator('#online-leave').click()
+      wait_for("!document.querySelector('#online-dialog').open && sessionStorage.getItem('heibon-mahjong-online-session') === null && !document.querySelector('#online-exit-notice').hidden")
+      wait_for("document.body.dataset.gameMode === 'none' && document.querySelector('#app-idle').hidden === false")
+      assert page.locator('#online-exit-notice').inner_text() == 'ルームを退出しました。'
+      assert page.locator('#app-idle').is_visible(), 'leaving the online room did not restore the idle state'
+      notice_viewports = []
+      for width, height in [(320,700),(375,812),(390,844),(414,896)]:
+        page.set_viewport_size({'width': width, 'height': height})
+        notice_layout = page.evaluate('''() => {
+          const header = document.querySelector('.app-header').getBoundingClientRect();
+          const notice = document.querySelector('#online-exit-notice');
+          const box = notice.getBoundingClientRect();
+          return {headerBottom: header.bottom, top: box.top, left: box.left, right: box.right,
+            pointerEvents: getComputedStyle(notice).pointerEvents,
+            scrollWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth};
+        }''')
+        assert notice_layout['top'] >= notice_layout['headerBottom'] + 7, (ENGINE, width, notice_layout)
+        assert notice_layout['left'] >= 0 and notice_layout['right'] <= width, (ENGINE, width, notice_layout)
+        assert notice_layout['scrollWidth'] <= notice_layout['viewportWidth'], (ENGINE, width, notice_layout)
+        assert notice_layout['pointerEvents'] == 'none', (ENGINE, width, notice_layout)
+        notice_viewports.append({'width': width, **notice_layout})
+      page.set_viewport_size({'width': 390, 'height': 844})
+      page.locator('#main-menu-toggle').click()
+      assert page.locator('#main-menu-toggle').get_attribute('aria-expanded') == 'true', (ENGINE, 'menu button was blocked by exit notice')
+      page.locator('#main-menu-toggle').click()
+      wait_for("document.querySelector('#online-exit-notice').hidden && document.querySelector('#online-exit-notice').textContent === ''", timeout=8000)
+      assert not errors, f'{ENGINE} online exit notice browser errors: {errors}'
+      print(json.dumps({'browser': ENGINE, 'onlineExitNoticeViewports': notice_viewports,
+        'menuOperable': True, 'autoDismiss': True, 'returnsToIdle': True, 'result': 'pass'}), flush=True)
+      browser.close()
+      raise SystemExit(0)
     layout_results = []
     for width, height in [(320, 700), (375, 667), (375, 812), (390, 844), (414, 896), (1280, 900)]:
       page.set_viewport_size({'width': width, 'height': height})

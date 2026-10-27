@@ -77,6 +77,8 @@ jobs:
           HEIBON_PRODUCTION_URL=http://127.0.0.1:4174/heibon-mahjong/ run_browser_test tests/browser-online-dialog-layout.py
           run_browser_test tests/browser-app-idle.py
           HEIBON_BROWSER=webkit run_browser_test tests/browser-app-idle.py
+          HEIBON_ONLINE_EXIT_NOTICE_ONLY=1 run_browser_test tests/browser-online-waiting-room.py
+          HEIBON_BROWSER=webkit HEIBON_ONLINE_EXIT_NOTICE_ONLY=1 run_browser_test tests/browser-online-waiting-room.py
           run_browser_test tests/browser-riichi-discard-layout.py
           run_browser_test tests/browser-action-controls.py
           run_browser_test tests/browser-action-panel.py
@@ -105,7 +107,7 @@ jobs:
           HEIBON_BROWSER=webkit run_browser_test tests/browser-step13-10.py
           run_browser_test tests/browser-step13-11.py
           run_browser_test tests/browser-online-waiting-room.py
-          HEIBON_BROWSER=webkit run_browser_test tests/browser-online-waiting-room.py
+          HEIBON_BROWSER=webkit HEIBON_ONLINE_PUBLIC_HAND_ONLY=1 run_browser_test tests/browser-online-waiting-room.py
           run_browser_test tests/browser-test-page.py
           HEIBON_BROWSER=webkit run_browser_test tests/browser-test-page.py
           run_browser_test tests/browser-river-test-mode.py
