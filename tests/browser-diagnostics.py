@@ -28,6 +28,7 @@ with sync_playwright() as playwright:
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto(base)
     page.reload()
+    page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => app.controller.newGame())")
     page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
     page.wait_for_function("localStorage.getItem('heibon-mahjong-diagnostics-v2')?.includes('local_runner_resume_snapshot') === true")
     page.locator('#main-menu-toggle').click()
