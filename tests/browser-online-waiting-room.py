@@ -1581,7 +1581,7 @@ with sync_playwright() as p:
     wait_for("document.body.dataset.gameMode === 'none' && document.querySelector('#app-idle').hidden === false")
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'exit notice causes horizontal overflow after leaving'
     assert page.locator('#local-table').is_hidden() and page.locator('#local-game-controls').is_hidden(), 'offline play or its controls remained active after online exit'
-    assert page.locator('#app-idle').inner_text() == '対局待機中\nメニューから対局を開始してください'
+    assert ' '.join(page.locator('#app-idle').inner_text().split()) == '対局待機中 メニューから対局を開始してください'
     assert_no_private_cpu_tile_ids_in_main('CPU private tile IDs leaked after leaving the room')
 
     select_menu_item('#online-join-open')

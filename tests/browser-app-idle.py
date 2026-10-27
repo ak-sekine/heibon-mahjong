@@ -12,7 +12,7 @@ with sync_playwright() as playwright:
     def assert_waiting(label):
         assert page.locator('body').get_attribute('data-game-mode') == 'none', f'{label}: app mode is not none'
         assert page.locator('#app-idle').is_visible(), f'{label}: idle state is not visible'
-        assert page.locator('#app-idle').inner_text() == '対局待機中\nメニューから対局を開始してください'
+        assert ' '.join(page.locator('#app-idle').inner_text().split()) == '対局待機中 メニューから対局を開始してください'
         assert page.locator('#local-table').is_hidden(), f'{label}: offline table is visible'
         assert page.locator('#local-game-controls').is_hidden(), f'{label}: offline operation controls are visible'
         assert page.locator('#local-game-controls button:visible').count() == 0
