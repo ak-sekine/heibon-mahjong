@@ -46,7 +46,7 @@ if (document.querySelector('#main-menu-toggle')) {
 const resultDialog = new ResultDialog();
 let onlineGameController: OnlineGameController | null = null;
 const localTable = document.querySelector<HTMLElement>('#local-table')!;
-const idleState = document.querySelector<HTMLElement>('#app-idle')!;
+const idleState = document.querySelector<HTMLElement>('#app-idle');
 const localDeclarationBubbles = new DeclarationBubbleRenderer(localTable);
 const riverDebugMode = window.location.pathname.endsWith('/test.html') &&
   new URLSearchParams(window.location.search).get('debug') === 'river';
@@ -86,7 +86,7 @@ function render(): void {
   if (!controller.hasGame) {
     document.body.dataset.gameMode = 'none';
     localDeclarationBubbles.clearAll();
-    idleState.hidden = false;
+    if (idleState) idleState.hidden = false;
     localScoreRoot!.hidden = true;
     localTableInfoRoot!.hidden = true;
     localTable.hidden = true;
@@ -108,7 +108,7 @@ function render(): void {
     return;
   }
   document.body.dataset.gameMode = 'offline';
-  idleState.hidden = true;
+  if (idleState) idleState.hidden = true;
   localScoreRoot!.hidden = false;
   localTableInfoRoot!.hidden = false;
   localTable.hidden = false;
