@@ -35,6 +35,11 @@ with sync_playwright() as p:
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(base)
         page.wait_for_selector('#online-game-controls', state='attached')
+        page.locator('#main-menu-toggle').click()
+        page.locator('#new-game').click()
+        page.locator('#confirm-new-game').click()
+        page.locator('#local-table').wait_for(state='visible')
+        assert page.locator('body').get_attribute('data-game-mode') == 'offline'
         page.evaluate('''async()=>{
           const renderer=await import('/heibon-mahjong/src/rendering/table.ts');
           const base=(await import('/heibon-mahjong/src/game/start.ts')).startGame();
@@ -69,6 +74,7 @@ with sync_playwright() as p:
                   const table=document.querySelector(tableSelector),t=rect(table);
                   const rivers=[...table.querySelectorAll('.river')];
                   const faces=[...table.querySelectorAll('.river .tile-svg')];
+                  const faceRects=faces.map(rect);
                   const hand=[...table.querySelectorAll(handSelector+' .tile-svg')];
                   const seatTiles=[...table.querySelectorAll('.seat .tile-back,.seat .open-meld .tile-svg,.seat .revealed-tile .tile-svg,.seat-bottom #player-hand .tile-svg,.online-concealed-hand .tile-back,.online-open-melds .tile-svg,.online-seat-bottom #online-player-hand .tile-svg')];
                   const center=table.querySelector('.center-info'),dora=[...center.querySelectorAll('.dora-area .tile-svg')];
@@ -126,7 +132,9 @@ with sync_playwright() as p:
                   });
                   const expectedRows=river=>[1,3].includes(Number(seatOfRiver(river)))
                     ?Math.max(3,Math.ceil(count/8)):Math.max(3,Math.ceil(count/6));
-                  return {tileCounts:rivers.map(e=>e.children.length),correctCount:rivers.every(e=>e.children.length===count),
+                  return {tableVisible:t.width>0&&t.height>0,faceCountMatches:faces.length===count*4,
+                    faceDimensionsValid:faceRects.every(a=>a.width>0&&a.height>0),
+                    tileCounts:rivers.map(e=>e.children.length),correctCount:rivers.every(e=>e.children.length===count),
                     allFourPositions:rivers.length===4,riverPairs,handClear,centerClear,doraClear,seatClear,sideScaleCorrect,criticalSlotsCorrect,tileBounds,riverBounds,
                     noPageOverflow:document.documentElement.scrollWidth<=innerWidth,
                     fourthRow:rivers.every(r=>Number(r.dataset.riverRows)===expectedRows(r)&&

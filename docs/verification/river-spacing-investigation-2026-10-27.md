@@ -42,7 +42,11 @@ run `40522323858`は後続commitの別runで、Browser UI job全体が成功し�
 - [`src/rendering/river-layout.ts`](../../src/rendering/river-layout.ts)がオンライン・オフライン共通の配置計算です。自分と対面は6列、左右CPUは8列で、最低3段です。通常18枚までは3段、19枚目以降は必要に応じて行を拡張し、左右席は24枚まで8列×3段、その後は牌・間隔を縮小します。
 - 両レンダーは`calculateRiverLayout`で同じ配置を作り、`applyRiverLayout`と`applyRiverTilePlacement`でCSS変数・座標を適用しています。オンライン側のDOM置換は`online/game-controller.ts`の`renderRivers`で同期的に行います。
 - CSSは卓サイズ由来の牌幅・高さを使い、河gapの基準を1pxとしています。宣言牌は横向きになり、配置計算はその表示寸法を考慮します。ブラウザー測定はSVG牌面の`getBoundingClientRect()`を使っています。
+- オンラインfixtureはWebSocket mockの`MessageEvent`から`render()`を呼び、`renderRivers()`が河を同期的に`replaceChildren()`します。scenarioのDOM更新がPromiseやtimer後に行われる実装ではありません。河牌や牌面にtransition／animation指定はなく、牌は外部画像でなくinline SVGです。CSSに外部Webフォント定義もなく、SVG寸法は明示したCSSサイズです。フォント／画像ロード待ち不足が元の値を生んだという証拠はありません。
+- `getBoundingClientRect()`はCSS pxの小数値を返します。devicePixelRatioは物理ピクセルへの描画には関係しますが、この測定値自体はCSS pxで、初回runのDPRは記録されていません。ブラウザーzoomも初回runでは未記録です。viewportはCSS pxで固定されています。
+- Browser UI workflow内の各Pythonスクリプトは逐次起動され、河測定スクリプトも新しいPlaywright browser/pageを作成します。スクリプト内のシナリオ間では同じpageを使いますが、mockが毎回4席の河・viewer・宣言indexを上書きし、rendererが河classと子DOM、layout由来inline styleを更新します。並列実行による干渉はありません。初回artifactが取得できず、失敗時のclass／DOM残留やCSS実測値は確認できていません。
 - `river-layout.test.ts`、`river-capacity-flow.test.ts`、`browser-riichi-discard-layout.py`、`browser-river-capacity.py`を確認しました。今回の失敗測定は、失敗時点で現実の表示不具合である可能性を排除できません。
+- ローカルで容量Browser UI回帰を初めて実測した際、offlineケースの牌面rectが全て`[0,0,0,0]`なのに384 checksが成功しました。idle画面では`#local-table`がhiddenで、従来テストはオフライン河のDOM位置を検査できていませんでした。容量テストの開始時に実際の新規offline対局をUIから開始し、卓サイズ、牌面数、各牌面の非ゼロ寸法も検査するよう修正しました。修正後の384 checksはChromiumで成功し、19枚目／24枚目の左右CPU牌面rectも320px・390px幅で非ゼロ値を確認しています。これはテストの検出漏れ修正で、元の0.53125pxを説明するものではありません。
 - この変更では本番CSS／描画コードを変えていません。19枚目／24枚目の配置仕様も変更していません。
 
 ## 対策と再現検証
@@ -53,7 +57,7 @@ run `40522323858`は後続commitの別runで、Browser UI job全体が成功し�
 - 河間隔の回帰、18→19枚目、23→24枚目、左右CPUの確認幅に414pxを加え、Chromium／WebKitの既存Browser UI workflowで実行します。
 - Browser UI run `40588289896`（commit `8315d004`）は間隔測定前に止まりました。timeout時のartifact画像・JSON（ID `12773760863`）には固定fixture設定前の実対局DOM（上1枚、右2枚、下1枚、左0枚）、320×568px、DPR 1、pageerror/console errorなしが記録されています。ただし、後続runで同じ待機呼び出しのTypeErrorが判明したため、これは「3秒間レイアウトが不安定だった」証拠ではありません。
 - Browser UI run `40590397325`（commit `36863eda`）の診断artifact（ID `12773429233`）では、fixture反映後の4河各6枚・宣言牌各1枚が保存され、最終DOMRectから再計算したgapは1.0–1.015625pxでした。しかし、後続runで待機呼び出しがTypeErrorで止まっていたことが判明したため、これも反復assertionの結果ではありません。run `40591929025`（commit `5b037727`）も同じ誤った呼び出し方をしており、以上3 runのspacing assertionはすべて0件です。
-- Browser UIを含むrun `40594213336`（commit `63c266fa`）のログで、wait helperが`TypeError: Page.wait_for_function() takes 2 positional arguments but 3 positional arguments ...`を出していたことが判明しました。インストール済みPlaywright Pythonでは`arg`がkeyword-onlyですが、コードは第2引数として位置渡ししていました。さらに広い`except Exception`がTypeErrorをlayout timeoutとして包み、原因を隠していました。同じ呼び出し方が前の修正commitにも入っていたため、run `40588289896`、`40590397325`、`40591929025`はいずれもspacing assertionを実行していません。run `40594213091`の初回attemptでは、これに先立ち`npm test`内の既存online CPU turn testも失敗し、Browser UIまで到達しませんでした。ローカルの同じ`npm test`は63 files／1233 testsで成功しています。
+- Browser UIを含むrun `40594213336`（commit `63c266fa`）のログで、wait helperが`TypeError: Page.wait_for_function() takes 2 positional arguments but 3 positional arguments ...`を出していたことが判明しました。インストール済みPlaywright Pythonでは`arg`がkeyword-onlyですが、コードは第2引数として位置渡ししていました。さらに広い`except Exception`がTypeErrorをlayout timeoutとして包み、原因を隠していました。同じ呼び出し方が前の修正commitにも入っていたため、run `40588289896`、`40590397325`、`40591929025`はいずれもspacing assertionを実行していません。run `40594213091`の初回attemptでは、これに先立ち`npm test`内の既存online CPU turn testも失敗し、Browser UIまで到達しませんでした。ローカルの同じ`npm test`は63/63 test filesで成功しています。
 - `arg=`で渡し、timeout catchをPlaywrightの`TimeoutError`だけに限定しています。一般wait helperもtimeoutだけを捕捉し、それ以外のAPI／プログラムエラーはそのまま露出するようにしました。最新コードでのActions結果は後続更新に追記します。
 
 ## 検証結果
@@ -66,7 +70,9 @@ run `40522323858`は後続commitの別runで、Browser UI job全体が成功し�
 - `npm test`：63件成功。
 - `npm run build`：成功。
 - `npm run typecheck:worker`：成功。
-- `python -m py_compile tests/browser-online-waiting-room.py`：成功。
+- ローカルChromium 154の`HEIBON_ONLINE_RIVER_SPACING_ONLY=1`：320/375/390/414px、4席×3周の48 scenario／960 adjacent pairs成功、console errorなし。
+- ローカルChromium 154の`browser-river-capacity.py`：384 checks成功。320/355/375/390/414/430px、8 river counts、4宣言席、online/offlineを測定。修正後のcritical CPU river facesは19枚目／24枚目とも非ゼロのrectでした。
+- `python -m py_compile tests/browser-online-waiting-room.py tests/browser-river-capacity.py`：成功。
 - `git diff --check`：成功。
 - iPhone Safari実機：この調査では未実施。退出通知についての既存実機確認は[既存記録](online-exit-notice-layout-2026-10-27.md)を参照。
 
