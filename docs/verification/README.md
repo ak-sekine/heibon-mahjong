@@ -4,6 +4,7 @@
 
 ## 実機確認
 
+- [オンライン退出通知の配置修正 — iPhone Safari実機、2026-10-28](online-exit-notice-layout-2026-10-27.md)。タイトル・メニューボタンとの非重複、通知表示中のメニュー操作、約8秒後の自動消去をユーザーが確認済みです。Chromium／WebKitの自動検証結果と初回の河間隔測定失敗も同記録に保持しています。
 - [対面プレイヤー公開手牌の180度回転 — iPhone Safari実機、2026-10-27](online-opponent-public-hand-orientation-2026-10-27.md)。和了・流局時は正常、九種九牌は実機未確認です。自動テスト／WebKit結果と区別しています。
 - [CPU手番診断 — iPhone Safari実機、2026-10-27](cpu-turn-render-diagnostics-2026-10-26.md)。schema 2の正常なCPU手番、鳴き、状態遷移・描画、復帰スナップショットをユーザーが確認。停滞検知・描画例外・CPU処理中断復帰は未確認で、フリーズ原因は未特定です。
 - [オンラインダイアログ「閉じる」ボタン — iPhone Safari実機、2026-10-26](online-dialog-close-2026-10-26.md)。新しくルームを作る／ルームに参加する／オンライン待機の3画面すべてで1行表示をユーザーが確認済みです。関連する自動検証とPages deploymentの記録も同じファイルにあります。
@@ -15,6 +16,7 @@
 
 | 記録 | 主な対象 |
 | --- | --- |
+| [オンライン退出通知の配置修正](online-exit-notice-layout-2026-10-27.md) | Chromium／WebKitの退出フロー・モバイル配置・操作・自動消去、2026-10-28のユーザーによるiPhone Safari実機確認（完了）。 |
 | [オンラインダイアログの閉じるボタン修正](online-dialog-close-2026-10-26.md) | 修正履歴、公開用ビルド／WebKitの12条件、Pages deployment、ユーザーによる3画面のiPhone Safari実機確認（完了）。 |
 | [流局結果概要と操作ボタン配置](round-end-result-2026-10-24.md) | 通常／途中流局の概要表示、Chromium / WebKitのモバイル表示、デプロイ結果、ユーザー報告のiPhone Safari実機確認。 |
 | [オンライン診断ログ](online-diagnostics.md) | ブラウザーのlocalStorageログ、Worker構造化ログ、Cloudflare確認方法、保存範囲と検証制限。 |
