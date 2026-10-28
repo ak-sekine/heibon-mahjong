@@ -11,6 +11,8 @@ with sync_playwright() as playwright:
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto(base + 'test.html')
     assert page.locator('.test-badge').inner_text() == 'TEST'
+    assert page.locator('#tile-gallery, .catalog').count() == 0, 'development tile catalog is present on test page'
+    assert page.get_by_text('開発用：全34種類と赤5を見る').count() == 0, 'development tile catalog remains reachable on test page'
     assert page.locator('#player-hand button').count() == 14
     assert page.locator('.concealed-hand .revealed-tile').count() == 0
     assert page.locator('#kyuushu-kyuuhai').is_visible()

@@ -41,3 +41,13 @@ Browser UI では、通常ページにカタログとメニュー項目がない
 ## 実機確認と未確認事項
 
 - iPhone Safari実機：**実機未確認**。GitHub ActionsのChromium/WebKit結果とは区別します。
+
+## 2026-10-28 追加調査：残存表示
+
+追加報告された表示を調査したところ、最初の削除で対象ページを取り違えていました。`index.html` と `kan-test.html` からは既に削除済みでしたが、Vite の [`vite.config.ts`](../../vite.config.ts) は公開される `test.html` もビルド対象にしており、ここにカタログの `<details>` が残っていました。`test.html` は通常版からリンクされていない公開テスト環境ですが、URLを直接開くと表示され、`dist/test.html` にも出力されていました。HTMLの残存であり、TypeScriptの動的生成、専用CSS、またはキャッシュ由来ではありません。`src/verification/test-page.ts` にカタログ生成処理はありません。
+
+`test.html` からマークアップを削除しました。単体テストは Vite の全 HTML entry（通常版、カン検証、テスト環境）を検査するよう拡張し、Browser UI も `test.html` を開いた直後にカタログがないことを検査します。共通牌描画と通常対局・カン検証は変更していません。
+
+最新 `main` と本番状況：開始時の `git fetch origin` は通常実行でプロキシ接続に失敗しましたが、承認付き再実行は成功し、`origin/main` と開始時HEADはともに `70a03adab51ecb70aee3ac86362093bcaf924e48`、behind/ahead は `0/0` でした。同SHAの GitHub Pages deploy workflow run [40628586473](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40628586473) は成功です。公開URLへの直接HTTP取得は、この実行環境から HTTP 403（Envoy）で拒否され、配信HTMLのキャッシュヘッダーと本文は確認できませんでした。
+
+今回の追加入力の検証結果・コミット・Browser UI run・push後の状態は、この節に追記します。iPhone Safari実機の再確認は未実施であり、Issue #3 はOpenのままです。
