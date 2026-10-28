@@ -24,7 +24,14 @@ with sync_playwright() as p:
               window.mr=await import('/heibon-mahjong/src/rendering/match.ts');
               window.match=(await import('/heibon-mahjong/src/game/match.ts')).startMatch();
               const base=match.game, pool=[...base.liveWall,...base.deadWall];
-              window.game={...base,players:base.players.map((p,id)=>({...p,hand:p.hand.slice(0,1),river:pool.slice(id*18,id*18+18),riichi:{declarationTileId:pool[id*18+17].id},melds:Array.from({length:4},()=>({type:'pon',tiles:pool.slice(0,3),calledTileId:pool[0].id,fromPlayerId:(id+3)%4}))}))};
+              window.game={...base,players:base.players.map((p,id)=>{
+                const river=pool.slice(id*18,id*18+18);
+                const melds=Array.from({length:4},(_,index)=>{
+                  const tiles=pool.slice(80+id*12+index*3,83+id*12+index*3);
+                  return {type:'pon',tiles,calledTileId:tiles[0].id,fromPlayerId:(id+3)%4};
+                });
+                return {...p,hand:p.hand.slice(0,1),river,discardHistory:river,riichi:null,melds};
+              })};
               tr.renderTable(game,[25000,25000,25000,25000]);
             }''')
             for deposits in [0, 1, 2, 5, 10, 17]:
