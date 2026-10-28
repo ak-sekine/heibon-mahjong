@@ -44,7 +44,7 @@ with sync_playwright() as p:
                   const view={format:fmt,roundWind:wind,roundNumber:roundNo,honba,liveWallCount:live};
                   if(dead!==null)view.deadWallCount=dead;
                   textRenderer(round,wall,view);
-                  const box=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
+                  const box=e=>{const r=typeof e.getBoundingClientRect==='function'?e.getBoundingClientRect():e;return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
                   const inside=(a,b)=>a.x>=b.x-.2&&a.right<=b.right+.2&&a.y>=b.y-.2&&a.bottom<=b.bottom+.2;
                   const overlaps=(a,b)=>a.x<b.right-.2&&a.right>b.x+.2&&a.y<b.bottom-.2&&a.bottom>b.y+.2;
                   const centerBox=box(center),roundBox=box(round),wallBox=box(wall),summaryBox=box(round.parentElement);
