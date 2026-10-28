@@ -484,7 +484,6 @@ header > div { min-width:0; }
 /* Both indicator rows use the same unrotated face size as river tiles. */
 .table .center-info { justify-content:center; gap:2px; font-size:clamp(8px,1.8cqw,11px); line-height:1.25; }
 .table .round-label { white-space:nowrap; font-size:clamp(8px,1.8cqw,11px); line-height:inherit; }
-.table .round-label::after { content:" · " attr(data-format-label); font-size:.75em; }
 .table .center-info .dora-area { --dora-width:var(--river-tile-width); --dora-height:var(--river-tile-height); flex:none; }
 .table .center-info .dora-indicators { grid-template-columns:repeat(5,var(--dora-width)); grid-template-rows:none; grid-auto-rows:var(--dora-height); }
 .table .center-info .dora-slot,.table .center-info .dora-slot .tile-svg { width:var(--dora-width); height:var(--dora-height); }
@@ -564,3 +563,10 @@ header > div { min-width:0; }
 .table .center-info .deposit-sticks { margin-top:0; gap:2px; flex:none; }
 .table .center-info .deposit-stick { flex:none; width:44px; height:11.73px; }
 .table .round-summary .round-label { font-weight:400; }
+@media (max-width:599px) {
+ .table .round-summary,.table .round-label,.table .wall-count { font-size:16px; line-height:1.2; }
+ .table .round-summary { flex-direction:column; align-items:center; gap:1px; letter-spacing:normal; }
+ .table .round-label { font-weight:600; }
+ .table .wall-count { display:flex; flex-direction:row; align-items:center; justify-content:center; gap:4px; white-space:nowrap; }
+ .table .wall-dead-count { font-size:12px; }
+}

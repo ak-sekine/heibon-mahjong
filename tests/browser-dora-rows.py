@@ -5,8 +5,11 @@ from playwright.sync_api import sync_playwright
 out = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui')) / 'dora-rows'
 out.mkdir(parents=True, exist_ok=True)
 reports = []
+browser_name = os.environ.get('HEIBON_BROWSER', 'chromium')
 with sync_playwright() as p:
-    browser = p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'), args=['--no-sandbox'])
+    browser_type = getattr(p, browser_name)
+    launch_args = {'args': ['--no-sandbox']} if browser_name == 'chromium' else {}
+    browser = browser_type.launch(executable_path=(os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium')) if browser_name == 'chromium' else None, **launch_args)
     for entry in ['', 'kan-test.html']:
         for width in [320, 375, 390, 430, 1280]:
             page = browser.new_page(viewport={'width': width, 'height': 844})
@@ -66,11 +69,11 @@ with sync_playwright() as p:
                     reports.append({'entry': entry or 'index.html', 'width': width, 'deposits': deposits, 'uraCount': count, **result})
                     if not all(result['checks'].values()):
                         (out/'diagnostics.json').write_text(json.dumps(reports, indent=2))
-                        page.screenshot(path=str(out/'failure.png'), full_page=True)
+                        page.screenshot(path=str(out/f'{browser_name}-failure.png'), full_page=True)
                     assert all(result['checks'].values()), reports[-1]
                     if deposits == 17 and count == 5:
-                        page.screenshot(path=str(out/f'{"kan" if entry else "main"}-{width}.png'), full_page=True)
+                        page.screenshot(path=str(out/f'{browser_name}-{"kan" if entry else "main"}-{width}.png'), full_page=True)
             page.close()
     browser.close()
-(out/'results.json').write_text(json.dumps(reports, indent=2))
-print(f'{len(reports)} central dora/deposit layouts passed')
+(out/f'{browser_name}-results.json').write_text(json.dumps(reports, indent=2))
+print(f'{len(reports)} central dora/deposit layouts passed in {browser_name}')

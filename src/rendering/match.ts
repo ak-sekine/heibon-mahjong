@@ -17,7 +17,7 @@ function tileOrder(tile: Tile): number {
 }
 export function renderMatch(match: MatchState): void {
   const round=document.querySelector<HTMLElement>('#table-round');
-  if(round) renderRoundLabel(round, { format: match.format ?? 'tonpu', roundWind: match.roundWind, roundNumber: match.roundNumber, honba: match.honba });
+  if(round) renderRoundLabel(round, { roundWind: match.roundWind, roundNumber: match.roundNumber, honba: match.honba });
   const deposits = document.querySelector<HTMLElement>('#deposit-sticks');
   if (deposits) renderDepositSticks(deposits, match.depositSticks);
   const panel = document.querySelector<HTMLElement>('#match-result')!;

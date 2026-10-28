@@ -97,7 +97,6 @@ function render(): void {
       node.textContent = '';
       node.removeAttribute('aria-label');
       node.removeAttribute('title');
-      delete node.dataset.formatLabel;
     });
     localActionPanel?.clear();
     previouslyRenderedGame = null;

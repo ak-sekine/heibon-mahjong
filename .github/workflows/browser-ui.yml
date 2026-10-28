@@ -95,6 +95,9 @@ jobs:
           run_browser_test tests/browser-result-hand-layout.py
           HEIBON_BROWSER=webkit run_browser_test tests/browser-result-hand-layout.py
           run_browser_test tests/browser-dora-rows.py
+          run_browser_test tests/browser-center-round-display.py
+          HEIBON_BROWSER=webkit run_browser_test tests/browser-center-round-display.py
+          HEIBON_BROWSER=webkit run_browser_test tests/browser-dora-rows.py
           run_browser_test tests/browser-mobile-table-layout.py
           run_browser_test tests/browser-seat-kan-overlap.py
           run_browser_test tests/browser-step13-5-5.py

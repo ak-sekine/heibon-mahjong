@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { renderSeatLabel, type SeatLabelView } from '../src/rendering/shared-table-components.ts';
+import { renderSeatLabel, renderTableRoundInfo, type SeatLabelView } from '../src/rendering/shared-table-components.ts';
 import type { SeatWind } from '../src/model/game.ts';
 
 class ElementStub {
@@ -92,3 +92,30 @@ test('shared seat rows show only name, wind/dealer, and right-ready points in vi
     assert.ok(rows.every(row => !row.children.some(child => ['seat-status', 'seat-self-marker'].includes(child.className))));
   });
 });
+
+for (const format of ['tonpu', 'tonnan'] as const) {
+  test(`shared center round display omits match format for ${format}`, () => {
+    withStrip(() => {
+      for (const scenario of [
+        { roundWind: 'east' as const, roundNumber: 1, honba: 0, liveWallCount: 69, label: '東1局' },
+        { roundWind: 'east' as const, roundNumber: 4, honba: 1, liveWallCount: 68, label: '東4局 1本場' },
+        { roundWind: 'south' as const, roundNumber: 4, honba: 2, liveWallCount: 12, label: '南4局 2本場' },
+      ]) {
+        const round = new ElementStub('div');
+        const wall = new ElementStub('div');
+        const view = Object.assign({
+          roundWind: scenario.roundWind,
+          roundNumber: scenario.roundNumber,
+          honba: scenario.honba,
+          liveWallCount: scenario.liveWallCount,
+        }, { format });
+        renderTableRoundInfo(round as unknown as HTMLElement, wall as unknown as HTMLElement, view);
+        assert.equal(round.textContent, scenario.label);
+        assert.equal(round.attributes['aria-label'], scenario.label);
+        assert.equal(round.title, scenario.label);
+        assert.equal(round.dataset.formatLabel, undefined);
+        assert.deepEqual(wall.children.map(child => child.textContent), [`山${scenario.liveWallCount}枚`]);
+      }
+    });
+  });
+}
