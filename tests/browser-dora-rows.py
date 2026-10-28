@@ -49,10 +49,11 @@ with sync_playwright() as p:
                       const seatTiles=[...document.querySelectorAll('.table .seat .tile-svg,.table .seat .tile-back')].map(box);
                       const doraOutlineClear=slots.slice(5).every(e=>getComputedStyle(e).outlineStyle==='none');
                       const uraMarker=slots.length===10&&getComputedStyle(slots[5],'::after').content.replaceAll('"','')==='裏';
+                      const roundAndWallLayout=innerWidth<=599?r.bottom<=w.top+.2:Math.abs(r.top-w.top)<.1;
                       const depositsFit=sticks.every(e=>{const r=box(e);return r.width>=42&&r.width<=48&&r.height>=11&&r.height<=13;});
                       const depositDots=sticks.every(e=>{const svg=e.querySelector('svg'),count=svg.querySelectorAll('circle').length,expected={'1000':1,'5000':3,'10000':6}[e.dataset.points];return count===expected&&[...svg.querySelectorAll('circle')].every(dot=>dot.getBoundingClientRect().width>=3);});
                       return {boxes,measurements:{riverTile:riverFace,doraFaces,depositSticks:sticks.map(box)},checks:{doraInside:inside(d,c),doraSizeMatchesRiver,doraRowsEqual,roundClear:r.bottom<=d.top+.1,wallInside:inside(w,c),roundInside:inside(r,c),
-                        summary:q('#table-round').textContent===`東1局${honba?` ${honba}本場`:''}`&&q('#wall-count span').textContent===`山${game.liveWall.length-count}枚`&&Math.abs(r.top-w.top)<.1,
+                        summary:q('#table-round').textContent===`東1局${honba?` ${honba}本場`:''}`&&q('#wall-count span').textContent===`山${game.liveWall.length-count}枚`&&roundAndWallLayout,
                         summarySize:parseFloat(getComputedStyle(q('.round-summary')).fontSize)>=12,
                         depositClear:sticks.every(e=>box(e).top>=d.bottom&&slots.every(t=>separate(box(e),box(t)))),
                         hiddenDeposits:q('#deposit-sticks').hidden===(deposits===0),
