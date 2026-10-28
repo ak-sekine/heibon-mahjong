@@ -110,6 +110,8 @@ mainへアプリ成果物を変更するpushでは、全単体・結合テスト
 | その他の長時間script | `browser-riichi-discard-layout.py` Chromium 1分47.7秒、`browser-river-capacity.py` WebKit 1分06.2秒、通常の`browser-online-waiting-room.py` Chromium 1分05.7秒 |
 | 検証用jobのrunner時間合計 | 18分46秒（分類9秒、文書check 11秒、verify 51秒、Browser UI 17分35秒） |
 | Actions run作成から全検証完了まで | 18分45秒（21:51:39作成、22:10:24 Browser UI完了） |
+| Markdown-only run | [`40778150218`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40778150218)：32秒、成功 |
+| Markdown-only時のCI | Deploy分類・Browser UI分類・両`git diff --check`は成功。`verify`、全Browser UI、Worker／Pages deployはskip |
 | Worker／Pages再デプロイ | 実行なし（テスト・CI変更commitをclassifierが`validation-only`に分類） |
 | pushから検証完了まで | 未計測（pushイベント時刻の正確な取得なし。run作成からの経過を記載） |
 | pushからデプロイ完了まで | 未計測（このcommitではdeployなし） |
@@ -119,7 +121,7 @@ mainへアプリ成果物を変更するpushでは、全単体・結合テスト
 
 壁時計の検証完了は、変更前run群の最初のrunner logから必須Browser UI終了まで約18分44秒、変更後はActions run作成から必須Browser UI終了まで約18分45秒で、実質短縮は確認できません。変更前の各jobは並行起動されており、重複run削減はrunner時間を減らしましたが、検証全体の待ち時間は短縮しませんでした。変更前後のBrowser UI regression stepは16分33秒／16分13秒（Issue記録）と16分24.9秒（今回実測）で、個々の回帰実行自体にも短縮はありません。
 
-今回のcommitはアプリ成果物を変えていないためWorker deploy・本番通信テスト・Pages build/deployは実行していません。したがって実デプロイ時間の前後比較は未計測です。ローカルのpush時刻も正確には取れなかったので、push-to-verifyとpush-to-deployはrun作成時刻の代理値で置き換えていません。
+Markdownのみの検証記録commit `eb3930ea78f4966e8be6da10dbad64cd92f0f1b3` のrun `40778150218`では、両classifierが`docs-only`・`run_full_suite=false`・`deploy_required=false`を出し、両方の`git diff --check`が成功しました。`verify`、Browser UI job、Worker deploy、本番通信テスト、Pages build/deployはGitHub Actions上でskipとして完了し、run全体は成功しました。今回のCI設定・テスト変更commitでもWorker deploy・本番通信テスト・Pages build/deployは実行していません。したがって実デプロイ時間の前後比較は未計測です。ローカルのpush時刻も正確には取れなかったので、push-to-verifyとpush-to-deployはrun作成時刻の代理値で置き換えていません。
 
 ## 未解決事項とリスク
 
