@@ -19,6 +19,7 @@ iPhone Safariのスクリーンショットでは、卓中央に「東1局 東�
 - `src/rendering/match.ts`
 - `src/rendering/shared-table-components.ts`
 - `src/style.css`
+- `tests/browser-app-idle.py`
 - `tests/browser-dora-rows.py`
 - `tests/shared-table-components.test.ts`
 - `tests/browser-center-round-display.py`
@@ -31,13 +32,13 @@ iPhone Safariのスクリーンショットでは、卓中央に「東1局 東�
 - `npm run build`: 成功。
 - `npm run typecheck:worker`: 成功。
 - `git diff --check`: 成功。
-- Browser UIテスト: 新しい検証を既存 `Browser UI verification` に追加。320、375、390、430、1280pxでオンライン／オフライン、両対局形式、東場／南場、本場数、山枚数、領域内配置、折返し、ドラ・河との干渉をChromiumとWebKitで測定し、スクリーンショットを保存します。対象コミットのActions実行前のため、結果は未確認です。
+- Browser UIテスト: 新しい検証を既存 `Browser UI verification` に追加。320、375、390、430、1280pxでオンライン／オフライン、両対局形式、東場／南場、本場数、山枚数、領域内配置、折返し、ドラ・河との干渉をChromiumとWebKitで測定し、スクリーンショットを保存します。初回Actions実行 #245 は古い `browser-app-idle.py` が対局形式属性を期待して失敗しました。Issue #4の表示仕様に合わせ、属性がなく表示もないことと、内部の東風戦／半荘戦設定が保持されることを確認するテストに修正しました。修正後のActions再実行は未完了です。
 - iPhone Safari実機: ユーザーからの実機確認報告がないため未確認です。
 
 ## 公開・コミット
 
-- 対象実装コミットSHA: `1e42c29bf3c124f20fe41db3cc2c6b6fc7467ba1`（Issue #4の実装・テスト）。
-- GitHub Actions、Pages、Workersデプロイ: 対象コミットの実行結果を確認後に追記します。
+- 対象実装コミットSHA: `1e42c29bf3c124f20fe41db3cc2c6b6fc7467ba1`（Issue #4の実装）。`60584e67fc24f6ee36d5f7aad13ef5159c1b168b`（既存Browser UI期待値の更新）。
+- 初回 GitHub Actions Deploy run #337: verify 成功、Browser UI gate 失敗。production test、Workers deploy、Pages build／deploy はすべて skipped で、デプロイ未実施です。Browser UI run #245 も同じ古い対局形式属性の期待値で失敗しました。テストを修正済みで、再実行結果を確認後に更新します。
 
 ## 未確認事項
 
