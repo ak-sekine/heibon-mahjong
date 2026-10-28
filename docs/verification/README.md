@@ -18,6 +18,7 @@
 
 | 記録 | 主な対象 |
 | --- | --- |
+| [卓中央の局表示 — Issue #4](center-round-display-2026-10-28.md) | 東風戦・半荘戦の表示削除、東／南場・本場・山枚数、320〜430pxとPC幅のオンライン／オフライン表示。Chromium／WebKit・実機・デプロイ結果を区別して記録。 |
 | [開発用「牌表示確認」の削除 — Issue #3](tile-preview-removal-2026-10-28.md) | 牌カタログの削除と、通常対局・カン検証ページの共通牌描画回帰確認。自動テスト、Browser UI、iPhone Safari実機確認を区別しています。 |
 | [オンライン退出通知の配置修正](online-exit-notice-layout-2026-10-27.md) | Chromium／WebKitの退出フロー・モバイル配置・操作・自動消去、2026-10-28のユーザーによるiPhone Safari実機確認（完了）。 |
 | [Browser UI河間隔測定の調査](river-spacing-investigation-2026-10-27.md) | 回転SVG牌面rectのずれに対するCSS修正、自動回帰検証、2026-10-28のユーザーによるiPhone Safari目視確認、Issue #14の完了。初回失敗等の未確認事項を明記。 |
