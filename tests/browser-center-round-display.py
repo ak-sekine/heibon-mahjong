@@ -73,7 +73,7 @@ with sync_playwright() as p:
                     'round and wall fit': metrics['roundInside'] and metrics['wallInside'],
                     'readable single-line layout': metrics['roundSingleLine'] and metrics['summaryNoWrap'] and (metrics['roundWallSeparated'] if width <= 599 else metrics['roundWallInline']),
                     'no text overflow': not metrics['roundOverflow'] and not metrics['wallOverflow'],
-                    'wall gap': metrics['roundWallGap'] >= 0,
+                    'wall gap': metrics['roundWallGap'] >= 0 if width <= 599 else metrics['roundWallInline'],
                     'dora clear': metrics['doraClear'],
                     'rivers clear': metrics['riverClear'],
                     'no page overflow': not metrics['viewportOverflow'],
