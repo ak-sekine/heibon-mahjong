@@ -1,4 +1,4 @@
-# Browser UI河間隔測定の調査（2026-10-27）
+# Browser UI河間隔測定の調査（2026-10-27、2026-10-28更新）
 
 ## 結論
 
@@ -8,7 +8,7 @@
 
 commit `505357bb7d1f997b9643c7b8e6c62005631afc26`で中心原点の回転をやめ、`transform-origin: top left`と角度別の明示translationに変更しました。GitHub Actions run `40607347640`ではChromium／WebKitともfocused測定3反復が成功し、各ブラウザーで48 scenario cases／960隣接牌面ペアを測定しました。すべての対象幅でエラーなしです。Codex CloudのローカルBrowser UI出力は`--no-sandbox`起動のため検証結果から除外します。
 
-**元のChromium runがこのSVGずれを測った直接の画面記録はありません。** 元の失敗は同じcommitの再実行でも同値でしたが、後続のWebKit安定測定で同じ0.53125pxを再現しました。初回の失敗画像を取得できず、Chromiumで同じDOM状態だったかの直接照合はできません。元の測定原因は特定でき、初回Chromiumでの発生契機には不確実性が残ります。
+**元のChromium runがこのSVGずれを測った直接の画面記録はありません。** 元の失敗は同じcommitの再実行でも同値でしたが、後続のWebKit安定測定で同じ0.53125pxを再現しました。初回の失敗画像を取得できず、Chromiumで同じDOM状態だったかの直接照合はできません。回転SVGのrectずれと修正は後続WebKitで確認しましたが、初回Chromium失敗のすべての詳細や発生契機が解明されたわけではありません。
 
 河layoutの計算式と1px±0.35pxの許容値は変更していません。SVG面の位置計算CSSのみを修正し、gap、center step、重なり、卓内配置のアサーションを維持しています。
 
@@ -19,6 +19,7 @@ commit `505357bb7d1f997b9643c7b8e6c62005631afc26`で中心原点の回転をや�
 - 初回失敗： [GitHub Actions run `40519653129`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40519653129)、commit `20169c95a00fee957eb11d04a2f97167b8795771`。
 - 成功した後続run： [GitHub Actions run `40522323858`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40522323858)、commit `2e9b4d24143af0527a2186066ce50742ef3cee68`。
 - 修正commit：`505357bb7d1f997b9643c7b8e6c62005631afc26`。Browser UI run `40607347640`は成功しました。pushで起動したdeploy run `40607347889`もverify、Browser UI、Worker deploy、production test、Pages build、Pages deployの全jobが成功しました。
+- 検証済みmain：commit `2ceec6ea5518d94fa1dc17d251b854025ab780b6`。この文書は同commit上で更新しています。
 - 作業開始時のHEAD：`3eba6ca1d063d610a71c27224448401daaacac51`、branch `work`、作業ツリーはclean。
 - `git fetch origin`後の`origin/main`：`5337ede744320131267eea68e0021d7a412b8389`。開始時HEADとの差はbehind 2 / ahead 0で、`git merge --ff-only origin/main`でfast-forwardしました。
 - 修正作業はこの最新mainを基準とし、コード修正commit `505357bb7d1f997b9643c7b8e6c62005631afc26`を`main`へpush済みです。本記録は同commitに対するBrowser UI／deploy workflow結果を反映しています。
@@ -80,9 +81,19 @@ run `40522323858`は後続commitの別runで、Browser UI job全体が成功し�
 - commit `f35ea4c`で`npm test` 63/63、`npm run build`、`npm run typecheck:worker`が成功。
 - 修正commit `505357bb7d1f997b9643c7b8e6c62005631afc26`のBrowser UI run [`40607347640`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40607347640)は成功しました。`npm test`は1,233件成功／失敗0件、`npm run build`、Browser regressions全体が通過しました。focused spacing測定はChromium／WebKitそれぞれ3反復で合計48 scenario cases／960 adjacent pairs（320/375/390/414px）成功、console errors 0件です。河容量／19枚目・24枚目／左右CPU回帰はChromium／WebKit各384 checks成功（320/355/375/390/414/430px、18/19/20/23/24/25/32/33枚、online／offline）しました。失敗診断artifactは不要となり未生成で、通常Browser UI artifactはID `12782218477`です。
 - 同じpushで起動したdeploy workflow run [`40607347889`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40607347889)はverify、deploy workflow内Browser UI、Worker deploy、production test、Pages build、Pages deployの全jobが成功しました。verifyではnpm regression tests、Cloudflare Worker typecheck、Pages buildが通過しています。
-- iPhone Safari実機：この調査では未実施。退出通知についての既存実機確認は[既存記録](online-exit-notice-layout-2026-10-27.md)を参照。
+- 2026-10-27時点では、この調査のiPhone Safari実機確認は未実施でした。翌28日のユーザーによる目視確認は次節に追記しています。退出通知についての実機確認は[既存記録](online-exit-notice-layout-2026-10-27.md)を参照。
+
+## 2026-10-28のiPhone Safari実機確認とIssue完了
+
+- 2026-10-28、ユーザーがiPhone Safariで河のレイアウトを目視し、「問題なさそうです。」と報告しました。これはユーザーによる実機確認であり、Codexが実機確認したものではありません。目視した範囲では河レイアウトに問題が認められなかったものとして記録します。
+- この実機確認は目視確認です。牌面間隔1pxを実機で数値測定していません。すべての河配置・画面サイズを確認したものではなく、19枚目・24枚目や左右CPUの局面を個別に実機確認したものでもありません。
+- 上記の配置・枚数・幅の回帰範囲は自動検証結果です。GitHub Actions [Browser UI run `40609943470`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40609943470)ではChromium／WebKit、合計48ケース・隣接牌面960ペアを320／375／390／414pxで検証し、失敗0件でした。19枚目・24枚目および左右CPUの回帰検証も成功しています。これらの自動検証範囲を実機確認範囲に含めません。
+- GitHub Actions [Deploy run `40609943503`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40609943503)ではverify、Browser UI、Worker deploy、production test、Pages build／deployがすべて成功しました。
+- GitHub Issue [#14](https://github.com/ak-sekine/heibon-mahjong/issues/14)はGitHub上でclosed（completed）と確認しました。すでにクローズ済みのため、再度のクローズ操作やIssueへの追記はしていません。
+- 最終状態：**実機目視確認済み・完了**。この状態は今回の調査に対するもので、下記の初回失敗に関する未確認事項を解消したという意味ではありません。
 
 ## 未解決・未確認事項
 
 - 初回Chromium failureのartifactが32MiBを超えたため、失敗時のスクリーンショット、DOM、DPR、zoom、console errorを確認できませんでした。後続WebKitで同値の測定不具合とCSS rect offsetを直接確認しましたが、初回Chromiumと後続WebKitのface rectを同一条件で比較できていません。
-- iPhone Safari実機は未確認です。Codex Cloud内で行った`--no-sandbox`起動のローカルChromium試験出力は検証数に含めていません。
+- 初回Chromium失敗と後続WebKit失敗が完全に同一条件だったかは未確認です。特定の後続Chromium runが成功した理由も特定できていません。初回失敗のすべての詳細が解明されたわけではありません。
+- iPhone Safariではユーザーの目視確認を記録しましたが、全河配置・全画面サイズ・19枚目／24枚目・左右CPUの個別実機確認、および1px間隔の実機数値測定は未確認です。Codex Cloud内で行った`--no-sandbox`起動のローカルChromium試験出力は検証数に含めていません。

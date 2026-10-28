@@ -4,6 +4,7 @@
 
 ## 実機確認
 
+- [Browser UI河間隔測定の調査 — iPhone Safari実機目視、2026-10-28](river-spacing-investigation-2026-10-27.md)。ユーザー報告「問題なさそうです。」を河レイアウトの目視上問題なしとして記録。1pxの数値測定や全配置・画面サイズ・19／24枚目・左右CPUの個別実機確認は未実施です。Issue #14はclosed（completed）。自動テストの確認範囲とは区別しています。
 - [オンライン退出通知の配置修正 — iPhone Safari実機、2026-10-28](online-exit-notice-layout-2026-10-27.md)。タイトル・メニューボタンとの非重複、通知表示中のメニュー操作、約8秒後の自動消去をユーザーが確認済みです。Chromium／WebKitの自動検証結果と初回の河間隔測定失敗も同記録に保持しています。
 - [対面プレイヤー公開手牌の180度回転 — iPhone Safari実機、2026-10-27](online-opponent-public-hand-orientation-2026-10-27.md)。和了・流局時は正常、九種九牌は実機未確認です。自動テスト／WebKit結果と区別しています。
 - [CPU手番診断 — iPhone Safari実機、2026-10-27](cpu-turn-render-diagnostics-2026-10-26.md)。schema 2の正常なCPU手番、鳴き、状態遷移・描画、復帰スナップショットをユーザーが確認。停滞検知・描画例外・CPU処理中断復帰は未確認で、フリーズ原因は未特定です。
@@ -17,7 +18,7 @@
 | 記録 | 主な対象 |
 | --- | --- |
 | [オンライン退出通知の配置修正](online-exit-notice-layout-2026-10-27.md) | Chromium／WebKitの退出フロー・モバイル配置・操作・自動消去、2026-10-28のユーザーによるiPhone Safari実機確認（完了）。 |
-| [Browser UI河間隔測定の調査](river-spacing-investigation-2026-10-27.md) | 390px・6枚河の0.53125px測定原因、回転SVG牌面rectのずれに対するCSS修正、Chromium／WebKitの反復検証結果。初回artifact等の未確認事項を明記。 |
+| [Browser UI河間隔測定の調査](river-spacing-investigation-2026-10-27.md) | 回転SVG牌面rectのずれに対するCSS修正、自動回帰検証、2026-10-28のユーザーによるiPhone Safari目視確認、Issue #14の完了。初回失敗等の未確認事項を明記。 |
 | [オンラインダイアログの閉じるボタン修正](online-dialog-close-2026-10-26.md) | 修正履歴、公開用ビルド／WebKitの12条件、Pages deployment、ユーザーによる3画面のiPhone Safari実機確認（完了）。 |
 | [流局結果概要と操作ボタン配置](round-end-result-2026-10-24.md) | 通常／途中流局の概要表示、Chromium / WebKitのモバイル表示、デプロイ結果、ユーザー報告のiPhone Safari実機確認。 |
 | [オンライン診断ログ](online-diagnostics.md) | ブラウザーのlocalStorageログ、Worker構造化ログ、Cloudflare確認方法、保存範囲と検証制限。 |
