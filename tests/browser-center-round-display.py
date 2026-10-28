@@ -16,7 +16,7 @@ with sync_playwright() as p:
         page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => app.controller.newGame())")
         page.evaluate("import('/heibon-mahjong/src/rendering/shared-table-components.ts').then(module => { window.renderRoundInfo = module.renderTableRoundInfo; })")
         page.wait_for_selector('#player-hand svg')
-        page.wait_for_selector('[data-online-center-info]')
+        page.wait_for_selector('[data-online-center-info]', state='attached')
         scenarios = [
             ('tonpu', 'east', 1, 0, 69, '東1局'),
             ('tonnan', 'east', 4, 1, 68, '東4局 1本場'),
