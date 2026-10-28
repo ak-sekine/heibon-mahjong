@@ -44,10 +44,19 @@ Browser UI では、通常ページにカタログとメニュー項目がない
 
 ## 2026-10-28 追加調査：残存表示
 
-追加報告された表示を調査したところ、最初の削除で対象ページを取り違えていました。`index.html` と `kan-test.html` からは既に削除済みでしたが、Vite の [`vite.config.ts`](../../vite.config.ts) は公開される `test.html` もビルド対象にしており、ここにカタログの `<details>` が残っていました。`test.html` は通常版からリンクされていない公開テスト環境ですが、URLを直接開くと表示され、`dist/test.html` にも出力されていました。HTMLの残存であり、TypeScriptの動的生成、専用CSS、またはキャッシュ由来ではありません。`src/verification/test-page.ts` にカタログ生成処理はありません。
+追加報告された表示を調査したところ、最初の削除で対象ページを取りこぼしていました。Vite の [`vite.config.ts`](../../vite.config.ts) は公開される `test.html` もビルド対象にしており、ここにカタログの `<details>` が残っていました。`test.html` は通常版からリンクされていない公開テスト環境ですが、URLを直接開くと表示され、`dist/test.html` にも出力されていました。
+
+切り分け結果：
+
+- HTML：残存マークアップは `test.html` にありました。`index.html` と `kan-test.html` には現行ソース上のカタログはなく、今回のビルドでも生成HTML3ページすべてにカタログ文言・要素がありません。
+- TypeScript：`src/main.ts` と `src/verification/test-page.ts` にカタログの動的生成処理はありません。
+- CSS：カタログ専用スタイルは既に削除されており、残っていません。
+- ブラウザーキャッシュ：本番ページの直接取得がこの環境から HTTP 403（Envoy）となり、実レスポンス本文やキャッシュヘッダーは取得できませんでした。このため報告された `/kan-test.html` のレスポンスが古いキャッシュだった可能性は排除できていません。GitHub Actions の新しいブラウザーでは、変更後の公開ページ一式にカタログがないことを確認しました。
 
 `test.html` からマークアップを削除しました。単体テストは Vite の全 HTML entry（通常版、カン検証、テスト環境）を検査するよう拡張し、Browser UI も `test.html` を開いた直後にカタログがないことを検査します。共通牌描画と通常対局・カン検証は変更していません。
 
 最新 `main` と本番状況：開始時の `git fetch origin` は通常実行でプロキシ接続に失敗しましたが、承認付き再実行は成功し、`origin/main` と開始時HEADはともに `70a03adab51ecb70aee3ac86362093bcaf924e48`、behind/ahead は `0/0` でした。同SHAの GitHub Pages deploy workflow run [40628586473](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40628586473) は成功です。公開URLへの直接HTTP取得は、この実行環境から HTTP 403（Envoy）で拒否され、配信HTMLのキャッシュヘッダーと本文は確認できませんでした。
 
-今回の追加入力の検証結果・コミット・Browser UI run・push後の状態は、この節に追記します。iPhone Safari実機の再確認は未実施であり、Issue #3 はOpenのままです。
+追加入力の検証結果：`npm test` は64/64成功、`npm run build` 成功、`npm run typecheck:worker` 成功、生成された `dist/index.html`・`dist/kan-test.html`・`dist/test.html` にカタログ要素なし。Browser UI verification run [40685855518](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40685855518) は成功し、Deploy workflow run [40685855519](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40685855519) も verify、Browser UI、Worker本番通信テスト、Pages build、Pages deploy がすべて成功しました。
+
+追加入力のコミットは [`b4b0553debc2ead60751c55c598ed741cb6a8049`](https://github.com/ak-sekine/heibon-mahjong/commit/b4b0553debc2ead60751c55c598ed741cb6a8049)、push先 `main` のSHAも同一です。GitHub Issue #3 はOpenです。iPhone Safari実機での再確認は未実施であり、報告されたカン検証ページの実レスポンスとキャッシュ状態も実機確認まで未確定です。
