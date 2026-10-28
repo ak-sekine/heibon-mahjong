@@ -28,7 +28,11 @@ with sync_playwright() as playwright:
     page.locator('#confirm-new-game').click()
     page.locator('#local-table').wait_for(state='visible')
     assert page.locator('body').get_attribute('data-game-mode') == 'offline'
-    assert page.locator('#table-round').get_attribute('data-format-label') == '東風戦'
+    assert page.locator('#table-round').inner_text() == '東1局'
+    assert page.locator('#table-round').get_attribute('aria-label') == '東1局'
+    assert page.locator('#table-round').get_attribute('data-format-label') is None
+    assert '東風戦' not in page.locator('#local-table .center-info').inner_text()
+    assert page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => app.controller.match.format)") == 'tonpu'
     assert page.locator('#player-hand li').count() == 14
 
     page.locator('#main-menu-toggle').click()
@@ -36,7 +40,11 @@ with sync_playwright() as playwright:
     page.locator('input[name="offline-match-format"][value="tonnan"]').check()
     page.locator('#confirm-new-game').click()
     assert page.locator('body').get_attribute('data-game-mode') == 'offline'
-    assert page.locator('#table-round').get_attribute('data-format-label') == '半荘戦'
+    assert page.locator('#table-round').inner_text() == '東1局'
+    assert page.locator('#table-round').get_attribute('aria-label') == '東1局'
+    assert page.locator('#table-round').get_attribute('data-format-label') is None
+    assert '半荘戦' not in page.locator('#local-table .center-info').inner_text()
+    assert page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => app.controller.match.format)") == 'tonnan'
     assert page.locator('#player-hand li').count() == 14
     print('Initial load and reload stay idle at 320px; explicit menu starts create Tonpu and Tonnan matches.')
     browser.close()
