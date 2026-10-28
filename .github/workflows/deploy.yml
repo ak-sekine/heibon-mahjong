@@ -3,15 +3,13 @@ name: Deploy to GitHub Pages and Cloudflare Workers
 on:
   push:
     branches: [main]
-    # Test-only diagnostics and sync regressions must not deploy the Worker.
-    paths-ignore:
-      - '.github/workflows/deploy.yml'
-      - '.github/workflows/production-diagnostics.yml'
-      - 'docs/verification/production-timeout-diagnostics.md'
-      - 'tests/online-production.mjs'
-      - 'tests/online-production-sync.mjs'
-      - 'tests/online-production-sync.test.ts'
   workflow_dispatch:
+    inputs:
+      deploy_to_production:
+        description: Deploy Worker and Pages after full verification succeeds.
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -21,7 +19,55 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_full_suite: ${{ steps.classify.outputs.run_full_suite }}
+      deploy_required: ${{ steps.classify.outputs.deploy_required }}
+      classification: ${{ steps.classify.outputs.classification }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Classify changed files
+        id: classify
+        env:
+          BASE_REF: ${{ github.event.before }}
+          HEAD_REF: ${{ github.sha }}
+        shell: bash
+        run: |
+          if [[ -n "$BASE_REF" ]] && git rev-parse --verify "${BASE_REF}^{commit}" >/dev/null 2>&1 \
+            && git rev-parse --verify "${HEAD_REF}^{commit}" >/dev/null 2>&1; then
+            if git diff --no-renames --name-only -z "$BASE_REF" "$HEAD_REF" -- > "$RUNNER_TEMP/changed-paths"; then
+              node .github/scripts/classify-changes.mjs < "$RUNNER_TEMP/changed-paths"
+            else
+              node .github/scripts/classify-changes.mjs --unsafe
+            fi
+          else
+            node .github/scripts/classify-changes.mjs --unsafe
+          fi
+
+  docs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check changed files for whitespace errors
+        env:
+          BASE_REF: ${{ github.event.before }}
+          HEAD_REF: ${{ github.sha }}
+        shell: bash
+        run: |
+          if [[ -n "$BASE_REF" ]] && git rev-parse --verify "${BASE_REF}^{commit}" >/dev/null 2>&1; then
+            git diff --check "$BASE_REF" "$HEAD_REF" --
+          else
+            git show --check --format= --no-renames "$HEAD_REF"
+          fi
+
   verify:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run_full_suite == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,12 +82,35 @@ jobs:
         run: npm run typecheck:worker
       - name: Build the Pages application
         run: npm run build
+      - name: Save the verified browser test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist
+          if-no-files-found: error
 
   browser-ui:
     uses: ./.github/workflows/browser-ui.yml
+    needs: [detect-changes, verify]
+    if: >-
+      ${{
+        always() &&
+        needs.detect-changes.result == 'success' &&
+        (needs.verify.result == 'success' || needs.detect-changes.outputs.run_full_suite != 'true')
+      }}
+    with:
+      reuse_build: ${{ needs.detect-changes.outputs.run_full_suite == 'true' }}
 
   deploy-worker:
-    needs: [verify, browser-ui]
+    needs: [detect-changes, verify, browser-ui]
+    if: >-
+      ${{
+        always() &&
+        needs.detect-changes.outputs.deploy_required == 'true' &&
+        needs.verify.result == 'success' &&
+        needs.browser-ui.result == 'success' &&
+        (github.event_name != 'workflow_dispatch' || inputs.deploy_to_production == true)
+      }}
     runs-on: ubuntu-latest
     outputs:
       worker_url: ${{ steps.deploy.outputs.worker_url }}
@@ -94,7 +163,16 @@ jobs:
         run: npm run test:online:production
 
   pages-build:
-    needs: [verify, deploy-worker, production-test]
+    needs: [detect-changes, verify, browser-ui, deploy-worker, production-test]
+    if: >-
+      ${{
+        always() &&
+        needs.detect-changes.outputs.deploy_required == 'true' &&
+        needs.verify.result == 'success' &&
+        needs.browser-ui.result == 'success' &&
+        needs.deploy-worker.result == 'success' &&
+        needs.production-test.result == 'success'
+      }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
