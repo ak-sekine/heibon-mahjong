@@ -4,7 +4,7 @@
 
 初回失敗では、Chromiumが390×844pxのオンライン対局画面で、6枚目をリーチ宣言牌にした河の牌面間隔を0.53125pxと測定しました。期待値1pxとの差0.46875pxが既存許容差0.35pxを超えています。中心間隔も実測21.5px、牌面寸法からの期待値21.96875pxでした。
 
-0.53125pxの差は、河のlayout cell間隔ではなく、宣言牌と隣牌のSVG面rectが各cell中心から逆方向にずれて発生したことをWebKitの安定測定で確認しました。layout cell自体は1px離れていましたが、宣言牌のface rectはcell中心より右に0.234375px、隣牌のface rectは左に0.234375px寄り、実測face gapは0.53125pxでした。`transform-box:border-box`と`transform-origin:center`指定だけでは直らず、明示的な`left/top:calc(...)`配置もWebKitでface rectをcell中央にできませんでした。現在の修正は中央配置だけを担当する`.river-tile-face` wrapperと、回転だけを担当するSVGに分けました。Chromiumではfocused spacingとcapacity検証に成功し、WebKitのActions再検証待ちです。
+初回および後続の失敗で、河のlayout cell間隔は1pxでもSVGの`getBoundingClientRect()`は異なる値を返すことを安定測定で確認しました。run `40603340862`では宣言牌と隣牌の水平offsetがそれぞれ逆向きに0.234375pxでした。wrapperの中央配置をtranslateから直接座標計算へ変えたcommit `f35ea4c`でも、run `40605706247`のWebKit測定はgap `0.546875px`で失敗しました。診断JSONではwrapper rectは通常牌のcellと一致し、宣言牌はcellから0.015625px以内でしたが、180度回転した通常牌SVGのrectだけが左へ0.46875pxずれていました。DPR1、scale1、pageerror／console errorなし、DOMは安定済みです。証拠はSVG rootに対するCSS回転の中心原点計算に残るずれを示します。現在の作業差分では、中心原点を使わず回転後の寸法からtranslationを明示計算するCSSへ変更し、Actionsで再検証します。Codex CloudのローカルBrowser UI出力は`--no-sandbox`起動のためすべて検証結果から除外します。
 
 **元のChromium runがこのSVGずれを測った直接の画面記録はありません。** 元の失敗は同じcommitの再実行でも同値でしたが、後続のWebKit安定測定で同じ0.53125pxを再現しました。初回の失敗画像を取得できず、Chromiumで同じDOM状態だったかの直接照合はできません。元の測定原因は特定でき、初回Chromiumでの発生契機には不確実性が残ります。
 
@@ -16,6 +16,7 @@
 
 - 初回失敗： [GitHub Actions run `40519653129`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40519653129)、commit `20169c95a00fee957eb11d04a2f97167b8795771`。
 - 成功した後続run： [GitHub Actions run `40522323858`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40522323858)、commit `2e9b4d24143af0527a2186066ce50742ef3cee68`。
+- `f35ea4c` Browser UI run `40605706247`は失敗しました。次の修正commitとActions runを追記します。
 - 作業開始時のHEAD：`3eba6ca1d063d610a71c27224448401daaacac51`、branch `work`、作業ツリーはclean。
 - `git fetch origin`後の`origin/main`：`5337ede744320131267eea68e0021d7a412b8389`。開始時HEADとの差はbehind 2 / ahead 0で、`git merge --ff-only origin/main`でfast-forwardしました。
 - 修正作業はこの最新mainを基準にしています。push前後のSHAは最終更新します。
@@ -48,8 +49,8 @@ run `40522323858`は後続commitの別runで、Browser UI job全体が成功し�
 - `getBoundingClientRect()`はCSS pxの小数値を返します。devicePixelRatioは物理ピクセルへの描画には関係しますが、この測定値自体はCSS pxで、初回runのDPRは記録されていません。ブラウザーzoomも初回runでは未記録です。viewportはCSS pxで固定されています。
 - Browser UI workflow内の各Pythonスクリプトは逐次起動され、河測定スクリプトも新しいPlaywright browser/pageを作成します。スクリプト内のシナリオ間では同じpageを使いますが、mockが毎回4席の河・viewer・宣言indexを上書きし、rendererが河classと子DOM、layout由来inline styleを更新します。並列実行による干渉はありません。初回artifactが取得できず、失敗時のclass／DOM残留やCSS実測値は確認できていません。
 - `river-layout.test.ts`、`river-capacity-flow.test.ts`、`browser-riichi-discard-layout.py`、`browser-river-capacity.py`を確認しました。今回の失敗測定は、失敗時点で現実の表示不具合である可能性を排除できません。
-- ローカルで容量Browser UI回帰を初めて実測した際、offlineケースの牌面rectが全て`[0,0,0,0]`なのに384 checksが成功しました。idle画面では`#local-table`がhiddenで、従来テストはオフライン河のDOM位置を検査できていませんでした。容量テストの開始時に実際の新規offline対局をUIから開始し、卓サイズ、牌面数、各牌面の非ゼロ寸法も検査するよう修正しました。修正後の384 checksはChromiumで成功し、19枚目／24枚目の左右CPU牌面rectも320px・390px幅で非ゼロ値を確認しています。これはテストの検出漏れ修正で、元の0.53125pxを説明するものではありません。
-- 初回のCSS修正ではSVG牌面の`transform-box:border-box`と`transform-origin:center`を明示しましたが、run `40598287787`で不十分と確認しました。次の`left/top:calc(...)`配置もrun `40600778575`でWebKit測定が失敗しました。現在のCSSは、cell中央に配置する`.river-tile-face` wrapperとその内側で回転するSVGを分離しています。`calculateRiverLayout`の配置計算、河gap、6×4／8×3の列構成、19枚目／24枚目の配置仕様は変更していません。
+- 容量テストを修正する過程のCodex Cloudローカル出力では、offlineケースの牌面rectが全て`[0,0,0,0]`なのに384 checksがpassしました。この実行もChromiumを`--no-sandbox`で起動したため検証結果から除外します。コード確認ではidle画面で`#local-table`がhiddenになっており、従来テストがオフライン河のDOM位置を検査できない状態と判明しました。容量テスト開始時に新規offline対局をUIから開始し、卓サイズ、牌面数、各牌面の非ゼロ寸法も検査するよう修正し、その後のGitHub Actions run `40598287787`でChromium／WebKit各384 checksの成功を確認しました。これは別の容量テスト検出漏れ修正で、元の0.53125pxを説明するものではありません。
+- 初回のCSS修正ではSVG牌面の`transform-box:border-box`と`transform-origin:center`を明示しましたが、run `40598287787`で不十分と確認しました。SVG自体への`left/top:calc(...)`配置もrun `40600778575`で失敗しました。wrapperと子SVGを分離したrun `40603340862`でもWebKitの同一ケースが失敗し、gap `0.53125px`、center step `21.5px`（期待`21.96875px`）でした。artifact `12780895827`のJSON・スクリーンショットではDPR1、visual viewport scale1、pageerror／console errorなし、wrapperと面rectの差を確認しました。commit `f35ea4c`ではwrapperを直接計算位置へ移しましたが、run `40605706247`でもgap `0.546875px`、center step `21.515625px`（期待`21.96875px`）で失敗しました。artifact `12781276082`でwrapper rectとSVG face rectを比較すると、通常牌wrapperはcellと一致する一方、180度回転した通常牌SVG rectはcellより左へ`0.46875px`ずれていました。DPR1、visual viewport scale1、pageerror／console errorなしです。これを根拠に、現在の作業差分では`transform-origin:top left`と角度別の明示translationを使い、回転中心の暗黙計算を避けます。河layout計算、河gap、6×4／8×3、19枚目／24枚目の配置仕様は変更していません。
 
 ## 対策と再現検証
 
@@ -64,19 +65,21 @@ run `40522323858`は後続commitの別runで、Browser UI job全体が成功し�
 - 安定待ちAPI修正後のActions run `40595972735`（commit `0fa9333`）では、Chromium focused runは48 scenarios／960 pairs成功、WebKitは390×844px・viewer0・6枚・宣言index5の上河で失敗し、gap `0.53125px`を再現しました。WebKitのpageerror／console errorは空、DPR1、visual viewport scale1で、安定待ちは通過済みでした。診断artifact `river-spacing-diagnostics-0fa93334245d37ac411208834254e929d675ab07`（ID `12776068020`）のJSONとスクリーンショットを確認し、cell間隔とSVG面rectの逆方向0.234375pxずれを記録しました。
 - run `40597389839`（commit `bf83c16`、transform-box/origin指定前）でもWebKitの同じ390×844px条件でgap `0.53125px`を再現しました。run `40598287787`（commit `3373ccc`、transform-box/origin指定後）でも、WebKitはstable wait通過後、初回ケースで同値失敗しました。2回目の診断JSONにはcomputed `transformOrigin: 8.734375px 12.234375px`、`transformBox: border-box`があり、normal face rectはcellから左上に0.234375px、宣言faceは右上に0.234375pxずれていました。DPR1、visual viewport scale1、pageerror／console errorなしです。安定待ちのAPI修正ではこの幾何差は変わらず、許容差も変更していません。
 - run `40600778575`（commit `c8e4bf8`、`left/top:calc(...)`配置）では、npm test/build、Chromium/WebKit capacity各384 checks、focused Chromium 48 cases／960 pairsは成功し、WebKit focused spacingは同じ390×844pxの初回caseでgap `0.546875px`、center step `21.515625px`（期待`21.96875px`）で失敗しました。diagnostic artifact `12778144543`ではnormal face rectがcellの左上から`0.46875px`ずれ、宣言faceは左へ`0.015625px`ずれていました。DPR1、visual viewport scale1、pageerror／console errorなしです。WebKitでCSS computed left/topを次のdiagnosticsで取れるよう追加し、現行wrapper修正を検証中です。
+- run `40603340862`（commit `d96762a`、中央配置と回転を別要素に分離）では、先行するChromium/WebKit capacity各384 checksおよびfocused Chromium 48 cases／960 pairsが成功し、WebKit focused spacingが同じ390×844pxの初回caseでgap `0.53125px`、center step `21.5px`（期待`21.96875px`）で失敗しました。diagnostic artifact `12780895827`のスクリーンショットとJSONを確認しました。viewportは390×844、DPR1、scale1、pageerror／console errorなしです。正常牌のSVG rectは親cellから左上へ0.234375px、宣言牌は右へ0.234375pxずれ、wrapper rectも中央位置から0.234375pxずれていました。
+- commit `f35ea4c`ではwrapperに対する`translate(-50%)`を削除し、セルと牌面寸法から`left/top`を直接計算しましたが、run `40605706247`のWebKit測定でまだ失敗しました。wrapper自体は正しく配置された一方、SVG rootの`transform-origin:center`による回転後rectにずれが残るため、作業中のCSSでは原点をtop-leftにし、各向きの回転後寸法からtranslationを明示しています。次のActions runで検証します。
 
 ## 検証結果
 
 - run `40598287787`（commit `3373ccc`）の`npm test`と`npm run build`は成功。capacity regressionはChromium 384 checks、WebKit 384 checks成功（320/355/375/390/414/430px、18/19/20/23/24/25/32/33枚、online/offline）。focused spacingはChromium 48 scenarios／960 pairs成功、WebKitは初回ケースでgap `0.53125px`により失敗。Actions artifact `12778420786`には失敗条件のJSONとスクリーンショットを保存しました。
-- `c8e4bf8`でもWebKit failureが続いたため、SVG faceを`translate`で回転と同時に移動する方式や、SVG自体を`left/top`で中央配置する方式をやめ、HTML wrapperで中央配置して子SVGだけを回転する方式に変更しました。このwrapper CSSでローカルChromium focused testは48 scenarios／960 pairs成功（320/375/390/414px、4席×3周、console errors 0）。
-- 同じwrapper CSSでローカルChromium capacity testは384 checks成功（8河枚数、4宣言席、online/offline、320/355/375/390/414/430px）。offline 19枚目／24枚目の左右CPU牌面rectは非ゼロでした。
+- `d96762a`ではHTML wrapperで中央配置し子SVGだけを回転する方式もWebKitで失敗しました（run `40603340862`）。`f35ea4c`でwrapperのtranslateを除き、`left/top:calc(...)`で配置する方式に変えました。
+- Codex Cloud上で修正後のローカルChromium focused testを2回実行し、各回48 scenarios／960 pairs、合計96 scenarios／1,920 pairs、gap `0.984375–1.0234375px`、期待中心間隔との差`-0.015625–0.0234375px`というpass出力を得ました。ローカルcapacity testも384 checksのpass出力でした。ただし、対象PythonスクリプトがChromiumを`--no-sandbox`で起動し、AGENTS.mdがCodex Cloud内で禁止している手順でした。これらは参考値としてのみ記録し、検証成功数には含めません。これ以降、Codex CloudでBrowser UIを起動していません。
 - wrapper導入に伴い`riichi-river.test.ts`は牌面SVGをwrapper内から取得するように更新し、宣言牌ID・accessible label・他牌・resetのassertionは維持しました。
-- wrapper導入後、`npm test`：63件成功、`npm run build`：成功、`npm run typecheck:worker`：成功。
 - `python -m py_compile tests/browser-online-waiting-room.py tests/browser-river-capacity.py`と`git diff --check`：成功。
-- 現行wrapper CSSのWebKit focused spacingとBrowser UI full Actions run：修正commit後に実施予定。
+- commit `f35ea4c`で`npm test` 63/63、`npm run build`、`npm run typecheck:worker`が成功。
+- run `40605706247`では`npm test`、`npm run build`、Chromium/WebKit capacity各384 checks、focused Chromium 48 scenarios／960 pairsが成功しました。WebKit focused spacingは初回caseでgap `0.546875px`、center step `21.515625px`により失敗しました。修正後も同じ幾何差が残ったため、現在の作業差分のorigin-zero変換方式を次のActions runで検証します。
 - iPhone Safari実機：この調査では未実施。退出通知についての既存実機確認は[既存記録](online-exit-notice-layout-2026-10-27.md)を参照。
 
 ## 未解決・未確認事項
 
 - 初回Chromium failureのスクリーンショットはartifactが32MiBを超えて取得できず、初回のDOM、DPR、zoom、console errorは未記録です。後続WebKitで初回と同値が安定再現したため、同じCSS幾何不具合が有力な根本原因ですが、初回runの具体的なface offsetは直接照合できません。
-- 現行wrapper CSSのWebKit focused spacingとBrowser UI full runは未確認です。Actions結果、成功回数・失敗回数、commit/push後のmain SHAは最終更新します。
+- `f35ea4c`のWebKit focused spacingはrun `40605706247`で失敗しました。次の修正後Actions run、最終成功回数・失敗回数、main SHAは追記します。初回Chromium failureのDPR、zoom、console errorと直接の画面記録は未取得です。Codex Cloud内のローカルChromium出力は`--no-sandbox`起動のため除外しています。iPhone Safari実機も未確認です。

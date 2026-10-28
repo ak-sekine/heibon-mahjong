@@ -300,18 +300,25 @@ header > div { min-width:0; }
 .seat-right .tile-back { width:var(--table-tile-height); height:var(--table-tile-width); }
 .rivers { --river-tile-width:var(--table-tile-width); --river-tile-height:var(--table-tile-height); grid-area:rivers; width:100%; justify-self:center; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(4,auto); grid-template-areas:'top top' 'info info' 'left right' 'bottom bottom'; gap:8px 4px; align-content:start; align-items:center; justify-items:center; min-width:0; }
 .river { display:block; gap:0; min-width:0; }
-.river-top { grid-area:top; --face-angle:180deg; }
+.river-top { grid-area:top; }
 .river-bottom { grid-area:bottom; }
-.river-left { grid-area:left; --face-angle:90deg; }
-.river-right { grid-area:right; --face-angle:270deg; }
+.river-left { grid-area:left; }
+.river-right { grid-area:right; }
 .river-tile { position:relative; width:var(--table-tile-height); height:var(--table-tile-height); }
 .river-tile.pending-discard-target { outline:3px solid #FFD700; outline-offset:0; border-radius:2px; pointer-events:none; z-index:1; }
 .river-left .river-tile { width:var(--table-tile-height); height:var(--table-tile-height); }
 .river-right .river-tile { width:var(--table-tile-height); height:var(--table-tile-height); }
-/* Calculate fractional offsets directly; translate centering shifts WebKit's SVG bounds by subpixels. */
+/* Calculate fractional offsets directly; translated wrappers were offset from their cells in WebKit. */
 .river-tile-face { position:absolute; display:block; width:var(--river-tile-width); height:var(--river-tile-height); left:calc((100% - var(--river-tile-width)) * .5); top:calc((100% - var(--river-tile-height)) * .5); }
-.river-tile-face .tile-svg { display:block; width:100%; height:100%; transform-box:border-box; transform-origin:center; transform:rotate(var(--face-angle,0deg)); }
-.river-tile[data-riichi-declaration='true'] .river-tile-face .tile-svg { transform:rotate(calc(var(--face-angle,0deg) + 90deg)); }
+/* Avoid WebKit's fractional SVG center-origin bounds with explicit top-left translations. */
+.river-tile-face .tile-svg { display:block; width:100%; height:100%; transform-box:border-box; transform-origin:top left; }
+.river-top .river-tile-face .tile-svg { transform:translate(var(--river-tile-width),var(--river-tile-height)) rotate(180deg); }
+.river-left .river-tile-face .tile-svg { transform:translate(calc((var(--river-tile-height) + var(--river-tile-width)) * .5),calc((var(--river-tile-height) - var(--river-tile-width)) * .5)) rotate(90deg); }
+.river-right .river-tile-face .tile-svg { transform:translate(calc((var(--river-tile-width) - var(--river-tile-height)) * .5),calc((var(--river-tile-height) + var(--river-tile-width)) * .5)) rotate(270deg); }
+.river-top .river-tile[data-riichi-declaration='true'] .tile-svg { transform:translate(calc((var(--river-tile-width) - var(--river-tile-height)) * .5),calc((var(--river-tile-width) + var(--river-tile-height)) * .5)) rotate(270deg); }
+.river-bottom .river-tile[data-riichi-declaration='true'] .tile-svg { transform:translate(calc((var(--river-tile-height) + var(--river-tile-width)) * .5),calc((var(--river-tile-height) - var(--river-tile-width)) * .5)) rotate(90deg); }
+.river-left .river-tile[data-riichi-declaration='true'] .tile-svg { transform:translate(var(--river-tile-width),var(--river-tile-height)) rotate(180deg); }
+.river-right .river-tile[data-riichi-declaration='true'] .tile-svg { transform:none; }
 .center-info { grid-area:info; align-self:stretch; width:100%; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:4px; padding:3px 0; border-radius:6px; background:#123f32; font-size:12px; line-height:1.35; text-align:center; overflow-wrap:anywhere; }
 .round-label { font-weight:700; }
 .wall-count { display:flex; flex-direction:column; gap:1px; }
