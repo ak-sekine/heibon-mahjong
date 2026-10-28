@@ -32,14 +32,15 @@ iPhone Safariのスクリーンショットでは、卓中央に「東1局 東�
 - `npm run build`: 成功。
 - `npm run typecheck:worker`: 成功。
 - `git diff --check`: 成功。
-- Browser UIテスト: 新しい検証を既存 `Browser UI verification` に追加。320、375、390、430、1280pxでオンライン／オフライン、両対局形式、東場／南場、本場数、山枚数、領域内配置、折返し、ドラ・河との干渉をChromiumとWebKitで測定し、スクリーンショットを保存します。run #245 は古い `browser-app-idle.py` が対局形式属性を期待して失敗しました。run #246 ではその期待値は直りましたが、テストが公開用previewからVite開発時専用のTypeScriptモジュールを読み込もうとして失敗しました。ソースの対局進行ロジックは変更していないため、公開画面の仕様だけを検証し、形式進行は既存 `tests/match-format.test.ts` に任せるよう修正しました。次のActions再実行は未完了です。
+- Browser UIテスト: 新しい検証を既存 `Browser UI verification` に追加。320、375、390、430、1280pxでオンライン／オフライン、両対局形式、東場／南場、本場数、山枚数、領域内配置、折返し、ドラ・河との干渉をChromiumとWebKitで測定し、スクリーンショットを保存します。run #245 は古い `browser-app-idle.py` が対局形式属性を期待して失敗しました。run #246 ではその期待値は直りましたが、テストが公開用previewからVite開発時専用のTypeScriptモジュールを読み込もうとして失敗しました。run #247 は `browser-dora-rows.py` がスマホでも局と山を同じ高さに期待して失敗しました。ログで局・山・ドラ・河の領域内測定が通り、同じ高さ条件だけが失敗したことを確認し、幅599px以下は別行、PC幅は従来の同じ行を検査するよう修正しました。ソースの対局進行ロジックは変更していないため、形式進行は既存 `tests/match-format.test.ts` に任せます。修正後のActions再実行は未完了です。
 - iPhone Safari実機: ユーザーからの実機確認報告がないため未確認です。
 
 ## 公開・コミット
 
-- 対象コミットSHA: `1e42c29bf3c124f20fe41db3cc2c6b6fc7467ba1`（Issue #4実装）、`60584e67fc24f6ee36d5f7aad13ef5159c1b168b`（Browser UI期待値更新）、`eb68c71cbe26ca6be2dcfcb7f8c7cb73ab713b01`（preview非対応のソースimport期待値を削除）。
+- 対象コミットSHA: `1e42c29bf3c124f20fe41db3cc2c6b6fc7467ba1`（Issue #4実装）、`60584e67fc24f6ee36d5f7aad13ef5159c1b168b`／`eb68c71cbe26ca6be2dcfcb7f8c7cb73ab713b01`（Browser UI期待値更新）、`523a17410ab2346b074a82a405da1fa51f2839e4`（スマホ別行配置を既存レイアウトテストに反映）。
 - Deploy run #337: verify 成功、Browser UI gate 失敗。production test、Workers deploy、Pages build／deploy はすべて skipped で、デプロイ未実施です。
 - Deploy run #338: verify 成功、Browser UI gate 失敗。Pages／Workers のデプロイ関連jobはすべて skipped で、デプロイ未実施です。
+- Deploy run #339: verify 成功、Browser UI gate 失敗。Pages／Workers のデプロイ関連jobはすべて skipped で、デプロイ未実施です。
 
 ## 未確認事項
 
