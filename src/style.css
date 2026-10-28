@@ -571,4 +571,10 @@ header > div { min-width:0; }
  .table .round-label { font-weight:600; }
  .table .wall-count { display:flex; flex-direction:row; align-items:center; justify-content:center; gap:4px; white-space:nowrap; }
  .table .wall-dead-count { font-size:12px; }
+ .table .center-info .deposit-sticks:has(.deposit-stick:nth-child(3)) .deposit-stick {
+   width:min(44px,calc(33.333% - 1.333px)); height:auto; aspect-ratio:60 / 16;
+ }
+ .table .center-info .deposit-sticks:has(.deposit-stick:nth-child(4)) .deposit-stick {
+   width:min(44px,calc(25% - 1.5px));
+ }
 }
