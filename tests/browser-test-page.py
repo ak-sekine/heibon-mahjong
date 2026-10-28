@@ -103,8 +103,13 @@ with sync_playwright() as playwright:
 
     page.goto(base)
     assert page.locator('.test-lab, #scenario, .test-badge').count() == 0, 'test controls leaked to regular entry'
+    assert page.locator('#tile-gallery, .catalog').count() == 0, 'development tile catalog is present on regular entry'
+    page.locator('#main-menu-toggle').click()
+    assert page.get_by_role('button', name='牌表示確認').count() == 0, 'tile preview menu item is present'
+    assert page.get_by_text('開発用：全34種類と赤5を見る').count() == 0, 'development tile catalog remains reachable'
     page.goto(base + 'kan-test.html')
     assert page.locator('#scenario option').count() == 6, 'kan verification page changed'
+    assert page.locator('#tile-gallery, .catalog').count() == 0, 'development tile catalog is present on kan verification page'
     assert not errors, errors
     print(json.dumps({'testPage': 'pass', 'scenarios': ['kyuushu-self', *[case[0] for case in cases]],
                       'widths': [320, 375, 390, 430], 'regularPageIsolation': 'pass',
