@@ -129,3 +129,41 @@ Markdownのみの検証記録commit `eb3930ea78f4966e8be6da10dbad64cd92f0f1b3` �
 - Issue #7のBrowser UI timeoutと、記録されている過去のオンラインCPU手番進行テスト失敗は今回の変更では削除・skip・timeout緩和していません。変更後のローカル`npm test`は65 test files、65成功、0失敗（うち`step14-0-1.test.ts`単独も成功）です。`npm run build`、`npm run typecheck:worker`、workflow YAML構文確認、Browser runnerのPython compile、`git diff --check`も成功しました。Issue #7の過去Browser UI timeout原因は未解決です。
 - 初回workflow実行でartifact共有、条件式、GitHub Actionsのcheck名、Browser UI全回帰は成功しました。アプリ変更を含む実デプロイ経路は今回未実行です。
 - 文書のみのworkflow dispatch/push、手動の本番deploy、失敗・cancel経路の実デプロイは行っていません。条件classifierのテストとdeploy jobのsuccess条件を静的検査しました。iPhone Safari実機確認は未実施です。
+
+
+## 本番デプロイ経路の再確認（2026-10-28）
+
+### 対象と確認区分
+
+- GitHub APIで確認したmain SHA: `16985778886bfeb781357940db98defe930bf6ef`。通常の `git fetch origin main` は実行環境のproxy接続失敗で取得できませんでした。GitHub APIのmain commitと同SHAのworkflow／文書を読み取りました。
+- 静的検査: `.github/workflows/deploy.yml`、`.github/workflows/browser-ui.yml`、`.github/scripts/classify-changes.mjs`、`wrangler.jsonc`、`package.json`を確認。
+- GitHub Actions履歴: #357（`f1ab679c5ae19c40e6f2fcb9937abe64ffef01bf`）、#358（`eb3930ea78f4966e8be6da10dbad64cd92f0f1b3`）、#359（`16985778886bfeb781357940db98defe930bf6ef`）のrun/job/artifact情報を確認。
+- 本番デプロイ: 新CI導入後のアプリコード変更によるWorker／Pagesデプロイ履歴は確認できませんでした。今回、新しいデプロイは実行していません。
+- ライブ稼働状態: GitHub Actions上の最後の成功記録は確認しましたが、この実行環境の送信先制限により公開Pages／Workerへ直接接続できず、現在の応答状態は未確認です。
+
+### 現行デプロイ経路の静的検査
+
+`main` pushではDeploy workflowが常に変更分類と`docs-check`を開始します。Markdown以外の変更では`verify`が`npm test`、`npm run typecheck:worker`、`npm run build`を実行し、成功した`dist`を`pages-dist-<github.sha>-<run_attempt>`名で保存します。Deployから呼ぶBrowser UI workflowは同じSHA／run attempt名のartifactを取得して45呼び出しのChromium／WebKit回帰を実行します。
+
+Worker deployの条件は`deploy_required == true`、`verify.result == success`、`browser-ui.result == success`です。いずれかの失敗・キャンセル・skip、変更分類失敗、またはBrowser UIのartifact download失敗では条件を満たしません。Worker deployは`github.sha`をcheckoutします。PagesはWorker deployと本番通信テストの成功後に同じSHAをbuildし、デプロイ済みWorker URLがJS bundleに含まれることを確認してPages artifactを作成し、その後`actions/deploy-pages`で公開します。Browser UIが使う検証済みartifactと、Worker URLを埋め込んだPages用artifactは別のbuildです。
+
+以下は静的検査で確認した制限・未確認事項です。
+
+- 本番通信テストはWorker deploy後に実行されます。その成功はPages build／deployをゲートしますが、既に開始されたWorker deployを事前にゲートする検証ではありません。
+- `docs-check`は`deploy-worker.needs`に含まれず、Worker deployを直接ゲートしません。GitHub branch protection／rulesetのrequired checks endpointは403 `Resource not accessible by integration`となり、`docs-check`や他jobがrequiredかは未確認です。
+- Browser用artifact名はSHAとrun attemptに結び付き、現runからその名前で取得します。別SHA名のartifactは取得できずjob失敗になります。ただしartifact内容を独立したSHA-256 manifestと照合する検証はworkflowにありません。
+- `workflow_dispatch`は`deploy_to_production: true`を明示しない限りdeployしませんが、workflow自体にmain ref限定条件はありません。将来手動実行で検証する場合はmain refを選ぶ必要があります。
+- 意図的に失敗するコードをpushせず、現行workflowでの失敗／キャンセル経路は静的条件とjob依存関係で確認しました。現行workflow上でこれらの失敗を実環境再現した結果ではありません。
+
+### GitHub Actions履歴での確認
+
+- Deploy #357は成功。SHA `f1ab679c5ae19c40e6f2fcb9937abe64ffef01bf`で単体テスト、Worker型チェック、Pages build、45呼び出しのBrowser UIが成功し、Browser UIが同runの`pages-dist-f1ab...-1`をdownloadしました。classifierの分類はvalidation-onlyでWorker／Pages deployはskipでした。そのため、新CIの全検証成功とartifact受け渡しは履歴で確認できますが、アプリ変更によるdeploy経路は確認できません。
+- Deploy #358と#359はいずれもdocs-onlyとして成功し、`verify`、Browser UI回帰、Worker／Pages deployはskipでした。
+- 新CI導入前のDeploy #355はSHA `04e394c6554512f912adff52beaef48b55c7520a`で、verify、Browser UI、Worker deploy、本番通信テスト、Pages build、Pages deployがすべて成功していました。Worker deployと本番通信テストの対象SHAは同SHAでした。#356はBrowser UI内の`npm test`失敗でWorker／Pages deployがskipでした。Issue #7の報告ではオンラインCPU手番進行テスト2件の失敗です。#356は新CI定義導入前のrunです。
+- GitHub compare上、#355のSHAから現在のmainまでに変更されたファイルはCI、文書、package scripts、テスト用runner／分類テストで、ゲームのアプリ／Workerソースは含まれていません。これはリポジトリ内容の比較であり、稼働中本番への直接probeではありません。
+
+### 本番状態と未確認事項
+
+#355の本番通信テストは2026-10-28 17:13 UTCに成功し、Pages deployは17:16 UTCに成功しました。これがGitHub Actionsから確認できた最後の本番成功記録です。#356以降、本番deploy成功のActions履歴はありません。公開Pages／Workerの現在のHTTP応答を直接確認できなかったため、現在の稼働正常性は未確認です。
+
+CI高速化後のアプリコード変更deploy、現在の本番HTTP応答、required checks設定、失敗／キャンセル経路の実環境再現、実機操作は未確認です。Issue #15はこれらが残るためOpenのままです。Issue #7の失敗を解決済みとは扱いません。
