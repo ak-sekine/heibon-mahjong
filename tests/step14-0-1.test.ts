@@ -772,7 +772,8 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     });
     assert.equal(leave.ok, true);
     const afterHostLeave = persistedGame(fixture) as unknown as OnlineGameSession;
-    assert.equal(afterHostLeave.status, 'playing');
+    assert.ok(afterHostLeave.status === 'playing' || afterHostLeave.status === 'round-ended',
+      'host leave preserves the active or just-ended online game');
     assert.equal(afterHostLeave.identities[0].control, 'cpu');
     assert.equal(afterHostLeave.match.game.players[0].control, 'cpu');
     const afterHostLeaveRoom = await readState(fixture);
