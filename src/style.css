@@ -564,6 +564,8 @@ header > div { min-width:0; }
 .table .center-info .deposit-stick { flex:none; width:44px; height:11.73px; }
 .table .round-summary .round-label { font-weight:400; }
 @media (max-width:599px) {
+ /* The larger center readout can be taller than the original center gap. */
+ .table .river-bottom { bottom:calc(var(--cell)*1.8 - 3px); }
  .table .round-summary,.table .round-label,.table .wall-count { font-size:16px; line-height:1.2; }
  .table .round-summary { flex-direction:column; align-items:center; gap:1px; letter-spacing:normal; }
  .table .round-label { font-weight:600; }

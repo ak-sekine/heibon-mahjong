@@ -55,7 +55,9 @@ with sync_playwright() as p:
                       const doraSizeMatchesRiver=doraFaces.every(e=>Math.abs(e.width-riverFace.width)<.05&&Math.abs(e.height-riverFace.height)<.05);
                       const doraRowsEqual=doraFaces.every((e,i)=>Math.abs(e.width-doraFaces[0].width)<.05&&Math.abs(e.height-doraFaces[0].height)<.05);
                       const seatTiles=[...document.querySelectorAll('.table .seat .tile-svg,.table .seat .tile-back')].map(box);
-                      const riverOverlaps=[...document.querySelectorAll('.river svg')].map(e=>({
+                      const riverFaces=[...document.querySelectorAll('.river svg')];
+                      const riverClear=riverFaces.every(e=>separate(box(e),c));
+                      const riverOverlaps=riverClear?[]:riverFaces.map(e=>({
                         seat:e.closest('.river').dataset.playerId,
                         index:[...e.closest('.river').querySelectorAll('.river-tile')].indexOf(e.closest('.river-tile')),
                         rect:box(e)
@@ -76,7 +78,7 @@ with sync_playwright() as p:
                         order:slots.every((e,i)=>e.dataset.tileId===(i<5?omote[i]?.id:ura[i-5]?.id)),
                         faces:slots.every((e,i)=>{const tile=i<5?omote[i]:ura[i-5];return !tile||e.querySelector('svg').getAttribute('aria-label').endsWith(e.getAttribute('aria-label').split('：')[1].split('、')[0])}),
                         hidden:wall.deadWall.filter(t=>![...omote,...ura].some(p=>p.id===t.id)).every(t=>!q('#dora-indicators').outerHTML.includes(t.id)),
-                        riverClear:[...document.querySelectorAll('.river svg')].every(e=>separate(box(e),c)),
+                        riverClear,
                         seatClear:seatTiles.every(e=>separate(e,c)),
                         square:Math.abs(t.width-t.height)<1,noOverflow:document.documentElement.scrollWidth<=innerWidth}};
                     }''', {'deposits': deposits, 'count': count})
