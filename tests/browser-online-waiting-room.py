@@ -1708,6 +1708,11 @@ with sync_playwright() as p:
     wait_for("document.querySelector('#online-table-round').innerText.includes('東2局')")
     assert page.locator('#online-round-result').is_hidden(), 'the old round result remained after next-round transition'
 
+    round_before_reconnect = page.locator('#online-table-round').inner_text()
+    wall_before_reconnect = page.locator('#online-wall-count').inner_text()
+    center_before_reconnect = page.locator('[data-online-center-info]').inner_text()
+    assert '東2局' in round_before_reconnect, round_before_reconnect
+    assert '東風戦' not in center_before_reconnect and '半荘戦' not in center_before_reconnect, center_before_reconnect
     hand_before_reconnect = page.locator('#online-player-hand button[data-tile-id]').evaluate_all("nodes => nodes.map(node => node.dataset.tileId).join(',')")
     tickets_before_reconnect = page.evaluate('window.onlineMock.ticketRequests')
     page.evaluate('window.onlineMock.forceDisconnect()')
@@ -1715,6 +1720,10 @@ with sync_playwright() as p:
     wait_for(f'window.onlineMock.ticketRequests > {tickets_before_reconnect}', timeout=10000)
     wait_for("document.querySelectorAll('#online-player-hand button[data-tile-id]').length === 14", timeout=10000)
     assert page.locator('body').get_attribute('data-game-mode') == 'online', 'reconnection switched into another game mode'
+    assert page.locator('#online-table-round').inner_text() == round_before_reconnect, 'the round display changed after reconnect'
+    assert page.locator('#online-wall-count').inner_text() == wall_before_reconnect, 'the wall count changed after reconnect'
+    center_after_reconnect = page.locator('[data-online-center-info]').inner_text()
+    assert '東風戦' not in center_after_reconnect and '半荘戦' not in center_after_reconnect, center_after_reconnect
     hand_after_reconnect = page.locator('#online-player-hand button[data-tile-id]').evaluate_all("nodes => nodes.map(node => node.dataset.tileId).join(',')")
     assert hand_after_reconnect == hand_before_reconnect, 'the online hand was not restored after reconnect'
     page.evaluate('''() => {
