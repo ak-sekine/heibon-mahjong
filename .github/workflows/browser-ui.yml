@@ -130,6 +130,13 @@ jobs:
             /tmp/heibon-vite.log
             /tmp/heibon-preview.log
             docs/verification/step13.5.5
+      - name: Save center round display screenshots and measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: center-round-display-${{ github.sha }}
+          if-no-files-found: warn
+          path: /tmp/heibon-table-ui/center-round-display
       - name: Save river spacing failure diagnostics
         if: always()
         uses: actions/upload-artifact@v4

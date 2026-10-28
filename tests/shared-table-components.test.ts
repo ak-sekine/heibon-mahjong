@@ -98,7 +98,12 @@ for (const format of ['tonpu', 'tonnan'] as const) {
     withStrip(() => {
       for (const scenario of [
         { roundWind: 'east' as const, roundNumber: 1, honba: 0, liveWallCount: 69, label: '東1局' },
+        { roundWind: 'east' as const, roundNumber: 2, honba: 0, liveWallCount: 68, label: '東2局' },
+        { roundWind: 'east' as const, roundNumber: 3, honba: 0, liveWallCount: 67, label: '東3局' },
         { roundWind: 'east' as const, roundNumber: 4, honba: 1, liveWallCount: 68, label: '東4局 1本場' },
+        { roundWind: 'south' as const, roundNumber: 1, honba: 0, liveWallCount: 66, label: '南1局' },
+        { roundWind: 'south' as const, roundNumber: 2, honba: 0, liveWallCount: 65, label: '南2局' },
+        { roundWind: 'south' as const, roundNumber: 3, honba: 0, liveWallCount: 64, label: '南3局' },
         { roundWind: 'south' as const, roundNumber: 4, honba: 2, liveWallCount: 12, label: '南4局 2本場' },
       ]) {
         const round = new ElementStub('div');
