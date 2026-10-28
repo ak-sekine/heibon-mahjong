@@ -23,7 +23,8 @@ with sync_playwright() as p:
               window.tr=await import('/heibon-mahjong/src/rendering/table.ts');
               window.mr=await import('/heibon-mahjong/src/rendering/match.ts');
               window.match=(await import('/heibon-mahjong/src/game/match.ts')).startMatch();
-              const base=match.game, pool=[...base.liveWall,...base.deadWall];
+              const base=match.game, pool=(await import('/heibon-mahjong/src/game/wall.ts')).createWall()
+                .map(tile=>({...tile,id:`dora-layout-${tile.id}`}));
               window.game={...base,players:base.players.map((p,id)=>{
                 const river=pool.slice(id*18,id*18+18);
                 const melds=Array.from({length:4},(_,index)=>{
