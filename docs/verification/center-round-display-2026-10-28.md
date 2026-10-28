@@ -1,49 +1,70 @@
 # 卓中央の局表示 — Issue #4 — 2026-10-28
 
-## 修正前の問題と原因
+## 調査結果と原因
 
-iPhone Safariのスクリーンショットでは、卓中央に「東1局 東風戦 山69枚」が小さく表示され、読み取りづらいとの報告がありました。ソースでは共通の局ラベル描画処理が `data-format-label` を設定し、CSS疑似要素が東風戦／半荘戦を追加していました。卓中央は牌寸法を基準にした狭い領域で、文字も最大11px相当の clamp 指定でした。
+Issueの報告では、iPhone Safariの中央に「東1局 東風戦 山69枚」が小さく表示されていました。描画処理を調べると、局ラベルに対局形式を示す `data-format-label` を設定し、CSS疑似要素が「東風戦／半荘戦」を付け足していました。卓中央は牌寸法を基準とした狭い領域で、局ラベルも最大11px相当だったため、形式名が局情報と山枚数の幅を圧迫していました。
+
+この描画処理はオフライン・オンラインで共通です。原因は中央表示にあり、対局形式の設定値やゲーム進行ロジックを変える必要はありませんでした。
 
 ## 変更内容
 
-- 共通局表示から対局形式の文字・属性を外し、局情報、本場数、残り枚数だけを描画します。
-- 0本場は省略し、1本場以降は局情報に表示します。山の残り枚数は従来どおりゲーム状態から受け取ります。
-- 599px以下は局情報と山表示を別行にし、主要テキストを16pxに設定します。王牌枚数は補助表示として同じ行に収めます。
-- PC幅では従来の横並び、文字サイズ、卓寸法を保ちます。
-- 描画処理はオンラインとオフラインで共通です。対局形式の設定・局進行・通信処理は変更していません。
+- 卓中央から「東風戦／半荘戦」と形式用属性を削除しました。対局形式は設定と進行ロジックで引き続き使用します。
+- 局名は東／南と1〜4局から生成し、本場は1本場以降だけ付けます。山枚数はオフラインの `game.liveWall.length`、オンラインのviewにある `liveWallCount` を表示します。
+- 599px以下では局と山を別行にし、両方16px、改行なしで表示します。PCでは従来の横並びと文字サイズを保ちます。
+- 中央情報の位置を1.5px調整し、モバイルの河との間隔を確保しました。狭い幅で供託棒が3本以上並ぶ局面では1行に収め、ドラ表示・河と干渉しないようにしました。
+- オンライン再接続の回帰テストで、再接続前後に局名・山枚数が維持され、対局形式名が現れないことを確認します。
 
 ## 変更ファイル
 
-- `.github/workflows/browser-ui.yml`
+- `.github/workflows/browser-ui.yml` — 中央表示専用の小容量artifactを追加。
 - `src/main.ts`
 - `src/rendering/match.ts`
 - `src/rendering/shared-table-components.ts`
 - `src/style.css`
 - `tests/browser-app-idle.py`
-- `tests/browser-dora-rows.py`
-- `tests/shared-table-components.test.ts`
 - `tests/browser-center-round-display.py`
+- `tests/browser-dora-rows.py`
+- `tests/browser-online-waiting-room.py`
+- `tests/shared-table-components.test.ts`
+- `tests/step14-0-1.test.ts` — 対局が直後に終了状態へ進む場合も許容する既存テストの期待値を修正。
 - `docs/verification/README.md`
 - `docs/verification/center-round-display-2026-10-28.md`
 
 ## 検証結果
 
-- `npm test`: 成功（64個のテストファイルが成功、失敗0）。東風戦・半荘戦共通の局ラベル、東場・南場、0本場省略、1本場以上、動的な山枚数を確認。
+### 単体・ビルド
+
+- `npm test`: 成功。64テストファイル、64成功、失敗0。東風戦・半荘戦の双方で東1〜東4、南1〜南4、0本場省略、1本場以上、ゲーム状態の山枚数を確認。
 - `npm run build`: 成功。
 - `npm run typecheck:worker`: 成功。
 - `git diff --check`: 成功。
-- Browser UIテスト: 新しい検証を既存 `Browser UI verification` に追加。320、375、390、430、1280pxでオンライン／オフライン、両対局形式、東場／南場、本場数、山枚数、領域内配置、折返し、ドラ・河との干渉をChromiumとWebKitで測定し、スクリーンショットを保存します。run #245 は古い `browser-app-idle.py` が対局形式属性を期待して失敗しました。run #246 ではその期待値は直りましたが、テストが公開用previewからVite開発時専用のTypeScriptモジュールを読み込もうとして失敗しました。run #247 は `browser-dora-rows.py` がスマホでも局と山を同じ高さに期待して失敗しました。ログで局・山・ドラ・河の領域内測定が通り、同じ高さ条件だけが失敗したことを確認し、幅599px以下は別行、PC幅は従来の同じ行を検査するよう修正しました。ソースの対局進行ロジックは変更していないため、形式進行は既存 `tests/match-format.test.ts` に任せます。修正後のActions再実行は未完了です。
-- iPhone Safari実機: ユーザーからの実機確認報告がないため未確認です。
 
-## 公開・コミット
+### Browser UI
 
-- 対象コミットSHA: `1e42c29bf3c124f20fe41db3cc2c6b6fc7467ba1`（Issue #4実装）、`60584e67fc24f6ee36d5f7aad13ef5159c1b168b`／`eb68c71cbe26ca6be2dcfcb7f8c7cb73ab713b01`（Browser UI期待値更新）、`523a17410ab2346b074a82a405da1fa51f2839e4`（スマホ別行配置を既存レイアウトテストに反映）。
-- Deploy run #337: verify 成功、Browser UI gate 失敗。production test、Workers deploy、Pages build／deploy はすべて skipped で、デプロイ未実施です。
-- Deploy run #338: verify 成功、Browser UI gate 失敗。Pages／Workers のデプロイ関連jobはすべて skipped で、デプロイ未実施です。
-- Deploy run #339: verify 成功、Browser UI gate 失敗。Pages／Workers のデプロイ関連jobはすべて skipped で、デプロイ未実施です。
+- Browser UI run **40726786297**（SHA `90721b675bbc82c0a73b221cdc63a71a31b6e998`）成功。
+- ChromiumとWebKitで中央表示を各30ケース実行。各エンジンで320、375、390、430、1280pxを、オフライン／オンラインと3つの局・本場・山枚数で確認し、失敗0でした。
+- 両エンジンともモバイルの局・山は16px、5幅すべてで表示領域内、局名の意図しない改行なし、ドラ・河との干渉なし、ページ横はみ出しなし。PC幅では局11px・山15pxの従来レイアウトを確認。
+- 各エンジンのドラ／供託棒回帰テストは360ケース成功。オンライン再接続テストでは、再接続前後の局と山枚数の一致を確認。
+- Chromium／WebKitの320、390、1280px、オンライン／オフラインのスクリーンショット計12枚を取得し、すべて目視確認しました。局名と山の重なり、意図しない改行、中央からのはみ出し、ドラ・河との重なりはありませんでした。牌・河の配置にも見た目上の異常はありませんでした。
+- 計測JSONとスクリーンショット: Deploy run **40726786666** のartifact `center-round-display-90721b675bbc82c0a73b221cdc63a71a31b6e998`（artifact ID `12833933643`）。
+
+### 失敗した検証の調査と修正
+
+- 初期のbrowser runでは、古い `browser-app-idle.py` が形式表示用属性を期待していました。また、開発用TypeScript importをproduction previewで読み込もうとして失敗しました。テストを新しい表示仕様と開発サーバーに合わせました。
+- モバイルの局・山を同じ高さに期待した河・ドラテストを、別行のレイアウトに合わせました。
+- run #254では中央の位置を `-3px` 調整した状態で河と0.84px重なりました。上側・下側の余白を均等にする `-1.5px` に調整しました。
+- run #255では、CPU進行で局が終了状態になり得るのに、既存オンラインテストが `playing` のみを期待して失敗しました。ゲーム処理は変えず、`playing` または `round-ended` を許容するテストに直しました。
+- run #256／#257では、供託棒17本と裏ドラを含む320pxの高密度局面で、供託棒が複数行になり河と重なりました。モバイルで3本以上の場合に供託棒を1行へ圧縮しました。
+- run #258では起動時に非表示のオンライン要素をvisibleまで待ち、run #259ではRangeから得るDOMRectをElementとして扱って失敗しました。前者はattached待ちにし、後者はElementと矩形の両方を測定できるよう直しました。
+- run #260ではPCの横並び要素に対してモバイル用の縦間隔条件を誤って適用していました。狭幅では縦の間隔、PC幅では横並びを検査するよう条件を分けました。
+- 修正後のBrowser UI run #40726786297とDeploy内Browser UI gateは成功しました。
+
+## Deployと対象コミット
+
+- 対象コミットSHA: `90721b675bbc82c0a73b221cdc63a71a31b6e998`。
+- Deploy run **40726786666** は成功。`verify`、Browser UI gate、`deploy-worker`、`production-test`、`pages-build`、`pages-deploy` がすべて成功しました。
+- 対象コードは `origin/main` へpush済み。この記録は対象SHAに続くドキュメント更新コミットに含めます。
 
 ## 未確認事項
 
-- Chromium／WebKitのブラウザー計測とスクリーンショット。
-- GitHub Pages／Workersのデプロイ完了。
-- iPhone Safari実機の目視確認。
+- iPhone Safari実機では未確認です。Chromium／WebKitの結果を実機確認済みとは扱いません。ユーザーから実機報告があるまでIssue #4はOpenのままにします。
