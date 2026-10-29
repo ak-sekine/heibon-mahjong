@@ -28,3 +28,15 @@ Bは隔離した一時変更で旧来のCPU席1の河のみの判定を適用す
 ## 未確認事項とIssue #22
 
 ブラウザーでのAの実行・反復・mutation、Chromium／WebKit全体、iPhone Safari実機、Actionsと公開結果は未確認。[Issue #22](https://github.com/ak-sekine/heibon-mahjong/issues/22)の親テスト30秒タイムアウトは別件で、タイムアウト延長・skip・CI順序変更は行っていない。原因は未特定であり、Issue #22自体は変更しない。
+
+## 専用ブランチでのCI検証
+
+検証中。開始時HEADと最新origin/mainはいずれも `976ae62180fde61c169574af92c1f97d9809340d`。未コミット差分と未追跡ファイルを `/workspace/issue21-backup` に保存し、`test/issue-21-browser-regression` に移した。検証対象は `05848b334ac5eb73cb0f105337823a8d617cdcd8`。mainには未反映。
+
+静的レビューで東1局のリーチ宣言牌が河に存在すること、結果から次局を操作すること、次局mockの宣言参照・河の初期化と東2局表示、例外捕捉を照合した。描画検証の無効化や次局状態の補正はない。旧不具合時に局表示待ちだけでタイムアウトしないよう、状態または例外を先に観測し直接assertする。
+
+[正常系run 40897247248](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40897247248) は成功。npm testとbuild成功、Browser UI 52件（Chromium 33、WebKit 19）成功。A専用シナリオはChromium・WebKitとも成功、Chromium待機室全フローも成功。WebKit待機室はA専用および限定シナリオで、待機室全フローではない。BはCIのnpm testで成功し、既存オンラインテストも成功した。B単独20回および旧判定の検出は前節のローカル結果。Aの20回反復は未実施。
+
+[異常系run 40897377113](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40897377113) は別ブランチ `test/issue-21-mutation-check` の `c6aa244918307362cc8329146f79b5f8af3c7f0c` で、次局mockの宣言参照初期化のみを意図的に無効化した。同じworkflowのChromium Aが `Riichi declaration tile reference is missing from online seat 0` のRangeErrorを直接assertして失敗し、タイムアウトではなかった。正常系Chromium Aの成功と比較して検出を確認。manifestは最初の失敗で停止するため異常系WebKitは未実行。意図的変更は正常系やmainに含めない。
+
+Worker型チェックとdiff checkは前回ローカルで成功。実機検証、Aの反復とWebKit異常系は未確認。Issue #22は変更していない。
