@@ -724,7 +724,7 @@ with sync_playwright() as p:
         leaked_ids = page.evaluate('''() => {
           const controller = window.onlineUiTest.controller;
           if (!controller.hasGame) return [];
-          const privateIds = controller.game.players.slice(1).flatMap(player => [
+          const privateIds = controller.game.players.filter(player => player.control === 'cpu').flatMap(player => [
             ...player.hand, ...(player.drawnTile ? [player.drawnTile] : []),
           ]).map(tile => tile.id);
           const html = document.querySelector('main').innerHTML;
