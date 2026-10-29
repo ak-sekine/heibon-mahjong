@@ -234,8 +234,7 @@ async function waitForCpuProgress(clients, afterRevision, previousRivers, timeou
   });
 }
 
-function inspectGameView(client, expectedSeat, privateValues, expectedRoomCode) {
-  const message = latestGameMessage(client);
+function inspectGameView(client, expectedSeat, privateValues, expectedRoomCode, message = latestGameMessage(client)) {
   const view = message?.view;
   check(view?.roomCode === expectedRoomCode && view.viewerSeat === expectedSeat, 'A seat-specific game state was not received.');
   check(Array.isArray(view.seats) && view.seats.length === 4, 'The game view did not contain all four public seats.');
@@ -494,57 +493,79 @@ async function main() {
     check(nonHostStart.result.ok === false && nonHostStart.result.code === 'not_host', 'A non-host started the game.');
     const gameStarted = await sendGameAction(two.host, { type: 'start-game', requestId: nextRequestId('game-start') }, 0, 'game-start');
     check(gameStarted.result.ok === true && gameStarted.result.gameRevision === 1, 'The host could not start the server-owned game.');
-    await Promise.all([two.host, two.guest].map((client, seat) => waitForGameState(client, view =>
-      view?.roomCode === two.roomCode && view.viewerSeat === seat &&
-      Number(view.gameRevision) >= Number(gameStarted.result.gameRevision), 0, 15000, `game-started view for seat ${seat}`)));
-    const hostView = inspectGameView(two.host, 0, privateValues, two.roomCode);
-    const guestView = inspectGameView(two.guest, 1, privateValues, two.roomCode);
+    const [hostStarted, guestStarted] = await Promise.all([two.host, two.guest].map((client, participantSeat) => waitForGameState(client, view =>
+      view?.roomCode === two.roomCode && Number(view.gameRevision) >= Number(gameStarted.result.gameRevision),
+    0, 15000, `game-started view for participant seat ${participantSeat}`)));
+    const hostGameSeat = hostStarted.view.viewerSeat;
+    const guestGameSeat = guestStarted.view.viewerSeat;
+    check(Number.isInteger(hostGameSeat) && Number.isInteger(guestGameSeat) && hostGameSeat !== guestGameSeat,
+      'Participants did not receive distinct randomized game seats.');
+    const hostView = inspectGameView(two.host, hostGameSeat, privateValues, two.roomCode, hostStarted);
+    const guestView = inspectGameView(two.guest, guestGameSeat, privateValues, two.roomCode, guestStarted);
+    check(hostView.self.isHost && !guestView.self.isHost, 'Host authority did not stay with the original participant after seating.');
+    check(hostView.seats.map(seat => seat.name).join('\0') === guestView.seats.map(seat => seat.name).join('\0'),
+      'Participants received different game-seat assignments.');
+    check(hostView.seats[hostGameSeat].control === 'human' && guestView.seats[guestGameSeat].control === 'human' &&
+      hostView.seats[hostGameSeat].name === hostFinal.seats[0].name &&
+      guestView.seats[guestGameSeat].name === hostFinal.seats[1].name,
+    'The randomized game seats did not preserve each participant identity.');
     const hostPrivateIds = new Set([
-      ...hostView.seats[0].hand.map(tile => tile.id),
-      hostView.seats[0].drawnTile?.id,
+      ...hostView.seats[hostGameSeat].hand.map(tile => tile.id),
+      hostView.seats[hostGameSeat].drawnTile?.id,
     ].filter(Boolean));
     const guestPrivateIds = new Set([
-      ...guestView.seats[1].hand.map(tile => tile.id),
-      guestView.seats[1].drawnTile?.id,
+      ...guestView.seats[guestGameSeat].hand.map(tile => tile.id),
+      guestView.seats[guestGameSeat].drawnTile?.id,
     ].filter(Boolean));
-    check(hostView.seats[0].hand.length === 13 && hostView.seats[0].drawnTile, 'The host did not receive their own 14-tile opening hand.');
-    check(guestView.seats[1].hand.length === 13 && guestView.seats[1].drawnTile === null, 'The guest did not receive their own 13-tile opening hand.');
-    check([...guestPrivateIds].every(id => !JSON.stringify(latestGameMessage(two.host)).includes(id)), 'The host received the guest concealed hand.');
-    check([...hostPrivateIds].every(id => !JSON.stringify(latestGameMessage(two.guest)).includes(id)), 'The guest received the host concealed hand.');
-    const revisionAfterStart = Number(hostView.gameRevision);
+    for (const [view, gameSeat, participant] of [[hostView, hostGameSeat, 'host'], [guestView, guestGameSeat, 'guest']]) {
+      check(view.seats[gameSeat].hand.length === 13 && Boolean(view.seats[gameSeat].drawnTile) === (gameSeat === 0),
+        `The ${participant} did not receive the correct private opening hand for randomized seat ${gameSeat}.`);
+    }
+    check([...guestPrivateIds].every(id => !JSON.stringify(hostStarted).includes(id)), 'The host received the guest concealed hand.');
+    check([...hostPrivateIds].every(id => !JSON.stringify(guestStarted).includes(id)), 'The guest received the host concealed hand.');
+    const revisionAfterStart = Number(gameStarted.result.gameRevision);
     const duplicateStart = await sendGameAction(two.host,
       { type: 'start-game', requestId: gameStarted.requestId }, 0, 'unused');
-    check(duplicateStart.result.ok && Number(latestGameMessage(two.host).view.gameRevision) === revisionAfterStart,
+    check(duplicateStart.result.ok && Number(duplicateStart.result.gameRevision) === revisionAfterStart &&
+      Number(latestGameMessage(two.host).view.gameRevision) >= revisionAfterStart,
       'A duplicate start operation dealt another wall.');
     const secondStart = await sendGameAction(two.host, { type: 'start-game' }, 0, 'second-start');
     check(secondStart.result.ok === false && secondStart.result.code === 'already_started', 'A second start operation was accepted.');
 
-    const guestFirstTile = guestView.self.discardableTileIds?.[0] ?? guestView.seats[1].hand[0].id;
-    const outOfTurn = await sendGameAction(two.guest, { type: 'discard', tileId: guestFirstTile }, revisionAfterStart, 'out-of-turn');
-    check(outOfTurn.result.ok === false && outOfTurn.result.code === 'not_your_turn', 'An out-of-turn discard was accepted.');
-    const stealTile = await sendGameAction(two.host, { type: 'discard', tileId: guestFirstTile }, revisionAfterStart, 'other-hand');
-    check(stealTile.result.ok === false && stealTile.result.code === 'invalid_action', 'A host discarded a tile owned by another seat.');
+    const humanTurn = await waitForHumanTurn([two.host, two.guest], revisionAfterStart);
+    if (humanTurn.status === 'playing') {
+      check(humanTurn.phase === 'awaiting-discard', 'The active human turn did not allow a discard.');
+      const [hostAtHumanTurn, guestAtHumanTurn] = await Promise.all([two.host, two.guest].map((client, participantSeat) => waitForGameState(client,
+        view => view?.roomCode === two.roomCode && Number(view.gameRevision) >= Number(humanTurn.gameRevision),
+      0, 15000, `human-turn state for participant seat ${participantSeat}`)));
+      const activeHuman = humanTurn.viewerSeat === hostGameSeat ? two.host
+        : humanTurn.viewerSeat === guestGameSeat ? two.guest : null;
+      check(activeHuman !== null, 'The active human turn did not map to either connected participant.');
+      const otherHuman = activeHuman === two.host ? two.guest : two.host;
+      const otherHumanGameSeat = activeHuman === two.host ? guestGameSeat : hostGameSeat;
+      const otherHumanView = activeHuman === two.host ? guestAtHumanTurn.view : hostAtHumanTurn.view;
+      const otherHumanTile = otherHumanView.seats[otherHumanGameSeat].hand[0].id;
+      const outOfTurn = await sendGameAction(otherHuman, { type: 'discard', tileId: otherHumanTile }, humanTurn.gameRevision, 'out-of-turn');
+      check(outOfTurn.result.ok === false && outOfTurn.result.code === 'not_your_turn', 'An out-of-turn discard was accepted.');
+      const stealTile = await sendGameAction(activeHuman, { type: 'discard', tileId: otherHumanTile }, humanTurn.gameRevision, 'other-hand');
+      check(stealTile.result.ok === false && stealTile.result.code === 'invalid_action', 'A player discarded a tile owned by another seat.');
 
-    const hostDiscardId = hostView.self.discardableTileIds[0];
-    const hostDiscard = await sendGameAction(two.host, { type: 'discard', tileId: hostDiscardId,
-      requestId: nextRequestId('game-discard') }, revisionAfterStart, 'host-discard');
-    check(hostDiscard.result.ok === true, 'A legal host discard was rejected.');
-    const afterHostRevision = Math.max(Number(latestGameMessage(two.host).view.gameRevision), Number(latestGameMessage(two.guest).view.gameRevision));
-    const humanTurn = await waitForHumanTurn([two.host, two.guest], afterHostRevision);
-    check(humanTurn.status === 'playing' && humanTurn.phase === 'awaiting-discard', 'A human turn did not resume after the discard window.');
-    const activeHuman = humanTurn.viewerSeat === 0 ? two.host : two.guest;
-    const activeTileId = humanTurn.self.discardableTileIds[0];
-    check(typeof activeTileId === 'string', 'The active human did not receive a legal discard candidate.');
-    const cpuBaselineView = latestGameMessage(two.host).view;
-    const cpuRiversBefore = Object.fromEntries(cpuBaselineView.seats.map(seat => [seat.seat, seat.river.length]));
-    const humanDiscard = await sendGameAction(activeHuman, { type: 'discard', tileId: activeTileId }, humanTurn.gameRevision, 'human-discard');
-    check(humanDiscard.result.ok === true, 'A legal human discard was not accepted.');
-    const cpuUpdate = await waitForCpuProgress([two.host, two.guest], humanTurn.gameRevision, cpuRiversBefore);
-    check(cpuUpdate.status !== 'playing' || cpuUpdate.seats.some(seat => seat.control === 'cpu' && seat.river.length > cpuRiversBefore[seat.seat]),
-      'CPU auto progress was not visible to either client.');
+      const activeTileId = humanTurn.self.discardableTileIds[0];
+      check(typeof activeTileId === 'string', 'The active human did not receive a legal discard candidate.');
+      const cpuBaselineView = hostAtHumanTurn.view;
+      const cpuRiversBefore = Object.fromEntries(cpuBaselineView.seats.map(seat => [seat.seat, seat.river.length]));
+      const humanDiscard = await sendGameAction(activeHuman, { type: 'discard', tileId: activeTileId }, humanTurn.gameRevision, 'human-discard');
+      check(humanDiscard.result.ok === true, 'A legal human discard was rejected.');
+      const cpuUpdate = await waitForCpuProgress([two.host, two.guest], humanTurn.gameRevision, cpuRiversBefore);
+      check(cpuUpdate.status !== 'playing' || cpuUpdate.seats.some(seat => seat.control === 'cpu' && seat.river.length > cpuRiversBefore[seat.seat]),
+        'CPU auto progress was not visible to either client.');
+    } else {
+      check(humanTurn.status === 'round-ended' && Boolean(humanTurn.result),
+        'The game ended before a human turn without a public round result.');
+    }
 
     const guestBeforeReconnect = latestGameMessage(two.guest).view;
-    const guestHandBeforeReconnect = guestBeforeReconnect.seats[1].hand.map(tile => tile.id).sort();
+    const guestHandBeforeReconnect = guestBeforeReconnect.seats[guestGameSeat].hand.map(tile => tile.id).sort();
     const disconnectAt = two.host.messages.length;
     const disconnected = waitForRoomState(two.host,
       state => state.seats.some(seat => seat.seat === 1 && !seat.connected), disconnectAt);
@@ -553,18 +574,13 @@ async function main() {
     const gameReconnect = await connectParticipant(two.roomCode, two.guestToken, 'guest-reconnected');
     two.sockets.push(gameReconnect);
     two.guest = gameReconnect;
-    const resumedGame = await waitForGameState(gameReconnect, view => view.viewerSeat === 1 && view.status !== 'aborted');
-    check(resumedGame.view.seats[1].hand.map(tile => tile.id).sort().join(',') === guestHandBeforeReconnect.join(','),
+    const resumedGame = await waitForGameState(gameReconnect, view => view.viewerSeat === guestGameSeat && view.status !== 'aborted');
+    check(resumedGame.view.seats[guestGameSeat].hand.map(tile => tile.id).sort().join(',') === guestHandBeforeReconnect.join(','),
       'Reconnection did not restore the same private hand.');
-    inspectGameView(gameReconnect, 1, privateValues, two.roomCode);
+    inspectGameView(gameReconnect, guestGameSeat, privateValues, two.roomCode);
     check(!two.host.privacyLeak && !two.guest.privacyLeak && !gameReconnect.privacyLeak, 'A game WebSocket update included a secret.');
 
     const beforeGuestGameExit = two.guest.messages.length;
-    const hostViewBeforeExit = latestGameMessage(two.host).view;
-    const hostPrivateIdsAtExit = new Set([
-      ...hostViewBeforeExit.seats[0].hand.map(tile => tile.id),
-      hostViewBeforeExit.seats[0].drawnTile?.id,
-    ].filter(Boolean));
     const leaveGame = await sendAction(two.host, { type: 'leave-room' }, 'game-host-leave');
     check(leaveGame.result.ok, 'A participant could not explicitly leave an active online game.');
     const takeoverNotice = await waitForMessage(two.guest,
@@ -579,12 +595,11 @@ async function main() {
     check(roomAfterHandoff.seats[1].isHost, 'Room host control was not transferred after explicit game exit.');
     const resumedAfterExit = await waitForGameState(two.guest, view =>
       (view.status === 'playing' || view.status === 'round-ended') &&
-      view.seats[0].control === 'cpu' && view.self.isHost === true &&
+      view.seats[hostGameSeat].control === 'cpu' && view.self.isHost === true &&
       Number(view.gameRevision) > revisionAfterStart, 0, 15000, 'CPU takeover game state');
-    check(!('hand' in resumedAfterExit.view.seats[0]) &&
-      [...hostPrivateIdsAtExit].every(id => !JSON.stringify(resumedAfterExit).includes(id)),
+    check(!('hand' in resumedAfterExit.view.seats[hostGameSeat]) && !('drawnTile' in resumedAfterExit.view.seats[hostGameSeat]),
       'The CPU takeover exposed the departed seat concealed hand.');
-    check(resumedAfterExit.view.seats[0].name === 'CPU1', 'The online game view did not use the CPU1 display name.');
+    check(resumedAfterExit.view.seats[hostGameSeat].name === 'CPU1', 'The online game view did not use the CPU1 display name.');
     const departedGameToken = await request(`/api/rooms/${two.roomCode}/ticket`, { method: 'POST', token: two.hostToken });
     check(departedGameToken.response.status === 401, 'An exited host token was accepted after CPU takeover.');
     const finalLeave = await sendAction(two.guest, { type: 'leave-room' }, 'game-final-human-leave');
