@@ -1,11 +1,10 @@
 name: Production Worker diagnostics
 
 on:
-  push:
+  workflow_run:
+    workflows: [Deploy to GitHub Pages and Cloudflare Workers]
     branches: [main]
-    paths:
-      - '.github/workflows/production-diagnostics.yml'
-      - 'tests/online-production.mjs'
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -13,11 +12,12 @@ permissions:
 
 jobs:
   production-test:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -26,7 +26,7 @@ jobs:
         env:
           ONLINE_API_URL: https://heibon-mahjong-online.ak-sekine.workers.dev
         run: |
-          echo "Test commit: $GITHUB_SHA"
+          echo "Test commit: ${{ github.event.workflow_run.head_sha || github.sha }}"
           echo "Production Worker: $ONLINE_API_URL"
       - run: npm ci
       - name: Verify production Worker with state diagnostics
