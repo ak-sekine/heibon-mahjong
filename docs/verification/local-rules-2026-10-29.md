@@ -45,26 +45,34 @@ Issue：[#6 ローカルルール設定画面・前回設定復元・オンラ�
 
 ## 自動検証・本番デプロイ
 
-この節は実施結果を確定後に記入します。
-
 | 検証 | 結果 |
 | --- | --- |
-| `npm test` | 成功。67ファイル／テスト群、67 passed、0 failed（2026-10-29）。Workerの旧ルーム形式・不正変更テストを追加後に対象テストを再実行。 |
-| `npm run build` | 成功（2026-10-29、TypeScriptとVite production build）。 |
+| `npm test` | 成功。67テスト群、67 passed、0 failed。最終ソース修正後にも実行（2026-10-29）。 |
+| `npm run build` | 成功。TypeScript検査とVite production build（2026-10-29）。 |
 | `npm run typecheck:worker` | 成功（2026-10-29）。 |
-| `git diff --check` | 成功（2026-10-29）。 |
-| Chromium / WebKit Browser UI | GitHub Actions結果確認後に記入 |
-| GitHub Actions Worker・本番通信・Pages | push後、対象コミットの実行を確認して記入 |
-| Worker・Pages本番デプロイ | push後に確認。未確認の段階では成功扱いしない |
+| `git diff --check` | 成功（2026-10-29、最終ドキュメントpush前に再実行）。 |
+| Chromium / WebKit Browser UI | 成功。GitHub Actions [run 40857841888](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40857841888) で48スクリプトすべて成功（Chromium 31、WebKit 17）。新規対局設定・保存復元、オンライン待機時のルール確認、`kan-test.html`を含む検証ページを確認。 |
+| GitHub Actions verify | 成功。同runで回帰テスト、Worker型チェック、Pages build用artifact作成。 |
+| Worker本番デプロイ | 成功（2026-10-29 10:48 UTC）。本番Worker: https://heibon-mahjong-online.ak-sekine.workers.dev |
+| 本番通信テスト | 成功。同runでHTTPS、ルーム、WebSocket、再接続、認証、プライバシーを検証。2人対局、切断・再接続、ホスト交代、CPU引継ぎ、4人対局のシナリオが成功。 |
+| Pages build・deploy | 成功。公開URL: https://ak-sekine.github.io/heibon-mahjong/ （2026-10-29 10:49 UTC）。 |
 | iPhone Safari実機 | 未確認。ユーザー確認待ち |
+
+### CI中に見つけた問題と修正
+
+- 初回Browser run [40855839335](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40855839335) では、テスト前半ですでに開始済みの東風戦を保存しているのに、後半でlocalStorageが空のままと誤って期待していました。テストを保存済み値との比較へ修正し、[86e79f9](https://github.com/ak-sekine/heibon-mahjong/commit/86e79f95e5a4223da3192edf73f649d027534f52) に記録しました。
+- 修正確認時のBrowser run [40856644534](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40856644534) では、`kan-test.html`にルール設定ダイアログがないため共通`main.ts`の初期化が失敗しました。ダイアログがない検証ページでは設定ダイアログを初期化しないよう修正し、最終runで同ページを含む全Browser UIが成功しました。
+- 検証記録の末尾空白は`ea65798`で修正し、後続の`docs-check`は成功しています。
 
 ## 変更ファイル・コミット
 
 主要実装コミット：`451ff9495eb4493248a6b16f1d23046a56bd203a`（origin/main `9ef97d090c5cc4b3089dcb7907123d1c385d4597`から作成）。
 
+追加修正コミット：`86e79f95e5a4223da3192edf73f649d027534f52`（キャンセル時の保存値回帰テスト修正）、`9d2622dac10064b8c2f6f68c3810139d2796010e`（ダイアログのない検証ページとの互換性）。最終検証runは`9d2622dac10064b8c2f6f68c3810139d2796010e`で実行しました。
+
 変更ファイル：`docs/ROADMAP.md`、`docs/SPEC.md`、`docs/verification/README.md`、`docs/verification/local-rules-2026-10-29.md`、`index.html`、`src/main.ts`、`src/model/rules.ts`、`src/online/protocol.ts`、`src/online/waiting-room.ts`、`src/style.css`、`src/ui/new-game-dialog.ts`、`src/ui/rule-settings.ts`、`tests/browser-app-idle.py`、`tests/browser-online-waiting-room.py`、`tests/run-browser-regressions.py`、`tests/rules.test.ts`、`tests/step14-0-1.test.ts`、`worker/index.ts`、`worker/room.ts`。
 
-Actions・本番検証の対象コミットと最終push SHAは下記の結果確認後に追記します。Issue #6はiPhone Safari実機確認までOpenを維持します。
+Issue #6はiPhone Safari実機確認までOpenを維持します。
 
 ## iPhone Safari実機で確認する項目
 
