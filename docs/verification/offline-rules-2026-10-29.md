@@ -33,8 +33,8 @@
 | `npm run typecheck:worker` | 成功。 |
 | `git diff --check` | 成功。 |
 | Pythonの構文確認 | 変更したBrowser UIスクリプトとmanifestの`py_compile`成功。 |
-| Chromium / WebKit Browser UI | GitHub Actionsで実施予定。結果は確認後に追記。 |
-| GitHub Actions・Worker／Pages公開 | 未実施。実施後に対象コミットと結果を追記。 |
+| Chromium / WebKit Browser UI | 作業ブランチの[run 40872584378](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40872584378)で全50スクリプト成功（Chromium 32、WebKit 18）。対象SHAは`8198baabbc8560086b24478d3be8a14c0f7676e8`。 |
+| GitHub Actions・Worker／Pages公開 | main初回[run 40875485705](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40875485705)は既存オンライン回帰テストで失敗し、Browser UI・Worker／Pages公開はskip。対応後の結果は確認後に追記。 |
 | iPhone Safari実機 | **未確認**。自動WebKitはiPhone実機確認として扱いません。 |
 
 ### 追加・更新した検証範囲
@@ -46,12 +46,20 @@
 - `tests/browser-online-waiting-room.py`：オフライン確認後に同じ画面をオンライン待機で再利用しても、サーバー確定ルール・案内・aria-label・読み取り専用が正しいことを確認。新しいメニュー項目を含むキーボード操作とオンライン開始時の非表示も検証します。
 - `tests/run-browser-regressions.py`：既存Browser UIワークフローに新スクリプトのChromium／WebKitを追加。全50スクリプト（Chromium 32、WebKit 18）。
 
+### main初回の回帰テスト失敗と対応
+
+- `8198baa`の作業ブランチでは全テストとBrowser UIが成功しましたが、main初回runの`tests/step14-0-1.test.ts:818`で、参加者の手番を期待する既存テストが`2 !== 3`で失敗しました。verify以降はskipされ、公開は行われていません。
+- 該当テストは本番用の暗号学的乱数で座席と牌山を決めた後、特定の人間の手番まで進める前提でした。ランダムな対局はCPUの和了・途中流局などで先に終了できるため、このライフサイクル検証には入力の再現性が必要です。元の入力による同じ失敗はローカル80回では再現しておらず、CIで実際にどの局終了条件が成立したかまではログから特定できていません。
+- 該当サブテストだけ`TestContext.mock`で乱数列を固定し、完了時に自動復元します。手番・公開範囲・保存・再接続・重複操作の期待値や待ち上限は変更していません。失敗時は状態・phase・手番・revision・結果を出力するようにしました。本番の乱数・ゲーム処理は変更しません。
+- 修正後の対象ファイル20回連続実行（各23テスト）と`npm test`全67テスト群が成功しました。アプリのソースは変更していないため、ローカルbuild・Worker型チェックは同じソースで成功した結果を引き継ぎ、本番ワークフローでも再確認します。
+
 ## 変更ファイルとコミット
 
 - 実装：`index.html`、`src/main.ts`、`src/model/match.ts`、`src/model/rules.ts`、`src/game/match.ts`、`src/ui/controller.ts`、`src/ui/rule-settings.ts`、`src/online/game-controller.ts`、`src/style.css`。
-- テスト：`tests/rules.test.ts`、`tests/browser-offline-rules.py`、`tests/browser-app-idle.py`、`tests/browser-online-waiting-room.py`、`tests/run-browser-regressions.py`。
+- テスト：`tests/rules.test.ts`、`tests/browser-offline-rules.py`、`tests/browser-app-idle.py`、`tests/browser-online-waiting-room.py`、`tests/run-browser-regressions.py`、`tests/step14-0-1.test.ts`。
 - 文書：`docs/SPEC.md`、`docs/ROADMAP.md`、`docs/verification/README.md`、本記録。
-- コミットSHA・main反映・Actions URLは確認後に追記します。
+- 実装コミット：`8198baabbc8560086b24478d3be8a14c0f7676e8`。作業ブランチ`issue20-offline-rules`の全自動検証成功後、`origin/main`が基準SHAのままでbehind 0 / ahead 1、作業ツリーに変更なし、push対象が本Issueの1コミットだけであることを確認しました。
+- `git push origin HEAD:main`成功（fast-forward、forceなし）。push後の`git ls-remote origin refs/heads/main`で同じ実装SHAを確認。ローカルも`main`へ切り替えました。
 
 ## iPhone Safari実機で確認する項目
 

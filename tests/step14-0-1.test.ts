@@ -665,7 +665,20 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.ok(rateClient.client.sent.some(message => JSON.parse(message).code === 'rate_limited'));
   });
 
-  await t.test('starts, persists, isolates, resumes and advances a two-human online game', { timeout: 30_000 }, async () => {
+  await t.test('starts, persists, isolates, resumes and advances a two-human online game', { timeout: 30_000 }, async t => {
+    // This lifecycle scenario requires both humans to discard before the round
+    // ends. Random walls/seats can legitimately end on an earlier CPU turn.
+    // Keep its inputs reproducible without changing production randomness or
+    // weakening the turn, privacy, persistence, and idempotency assertions.
+    let randomState = 11;
+    t.mock.method(crypto, 'getRandomValues', <T extends ArrayBufferView | null>(array: T): T => {
+      assert.ok(array instanceof Uint8Array || array instanceof Uint32Array);
+      for (let index = 0; index < array.length; index++) {
+        randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
+        array[index] = randomState;
+      }
+      return array;
+    });
     const fixture = await makeRoom('Game host', token('7'));
     const guestInfo = await joinRoom(fixture, 'Game guest', token('8'));
     const host = await connectParticipant(fixture, fixture.hostToken);
@@ -815,7 +828,10 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
       await passVisibleDecisions(fixture, [host, guest]);
     }
     let guestTurn = latestGameView(guest);
-    assert.equal(guestTurn.turnPlayerId, guestGameSeat);
+    assert.equal(guestTurn.turnPlayerId, guestGameSeat, JSON.stringify({
+      status: guestTurn.status, phase: guestTurn.phase, turn: guestTurn.turnPlayerId, guestGameSeat,
+      gameRevision: guestTurn.gameRevision, result: guestTurn.result,
+    }));
     assert.equal(guestTurn.phase, 'awaiting-discard');
     const guestDiscardIds = (guestTurn.self as Record<string, unknown>).discardableTileIds as string[];
     assert.ok(guestDiscardIds.length > 0);
