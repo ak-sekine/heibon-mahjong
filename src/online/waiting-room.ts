@@ -8,6 +8,8 @@ import {
   type GameActionPayload,
 } from './protocol.ts';
 import { diagnosticLog } from './diagnostics.ts';
+import { DEFAULT_GAME_RULES, rulesForFormat, type GameRules } from '../model/rules.ts';
+import { openReadOnlyRules, RulePreferences } from '../ui/rule-settings.ts';
 
 type RoomSeat = OnlineRoomSeat;
 type RoomState = OnlineRoomState & { type?: string };
@@ -18,7 +20,7 @@ type RoomSession = {
   displayName: string;
   expiresAt: number;
 };
-type ApiRoomResponse = RoomSession & { seats: RoomSeat[]; createdAt?: number; format?: 'tonpu' | 'tonnan' };
+type ApiRoomResponse = RoomSession & { seats: RoomSeat[]; createdAt?: number; format?: 'tonpu' | 'tonnan'; rules?: GameRules };
 type PendingAction = {
   requestId: string;
   expectedRevision: number;
@@ -122,6 +124,7 @@ export class OnlineWaitingRoom {
   private readonly leaveButton = document.querySelector<HTMLButtonElement>('#online-leave')!;
   private readonly closeRoomButton = document.querySelector<HTMLButtonElement>('#online-close-room')!;
   private readonly startGameButton = document.querySelector<HTMLButtonElement>('#online-start-game')!;
+  private readonly confirmRulesButton = document.querySelector<HTMLButtonElement>('#online-confirm-rules')!;
   private readonly roomMenuItem = document.querySelector<HTMLButtonElement>('#menu-room')!;
   private readonly apiUrl: string;
   private readonly onlineUnavailableMessage: string;
@@ -147,16 +150,19 @@ export class OnlineWaitingRoom {
   private gameActive = false;
   private gameTerminated = false;
   private readonly onGameMessage: (message: Record<string, unknown>) => void;
+  private readonly rulePreferences?: RulePreferences;
 
-  constructor(apiUrl: string | undefined, onGameMessage: (message: Record<string, unknown>) => void = () => {}) {
+  constructor(apiUrl: string | undefined, onGameMessage: (message: Record<string, unknown>) => void = () => {},
+    rulePreferences?: RulePreferences) {
+    this.rulePreferences = rulePreferences;
     this.apiUrl = (apiUrl ?? '').replace(/\/+$/u, '');
     this.onlineUnavailableMessage = !this.apiUrl
       ? 'オンライン接続先はまだ設定されていません。'
       : !this.isSecureApiUrl(this.apiUrl) ? 'オンライン接続先の設定を確認してください。' : '';
     this.onGameMessage = onGameMessage;
     document.querySelector<HTMLButtonElement>('#online-create-open')!.addEventListener('click', () => {
-      const defaultFormat = document.querySelector<HTMLInputElement>('input[name="online-match-format"][value="tonpu"]');
-      if (defaultFormat) defaultFormat.checked = true;
+      this.rulePreferences?.resetToLastStarted();
+      this.updateCreateRulesSummary();
       this.openEntryDialog(this.createDialog, this.createCloseButton);
     });
     document.querySelector<HTMLButtonElement>('#online-join-open')!.addEventListener('click', () => this.openEntryDialog(this.joinDialog, this.joinCloseButton));
@@ -194,6 +200,10 @@ export class OnlineWaitingRoom {
     this.readyButton.addEventListener('click', () => this.toggleReady());
     this.finalizeButton.addEventListener('click', () => this.sendAction({ type: 'finalize-seats' }));
     this.startGameButton.addEventListener('click', () => this.sendGameAction({ type: 'start-game' }, 0));
+    this.confirmRulesButton.addEventListener('click', () => {
+      if (this.state) openReadOnlyRules(this.confirmRulesButton,
+        this.state.rules ?? rulesForFormat(this.state.format));
+    });
     this.leaveButton.addEventListener('click', () => this.leaveRoom());
     this.closeRoomButton.addEventListener('click', () => this.closeRoom());
     document.querySelector<HTMLButtonElement>('#online-copy-code')!.addEventListener('click', () => {
@@ -377,14 +387,16 @@ export class OnlineWaitingRoom {
       return;
     }
     this.roomRequestPending = true;
+    const selectedRules = this.rulePreferences?.current ?? DEFAULT_GAME_RULES;
     this.setFormMessage(this.createMessage, 'ルームを作成しています…');
     this.updateFormAvailability();
     try {
       const result = await this.request<ApiRoomResponse>('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName: name, format: document.querySelector<HTMLInputElement>('input[name="online-match-format"]:checked')?.value === 'tonnan' ? 'tonnan' : 'tonpu' }),
+        body: JSON.stringify({ displayName: name, rules: selectedRules, format: selectedRules.matchFormat }),
       });
+      this.rulePreferences?.acceptedStart(result.rules ?? rulesForFormat(result.format ?? selectedRules.matchFormat));
       this.closeEntryDialog(this.createDialog);
       this.setSession(result, name, '');
       await this.connect();
@@ -725,7 +737,13 @@ export class OnlineWaitingRoom {
       this.setStatus(this.gameActive ? 'オンライン対局を進行しています。' : '座席が確定しました。ホストはオンライン対局を開始できます。');
     }
     this.roomPanel.hidden = false;
+    this.confirmRulesButton.hidden = state.status === 'closed';
     this.renderControls();
+  }
+
+  private updateCreateRulesSummary(): void {
+    const summary = document.querySelector<HTMLElement>('#online-create-rules-summary');
+    if (summary) summary.textContent = this.rulePreferences?.current.matchFormat === 'tonnan' ? '設定：半荘戦' : '設定：東風戦';
   }
 
   private renderControls(): void {

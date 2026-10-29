@@ -26,10 +26,8 @@
     <header class="online-dialog-header"><h2 id="online-create-title">新しくルームを作る</h2><button id="online-create-close" class="online-dialog-close" type="button" aria-label="ルーム作成を閉じる">閉じる</button></header>
     <form id="online-create-form" class="online-entry-form" novalidate>
       <label for="online-create-name">表示名</label>
-      <fieldset class="match-format-options"><legend>対局形式</legend>
-        <label><input type="radio" name="online-match-format" value="tonpu" checked> 東風戦</label>
-        <label><input type="radio" name="online-match-format" value="tonnan"> 半荘戦</label>
-      </fieldset>
+      <button id="online-create-rules" class="rule-settings-open" type="button">ルール設定</button>
+      <p id="online-create-rules-summary" class="rule-settings-summary" aria-live="polite">東風戦</p>
       <input id="online-create-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" aria-describedby="online-create-message" required>
       <p id="online-create-message" class="online-form-message" role="status" aria-live="polite" hidden></p>
       <button id="online-create" type="submit" disabled>ルームを作成</button>
@@ -60,7 +58,7 @@
         <div class="online-room-info">
           <p class="online-room-code-row"><span>ルームコード</span><strong id="online-room-code">—</strong><button id="online-copy-code" type="button">コピー</button></p>
           <p class="online-room-expiry-row">有効期限：<time id="online-room-expiry">—</time></p>
-          <p id="online-room-format" class="online-room-expiry-row"></p>
+          <div class="online-room-rule-row"><p id="online-room-format" class="online-room-expiry-row"></p><button id="online-confirm-rules" type="button">ルール確認</button></div>
         </div>
         <p id="online-connection" role="status" aria-live="polite" hidden>接続状態を確認しています。</p>
         <ol id="online-seats" aria-label="参加者とCPUの一覧"></ol>
@@ -181,14 +179,28 @@
   </dialog>
   <dialog id="new-game-dialog" aria-labelledby="new-game-question">
     <p id="new-game-question">現在の対局を終了して、最初から始めますか？</p>
-    <fieldset class="match-format-options"><legend>対局形式</legend>
-      <label><input type="radio" name="offline-match-format" value="tonpu" checked> 東風戦</label>
-      <label><input type="radio" name="offline-match-format" value="tonnan"> 半荘戦</label>
-    </fieldset>
+    <button id="new-game-rules" class="rule-settings-open" type="button">ルール設定</button>
+    <p id="new-game-rules-summary" class="rule-settings-summary" aria-live="polite">東風戦</p>
     <div class="new-game-actions">
       <button id="cancel-new-game" type="button" autofocus>キャンセル</button>
       <button id="confirm-new-game" type="button">新しい対局を開始</button>
     </div>
+  </dialog>
+  <dialog id="rule-settings-dialog" class="online-dialog" aria-labelledby="rule-settings-title">
+    <header class="online-dialog-header"><h2 id="rule-settings-title">ルール設定</h2></header>
+    <p>新しい対局で使用するルールを選びます。</p>
+    <fieldset class="match-format-options"><legend>対局形式</legend>
+      <label><input type="radio" name="rules-match-format" value="tonpu" checked> 東風戦（東1局〜東4局）</label>
+      <label><input type="radio" name="rules-match-format" value="tonnan"> 半荘戦（東場・南場）</label>
+    </fieldset>
+    <section id="rule-settings-details" aria-label="固定ルール"></section>
+    <p id="rule-settings-summary" class="rule-settings-summary"></p>
+    <footer class="rule-settings-actions"><button id="cancel-rule-settings" type="button">キャンセル</button><button id="confirm-rule-settings" type="button">設定を確定</button></footer>
+  </dialog>
+  <dialog id="online-rules-dialog" class="online-dialog" aria-labelledby="online-rules-title">
+    <header class="online-dialog-header"><h2 id="online-rules-title">ルール確認</h2><button id="online-rules-close" class="online-dialog-close" type="button">閉じる</button></header>
+    <p id="online-rules-readonly-label" class="rule-settings-summary">読み取り専用</p>
+    <section id="online-rules-list" aria-label="サーバーで確定したルール"></section>
   </dialog>
 </main>
 <script type="module" src="/src/main.ts"></script>

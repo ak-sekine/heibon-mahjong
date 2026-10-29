@@ -4,6 +4,8 @@ import { renderTable, renderSelection } from './rendering/table.ts';
 import { renderMatch } from './rendering/match.ts';
 import { ResultDialog } from './ui/result-dialog.ts';
 import { NewGameDialog } from './ui/new-game-dialog.ts';
+import { RulePreferences, RuleSettingsDialog } from './ui/rule-settings.ts';
+import type { GameRules } from './model/rules.ts';
 import { GameController } from './ui/controller.ts';
 import { getLastLocalGameTransition, waitForTurn } from './game/automatic-turns.ts';
 import { OnlineWaitingRoom } from './online/waiting-room.ts';
@@ -177,12 +179,17 @@ diagnosticLog.record('INFO', 'app_build_info', {
   executionMode: 'none',
 });
 export function resetLocalActionChoices(): void { localKanChoicesOpen = false; }
-function newGame(format: 'tonpu' | 'tonnan' = 'tonpu'): void {
+function newGame(rules: GameRules): void {
   localDeclarationBubbles.clearAll();
-  controller.newGame(format);
+  controller.newGame(rules.matchFormat);
+  // A synchronous, accepted local start is the persistence boundary. Storage
+  // failures are swallowed so they cannot interrupt a playable match.
+  rulePreferences.acceptedStart(rules);
   window.scrollTo(0, 0);
 }
-new NewGameDialog(newGame, () => controller.hasGame);
+const rulePreferences = new RulePreferences();
+new RuleSettingsDialog(rulePreferences);
+new NewGameDialog(newGame, () => controller.hasGame, rulePreferences);
 if (localActionRoot) localActionPanel = new ActionPanel(localActionRoot, event => {
   switch (event.type) {
     case 'discard':
@@ -235,7 +242,7 @@ if (document.querySelector('#online-create-open')) {
     controller.clearGame();
     render();
   });
-  const waitingRoom = new OnlineWaitingRoom(import.meta.env.VITE_ONLINE_API_URL, message => onlineGameController?.receive(message));
+  const waitingRoom = new OnlineWaitingRoom(import.meta.env.VITE_ONLINE_API_URL, message => onlineGameController?.receive(message), rulePreferences);
   onlineGameController.setActionSender((action, expectedGameRevision) => waitingRoom.sendGameAction(action, expectedGameRevision));
 }
 document.querySelector('#player-hand')!.addEventListener('click', event => {

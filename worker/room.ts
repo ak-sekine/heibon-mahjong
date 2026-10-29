@@ -10,6 +10,7 @@ import {
   type SeatTakenOverMessage,
 } from '../src/online/protocol.ts';
 import type { PlayerId } from '../src/model/game.ts';
+import { normalizeGameRules, rulesForFormat } from '../src/model/rules.ts';
 import {
   advanceOnlineCpu,
   applyOnlineGameAction,
@@ -363,6 +364,7 @@ export class RoomDurableObject {
       roomCode: room.code,
       status: room.status,
       format: room.format === 'tonnan' ? 'tonnan' : 'tonpu',
+      rules: rulesForFormat(room.format === 'tonnan' ? 'tonnan' : 'tonpu'),
       hostSeat: room.host_seat,
       revision: room.revision,
       createdAt: room.created_at,
@@ -496,9 +498,12 @@ export class RoomDurableObject {
 
     if (url.pathname === '/internal/create' && request.method === 'POST') {
       const body = await internalJson(request);
+      const rules = body?.rules === undefined
+        ? rulesForFormat(body?.format === 'tonnan' ? 'tonnan' : 'tonpu')
+        : normalizeGameRules(body.rules);
       const displayName = cleanDisplayName(body?.displayName);
       if (!body || !CODE_PATTERN.test(String(body.code ?? '')) || !displayName ||
-          !TOKEN_PATTERN.test(String(body.participantToken ?? '')) || !['tonpu','tonnan'].includes(String(body.format ?? 'tonpu'))) {
+          !TOKEN_PATTERN.test(String(body.participantToken ?? '')) || !['tonpu','tonnan'].includes(rules.matchFormat)) {
         return json({ error: 'invalid_room' }, 400, origin);
       }
       if (this.room()) return json({ error: 'room_exists' }, 409, origin);
@@ -509,7 +514,7 @@ export class RoomDurableObject {
         if (this.room()) return false;
         this.ctx.storage.sql.exec(
           "INSERT INTO room (code, created_at, expires_at, status, host_seat, revision, format) VALUES (?, ?, ?, 'waiting', 0, 0, ?)",
-          body.code, now, expiresAt, body.format === 'tonnan' ? 'tonnan' : 'tonpu',
+          body.code, now, expiresAt, rules.matchFormat,
         );
         this.ctx.storage.sql.exec(
           'INSERT INTO seats (seat, name, token_hash, connected, kind, ready, connection_id) VALUES (0, ?, ?, 0, \'human\', 0, NULL)',

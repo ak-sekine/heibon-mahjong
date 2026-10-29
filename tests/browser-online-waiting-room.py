@@ -3,6 +3,7 @@ import json
 import os
 import pathlib
 import shutil
+import sys
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 from browser_main_fixtures import fixed_seat_fixture
 
@@ -12,6 +13,7 @@ ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 PUBLIC_HAND_ONLY = os.environ.get('HEIBON_ONLINE_PUBLIC_HAND_ONLY') == '1'
 EXIT_NOTICE_ONLY = os.environ.get('HEIBON_ONLINE_EXIT_NOTICE_ONLY') == '1'
 RIVER_SPACING_ONLY = os.environ.get('HEIBON_ONLINE_RIVER_SPACING_ONLY') == '1'
+RULES_ONLY = os.environ.get('HEIBON_ONLINE_RULES_ONLY') == '1'
 OUT.mkdir(parents=True, exist_ok=True)
 
 MOCK = r"""
@@ -21,7 +23,7 @@ MOCK = r"""
   const code = 'ABC234';
   const empty = seat => ({ seat, gameSeat: null, kind: 'empty', name: null, connected: false, ready: false, isHost: false });
   const state = {
-    roomCode: code, status: 'waiting', hostSeat: 0, revision: 0, format: 'tonpu',
+    roomCode: code, status: 'waiting', hostSeat: 0, revision: 0, format: 'tonpu', rules: {schemaVersion: 1, matchFormat: 'tonpu'},
     createdAt: Date.now(), expiresAt: Date.now() + 86400000,
     seats: [
       { seat: 0, gameSeat: null, kind: 'human', name: 'テストホスト', connected: false, ready: false, isHost: true },
@@ -511,14 +513,17 @@ MOCK = r"""
     requests.push({ path: requestUrl.pathname, body: init.body ? JSON.parse(init.body) : null });
     let value;
     if (requestUrl.pathname === '/api/rooms' && init.method === 'POST') {
-      state.format = JSON.parse(init.body).format ?? 'tonpu';
-      value = { roomCode: code, participantToken: hostToken, playerSeat: 0, createdAt: state.createdAt, expiresAt: state.expiresAt, format: state.format, seats: state.seats };
+      const request = JSON.parse(init.body);
+      state.format = request.rules?.matchFormat ?? request.format ?? 'tonpu';
+      state.rules = request.rules ?? {schemaVersion: 1, matchFormat: state.format};
+      value = { roomCode: code, participantToken: hostToken, playerSeat: 0, createdAt: state.createdAt, expiresAt: state.expiresAt, format: state.format, rules: state.rules, seats: state.seats };
     } else if (requestUrl.pathname === `/api/rooms/${code}/ticket`) {
       tickets++;
       value = { ticket: 'c'.repeat(64), expiresAt: Date.now() + 60000 };
     } else if (requestUrl.pathname === `/api/rooms/${code}/join`) {
       const displayName = JSON.parse(init.body).displayName;
       state.format = 'tonpu';
+      state.rules = {schemaVersion: 1, matchFormat: 'tonpu'};
       state.status = 'waiting';
       state.hostSeat = 0;
       state.revision = 0;
@@ -909,12 +914,15 @@ with sync_playwright() as p:
     assert page.locator('#main-menu-items').is_hidden(), 'clicking outside did not close the menu'
     select_menu_item('#new-game')
     assert page.locator('#new-game-dialog').evaluate('element => element.open'), 'new-game menu item did not open the existing confirmation'
-    assert page.locator('input[name="offline-match-format"][value="tonpu"]').is_checked(), 'offline match format did not default to tonpu'
+    assert page.locator('#new-game-rules-summary').inner_text() == '現在：東風戦', 'offline rules did not default to East-only'
+    page.locator('#new-game-rules').click()
+    assert page.locator('#rule-settings-dialog').evaluate('element => element.open'), 'offline rule settings did not open'
+    assert page.locator('input[name="rules-match-format"][value="tonpu"]').is_checked(), 'offline match format did not default to tonpu'
     format_layouts = []
     for width in [320, 375, 390, 414]:
       page.set_viewport_size({'width': width, 'height': 812})
       layout = page.evaluate('''() => {
-        const dialog = document.querySelector('#new-game-dialog');
+        const dialog = document.querySelector('#rule-settings-dialog');
         const options = dialog.querySelector('.match-format-options').getBoundingClientRect();
         const labels = [...dialog.querySelectorAll('.match-format-options label')].map(label => {
           const box = label.getBoundingClientRect();
@@ -923,17 +931,37 @@ with sync_playwright() as p:
         return {noHorizontalScroll: document.documentElement.scrollWidth <= innerWidth && dialog.scrollWidth <= dialog.clientWidth,
           optionsVisible: options.width > 0 && options.bottom <= innerHeight, labels};
       }''')
-      assert layout['noHorizontalScroll'] and layout['optionsVisible'] and all(label['fits'] and label['height'] >= 44 for label in layout['labels']), f'offline format chooser layout failed at {width}px: {layout}'
+      assert layout['noHorizontalScroll'] and layout['optionsVisible'] and all(label['fits'] and label['height'] >= 44 for label in layout['labels']), f'rule settings layout failed at {width}px: {layout}'
       format_layouts.append({'width': width, **layout})
-    page.locator('input[name="offline-match-format"][value="tonnan"]').check()
-    assert page.locator('input[name="offline-match-format"][value="tonnan"]').is_checked(), 'offline match format selection did not respond'
+    page.locator('input[name="rules-match-format"][value="tonnan"]').check()
+    page.set_viewport_size({'width': 320, 'height': 600})
+    settings_layout = page.locator('#rule-settings-dialog').evaluate('''dialog => {
+      const box = dialog.getBoundingClientRect();
+      return {top: box.top, bottom: box.bottom, width: box.width, clientWidth: dialog.clientWidth,
+        scrollWidth: dialog.scrollWidth, clientHeight: dialog.clientHeight, scrollHeight: dialog.scrollHeight,
+        noPageHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth};
+    }''')
+    assert settings_layout['top'] >= 0 and settings_layout['bottom'] <= 600 and settings_layout['scrollWidth'] <= settings_layout['clientWidth'] and settings_layout['noPageHorizontalOverflow'], f'rule settings dialog did not fit or scroll at 320x600: {settings_layout}'
+    page.locator('#cancel-rule-settings').scroll_into_view_if_needed()
+    assert page.locator('#cancel-rule-settings').is_visible(), 'rule settings cancel action was unreachable on a short screen'
+    page.set_viewport_size({'width': 390, 'height': 812})
+    page.locator('#cancel-rule-settings').click()
+    assert page.locator('#new-game-rules-summary').inner_text() == '現在：東風戦', 'canceling rule settings changed the draft match format'
+    page.locator('#new-game-rules').click()
+    page.locator('input[name="rules-match-format"][value="tonnan"]').check()
+    page.locator('#confirm-rule-settings').click()
+    assert page.locator('#new-game-rules-summary').inner_text() == '現在：半荘戦', 'confirmed rules were not applied to the pending match'
     page.locator('#cancel-new-game').click()
+    assert page.evaluate("localStorage.getItem('heibon-mahjong-last-rules') === null"), 'canceling a new match saved unstarted rules'
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'dismissing the new-game dialog did not restore focus to the visible menu button'
     select_menu_item('#new-game')
-    assert page.locator('input[name="offline-match-format"][value="tonpu"]').is_checked(), 'offline dialog did not restore the tonpu default on reopening'
-    page.locator('input[name="offline-match-format"][value="tonnan"]').check()
+    assert page.locator('#new-game-rules-summary').inner_text() == '現在：東風戦', 'unstarted rules replaced the last-started default'
+    page.locator('#new-game-rules').click()
+    page.locator('input[name="rules-match-format"][value="tonnan"]').check()
+    page.locator('#confirm-rule-settings').click()
     page.locator('#confirm-new-game').click()
     assert page.evaluate('window.onlineUiTest.controller.match.format') == 'tonnan', 'offline selection was not stored in match state'
+    assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'"), 'accepted offline start did not save the last rules'
 
     assert page.locator('#online-create-name').count() == 1 and page.locator('#online-join-name').count() == 1, 'create and join must have separate display-name fields'
     assert page.evaluate('''() => { const ids = [...document.querySelectorAll('[id]')].map(node => node.id); return new Set(ids).size === ids.length; }'''), 'the UI contains duplicate DOM IDs'
@@ -944,17 +972,16 @@ with sync_playwright() as p:
     assert page.locator('#online-join-dialog').evaluate('element => !element.open'), 'room creation also opened the join dialog'
     assert page.locator('#online-create-dialog h2').inner_text() == '新しくルームを作る', 'room creation dialog title was not shown'
     assert page.locator('#online-create-dialog label[for="online-create-name"]').all_inner_texts() == ['表示名'], 'room creation dialog display-name label changed'
-    assert page.locator('#online-create-dialog .match-format-options legend').inner_text() == '対局形式', 'room creation dialog omitted its match-format label'
-    assert page.locator('#online-create-dialog .match-format-options label').all_inner_texts() == ['東風戦', '半荘戦'], 'room creation dialog omitted a match-format option'
+    assert page.locator('#online-create-rules').inner_text() == 'ルール設定', 'room creation dialog omitted rule settings'
     assert page.locator('#online-create-dialog #online-join').count() == 0, 'room creation dialog contains a join button'
     assert page.locator('#online-create-close').evaluate('element => document.activeElement === element'), 'opening the create dialog did not focus its close button'
     assert page.locator('#online-create-name').evaluate('element => document.activeElement !== element'), 'opening the create dialog focused its display-name input'
     page.keyboard.press('Tab')
-    assert page.locator('input[name="online-match-format"][value="tonpu"]').evaluate('element => document.activeElement === element'), 'Tab did not move from the create close button to match-format selection'
+    assert page.locator('#online-create-rules').evaluate('element => document.activeElement === element'), 'Tab did not move from the create close button to rule settings'
     page.keyboard.press('Tab')
-    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Tab did not move from match-format selection to the create display-name input'
+    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Tab did not move from rule settings to the create display-name input'
     page.keyboard.press('Shift+Tab')
-    assert page.locator('input[name="online-match-format"][value="tonpu"]').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to match-format selection'
+    assert page.locator('#online-create-rules').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to rule settings'
     page.keyboard.press('Shift+Tab')
     assert page.locator('#online-create-close').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to the create close button'
     assert page.locator('#online-create').is_disabled(), 'room creation was enabled without a display name'
@@ -1079,15 +1106,35 @@ with sync_playwright() as p:
     assert page.evaluate('window.onlineMock.requests.length') == before_empty_submit, 'an empty display name was sent to the server'
     page.locator('#online-create-name').fill('テストホスト')
     assert page.locator('#online-create').is_enabled(), 'room creation remained disabled after restoring a valid display name'
-    assert page.locator('input[name="online-match-format"][value="tonpu"]').is_checked(), 'online match format did not default to tonpu'
-    page.locator('input[name="online-match-format"][value="tonnan"]').check()
+    assert page.locator('#online-create-rules-summary').inner_text() == '設定：半荘戦', 'online creation did not restore the last started format'
+    page.locator('#online-create-rules').click()
+    assert page.locator('input[name="rules-match-format"][value="tonnan"]').is_checked(), 'online rules did not use the shared last-started setting'
+    page.locator('#confirm-rule-settings').click()
     page.locator('#online-create').click()
     wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234'")
     assert not page.locator('#online-create-dialog').evaluate('element => element.open'), 'room creation form remained open after success'
     assert not page.locator('#online-join-dialog').evaluate('element => element.open'), 'join form opened after room creation'
     assert page.locator('#online-dialog #online-create-form, #online-dialog #online-join-form').count() == 0, 'input forms were mixed into the room management screen'
-    assert page.evaluate("window.onlineMock.requests[0].body.format === 'tonnan'"), 'host match format was not sent to the server'
+    assert page.evaluate("window.onlineMock.requests[0].body.rules.matchFormat === 'tonnan' && window.onlineMock.requests[0].body.rules.schemaVersion === 1"), 'host rules were not sent to the server'
     assert page.locator('#online-room-format').inner_text() == '対局形式：半荘戦', 'selected format was not shown in the waiting room'
+    page.locator('#online-confirm-rules').click()
+    assert page.locator('#online-rules-dialog').evaluate('element => element.open'), 'waiting-room rule confirmation did not open'
+    assert '読み取り専用' in page.locator('#online-rules-readonly-label').inner_text(), 'rule confirmation was not marked read-only'
+    assert '半荘戦' in page.locator('#online-rules-list').inner_text(), 'confirmed room rules did not show the host format'
+    assert page.locator('#online-rules-dialog input, #online-rules-dialog select, #online-rules-dialog button:not(#online-rules-close)').count() == 0, 'read-only rule confirmation exposed editing controls'
+    page.set_viewport_size({'width': 320, 'height': 600})
+    readonly_layout = page.locator('#online-rules-dialog').evaluate('''dialog => {
+      const box = dialog.getBoundingClientRect();
+      return {top: box.top, bottom: box.bottom, clientWidth: dialog.clientWidth, scrollWidth: dialog.scrollWidth,
+        noPageHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth};
+    }''')
+    assert readonly_layout['top'] >= 0 and readonly_layout['bottom'] <= 600 and readonly_layout['scrollWidth'] <= readonly_layout['clientWidth'] and readonly_layout['noPageHorizontalOverflow'], f'confirmed rules overflowed at 320x600: {readonly_layout}'
+    page.set_viewport_size({'width': 390, 'height': 844})
+    page.locator('#online-rules-close').click()
+    if RULES_ONLY:
+      print(json.dumps({'browser': ENGINE, 'scenario': 'online waiting-room read-only confirmed rules', 'result': 'pass'}, ensure_ascii=False))
+      browser.close()
+      raise SystemExit(0)
     assert page.locator('#online-status').is_hidden(), 'room creation still displays a redundant permanent success message'
     assert page.evaluate("window.onlineMock.requests[0].body.displayName === 'テストホスト'"), 'room creation did not send the common display name'
     assert page.locator('#menu-room').evaluate('element => !element.hidden'), 'room operations were not added to the menu for an online participant'

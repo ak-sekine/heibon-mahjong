@@ -36,7 +36,9 @@ with sync_playwright() as playwright:
 
     page.locator('#main-menu-toggle').click()
     page.locator('#new-game').click()
-    page.locator('input[name="offline-match-format"][value="tonnan"]').check()
+    page.locator('#new-game-rules').click()
+    page.locator('input[name="rules-match-format"][value="tonnan"]').check()
+    page.locator('#confirm-rule-settings').click()
     page.locator('#confirm-new-game').click()
     assert page.locator('body').get_attribute('data-game-mode') == 'offline'
     assert page.locator('#table-round').inner_text() == '東1局'
@@ -44,5 +46,20 @@ with sync_playwright() as playwright:
     assert page.locator('#table-round').get_attribute('data-format-label') is None
     assert '半荘戦' not in page.locator('#local-table .center-info').inner_text()
     assert page.locator('#player-hand li').count() in (13, 14)
-    print('Initial load and reload stay idle at 320px; explicit menu starts create Tonpu and Tonnan matches.')
+    saved = page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules'))")
+    assert saved['version'] == 1 and saved['rules']['matchFormat'] == 'tonnan', saved
+    page.locator('#main-menu-toggle').click()
+    page.locator('#new-game').click()
+    assert page.locator('#new-game-rules-summary').inner_text() == '現在：半荘戦'
+    page.locator('#new-game-rules').click()
+    page.locator('input[name="rules-match-format"][value="tonpu"]').check()
+    page.locator('#cancel-rule-settings').click()
+    assert page.locator('#new-game-rules-summary').inner_text() == '現在：半荘戦', 'cancel did not restore the prior draft'
+    page.locator('#cancel-new-game').click()
+    assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'")
+    page.locator('#main-menu-toggle').click()
+    page.locator('#new-game').click()
+    assert page.locator('#new-game-rules-summary').inner_text() == '現在：半荘戦', 'last started rules were not restored'
+    page.locator('#cancel-new-game').click()
+    print('Initial load and reload stay idle at 320px; confirmed Tonpu/Tonnan settings, cancel, and restoration work in Chromium/WebKit.')
     browser.close()

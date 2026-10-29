@@ -150,13 +150,13 @@ async function digest(value: string): Promise<string> {
   return [...new Uint8Array(result)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function makeRoom(displayName = 'Host', hostToken = token('a')): Promise<RoomFixture> {
+async function makeRoom(displayName = 'Host', hostToken = token('a'), rules?: unknown): Promise<RoomFixture> {
   const ctx = new TestRoomContext();
   const room = new RoomDurableObject(ctx as unknown as DurableObjectState, {} as Env);
   const code = nextCode();
   const response = await room.fetch(new Request('https://room.internal/internal/create', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code, displayName, participantToken: hostToken }),
+    body: JSON.stringify({ code, displayName, participantToken: hostToken, ...(rules === undefined ? {} : { rules }) }),
   }));
   assert.equal(response.status, 201);
   return { ctx, room, code, hostToken };
@@ -356,6 +356,8 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.equal(state.hostSeat, 0);
     assert.equal(state.revision, 0);
     assert.equal(state.expiresAt, expiresAt);
+    assert.equal(state.format, 'tonpu');
+    assert.deepEqual(state.rules, { schemaVersion: 1, matchFormat: 'tonpu' }, 'legacy room without a format should use the old East-only default');
     assert.deepEqual(publicSeats(state).map(seat => seat.kind), ['human', 'empty', 'empty', 'empty']);
     assert.equal(ctx.storage.sql.exec<{ token_hash: string }>('SELECT token_hash FROM seats WHERE seat = 0').toArray()[0].token_hash, legacyHash);
     const client = await connectParticipant(fixture, legacyToken);
@@ -368,6 +370,23 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
       },
     }));
     assert.equal(reused.status, 401, 'the WebSocket ticket was reusable');
+  });
+
+  await t.test('persists the host match format in Worker state and rejects attempted rule mutations', async () => {
+    const fixture = await makeRoom('Rules host', token('9'), { schemaVersion: 1, matchFormat: 'tonnan' });
+    const state = await readState(fixture);
+    assert.equal(state.format, 'tonnan');
+    assert.deepEqual(state.rules, { schemaVersion: 1, matchFormat: 'tonnan' });
+    const host = await connectParticipant(fixture, fixture.hostToken);
+    const before = host.client.sent.length;
+    fixture.room.webSocketMessage(host.server as unknown as WebSocket, JSON.stringify({
+      type: 'set-ready', requestId: 'change-rules', expectedRevision: state.revision,
+      ready: true, rules: { schemaVersion: 1, matchFormat: 'tonpu' },
+    }));
+    assert.equal(JSON.parse(host.client.sent.slice(before).at(-1)!).code, 'invalid_message');
+    assert.deepEqual((await readState(fixture)).rules, { schemaVersion: 1, matchFormat: 'tonnan' });
+    fixture.room = new RoomDurableObject(fixture.ctx as unknown as DurableObjectState, {} as Env);
+    assert.deepEqual((await readState(fixture)).rules, { schemaVersion: 1, matchFormat: 'tonnan' });
   });
 
   await t.test('supports two humans, Ready, conflict responses, CPU fill and idempotent finalization', async () => {
@@ -631,6 +650,8 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     fixture.room.webSocketMessage(host.server as unknown as WebSocket, JSON.stringify({ type: 'set-ready', requestId: 'spoof', expectedRevision: 1, ready: true, seat: 1 }));
     assert.equal(JSON.parse(host.client.sent.at(-1)!).code, 'invalid_message');
     fixture.room.webSocketMessage(host.server as unknown as WebSocket, JSON.stringify({ type: 'unknown-action' }));
+    assert.equal(JSON.parse(host.client.sent.at(-1)!).code, 'invalid_message');
+    fixture.room.webSocketMessage(host.server as unknown as WebSocket, JSON.stringify({ type: 'start-game', requestId: 'rule-inject', expectedGameRevision: 0, rules: { schemaVersion: 1, matchFormat: 'tonnan' } }));
     assert.equal(JSON.parse(host.client.sent.at(-1)!).code, 'invalid_message');
     fixture.room.webSocketMessage(host.server as unknown as WebSocket, 'x'.repeat(4097));
     assert.equal(JSON.parse(host.client.sent.at(-1)!).code, 'message_too_large');

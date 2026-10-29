@@ -1,6 +1,7 @@
 /** Shared contract for the online waiting room and its server-owned game. */
 import type { MatchFormat } from '../model/match.ts';
 import type { PlayerId } from '../model/game.ts';
+import type { GameRules } from '../model/rules.ts';
 import type { PlayerGameView, PublicRoundResult } from './game-view.ts';
 
 export const ONLINE_WS_PROTOCOL = 'heibon-mahjong.v1';
@@ -24,6 +25,8 @@ export type OnlineRoomState = {
   roomCode: string;
   status: RoomStatus;
   format: MatchFormat;
+  /** Present on current servers; absent legacy payloads fall back from format. */
+  rules?: GameRules;
   hostSeat: number | null;
   revision: number;
   createdAt: number;

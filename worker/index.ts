@@ -1,6 +1,7 @@
 import { RateLimitDurableObject } from './rate-limit.ts';
 import { RoomDurableObject } from './room.ts';
 import { logWorker } from './diagnostics.ts';
+import { normalizeGameRules, rulesForFormat, type GameRules } from '../src/model/rules.ts';
 
 const allowedOrigins = new Set([
   'https://ak-sekine.github.io',
@@ -125,7 +126,7 @@ async function consumeRateLimit(
   };
 }
 
-async function createRoom(env: Env, origin: string, displayName: string, format: 'tonpu' | 'tonnan'): Promise<Response> {
+async function createRoom(env: Env, origin: string, displayName: string, rules: GameRules): Promise<Response> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const code = randomRoomCode();
     const participantToken = randomToken();
@@ -133,18 +134,20 @@ async function createRoom(env: Env, origin: string, displayName: string, format:
       code,
       displayName,
       participantToken,
-      format,
+      format: rules.matchFormat,
+      rules,
     }, { Origin: origin }));
     if (response.status === 409) continue;
     if (!response.ok) return json({ error: 'room_create_failed' }, 500, origin);
-    const room = await response.json() as { createdAt: number; expiresAt: number; seats: unknown[]; format?: 'tonpu' | 'tonnan' };
+    const room = await response.json() as { createdAt: number; expiresAt: number; seats: unknown[]; format?: 'tonpu' | 'tonnan'; rules?: GameRules };
     return json({
       roomCode: code,
       participantToken,
       playerSeat: 0,
       createdAt: room.createdAt,
       expiresAt: room.expiresAt,
-      format: room.format ?? format,
+      format: room.format ?? rules.matchFormat,
+      rules: room.rules ?? rulesForFormat(room.format ?? rules.matchFormat),
       seats: room.seats,
     }, 201, origin);
   }
@@ -163,8 +166,10 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
     const body = await parseJson(request);
     const displayName = cleanDisplayName(body?.displayName);
     if (!displayName) return json({ error: 'invalid_display_name' }, 400, origin);
-    const format = body?.format === 'tonnan' ? 'tonnan' : 'tonpu';
-    return createRoom(env, origin, displayName, format);
+    const rules = body?.rules === undefined
+      ? rulesForFormat(body?.format === 'tonnan' ? 'tonnan' : 'tonpu')
+      : normalizeGameRules(body.rules);
+    return createRoom(env, origin, displayName, rules);
   }
 
   const match = path.match(/^\/api\/rooms\/([A-HJ-NP-Z2-9]{6})(?:\/(join|ticket|socket))?$/u);
@@ -191,7 +196,7 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
     if (!response.ok) return response;
     const room = await response.json() as {
       playerSeat: number; roomCode: string; status: string; hostSeat: number | null; revision: number;
-      createdAt: number; expiresAt: number; seats: unknown[]; format?: 'tonpu' | 'tonnan';
+      createdAt: number; expiresAt: number; seats: unknown[]; format?: 'tonpu' | 'tonnan'; rules?: GameRules;
     };
     return json({
       roomCode: code,
@@ -200,6 +205,7 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
       createdAt: room.createdAt,
       expiresAt: room.expiresAt,
       format: room.format ?? 'tonpu',
+      rules: room.rules ?? rulesForFormat(room.format ?? 'tonpu'),
       seats: room.seats,
     }, 201, origin);
   }

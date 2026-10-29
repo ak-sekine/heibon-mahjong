@@ -1,14 +1,21 @@
+import type { GameRules } from '../model/rules.ts';
+import { DEFAULT_GAME_RULES } from '../model/rules.ts';
+import { RulePreferences } from './rule-settings.ts';
+
 /** Only explicit confirmation may reset the match; dismissal only restores focus. */
 export class NewGameDialog {
   private readonly dialog = document.querySelector<HTMLDialogElement>('#new-game-dialog')!;
   private trigger: HTMLButtonElement | null = null;
-  constructor(start: (format: 'tonpu' | 'tonnan') => void, hasActiveGame: () => boolean = () => true) {
+  private readonly preferences?: RulePreferences;
+  constructor(start: (rules: GameRules) => void, hasActiveGame: () => boolean = () => true,
+    preferences?: RulePreferences) {
+    this.preferences = preferences;
     for (const id of ['#new-game', '#result-new-game']) {
       const button = document.querySelector<HTMLButtonElement>(id)!;
       button.addEventListener('click', () => {
         if (this.dialog.open) return;
-        const defaultFormat = document.querySelector<HTMLInputElement>('input[name="offline-match-format"][value="tonpu"]');
-        if (defaultFormat) defaultFormat.checked = true;
+        this.preferences?.resetToLastStarted();
+        this.updateSummary();
         // The header action now lives in a menu that becomes hidden as soon as
         // it is selected, so restore focus to the menu button after dismissal.
         this.trigger = id === '#new-game'
@@ -17,7 +24,7 @@ export class NewGameDialog {
         const question = document.querySelector<HTMLElement>('#new-game-question');
         if (question) question.textContent = hasActiveGame()
           ? '現在の対局を終了して、最初から始めますか？'
-          : '対局形式を選んで、オフライン対局を開始します。';
+          : 'ルールを確認して、オフライン対局を開始します。';
         this.dialog.showModal();
         document.querySelector<HTMLButtonElement>('#cancel-new-game')!.focus({ preventScroll: true });
       });
@@ -33,13 +40,16 @@ export class NewGameDialog {
       const focusTarget = document.querySelector<HTMLButtonElement>('#main-menu-toggle') ?? this.trigger;
       this.trigger = null;
       this.dialog.close();
-      const format = document.querySelector<HTMLInputElement>('input[name="offline-match-format"]:checked')?.value === 'tonnan' ? 'tonnan' : 'tonpu';
-      start(format);
+      start(this.preferences?.current ?? DEFAULT_GAME_RULES);
       focusTarget?.focus({ preventScroll: true });
     });
   }
   private cancel(): void {
     this.dialog.close();
     this.trigger?.focus({ preventScroll: true });
+  }
+  private updateSummary(): void {
+    const summary = document.querySelector<HTMLElement>('#new-game-rules-summary');
+    if (summary) summary.textContent = this.preferences?.current.matchFormat === 'tonnan' ? '現在：半荘戦' : '現在：東風戦';
   }
 }
