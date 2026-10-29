@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
+from browser_ui_metrics import timed_call
 
 base = os.environ.get('HEIBON_BASE_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 out = Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
@@ -32,18 +33,20 @@ with sync_playwright() as p:
     launch_options = {'headless': True}
     if engine == 'chromium' and os.environ.get('HEIBON_CHROMIUM'):
         launch_options['executable_path'] = os.environ['HEIBON_CHROMIUM']
-    browser = browser_type.launch(**launch_options)
+    browser = timed_call('browser_launch', browser_type.launch, **launch_options)
     viewports = [(320, 568), (355, 812), (375, 812), (390, 844), (414, 896), (430, 932)]
     for width, height in viewports:
-        page = browser.new_page(viewport={'width': width, 'height': height})
+        context = timed_call('browser_context_create', browser.new_context, viewport={'width': width, 'height': height})
+        page = timed_call('page_create', context.new_page)
         page.on('pageerror', lambda error: errors.append(str(error)))
-        page.goto(base)
-        page.wait_for_selector('#online-game-controls', state='attached')
+        timed_call('page_navigation', page.goto, base)
+        timed_call('wait_for_selector:#online-game-controls', page.wait_for_selector,
+                   '#online-game-controls', state='attached')
         page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => { app.controller.random = () => .999999; })")
         page.locator('#main-menu-toggle').click()
         page.locator('#new-game').click()
         page.locator('#confirm-new-game').click()
-        page.locator('#local-table').wait_for(state='visible')
+        timed_call('wait_for_locator:#local-table', page.locator('#local-table').wait_for, state='visible')
         assert page.locator('body').get_attribute('data-game-mode') == 'offline'
         page.evaluate('''async()=>{
           const renderer=await import('/heibon-mahjong/src/rendering/table.ts');
@@ -213,8 +216,9 @@ with sync_playwright() as p:
                     width, count, mode, 'stable-riichi-prefix', result)
             page.evaluate("window.riverFixture.online.receive({type:'online-session-ended'})")
         assert not errors, errors
-        page.close()
-    browser.close()
+        timed_call('page_close', page.close)
+        timed_call('browser_context_close', context.close)
+    timed_call('browser_close', browser.close)
 (out / f"river-capacity-{os.environ.get('HEIBON_BROWSER', 'chromium')}.json").write_text(
     json.dumps(reports, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 print(json.dumps({'browser': os.environ.get('HEIBON_BROWSER', 'chromium'), 'checks': len(reports),

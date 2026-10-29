@@ -2,6 +2,7 @@
 """Run the Browser UI manifest with per-invocation timing and a CSV report."""
 
 import argparse
+import atexit
 import csv
 import os
 from pathlib import Path
@@ -9,6 +10,7 @@ import signal
 import subprocess
 import sys
 from datetime import datetime, timezone
+from browser_ui_metrics import ResourceSampler, enabled as metrics_enabled, record_event, warn_metrics
 
 
 def run(script, browser='chromium', **extra_env):
@@ -133,6 +135,20 @@ def main():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
+    collect_metrics = metrics_enabled()
+    resource_sampler = None
+    if collect_metrics:
+        try:
+            resource_sampler = ResourceSampler(interval_seconds=5)
+            resource_sampler.start()
+            atexit.register(resource_sampler.stop)
+            os.environ['BROWSER_UI_METRICS_RUN_START_MONOTONIC'] = str(resource_sampler.started)
+        except Exception as error:
+            if resource_sampler:
+                resource_sampler.stop()
+            resource_sampler = None
+            warn_metrics(error)
+
     failed = False
     for index in selected:
         item = SUITE[index]
@@ -140,6 +156,8 @@ def main():
         start_clock = datetime.now(timezone.utc)
         env = os.environ.copy()
         env.update(item['env'])
+        if collect_metrics:
+            env['HEIBON_BROWSER_SCENARIO'] = Path(item['script']).stem
         print(f"::group::Browser UI {item['browser']} {item['script']}", flush=True)
         print(f"::notice title=Browser UI started::browser={item['browser']} script={item['script']} start={start}", flush=True)
         try:
@@ -148,9 +166,9 @@ def main():
                 text=True, encoding='utf-8', errors='replace', env=env,
             )
             output, _ = current_process.communicate()
+            status_code = current_process.returncode
             if output:
                 print(output, end='' if output.endswith('\n') else '\n', flush=True)
-            status_code = current_process.returncode
             if cancelled:
                 status, timed_out = 'cancelled', 'no'
             elif status_code == 0:
@@ -169,6 +187,16 @@ def main():
             'start_utc': start, 'end_utc': end, 'duration_seconds': f'{elapsed:.3f}',
             'status': status, 'timed_out': timed_out,
         })
+        if collect_metrics:
+            record_event({
+                'operation': 'scenario_total',
+                'scenario': Path(item['script']).stem,
+                'browser': item['browser'],
+                'start_utc': start,
+                'end_utc': end,
+                'duration_seconds': round(elapsed, 3),
+                'outcome': status,
+            })
         current_process = None
         save_report(args.timings_file, rows)
         print(
@@ -181,6 +209,9 @@ def main():
             failed = True
             break
 
+    if resource_sampler:
+        resource_sampler.stop()
+        atexit.unregister(resource_sampler.stop)
     print(f'Browser UI timing report: {args.timings_file}', flush=True)
     if cancelled:
         return 130

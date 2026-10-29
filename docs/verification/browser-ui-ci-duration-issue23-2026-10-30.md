@@ -1,6 +1,6 @@
 # Browser UI CI実行時間増加の原因調査 — Issue #23
 
-**調査状況：調査完了（判定 B：原因候補まで。具体的な根本原因は未確定）。** 既存履歴の比較と同一SHAの反復測定を実施した。run間の実行速度差は確認できたが、runner資源の計測値がないため要因は特定できていない。
+**Phase 1 判定：B（原因候補まで。具体的な根本原因は未確定）。Phase 2：計測機能を実装し、ローカル確認済み。計測有効のCI比較は未実施。**
 
 ## 1. 調査目的と開始状態
 
@@ -259,6 +259,59 @@ root causeをさらに特定する場合、まず `.github/workflows/browser-ui.
 - **#22 Open：** `tests/step14-0-1.test.ts` のonline lifecycle親テスト30秒timeout調査。別のunit/integration test上の事象であり、今回のBrowser UI遅延と結び付ける証拠は見つかっていない。状態・内容を変更しない。
 - **#23 Open：** 比較履歴・同一SHAの3run・判定Bを記録した。具体的なroot causeとrunner資源計測は未確認のためOpenを維持する。
 
-## 11. この調査での変更
+## 11. Phase 1での変更
 
-ゲーム本体、Browser UIテスト、workflow、timeout、成功条件は変更していない。変更対象はこの調査記録と `docs/verification/README.md` の目次だけ。
+Phase 1ではゲーム本体、Browser UIテスト、workflow、timeout、成功条件は変更していない。変更対象はこの調査記録と `docs/verification/README.md` の目次だけだった。
+
+## 12. Phase 2：Browser UI計測
+
+### 実装
+
+Browser UI CI専用の任意計測を追加した。ゲーム本体、アサーション、skip、timeout、52項目のmanifestと順序は変更していない。計測対象は長時間だった `browser-round-end-ui`（Chromium／WebKit）、`browser-riichi-discard-layout`（Chromium）、`browser-river-capacity`（Chromium／WebKit）。この5 invocation以外の47 invocationでは既存のCSVによるシナリオ全体時間のみを使う。
+
+`tests/run-browser-regressions.py` のsuite処理内でPython thread samplerを開始し、5秒間隔で `runner-resources.jsonl` にUTC、共通のmonotonic経過秒、CPU、memory、pressure、process数を保存する。host CPU使用率は `/proc/stat` の差分、実行プロセスが属するcgroupのCPU使用率は `cpu.stat` の `usage_usec` 差分から別々に算出する。cgroup利用率は `cpu.max` quotaで正規化し、quotaと論理CPU数も併記する。cgroupの範囲がrunner job全体と一致するかは実CI artifactで確認する必要がある。quotaなしは `cpu_quota_status=unlimited` とし、取得不能は `unavailable`／`null` に分ける。memoryはhostの使用／availableに加えてcgroupのcurrent／limit、swap使用量を記録する。CPU、memory、I/O pressureは `/proc/pressure` の取得値、process数は `/proc` から記録する。
+
+3つのPlaywrightスクリプトに、browser launch、context作成、page作成・遷移・終了、context/browser終了、存在するselector/function/locator待ちを記録する `browser-events.jsonl` を追加した。scenario全体時間は `scenario_total` として開始・終了UTC、所要秒、成功／失敗を記録する。イベントにはシナリオとbrowserを含み、resource JSONLとUTC・run共通のmonotonic秒で対応づけられる。対象スクリプトに `expect` 待ちはなく、テスト内に存在する条件待ちだけを計測する。URL、環境変数値、secret、DOM本文は出力しない。
+
+計測コードのI/O等で例外が起きた場合は警告を出して記録を欠測とし、元のPlaywright操作やその例外を変えない。samplerは別プロセスを作らず、suite終了時にstop/joinする。runner異常終了時にもthreadはdaemonであり親プロセス終了とともに終了する。
+
+### 有効・無効とartifact
+
+- Browser UI workflow_dispatchの `browser_ui_metrics` をtrueにすると `BROWSER_UI_METRICS=1` で計測を有効にする。既定値false。ローカルでは環境変数を設定する。
+- 無効時はsamplerを起動せず、metric wrapperは関数をそのまま実行する。通常テストとデプロイworkflowには環境変数を渡さない。
+- 有効時の出力は `artifacts/browser-ui-metrics/runner-resources.jsonl` と `browser-events.jsonl`。Actionsでは既存の `browser-ui-*` artifactとは別の `browser-ui-metrics-<sha>-<attempt>` artifactとして保存し、テスト失敗後も `always()` で保存を試みる。
+- 追加したのは `.github/workflows/browser-ui.yml` の入力・stepのみ。Deploy workflowは変更せず、Browser UI workflowにデプロイjobや本番secret参照はない。
+
+### Phase 2ローカル確認
+
+- `python -m py_compile` を計測helper、runner、3対象scriptに実施：成功。
+- metrics無効のsmoke：出力ファイルを生成しないことを確認。
+- metrics有効のsmoke：event 2件とresource 1件をJSONとして読み込み、必須キー、UTC／monotonic秒、成功／例外区別、例外の再送出、sampler thread停止を確認。
+- `npm test`：67 passed、0 failed。
+- `npm run build`：成功。
+- `git diff --check`：成功。
+- secretは出力対象フィールドに含めず、operation名・ブラウザー・シナリオ・資源数値だけを記録する実装を確認。
+- この作業環境のChromium起動は [`AGENTS.md`](../../AGENTS.md) と [`codex-cloud-chromium.md`](codex-cloud-chromium.md) に記録済みのseccomp/Crashpad制限があるため、ローカルBrowser UI一式は起動していない。
+
+### CI比較・結果
+
+**Phase 2のActions runはまだない。** workflow_dispatchは本番deployを起動しない構成と確認したが、利用可能なGitHub connectorにはworkflow_dispatch開始APIがなく、通常の `git fetch` もproxy接続失敗となった。CIの無効1回＋有効3回を実行できる経路がこの実行環境では確認できなかったため、Actions run URL、runner資源値、browser/wait時間、計測artifactは未取得である。run自体の実行・成否を推測で補っていない。
+
+従って計測オーバーヘッドはCIで評価できていない。コード上の無効時はsamplerを作らず、JSONL処理・時計取得を行わない。有効時は5秒ごとに1行を追加し、対象呼出し前後にmonotonic/UTC取得とJSONL appendを行うため、その負荷は存在する。CI比較なしにオーバーヘッド量を数値化しない。
+
+| 比較条件 | Run | Browser job / regression / scenario合計 | CPU・memory・I/O | browser/wait | 状態 |
+|---|---|---|---|---|---|
+| metrics無効 | 未実施 | 未取得 | 未取得 | 未取得 | workflow_dispatchが未実行 |
+| metrics有効 1 | 未実施 | 未取得 | 未取得 | 未取得 | workflow_dispatchが未実行 |
+| metrics有効 2 | 未実施 | 未取得 | 未取得 | 未取得 | workflow_dispatchが未実行 |
+| metrics有効 3 | 未実施 | 未取得 | 未取得 | 未取得 | workflow_dispatchが未実行 |
+
+既存の比較・Phase 1測定runの数値は§2〜§8に保持しているが、計測コード未導入時の値なのでPhase 2の有効／無効比較とは扱わない。52 scenario、Chromium 33件、WebKit 19件のCI比較も未実施。
+
+### 原因評価と次の作業
+
+原因判定はPhase 1の **B（候補まで）** のまま。run間の実効throughput差は候補だが、runner CPU競合、memory pressure/swap、I/O pressure、ブラウザー起動、Playwright待ちのどれが時間差を説明するかは、Phase 2 runがないため新しい証拠を得ていない。既存runでは全シナリオに広がる差を確認したが、因果関係は特定していない。
+
+次はこの専用ブランチの同一SHAでBrowser UI workflow_dispatchを、同時実行させずにmetrics無効1回、その後metrics有効を逐次3回行う。4回すべてで52件の件数・順序・browser versionを確認し、job全体、regression step、Chromium/WebKit合計、上位scenario、JSONLのresource/eventを比較する。自然変動幅が大きいため4回だけでは厳密な計測負荷の分離はできない。runを取得できた場合に本節とIssue #23コメントを追記し、原因候補を再評価する。
+
+Issue状態は #21 Closed、#22 Open、#23 Openを維持する。Phase 2のCI結果が未取得のためIssue #23はOpenのままとする。

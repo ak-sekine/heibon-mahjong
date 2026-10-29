@@ -6,10 +6,21 @@ on:
     branches: [fix-mobile-table-layout, ui-river-spacing, fix-riichi-discard-layout]
   pull_request:
   workflow_dispatch:
+    inputs:
+      browser_ui_metrics:
+        description: Collect optional Browser UI runner and Playwright timing metrics.
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       reuse_build:
         description: Reuse the verified dist artifact produced by the calling workflow.
+        required: false
+        type: boolean
+        default: false
+      browser_ui_metrics:
+        description: Collect optional Browser UI runner and Playwright timing metrics.
         required: false
         type: boolean
         default: false
@@ -96,6 +107,8 @@ jobs:
         shell: bash
         env:
           HEIBON_BROWSER_TIMINGS: /tmp/heibon-browser-ui-timings.csv
+          BROWSER_UI_METRICS: ${{ inputs.browser_ui_metrics && '1' || '0' }}
+          BROWSER_UI_METRICS_DIR: ${{ github.workspace }}/artifacts/browser-ui-metrics
         run: |
           VITE_ONLINE_API_URL=https://online-mock.invalid npm run dev -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/heibon-vite.log 2>&1 &
           vite_pid=$!
@@ -125,6 +138,13 @@ jobs:
             /tmp/heibon-vite.log
             /tmp/heibon-preview.log
             docs/verification/step13.5.5
+      - name: Save Browser UI metrics
+        if: ${{ always() && inputs.browser_ui_metrics }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-ui-metrics-${{ github.sha }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          path: artifacts/browser-ui-metrics
       - name: Save center round display screenshots and measurements
         if: always()
         uses: actions/upload-artifact@v4

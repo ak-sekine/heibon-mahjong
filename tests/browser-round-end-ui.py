@@ -5,6 +5,7 @@ import pathlib
 import re
 import shutil
 from playwright.sync_api import sync_playwright
+from browser_ui_metrics import timed_call
 
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-round-end-ui'))
 OUT.mkdir(parents=True, exist_ok=True)
@@ -40,13 +41,15 @@ with sync_playwright() as p:
     if ENGINE == 'chromium':
         launch_options['executable_path'] = os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium')
         launch_options['args'] = ['--no-sandbox']
-    browser = browser_type.launch(**launch_options)
+    browser = timed_call('browser_launch', browser_type.launch, **launch_options)
     reports = []
     for width, height in WIDTHS:
         mobile = ENGINE == 'webkit' and width < 500
-        page = browser.new_page(viewport={'width': width, 'height': height},
-                                device_scale_factor=2 if mobile else 1,
-                                is_mobile=mobile, has_touch=mobile)
+        context = timed_call('browser_context_create', browser.new_context,
+                             viewport={'width': width, 'height': height},
+                             device_scale_factor=2 if mobile else 1,
+                             is_mobile=mobile, has_touch=mobile)
+        page = timed_call('page_create', context.new_page)
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
 
@@ -56,10 +59,10 @@ with sync_playwright() as p:
             route.fulfill(response=response, body=source)
 
         page.route('**/src/main.ts', expose_app)
-        page.goto('http://127.0.0.1:4173/heibon-mahjong/')
+        timed_call('page_navigation', page.goto, 'http://127.0.0.1:4173/heibon-mahjong/')
         page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => { app.controller.random = () => .999999; app.controller.newGame(); })")
-        page.wait_for_selector('#player-hand svg')
-        page.wait_for_function('typeof window.roundEndTest === "object"')
+        timed_call('wait_for_selector:#player-hand svg', page.wait_for_selector, '#player-hand svg')
+        timed_call('wait_for_function:roundEndTest', page.wait_for_function, 'typeof window.roundEndTest === "object"')
         page.evaluate('''async () => {
           const [matches, ron, tsumo, fixed, ronFixture, cpu, red, wall, tsumoFixture, tileSvg, tileModel, kyuushu, specialDraws] = await Promise.all([
             import('/heibon-mahjong/src/game/match.ts'),
@@ -618,8 +621,9 @@ with sync_playwright() as p:
         reports.append({'viewport': [width, height], 'squareTable': True, 'meldLayouts': meld_cases,
             'roundVariants': variant_reports, 'nextRoundOnce': True, 'eastEndAndReset': True})
         page.screenshot(path=str(OUT / f'{ENGINE}-{width}x{height}-round-end.png'), full_page=True)
-        page.close()
-    browser.close()
+        timed_call('page_close', page.close)
+        timed_call('browser_context_close', context.close)
+    timed_call('browser_close', browser.close)
 
 (OUT / 'round-end-ui.json').write_text(json.dumps(reports, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 print(f'{len(reports)} viewport suites passed: {OUT}')

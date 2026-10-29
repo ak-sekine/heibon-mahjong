@@ -3,6 +3,7 @@ import os
 import pathlib
 import shutil
 from playwright.sync_api import sync_playwright
+from browser_ui_metrics import timed_call
 
 screenshots = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 screenshots.mkdir(parents=True, exist_ok=True)
@@ -10,16 +11,19 @@ widths = [(320, 568), (355, 812), (375, 812), (390, 844), (414, 896), (430, 932)
 positions = [-1, *range(18)]
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'), args=['--no-sandbox'])
+    browser = timed_call('browser_launch', p.chromium.launch,
+                         executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'),
+                         args=['--no-sandbox'])
     for width, height in widths:
         cpu2_normal_main = []
         cpu2_riichi_main = []
         cpu2_riichi_cross = []
         cpu2_line_alignment = 0
-        page = browser.new_page(viewport={'width': width, 'height': height})
-        page.goto('http://localhost:4173/heibon-mahjong/')
+        context = timed_call('browser_context_create', browser.new_context, viewport={'width': width, 'height': height})
+        page = timed_call('page_create', context.new_page)
+        timed_call('page_navigation', page.goto, 'http://localhost:4173/heibon-mahjong/')
         page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => { app.controller.random=()=>.999999; app.controller.newGame(); })")
-        page.wait_for_selector('#player-hand svg')
+        timed_call('wait_for_selector:#player-hand svg', page.wait_for_selector, '#player-hand svg')
         page.evaluate('''async()=>{
           window.renderer=await import('/heibon-mahjong/src/rendering/table.ts');
           window.dora=await import('/heibon-mahjong/src/game/dora.ts');
@@ -155,5 +159,6 @@ with sync_playwright() as p:
                     page.screenshot(path=str(screenshots/f'riichi-seat-{seat}-position-{position+1}.png'), full_page=True)
         print(f'{width}px CPU2 SVG edge gaps: normal={min(cpu2_normal_main):.2f}–{max(cpu2_normal_main):.2f}px; riichi line neighbors={min(cpu2_riichi_main):.2f}–{max(cpu2_riichi_main):.2f}px; riichi cross-axis={min(cpu2_riichi_cross):.2f}–{max(cpu2_riichi_cross):.2f}px; max line-origin drift={cpu2_line_alignment:.2f}px')
         print(f'{width}px riichi layout passed for all seats and declaration positions')
-        page.close()
-    browser.close()
+        timed_call('page_close', page.close)
+        timed_call('browser_context_close', context.close)
+    timed_call('browser_close', browser.close)
