@@ -4,6 +4,7 @@ import os
 import pathlib
 import shutil
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
+from browser_main_fixtures import fixed_seat_fixture
 
 BASE_URL = os.environ.get('HEIBON_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
@@ -578,7 +579,11 @@ with sync_playwright() as p:
 
     def expose_app(route):
         response = route.fetch()
-        route.fulfill(response=response, body=response.text() + '\nwindow.onlineUiTest = { controller, onlineGameController, resultDialog };\n')
+        source = fixed_seat_fixture(
+            response.text(),
+            '(_ms, signal) => new Promise(resolve => signal.addEventListener("abort", resolve, {once:true}))',
+        )
+        route.fulfill(response=response, body=source + '\nwindow.onlineUiTest = { controller, onlineGameController, resultDialog };\n')
 
     page.route('**/src/main.ts', expose_app)
     page.goto(BASE_URL)
@@ -752,6 +757,8 @@ with sync_playwright() as p:
             closeWidth: closeBox.width, closeHeight: closeBox.height,
             textLines: range.getClientRects().length,
             whiteSpace: getComputedStyle(close).whiteSpace,
+            dialogScrollWidth: dialog.scrollWidth, dialogClientWidth: dialog.clientWidth,
+            documentScrollWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth,
             noHorizontalOverflow: dialog.scrollWidth <= dialog.clientWidth && document.documentElement.scrollWidth <= innerWidth,
           };
         }''', {'dialogSelector': dialog_selector, 'closeSelector': close_selector})

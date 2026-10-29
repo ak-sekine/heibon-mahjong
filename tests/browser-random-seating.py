@@ -1,4 +1,4 @@
-"""Exercise every offline player-to-seat ordering at a mobile viewport."""
+"""Exercise every offline player-to-seat ordering at a 320px mobile viewport."""
 import os
 import shutil
 from playwright.sync_api import sync_playwright
@@ -11,7 +11,7 @@ if ENGINE == 'chromium':
 
 with sync_playwright() as playwright:
     browser = getattr(playwright, ENGINE).launch(**launch)
-    page = browser.new_page(viewport={'width': 390, 'height': 844})
+    page = browser.new_page(viewport={'width': 320, 'height': 700})
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto('http://127.0.0.1:4173/heibon-mahjong/')
@@ -44,11 +44,14 @@ with sync_playwright() as playwright:
                   });
                   return {viewer, human:game.players.filter(player=>player.control==='human').map(player=>player.id),
                     names:controller.playerNames, bottom:document.querySelector('#label-0')?.dataset.self,
-                    handCount:document.querySelectorAll('#player-hand svg').length, rows};
+                    handCount:document.querySelectorAll('#player-hand svg').length,
+                    documentWidth:document.documentElement.scrollWidth, viewportWidth:innerWidth,
+                    rows};
                 }''')
                 assert result['human'] == [result['viewer']], result
                 assert result['bottom'] == 'true', result
                 assert result['handCount'] >= 13, result
+                assert result['documentWidth'] <= result['viewportWidth'], result
                 assert len(set(result['names'])) == 4, result
                 for row in result['rows']:
                     assert row['display'] == (row['id'] - result['viewer'] + 4) % 4, row

@@ -26,16 +26,16 @@
 
 ## GitHub Actionsとデプロイ
 
-push後に起動するDeploy workflowの結果をここへ追記します。Issue #15のCI構成どおり、Browser UI workflowはDeployから1回だけ呼び出します。
+Issue #15のCI構成どおり、Browser UI workflowはDeployから1回だけ呼び出します。
 
 | 工程 | 結果 |
 | --- | --- |
-| 回帰テスト・Worker型チェック・Pagesビルド | push後に確認 |
-| Chromium Browser UI | push後に確認 |
-| WebKit Browser UI | push後に確認 |
-| Cloudflare Workerデプロイ | push後に確認 |
-| 本番通信テスト | push後に確認 |
-| GitHub Pagesビルド・デプロイ | push後に確認 |
+| 回帰テスト・Worker型チェック・Pagesビルド | run `40798450867` 成功 |
+| Chromium Browser UI | run `40798450867` 失敗。オンライン参加ダイアログを320pxで開いた際に横はみ出し検査が失敗 |
+| WebKit Browser UI | 部分成功。全24順列の座席検査は390pxで成功。Chromiumの失敗時点で後続シナリオ未実行 |
+| Cloudflare Workerデプロイ | スキップ。Browser UIゲートが失敗 |
+| 本番通信テスト | スキップ。Workerデプロイのゲートが未達 |
+| GitHub Pagesビルド・デプロイ | スキップ。Browser UIゲートが失敗 |
 
 機能コミット初回run `40794748815` では、`verify` は成功しました。`docs-check` はこの記録のMarkdown改行用末尾スペースで失敗し、削除しました。Chromium Browser UIは既存の`browser-app-idle.py`が「対局開始直後から手牌14枚」と固定して失敗しました。CPU東家の手番中は自分が13枚のため、13枚または14枚のいずれも正しい初期表示です。
 
@@ -47,7 +47,7 @@ run `40796476829` では前段のBrowser UIテストが通過しましたが、`
 
 run `40797640924` では、全24順列のOffline seating確認がChromium／WebKitの両方で成功し、`browser-action-controls.py`も通過しました。その後、WebKitの355px河容量テストで、CPU自動手番が測定用の固定河を上書きして失敗しました。河容量テスト用に自分が東席になる固定抽選を設定し、合成局面の測定中に自動手番が割り込まないようにしました。座席抽選のBrowser UIテストは引き続き通常の抽選源を注入し、全順列を検証します。
 
-これら5回の修正runではBrowser UIゲートの失敗によりWorkerデプロイ、本番通信、Pagesビルド／デプロイはスキップされました。今回の修正を含むrunの実結果を下表へ追記します。
+run `40798450867` では`docs-check`、回帰テスト・Worker型チェック・ビルドが成功しました。全24順列のBrowser UI確認もChromium／WebKitで通過しましたが、そのシナリオの幅は390pxでした。その後のChromiumオンライン待機室テストが320px幅の横はみ出し検査で失敗し、Workerデプロイ、本番通信、Pagesビルド／デプロイはスキップされました。座席待機室テストの初期席を既存fixtureと同じ東席に固定し、CPUの自動手番をテスト制御下に置き、横はみ出しの寸法情報を失敗時に出すようにしました。別の座席抽選Browser UIテストでは全24順列を320px幅で検査し、文書全体がビューポートを超えないことも確認します。変更後のrunで再検証します。
 
 ## iPhone Safari実機確認
 
