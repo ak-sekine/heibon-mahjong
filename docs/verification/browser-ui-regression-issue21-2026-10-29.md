@@ -14,7 +14,7 @@
 
 Bは隔離した一時変更で旧来のCPU席1の河のみの判定を適用すると固定テストが期待どおり失敗した。現行判定では成功。Aは初期化行を除去すると空の河と宣言牌参照が不整合になることを検出する設計だが、ブラウザーを起動できずmutation検証は未実施。テスト用の一時変更は含めない。
 
-## 実行結果
+## 前回ローカル実行結果
 
 | 検証 | 結果 |
 | --- | --- |
@@ -25,7 +25,7 @@ Bは隔離した一時変更で旧来のCPU席1の河のみの判定を適用す
 | build、Worker型チェック、diff check | 成功。 |
 | Chromium／WebKit Browser UI全体 | 未確認。WebKitの限定シナリオは全フローの代替ではない。 |
 
-## 未確認事項とIssue #22
+## 前回時点の未確認事項とIssue #22
 
 ブラウザーでのAの実行・反復・mutation、Chromium／WebKit全体、iPhone Safari実機、Actionsと公開結果は未確認。[Issue #22](https://github.com/ak-sekine/heibon-mahjong/issues/22)の親テスト30秒タイムアウトは別件で、タイムアウト延長・skip・CI順序変更は行っていない。原因は未特定であり、Issue #22自体は変更しない。
 
@@ -37,6 +37,6 @@ Bは隔離した一時変更で旧来のCPU席1の河のみの判定を適用す
 
 [正常系run 40897247248](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40897247248) は成功。npm testとbuild成功、Browser UI 52件（Chromium 33、WebKit 19）成功。A専用シナリオはChromium・WebKitとも成功、Chromium待機室全フローも成功。WebKit待機室はA専用および限定シナリオで、待機室全フローではない。BはCIのnpm testで成功し、既存オンラインテストも成功した。B単独20回および旧判定の検出は前節のローカル結果。Aの20回反復は未実施。
 
-[異常系run 40897377113](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40897377113) は別ブランチ `test/issue-21-mutation-check` の `c6aa244918307362cc8329146f79b5f8af3c7f0c` で、次局mockの宣言参照初期化のみを意図的に無効化した。同じworkflowのChromium Aが `Riichi declaration tile reference is missing from online seat 0` のRangeErrorを直接assertして失敗し、タイムアウトではなかった。正常系Chromium Aの成功と比較して検出を確認。manifestは最初の失敗で停止するため異常系WebKitは未実行。意図的変更は正常系やmainに含めない。
+[異常系run 40897377113](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40897377113) は別ブランチ `test/issue-21-mutation-check` の `c6aa244918307362cc8329146f79b5f8af3c7f0c` で、次局mockの宣言参照初期化のみを意図的に無効化した。同じworkflowのChromium Aが `Riichi declaration tile reference is missing from online seat 0` のRangeErrorを直接assertして失敗し、タイムアウトではなかった。正常系Chromium Aの成功と比較して検出を確認。manifestは最初の失敗で停止するため異常系WebKitは未実行。意図的変更は正常系やmainに含めない。異常系ブランチ先端では `3c214055443250d8fcde4af87466be865e3c42c1` で初期化を復元し、対象ファイルが正常系検証commitと一致することを確認した。
 
 Worker型チェックとdiff checkは前回ローカルで成功。実機検証、Aの反復とWebKit異常系は未確認。Issue #22は変更していない。
