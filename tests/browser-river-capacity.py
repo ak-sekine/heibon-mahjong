@@ -39,6 +39,7 @@ with sync_playwright() as p:
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(base)
         page.wait_for_selector('#online-game-controls', state='attached')
+        page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => { app.controller.random = () => .999999; })")
         page.locator('#main-menu-toggle').click()
         page.locator('#new-game').click()
         page.locator('#confirm-new-game').click()
