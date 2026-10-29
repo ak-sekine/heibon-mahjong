@@ -28,13 +28,18 @@
 
 | 検証 | 結果 |
 | --- | --- |
-| `npm test` | 成功。67テスト群、67 passed、0 failed。 |
+| `npm test` | 成功。ローカル67テスト群、67 passed、0 failed。追加修正後も成功。本番用手動runのverifyでは1,263テストすべて成功（0 failed）。 |
 | `npm run build` | 成功。TypeScriptとVite production build。 |
 | `npm run typecheck:worker` | 成功。 |
 | `git diff --check` | 成功。 |
 | Pythonの構文確認 | 変更したBrowser UIスクリプトとmanifestの`py_compile`成功。 |
-| Chromium / WebKit Browser UI | 作業ブランチの[run 40872584378](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40872584378)で全50スクリプト成功（Chromium 32、WebKit 18）。対象SHAは`8198baabbc8560086b24478d3be8a14c0f7676e8`。 |
-| GitHub Actions・Worker／Pages公開 | main初回[run 40875485705](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40875485705)は既存オンライン回帰テストで失敗し、Browser UI・Worker／Pages公開はskip。対応後の結果は確認後に追記。 |
+| Chromium / WebKit Browser UI | 作業ブランチの[run 40872584378](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40872584378)（`8198baa`）と最終[run 40876987847](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40876987847)（`d0dc154`）の両方で全50スクリプト成功（Chromium 32、WebKit 18）。最終runでもオフライン確認・オンライン待機の既存確認を含めて成功。 |
+| GitHub Actions verify | 最終run `40876987847`、SHA `d0dc154a0b0657dbfac7a916008fc7836f21c146`で全1,263テスト、Worker型チェック、build、文書checkが成功。 |
+| Worker本番デプロイ | 成功。最終runのdeploy-worker job、2026-10-29 13:14 UTC。https://heibon-mahjong-online.ak-sekine.workers.dev |
+| 本番通信テスト | 成功。HTTPS・ルーム・WebSocket・再接続・認証・プライバシーに加え、2人対局とホストのCPU引き継ぎ、切断・再接続、ホスト交代後の1人＋CPU3人、4人対局、3人＋CPU1人のシナリオが成功。 |
+| Pages build | 成功。最終runのpages-build jobで本番Worker URLを埋め込んだbuildとartifact作成を確認。 |
+| Pages deploy | 成功。最終runのpages-deploy job、2026-10-29 13:15 UTC。https://ak-sekine.github.io/heibon-mahjong/ |
+| 公開後のProduction Worker diagnostics | 同じSHAの[run 40880289609](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40880289609)も成功。 |
 | iPhone Safari実機 | **未確認**。自動WebKitはiPhone実機確認として扱いません。 |
 
 ### 追加・更新した検証範囲
@@ -52,6 +57,8 @@
 - 該当テストは本番用の暗号学的乱数で座席と牌山を決めた後、特定の人間の手番まで進める前提でした。ランダムな対局はCPUの和了・途中流局などで先に終了できるため、このライフサイクル検証には入力の再現性が必要です。元の入力による同じ失敗はローカル80回では再現しておらず、CIで実際にどの局終了条件が成立したかまではログから特定できていません。
 - 該当サブテストだけ`TestContext.mock`で乱数列を固定し、完了時に自動復元します。手番・公開範囲・保存・再接続・重複操作の期待値や待ち上限は変更していません。失敗時は状態・phase・手番・revision・結果を出力するようにしました。本番の乱数・ゲーム処理は変更しません。
 - 修正後の対象ファイル20回連続実行（各23テスト）と`npm test`全67テスト群が成功しました。アプリのソースは変更していないため、ローカルbuild・Worker型チェックは同じソースで成功した結果を引き継ぎ、本番ワークフローでも再確認します。
+- テストと本記録の追加修正：`d0dc154a0b0657dbfac7a916008fc7836f21c146`。mainへのfast-forward push後、リモートSHAの一致を確認しました。テストのみの変更は通常のpush分類では公開対象外のため、同じSHAで`deploy_to_production=true`を指定した[手動run 40876987847](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40876987847)を起動しました。重複するpush run `40876986361`はcancelledとして停止し、手動runで全検証から実施しました。テストやデプロイ前の検証ゲートは省略していません。
+- 手動runのverify job `123458919642`で、該当オンラインライフサイクルテストを含む全1,263テスト、Worker型チェック、buildが成功しました。
 
 ## 変更ファイルとコミット
 
@@ -60,6 +67,7 @@
 - 文書：`docs/SPEC.md`、`docs/ROADMAP.md`、`docs/verification/README.md`、本記録。
 - 実装コミット：`8198baabbc8560086b24478d3be8a14c0f7676e8`。作業ブランチ`issue20-offline-rules`の全自動検証成功後、`origin/main`が基準SHAのままでbehind 0 / ahead 1、作業ツリーに変更なし、push対象が本Issueの1コミットだけであることを確認しました。
 - `git push origin HEAD:main`成功（fast-forward、forceなし）。push後の`git ls-remote origin refs/heads/main`で同じ実装SHAを確認。ローカルも`main`へ切り替えました。
+- 最終自動検証・本番公開SHA：`d0dc154a0b0657dbfac7a916008fc7836f21c146`。この結果追記は文書のみで、検証済みのアプリ・テストを変更しません。
 
 ## iPhone Safari実機で確認する項目
 
