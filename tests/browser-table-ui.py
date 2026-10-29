@@ -17,7 +17,7 @@ with sync_playwright() as p:
             page.on('console', lambda message: console_errors.append(message.text) if message.type == 'error' else None)
             page.goto('http://localhost:4173/heibon-mahjong/' + entry)
             if not entry:
-                page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => app.controller.newGame())")
+                page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => { app.controller.random = () => .999999; app.controller.newGame(); })")
             try:
                 page.wait_for_selector('#player-hand svg')
             except Exception:

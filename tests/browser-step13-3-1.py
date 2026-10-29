@@ -1,6 +1,7 @@
 """Step 13.3.1: legal physical walls, result accessibility and hidden-information checks."""
 import json,pathlib,shutil
 from playwright.sync_api import sync_playwright
+from browser_main_fixtures import fixed_seat_fixture
 out=pathlib.Path('docs/screenshots/step13.3.1');out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
@@ -36,6 +37,7 @@ window.multi=()=>{let g=controller.game;g=discardTile(g,1,g.players[1].drawnTile
 window.pass=()=>{controller.match=updateMatchGame(controller.match,passRon(controller.game,0));render();};
 window.finishDraw=()=>{controller.match=updateMatchGame(controller.match,controller.game);render();};
 """
+   source=fixed_seat_fixture(source)
    route.fulfill(response=response,body=source)
   page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/heibon-mahjong/');page.wait_for_function('typeof check==="function"')
   results=[]

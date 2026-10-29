@@ -4,6 +4,7 @@ The module route adds test controls only; no test hooks ship in the application.
 """
 import json,pathlib,shutil
 from playwright.sync_api import sync_playwright
+from browser_main_fixtures import fixed_seat_fixture
 out=pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', 'docs/verification/step13.5.2/screenshots')) / 'browser-cpu-riichi';out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
@@ -36,7 +37,7 @@ window.stepTsumo=()=>{const g=controller.game;controller.game=declareTsumo(g,g.t
 window.stepMulti=(winners)=>{controller.newGame();let g=ronStart(1,winners);let liveWall=[...g.liveWall];const players=[...g.players];for(const id of winners){const index=liveWall.findIndex(t=>t.tile.category==='honor');const tile=liveWall.splice(index,1)[0];players[id]={...players[id],river:[tile],riichi:{declarationTileId:tile.id,passedRon:false}};}g={...g,players,liveWall};controller.match={...startMatch(g),points:[0,1,2,3].map(id=>winners.includes(id)?24000:25000),depositSticks:winners.length};controller.game=discardTile(g,1,g.players[1].drawnTile.id);render();};
 window.stepRows=(position)=>{controller.newGame();const g=riichiStart('tsumo');const players=g.players.map((p,id)=>({...p,river:g.liveWall.slice(id*13,id*13+13),riichi:{declarationTileId:g.liveWall[id*13+position-1].id,passedRon:false}}));controller.match={...startMatch(g),game:{...g,players,liveWall:g.liveWall.slice(52)},points:[24000,24000,24000,24000],depositSticks:4};render();};
 """
-   source=source.replace('new GameController(void 0, { onChange: render })','new GameController(undefined, { onChange: render, wait: (_ms, signal) => new Promise(resolve => {stepWaits.push(resolve);signal.addEventListener("abort",resolve,{once:true});}) })')
+   source=fixed_seat_fixture(source, '(_ms, signal) => new Promise(resolve => {stepWaits.push(resolve);signal.addEventListener("abort",resolve,{once:true});})')
    route.fulfill(response=response,body=source)
   page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/heibon-mahjong/');page.wait_for_function('typeof stepCheck === "function"')
   measurements=[];shot_states=[]

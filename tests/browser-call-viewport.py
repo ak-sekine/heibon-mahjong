@@ -4,6 +4,7 @@ Run against npm run dev -- --host 127.0.0.1 --port 4173.
 """
 import shutil
 from playwright.sync_api import sync_playwright
+from browser_main_fixtures import fixed_seat_fixture
 
 with sync_playwright() as p:
  browser = p.chromium.launch(executable_path=shutil.which('chromium'), args=['--no-sandbox'])
@@ -24,6 +25,7 @@ window.loadCalls=(mode)=>{controller.newGame();let g=callStart(3,
  controller.match=startMatch(discardTile(g,3,g.players[3].drawnTile.id));render();};
 window.callState=()=>controller.game;
 """
+   source=fixed_seat_fixture(source)
    route.fulfill(response=response,body=source)
   page.route('**/src/main.ts',inject)
   page.goto('http://127.0.0.1:4173/heibon-mahjong/')

@@ -34,7 +34,7 @@ window.declarationGameplayTest = { controller, render, onlineGameController };
 
     page.route('**/src/main.ts', expose_app)
     page.goto(BASE_URL)
-    page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => app.controller.newGame())")
+    page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => { app.controller.random = () => .999999; app.controller.newGame(); })")
     page.wait_for_selector('#player-hand button[data-tile-id]')
     page.wait_for_function('window.declarationGameplayTest?.onlineGameController')
     page.evaluate('''async() => {
@@ -56,6 +56,7 @@ window.declarationGameplayTest = { controller, render, onlineGameController };
         import('/heibon-mahjong/src/game/match.ts'),
       ]);
       const app = window.declarationGameplayTest;
+      app.controller.random = () => .999999;
       app.controller.newGame();
       app.controller.match = startMatch(riichiStart('ron'));
       app.controller.selectedTileId = null;

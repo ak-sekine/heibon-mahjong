@@ -13,7 +13,7 @@ with sync_playwright() as p:
     for width in [320, 375, 390, 430, 1280]:
         page = browser.new_page(viewport={'width': width, 'height': 900})
         page.goto(base_url)
-        page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => app.controller.newGame())")
+        page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => { app.controller.random = () => .999999; app.controller.newGame(); })")
         page.evaluate("import('/heibon-mahjong/src/rendering/shared-table-components.ts').then(module => { window.renderRoundInfo = module.renderTableRoundInfo; })")
         page.wait_for_selector('#player-hand svg')
         page.wait_for_selector('[data-online-center-info]', state='attached')

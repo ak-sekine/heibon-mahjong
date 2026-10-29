@@ -2,6 +2,7 @@ import os
 """Kan acceptance using full 136-tile fixtures, routed only in the test browser."""
 import json,pathlib,shutil,re
 from playwright.sync_api import sync_playwright
+from browser_main_fixtures import fixed_seat_fixture
 out=pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', 'docs/verification/step13.5.2/screenshots')) / 'browser-step13-5';out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
@@ -30,8 +31,7 @@ if(mode==='seats')g=kanGame({hands:{0:['234m','456p','678s','2z']},draw:'south',
 if(mode==='seats')g={...g,phase:'wall-exhausted',abortiveDraw:'four-kans'};
 controller.match=startMatch(g);render();};
 """
-   source,count=re.subn(r'new GameController\((?:undefined|void 0), \{ onChange: render \}\)', 'new GameController(undefined, { onChange: render, wait: (_ms,signal)=>new Promise(resolve=>signal.addEventListener("abort",resolve,{once:true})) })',source)
-   assert count==1
+   source=fixed_seat_fixture(source, '(_ms,signal)=>new Promise(resolve=>signal.addEventListener("abort",resolve,{once:true}))')
    route.fulfill(response=response,body=source)
   page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/heibon-mahjong/');page.wait_for_function('typeof loadKan === "function"')
   def shot(name):page.screenshot(path=str(out/f'{width}x{height}-{name}.png'),full_page=True)

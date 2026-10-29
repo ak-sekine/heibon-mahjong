@@ -1,6 +1,7 @@
 """Step 13.1.1 deposit lifecycle and Step 13.1 Chromium regression. Test injection never ships in the app."""
 import json,pathlib,shutil
 from playwright.sync_api import sync_playwright
+from browser_main_fixtures import fixed_seat_fixture
 out=pathlib.Path('docs/screenshots/step13.1.1/lifecycle');out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
@@ -22,7 +23,7 @@ window.riichiDraw = () => { if(controller.game.phase==='awaiting-draw') controll
 window.riichiDiscard = () => {controller.game=discardTile(controller.game,controller.game.turnPlayerId,controller.game.players[controller.game.turnPlayerId].drawnTile.id);render();};
 """
    # Hold the CPU loop until reset; test controls advance the same pure APIs.
-   source=source.replace('new GameController(void 0, { onChange: render })', 'new GameController(undefined, { onChange: render, wait: (_ms, signal) => new Promise(resolve => signal.addEventListener("abort", resolve, {once:true})) })')
+   source=fixed_seat_fixture(source, '(_ms, signal) => new Promise(resolve => signal.addEventListener("abort", resolve, {once:true}))')
    route.fulfill(response=response,body=source)
   page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:5173/heibon-mahjong/',wait_until='domcontentloaded');page.wait_for_function('typeof riichiCheck === "function"')
   def conservation():

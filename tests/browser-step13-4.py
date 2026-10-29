@@ -2,6 +2,7 @@ import os
 """Step 13.4 Chromium acceptance: complete legal physical-wall fixtures."""
 import json,pathlib,shutil
 from playwright.sync_api import sync_playwright
+from browser_main_fixtures import fixed_seat_fixture
 out=pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', 'docs/verification/step13.5.2/screenshots')) / 'browser-step13-4';out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
@@ -36,6 +37,7 @@ const players=g.players.map((p,i)=>({...p,melds:[melds[i]],hand:pool.splice(0,10
 const extra=pool.shift();players[0]={...players[0],drawnTile:extra,drawnTileSource:'live-wall'};
 g={...g,players,deadWall:pool.splice(-14),liveWall:pool,phase:'awaiting-discard',turnPlayerId:0,ronWindow:null,callsMade:true};controller.match=startMatch(g);render();};
 """
+   source=fixed_seat_fixture(source)
    route.fulfill(response=response,body=source)
   page.route('**/src/main.ts',inject)
   page.goto('http://127.0.0.1:4173/heibon-mahjong/');page.wait_for_function('typeof load==="function"')

@@ -1,6 +1,7 @@
 """Step 12 Chromium checks. Fixtures are injected only by Playwright routes."""
 import json,pathlib,re,shutil
 from playwright.sync_api import sync_playwright
+from browser_main_fixtures import fixed_seat_fixture
 out=pathlib.Path('docs/screenshots/ui-step12-4');out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
@@ -29,6 +30,7 @@ import { fixedRound, fixedRon } from '/heibon-mahjong/tests/match-fixture.ts';
 import { scoringGame } from '/heibon-mahjong/tests/scoring-fixture.ts';
 import { cpuTsumoStart } from '/heibon-mahjong/tests/cpu-tsumo-fixture.ts';
 '''+source
+   source=fixed_seat_fixture(source)
    route.fulfill(response=response,body=source)
   page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/heibon-mahjong/')
   page.wait_for_function('typeof matchCheck === "function"')

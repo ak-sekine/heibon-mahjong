@@ -2,6 +2,7 @@ import os
 """Step 13.1.2 Chromium verification. Test injection never ships in the app."""
 import json,pathlib,shutil
 from playwright.sync_api import sync_playwright
+from browser_main_fixtures import fixed_seat_fixture
 out=pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', 'docs/verification/step13.5.2/screenshots')) / 'browser-action-controls';out.mkdir(parents=True,exist_ok=True)
 reports=[]
 with sync_playwright() as p:
@@ -23,7 +24,7 @@ window.riichiDraw = () => { if(controller.game.phase==='awaiting-draw') controll
 window.riichiDiscard = () => {controller.game=discardTile(controller.game,controller.game.turnPlayerId,controller.game.players[controller.game.turnPlayerId].drawnTile.id);render();};
 """
    # Hold the CPU loop until reset; test controls advance the same pure APIs.
-   source=source.replace('new GameController(void 0, { onChange: render })', 'new GameController(undefined, { onChange: render, wait: (_ms, signal) => new Promise(resolve => signal.addEventListener("abort", resolve, {once:true})) })')
+   source=fixed_seat_fixture(source, '(_ms, signal) => new Promise(resolve => signal.addEventListener("abort", resolve, {once:true}))')
    route.fulfill(response=response,body=source)
   page.route('**/src/main.ts',inject);page.goto('http://127.0.0.1:4173/heibon-mahjong/');page.wait_for_function('typeof riichiCheck === "function"')
   def conservation(): assert page.evaluate('riichiCheck().points.reduce((a,b)=>a+b,0)+riichiCheck().depositSticks*1000')==100000
