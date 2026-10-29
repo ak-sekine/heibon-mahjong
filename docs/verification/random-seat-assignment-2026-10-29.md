@@ -45,6 +45,8 @@
 
 最初のpushで別workflow `Production Worker diagnostics` run `40813350790` がDeployと並行起動し、Workerデプロイ前の旧本番Workerに新しい`gameSeat`応答を要求して失敗しました。Deploy run `40813350867`自体はBrowser UI通過後にWorkerをデプロイし、その後のproduction-testとPages deployまで成功しています。この並行実行を避けるためworkflow修正コミット `c27856e157c601ced0a400f177bb6fdcdc26a450` で、独立Production diagnosticsをDeploy成功後に起動する`workflow_run`へ変更しました。修正後の診断run `40815205407` はデプロイ後に5シナリオすべて成功しました。
 
+workflow修正コミットの追加CI run `40813562264` はverifyとBrowser UI（Chromium／WebKit合計47実行）が成功しました。`.github/workflows`のみの変更なのでWorker・Pagesの再デプロイはありません。検証記録コミット `ffee21eb6d7fbc60723eb02307b87a5b183b21f1` のrun `40815692031` も成功し、docs-checkが通過しました。Markdownのみの変更のため、verify・Browser UI・デプロイ工程は分類どおりskipです。追加の本番診断run `40817015050` と `40817066032` は、デプロイ済みWorkerに対する5シナリオをそれぞれ成功しました。
+
 ## ローカル自動検証
 
 | 確認 | 結果 |
