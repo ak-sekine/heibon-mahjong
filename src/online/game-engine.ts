@@ -72,6 +72,21 @@ export function startOnlineGame(
     ...identity, participantSeat: identity.participantSeat ?? identity.seat,
   })) as unknown as OnlineGameSession['identities'], random);
   const assigned = shuffled.map((identity, seat) => ({ ...identity, seat: seat as PlayerId })) as unknown as OnlineGameSession['identities'];
+  return startOnlineGameWithSeatAssignment(assigned, hostSeat, format, random);
+}
+
+/** Starts a match from a server-persisted seat assignment without drawing again. */
+export function startOnlineGameWithSeatAssignment(
+  assigned: OnlineGameSession['identities'],
+  hostSeat: PlayerId,
+  format: import('../model/match.ts').MatchFormat = 'tonpu',
+  random: RandomSource = secureRandomSource,
+): OnlineGameSession {
+  if (assigned.length !== 4 || assigned.some((identity, seat) => identity.seat !== seat) ||
+      new Set(assigned.map(identity => identity.seat)).size !== 4 ||
+      new Set(assigned.map(identity => identity.participantSeat ?? identity.seat)).size !== 4) {
+    throw new OnlineGameRuleError('seat_assignment_invalid');
+  }
   const game = nextSecureGame(0, assigned, random);
   const match = startMatch(game, format);
   assertPointConservation(match);

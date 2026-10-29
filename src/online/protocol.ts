@@ -9,7 +9,10 @@ export type RoomStatus = 'waiting' | 'finalized' | 'closed';
 export type RoomSeatKind = 'human' | 'cpu' | 'empty';
 
 export type OnlineRoomSeat = {
+  /** Stable participant slot used for authentication and host ownership. */
   seat: number;
+  /** Match seat after finalization; null while the waiting list is unassigned. */
+  gameSeat: number | null;
   kind: RoomSeatKind;
   name: string | null;
   connected: boolean;

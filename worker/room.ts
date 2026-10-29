@@ -15,9 +15,8 @@ import {
   applyOnlineGameAction,
   hydrateOnlineGame,
   markOnlineGameAborted,
-  onlineIdentitiesFromSeats,
   readyForNextOnlineRound,
-  startOnlineGame,
+  startOnlineGameWithSeatAssignment,
   transferOnlineSeatToCpu,
   timeoutOnlineDecision,
   DECISION_TIMEOUT_MS,
@@ -36,7 +35,6 @@ const WS_RATE_WINDOW_MS = 60 * 1000;
 const CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/u;
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/u;
-const SEAT_LABELS = ['東', '南', '西', '北'] as const;
 
 type RoomRow = {
   format: 'tonpu' | 'tonnan';
@@ -55,6 +53,7 @@ type SeatRow = {
   kind: 'human' | 'cpu';
   ready: number;
   connection_id: string | null;
+  game_seat: number | null;
 };
 type PublicSeat = OnlineRoomSeat;
 type PublicRoomState = OnlineRoomState;
@@ -89,6 +88,21 @@ function cleanDisplayName(value: unknown): string | null {
 function randomToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function drawSecureRoomSeatAssignment(participantSeats: [number, number, number, number]): [number, number, number, number] {
+  const shuffled = [...participantSeats];
+  const uint32Range = 0x1_0000_0000;
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const choices = index + 1;
+    const acceptedRange = uint32Range - (uint32Range % choices);
+    let value: number;
+    do { value = crypto.getRandomValues(new Uint32Array(1))[0]; }
+    while (value >= acceptedRange);
+    const target = value % choices;
+    [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
+  }
+  return shuffled as [number, number, number, number];
 }
 
 async function tokenHash(token: string): Promise<string> {
@@ -161,6 +175,7 @@ export class RoomDurableObject {
     this.ensureColumn('seats', 'kind', "TEXT NOT NULL DEFAULT 'human'");
     this.ensureColumn('seats', 'ready', 'INTEGER NOT NULL DEFAULT 0');
     this.ensureColumn('seats', 'connection_id', 'TEXT');
+    this.ensureColumn('seats', 'game_seat', 'INTEGER');
     if (addedHostSeat) {
       // Step 14.0 always created seat 0 first. If it is absent, preserve the room
       // without promoting another participant during migration.
@@ -317,13 +332,13 @@ export class RoomDurableObject {
 
   private seats(): SeatRow[] {
     return this.ctx.storage.sql.exec<SeatRow>(
-      'SELECT seat, name, token_hash, connected, kind, ready, connection_id FROM seats ORDER BY seat',
+      'SELECT seat, name, token_hash, connected, kind, ready, connection_id, game_seat FROM seats ORDER BY seat',
     ).toArray();
   }
 
   private seat(seat: number): SeatRow | undefined {
     return this.ctx.storage.sql.exec<SeatRow>(
-      'SELECT seat, name, token_hash, connected, kind, ready, connection_id FROM seats WHERE seat = ?', seat,
+      'SELECT seat, name, token_hash, connected, kind, ready, connection_id, game_seat FROM seats WHERE seat = ?', seat,
     ).toArray()[0];
   }
 
@@ -332,10 +347,11 @@ export class RoomDurableObject {
     const stored = new Map(this.seats().map(value => [value.seat, value]));
     const seats: PublicSeat[] = [0, 1, 2, 3].map(seat => {
       const player = stored.get(seat);
-      if (!player) return { seat, kind: 'empty', name: null, connected: false, ready: false, isHost: false };
+      if (!player) return { seat, gameSeat: null, kind: 'empty', name: null, connected: false, ready: false, isHost: false };
       const kind = player.kind;
       return {
         seat,
+        gameSeat: room.status === 'finalized' ? player.game_seat : null,
         kind,
         name: player.name,
         connected: kind === 'human' && player.connected === 1,
@@ -770,13 +786,20 @@ export class RoomDurableObject {
           else if (humans.some(seat => seat.ready !== 1)) code = 'players_not_ready';
           else {
             const occupied = new Set(humans.map(seat => seat.seat));
+            let cpuIndex = 1;
             for (const seat of [0, 1, 2, 3]) {
               if (occupied.has(seat)) continue;
               this.ctx.storage.sql.exec(
                 "INSERT INTO seats (seat, name, token_hash, connected, kind, ready, connection_id) VALUES (?, ?, ?, 0, 'cpu', 0, NULL)",
-                seat, `CPU（${SEAT_LABELS[seat]}席）`, `cpu:${seat}`,
+                seat, `CPU${cpuIndex++}`, `cpu:${seat}`,
               );
             }
+            const roomSeats = this.seats();
+            if (roomSeats.length !== 4) throw new Error('Room does not contain four participants after CPU assignment');
+            const shuffled = drawSecureRoomSeatAssignment(roomSeats.map(item => item.seat) as [number, number, number, number]);
+            shuffled.forEach((participantSeat, gameSeat) => {
+              this.ctx.storage.sql.exec('UPDATE seats SET game_seat = ? WHERE seat = ?', gameSeat, participantSeat);
+            });
             this.ctx.storage.sql.exec("UPDATE room SET status = 'finalized'");
             this.incrementRevision();
           }
@@ -948,20 +971,34 @@ export class RoomDurableObject {
             if (room.host_seat !== actor.seat) throw new OnlineGameRuleError('not_host');
             if (previousSession) throw new OnlineGameRuleError('already_started');
             if (action.expectedGameRevision !== 0) throw new OnlineGameRuleError('stale_revision');
-            const seats = this.seats();
+            let seats = this.seats();
             if (seats.length !== 4 || [0, 1, 2, 3].some(seat => !seats.some(item => item.seat === seat))) {
               throw new OnlineGameRuleError('seat_assignment_invalid');
             }
-            const identities = onlineIdentitiesFromSeats(seats.map(item => ({
-              seat: item.seat,
+            // Finalized rooms created by older deployments have no persisted map.
+            // Assign them once on first start and keep the mapping in SQLite.
+            if (seats.every(seat => seat.game_seat === null)) {
+              const shuffled = drawSecureRoomSeatAssignment(seats.map(item => item.seat) as [number, number, number, number]);
+              shuffled.forEach((participantSeat, gameSeat) => {
+                this.ctx.storage.sql.exec('UPDATE seats SET game_seat = ? WHERE seat = ?', gameSeat, participantSeat);
+              });
+              seats = this.seats();
+            }
+            if (seats.some(seat => !Number.isInteger(seat.game_seat) || seat.game_seat! < 0 || seat.game_seat! > 3) ||
+                new Set(seats.map(seat => seat.game_seat)).size !== 4) {
+              throw new OnlineGameRuleError('seat_assignment_invalid');
+            }
+            const identities = seats.map(item => ({
+              seat: item.game_seat as PlayerId,
+              participantSeat: item.seat as PlayerId,
               name: item.name,
-              kind: item.kind,
-              connected: item.connected === 1,
-            })));
-            if (identities.some(identity => identity.control === 'human' && !connected.has(identity.seat))) {
+              control: item.kind,
+              connected: item.kind === 'cpu' || item.connected === 1,
+            })).sort((first, second) => first.seat - second.seat) as unknown as OnlineGameSession['identities'];
+            if (identities.some(identity => identity.control === 'human' && !connected.has(identity.participantSeat ?? identity.seat))) {
               throw new OnlineGameRuleError('player_disconnected');
             }
-            nextSession = startOnlineGame(identities, actor.seat as PlayerId, undefined, room.format === 'tonnan' ? 'tonnan' : 'tonpu');
+            nextSession = startOnlineGameWithSeatAssignment(identities, actor.seat as PlayerId, room.format === 'tonnan' ? 'tonnan' : 'tonpu');
             started = true;
           } else {
             if (!previousSession) throw new OnlineGameRuleError('game_not_started');

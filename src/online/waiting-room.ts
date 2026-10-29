@@ -650,6 +650,7 @@ export class OnlineWaitingRoom {
       if (!value || typeof value !== 'object') return null;
       const seat = value as Record<string, unknown>;
       if (!Number.isInteger(seat.seat) || (seat.seat as number) < 0 || (seat.seat as number) > 3 ||
+          (seat.gameSeat !== null && (!Number.isInteger(seat.gameSeat) || (seat.gameSeat as number) < 0 || (seat.gameSeat as number) > 3)) ||
           !['human', 'cpu', 'empty'].includes(String(seat.kind)) ||
           (seat.name !== null && typeof seat.name !== 'string') || typeof seat.connected !== 'boolean' ||
           typeof seat.ready !== 'boolean' || typeof seat.isHost !== 'boolean') return null;
@@ -659,21 +660,29 @@ export class OnlineWaitingRoom {
         ![0, 1, 2, 3].every(seat => seats.some(value => value.seat === seat)) ||
         (message.hostSeat !== null && (!Number.isInteger(message.hostSeat) || (message.hostSeat as number) < 0 || (message.hostSeat as number) > 3)) ||
         !Number.isFinite(message.createdAt) || !Number.isFinite(message.expiresAt)) return null;
+    const assignedSeats = seats.map(seat => seat.gameSeat).filter((seat): seat is number => seat !== null);
+    if ((message.status === 'waiting' && assignedSeats.length !== 0) ||
+        (assignedSeats.length !== 0 && assignedSeats.length !== 4) ||
+        new Set(assignedSeats).size !== assignedSeats.length) return null;
     return message as unknown as RoomState;
   }
 
   private renderState(state: RoomState): void {
     if (this.state && state.revision < this.state.revision) return;
     this.state = state;
-    const bySeat = new Map(state.seats.map(seat => [seat.seat, seat]));
+    const assigned = state.status === 'finalized' && state.seats.every(seat => seat.gameSeat !== null);
+    this.seats.dataset.assigned = String(assigned);
+    const rows = assigned
+      ? [...state.seats].sort((first, second) => first.gameSeat! - second.gameSeat!)
+      : [...state.seats].sort((first, second) => first.seat - second.seat);
     this.seats.replaceChildren();
-    for (const seatNumber of [0, 1, 2, 3]) {
-      const participant = bySeat.get(seatNumber)!;
+    for (const participant of rows) {
       const item = document.createElement('li');
       item.dataset.kind = participant.kind;
       const wind = document.createElement('span');
       wind.className = 'online-seat-wind';
-      wind.textContent = SEAT_NAMES[seatNumber];
+      wind.textContent = assigned && participant.gameSeat !== null ? SEAT_NAMES[participant.gameSeat] : '';
+      wind.hidden = !assigned;
       const content = document.createElement('div');
       content.className = 'online-seat-content';
       if (participant.kind === 'empty') {
@@ -687,7 +696,7 @@ export class OnlineWaitingRoom {
         name.textContent = participant.name ?? (participant.kind === 'cpu' ? 'CPU' : '参加者');
         name.title = name.textContent;
         const roles = [
-          seatNumber === this.session?.playerSeat && participant.kind === 'human' ? '自分' : '',
+          participant.seat === this.session?.playerSeat && participant.kind === 'human' ? '自分' : '',
           participant.isHost ? 'ホスト' : '',
         ].filter(Boolean);
         playerLine.append(name);

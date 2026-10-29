@@ -205,7 +205,8 @@ header > div { min-width:0; }
 .online-room-code-row strong { min-width:0; overflow:hidden; text-overflow:ellipsis; letter-spacing:.08em; font-size:1.05rem; }
 .online-room-expiry-row { color:#d7e6dd; font-size:.72rem; line-height:1.25; white-space:nowrap; }
 #online-seats { display:grid; gap:4px; padding:0; margin:4px 0 6px; list-style:none; }
-#online-seats li { display:grid; grid-template-columns:2rem minmax(0,1fr); align-items:center; gap:6px; min-width:0; min-height:34px; box-sizing:border-box; padding:4px 7px; border:1px solid #63947a; border-radius:6px; }
+#online-seats li { display:grid; grid-template-columns:minmax(0,1fr); align-items:center; gap:6px; min-width:0; min-height:34px; box-sizing:border-box; padding:4px 7px; border:1px solid #63947a; border-radius:6px; }
+#online-seats[data-assigned="true"] li { grid-template-columns:2rem minmax(0,1fr); }
 #online-seats .online-seat-wind { color:#ffda7d; font-weight:700; }
 .online-seat-content { display:flex; align-items:center; gap:6px; min-width:0; }
 .online-seat-player-line { display:flex; align-items:center; flex:1 1 auto; min-width:0; }

@@ -474,6 +474,8 @@ async function main() {
     check(hostFinal.seats.filter(seat => seat.kind === 'human').length === 2, 'Human seats were replaced during finalization.');
     check(hostFinal.seats.filter(seat => seat.kind === 'cpu').length === 2, 'Two empty seats were not filled with CPUs.');
     check(hostFinal.seats.every((seat, index) => seat.seat === index), 'Seat identifiers were duplicated or reordered.');
+    const finalizedGameSeats = new Map(hostFinal.seats.map(seat => [seat.seat, seat.gameSeat]));
+    check([...finalizedGameSeats.values()].sort().join(',') === '0,1,2,3', 'Finalization did not assign four unique game seats.');
     check(new Set(hostFinal.seats.filter(seat => seat.kind === 'cpu').map(seat => seat.name)).size === 2, 'CPU names were not unique by seat.');
     const revisionAfterFinalize = currentRevision(two.host);
     const beforeDuplicate = two.host.messages.length;
@@ -500,6 +502,8 @@ async function main() {
     const guestGameSeat = guestStarted.view.viewerSeat;
     check(Number.isInteger(hostGameSeat) && Number.isInteger(guestGameSeat) && hostGameSeat !== guestGameSeat,
       'Participants did not receive distinct randomized game seats.');
+    check(hostGameSeat === finalizedGameSeats.get(0) && guestGameSeat === finalizedGameSeats.get(1),
+      'The started game did not use the seats shown after finalization.');
     const hostView = inspectGameView(two.host, hostGameSeat, privateValues, two.roomCode, hostStarted);
     const guestView = inspectGameView(two.guest, guestGameSeat, privateValues, two.roomCode, guestStarted);
     check(hostView.self.isHost && !guestView.self.isHost, 'Host authority did not stay with the original participant after seating.');
@@ -645,6 +649,8 @@ async function main() {
     check(oneHuman.seats.filter(seat => seat.kind === 'human').length === 1 && oneHuman.seats.filter(seat => seat.kind === 'cpu').length === 3,
       'A one-person room did not receive three CPU seats.');
     check(oneHuman.seats[1].isHost, 'The successor host identity was lost at finalization.');
+    check([...oneHuman.seats.map(seat => seat.gameSeat)].sort().join(',') === '0,1,2,3',
+      'The one-human room did not receive four unique randomized game seats.');
     await closeRoom(handoff, handoff.guest);
     roomSummaries.push({ scenario: 'host-handoff-one-human-three-cpu', roomCode: handoff.roomCode, revision: oneHuman.revision });
     activeHostForCleanup = null;
@@ -695,11 +701,13 @@ async function main() {
     const fourHumanState = await waitForRoomState(concurrent.host, state => state.status === 'finalized');
     check(fourHumanState.seats.filter(seat => seat.kind === 'human').length === 4 &&
       fourHumanState.seats.filter(seat => seat.kind === 'cpu').length === 0, 'A four-human room received an unexpected CPU.');
+    check([...fourHumanState.seats.map(seat => seat.gameSeat)].sort().join(',') === '0,1,2,3',
+      'The four-human room did not receive four unique randomized game seats.');
     await closeRoom(concurrent, concurrent.host);
     roomSummaries.push({ scenario: 'four-humans-zero-cpu', roomCode: concurrent.roomCode, revision: fourHumanState.revision });
     activeHostForCleanup = null;
 
-    // Scenario 5: three humans receive one deterministic CPU seat.
+    // Scenario 5: three humans receive one CPU in the remaining participant slot.
     const three = await createRoom(`${label}-three`);
     activeHostForCleanup = await connectParticipant(three.roomCode, three.hostToken);
     three.host = activeHostForCleanup;
@@ -713,7 +721,9 @@ async function main() {
     const threeState = await waitForRoomState(three.host, state => state.status === 'finalized');
     const cpuSeats = threeState.seats.filter(seat => seat.kind === 'cpu');
     check(threeState.seats.filter(seat => seat.kind === 'human').length === 3 && cpuSeats.length === 1 && cpuSeats[0].seat === 3,
-      'A three-human room did not receive one CPU in the empty north seat.');
+      'A three-human room did not receive one CPU in the remaining participant slot.');
+    check([...threeState.seats.map(seat => seat.gameSeat)].sort().join(',') === '0,1,2,3',
+      'The three-human room did not receive four unique randomized game seats.');
     await closeRoom(three, three.host);
     roomSummaries.push({ scenario: 'three-humans-one-cpu', roomCode: three.roomCode, revision: threeState.revision });
     activeHostForCleanup = null;

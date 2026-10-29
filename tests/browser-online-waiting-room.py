@@ -19,12 +19,12 @@ MOCK = r"""
   const hostToken = 'a'.repeat(64);
   const guestToken = 'b'.repeat(64);
   const code = 'ABC234';
-  const empty = seat => ({ seat, kind: 'empty', name: null, connected: false, ready: false, isHost: false });
+  const empty = seat => ({ seat, gameSeat: null, kind: 'empty', name: null, connected: false, ready: false, isHost: false });
   const state = {
     roomCode: code, status: 'waiting', hostSeat: 0, revision: 0, format: 'tonpu',
     createdAt: Date.now(), expiresAt: Date.now() + 86400000,
     seats: [
-      { seat: 0, kind: 'human', name: 'テストホスト', connected: false, ready: false, isHost: true },
+      { seat: 0, gameSeat: null, kind: 'human', name: 'テストホスト', connected: false, ready: false, isHost: true },
       empty(1), empty(2), empty(3),
     ],
   };
@@ -208,9 +208,12 @@ MOCK = r"""
         const humans = state.seats.filter(seat => seat.kind === 'human');
         if (state.hostSeat !== 0) return result(this, message, false, 'not_host');
         if (!humans.every(seat => seat.connected && seat.ready)) return result(this, message, false, 'players_not_ready');
-        state.seats = state.seats.map(seat => seat.kind === 'empty'
-          ? { seat: seat.seat, kind: 'cpu', name: `CPU（${['東','南','西','北'][seat.seat]}席）`, connected: false, ready: false, isHost: false }
-          : seat);
+        const gameSeats = [2, 0, 3, 1];
+        state.seats = state.seats.map(seat => ({
+          ...seat,
+          gameSeat: gameSeats[seat.seat],
+          ...(seat.kind === 'empty' ? { kind: 'cpu', name: `CPU${seat.seat === 2 ? 1 : 2}` } : {}),
+        }));
         state.status = 'finalized';
         state.revision++;
         result(this, message, true);
@@ -221,7 +224,7 @@ MOCK = r"""
           const cpuSeats = state.seats.filter(seat => seat.kind === 'cpu').map(seat => seat.seat).concat(this.seat).sort((a, b) => a - b);
           const cpuName = `CPU${cpuSeats.indexOf(this.seat) + 1}`;
           state.seats[this.seat] = {
-            seat: this.seat, kind: 'cpu', name: cpuName,
+            seat: this.seat, gameSeat: state.seats[this.seat].gameSeat, kind: 'cpu', name: cpuName,
             connected: false, ready: false, isHost: false,
           };
           const successor = state.seats.find(seat => seat.kind === 'human').seat;
@@ -297,14 +300,14 @@ MOCK = r"""
   const requests = [];
   window.onlineMock = {
     addGuest() {
-      state.seats[1] = { seat: 1, kind: 'human', name: 'テスト参加者', connected: true, ready: false, isHost: false };
+      state.seats[1] = { seat: 1, gameSeat: null, kind: 'human', name: 'テスト参加者', connected: true, ready: false, isHost: false };
       state.revision++;
       broadcast();
       return guestToken;
     },
     setAdditionalGuests() {
-      state.seats[2] = { seat: 2, kind: 'human', name: '参加者名がとても長いテスト表示用の名前', connected: true, ready: false, isHost: false };
-      state.seats[3] = { seat: 3, kind: 'human', name: 'もう一人の長い参加者表示名テスト', connected: true, ready: true, isHost: false };
+      state.seats[2] = { seat: 2, gameSeat: null, kind: 'human', name: '参加者名がとても長いテスト表示用の名前', connected: true, ready: false, isHost: false };
+      state.seats[3] = { seat: 3, gameSeat: null, kind: 'human', name: 'もう一人の長い参加者表示名テスト', connected: true, ready: true, isHost: false };
       state.revision++;
       broadcast();
     },
@@ -327,7 +330,7 @@ MOCK = r"""
       const seat = 1;
       const departedName = state.seats[seat].name;
       const hostChanged = state.hostSeat === seat;
-      state.seats[seat] = { seat, kind: 'cpu', name: '', connected: false, ready: false, isHost: false };
+      state.seats[seat] = { seat, gameSeat: state.seats[seat].gameSeat, kind: 'cpu', name: '', connected: false, ready: false, isHost: false };
       if (hostChanged) state.hostSeat = state.seats.find(value => value.kind === 'human').seat;
       state.seats.forEach(value => { value.isHost = value.seat === state.hostSeat; });
       state.seats.filter(value => value.kind === 'cpu').sort((a, b) => a.seat - b.seat)
@@ -520,8 +523,8 @@ MOCK = r"""
       state.hostSeat = 0;
       state.revision = 0;
       state.seats.splice(0, 4,
-        { seat: 0, kind: 'human', name: '既存ホスト', connected: false, ready: false, isHost: true },
-        { seat: 1, kind: 'human', name: displayName, connected: false, ready: false, isHost: false },
+        { seat: 0, gameSeat: null, kind: 'human', name: '既存ホスト', connected: false, ready: false, isHost: true },
+        { seat: 1, gameSeat: null, kind: 'human', name: displayName, connected: false, ready: false, isHost: false },
         empty(2), empty(3));
       gameStarted = false;
       gameStatus = 'playing';
@@ -1156,11 +1159,11 @@ with sync_playwright() as p:
     wait_for("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
     seat_text = page.locator('#online-seats').inner_text()
     host_row = page.locator('#online-seats li').nth(0)
-    assert host_row.locator('.online-seat-wind').inner_text() == '東', 'the host was not shown in the east seat'
+    assert host_row.locator('.online-seat-wind').is_hidden(), 'a seat wind was shown before seat finalization'
     assert host_row.locator('.online-seat-name').inner_text() == 'テストホスト', 'the current player name was not shown in the seat list'
     assert host_row.locator('.online-seat-role').inner_text() == '（自分・ホスト）', 'the current player and host roles were not identified in the seat list'
     assert host_row.locator('.online-seat-status').inner_text() == '接続中・未準備', 'the connection and ready state were not displayed in the seat list'
-    assert '南' in seat_text and 'テスト参加者' in seat_text, 'the guest seat or name was not displayed'
+    assert 'テスト参加者' in seat_text and all(wind not in seat_text for wind in ('東', '南', '西', '北')), 'waiting list exposed a seat wind before finalization'
     assert page.locator('#online-my-seat, #online-host').count() == 0, 'self and host are still shown in separate fields'
     assert page.locator('#online-finalize').is_visible() and not page.locator('#online-finalize').is_enabled(), 'host finalize was enabled before both players were ready'
     assert '人間' not in seat_text and '空席' in seat_text, 'seat rows still contain redundant participant types or omit empty seats'
@@ -1176,16 +1179,16 @@ with sync_playwright() as p:
         noHorizontalScroll: document.documentElement.scrollWidth <= innerWidth && dialog.scrollWidth <= dialog.clientWidth && seats.scrollWidth <= seats.clientWidth,
         actionsVisible: actions.bottom <= innerHeight && [...document.querySelectorAll('#online-actions button:not([hidden])')].every(button => button.getBoundingClientRect().bottom <= innerHeight),
         longNamesEllipsized: longNames.filter(name => name.scrollWidth > name.clientWidth && getComputedStyle(name).textOverflow === 'ellipsis').length >= 2,
-        order: [...seats.children].map(item => item.querySelector('.online-seat-wind').textContent),
+        windsHidden: [...seats.children].every(item => item.querySelector('.online-seat-wind').hidden),
       };
     }''')
     assert full_seat_layout['noHorizontalScroll'], f'long names caused horizontal scrolling: {full_seat_layout}'
     assert full_seat_layout['actionsVisible'], f'actions are hidden with four occupied seats: {full_seat_layout}'
     assert full_seat_layout['longNamesEllipsized'], f'long seat names were not ellipsized: {full_seat_layout}'
-    assert full_seat_layout['order'] == ['東', '南', '西', '北'], f'seat order changed: {full_seat_layout}'
+    assert full_seat_layout['windsHidden'], f'a seat wind was shown before finalization: {full_seat_layout}'
     page.screenshot(path=str(OUT / 'online-waiting-375x812-four-players.png'))
     page.evaluate('window.onlineMock.clearAdditionalGuests()')
-    wait_for("document.querySelector('#online-seats').innerText.includes('西') && document.querySelector('#online-seats').innerText.includes('空席')")
+    wait_for("document.querySelector('#online-seats').innerText.includes('空席')")
     page.set_viewport_size({'width': 390, 'height': 844})
 
     page.locator('#online-close').click()
@@ -1227,7 +1230,11 @@ with sync_playwright() as p:
     wait_for("document.querySelector('#online-finalized-message').hidden === false")
     assert page.locator('#online-finalized-message').inner_text() == '座席が確定しました。ホストはオンライン対局を開始できます。'
     seat_text = page.locator('#online-seats').inner_text()
-    assert 'CPU（西席）' in seat_text and 'CPU（北席）' in seat_text, seat_text
+    assert 'CPU1' in seat_text and 'CPU2' in seat_text, seat_text
+    assert [wind.inner_text() for wind in page.locator('#online-seats .online-seat-wind').all()] == ['東', '南', '西', '北'], 'the finalized list did not show all actual game seats in order'
+    assert [name.inner_text() for name in page.locator('#online-seats .online-seat-name').all()] == [
+      'テスト参加者', 'CPU2', 'テストホスト', 'CPU1',
+    ], 'the finalized winds did not match the saved participant-to-seat assignment'
     assert 'ホスト' in seat_text and '自分' in seat_text, seat_text
     assert page.locator('#online-dialog').evaluate('element => element.scrollWidth <= element.clientWidth'), 'online dialog content overflows horizontally'
     page.locator('#online-copy-code').click()

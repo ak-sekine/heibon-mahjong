@@ -378,6 +378,8 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     const guest = await connectParticipant(fixture, guestInfo.token);
     const waiting = await readState(fixture);
     assert.deepEqual(publicSeats(waiting).map(seat => seat.seat), [0, 1, 2, 3]);
+    assert.deepEqual(publicSeats(waiting).map(seat => seat.gameSeat), [null, null, null, null],
+      'the waiting state exposed game seats before finalization');
     assert.deepEqual(publicSeats(waiting).map(seat => seat.kind), ['human', 'human', 'empty', 'empty']);
     assert.equal((waiting.expiresAt as number) - (waiting.createdAt as number), 24 * 60 * 60 * 1000);
     assert.equal(publicSeats(waiting)[0].isHost, true);
@@ -413,14 +415,25 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.equal(finalized.revision, (beforeFinalize.revision as number) + 1);
     assert.deepEqual(publicSeats(finalized).map(seat => seat.kind), ['human', 'human', 'cpu', 'cpu']);
     assert.deepEqual(publicSeats(finalized).map(seat => seat.seat), [0, 1, 2, 3]);
-    assert.equal(publicSeats(finalized)[2].name, 'CPU（西席）');
-    assert.equal(publicSeats(finalized)[3].name, 'CPU（北席）');
+    const finalizedSeats = publicSeats(finalized);
+    const gameSeatAssignment = finalizedSeats.map(seat => seat.gameSeat);
+    assert.deepEqual([...gameSeatAssignment].sort(), [0, 1, 2, 3]);
+    assert.equal(finalizedSeats[2].name, 'CPU1');
+    assert.equal(finalizedSeats[3].name, 'CPU2');
+    assert.equal(finalizedSeats.some(seat => String(seat.name).includes('席')), false,
+      'participant or CPU names exposed a wind before the assignment list was rendered');
     fixture.room = new RoomDurableObject(fixture.ctx as unknown as DurableObjectState, {} as Env);
     const duplicate = sendAction(fixture, host, {
       type: 'finalize-seats', requestId: 'finalize-once', expectedRevision: beforeFinalize.revision,
     });
     assert.equal(duplicate.ok, true);
     assert.equal((await readState(fixture)).revision, finalized.revision);
+    const duplicateFinalization = sendAction(fixture, host, {
+      type: 'finalize-seats', requestId: 'finalize-new-request', expectedRevision: finalized.revision,
+    });
+    assert.equal(duplicateFinalization.code, 'already_finalized');
+    assert.deepEqual(publicSeats(await readState(fixture)).map(seat => seat.gameSeat), gameSeatAssignment,
+      'a second finalization changed the saved game seats');
     const lateJoin = await fixture.room.fetch(new Request('https://room.internal/internal/join', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ displayName: 'Late', participantToken: token('c') }),
@@ -552,6 +565,18 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
         assert.equal(seats[participant.seat].name, participant.seat === 0 ? `Host-${humanCount}` : seats[participant.seat].name);
       }
       assert.equal(new Set(seats.filter(seat => seat.kind === 'cpu').map(seat => seat.name)).size, 4 - humanCount);
+      assert.deepEqual(seats.map(seat => seat.gameSeat).sort(), [0, 1, 2, 3],
+        `the ${humanCount}-human room did not receive four unique game seats`);
+      const host = participants.find(participant => participant.seat === 0) ?? participants[0];
+      const start = await sendGameAction(fixture, host, {
+        type: 'start-game', requestId: `all-count-start-${humanCount}`, expectedGameRevision: 0,
+      });
+      assert.equal(start.ok, true, `the ${humanCount}-human room did not start`);
+      const identities = persistedGame(fixture).identities as Array<Record<string, unknown>>;
+      for (const seat of seats) {
+        assert.equal(identities.find(identity => identity.participantSeat === seat.seat)?.seat, seat.gameSeat,
+          `the ${humanCount}-human start changed participant ${seat.seat}'s finalized seat`);
+      }
     }
   });
 
@@ -625,6 +650,7 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     const host = await connectParticipant(fixture, fixture.hostToken);
     let guest = await connectParticipant(fixture, guestInfo.token);
     await readyAndFinalize(fixture, [host, guest]);
+    const finalizedSeats = publicSeats(await readState(fixture));
 
     const nonHostStart = await sendGameAction(fixture, guest, {
       type: 'start-game', requestId: 'game-non-host-start', expectedGameRevision: 0,
@@ -670,6 +696,10 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.equal(secondStartRequest.code, 'already_started');
     assert.deepEqual(persistedGame(fixture).identities, initial.identities,
       'a distinct duplicate start request did not redraw the participant seats');
+    assert.deepEqual(initial.identities.map((identity: Record<string, unknown>) => identity.seat).sort(), [0, 1, 2, 3]);
+    assert.deepEqual(initial.identities.map((identity: Record<string, unknown>) =>
+      [identity.participantSeat, identity.seat]).sort((first: unknown[], second: unknown[]) => Number(first[0]) - Number(second[0])),
+    finalizedSeats.map(seat => [seat.seat, seat.gameSeat]), 'start-game changed the persisted finalization assignment');
 
     // Recreate the DO and replace one socket. The same participant token recovers
     // the same seat hand from the persisted authoritative state.
@@ -680,6 +710,8 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     const disconnectedRoom = await readState(fixture);
     assert.equal(publicSeats(disconnectedRoom)[1].kind, 'human');
     assert.equal(publicSeats(disconnectedRoom)[1].connected, false);
+    assert.deepEqual(publicSeats(disconnectedRoom).map(seat => seat.gameSeat), finalizedSeats.map(seat => seat.gameSeat),
+      'reconnect changed the finalized game seats');
     const persistedIdentities = persistedGame(fixture).identities as Array<Record<string, unknown>>;
     assert.equal(persistedIdentities.find(identity => identity.participantSeat === 1)?.control, 'human');
     fixture.room = new RoomDurableObject(fixture.ctx as unknown as DurableObjectState, {} as Env);
@@ -815,6 +847,8 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.equal(afterHostLeaveRoom.status, 'finalized');
     assert.equal(afterHostLeaveRoom.hostSeat, 1);
     assert.equal(publicSeats(afterHostLeaveRoom)[0].kind, 'cpu');
+    assert.deepEqual(publicSeats(afterHostLeaveRoom).map(seat => seat.gameSeat), finalizedSeats.map(seat => seat.gameSeat),
+      'CPU takeover or host handoff changed the finalized game seats');
     const end = sendAction(fixture, guest, {
       type: 'leave-room', requestId: 'game-ci-last-human-leaves', expectedRevision: afterHostLeaveRoom.revision,
     });

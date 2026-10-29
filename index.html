@@ -55,7 +55,7 @@
   <dialog id="online-dialog" class="online-dialog" aria-labelledby="online-title">
     <header class="online-dialog-header"><h2 id="online-title">オンライン待機</h2><button id="online-close" class="online-dialog-close" type="button" aria-label="オンライン待機を閉じる">閉じる</button></header>
     <p id="online-status" role="status" aria-live="polite" hidden></p>
-    <section id="online-room" aria-label="ルームの座席" hidden>
+    <section id="online-room" aria-label="ルームの参加者" hidden>
       <div id="online-room-content">
         <div class="online-room-info">
           <p class="online-room-code-row"><span>ルームコード</span><strong id="online-room-code">—</strong><button id="online-copy-code" type="button">コピー</button></p>
@@ -63,7 +63,7 @@
           <p id="online-room-format" class="online-room-expiry-row"></p>
         </div>
         <p id="online-connection" role="status" aria-live="polite" hidden>接続状態を確認しています。</p>
-        <ol id="online-seats" aria-label="東・南・西・北の席"></ol>
+        <ol id="online-seats" aria-label="参加者とCPUの一覧"></ol>
         <p id="online-finalized-message" role="status" hidden>座席が確定しました。ホストはオンライン対局を開始できます。</p>
         <p id="online-error" role="alert" hidden></p>
       </div>
