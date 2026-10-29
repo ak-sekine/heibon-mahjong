@@ -12,6 +12,7 @@ import { completeKan } from '../game/kan.ts';
 import { startGame } from '../game/start.ts';
 import type { RandomSource } from '../game/shuffle.ts';
 import { tileKindKey } from '../model/tile.ts';
+import { drawSeatAssignment } from '../game/seating.ts';
 import type { GameState, PlayerId, PlayerState } from '../model/game.ts';
 import type { MatchState } from '../model/match.ts';
 import { declarationsBetween, type PublicDeclarationEvent } from '../model/declaration.ts';
@@ -67,7 +68,11 @@ export function startOnlineGame(
   random: RandomSource = secureRandomSource,
   format: import('../model/match.ts').MatchFormat = 'tonpu',
 ): OnlineGameSession {
-  const game = nextSecureGame(0, identities, random);
+  const shuffled = drawSeatAssignment(identities.map(identity => ({
+    ...identity, participantSeat: identity.participantSeat ?? identity.seat,
+  })) as unknown as OnlineGameSession['identities'], random);
+  const assigned = shuffled.map((identity, seat) => ({ ...identity, seat: seat as PlayerId })) as unknown as OnlineGameSession['identities'];
+  const game = nextSecureGame(0, assigned, random);
   const match = startMatch(game, format);
   assertPointConservation(match);
   return {
@@ -75,7 +80,7 @@ export function startOnlineGame(
     gameRevision: 1,
     match,
     status: 'playing',
-    identities,
+    identities: assigned,
     hostSeat,
     decision: null,
     declarations: [],
@@ -141,6 +146,12 @@ function openWindow(
 
 function humanSeats(session: OnlineGameSession): readonly PlayerId[] {
   return session.identities.filter(identity => identity.control === 'human').map(identity => identity.seat);
+}
+
+function gameSeatForParticipant(session: OnlineGameSession, participantSeat: PlayerId): PlayerId {
+  const identity = session.identities.find(item => (item.participantSeat ?? item.seat) === participantSeat);
+  if (!identity) throw new OnlineGameRuleError('unauthorized');
+  return identity.seat;
 }
 
 function advanceDecision(
@@ -258,25 +269,25 @@ export function transferOnlineSeatToCpu(
   hostSeat: PlayerId,
   now = Date.now(),
 ): OnlineGameSession {
-  if (session.status === 'aborted' || session.identities[seat]?.control !== 'human') {
+  const gameSeat = gameSeatForParticipant(session, seat);
+  if (session.status === 'aborted' || session.identities[gameSeat]?.control !== 'human') {
     throw new OnlineGameRuleError('seat_not_human');
   }
-  const cpuSeats = session.identities
-    .filter(identity => identity.control === 'cpu' || identity.seat === seat)
-    .map(identity => identity.seat)
-    .sort((a, b) => a - b);
-  const cpuNames = new Map(cpuSeats.map((cpuSeat, index) => [cpuSeat, `CPU${index + 1}`]));
+  const cpuParticipants = session.identities
+    .filter(identity => identity.control === 'cpu' || (identity.participantSeat ?? identity.seat) === seat)
+    .sort((first, second) => (first.participantSeat ?? first.seat) - (second.participantSeat ?? second.seat));
+  const cpuNames = new Map(cpuParticipants.map((identity, index) => [identity.seat, `CPU${index + 1}`]));
   const identities = session.identities.map(identity => {
-    const control = identity.seat === seat ? 'cpu' as const : identity.control;
+    const control = identity.seat === gameSeat ? 'cpu' as const : identity.control;
     const cpuName = cpuNames.get(identity.seat);
     return {
       ...identity,
       ...(cpuName ? { name: cpuName } : {}),
       control,
-      ...(identity.seat === seat ? { connected: true } : {}),
+      ...(identity.seat === gameSeat ? { connected: true } : {}),
     };
   }) as unknown as OnlineGameSession['identities'];
-  const players = session.match.game.players.map(player => player.id === seat
+  const players = session.match.game.players.map(player => player.id === gameSeat
     ? { ...player, control: 'cpu' as const }
     : player) as unknown as OnlineGameSession['match']['game']['players'];
   const converted: OnlineGameSession = {
@@ -287,15 +298,15 @@ export function transferOnlineSeatToCpu(
   };
 
   const decision = session.decision;
-  if (!decision || !decision.requiredSeats.includes(seat)) {
+  if (!decision || !decision.requiredSeats.includes(gameSeat)) {
     return startOnlineRoundIfReady({ ...converted, gameRevision: session.gameRevision + 1 });
   }
 
   const responses = { ...decision.responses };
-  delete responses[seat];
+  delete responses[gameSeat];
   const updatedDecision: PlayerDecisionWindow = {
     ...decision,
-    requiredSeats: decision.requiredSeats.filter(requiredSeat => requiredSeat !== seat),
+    requiredSeats: decision.requiredSeats.filter(requiredSeat => requiredSeat !== gameSeat),
     responses,
   };
   const withUpdatedDecision = { ...converted, decision: updatedDecision };
@@ -309,10 +320,12 @@ export function transferOnlineSeatToCpu(
   return finishDecision(withUpdatedDecision, updatedDecision, now);
 }
 
-function requireHuman(session: OnlineGameSession, seat: PlayerId, connectedSeats: ReadonlySet<PlayerId>): void {
-  if (session.identities[seat]?.control !== 'human' || !connectedSeats.has(seat)) {
+function requireHuman(session: OnlineGameSession, participantSeat: PlayerId, connectedSeats: ReadonlySet<PlayerId>): PlayerId {
+  const identity = session.identities.find(item => (item.participantSeat ?? item.seat) === participantSeat);
+  if (!identity || identity.control !== 'human' || !connectedSeats.has(participantSeat)) {
     throw new OnlineGameRuleError('unauthorized');
   }
+  return identity.seat;
 }
 
 export function applyOnlineGameAction(
@@ -322,7 +335,7 @@ export function applyOnlineGameAction(
   connectedSeats: ReadonlySet<PlayerId>,
   now = Date.now(),
 ): OnlineGameSession {
-  requireHuman(session, actorSeat, connectedSeats);
+  actorSeat = requireHuman(session, actorSeat, connectedSeats);
   if (session.status !== 'playing' || session.match.status !== 'playing') {
     throw new OnlineGameRuleError('game_not_playing');
   }
@@ -428,6 +441,7 @@ export function readyForNextOnlineRound(
   seat: PlayerId,
   expectedGameRevision: number,
 ): OnlineGameSession {
+  seat = gameSeatForParticipant(session, seat);
   if (session.identities[seat]?.control !== 'human') throw new OnlineGameRuleError('unauthorized');
   if (session.status !== 'round-ended' || session.match.status !== 'round-ended') {
     throw new OnlineGameRuleError('round_not_ended');
@@ -545,6 +559,11 @@ export function hydrateOnlineGame(serialized: string): OnlineGameSession | null 
     const session = parsed as Partial<OnlineGameSession>;
     if (session.schemaVersion !== 1 || !Number.isSafeInteger(session.gameRevision) ||
         !session.match || !Array.isArray(session.identities) || session.identities.length !== 4 ||
+        session.identities.some((identity, seat) => identity.seat !== seat ||
+          !Number.isInteger(identity.participantSeat ?? identity.seat) ||
+          (identity.participantSeat ?? identity.seat) < 0 || (identity.participantSeat ?? identity.seat) > 3 ||
+          !identity.name || !['human', 'cpu'].includes(identity.control)) ||
+        new Set(session.identities.map(identity => identity.participantSeat ?? identity.seat)).size !== 4 ||
         !Number.isInteger(session.hostSeat) || session.hostSeat! < 0 || session.hostSeat! > 3 ||
         !['playing', 'round-ended', 'match-ended', 'aborted'].includes(String(session.status)) ||
         !(session.decision === null || typeof session.decision === 'object')) return null;
@@ -571,6 +590,7 @@ export function onlineIdentitiesFromSeats(
     if (!item || !item.name) throw new OnlineGameRuleError('seat_assignment_invalid');
     return {
       seat: seat as PlayerId,
+      participantSeat: seat as PlayerId,
       name: item.name,
       control: item.kind,
       connected: item.kind === 'cpu' || item.connected === true,

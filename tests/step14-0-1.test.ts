@@ -269,9 +269,13 @@ function onlineSessionForGame(
   decision: PlayerDecisionWindow | null = null,
 ): OnlineGameSession {
   const base = persistedGame(fixture) as unknown as OnlineGameSession;
+  const identities = [0, 1, 2, 3].map(participantSeat => {
+    const identity = base.identities.find(value => (value.participantSeat ?? value.seat) === participantSeat)!;
+    return { ...identity, seat: participantSeat as PlayerId, participantSeat: participantSeat as PlayerId };
+  }) as unknown as OnlineGameSession['identities'];
   const players = game.players.map((player, seat) => ({
     ...player,
-    control: base.identities[seat as PlayerId].control,
+    control: identities[seat as PlayerId].control,
   })) as [PlayerState, PlayerState, PlayerState, PlayerState];
   const match = startMatch({ ...game, players });
   return {
@@ -279,7 +283,7 @@ function onlineSessionForGame(
     gameRevision,
     match,
     status: match.status,
-    identities: base.identities,
+    identities,
     hostSeat: base.hostSeat,
     decision,
   };
@@ -637,14 +641,16 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     const guestView = latestGameView(guest);
     const hostSeats = hostView.seats as Array<Record<string, unknown>>;
     const guestSeats = guestView.seats as Array<Record<string, unknown>>;
-    const hostHand = hostSeats[0].hand as Array<Record<string, unknown>>;
-    const guestHand = guestSeats[1].hand as Array<Record<string, unknown>>;
+    const hostGameSeat = Number(hostView.viewerSeat);
+    const guestGameSeat = Number(guestView.viewerSeat);
+    const hostHand = hostSeats[hostGameSeat].hand as Array<Record<string, unknown>>;
+    const guestHand = guestSeats[guestGameSeat].hand as Array<Record<string, unknown>>;
     assert.equal(hostHand.length, 13);
-    assert.equal(hostSeats[0].drawnTile !== null, true);
+    assert.equal(Boolean(hostSeats[hostGameSeat].drawnTile), hostGameSeat === 0);
     assert.equal(guestHand.length, 13);
-    assert.equal(guestSeats[1].drawnTile, null);
-    assert.equal('hand' in hostSeats[1], false);
-    assert.equal('drawnTile' in hostSeats[1], false);
+    assert.equal(Boolean(guestSeats[guestGameSeat].drawnTile), guestGameSeat === 0);
+    assert.equal('hand' in hostSeats[guestGameSeat], false);
+    assert.equal('drawnTile' in hostSeats[guestGameSeat], false);
     assert.equal('liveWall' in hostView, false);
     assert.equal('deadWall' in hostView, false);
     assert.equal('match' in hostView, false);
@@ -657,6 +663,13 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     });
     assert.equal(duplicateStart.ok, true);
     assert.equal(persistedGame(fixture).gameRevision, 1, 'a duplicate start did not deal a second wall');
+    const secondStartRequest = await sendGameAction(fixture, host, {
+      type: 'start-game', requestId: 'game-start-new-request', expectedGameRevision: 0,
+    });
+    assert.equal(secondStartRequest.ok, false);
+    assert.equal(secondStartRequest.code, 'already_started');
+    assert.deepEqual(persistedGame(fixture).identities, initial.identities,
+      'a distinct duplicate start request did not redraw the participant seats');
 
     // Recreate the DO and replace one socket. The same participant token recovers
     // the same seat hand from the persisted authoritative state.
@@ -667,42 +680,63 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     const disconnectedRoom = await readState(fixture);
     assert.equal(publicSeats(disconnectedRoom)[1].kind, 'human');
     assert.equal(publicSeats(disconnectedRoom)[1].connected, false);
-    assert.equal((persistedGame(fixture).identities as Array<Record<string, unknown>>)[1].control, 'human');
+    const persistedIdentities = persistedGame(fixture).identities as Array<Record<string, unknown>>;
+    assert.equal(persistedIdentities.find(identity => identity.participantSeat === 1)?.control, 'human');
     fixture.room = new RoomDurableObject(fixture.ctx as unknown as DurableObjectState, {} as Env);
     guest = await connectParticipant(fixture, guestInfo.token);
     assert.equal(guest.seat, 1);
     const recoveredGuest = latestGameView(guest);
-    assert.deepEqual(((recoveredGuest.seats as Array<Record<string, unknown>>)[1].hand as Array<Record<string, unknown>>)
+    assert.equal(recoveredGuest.viewerSeat, guestGameSeat);
+    assert.deepEqual(((recoveredGuest.seats as Array<Record<string, unknown>>)[guestGameSeat].hand as Array<Record<string, unknown>>)
       .map(tile => tile.id).sort(), guestHand.map(tile => tile.id).sort());
-    assert.deepEqual(((latestGameView(host).seats as Array<Record<string, unknown>>)[0].hand as Array<Record<string, unknown>>)
+    assert.deepEqual(((latestGameView(host).seats as Array<Record<string, unknown>>)[hostGameSeat].hand as Array<Record<string, unknown>>)
       .map(tile => tile.id).sort(), hostHandIds);
     fixture.room.webSocketClose(previousGuest.server as unknown as WebSocket);
 
     const revision = Number(latestGameView(host).gameRevision);
-    const currentGuestHand = (latestGameView(guest).seats as Array<Record<string, unknown>>)[1].hand as Array<Record<string, unknown>>;
-    const wrongTurn = await sendGameAction(fixture, guest, {
+    const turnSeat = Number(latestGameView(host).turnPlayerId);
+    const turnIdentity = (persistedGame(fixture).identities as Array<Record<string, unknown>>).find(identity => identity.seat === turnSeat)!;
+    const wrongParticipant = turnIdentity.participantSeat === 0 ? guest : host;
+    const wrongView = latestGameView(wrongParticipant);
+    const wrongGameSeat = Number(wrongView.viewerSeat);
+    const wrongOwnHand = (wrongView.seats as Array<Record<string, unknown>>)[wrongGameSeat].hand as Array<Record<string, unknown>>;
+    const wrongTurn = await sendGameAction(fixture, wrongParticipant, {
       type: 'discard', requestId: 'game-wrong-turn', expectedGameRevision: revision,
-      tileId: String(currentGuestHand[0].id),
+      tileId: String(wrongOwnHand[0].id),
     });
     assert.equal(wrongTurn.ok, false);
     assert.equal(wrongTurn.code, 'not_your_turn');
-    const illegalOwner = await sendGameAction(fixture, host, {
+    const turnParticipant = turnIdentity.participantSeat === 0 ? host : turnIdentity.participantSeat === 1 ? guest : null;
+    const illegalParticipant = turnParticipant ?? wrongParticipant;
+    const illegalOwner = await sendGameAction(fixture, illegalParticipant, {
       type: 'discard', requestId: 'game-other-hand', expectedGameRevision: revision,
-      tileId: String(currentGuestHand[0].id),
+      tileId: String((illegalParticipant === host ? guestHand : hostHand)[0].id),
     });
     assert.equal(illegalOwner.ok, false);
-    assert.equal(illegalOwner.code, 'invalid_action');
+    assert.equal(illegalOwner.code, turnParticipant ? 'invalid_action' : 'not_your_turn');
     assert.equal(persistedGame(fixture).gameRevision, revision, 'rejected operations changed game state');
 
-    const initialHostHand = (latestGameView(host).seats as Array<Record<string, unknown>>)[0].hand as Array<Record<string, unknown>>;
-    const discardTileId = String(initialHostHand[0].id);
-    const hostDiscard = await sendGameAction(fixture, host, {
-      type: 'discard', requestId: 'game-host-discard', expectedGameRevision: revision, tileId: discardTileId,
-    });
-    assert.equal(hostDiscard.ok, true);
+    const activeHuman = await (async () => {
+      for (let step = 0; step < 24; step++) {
+        for (const participant of [host, guest]) {
+          const view = latestGameView(participant);
+          if (view.phase !== 'awaiting-discard' || Number(view.turnPlayerId) !== Number(view.viewerSeat)) continue;
+          const ids = (view.self as Record<string, unknown>).discardableTileIds as string[];
+          const response = await sendGameAction(fixture, participant, {
+            type: 'discard', requestId: 'game-first-human-discard', expectedGameRevision: Number(view.gameRevision), tileId: ids[0],
+          });
+          assert.equal(response.ok, true);
+          return { participant, revision: Number(view.gameRevision), tileId: ids[0] };
+        }
+        await fixture.room.alarm();
+        await passVisibleDecisions(fixture, [host, guest]);
+      }
+      throw new Error('The shuffled match did not reach a human discard');
+    })();
+    assert.ok(activeHuman.tileId);
     const afterDiscardRevision = Number(persistedGame(fixture).gameRevision);
-    const duplicateDiscard = await sendGameAction(fixture, host, {
-      type: 'discard', requestId: 'game-host-discard', expectedGameRevision: revision, tileId: discardTileId,
+    const duplicateDiscard = await sendGameAction(fixture, activeHuman.participant, {
+      type: 'discard', requestId: 'game-first-human-discard', expectedGameRevision: activeHuman.revision, tileId: activeHuman.tileId,
     });
     assert.equal(duplicateDiscard.ok, true);
     assert.equal(persistedGame(fixture).gameRevision, afterDiscardRevision, 'duplicate discard was applied twice');
@@ -713,8 +747,8 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     // a turn, so drive any such host discard through its legal server view.
     for (let step = 0; step < 16; step++) {
       const currentView = latestGameView(host);
-      if (Number(currentView.turnPlayerId) === 1 && currentView.phase === 'awaiting-discard') break;
-      if (Number(currentView.turnPlayerId) === 0 && currentView.phase === 'awaiting-discard') {
+      if (Number(currentView.turnPlayerId) === Number(latestGameView(guest).viewerSeat) && currentView.phase === 'awaiting-discard') break;
+      if (Number(currentView.turnPlayerId) === Number(currentView.viewerSeat) && currentView.phase === 'awaiting-discard') {
         const hostDiscardIds = (currentView.self as Record<string, unknown>).discardableTileIds as string[];
         assert.ok(hostDiscardIds.length > 0, 'the host turn exposes a legal discard');
         const hostFollowup = await sendGameAction(fixture, host, {
@@ -728,7 +762,7 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
       await passVisibleDecisions(fixture, [host, guest]);
     }
     let guestTurn = latestGameView(guest);
-    assert.equal(guestTurn.turnPlayerId, 1);
+    assert.equal(guestTurn.turnPlayerId, guestGameSeat);
     assert.equal(guestTurn.phase, 'awaiting-discard');
     const guestDiscardIds = (guestTurn.self as Record<string, unknown>).discardableTileIds as string[];
     assert.ok(guestDiscardIds.length > 0);
@@ -750,7 +784,7 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
       const game = match.game as Record<string, unknown>;
       const players = game.players as Array<Record<string, unknown>>;
       cpuProgressed = Number(state.gameRevision) > beforeCpuRevision + 1 &&
-        (Boolean((players[2].river as unknown[]).length) || state.status !== 'playing');
+        (players.some(player => player.control === 'cpu' && (player.river as unknown[]).length > 0) || state.status !== 'playing');
     }
     const failedGame = (lastCpuProgressState.match as Record<string, unknown>).game as Record<string, unknown>;
     const failedPlayers = failedGame.players as Array<Record<string, unknown>>;
@@ -774,8 +808,9 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     const afterHostLeave = persistedGame(fixture) as unknown as OnlineGameSession;
     assert.ok(afterHostLeave.status === 'playing' || afterHostLeave.status === 'round-ended',
       'host leave preserves the active or just-ended online game');
-    assert.equal(afterHostLeave.identities[0].control, 'cpu');
-    assert.equal(afterHostLeave.match.game.players[0].control, 'cpu');
+    const departedIdentity = afterHostLeave.identities.find(identity => (identity.participantSeat ?? identity.seat) === 0)!;
+    assert.equal(departedIdentity.control, 'cpu');
+    assert.equal(afterHostLeave.match.game.players[departedIdentity.seat].control, 'cpu');
     const afterHostLeaveRoom = await readState(fixture);
     assert.equal(afterHostLeaveRoom.status, 'finalized');
     assert.equal(afterHostLeaveRoom.hostSeat, 1);
@@ -807,7 +842,8 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     const pendingTicket = (await responseObject(pendingTicketResponse)).ticket as string;
     const original = persistedGame(fixture) as unknown as OnlineGameSession;
     const originalRevision = original.gameRevision;
-    const oldPrivateId = original.match.game.players[0].hand[0].id;
+    const hostGameSeat = original.identities.find(identity => (identity.participantSeat ?? identity.seat) === 0)!.seat;
+    const oldPrivateId = original.match.game.players[hostGameSeat].hand[0].id;
     const beforeLeaveRoom = await readState(fixture);
     const leave = sendAction(fixture, host, {
       type: 'leave-room', requestId: 'handoff-host-leaves', expectedRevision: beforeLeaveRoom.revision,
@@ -824,8 +860,9 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.equal(publicSeats(afterHostLeave)[1].isHost, true);
     assert.equal(session.hostSeat, 1, 'the game host seat did not follow the room host');
     assert.equal(session.gameRevision, originalRevision + 1);
-    assert.equal(session.identities[0].control, 'cpu');
-    assert.equal(session.match.game.players[0].control, 'cpu');
+    const convertedHost = session.identities.find(identity => (identity.participantSeat ?? identity.seat) === 0)!;
+    assert.equal(convertedHost.control, 'cpu');
+    assert.equal(session.match.game.players[convertedHost.seat].control, 'cpu');
     assert.deepEqual(session.match.points, original.match.points);
     assert.deepEqual(session.match.game.liveWall, original.match.game.liveWall);
     assert.deepEqual(session.match.game.deadWall, original.match.game.deadWall);
@@ -835,8 +872,8 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     })), original.match.game.players);
     const survivorView = latestGameView(firstGuest);
     const publicViewSeats = survivorView.seats as Array<Record<string, unknown>>;
-    assert.equal(publicViewSeats[0].control, 'cpu');
-    assert.equal('hand' in publicViewSeats[0], false);
+    assert.equal(publicViewSeats[hostGameSeat].control, 'cpu');
+    assert.equal('hand' in publicViewSeats[hostGameSeat], false);
     assert.equal(JSON.stringify(survivorView).includes(oldPrivateId), false);
     const notice = firstGuest.client.sent.map(message => JSON.parse(message) as Record<string, unknown>)
       .filter(message => message.type === 'seat-taken-over').at(-1);
@@ -881,7 +918,8 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     session = persistedGame(fixture) as unknown as OnlineGameSession;
     assert.deepEqual(session, afterSecondLeave, 'a stale CPU calculation overwrote the newer handoff state');
     assert.equal(session.hostSeat, 2);
-    assert.deepEqual(session.identities.map(identity => identity.control), ['cpu', 'cpu', 'human', 'cpu']);
+    assert.deepEqual([0, 1, 2, 3].map(participantSeat => session.identities.find(identity =>
+      (identity.participantSeat ?? identity.seat) === participantSeat)!.control), ['cpu', 'cpu', 'human', 'cpu']);
     const oneHumanRoom = await readState(fixture);
     assert.equal(oneHumanRoom.hostSeat, 2);
     assert.equal(publicSeats(oneHumanRoom).filter(seat => seat.kind === 'human').length, 1);
@@ -896,7 +934,19 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     const afterHandoffRevision = session.gameRevision;
     for (let step = 0; step < 6; step++) {
       await passVisibleDecisions(fixture, [lastGuest]);
-      await fixture.room.alarm();
+      const currentView = latestGameView(lastGuest);
+      if (currentView.status === 'playing' && currentView.phase === 'awaiting-discard' &&
+          Number(currentView.turnPlayerId) === Number(currentView.viewerSeat)) {
+        const legalIds = (currentView.self as Record<string, unknown>).discardableTileIds as string[];
+        assert.ok(legalIds.length > 0, 'the remaining human turn exposes a legal discard');
+        const response = await sendGameAction(fixture, lastGuest, {
+          type: 'discard', requestId: `handoff-human-discard-${step}`,
+          expectedGameRevision: Number(currentView.gameRevision), tileId: legalIds[0],
+        });
+        assert.equal(response.ok, true);
+      } else {
+        await fixture.room.alarm();
+      }
       await passVisibleDecisions(fixture, [lastGuest]);
       session = persistedGame(fixture) as unknown as OnlineGameSession;
       if (session.gameRevision > afterHandoffRevision) break;
@@ -931,7 +981,7 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.equal(afterRoom.revision, (beforeRoom.revision as number) + 1);
     assert.equal(after.hostSeat, 0);
     assert.equal(after.gameRevision, before.gameRevision + 1);
-    assert.equal(after.identities[1].control, 'cpu');
+    assert.equal(after.identities.find(identity => (identity.participantSeat ?? identity.seat) === 1)?.control, 'cpu');
     assert.deepEqual(after.match.game.liveWall, before.match.game.liveWall);
     assert.deepEqual(after.match.points, before.match.points);
   });

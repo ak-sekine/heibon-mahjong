@@ -26,6 +26,8 @@ SUITE = [
     run('tests/browser-action-controls.py'),
     run('tests/browser-action-panel.py'),
     run('tests/browser-table-ui.py'),
+    run('tests/browser-random-seating.py'),
+    run('tests/browser-random-seating.py', 'webkit'),
     run('tests/browser-riichi-claimed-discard.py'),
     run('tests/browser-riichi-claimed-discard.py', 'webkit'),
     run('tests/browser-river-capacity.py'),

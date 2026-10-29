@@ -227,12 +227,15 @@ export class RoomDurableObject {
   }
 
   private gameView(session: OnlineGameSession, viewerSeat: PlayerId) {
-    return createPlayerGameView(session, viewerSeat, this.room()?.code ?? '', this.connectedHumanSeats());
+    const identity = session.identities.find(item => (item.participantSeat ?? item.seat) === viewerSeat);
+    if (!identity) throw new Error('Online viewer identity is missing');
+    return createPlayerGameView(session, identity.seat, this.room()?.code ?? '', this.connectedHumanSeats());
   }
 
   private sendGameState(socket: WebSocket, session = this.gameSession()): void {
     const attachment = this.attachment(socket);
-    if (!attachment || !session || session.identities[attachment.seat]?.control !== 'human') return;
+    if (!attachment || !session || !session.identities.some(identity =>
+      (identity.participantSeat ?? identity.seat) === attachment.seat && identity.control === 'human')) return;
     const seat = this.seat(attachment.seat);
     if (!seat || seat.kind !== 'human' || seat.token_hash !== attachment.participantId ||
         seat.connection_id !== attachment.connectionId || seat.connected !== 1) return;
@@ -245,7 +248,7 @@ export class RoomDurableObject {
     for (const socket of this.ctx.getWebSockets()) {
       if (socket.readyState === 1) this.sendGameState(socket, session);
     }
-    const result = this.gameView(session, session.identities[0].seat).result;
+    const result = this.gameView(session, (session.identities[0].participantSeat ?? session.identities[0].seat)).result;
     if (session.status === 'round-ended' && result) {
       const message = JSON.stringify({ type: 'round-ended', gameRevision: session.gameRevision, result });
       for (const socket of this.ctx.getWebSockets()) if (socket.readyState === 1) {
@@ -790,11 +793,9 @@ export class RoomDurableObject {
           if (nextHost === null || !remaining.some(seat => seat.seat === nextHost)) {
             code = 'game_unavailable';
           } else {
-            const cpuSeats = session.identities
-              .filter(identity => identity.control === 'cpu' || identity.seat === actor.seat)
-              .map(identity => identity.seat)
-              .sort((a, b) => a - b);
-            const cpuName = `CPU${cpuSeats.indexOf(actor.seat as PlayerId) + 1}`;
+            const cpuRoomSeats = this.seats().filter(seat => seat.kind === 'cpu' || seat.seat === actor.seat)
+              .map(seat => seat.seat).sort((a, b) => a - b);
+            const cpuName = `CPU${cpuRoomSeats.indexOf(actor.seat) + 1}`;
             const nextSession = transferOnlineSeatToCpu(
               session,
               actor.seat as PlayerId,
@@ -804,10 +805,10 @@ export class RoomDurableObject {
             this.ctx.storage.sql.exec('DELETE FROM tickets WHERE seat = ?', actor.seat);
             this.ctx.storage.sql.exec(
               "UPDATE seats SET name = ?, token_hash = ?, connected = 0, kind = 'cpu', ready = 0, connection_id = NULL WHERE seat = ? AND kind = 'human'",
-              cpuName, `cpu:${actor.seat}`, actor.seat,
+              cpuName,
+              `cpu:${actor.seat}`, actor.seat,
             );
-            cpuSeats.forEach((cpuSeat, index) => {
-              if (cpuSeat === actor.seat) return;
+            cpuRoomSeats.forEach((cpuSeat, index) => {
               this.ctx.storage.sql.exec("UPDATE seats SET name = ? WHERE seat = ? AND kind = 'cpu'", `CPU${index + 1}`, cpuSeat);
             });
             this.ctx.storage.sql.exec('UPDATE room SET status = \'finalized\', host_seat = ?', nextHost);

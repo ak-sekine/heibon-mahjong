@@ -33,10 +33,7 @@ function tileOrder(tile: Tile): number {
 }
 
 function playerName(view: PlayerGameView, playerId: number): string {
-  const player = view.seats[playerId];
-  if (player.control !== 'cpu') return player.name;
-  const cpuSeats = view.seats.filter(seat => seat.control === 'cpu').sort((a, b) => a.seat - b.seat);
-  return `CPU${cpuSeats.findIndex(seat => seat.seat === playerId) + 1}`;
+  return view.seats[playerId].name;
 }
 
 /** Render the compact online win overview shared with the local table. */

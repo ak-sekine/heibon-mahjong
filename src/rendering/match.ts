@@ -4,7 +4,7 @@ import { createTileElement } from './tile-svg.ts';
 import { renderDepositSticks } from './deposit-sticks.ts';
 import { HONORS, SUITS, type Tile } from '../model/tile.ts';
 import { renderRoundLabel } from './shared-table-components.ts';
-const names = ['自分','CPU1','CPU2','CPU3'];
+const defaultNames = ['自分','CPU1','CPU2','CPU3'];
 const renderedSettlements = new WeakMap<HTMLElement, MatchState['lastSettlement']>();
 const abortiveNames = {
   'four-kans': '四開槓',
@@ -15,7 +15,7 @@ const abortiveNames = {
 function tileOrder(tile: Tile): number {
   return tile.category === 'suited' ? SUITS.indexOf(tile.suit) * 9 + tile.rank - 1 : 27 + HONORS.indexOf(tile.honor);
 }
-export function renderMatch(match: MatchState): void {
+export function renderMatch(match: MatchState, names: readonly string[] = defaultNames): void {
   const round=document.querySelector<HTMLElement>('#table-round');
   if(round) renderRoundLabel(round, { roundWind: match.roundWind, roundNumber: match.roundNumber, honba: match.honba });
   const deposits = document.querySelector<HTMLElement>('#deposit-sticks');

@@ -46,7 +46,7 @@ test('single tsumo receives all deposits',()=>{
 });
 test('negative points allowed and new match resets all',()=>{
  const initial={...startMatch(),game:fixedRon(0,[0,1,2]),points:[99000,1000,1000,-1000] as Points};const match=settleRound(initial);assert.ok(match.points[3]<0);assertPointConservation(match);
- const ui=new GameController();ui.match=match;ui.newGame();assert.deepEqual(ui.match.points,[25000,25000,25000,25000]);assert.equal(ui.match.lastSettlement,null);
+ const ui=new GameController(undefined,{randomizeSeating:false});ui.match=match;ui.newGame();assert.deepEqual(ui.match.points,[25000,25000,25000,25000]);assert.equal(ui.match.lastSettlement,null);
 });
 for(const amount of [-1,1.5,NaN,Infinity])test(`invalid payment ${amount} rejected`,()=>{
  const game=fixedRon(0,[0]);const win=game.winResult!;if(win.winMethod!=='ron')throw Error();

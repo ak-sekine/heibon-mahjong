@@ -1,6 +1,7 @@
 import type { ActionButtonState, ActionChoiceOption, ActionPanelState } from '../ui/action-panel.ts';
 import { choiceAccessibleLabel } from '../ui/action-panel.ts';
 import type { MatchState } from '../model/match.ts';
+import type { PlayerId } from '../model/game.ts';
 import { canDeclareRiichi } from '../game/riichi.ts';
 import { canDeclareTsumo } from '../game/tsumo.ts';
 import { canDeclareRon, getRonTile } from '../game/ron.ts';
@@ -10,7 +11,7 @@ import { getKanOptions } from '../game/kan.ts';
 import { getCallOptions } from '../game/calls.ts';
 import { tileLabel } from './tile-svg.ts';
 
-const seatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
+const defaultSeatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
 const button = (visible: boolean, enabled: boolean, label: string): ActionButtonState => ({ visible, enabled, label });
 
 /** Convert the local match state and existing rule helpers into the shared panel contract. */
@@ -19,20 +20,23 @@ export function createLocalActionPanelState(
   selectedTileId: string | null,
   progressing: boolean,
   kanChoicesOpen: boolean,
+  viewerSeat = 0,
+  seatNames: readonly string[] = defaultSeatNames,
 ): ActionPanelState {
   const game = match.game;
-  const player = game.players[0];
-  const ownTurn = match.status === 'playing' && player.control === 'human' && canDiscard(game, 0);
+  const playerId = viewerSeat as PlayerId;
+  const player = game.players[playerId];
+  const ownTurn = match.status === 'playing' && player.control === 'human' && canDiscard(game, playerId);
   const selected = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
     .find(tile => tile.id === selectedTileId);
   const discardTile = player.riichi ? player.drawnTile : selected;
   const discardVisible = ownTurn;
-  const canRiichi = Boolean(ownTurn && selected && canDeclareRiichi(game, 0, selected.id, match.points[0]));
-  const canTsumo = ownTurn && player.control === 'human' && canDeclareTsumo(game, 0);
-  const kanOptions = getKanOptions(game, 0);
-  const kyuushu = ownTurn && canDeclareKyuushuKyuuhai(game, 0);
-  const canRon = player.control === 'human' && canDeclareRon(game, 0);
-  const callOptions = game.phase === 'awaiting-call' ? getCallOptions(game, 0) : [];
+  const canRiichi = Boolean(ownTurn && selected && canDeclareRiichi(game, playerId, selected.id, match.points[viewerSeat]));
+  const canTsumo = ownTurn && player.control === 'human' && canDeclareTsumo(game, playerId);
+  const kanOptions = getKanOptions(game, playerId);
+  const kyuushu = ownTurn && canDeclareKyuushuKyuuhai(game, playerId);
+  const canRon = player.control === 'human' && canDeclareRon(game, playerId);
+  const callOptions = game.phase === 'awaiting-call' ? getCallOptions(game, playerId) : [];
   const ronTile = canRon ? getRonTile(game) : null;
   const callChoices: ActionChoiceOption[] = callOptions.map(option => {
     const label = option.type === 'pon' ? 'ポン' : option.type === 'daiminkan' ? '大明カン' : 'チー';

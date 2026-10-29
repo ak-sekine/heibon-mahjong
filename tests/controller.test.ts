@@ -17,7 +17,7 @@ test('deferred controller has no offline match until an explicit start', () => {
 });
 
 test('selection toggles by physical ID without changing game; confirmation is single-use and reset is fresh', () => {
-  const ui = new GameController();
+  const ui = new GameController(undefined, { randomizeSeating: false });
   const game = ui.game;
   const snapshot = structuredClone(game);
   const [a, b] = game.players[0].hand;

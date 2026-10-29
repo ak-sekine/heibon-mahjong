@@ -25,7 +25,10 @@ export type PublicMeld = Readonly<{
 }>;
 
 export type OnlineSeatIdentity = Readonly<{
+  /** Current match seat, used by game rules and ordered clockwise. */
   seat: PlayerId;
+  /** Stable waiting-room seat used for authentication, reconnect and host ownership. */
+  participantSeat?: PlayerId;
   name: string;
   control: 'human' | 'cpu';
   connected: boolean;
@@ -305,7 +308,7 @@ export function createPlayerGameView(
       seat: player.id,
       name: identity.name,
       control: identity.control,
-      connected: identity.control === 'cpu' || connectedSeats.has(player.id),
+      connected: identity.control === 'cpu' || connectedSeats.has(identity.participantSeat ?? identity.seat),
       wind: player.wind,
       isDealer: player.id === game.dealerId,
       points: match.points[player.id],
@@ -346,7 +349,7 @@ export function createPlayerGameView(
     ...(revealUra ? { uraDoraIndicators: uraDoraIndicators(game).map(publicTile) } : {}),
     self: {
       seat: viewerSeat,
-      isHost: session.hostSeat === viewerSeat,
+      isHost: session.hostSeat === (session.identities[viewerSeat].participantSeat ?? viewerSeat),
       nextRoundReady: session.status === 'round-ended' && (session.roundReady?.seats.includes(viewerSeat) ?? false),
       discardableTileIds: canDiscard(game, viewerSeat)
         ? [...selfPlayer.hand, ...(selfPlayer.drawnTile ? [selfPlayer.drawnTile] : [])]

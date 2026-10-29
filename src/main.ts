@@ -50,6 +50,7 @@ const riverDebugMode = window.location.pathname.endsWith('/test.html') &&
   new URLSearchParams(window.location.search).get('debug') === 'river';
 const controller = new GameController(undefined, {
   startImmediately: false,
+  randomizeSeating: true,
   onChange: render,
   wait: (milliseconds, signal, context) => waitForTurn(riverDebugMode ? 800 : milliseconds, signal, context),
 });
@@ -123,23 +124,24 @@ function render(): void {
     }
     const declarations = declarationsBetween(previouslyRenderedGame, game);
     renderStage = 'renderTable';
-    renderTable(game, controller.match.points, controller.match.lastSettlement);
+    renderTable(game, controller.match.points, controller.match.lastSettlement, controller.playerSeat, controller.playerNames);
     renderStage = 'declarationBubbles';
     for (const declaration of declarations) {
-      const position = riverPositionFor(0, declaration.seat);
-      const river = localTable.querySelector<HTMLElement>(`.river[data-player-id="${declaration.seat}"]`);
+      const position = riverPositionFor(controller.playerSeat, declaration.seat);
+      const displaySeat = (declaration.seat - controller.playerSeat + 4) % 4;
+      const river = localTable.querySelector<HTMLElement>(`.river[data-player-id="${displaySeat}"]`);
       if (river) localDeclarationBubbles.show(declaration.seat, declaration.kind, position, river);
     }
     previouslyRenderedGame = game;
     previouslyRenderedMatchStatus = controller.match.status;
     renderStage = 'renderMatch';
-    renderMatch(controller.match);
+    renderMatch(controller.match, controller.playerNames);
     renderStage = 'renderSelection';
-    renderSelection(controller.game, controller.selectedTileId, controller.progressing);
+    renderSelection(controller.game, controller.selectedTileId, controller.progressing, controller.playerSeat);
     renderStage = 'localActionPanel';
     try {
       localActionPanel?.update(createLocalActionPanelState(
-        controller.match, controller.selectedTileId, controller.progressing, localKanChoicesOpen,
+        controller.match, controller.selectedTileId, controller.progressing, localKanChoicesOpen, controller.playerSeat, controller.playerNames,
       ));
       diagnosticLog.record('INFO', 'local_action_panel_updated', { renderId }, { persist: false, replace: true });
     } catch (error) {
@@ -240,9 +242,9 @@ document.querySelector('#player-hand')!.addEventListener('click', event => {
   const button = (event.target as Element).closest<HTMLButtonElement>('button[data-tile-id]');
   if (!button) return;
   controller.select(button.dataset.tileId!);
-  renderSelection(controller.game, controller.selectedTileId, controller.progressing);
+  renderSelection(controller.game, controller.selectedTileId, controller.progressing, controller.playerSeat);
   localActionPanel?.update(createLocalActionPanelState(
-    controller.match, controller.selectedTileId, controller.progressing, localKanChoicesOpen,
+    controller.match, controller.selectedTileId, controller.progressing, localKanChoicesOpen, controller.playerSeat, controller.playerNames,
   ));
   resultDialog.update(controller.match);
 });

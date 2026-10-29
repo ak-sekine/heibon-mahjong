@@ -5,11 +5,8 @@ import type { PlayerGameView } from './game-view.ts';
 
 const button = (visible: boolean, enabled: boolean, label: string): ActionButtonState => ({ visible, enabled, label });
 
-function displayName(view: PlayerGameView, seat: PlayerGameView['seats'][number]): string {
-  if (seat.control !== 'cpu') return seat.name;
-  const cpuSeats = view.seats.filter(candidate => candidate.control === 'cpu').sort((a, b) => a.seat - b.seat);
-  const index = cpuSeats.findIndex(candidate => candidate.seat === seat.seat);
-  return index < 0 ? seat.name : `CPU${index + 1}`;
+function displayName(seat: PlayerGameView['seats'][number]): string {
+  return seat.name;
 }
 
 /** Map only the viewer-scoped, server-provided legal operations into the shared panel contract. */
@@ -71,7 +68,7 @@ export function createOnlineActionPanelState(
     : 'この対局は中断されました。';
   else if (view.phase === 'awaiting-ron') actionStatus = 'ロン判断を待っています。';
   else if (view.phase === 'awaiting-call') actionStatus = '鳴き判断を待っています。';
-  else if (view.turnPlayerId !== view.viewerSeat) actionStatus = `${displayName(view, view.seats[view.turnPlayerId])}の手番です。`;
+  else if (view.turnPlayerId !== view.viewerSeat) actionStatus = `${displayName(view.seats[view.turnPlayerId])}の手番です。`;
   else if (view.self.discardableTileIds.length) actionStatus = discardTileId ? '牌を選択中です。' : '打牌する牌を選択してください。';
   else actionStatus = 'サーバーの更新を待っています。';
 

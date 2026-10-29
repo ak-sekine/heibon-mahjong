@@ -55,11 +55,11 @@ test('fixed complete east match: seven rounds to rankings',()=>{
  assert.deepEqual(rankPlayers(match).map(p=>p.playerId),[0,1,2,3]);assert.equal(nextRound(match),match);
 });
 test('CPU tsumo callback settles once, old wait cannot overwrite a reset',async()=>{
- let release: (()=>void)|undefined;const ui=new GameController(undefined,{wait:()=>new Promise<void>(r=>release=r)});
+ let release: (()=>void)|undefined;const ui=new GameController(undefined,{randomizeSeating:false,wait:()=>new Promise<void>(r=>release=r)});
  ui.select(ui.game.players[0].drawnTile!.id);const old=ui.confirm();assert.ok(release);ui.newGame();const match=ui.match;release!();await old;assert.equal(ui.match,match);assert.equal(ui.match.lastSettlement,null);assert.deepEqual(ui.match.points,[25000,25000,25000,25000]);
 });
 test('next round double click and reset invalidate previous CPU generation',async()=>{
- let release: (()=>void)|undefined;const ui=new GameController(undefined,{wait:()=>new Promise<void>(r=>release=r)});ui.match=startMatch(fixedRon(0,[1]));const old=ui.nextRound();assert.equal(ui.game.dealerId,1);assert.ok(release);const game=ui.game;await ui.nextRound();assert.equal(ui.game,game);ui.newGame();const match=ui.match;release!();await old;assert.equal(ui.match,match);assert.equal(ui.game.dealerId,0);
+ let release: (()=>void)|undefined;const ui=new GameController(undefined,{randomizeSeating:false,wait:()=>new Promise<void>(r=>release=r)});ui.match=startMatch(fixedRon(0,[1]));const old=ui.nextRound();assert.equal(ui.game.dealerId,1);assert.ok(release);const game=ui.game;await ui.nextRound();assert.equal(ui.game,game);ui.newGame();const match=ui.match;release!();await old;assert.equal(ui.match,match);assert.equal(ui.game.dealerId,0);
 });
 test('ended match ignores subsequent game updates and retains final ranking',()=>{
  const match=settleRound({...startMatch(),roundNumber:4,game:fixedRon(0,[1])});assert.equal(updateMatchGame(match,startGame()),match);assert.equal(nextRound(match),match);

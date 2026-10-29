@@ -1,7 +1,7 @@
 import type { GameState, PlayerState } from '../model/game.ts';
 import { createTileElement, tileLabel } from './tile-svg.ts';
-const seatNames=['自分','CPU1','CPU2','CPU3'];
-export function renderMelds(container: HTMLElement, player: PlayerState, game?: GameState): void {
+const defaultSeatNames=['自分','CPU1','CPU2','CPU3'];
+export function renderMelds(container: HTMLElement, player: PlayerState, game?: GameState, seatNames: readonly string[] = defaultSeatNames): void {
   container.setAttribute('aria-label', `${seatNames[player.id]}の公開副露面子`);
   container.replaceChildren(...(player.melds ?? []).map((meld, index) => {
     const group=document.createElement('div');group.className='open-meld';group.setAttribute('role','group');

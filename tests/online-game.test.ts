@@ -7,7 +7,7 @@ import { getRiichiDiscardOptions } from '../src/game/riichi.ts';
 import { canDeclareTsumo, declareTsumo } from '../src/game/tsumo.ts';
 import { declareRon, markRonPassed } from '../src/game/ron.ts';
 import { startMatch, settleRound } from '../src/game/match.ts';
-import { fixedRon } from './match-fixture.ts';
+import { fixedRon, fixedRound } from './match-fixture.ts';
 import { tileKindKey } from '../src/model/tile.ts';
 import type { GameState, PlayerId, PlayerState } from '../src/model/game.ts';
 import { isForbiddenDiscard } from '../src/game/melds.ts';
@@ -36,6 +36,7 @@ import {
 } from '../src/online/game-view.ts';
 import { ronGame, ronStart } from './ron-fixture.ts';
 import { renderOnlineWinSummary } from '../src/online/result-content.ts';
+import { createOnlineActionPanelState } from '../src/online/action-panel-state.ts';
 
 const allTiles = (game: GameState) => [
   ...game.liveWall,
@@ -47,6 +48,13 @@ const allTiles = (game: GameState) => [
     ...(player.melds ?? []).flatMap(meld => meld.tiles),
   ]),
 ];
+const orderedRandom = () => 0.999999;
+function permutationRandom([pickFour, pickThree, pickTwo]: readonly [number, number, number]): () => number {
+  const picks = [pickFour, pickThree, pickTwo];
+  const sizes = [4, 3, 2];
+  let index = 0;
+  return () => index < 3 ? (picks[index] + 0.25) / sizes[index++] : 0.999999;
+}
 
 function identities(humanSeats: readonly number[]): OnlineGameSession['identities'] {
   return [0, 1, 2, 3].map(seat => ({
@@ -96,7 +104,7 @@ function ronDecision(seats: readonly PlayerId[], baseGameRevision: number, opene
 
 test('online game start fills four seats with secure-wall inventory and 25,000 points', () => {
   for (let humanCount = 1; humanCount <= 4; humanCount++) {
-    const session = startOnlineGame(identities([0, 1, 2, 3].slice(0, humanCount)), 0);
+    const session = startOnlineGame(identities([0, 1, 2, 3].slice(0, humanCount)), 0, orderedRandom);
     const game = session.match.game;
     const tiles = allTiles(game);
     assert.equal(session.gameRevision, 1);
@@ -111,13 +119,55 @@ test('online game start fills four seats with secure-wall inventory and 25,000 p
     assert.equal(counts.size, 34);
     assert.ok([...counts.values()].every(count => count === 4));
     assert.deepEqual(game.players.map(player => player.control), [0, 1, 2, 3].map(seat => seat < humanCount ? 'human' : 'cpu'));
+    assert.deepEqual(session.identities.map(identity => identity.participantSeat), [0, 1, 2, 3]);
     assert.ok(game.players.every(player => player.hand.length === 13));
     assert.ok(game.players[0].drawnTile);
   }
 });
 
+test('online start draws all 24 participant orders once and preserves host, reconnect, takeover, and next-round seats', () => {
+  const orders = new Set<string>();
+  for (let a = 0; a < 4; a++) for (let b = 0; b < 3; b++) for (let c = 0; c < 2; c++) {
+    const random = permutationRandom([a, b, c]);
+    for (let humanCount = 1; humanCount <= 4; humanCount++) {
+      const participantSeats = [0, 1, 2, 3].slice(0, humanCount);
+      const session = startOnlineGame(identities(participantSeats), 0, permutationRandom([a, b, c]));
+      const assignment = session.identities.map(identity => identity.participantSeat);
+      assert.deepEqual(assignment, startOnlineGame(identities(participantSeats), 0, permutationRandom([a, b, c])).identities
+        .map(identity => identity.participantSeat));
+      assert.equal(new Set(assignment).size, 4);
+      assert.deepEqual(session.match.game.players.map(player => player.control), session.identities.map(identity => identity.control));
+      assert.equal(session.match.game.dealerId, 0);
+      assert.equal(session.identities.filter(identity => identity.control === 'human').length, humanCount);
+      const host = session.identities.find(identity => identity.participantSeat === 0)!;
+      const guest = session.identities.find(identity => identity.participantSeat === 1);
+      assert.equal(createPlayerGameView(session, host.seat, 'A2CDEF', new Set([0, 1, 2, 3])).self.isHost, true);
+      if (guest) assert.equal(createPlayerGameView(session, guest.seat, 'A2CDEF', new Set([0, 1, 2, 3])).self.isHost, false);
+      orders.add(assignment.join(','));
+
+      const persisted = hydrateOnlineGame(JSON.stringify(session))!;
+      assert.equal(persisted.identities.find(identity => identity.participantSeat === 0)?.seat, host.seat);
+      const endedMatch = settleRound({ ...persisted.match, game: fixedRound(0, []) });
+      const ended = { ...persisted, match: endedMatch, status: endedMatch.status };
+      const next = startNextOnlineRound(ended, orderedRandom);
+      assert.deepEqual(next.identities, persisted.identities);
+      assert.equal(next.match.game.players[host.seat].control, 'human');
+      const takeover = transferOnlineSeatToCpu(next, 0, 1);
+      assert.equal(takeover.identities.find(identity => identity.participantSeat === 0)?.seat, host.seat);
+      assert.equal(takeover.match.game.players[host.seat].control, 'cpu');
+      assert.equal(takeover.hostSeat, 1);
+      const takeoverCpuNames = takeover.identities.filter(identity => identity.control === 'cpu')
+        .sort((first, second) => (first.participantSeat ?? first.seat) - (second.participantSeat ?? second.seat))
+        .map(identity => identity.name);
+      assert.deepEqual(takeoverCpuNames,
+        Array.from({ length: 5 - humanCount }, (_, index) => `CPU${index + 1}`));
+    }
+  }
+  assert.equal(orders.size, 24);
+});
+
 test('every player view allowlists only that viewer hand, with no wall or CPU decision internals', () => {
-  const base = startOnlineGame(identities([0, 1]), 0);
+  const base = startOnlineGame(identities([0, 1]), 0, orderedRandom);
   const players = [...base.match.game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
   for (const seat of [0, 1, 2, 3] as const) {
     const old = players[seat].hand[0];
@@ -244,8 +294,11 @@ test('online ron and tsumo summaries use Japanese yaku names and omit round and 
       const session = sessionForGame(game, [0]);
       const view = createPlayerGameView(session, 1, 'A2CDEF', new Set([0]));
       const winner = view.result!.winners[0];
+      const resultName = 'CPU identity name';
+      const resultView = { ...view, seats: view.seats.map(seat => seat.seat === winner.winnerId
+        ? { ...seat, control: 'cpu' as const, name: resultName } : seat) };
       const summary = new Node();
-      assert.equal(renderOnlineWinSummary(summary as unknown as HTMLElement, view), true);
+      assert.equal(renderOnlineWinSummary(summary as unknown as HTMLElement, resultView), true);
       assert.equal(summary.hidden, false);
       assert.equal(summary.children.length, 1);
       const section = summary.children[0];
@@ -253,7 +306,7 @@ test('online ron and tsumo summaries use Japanese yaku names and omit round and 
       const resultLine = section.children[0];
       assert.equal(resultLine.className, 'round-summary-winner');
       assert.equal(resultLine.children.map(node => node.textContent).join(''),
-        `Host ${method === 'tsumo' ? 'ツモ' : 'ロン'}・${winner.yakumanCount > 0 ? `${winner.yakumanCount}役満` : `${winner.han}翻 ${winner.fu}符`}・${winner.totalPoints.toLocaleString('ja-JP')}点`);
+        `${resultName} ${method === 'tsumo' ? 'ツモ' : 'ロン'}・${winner.yakumanCount > 0 ? `${winner.yakumanCount}役満` : `${winner.han}翻 ${winner.fu}符`}・${winner.totalPoints.toLocaleString('ja-JP')}点`);
       const yakuLine = section.children[1];
       assert.equal(yakuLine.className, 'round-summary-yaku');
       assert.deepEqual(yakuLine.textContent, winner.yaku.map(yaku => ({
@@ -266,8 +319,22 @@ test('online ron and tsumo summaries use Japanese yaku names and omit round and 
   } finally { globalThis.document = original; }
 });
 
+test('online action status uses the stable name stored for a shuffled CPU seat', () => {
+  const session = startOnlineGame(identities([0]), 0, orderedRandom);
+  const view = createPlayerGameView(session, 0, 'A2CDEF', new Set([0]));
+  const cpu = view.seats.find(seat => seat.control === 'cpu' && seat.seat === 3)!;
+  const name = 'Participant CPU name';
+  const renamed = {
+    ...view,
+    turnPlayerId: cpu.seat,
+    seats: view.seats.map(seat => seat.seat === cpu.seat ? { ...seat, name } : seat),
+  };
+  const panel = createOnlineActionPanelState(renamed, null, false, false, false, null);
+  assert.equal(panel.actionStatus, `${name}の手番です。`);
+});
+
 test('an exhaustive draw never exposes another human hand without a declaration', () => {
-  const base = startOnlineGame(identities([0, 1]), 0);
+  const base = startOnlineGame(identities([0, 1]), 0, orderedRandom);
   const players = [...base.match.game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
   for (const seat of [1, 2] as const) {
     const old = players[seat].hand[0];
@@ -310,7 +377,7 @@ test('an exhaustive draw never exposes another human hand without a declaration'
 });
 
 test('server action reducer rejects wrong turns, opponent tile IDs, and stale revisions without mutation', () => {
-  const session = startOnlineGame(identities([0, 1, 2, 3]), 0);
+  const session = startOnlineGame(identities([0, 1, 2, 3]), 0, orderedRandom);
   const connected = new Set<PlayerId>([0, 1, 2, 3]);
   const otherHandId = session.match.game.players[1].hand[0].id;
   const snapshot = structuredClone(session);

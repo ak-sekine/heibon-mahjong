@@ -20,7 +20,7 @@ import { riichiRiverReference } from './riichi-river-reference.ts';
 export { yakuDisplayName } from './yaku-names.ts';
 
 const winds: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
-const seatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
+const defaultSeatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
 
 function tileOrder(tile: Tile): number {
   return tile.category === 'suited' ? SUITS.indexOf(tile.suit) * 9 + tile.rank - 1 : 27 + HONORS.indexOf(tile.honor);
@@ -59,7 +59,8 @@ function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement
   return button;
 }
 
-export function renderTable(game: GameState, points?: readonly number[], settlement: RoundSettlement | null = null): void {
+export function renderTable(game: GameState, points?: readonly number[], settlement: RoundSettlement | null = null,
+  viewerSeat: PlayerId = 0, seatNames: readonly string[] = defaultSeatNames): void {
   const pendingDiscard = pendingDiscardTarget(game);
   // Validate every river before touching the current DOM. A malformed
   // declaration reference must leave the prior frame intact and be reported by
@@ -77,10 +78,10 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
     if (declaration.state === 'inconsistent') {
       throw new RangeError(`Riichi declaration tile is missing from player ${player.id}'s river`);
     }
-    return [player.id, calculateRiverLayout(riverPositionFor(0, player.id), player.river.length, declaration.index)] as const;
+    return [player.id, calculateRiverLayout(riverPositionFor(viewerSeat, player.id), player.river.length, declaration.index)] as const;
   }));
-  renderWinResult(game, settlement);
-  renderRoundSummary(game, settlement);
+  renderWinResult(game, settlement, seatNames);
+  renderRoundSummary(game, settlement, seatNames);
   const winningResults = game.winResult
     ? game.winResult.winMethod === 'ron' ? game.winResult.winners : [game.winResult]
     : [];
@@ -94,32 +95,35 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
     const winningResult = winnersById.get(id);
     const publicRonTileCount = player.control === 'cpu' && winningResult?.winMethod === 'ron' ? 1 : 0;
     const count = player.hand.length + Number(player.drawnTile !== null) + publicRonTileCount;
-    const label = document.querySelector<HTMLElement>(`#label-${id}`)!;
+    const displayId = (id - viewerSeat + 4) % 4;
+    const label = document.querySelector<HTMLElement>(`#label-${displayId}`)!;
+    const section = document.querySelector<HTMLElement>(`.seat[data-player-id="${displayId}"]`);
+    if (section) section.setAttribute('aria-label', `${seatNames[id]}の席`);
     renderSeatLabel(label, {
       name: seatNames[id],
       wind: player.wind,
       points: points?.[id] ?? 25000,
       isDealer: game.dealerId === id,
-      isSelf: id === 0,
+      isSelf: id === viewerSeat,
       isActive: game.phase !== 'wall-exhausted' && game.phase !== 'won' && game.turnPlayerId === id,
-      displayOrder: id,
+      displayOrder: displayId,
       isRiichi: Boolean(player.riichi),
       isConnected: true,
     });
-    if (id === 0) {
-      renderSelf(player, canDiscard(game, 0));
+    if (id === viewerSeat) {
+      renderSelf(player, canDiscard(game, viewerSeat));
       if (settlement?.reason === 'kyuushu-kyuuhai' && game.abortiveDrawPlayerId === id) {
         renderRevealedOwnHand(document.querySelector<HTMLUListElement>('#player-hand')!, player);
       }
     }
     else {
-      const backHand = document.querySelector<HTMLElement>(`.concealed-hand[data-player-id="${id}"]`);
+      const backHand = document.querySelector<HTMLElement>(`.concealed-hand[data-player-id="${displayId}"]`);
       if (backHand) {
         if (settlement?.reason === 'kyuushu-kyuuhai' && game.abortiveDrawPlayerId === id) {
-          renderPublicCpuDrawHand(backHand, player);
-        } else if (winningResult && player.control === 'cpu') renderPublicCpuHand(backHand, game, winningResult);
+          renderPublicCpuDrawHand(backHand, player, seatNames);
+        } else if (winningResult && player.control === 'cpu') renderPublicCpuHand(backHand, game, winningResult, seatNames);
         else if (player.control === 'cpu' && settlement?.reason === 'draw' && settlement.tenpai?.[id]) {
-          renderPublicCpuDrawHand(backHand, player);
+          renderPublicCpuDrawHand(backHand, player, seatNames);
         } else {
           backHand.setAttribute('aria-label', `${seatNames[id]}の非公開手牌 ${count}枚`);
           backHand.replaceChildren(...Array.from({length:count},()=>{
@@ -129,9 +133,10 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
         }
       }
     }
-    const melds = document.querySelector<HTMLElement>(`.open-melds[data-player-id="${id}"]`);
-    if (melds) renderMelds(melds, player, game);
-    const river = document.querySelector<HTMLElement>(`.river[data-player-id="${id}"]`)!;
+    const melds = document.querySelector<HTMLElement>(`.open-melds[data-player-id="${displayId}"]`);
+    if (melds) renderMelds(melds, player, game, seatNames);
+    const river = document.querySelector<HTMLElement>(`.river[data-player-id="${displayId}"]`)!;
+    river.setAttribute('aria-label', `${seatNames[id]}の河`);
     const layout = riverLayouts.get(id)!;
     applyRiverLayout(river, layout);
     river.replaceChildren(...player.river.map((physical, index) => {
@@ -139,6 +144,7 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
       const item = document.createElement('div');
       item.className = pendingDiscard?.seat === id && pendingDiscard.riverIndex === index
         ? 'river-tile pending-discard-target' : 'river-tile';
+      item.dataset.playerId = String(id);
       item.dataset.tileId = physical.id;
       item.dataset.riichiDeclaration = String(player.riichi?.declarationTileId === physical.id);
       applyRiverTilePlacement(item, position);
@@ -159,14 +165,14 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
 }
 
 /** Tile selection rendering never changes GameState or rebuilds focused tile buttons. */
-export function renderSelection(game: GameState, selectedTileId: string | null, progressing = false): void {
+export function renderSelection(game: GameState, selectedTileId: string | null, progressing = false, viewerSeat: PlayerId = 0): void {
   for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('#player-hand button'))) {
     button.setAttribute('aria-pressed', String(button.dataset.tileId === selectedTileId));
-    button.disabled = isForbiddenDiscard(game.players[0],button.dataset.tileId!) || progressing || !canDiscard(game, 0) || Boolean(game.players[0].riichi && button.dataset.tileId !== game.players[0].drawnTile?.id);
+    button.disabled = isForbiddenDiscard(game.players[viewerSeat],button.dataset.tileId!) || progressing || !canDiscard(game, viewerSeat) || Boolean(game.players[viewerSeat].riichi && button.dataset.tileId !== game.players[viewerSeat].drawnTile?.id);
   }
 }
 
-function renderRoundSummary(game: GameState, settlement: RoundSettlement | null): void {
+function renderRoundSummary(game: GameState, settlement: RoundSettlement | null, seatNames: readonly string[]): void {
   const summary = document.querySelector<HTMLElement>('#round-result-summary');
   if (!summary) return;
   summary.replaceChildren();
@@ -242,20 +248,20 @@ function winningPhysicalTile(game: GameState, result: TsumoResult | RonCandidate
   throw new RangeError('Missing physical winning tile');
 }
 
-function renderPublicCpuHand(container: HTMLElement, game: GameState, result: TsumoResult | RonCandidate): void {
+function renderPublicCpuHand(container: HTMLElement, game: GameState, result: TsumoResult | RonCandidate, seatNames: readonly string[]): void {
   const player = game.players[result.winnerId];
   const winningTile = winningPhysicalTile(game, result);
   const concealedTiles = [...player.hand]
     .sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
   // The confirmed winning tile is a current draw for tsumo, or the existing
   // physical discard for ron. Rendering adds no tile to GameState.
-  renderRevealedCpuHand(container, player, [...concealedTiles, winningTile], result.winningTileId);
+  renderRevealedCpuHand(container, player, [...concealedTiles, winningTile], seatNames, result.winningTileId);
 }
 
-function renderPublicCpuDrawHand(container: HTMLElement, player: PlayerState): void {
+function renderPublicCpuDrawHand(container: HTMLElement, player: PlayerState, seatNames: readonly string[]): void {
   const tiles = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
     .sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
-  renderRevealedCpuHand(container, player, tiles);
+  renderRevealedCpuHand(container, player, tiles, seatNames);
 }
 
 function renderRevealedOwnHand(container: HTMLUListElement, player: PlayerState): void {
@@ -273,7 +279,7 @@ function renderRevealedOwnHand(container: HTMLUListElement, player: PlayerState)
   }));
 }
 
-function renderRevealedCpuHand(container: HTMLElement, player: PlayerState, tiles: readonly PhysicalTile[], winningTileId?: string): void {
+function renderRevealedCpuHand(container: HTMLElement, player: PlayerState, tiles: readonly PhysicalTile[], seatNames: readonly string[], winningTileId?: string): void {
   container.setAttribute('aria-label', `${seatNames[player.id]}の公開手牌 ${tiles.map(tile => tileLabel(tile.tile)).join('・')}`);
   container.replaceChildren(...tiles.map(physical => {
     const tile = document.createElement('span');
@@ -285,7 +291,7 @@ function renderRevealedCpuHand(container: HTMLElement, player: PlayerState, tile
 }
 
 const renderedWins = new WeakMap<HTMLElement, GameState['winResult']>();
-function renderWinResult(game: GameState, settlement: RoundSettlement | null): void {
+function renderWinResult(game: GameState, settlement: RoundSettlement | null, seatNames: readonly string[]): void {
   const panel = document.querySelector<HTMLElement>('#win-result')!;
   const win = game.winResult;
   if (renderedWins.has(panel) && renderedWins.get(panel) === win) return;
@@ -322,7 +328,7 @@ function renderWinResult(game: GameState, settlement: RoundSettlement | null): v
       section.append(hand);
       if(player.melds?.length) {
         section.append(text('p','公開副露面子：'));
-        const open=document.createElement('div');open.className='result-melds';renderMelds(open,player);section.append(open);
+        const open=document.createElement('div');open.className='result-melds';renderMelds(open,player,undefined,seatNames);section.append(open);
       }
     }
     section.append(text('p', '今回対応している役の判定結果'));
