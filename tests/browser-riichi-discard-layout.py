@@ -18,7 +18,7 @@ with sync_playwright() as p:
         cpu2_line_alignment = 0
         page = browser.new_page(viewport={'width': width, 'height': height})
         page.goto('http://localhost:4173/heibon-mahjong/')
-        page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => app.controller.newGame())")
+        page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => { app.controller.random=()=>.999999; app.controller.newGame(); })")
         page.wait_for_selector('#player-hand svg')
         page.evaluate('''async()=>{
           window.renderer=await import('/heibon-mahjong/src/rendering/table.ts');
