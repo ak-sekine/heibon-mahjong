@@ -28,8 +28,22 @@
 | `npm test` | 成功。66件成功、失敗0、スキップ0。Worker統合テストで1〜4人構成、重複のない4席、開始時の席対応、重複確定・開始、再接続、CPU引き継ぎを確認。 |
 | `npm run typecheck:worker` | 成功。 |
 | `npm run build` | 成功。TypeScriptチェックとVite本番ビルドが完了。 |
-| Browser UI回帰 | 修正したオンライン待機画面テストを既存Browser UI workflowで実行予定。main push後の対象コミット結果を追記します。 |
+| Browser UI回帰 | run `40813350867` 成功。Chromium／WebKitの47実行がすべて成功し、オンライン待機画面テストも両ブラウザーで成功。 |
 | `git diff --check` | 成功。 |
+
+## GitHub Actions・本番デプロイ
+
+アプリ修正コミット: `c127ca3d949b35834aba72d00f938f25314a7f37` (`fix: finalize online seats before game start`)
+
+| 工程 | 結果 |
+| --- | --- |
+| verify・docs-check | Deploy run `40813350867` 成功。単体・統合テスト、Worker型チェック、Pagesビルド、docs-checkが成功。 |
+| Browser UI | 同runで47実行成功。Chromium／WebKitのオンライン待機画面回帰も成功。 |
+| Cloudflare Worker | 同runの`deploy-worker`成功。`https://heibon-mahjong-online.ak-sekine.workers.dev`へデプロイ。 |
+| デプロイ直後の本番通信テスト | 同runの`production-test`成功。2人対局と席表示一致、再接続、ホスト交代、CPU引き継ぎ、1〜4人構成、非公開情報保護の5シナリオを確認。秘密値はログに出ていません。 |
+| GitHub Pages | 同runのPages build・deploy成功。公開URLは[Heibon Mahjong](https://ak-sekine.github.io/heibon-mahjong/)です。Pages deploymentの`pages_build_version`はアプリ修正コミットSHAと一致します。 |
+
+最初のpushで別workflow `Production Worker diagnostics` run `40813350790` がDeployと並行起動し、Workerデプロイ前の旧本番Workerに新しい`gameSeat`応答を要求して失敗しました。Deploy run `40813350867`自体はBrowser UI通過後にWorkerをデプロイし、その後のproduction-testとPages deployまで成功しています。この並行実行を避けるためworkflow修正コミット `c27856e157c601ced0a400f177bb6fdcdc26a450` で、独立Production diagnosticsをDeploy成功後に起動する`workflow_run`へ変更しました。修正後の診断run `40815205407` はデプロイ後に5シナリオすべて成功しました。
 
 ## ローカル自動検証
 
