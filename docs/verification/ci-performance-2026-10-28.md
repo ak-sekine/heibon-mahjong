@@ -167,3 +167,61 @@ Worker deployの条件は`deploy_required == true`、`verify.result == success`�
 #355の本番通信テストは2026-10-28 17:13 UTCに成功し、Pages deployは17:16 UTCに成功しました。これがGitHub Actionsから確認できた最後の本番成功記録です。#356以降、本番deploy成功のActions履歴はありません。公開Pages／Workerの現在のHTTP応答を直接確認できなかったため、現在の稼働正常性は未確認です。
 
 CI高速化後のアプリコード変更deploy、現在の本番HTTP応答、required checks設定、失敗／キャンセル経路の実環境再現、実機操作は未確認です。Issue #15はこれらが残るためOpenのままです。Issue #7の失敗を解決済みとは扱いません。
+
+## 実アプリ変更と本番デプロイの確認（2026-10-29）
+
+### 確認対象
+
+Issue #5「新規対局時のランダム座席」の実装・修正に伴うmainのpushと、完了記録のみを変更したdocs-only pushをGitHub Actions上で確認しました。以下はGitHub Actionsのrun/job/step履歴から確認した過去の実行結果であり、この記録作成時に再実行した結果ではありません。
+
+### アプリ変更時のrun
+
+| Run | SHA・変更 | 成功したjob | スキップされた処理と理由 |
+| --- | --- | --- | --- |
+| [40806362450](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40806362450) | SHA cb1bb8f4dd99627aa308b84db3a64852ff06e135。座席ランダム化後の検証用座席を安定させる変更。 | detect-changes、docs-check、verify（全回帰テスト、Worker typecheck、Pages build、検証済みbuild artifact保存）、browser-ui / browser-ui、deploy-worker、production-test、pages-build、pages-deploy。 | reusable Browser UI内のclassifierと文書check jobはreuse_build=trueで呼ばれたためskip。Browser UI job内のunit testとbuild stepもskipし、SHAとrun attemptが一致するpages-dist artifactをdownloadして回帰を実施。これらは実行済みの親workflow検証を再利用したため。 |
+| [40813350867](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40813350867) | SHA c127ca3d949b35834aba72d00f938f25314a7f37。オンラインで座席を確定してから対局を開始するIssue #5の実装。 | detect-changes、docs-check、verify（全回帰テスト、Worker typecheck、Pages build、検証済みbuild artifact保存）、browser-ui / browser-ui、deploy-worker、production-test、pages-build、pages-deploy。 | reusable Browser UI内のclassifierと文書check jobはreuse_build=trueで呼ばれたためskip。Browser UI job内のunit testとbuild stepもskipし、検証済みartifactを再利用して回帰を実施。 |
+
+両runともclassifierはrun_full_suite=true、deploy_required=trueを出力しました。browser-ui job logでは各47件すべてがsuccessで、Chromium 31件・WebKit 16件、timeout 0でした。job履歴ではverifyとBrowser UIが成功した後にWorker deployが成功し、その後production test、Pages build、Pages deployが順に成功しています。Production testはHTTPS、room、WebSocket、再接続、認証、privacy検証stepが成功しました。したがって、CI最適化後の座席機能に関する実アプリ変更でWorkerとPagesが本番デプロイされ、本番通信検証も成功したことを確認しました。
+
+### 関連するvalidation-only run
+
+[Run 40813562264](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40813562264)（SHA c27856e157c601ced0a400f177bb6fdcdc26a450）では、detect-changesとdocs-check、verify、Chromium／WebKit Browser UIが成功しました。browser-ui job logは47件success（Chromium 31、WebKit 16、timeout 0）でした。Browser UI jobは検証済みbuildをdownloadし、unit test/buildの重複stepはskipしました。分類ログはrun_full_suite=true、deploy_required=false、classification=validation-onlyです。このrunのcommitは.github/workflows/production-diagnostics.ymlだけを変更しており、deploy-worker、production-test、pages-build、pages-deployはすべてskipでした。reusable Browser UI内のclassifierと文書checkもreuse_build=trueによりskipしました。変更分類どおりのskipであり、未実行のデプロイ処理を成功とは扱いません。
+
+### docs-only run
+
+[Run 40847470010](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40847470010)（SHA 9665defc0cec70cc90260a34af258eb0092f101a）はrun全体がsuccessでした。detect-changesとdocs-checkのgit diff --checkは成功し、reusable Browser UI側のclassifierと文書checkも成功しました。verify、browser-ui / browser-ui、deploy-worker、production-test、pages-build、pages-deployはjob単位でskipでした。docs-only classifierが全回帰とWorker／Pagesデプロイを除外した実例です。アプリ関連jobや本番デプロイを実行したとは記録しません。
+
+### 現行workflowの構成（静的確認）
+
+2026-10-29に取得したGitHub main SHA 9665defc0cec70cc90260a34af258eb0092f101aの.github/workflows/deploy.yml、browser-ui.yml、変更分類scriptを確認しました。以下はworkflow定義から読める構成です。
+
+- main pushはDeploy workflowがBrowser UI reusable workflowを1回呼びます。独立Browser UI workflowはmain pushを対象にせず、PR・指定ブランチpush・手動実行を対象にします。
+- verifyがnpm test、Worker typecheck、npm run buildを実行し、成功したdistをSHAとrun attemptを含むartifact名で保存します。Deployから呼ぶBrowser UIは同じ名前のartifactを取得するため、unit testとbuildを二重実行しません。Run 40806362450と40813350867では、このdownload stepと後続のChromium／WebKit回帰stepの成功も確認しました。
+- Browser UIのPlaywright installはChromiumとWebKitを指定し、登録された回帰を実行します。Run 40806362450、40813350867、40813562264では各47件（Chromium 31、WebKit 16）がsuccess、timeout 0でした。以前の時間比較に記載した45件は異なるrunでの実測です。現行YAMLだけでは実行時のケース個別結果までは断定せず、run artifact/logの結果に基づいて確認します。
+- docs-only分類ではdocs-checkを維持し、全アプリ検証、Browser UI、WorkerとPagesのdeployをskipします。Run 40847470010はこの実動作を示しています。
+- Worker deployは変更分類がdeploy対象で、verifyとBrowser UIがsuccessの場合に進みます。Worker本番通信テスト成功後にPages buildし、最後にPagesをdeployします。Run 40806362450と40813350867はこの順序で全jobがsuccessでした。
+- Pages向けにはWorker URLを注入して別途buildします。これは検証済みBrowser UI buildの重複ではなく、デプロイWorker URLが入った公開bundleを作るためのbuildです。
+
+### 効果の実測値と範囲
+
+この記録の「変更前後の実行時間・run数」節にある同一SHA比較（変更前run 40730187307／40730187445、変更後run 40775396476）を再確認しました。実測では同一SHAのBrowser UI回帰は2回・90呼び出しから1回・45呼び出しに減り、全検証jobのrunner時間合計は39分24.3秒から18分46秒へ20分38.3秒（約52%）減少しました。一方、必須検証完了までの壁時計時間は約18分44秒から約18分45秒で、短縮は確認されませんでした。これはその節に記載した各run・測定条件に限った比較です。2026-10-29の3コードrunについては実行時間削減率を算出していません。
+
+### Branch protectionとRequired Checks
+
+今回、GitHub APIのGET /repos/ak-sekine/heibon-mahjong/branches/mainはprotected: false、protection disabled、required status check contextsなしを返し、GET /repos/ak-sekine/heibon-mahjong/rulesetsは空配列でした。branch protection詳細endpointは403 Resource not accessible by integrationで取得できませんでした。Issueコメントに記録済みのユーザーによる2026-10-29 Settings画面確認でもBranch protection rulesとrepository Rulesetsは未設定です。確認できた範囲ではリポジトリのbranch protection／repository rulesetsによるRequired Checksはありません。組織・上位階層のポリシーまでは確認していません。
+
+Issue #15の受け入れ条件はActions内部の必須検証をdeploy gateにすることであり、新たなbranch protectionやRequired Checksの作成を要求していません。既存のmain直接push運用を維持し、ブランチ保護・Required Checksは追加・変更していません。
+
+### 未確認事項・制約
+
+- 意図的なテスト失敗・cancelを本番deployに通す実験はしていません。失敗・cancel・skipでdeploy条件を満たさないことはworkflow条件・依存関係の静的確認で判断し、実際の失敗履歴では確認していません。
+- 本番通信テストはWorker deploy後に実行され、成功がPages build／deployの前提になります。これはWorker deploy前のゲートではありません。
+- artifact名はSHAとrun attemptに結び付きますが、download後に内容のSHA-256 manifestを独立照合する仕組みはありません。
+- 本番公開先への今回の直接HTTP probeは行っていません。ここでいう本番確認は、指定されたActions履歴内のWorker deploy、production-test、Pages deployの成功です。
+- iPhone Safari実機検証はBrowser UI自動検証とは別であり、このCI検証の対象外です。
+
+### Issue #15の完了判定
+
+CI変更後の実アプリ変更run 40806362450と40813350867で、必要な自動検証、Chromium／WebKit Browser UI、Worker deploy、本番通信テスト、Pages deployの成功を確認しました。Run 40813562264はvalidation-onlyのデプロイskip、Run 40847470010はdocs-onlyの全アプリ検証・デプロイskipと文書check成功をそれぞれ示しました。以前の測定記録は重複run削減とrunner時間を実測し、壁時計時間が短縮したとはしていません。Branch protection確認はユーザー画面確認と今回のGitHub API応答を区別して記録しました。
+
+以上より、Issue本文の必須受け入れ条件は満たされました。Required Checksの新規設定はIssueの必須条件ではなく、現行運用に合わせて変更していません。失敗／cancel経路の実環境再現、現在の公開URLへの直接probe、組織上位ポリシーは未確認として残し、成功実績と混同しません。Issue #15を「実環境検証済み・完了」と判定します。
