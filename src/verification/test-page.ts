@@ -3,7 +3,10 @@ import { startMatch } from '../game/match.ts';
 import { AutomaticTurnRunner, waitForTurn } from '../game/automatic-turns.ts';
 import { getTestScenario } from './test-scenarios.ts';
 import { createRiverTestState } from './river-test-fixture.ts';
+import { useFixedTestSeating } from './fixed-test-seating.ts';
 import './style.css';
+
+useFixedTestSeating(controller);
 
 const select = document.querySelector<HTMLSelectElement>('#scenario')!;
 let cpu1InspectionDelay = false;

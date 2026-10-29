@@ -2,7 +2,10 @@ import { controller, render, resetLocalActionChoices } from '../main.ts';
 import { startMatch } from '../game/match.ts';
 import { declareKan, getKanOptions } from '../game/kan.ts';
 import { scenarioGame, scenarioHelp, type Scenario } from './scenarios.ts';
+import { useFixedTestSeating } from './fixed-test-seating.ts';
 import './style.css';
+
+useFixedTestSeating(controller);
 
 const select = document.querySelector<HTMLSelectElement>('#scenario')!;
 const cpuKan = document.querySelector<HTMLButtonElement>('#start-cpu-kan')!;
