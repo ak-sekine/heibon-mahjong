@@ -59,7 +59,11 @@ Issue：[#6 ローカルルール設定画面・前回設定復元・オンラ�
 
 ## 変更ファイル・コミット
 
-変更ファイル一覧とコミットSHAは検証・push後に追記します。Issue #6はiPhone Safari実機確認までOpenを維持します。
+主要実装コミット：`451ff9495eb4493248a6b16f1d23046a56bd203a`（origin/main `9ef97d090c5cc4b3089dcb7907123d1c385d4597`から作成）。
+
+変更ファイル：`docs/ROADMAP.md`、`docs/SPEC.md`、`docs/verification/README.md`、`docs/verification/local-rules-2026-10-29.md`、`index.html`、`src/main.ts`、`src/model/rules.ts`、`src/online/protocol.ts`、`src/online/waiting-room.ts`、`src/style.css`、`src/ui/new-game-dialog.ts`、`src/ui/rule-settings.ts`、`tests/browser-app-idle.py`、`tests/browser-online-waiting-room.py`、`tests/run-browser-regressions.py`、`tests/rules.test.ts`、`tests/step14-0-1.test.ts`、`worker/index.ts`、`worker/room.ts`。
+
+Actions・本番検証の対象コミットと最終push SHAは下記の結果確認後に追記します。Issue #6はiPhone Safari実機確認までOpenを維持します。
 
 ## iPhone Safari実機で確認する項目
 
