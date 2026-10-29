@@ -37,7 +37,7 @@ export function renderRulesList(root: HTMLElement, rules: unknown, readOnly = fa
 
 /** One editor is shared by offline new matches and online room creation. */
 export class RuleSettingsDialog {
-  private readonly dialog = document.querySelector<HTMLDialogElement>('#rule-settings-dialog')!;
+  private readonly dialog: HTMLDialogElement | null;
   private trigger: HTMLButtonElement | null = null;
   private accepted: ((rules: GameRules) => void) | null = null;
   private draft: GameRules;
@@ -45,6 +45,10 @@ export class RuleSettingsDialog {
   constructor(preferences: RulePreferences) {
     this.preferences = preferences;
     this.draft = preferences.current;
+    const dialog = document.querySelector<HTMLDialogElement>('#rule-settings-dialog');
+    this.dialog = dialog;
+    // Verification pages reuse main.ts without the production settings dialog.
+    if (!dialog) return;
     document.querySelectorAll<HTMLInputElement>('input[name="rules-match-format"]').forEach(input => {
       input.addEventListener('change', () => {
         if (!input.checked) return;
@@ -61,27 +65,27 @@ export class RuleSettingsDialog {
         this.open(button);
       });
     }
-    document.querySelector<HTMLButtonElement>('#cancel-rule-settings')!.addEventListener('click', () => this.cancel());
-    this.dialog.addEventListener('cancel', event => { event.preventDefault(); this.cancel(); });
-    this.dialog.addEventListener('close', () => {
+    document.querySelector<HTMLButtonElement>('#cancel-rule-settings')?.addEventListener('click', () => this.cancel());
+    dialog.addEventListener('cancel', event => { event.preventDefault(); this.cancel(); });
+    dialog.addEventListener('close', () => {
       this.trigger?.focus({ preventScroll: true });
       this.trigger = null;
       this.accepted = null;
     });
-    document.querySelector<HTMLButtonElement>('#confirm-rule-settings')!.addEventListener('click', () => {
-      if (!this.dialog.open) return;
+    document.querySelector<HTMLButtonElement>('#confirm-rule-settings')?.addEventListener('click', () => {
+      if (!dialog.open) return;
       const format = document.querySelector<HTMLInputElement>('input[name="rules-match-format"]:checked')?.value;
       this.draft = normalizeGameRules({ schemaVersion: 1, matchFormat: format });
       const done = this.accepted;
       this.preferences.commit(this.draft);
       this.updateSummaries();
       this.accepted = null;
-      this.dialog.close();
+      dialog.close();
       done?.(this.draft);
     });
   }
   open(trigger: HTMLButtonElement, accepted?: (rules: GameRules) => void): void {
-    if (this.dialog.open) return;
+    if (!this.dialog || this.dialog.open) return;
     this.trigger = trigger;
     this.accepted = accepted ?? null;
     this.draft = this.preferences.current;
@@ -89,11 +93,13 @@ export class RuleSettingsDialog {
     if (selected) selected.checked = true;
     const display = document.querySelector<HTMLElement>('#rule-settings-summary');
     if (display) display.textContent = this.draft.matchFormat === 'tonnan' ? '現在：半荘戦' : '現在：東風戦';
-    renderRulesList(document.querySelector<HTMLElement>('#rule-settings-details')!, this.draft);
+    const details = document.querySelector<HTMLElement>('#rule-settings-details');
+    if (details) renderRulesList(details, this.draft);
     this.dialog.showModal();
-    document.querySelector<HTMLButtonElement>('#cancel-rule-settings')!.focus({ preventScroll: true });
+    document.querySelector<HTMLButtonElement>('#cancel-rule-settings')?.focus({ preventScroll: true });
   }
   private cancel(): void {
+    if (!this.dialog) return;
     this.draft = this.preferences.current;
     this.accepted = null;
     this.dialog.close();
