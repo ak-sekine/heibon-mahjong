@@ -10,7 +10,7 @@
 - B：`tests/online-game.test.ts` は `callStart` の136枚の固定牌山・手牌・ツモで、人間0の打牌後にCPU席1が東を打ち、CPU席2がその牌をポンし打牌、人間席3へ戻る遷移を実際のオンラインゲーム処理で検証する。打牌履歴、ポンの牌ID・出所、CPU席1の空の河、revision 10→15、phase、playing、手番を確認する。席番号は0始まりであり、この固定fixtureのCPU表示名はPlayer 1・Player 2である。
 - `tests/cpu-progress.ts` の判定を既存の `tests/step14-0-1.test.ts` でも使い、revisionと打牌履歴・副露履歴を参照する。人間の打牌だけではCPU進行としない。既存の乱数固定は維持する。
 
-## 検出能力
+## 検出能力（初回ローカル時点。後述のCIでAの検出を確認）
 
 Bは隔離した一時変更で旧来のCPU席1の河のみの判定を適用すると固定テストが期待どおり失敗した。現行判定では成功。Aは初期化行を除去すると空の河と宣言牌参照が不整合になることを検出する設計だが、ブラウザーを起動できずmutation検証は未実施。テスト用の一時変更は含めない。
 
@@ -31,7 +31,7 @@ Bは隔離した一時変更で旧来のCPU席1の河のみの判定を適用す
 
 ## 専用ブランチでのCI検証
 
-検証中。開始時HEADと最新origin/mainはいずれも `976ae62180fde61c169574af92c1f97d9809340d`。未コミット差分と未追跡ファイルを `/workspace/issue21-backup` に保存し、`test/issue-21-browser-regression` に移した。検証対象は `05848b334ac5eb73cb0f105337823a8d617cdcd8`。mainには未反映。
+開始時点の記録：開始時HEADと最新origin/mainはいずれも `976ae62180fde61c169574af92c1f97d9809340d`。未コミット差分と未追跡ファイルを `/workspace/issue21-backup` に保存し、`test/issue-21-browser-regression` に移した。検証対象は `05848b334ac5eb73cb0f105337823a8d617cdcd8`。mainには未反映。
 
 静的レビューで東1局のリーチ宣言牌が河に存在すること、結果から次局を操作すること、次局mockの宣言参照・河の初期化と東2局表示、例外捕捉を照合した。描画検証の無効化や次局状態の補正はない。旧不具合時に局表示待ちだけでタイムアウトしないよう、状態または例外を先に観測し直接assertする。
 
@@ -42,3 +42,11 @@ Bは隔離した一時変更で旧来のCPU席1の河のみの判定を適用す
 Worker型チェックとdiff checkは前回ローカルで成功。実機検証、Aの反復とWebKit異常系は未確認。Issue #22は変更していない。
 
 遷移終了時にも未処理Promise拒否を確認する追加変更 `7926d869fd91285ae7dbf77b93d8063b17d9b6b3` の[再検証run 40900910487](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40900910487)も成功。npm test・buildとBrowser UI 52件（Chromium 33、WebKit 19）が成功し、A専用は両ブラウザー、待機室全フローはChromiumで成功した。異常系と正常系の直接比較は上記 `05848b3` の同一テスト条件で実施している。
+
+## main統合後の検証（進行中）
+
+2026-10-29にmain `976ae62180fde61c169574af92c1f97d9809340d` から正常系先端 `3ed08d175b1a3e90738c6ac7581cfeb5dbeff462` へfast-forwardした。異常系コミットは含まず、次局mockの宣言参照初期化を維持。想定8ファイルのみの差分で、skip・タイムアウト延長・本番仕様やデプロイ設定の変更はない。
+
+対象SHAの[main Actions run 40907137770](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40907137770)ではnpm test（1264件、失敗・skip 0）、build、Worker型チェックが成功。Browser UIは実行中で、完了・シナリオ別結果は未確認。対象SHAのファイルをGit blob SHA照合して隔離環境に再構成し、B単独、関連オンラインテスト、npm test、build、Worker型チェックが成功。mainとの差分を再構成した `git diff --check` も成功した。
+
+未確認：Aの20回反復、WebKit異常系、WebKit待機室全フロー、iPhone Safari実機。Issue #22の親テスト30秒タイムアウトは原因未特定の別件であり、引き続き調査が必要。Issue #21の完了はmain CIのBrowser UI結果確認待ち。
