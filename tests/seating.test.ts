@@ -90,6 +90,29 @@ test('the default offline controller randomizes only when a new match is request
   }
 });
 
+test('offline seating is rerolled for a new match but remains fixed during the current match', async () => {
+  const first = choicesRandom([3, 2, 1]);
+  const second = choicesRandom([0, 0, 0]);
+  const values = [...Array.from({ length: 3 }, first), ...Array.from({ length: 3 }, second)];
+  const controller = new GameController(dealerId => startGame(seeded(0x514), dealerId), {
+    startImmediately: false,
+    randomizeSeating: true,
+    random: () => values.shift() ?? 0.5,
+    wait: async () => {},
+  });
+
+  controller.newGame('tonpu');
+  assert.equal(controller.playerSeat, 0);
+  controller.match = settleRound({ ...controller.match, game: fixedRound(0, []) });
+  await controller.nextRound();
+  assert.equal(controller.playerSeat, 0);
+
+  controller.newGame('tonnan');
+  assert.equal(controller.playerSeat, 3);
+  assert.equal(controller.game.players[3].control, 'human');
+  assert.equal(controller.match.format, 'tonnan');
+});
+
 test('offline seating puts the human in all four seats, keeps the hand below, and preserves seats across rounds', async () => {
   for (let humanPosition = 0; humanPosition < 4; humanPosition++) {
     // Choose a shuffle whose first result position is exactly the requested ID.
