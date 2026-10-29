@@ -732,6 +732,8 @@ with sync_playwright() as p:
     page.locator('#new-game').click()
     page.locator('#confirm-new-game').click()
     wait_for("document.body.dataset.gameMode === 'offline'")
+    saved_rules_before_draft = page.evaluate("localStorage.getItem('heibon-mahjong-last-rules')")
+    assert json.loads(saved_rules_before_draft)['rules']['matchFormat'] == 'tonpu', 'the initial accepted match did not save its rules'
 
     def assert_no_private_cpu_tile_ids_in_main(message):
         leaked_ids = page.evaluate('''() => {
@@ -952,7 +954,7 @@ with sync_playwright() as p:
     page.locator('#confirm-rule-settings').click()
     assert page.locator('#new-game-rules-summary').inner_text() == '現在：半荘戦', 'confirmed rules were not applied to the pending match'
     page.locator('#cancel-new-game').click()
-    assert page.evaluate("localStorage.getItem('heibon-mahjong-last-rules') === null"), 'canceling a new match saved unstarted rules'
+    assert page.evaluate("localStorage.getItem('heibon-mahjong-last-rules')") == saved_rules_before_draft, 'canceling a new match overwrote the last-started rules'
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'dismissing the new-game dialog did not restore focus to the visible menu button'
     select_menu_item('#new-game')
     assert page.locator('#new-game-rules-summary').inner_text() == '現在：東風戦', 'unstarted rules replaced the last-started default'
