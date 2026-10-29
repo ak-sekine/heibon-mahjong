@@ -920,7 +920,8 @@ with sync_playwright() as p:
       wait_for("document.querySelector('#online-table-round').innerText.includes('東2局')")
       assert page.locator('[data-online-river] .river-tile').count() == 0, 'old river tiles remained rendered'
       assert page.locator('#online-round-result').is_hidden(), 'the old round result remained after next-round transition'
-      assert not errors, f'{ENGINE} next-round unhandled page errors: {errors}'
+      unhandled = page.evaluate('window.__nextRoundUnhandledErrors')
+      assert not unhandled and not errors, f'{ENGINE} next-round unhandled errors: {unhandled}, page errors: {errors}'
 
     if NEXT_ROUND_ONLY:
       select_menu_item('#online-create-open')
