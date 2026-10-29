@@ -43,10 +43,35 @@ Worker型チェックとdiff checkは前回ローカルで成功。実機検証�
 
 遷移終了時にも未処理Promise拒否を確認する追加変更 `7926d869fd91285ae7dbf77b93d8063b17d9b6b3` の[再検証run 40900910487](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40900910487)も成功。npm test・buildとBrowser UI 52件（Chromium 33、WebKit 19）が成功し、A専用は両ブラウザー、待機室全フローはChromiumで成功した。異常系と正常系の直接比較は上記 `05848b3` の同一テスト条件で実施している。
 
-## main統合後の検証（進行中）
+## main統合後の最終検証（2026-10-29）
 
-2026-10-29にmain `976ae62180fde61c169574af92c1f97d9809340d` から正常系先端 `3ed08d175b1a3e90738c6ac7581cfeb5dbeff462` へfast-forwardした。異常系コミットは含まず、次局mockの宣言参照初期化を維持。想定8ファイルのみの差分で、skip・タイムアウト延長・本番仕様やデプロイ設定の変更はない。
+回帰テスト強化はmainへ統合済みです。正常系の実装は `05848b334ac5eb73cb0f105337823a8d617cdcd8` を起点に検証し、異常系の意図的な変更は別ブランチだけに置きました。main統合後のテスト・CI更新コミットは `3ed08d175b1a3e90738c6ac7581cfeb5dbeff462` です。mainの最新SHA `50ecc56516b70f448a5ed85b8374b363c446fe01` は文書更新のみで、Run AからRun Bまでゲーム本体・テストコードに変更はありません。異常系コードはmainに含まれていません。
 
-対象SHAの[main Actions run 40907137770](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40907137770)ではnpm test（1264件、失敗・skip 0）、build、Worker型チェックが成功。Browser UIは実行中で、完了・シナリオ別結果は未確認。対象SHAのファイルをGit blob SHA照合して隔離環境に再構成し、B単独、関連オンラインテスト、npm test、build、Worker型チェックが成功。mainとの差分を再構成した `git diff --check` も成功した。
+### 回帰テストの内容
 
-未確認：Aの20回反復、WebKit異常系、WebKit待機室全フロー、iPhone Safari実機。Issue #22の親テスト30秒タイムアウトは原因未特定の別件であり、引き続き調査が必要。Issue #21の完了はmain CIのBrowser UI結果確認待ち。
+- **A — リーチ宣言牌参照の初期化漏れ：** `tests/browser-online-waiting-room.py` で東1局のリーチ結果から次局へ進むmockを作り、宣言牌参照・河が初期化され、描画と局表示が東2局へ進むことを確認します。例外と未処理Promise拒否も監視します。単独シナリオはChromiumとWebKitに登録されています。
+- **B — ポンでCPUの河が空になる局面：** `tests/online-game.test.ts` の固定牌山で、人間の打牌→CPU2の東打牌→CPU3のポン→CPU2の河が0枚→CPU3の打牌→人間へ手番が戻る流れを検証します。`tests/cpu-progress.ts` を使い、revision・手番・phase・打牌履歴・副露履歴で進行を判定します。`tests/step14-0-1.test.ts` でもこの進行判定を共有しています。
+
+### 正常系と異常系の検出確認
+
+- Aの正常系はRun AでChromium・WebKitの専用シナリオが成功し、Chromiumの待機室全フローも成功しました。ページ例外・未処理Promise拒否の監視を通過し、次局の表示と状態を確認しました。
+- Aの異常系は[run 40897377113](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40897377113)で次局mockの宣言参照初期化だけを意図的に無効化し、Chromiumが `declarationIndexes` 欠落のRangeErrorを直接検出しました。失敗はタイムアウトではありません。WebKitの異常系は実施していません。
+- Bの正常系はRun Aの `npm test` 内で成功し、単独反復は20回すべて成功しました。隔離した一時変更で旧来の河枚数のみの判定に戻すと固定テストが期待どおり失敗することも確認済みです。
+
+### GitHub Actions Run A / Run B
+
+| Run | 対象SHA・確認結果 |
+| --- | --- |
+| [Run A — 40907137770](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40907137770) | `3ed08d175b1a3e90738c6ac7581cfeb5dbeff462`。GitHub Actionsはcompleted / success。Browser UIはChromium 33件、WebKit 19件、計52件成功。A専用シナリオは両ブラウザーで成功し、待機室全フローはChromiumで成功しました。`npm test` は1,264件成功・失敗0・skip 0。B回帰テストの実行成功をログで確認。buildとWorker型チェックも成功。Browser UIジョブは18分43秒で、テストタイムアウト・停止はありません。 |
+| [Run B — 40909995139](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40909995139) | `50ecc56516b70f448a5ed85b8374b363c446fe01`。GitHub Actionsはcompleted / success。文書のみの変更でdocs-check成功。Browser UIは変更検出によりskipされました。Run A以降、ゲーム本体・テストコードに変更はありません。 |
+
+Run Aの所要時間は比較対象の正常系ブランチの約12分51秒に対して約5分52秒増加しました。主要な実行環境は一致し、複数シナリオで実行時間の増加が観測されましたが、根本原因は未特定です。時間増加の調査は[Issue #23](https://github.com/ak-sekine/heibon-mahjong/issues/23)で継続します。この未特定事項はIssue #21の回帰テスト検証を無効にする証拠ではありません。
+
+### 検証範囲・未確認事項
+
+- Chromium：Browser UI 33件。A専用シナリオと待機室全フローを含む。
+- WebKit：Browser UI 19件。A専用シナリオを含むが、待機室全フローではありません。
+- Aの20回反復、WebKit異常系、WebKit待機室全フロー、iPhone Safari実機確認は未実施です。成功したものとして扱いません。今回の回帰テスト強化にiPhone Safari実機確認は必須条件ではありません。
+- Issue #22の親テスト30秒タイムアウト原因調査は別件で、Openのまま継続します。Issue #23はBrowser UI CI時間増加の原因調査で、Openのまま継続します。いずれもIssue #21の完了条件には含めません。
+
+**最終状態：CI検証済み・完了。** Issue #21の回帰テストA・Bはmainに反映済みで、正常系CI、旧不具合の検出能力、文書整合性を確認しました。
