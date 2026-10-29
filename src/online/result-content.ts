@@ -6,6 +6,7 @@ import { createResultDoraRow } from '../rendering/dora.ts';
 import { createTileElement, tileLabel } from '../rendering/tile-svg.ts';
 import { yakuDisplayName } from '../rendering/yaku-names.ts';
 import { renderRoundWinSummary } from '../rendering/round-win-summary.ts';
+import { onlinePlayerName } from './player-name.ts';
 
 const winds = { east: '東', south: '南', west: '西', north: '北' } as const;
 const abortiveNames = {
@@ -33,7 +34,7 @@ function tileOrder(tile: Tile): number {
 }
 
 function playerName(view: PlayerGameView, playerId: number): string {
-  return view.seats[playerId].name;
+  return onlinePlayerName(view, playerId);
 }
 
 /** Render the compact online win overview shared with the local table. */

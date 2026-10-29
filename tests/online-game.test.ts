@@ -294,9 +294,9 @@ test('online ron and tsumo summaries use Japanese yaku names and omit round and 
       const session = sessionForGame(game, [0]);
       const view = createPlayerGameView(session, 1, 'A2CDEF', new Set([0]));
       const winner = view.result!.winners[0];
-      const resultName = 'CPU identity name';
+      const resultName = 'CPU1';
       const resultView = { ...view, seats: view.seats.map(seat => seat.seat === winner.winnerId
-        ? { ...seat, control: 'cpu' as const, name: resultName } : seat) };
+        ? { ...seat, control: 'cpu' as const, name: 'CPU identity name' } : seat) };
       const summary = new Node();
       assert.equal(renderOnlineWinSummary(summary as unknown as HTMLElement, resultView), true);
       assert.equal(summary.hidden, false);
