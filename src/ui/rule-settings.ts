@@ -17,7 +17,7 @@ export class RulePreferences {
   }
 }
 
-export function renderRulesList(root: HTMLElement, rules: unknown, readOnly = false): void {
+export function renderRulesList(root: HTMLElement, rules: unknown, label = '現在のルール'): void {
   root.replaceChildren();
   const list = document.createElement('dl');
   list.className = 'confirmed-rules-list';
@@ -32,7 +32,7 @@ export function renderRulesList(root: HTMLElement, rules: unknown, readOnly = fa
     list.append(row);
   }
   root.append(list);
-  root.setAttribute('aria-label', readOnly ? 'サーバーで確定したルール' : '現在のルール');
+  root.setAttribute('aria-label', label);
 }
 
 /** One editor is shared by offline new matches and online room creation. */
@@ -113,14 +113,23 @@ export class RuleSettingsDialog {
   }
 }
 
-export function openReadOnlyRules(trigger: HTMLButtonElement, rules: unknown): void {
+/** Shared offline/online viewer. The legacy online IDs are kept for existing callers. */
+export function openReadOnlyRules(trigger: HTMLButtonElement, rules: unknown, source: 'online' | 'offline' = 'online'): void {
   const dialog = document.querySelector<HTMLDialogElement>('#online-rules-dialog')!;
+  if (dialog.open) return;
   const title = document.querySelector<HTMLElement>('#online-rules-readonly-label')!;
-  title.textContent = '読み取り専用：ホストがルーム作成時に確定したルール';
-  renderRulesList(document.querySelector<HTMLElement>('#online-rules-list')!, rules, true);
+  title.textContent = source === 'offline'
+    ? '読み取り専用：現在の対局開始時に確定したルール'
+    : '読み取り専用：ホストがルーム作成時に確定したルール';
+  const list = document.querySelector<HTMLElement>('#online-rules-list')!;
+  renderRulesList(list, rules, source === 'offline' ? '現在の対局で確定したルール' : 'サーバーで確定したルール');
   const close = document.querySelector<HTMLButtonElement>('#online-rules-close')!;
   close.onclick = () => dialog.close();
-  dialog.onclose = () => trigger.focus({ preventScroll: true });
+  const focusTarget = source === 'offline'
+    ? document.querySelector<HTMLButtonElement>('#main-menu-toggle') ?? trigger
+    : trigger;
+  dialog.onclose = () => focusTarget.focus({ preventScroll: true });
   dialog.showModal();
+  list.scrollTop = 0;
   close.focus({ preventScroll: true });
 }

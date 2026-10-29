@@ -33,6 +33,10 @@ with sync_playwright() as playwright:
     assert page.locator('#table-round').get_attribute('data-format-label') is None
     assert '東風戦' not in page.locator('#local-table .center-info').inner_text()
     assert page.locator('#player-hand li').count() in (13, 14)
+    page.locator('#main-menu-toggle').click()
+    page.locator('#menu-offline-rules').click()
+    assert page.locator('#online-rules-list dd').first.inner_text() == '東風戦'
+    page.locator('#online-rules-close').click()
 
     page.locator('#main-menu-toggle').click()
     page.locator('#new-game').click()
@@ -48,6 +52,10 @@ with sync_playwright() as playwright:
     assert page.locator('#player-hand li').count() in (13, 14)
     saved = page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules'))")
     assert saved['version'] == 1 and saved['rules']['matchFormat'] == 'tonnan', saved
+    page.locator('#main-menu-toggle').click()
+    page.locator('#menu-offline-rules').click()
+    assert page.locator('#online-rules-list dd').first.inner_text() == '半荘戦（東南戦）'
+    page.locator('#online-rules-close').click()
     page.locator('#main-menu-toggle').click()
     page.locator('#new-game').click()
     assert page.locator('#new-game-rules-summary').inner_text() == '現在：半荘戦'

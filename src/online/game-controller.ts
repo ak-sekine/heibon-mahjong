@@ -234,6 +234,8 @@ export class OnlineGameController {
     this.root.hidden = false;
     document.body.classList.add('online-game-active');
     document.body.dataset.gameMode = 'online';
+    const offlineRules = document.querySelector<HTMLButtonElement>('#menu-offline-rules');
+    if (offlineRules) offlineRules.hidden = true;
     document.querySelector<HTMLButtonElement>('#new-game')!.disabled = true;
     this.render();
   }

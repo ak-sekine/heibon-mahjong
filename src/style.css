@@ -181,6 +181,7 @@ header > div { min-width:0; }
 #rule-settings-dialog,#online-rules-dialog { display:none; }
 #rule-settings-dialog[open],#online-rules-dialog[open] { display:flex; flex-direction:column; gap:8px; }
 #rule-settings-dialog > p { margin:0; }
+.readonly-rules-dialog > p { flex:none; margin:0; }
 #rule-settings-dialog .match-format-options { flex:none; margin:0; }
 .rule-settings-actions { display:flex; justify-content:space-between; gap:8px; flex:none; margin-top:4px; }
 .rule-settings-actions button { flex:1 1 50%; min-width:0; }

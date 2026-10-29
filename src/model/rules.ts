@@ -1,4 +1,4 @@
-import type { MatchFormat } from './match.ts';
+import type { MatchFormat, MatchState } from './match.ts';
 
 /** Rules selected for a newly created match. This version only exposes implemented match formats. */
 export type GameRules = Readonly<{
@@ -21,6 +21,13 @@ export function normalizeGameRules(value: unknown): GameRules {
   return candidate.schemaVersion === 1 && (candidate.matchFormat === 'tonpu' || candidate.matchFormat === 'tonnan')
     ? rulesForFormat(candidate.matchFormat)
     : DEFAULT_GAME_RULES;
+}
+
+/** The active match is authoritative. Legacy matches retain their original format. */
+export function rulesForMatch(match: Pick<MatchState, 'rules' | 'format'>): GameRules {
+  return match.rules === undefined
+    ? normalizeGameRules({ schemaVersion: 1, matchFormat: match.format ?? 'tonpu' })
+    : normalizeGameRules(match.rules);
 }
 
 export interface RulesStorage {

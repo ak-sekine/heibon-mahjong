@@ -4,8 +4,8 @@ import { renderTable, renderSelection } from './rendering/table.ts';
 import { renderMatch } from './rendering/match.ts';
 import { ResultDialog } from './ui/result-dialog.ts';
 import { NewGameDialog } from './ui/new-game-dialog.ts';
-import { RulePreferences, RuleSettingsDialog } from './ui/rule-settings.ts';
-import type { GameRules } from './model/rules.ts';
+import { openReadOnlyRules, RulePreferences, RuleSettingsDialog } from './ui/rule-settings.ts';
+import { rulesForMatch, type GameRules } from './model/rules.ts';
 import { GameController } from './ui/controller.ts';
 import { getLastLocalGameTransition, waitForTurn } from './game/automatic-turns.ts';
 import { OnlineWaitingRoom } from './online/waiting-room.ts';
@@ -84,6 +84,8 @@ let previouslyRenderedMatchStatus: string = 'playing';
 let localKanChoicesOpen = false;
 let localActionPanel: ActionPanel | null = null;
 function render(): void {
+  const rulesButton = document.querySelector<HTMLButtonElement>('#menu-offline-rules');
+  if (rulesButton) rulesButton.hidden = !controller.hasGame || document.body.classList.contains('online-game-active');
   if (!controller.hasGame) {
     document.body.dataset.gameMode = 'none';
     localDeclarationBubbles.clearAll();
@@ -181,7 +183,7 @@ diagnosticLog.record('INFO', 'app_build_info', {
 export function resetLocalActionChoices(): void { localKanChoicesOpen = false; }
 function newGame(rules: GameRules): void {
   localDeclarationBubbles.clearAll();
-  controller.newGame(rules.matchFormat);
+  controller.newGame(rules);
   // A synchronous, accepted local start is the persistence boundary. Storage
   // failures are swallowed so they cannot interrupt a playable match.
   rulePreferences.acceptedStart(rules);
@@ -190,6 +192,10 @@ function newGame(rules: GameRules): void {
 const rulePreferences = new RulePreferences();
 new RuleSettingsDialog(rulePreferences);
 new NewGameDialog(newGame, () => controller.hasGame, rulePreferences);
+document.querySelector<HTMLButtonElement>('#menu-offline-rules')?.addEventListener('click', event => {
+  if (!controller.hasGame || document.body.classList.contains('online-game-active')) return;
+  openReadOnlyRules(event.currentTarget as HTMLButtonElement, rulesForMatch(controller.match), 'offline');
+});
 if (localActionRoot) localActionPanel = new ActionPanel(localActionRoot, event => {
   switch (event.type) {
     case 'discard':

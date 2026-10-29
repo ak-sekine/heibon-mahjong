@@ -1,14 +1,16 @@
 import { winningMelds } from './melds.ts';
 import type { GameState, PlayerId } from '../model/game.ts';
 import type { MatchState, MatchFormat, Points, RoundSettlement, SettlementPayment, RoundWind } from '../model/match.ts';
+import { normalizeGameRules, rulesForFormat, type GameRules } from '../model/rules.ts';
 import { calculateTsumoPayments } from '../analysis/score.ts';
 import { getWaitingTileKinds } from './ron.ts';
 import { resolvePendingRiichi } from './riichi.ts';
 import { startGame } from './start.ts';
 import { getNagashiManganWinners } from './special-draws.ts';
 const ids = [0, 1, 2, 3] as const;
-export function startMatch(game: GameState = startGame(), format: MatchFormat = 'tonpu'): MatchState {
-  return settleRound({ format, roundWind: game.roundWind ?? 'east', roundNumber: 1, dealerId: game.dealerId, honba: 0,
+export function startMatch(game: GameState = startGame(), selection: MatchFormat | GameRules = 'tonpu'): MatchState {
+  const rules = normalizeGameRules(typeof selection === 'string' ? rulesForFormat(selection) : selection);
+  return settleRound({ rules, format: rules.matchFormat, roundWind: game.roundWind ?? 'east', roundNumber: 1, dealerId: game.dealerId, honba: 0,
     points: [25000,25000,25000,25000], depositSticks: 0, game, lastSettlement: null, status: 'playing' });
 }
 export function assertPointConservation(match: MatchState): void {

@@ -899,7 +899,7 @@ with sync_playwright() as p:
     assert menu_metrics['gap'] == '0px' and menu_metrics['background'] in ('rgb(255, 253, 247)', 'rgb(255, 255, 255)'), menu_metrics
     assert all(button['height'] >= 44 and button['width'] >= 44 and button['background'] in ('rgba(0, 0, 0, 0)', 'transparent') for button in menu_metrics['buttons']), menu_metrics
     assert [item.inner_text() for item in page.locator('#main-menu-items button:not([hidden])').all()] == [
-      'オフラインで新規対局', '河テスト', '新しくルームを作る', 'ルームに参加する', '診断ログ',
+      'オフラインで新規対局', 'ルール確認', '河テスト', '新しくルームを作る', 'ルームに参加する', '診断ログ',
     ], 'the shared menu actions were not available in order'
     assert page.locator('#menu-room').is_hidden(), 'room operations were shown before joining a room'
     assert page.locator('#main-menu-toggle').get_attribute('aria-expanded') == 'true', 'menu expanded state was not announced'
@@ -907,6 +907,8 @@ with sync_playwright() as p:
     assert page.locator('#main-menu-items').is_hidden(), 'the hamburger menu did not close on a second press'
     page.locator('#main-menu-toggle').press('Enter')
     assert page.locator('#new-game').evaluate('element => document.activeElement === element'), 'keyboard open did not focus the first menu item'
+    page.keyboard.press('ArrowDown')
+    assert page.locator('#menu-offline-rules').evaluate('element => document.activeElement === element'), 'arrow navigation did not reach active offline rules'
     page.keyboard.press('ArrowDown')
     assert page.locator('#river-test-open').evaluate('element => document.activeElement === element'), 'arrow navigation did not move through menu items'
     page.keyboard.press('Escape')
@@ -964,6 +966,10 @@ with sync_playwright() as p:
     page.locator('#confirm-new-game').click()
     assert page.evaluate('window.onlineUiTest.controller.match.format') == 'tonnan', 'offline selection was not stored in match state'
     assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'"), 'accepted offline start did not save the last rules'
+    select_menu_item('#menu-offline-rules')
+    assert '現在の対局開始時に確定' in page.locator('#online-rules-readonly-label').inner_text()
+    assert page.locator('#online-rules-list dd').first.inner_text() == '半荘戦（東南戦）'
+    page.locator('#online-rules-close').click()
 
     assert page.locator('#online-create-name').count() == 1 and page.locator('#online-join-name').count() == 1, 'create and join must have separate display-name fields'
     assert page.evaluate('''() => { const ids = [...document.querySelectorAll('[id]')].map(node => node.id); return new Set(ids).size === ids.length; }'''), 'the UI contains duplicate DOM IDs'
@@ -1122,6 +1128,8 @@ with sync_playwright() as p:
     page.locator('#online-confirm-rules').click()
     assert page.locator('#online-rules-dialog').evaluate('element => element.open'), 'waiting-room rule confirmation did not open'
     assert '読み取り専用' in page.locator('#online-rules-readonly-label').inner_text(), 'rule confirmation was not marked read-only'
+    assert 'ホストがルーム作成時に確定' in page.locator('#online-rules-readonly-label').inner_text(), 'offline viewer context leaked into the waiting room'
+    assert page.locator('#online-rules-list').get_attribute('aria-label') == 'サーバーで確定したルール'
     assert '半荘戦' in page.locator('#online-rules-list').inner_text(), 'confirmed room rules did not show the host format'
     assert page.locator('#online-rules-dialog input, #online-rules-dialog select, #online-rules-dialog button:not(#online-rules-close)').count() == 0, 'read-only rule confirmation exposed editing controls'
     page.set_viewport_size({'width': 320, 'height': 600})
@@ -1244,7 +1252,7 @@ with sync_playwright() as p:
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'closing the room dialog did not restore focus to the visible menu button'
     assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') !== null"), 'closing the dialog discarded the session token'
     assert [item.inner_text() for item in page.locator('#main-menu-items button:not([hidden])').all()] == [
-      'オフラインで新規対局', '河テスト', '新しくルームを作る', 'ルームに参加する', 'ルーム操作', '診断ログ',
+      'オフラインで新規対局', 'ルール確認', '河テスト', '新しくルームを作る', 'ルームに参加する', 'ルーム操作', '診断ログ',
     ], 'the shared menu actions and room operation were not available during a room session'
     request_count_before_blocked_actions = page.evaluate('window.onlineMock.requests.length')
     select_menu_item('#online-create-open')
@@ -1295,6 +1303,7 @@ with sync_playwright() as p:
     wait_for("document.querySelector('#online-dialog').open === false && document.querySelector('#online-match').hidden === false")
     wait_for("document.querySelectorAll('#online-player-hand button[data-tile-id]').length === 14")
     assert page.locator('#online-table').is_visible(), 'the online board was not displayed after host start'
+    assert page.locator('#menu-offline-rules').is_hidden(), 'offline rules were offered during online play'
     assert page.locator('#online-score-strip').inner_text().count('CPU') == 2, 'the two CPU seats were not shown at the table'
     assert page.locator('[data-online-hand="right"] .tile-back').count() == 13, 'the other human hand was not shown as backs'
     assert page.locator('[data-online-hand="top"] .tile-back').count() == 13, 'the CPU hand was not shown as backs'

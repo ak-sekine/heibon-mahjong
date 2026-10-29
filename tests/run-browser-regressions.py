@@ -20,6 +20,8 @@ SUITE = [
     run('tests/browser-online-dialog-layout.py', HEIBON_PRODUCTION_URL='http://127.0.0.1:4174/heibon-mahjong/'),
     run('tests/browser-app-idle.py'),
     run('tests/browser-app-idle.py', 'webkit'),
+    run('tests/browser-offline-rules.py'),
+    run('tests/browser-offline-rules.py', 'webkit'),
     run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_EXIT_NOTICE_ONLY='1'),
     run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_EXIT_NOTICE_ONLY='1'),
     run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_RULES_ONLY='1'),

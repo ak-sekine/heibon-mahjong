@@ -15,6 +15,7 @@
     </button>
     <nav id="main-menu-items" class="main-menu-items" aria-label="ゲームメニュー" hidden>
       <button id="new-game" type="button">オフラインで新規対局</button>
+      <button id="menu-offline-rules" type="button" aria-haspopup="dialog" aria-controls="online-rules-dialog" hidden>ルール確認</button>
       <button id="river-test-open" type="button" hidden>河テスト</button>
       <button id="online-create-open" type="button" aria-haspopup="dialog" aria-controls="online-create-dialog">新しくルームを作る</button>
       <button id="online-join-open" type="button" aria-haspopup="dialog" aria-controls="online-join-dialog">ルームに参加する</button>
@@ -197,7 +198,7 @@
     <p id="rule-settings-summary" class="rule-settings-summary"></p>
     <footer class="rule-settings-actions"><button id="cancel-rule-settings" type="button">キャンセル</button><button id="confirm-rule-settings" type="button">設定を確定</button></footer>
   </dialog>
-  <dialog id="online-rules-dialog" class="online-dialog" aria-labelledby="online-rules-title">
+  <dialog id="online-rules-dialog" class="online-dialog readonly-rules-dialog" aria-labelledby="online-rules-title">
     <header class="online-dialog-header"><h2 id="online-rules-title">ルール確認</h2><button id="online-rules-close" class="online-dialog-close" type="button">閉じる</button></header>
     <p id="online-rules-readonly-label" class="rule-settings-summary">読み取り専用</p>
     <section id="online-rules-list" aria-label="サーバーで確定したルール"></section>

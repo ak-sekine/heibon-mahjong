@@ -2,6 +2,7 @@ import { declareKan, getKanOptions } from '../game/kan.ts';
 import { declareCall, passCalls } from '../game/calls.ts';
 import { isForbiddenDiscard } from '../game/melds.ts';
 import type { MatchState, MatchFormat } from '../model/match.ts';
+import type { GameRules } from '../model/rules.ts';
 import { startMatch, updateMatchGame, nextRound } from '../game/match.ts';
 import type { GameState, PlayerId } from '../model/game.ts';
 import { canDeclareTsumo, declareTsumo } from '../game/tsumo.ts';
@@ -65,7 +66,7 @@ export class GameController {
       ...player, control: this.participants[seat].control,
     })) as unknown as GameState['players'] };
   }
-  private beginMatch(format: MatchFormat): void {
+  private beginMatch(rules: MatchFormat | GameRules): void {
     if (this.randomizeSeating) this.participants = drawSeatAssignment([
       { id: 'human', control: 'human', name: '自分' },
       { id: 'cpu1', control: 'cpu', name: 'CPU1' },
@@ -74,7 +75,7 @@ export class GameController {
     ], this.random);
     this.playerSeat = this.participants.findIndex(participant => participant.control === 'human') as PlayerId;
     this.playerNames = this.participants.map(participant => participant.name);
-    this.match = startMatch(this.createRosterGame(0), format);
+    this.match = startMatch(this.createRosterGame(0), rules);
   }
   get progressing(): boolean { return this.runner.running; }
   reportIfStalled(source?: string): void { this.runner.reportIfStalled(source); }
@@ -195,10 +196,10 @@ export class GameController {
     this.onChange();
     return this.runner.runMatch(() => this.match, match => { this.match = match; this.onChange(); }, this.onChange);
   }
-  newGame(format: MatchFormat = 'tonpu'): void {
+  newGame(rules: MatchFormat | GameRules = 'tonpu'): void {
     const previous = this.matchState?.game ?? null;
     this.runner.cancel();
-    this.beginMatch(format);
+    this.beginMatch(rules);
     if (previous) recordLocalGameTransition(previous, this.game, 'GameController.newGame');
     this.selectedTileId = null;
     this.onChange();

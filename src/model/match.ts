@@ -1,4 +1,5 @@
 import type { GameState, PlayerId } from './game.ts';
+import type { GameRules } from './rules.ts';
 export type MatchFormat = 'tonpu' | 'tonnan';
 export const MATCH_FORMATS = { TONPU: 'tonpu', TONNAN: 'tonnan' } as const;
 export function matchFormatLabel(format: MatchFormat): string { return format === 'tonnan' ? '半荘戦' : '東風戦'; }
@@ -32,6 +33,8 @@ export interface RoundSettlement extends RoundInfo {
   readonly matchEnded: boolean;
 }
 export interface MatchState extends RoundInfo {
+  /** Confirmed at match creation; absent only in legacy states. Never read from preferences. */
+  readonly rules?: GameRules;
   /** Missing in persisted legacy data; callers treat it as tonpu. */
   readonly format?: MatchFormat;
   readonly points: Points;
