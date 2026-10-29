@@ -30,11 +30,11 @@ Issue #15のCI構成どおり、Browser UI workflowはDeployから1回だけ呼�
 
 | 工程 | 結果 |
 | --- | --- |
-| 回帰テスト・Worker型チェック・Pagesビルド | run `40802315071` の`verify`成功。ローカル`npm test`も66件成功、失敗0、スキップ0 |
-| Browser UI | run `40802315071` 成功。47スクリプト成功。run `40804742893` は`browser-test-page.py`で失敗。CPU表示名のテストfixtureを固定し、再実行する |
-| Cloudflare Workerデプロイ | run `40802315071` 成功。run `40804742893` はスキップ |
-| 本番通信テスト | run `40802315071` は固定seat前提のテストで失敗。修正版は`Production Worker diagnostics` run `40804742762` で5シナリオ成功。run `40804742893` のDeploy workflow内テストはスキップ |
-| GitHub Pagesビルド・デプロイ | run `40804742893` スキップ。Browser UIゲートが失敗 |
+| 回帰テスト・Worker型チェック・Pagesビルド | run `40806362450` の`verify`成功。ローカル`npm test`は66件成功、失敗0、スキップ0 |
+| Browser UI | run `40806362450` 成功。47スクリプト成功。全24座席順列の320px検査はChromium／WebKit双方で成功 |
+| Cloudflare Workerデプロイ | run `40806362450` 成功。`https://heibon-mahjong-online.ak-sekine.workers.dev` |
+| 本番通信テスト | run `40806362450` 成功。人間1〜4人を含む5シナリオで開始、非公開情報、再接続、ホスト移譲、CPU引き継ぎを確認 |
+| GitHub Pagesビルド・デプロイ | run `40806362450` 成功。`https://ak-sekine.github.io/heibon-mahjong/` |
 
 機能コミット初回run `40794748815` では、`verify` は成功しました。`docs-check` はこの記録のMarkdown改行用末尾スペースで失敗し、削除しました。Chromium Browser UIは既存の`browser-app-idle.py`が「対局開始直後から手牌14枚」と固定して失敗しました。CPU東家の手番中は自分が13枚のため、13枚または14枚のいずれも正しい初期表示です。
 
@@ -51,7 +51,9 @@ run `40798450867` では`docs-check`、回帰テスト・Worker型チェック�
 
 run `40802315071` では`docs-check`、`verify`、47件のBrowser UIスクリプト、Cloudflare Workerデプロイが成功しました。Chromium／WebKitで全24順列を320px表示で確認し、オンライン結果・再接続・CPU引き継ぎのBrowser UI回帰も通過しました。本番通信テストだけが失敗し、ログには`game-started`と`game-state`が届いている一方、テストは参加者2の`viewerSeat === 1`を待っていました。待機席1のプレイヤーが抽選後に別の対局席へ割り当たる正常な状態を、テストが不正と判断していました。検証スクリプトを修正し、各接続の`viewerSeat`から対局席を特定して、開始時の手牌、手番、再接続、退出時のCPU引き継ぎを検査します。Workerデプロイ自体は成功しましたが、本番通信ゲートが未達のためPagesビルド・デプロイはスキップされました。修正後のActions結果を追記します。
 
-修正版の本番通信テストは`Production Worker diagnostics` run `40804742762` で成功し、人間1〜4人の5構成、再接続、ホスト移譲、CPU引き継ぎを確認しました。一方、push run `40804742893` のChromium Browser UIは`browser-test-page.py`で失敗しました。九種九牌の固定seat3局面で、検証ページの初期ランダム抽選がCPU表示名だけを入れ替え、期待`CPU3`に対して`CPU2`を表示していました。アプリの通常対局の抽選は維持し、テスト局面を作る検証ページだけ固定のseat抽選fixtureを使うよう修正します。このrunの`verify`は成功しました。Browser UIゲートが失敗したためDeploy workflowのWorker・本番通信・Pages工程はスキップされました。
+修正版の本番通信テストは`Production Worker diagnostics` run `40804742762` で成功し、人間1〜4人の5構成、再接続、ホスト移譲、CPU引き継ぎを確認しました。一方、push run `40804742893` のChromium Browser UIは`browser-test-page.py`で失敗しました。九種九牌の固定seat3局面で、検証ページの初期ランダム抽選がCPU表示名だけを入れ替え、期待`CPU3`に対して`CPU2`を表示していました。アプリの通常対局の抽選は維持し、テスト局面を作る検証ページだけ固定seat抽選fixtureを使うよう修正しました。このrunの`verify`は成功しましたが、Browser UIゲートの失敗でWorkerデプロイ・Deploy workflow内本番通信・Pages工程はスキップされました。
+
+最終run `40806362450` は`detect-changes`、`docs-check`、`verify`、47件すべてのBrowser UI、Cloudflare Workerデプロイ、本番通信テスト、Pagesビルド・デプロイが成功しました。全24座席順列の320px検査と検証ページのCPU席シナリオはChromium／WebKit双方で通過しました。本番通信テストでは人間1〜4人の構成、非公開手牌の保護、再接続、ホスト移譲、退出者席のCPU引き継ぎを確認し、トークンやWebSocket ticketはログに出ていません。Workerは`https://heibon-mahjong-online.ak-sekine.workers.dev`へ公開され、Pagesは`https://ak-sekine.github.io/heibon-mahjong/`へデプロイされました。Browser UI workflow内の`detect-changes`と`docs-check`が`skipped`なのは、親Deploy workflowから検証済みbuildを再利用して単体テスト・ビルドを重複させない既存CI構成によるものです。最終runではBrowser UI本体とデプロイ工程はスキップされていません。
 
 ## iPhone Safari実機確認
 
