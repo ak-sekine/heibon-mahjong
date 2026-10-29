@@ -1,7 +1,8 @@
 # Issue #6 ローカルルール設定・オンライン確認
 
-実施日：2026-10-29  
-Issue：[#6 ローカルルール設定画面・前回設定復元・オンライン待機時のルール確認](https://github.com/ak-sekine/heibon-mahjong/issues/6)  
+実施日：2026-10-29
+
+Issue：[#6 ローカルルール設定画面・前回設定復元・オンライン待機時のルール確認](https://github.com/ak-sekine/heibon-mahjong/issues/6)
 調査基準：`origin/main` `9ef97d090c5cc4b3089dcb7907123d1c385d4597` と、その時点の `docs/SPEC.md`、`docs/ROADMAP.md`、実装・テスト。
 
 ## ルール調査
