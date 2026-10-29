@@ -6,6 +6,7 @@ import { RoomDurableObject } from '../worker/room.ts';
 import { startMatch } from '../src/game/match.ts';
 import { ronGame } from './ron-fixture.ts';
 import { callStart } from './calls-fixture.ts';
+import { cpuMadeProgress } from './cpu-progress.ts';
 import { tsumoGame } from './tsumo-fixture.ts';
 import { discardTileForOnline } from '../src/game/discard.ts';
 import { getCallOptions } from '../src/game/calls.ts';
@@ -836,6 +837,7 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     const guestDiscardIds = (guestTurn.self as Record<string, unknown>).discardableTileIds as string[];
     assert.ok(guestDiscardIds.length > 0);
     const beforeCpuRevision = Number(guestTurn.gameRevision);
+    const beforeCpu = persistedGame(fixture) as unknown as OnlineGameSession;
     const guestDiscard = await sendGameAction(fixture, guest, {
       type: 'discard', requestId: 'game-guest-discard', expectedGameRevision: beforeCpuRevision,
       tileId: guestDiscardIds[0],
@@ -849,11 +851,7 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
       await passVisibleDecisions(fixture, [host, guest]);
       const state = persistedGame(fixture);
       lastCpuProgressState = state;
-      const match = state.match as Record<string, unknown>;
-      const game = match.game as Record<string, unknown>;
-      const players = game.players as Array<Record<string, unknown>>;
-      cpuProgressed = Number(state.gameRevision) > beforeCpuRevision + 1 &&
-        (players.some(player => player.control === 'cpu' && (player.river as unknown[]).length > 0) || state.status !== 'playing');
+      cpuProgressed = cpuMadeProgress(beforeCpu, state as unknown as OnlineGameSession);
     }
     const failedGame = (lastCpuProgressState.match as Record<string, unknown>).game as Record<string, unknown>;
     const failedPlayers = failedGame.players as Array<Record<string, unknown>>;

@@ -14,6 +14,7 @@ PUBLIC_HAND_ONLY = os.environ.get('HEIBON_ONLINE_PUBLIC_HAND_ONLY') == '1'
 EXIT_NOTICE_ONLY = os.environ.get('HEIBON_ONLINE_EXIT_NOTICE_ONLY') == '1'
 RIVER_SPACING_ONLY = os.environ.get('HEIBON_ONLINE_RIVER_SPACING_ONLY') == '1'
 RULES_ONLY = os.environ.get('HEIBON_ONLINE_RULES_ONLY') == '1'
+NEXT_ROUND_ONLY = os.environ.get('HEIBON_ONLINE_NEXT_ROUND_ONLY') == '1'
 OUT.mkdir(parents=True, exist_ok=True)
 
 MOCK = r"""
@@ -583,6 +584,11 @@ with sync_playwright() as p:
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.on('console', lambda message: console_errors.append(message.text) if message.type == 'error' else None)
     page.on('dialog', lambda dialog: dialog.accept())
+    page.add_init_script("""(() => {
+      window.__nextRoundUnhandledErrors = [];
+      window.addEventListener('error', event => window.__nextRoundUnhandledErrors.push(String(event.error || event.message)));
+      window.addEventListener('unhandledrejection', event => window.__nextRoundUnhandledErrors.push(String(event.reason)));
+    })()""")
     page.add_init_script(MOCK)
 
     def expose_app(route):
@@ -882,6 +888,62 @@ with sync_playwright() as p:
     wait_for('typeof window.onlineUiTest === "object"')
     assert page.locator('.table').is_visible() and page.locator('#player-hand svg').count() > 0, 'the existing mahjong table did not render'
     assert_no_private_cpu_tile_ids_in_main('CPU private tile IDs leaked before opening the room')
+
+    def assert_riichi_result_fixture():
+      fixture = page.evaluate("""() => {
+        const view = window.onlineUiTest.onlineGameController.view;
+        const seat = view.seats[0];
+        return {status: view.status, round: view.round.roundNumber, riichi: seat.riichi,
+          reference: seat.riichiDeclarationTileId, river: seat.river.map(tile => tile.id)};
+      }""")
+      assert fixture['status'] == 'round-ended' and fixture['round'] == 1, fixture
+      assert fixture['riichi'] and fixture['reference'] and fixture['reference'] in fixture['river'], fixture
+      assert page.locator('[data-online-river] [data-riichi-declaration="true"]').count() == 1, 'riichi declaration tile was not rendered'
+      return fixture
+
+    def assert_next_round_transition():
+      page.locator('#online-next-round').click()
+      # A render exception occurs before the round label is updated. Observe the
+      # received state or the exception first so that this failure is reported
+      # directly instead of being mistaken for a round-label timeout.
+      wait_for("window.onlineUiTest.onlineGameController.view?.round.roundNumber === 2 || window.__nextRoundUnhandledErrors.length > 0")
+      unhandled = page.evaluate('window.__nextRoundUnhandledErrors')
+      assert not unhandled and not errors, f'{ENGINE} next-round unhandled errors: {unhandled}, page errors: {errors}'
+      next_view = page.evaluate("""() => {
+        const view = window.onlineUiTest.onlineGameController.view;
+        return {status: view.status, round: view.round.roundNumber, phase: view.phase,
+          seats: view.seats.map(seat => ({river: seat.river, riichi: seat.riichi,
+            reference: seat.riichiDeclarationTileId ?? null}))};
+      }""")
+      assert next_view['status'] == 'playing' and next_view['round'] == 2 and next_view['phase'] == 'awaiting-discard', next_view
+      assert all(not seat['river'] and not seat['riichi'] and seat['reference'] is None for seat in next_view['seats']), next_view
+      wait_for("document.querySelector('#online-table-round').innerText.includes('東2局')")
+      assert page.locator('[data-online-river] .river-tile').count() == 0, 'old river tiles remained rendered'
+      assert page.locator('#online-round-result').is_hidden(), 'the old round result remained after next-round transition'
+      assert not errors, f'{ENGINE} next-round unhandled page errors: {errors}'
+
+    if NEXT_ROUND_ONLY:
+      select_menu_item('#online-create-open')
+      page.locator('#online-create-name').fill('テストホスト')
+      page.locator('#online-create').click()
+      wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234'")
+      page.locator('#online-ready').click()
+      wait_for('document.querySelector("#online-finalize").disabled === false')
+      page.locator('#online-finalize').click()
+      wait_for("document.querySelector('#online-finalized-message').hidden === false")
+      page.locator('#online-start-game').click()
+      wait_for("document.querySelector('#online-match').hidden === false")
+      page.evaluate("window.onlineMock.setResultScenario('self-tsumo', 0)")
+      wait_for("document.querySelector('#online-show-result').hidden === false")
+      assert_riichi_result_fixture()
+      page.locator('#online-show-result').click()
+      assert page.locator('#result-dialog').evaluate('element => element.open'), 'result dialog did not open'
+      assert '立直' in page.locator('#online-result-content').inner_text(), 'riichi result was not displayed'
+      page.locator('#view-table').click()
+      assert_next_round_transition()
+      print(json.dumps({'browser': ENGINE, 'scenario': 'riichi result to next round', 'result': 'pass'}, ensure_ascii=False), flush=True)
+      browser.close()
+      raise SystemExit(0)
 
     assert page.locator('#main-menu-toggle').is_visible(), 'the shared hamburger menu was not rendered'
     page.locator('#main-menu-toggle').click()
@@ -1776,9 +1838,8 @@ with sync_playwright() as p:
     page.locator('#view-table').click()
     page.evaluate("window.onlineUiTest.onlineGameController.receive({ type: 'game-started', view: window.readyOriginalView })")
     page.set_viewport_size({'width': 390, 'height': 844})
-    page.locator('#online-next-round').click()
-    wait_for("document.querySelector('#online-table-round').innerText.includes('東2局')")
-    assert page.locator('#online-round-result').is_hidden(), 'the old round result remained after next-round transition'
+    assert_riichi_result_fixture()
+    assert_next_round_transition()
 
     round_before_reconnect = page.locator('#online-table-round').inner_text()
     wall_before_reconnect = page.locator('#online-wall-count').inner_text()

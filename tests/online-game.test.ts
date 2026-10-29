@@ -13,6 +13,7 @@ import type { GameState, PlayerId, PlayerState } from '../src/model/game.ts';
 import { isForbiddenDiscard } from '../src/game/melds.ts';
 import { ankanGame } from './kan-fixture.ts';
 import { callStart } from './calls-fixture.ts';
+import { cpuMadeProgress } from './cpu-progress.ts';
 import { riichiStart } from './riichi-fixture.ts';
 import { childKyuushuGame, parentKyuushuGame } from './step13-10-fixture.ts';
 import { tsumoGame } from './tsumo-fixture.ts';
@@ -472,6 +473,57 @@ test('online action reducer validates riichi, tsumo, kan, kyuushu, and starts th
   assert.equal(next.match.roundNumber, tsumo.match.lastSettlement?.next?.roundNumber);
   assert.equal(next.gameRevision, tsumo.gameRevision + 1);
   assert.deepEqual(next.match.points, tsumo.match.points);
+});
+
+test('CPU progress survives a discard called for pon', async () => {
+  // The complete 136-tile wall is dealt with fixed hands and draws: seat 1
+  // declares riichi by discarding east, and seat 2 has an east pair.
+  const game = callStart(0, {
+    1: ['123m', '456p', '789s', '22p', '46m'],
+    2: ['11z', '123p', '456s', '789m', '34s'],
+  }, 'white', ['east']);
+  const initial = sessionForGame(game, [0, 3], 10);
+  const afterHuman = applyOnlineGameAction(initial, 0, {
+    type: 'discard', requestId: 'pon-progress-human', expectedGameRevision: 10,
+    tileId: game.players[0].drawnTile!.id,
+  }, new Set<PlayerId>([0, 3]), 1000);
+  assert.equal(afterHuman.gameRevision, 11);
+  assert.equal(afterHuman.match.game.phase, 'awaiting-draw');
+  assert.equal(afterHuman.match.game.turnPlayerId, 1);
+  assert.equal(cpuMadeProgress(initial, afterHuman), false);
+  assert.equal(cpuMadeProgress(afterHuman, afterHuman), false);
+
+  const drawn = await advanceOnlineCpu(afterHuman, 1001);
+  assert.equal(drawn.gameRevision, 12);
+  assert.equal(drawn.match.game.phase, 'awaiting-discard');
+  assert.equal(drawn.match.game.turnPlayerId, 1);
+  const called = await advanceOnlineCpu(drawn, 1002);
+  const cpuDiscard = called.match.game.players[1].discardHistory!;
+  const pon = called.match.game.players[2].melds?.[0];
+  assert.equal(called.gameRevision, 13);
+  assert.equal(cpuDiscard.length, 1);
+  assert.equal(tileKindKey(cpuDiscard[0].tile), 'east');
+  assert.equal(pon?.type, 'pon');
+  assert.equal(pon?.fromPlayerId, 1);
+  assert.equal(pon?.calledTileId, cpuDiscard[0].id);
+  assert.equal(called.match.game.players[1].river.length, 0);
+  assert.equal(called.match.game.phase, 'awaiting-discard');
+  assert.equal(called.match.game.turnPlayerId, 2);
+  assert.equal(cpuMadeProgress(afterHuman, called), true);
+
+  const afterPonDiscard = await advanceOnlineCpu(called, 1003);
+  assert.equal(afterPonDiscard.gameRevision, 14);
+  assert.equal(afterPonDiscard.match.game.players[2].discardHistory?.length, 1);
+  assert.equal(afterPonDiscard.match.game.phase, 'awaiting-draw');
+  assert.equal(afterPonDiscard.match.game.turnPlayerId, 3);
+  const humanTurn = await advanceOnlineCpu(afterPonDiscard, 1004);
+  assert.equal(humanTurn.gameRevision, 15);
+  assert.equal(humanTurn.status, 'playing');
+  assert.equal(humanTurn.decision, null);
+  assert.equal(humanTurn.match.game.phase, 'awaiting-discard');
+  assert.equal(humanTurn.match.game.turnPlayerId, 3);
+  assert.equal(humanTurn.match.game.players[3].control, 'human');
+  assert.equal(cpuMadeProgress(afterHuman, humanTurn), true);
 });
 
 test('online CPU riichi settles before the next draw and advances the revision', async () => {
