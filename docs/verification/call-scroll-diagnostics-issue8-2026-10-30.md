@@ -1,6 +1,6 @@
 # Issue #8: オフライン鳴き操作とスクロール診断 — 2026-10-30
 
-[Issue #8](https://github.com/ak-sekine/heibon-mahjong/issues/8)に対し、スクロール補正と次回の不応答を追跡する診断を実装しました。Issueに報告されたiPhone Safari実機の不応答原因は特定できていません。末尾に2026-10-30のユーザーによる実機確認を追記しましたが、確認範囲は一部シナリオに限られます。
+[Issue #8](https://github.com/ak-sekine/heibon-mahjong/issues/8)の従来調査・実機確認に、2026-10-30のスクロール再発報告、原因となった初回表示 `scrollBy` 経路の除去、候補別のChromium／Playwright WebKit回帰、本番公開結果を追記しました。以前の鳴きボタン不応答原因と、今回の修正を反映した後のiPhone Safari実機確認は未完了です。
 
 ## 作業前確認
 
@@ -78,9 +78,10 @@
 ### 原因と根拠
 
 - **コード上確認できる原因経路:** `src/ui/call-viewport.ts` の前回実装は、パネルの非表示→表示を検出すると次のanimation frameで矩形を測り、パネル下端とvisual viewport下端が合わなければ `window.scrollBy({ top: delta })` を呼んでいました。鳴き判断の開始がユーザーのタッチ／ホイール操作から750msを過ぎて起きると、この初回補正が実行されます。これは表示中の繰り返し補正とは別の、初回表示の強制スクロールです。
+- 前回の750msは一時的な抑制時間でした。タッチ中や直近のスクロール中は補正を抑えても、鳴きパネルが750ms経過後に現れると補正が再び有効になりました。今回の `MANUAL_SCROLL_GRACE_MS` はユーザー起点ログの分類専用であり、ページ位置を変える補正には使いません。
 - 3候補の表示は1候補よりパネルを高くし、下端アドレスバーでvisual viewportが狭い条件では、初回補正の `delta` が正になりやすくなります。前回のBrowser UI試験はチー2候補＋ポンを対象にしていましたが、全ボタンが最初からvisual viewport内に収まることを待っており、候補数別の表示前後の `scrollY` を比較していませんでした。
 - `visualViewport.resize` と `window.resize` は前回修正で余白計算だけになっており、`visualViewport.scroll` もページ位置を変えません。この再発報告で確認すべきアプリ側の残存強制スクロール経路は初回表示補正です。
-- `src/style.css` は画面下端余白を `--call-viewport-inset` で確保し、選択ボタンに44px以上の操作高を設定しています。これはページ末尾の余白・通常フローを調整するもので、CSS上の強制スクロール指定ではありません。鳴きボタンの `focus` は `preventScroll` を指定しています。アプリソースに `scrollIntoView` 呼び出しはありません。
+- `src/style.css` は画面下端余白を `--call-viewport-inset` で確保し、選択ボタンに44px以上の操作高を設定しています。これはページ末尾の余白・通常フローを調整するもので、CSS上の強制スクロール指定ではありません。今回の再発調査開始時点（`c575d91`）にはカン選択の `scrollIntoView` はなく、ロン／カンのフォーカス移動は `preventScroll` を指定していました。前段の旧記録はさらに前の `fb23b37` 時点の状態を指しています。
 - **実機イベントの確定範囲:** 今回の報告には、その瞬間の診断ログや `scrollY` 計測値は付いていません。そのため、端末上で `window.scrollBy` が実際に呼ばれたことを事後ログから確認したとは記録しません。実機の局面・残存コード経路・候補数による高さ増加が一致するため、不要な初回ページ補正を廃止して再発経路を除去します。
 
 ### 対策と診断
@@ -95,8 +96,18 @@
 ### 回帰試験
 
 - 正確な13枚fixtureで、チー1候補（`345m`）、2候補（`3456m`）、3候補（`3467m`）、チー2候補＋ポン（`445567m`）を生成することをゲームロジックで確認しました。チー候補数と「見送る」の表示、各条件の表示前後矩形・`scrollY`、短い縦画面での手動wheelスクロール後の位置と操作を `tests/browser-call-viewport.py` に追加しました。全条件で「見送る」後の判断解除・対局進行を確認し、既存のチー・ポン・ロン・カン回帰も維持します。
+- ChromiumとPlaywright WebKitの両方で、375×448pxの縦画面における候補別計測が一致しました。表示直前は各ケースとも `scrollY=0`、パネル非表示です。表示後の主要値は次のとおりです（visualViewport.height=448、offsetTop=0）。
+
+  | 表示内容 | 表示後（scrollY・パネル top/bottom/height） | 手動スクロール後（scrollY・パネル top/bottom） |
+  | --- | --- | --- |
+  | チー1候補＋見送る | `0`; `492/597/105px` | `200`; `292/397` |
+  | チー2候補＋見送る | `0`; `492/597/105px` | `200`; `292/397` |
+  | チー3候補＋見送る | `0`; `492/650/158px` | `253`; `239/397` |
+  | チー2候補＋ポン＋見送る | `0`; `492/650/158px` | `253`; `239/397` |
+
+- 3候補＋見送るの初回表示ではパネル下端650pxがvisual viewport下端448pxより202px下ですが、表示に伴う `scrollY` は0のままです。前回コードの初回補正ならここで正の `scrollBy` が発生します。ユーザーwheel後はパネル全体と各ボタンがviewport内に入り、チー／ポンボタン高49px、「見送る」44pxでした。手動スクロール安定後1100msと模擬Safariアドレスバー変更（height 404／700／484、offsetTop 24）後も位置を維持しました。3候補の各チーは個別に選択でき、`awaiting-discard` へ進みます。各候補数で「見送る」を押すと鳴き判断が解除され、対局が進みました。
 - ここまでのローカル結果: `node tests/call-viewport.test.ts` 成功（4/4。初回表示／viewport変更／高さ変化、手動タッチ操作、既知のプログラムスクロール、unattributed移動）、`npm test` 成功（68/68）、`npm run build` 成功、`npm run typecheck:worker` 成功、browser scriptのPython構文確認成功、`git diff --check` 成功。
-- ChromiumとPlaywright WebKitのブラウザー回帰は、変更を反映したGitHub Actionsの完了後に結果と実行SHAを追記します。Codex Cloud内のiPhone Safari実機確認はできません。今回の実機条件で最終確認する場合は、再公開後にiPhone Safariでの測定が必要です。
+- Codex Cloud内のiPhone Safari実機確認はできません。最新Pages公開後、報告された東4局4本場・山58枚・チー3候補＋見送るの条件とSafariアドレスバー表示で、実機の再確認が必要です。Chromium／Playwright WebKitと本番公開の結果は下記最終Actions実行に記録します。
 
 ### 最初のActions実行（2026-10-30）
 
@@ -111,4 +122,14 @@
 - WebKitでホイール操作は通りましたが、`scrollY > 0` を初めて観測した直後の値を安定後の基準位置として扱っていました。慣性スクロールが続いている間に1100ms後の値と比較したため、スクロール位置のassertionが失敗しました。パネル表示後の強制スクロールやviewport処理は、この計測区間では呼ばれていません。
 - 次の試験では `scrollY` が50ms間隔で8回連続一致した時点で手動スクロール後の基準位置を採ります。5秒以内に静止しなければ失敗とし、基準採取後1100msおよびviewport変更後も値が一致することを引き続き要求します。位置差の許容値、画面寸法、実操作、ゲーム進行assertionは変更しません。結果未確認のため、このrunもBrowser UI成功とは数えません。
 
-ブラウザー回帰とmain反映の確認が済むまで、Issue #8はopenのままです。
+### 3回目のActions実行（2026-10-30）
+
+- 対象コミット `213b5adbc3a66e75efaf4b752f53a54c0138755c`、Deploy run [`41057067318`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41057067318) は `detect-changes`、`docs-check`、`verify`、Browser UI全体が成功しました。ChromiumとPlaywright WebKitの候補別スクロール、各ボタン操作、対局進行、ロン・カン、オンライン待機回帰が成功しています。手動スクロールは安定値採取後1100ms待機し、viewport変更後も復帰しないことを確認しました。テスト条件・assertionの緩和はしていません。このコミットはBrowser UI検証更新のみで、Worker／Pagesデプロイは対象外としてskipでした。
+
+### 最終Actions実行・本番公開（2026-10-30）
+
+- 対象コミット `67392cc37d7c02e0be85d2686570451fdf18a943`、Deploy run [`41059814959`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41059814959) は `detect-changes`、`docs-check`、`verify`、Browser UI全体、Workerデプロイ、本番オンライン検証、Pages build／deployがすべて成功しました。
+- Browser UI全体の54シナリオが成功しました。`browser-call-viewport.py` はChromiumとPlaywright WebKit両方で320／375／390／430／844px幅を実行し、375×448pxの1／2／3チー候補と2チー＋ポン、表示後の `scrollY` 維持、手動位置維持、チー／ポン／見送るの操作と対局進行、ロン／カンを確認しました。コード変更後もassertionやviewport条件は変えていません。
+- Workerのproduction testでHTTPS、room、WebSocket、再接続、認証、プライバシーを確認しました。Pagesも公開済みです。実機Safariの確認はこのrunに含まれません。
+
+再発シナリオの修正とCI・本番公開を確認しました。更新後のiPhone Safari実機での確認と、以前報告された鳴きボタン不応答の根本原因特定が残るため、Issue #8はopenのままです。
