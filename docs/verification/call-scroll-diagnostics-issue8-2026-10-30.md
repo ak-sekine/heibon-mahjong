@@ -97,4 +97,11 @@
 - ここまでのローカル結果: `node tests/call-viewport.test.ts` 成功（3/3）、`npm test` 成功（68/68）、`npm run build` 成功、browser scriptのPython構文確認成功、`git diff --check` 成功。
 - ChromiumとPlaywright WebKitのブラウザー回帰は、変更を反映したGitHub Actionsの完了後に結果と実行SHAを追記します。Codex Cloud内のiPhone Safari実機確認はできません。今回の実機条件で最終確認する場合は、再公開後にiPhone Safariでの測定が必要です。
 
+### 最初のActions実行（2026-10-30）
+
+- 対象コミット `a4fa10a2e509e8d1e12391f2ad51f8ef263258fa` のDeploy run `41055298162` では、`verify` とbuildは成功しました。
+- Browser UIの `browser-call-viewport.py` はChromiumで320／375／390／430／844px幅の全シナリオが成功し、候補表示直後の `scrollY` 不変、短い画面の手動スクロール後の位置維持・viewport変更後の位置維持、チー／ポン／見送る、ロン・カンを確認しました。
+- Playwright WebKitは、モバイルWebKitに `Mouse.wheel` が実装されていないため、画面サイズ320×564で手動スクロール操作を開始する時点で試験が停止しました。WebKitでUI挙動の assertion が失敗したわけではありませんが、このrun全体をBrowser UI成功とは数えません。
+- 対策としてWebKitだけ `is_mobile` を無効にし、縦画面のCSS viewportとtouch supportを保ったまま、ホイール入力を可能にします。画面サイズやassertionは変更しません。Playwright WebKitはiPhone Safari実機の代替ではありません。修正後のActions runでChromiumとWebKit両方の結果を確認します。
+
 ブラウザー回帰とmain反映の確認が済むまで、Issue #8はopenのままです。

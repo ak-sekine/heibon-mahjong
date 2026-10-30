@@ -15,7 +15,10 @@ with sync_playwright() as p:
  if browser_name == 'chromium': launch['executable_path'] = os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium')
  browser = browser_type.launch(**launch)
  for width in [320,375,390,430,844]:
-  page = browser.new_page(viewport={'width':width,'height':844}, has_touch=True, is_mobile=True)
+  # Playwright's mobile WebKit context does not implement mouse-wheel input.
+  # Keep the portrait CSS viewport and touch support, while using desktop input
+  # plumbing for the manual wheel-scroll assertion in WebKit.
+  page = browser.new_page(viewport={'width':width,'height':844}, has_touch=True, is_mobile=browser_name != 'webkit')
   errors=[]
   page.on('pageerror',lambda e: errors.append(str(e)))
   def inject(route):
@@ -54,7 +57,7 @@ window.loadKan=()=>{controller.newGame();controller.match=startMatch(ankanGame()
    return page.evaluate('''()=>{const p=document.querySelector('#call-controls'),r=p.getBoundingClientRect(),v=visualViewport;return {
     scrollY,innerHeight,visualViewportHeight:v?.height??innerHeight,offsetTop:v?.offsetTop??0,
     panel:{top:r.top,bottom:r.bottom,height:r.height,width:r.width},
-    buttons:[...p.querySelectorAll('button')].map(b=>{const q=b.getBoundingClientRect();return {label:b.textContent.trim(),top:q.top,bottom:q.bottom,height:q.height};})
+    buttons:[...p.querySelectorAll('button')].map(b=>{const q=b.getBoundingClientRect();return {action:b.dataset.diagnosticActionType??b.id,top:q.top,bottom:q.bottom,height:q.height};})
    }}''')
   def load_call(height=844,mode='mixed',expected=3):
    page.set_viewport_size({'width':width,'height':height})
