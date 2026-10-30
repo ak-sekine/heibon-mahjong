@@ -59,6 +59,16 @@ window.loadKan=()=>{controller.newGame();controller.match=startMatch(ankanGame()
     panel:{top:r.top,bottom:r.bottom,height:r.height,width:r.width},
     buttons:[...p.querySelectorAll('button')].map(b=>{const q=b.getBoundingClientRect();return {action:b.dataset.diagnosticActionType??b.id,top:q.top,bottom:q.bottom,height:q.height};})
    }}''')
+  def settle_user_scroll():
+   page.evaluate('''async()=>{
+    let previous=scrollY,stableSamples=0;
+    for(let sample=0;sample<100;sample++){
+     await new Promise(resolve=>setTimeout(resolve,50));
+     if(scrollY===previous) stableSamples++; else {previous=scrollY;stableSamples=0;}
+     if(stableSamples>=8) return;
+    }
+    throw new Error('manual scroll did not settle within 5 seconds');
+   }''')
   def load_call(height=844,mode='mixed',expected=3):
    page.set_viewport_size({'width':width,'height':height})
    page.evaluate("document.querySelector('#call-controls').hidden=true")
@@ -90,9 +100,10 @@ window.loadKan=()=>{controller.newGame();controller.match=startMatch(ankanGame()
    if height <= 564:
     page.mouse.wheel(0,1200)
     page.wait_for_function('scrollY>0')
+    settle_user_scroll()
     manual_y=page.evaluate('scrollY')
     page.wait_for_timeout(1100)
-    assert page.evaluate('scrollY')==manual_y
+    assert page.evaluate('scrollY')==manual_y,{'settledY':manual_y,'laterY':page.evaluate('scrollY')}
     assert page.evaluate("""()=>{const r=document.querySelector('#pass-calls').getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}""")
     page.evaluate('''()=>{window.nativeViewport=visualViewport;window.testViewport=new EventTarget();Object.assign(testViewport,{height:Math.max(300,innerHeight-80),offsetTop:20});Object.defineProperty(window,'visualViewport',{configurable:true,get:()=>testViewport});testViewport.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('resize'));testViewport.dispatchEvent(new Event('scroll'));}''')
     page.wait_for_timeout(50)
@@ -112,9 +123,10 @@ window.loadKan=()=>{controller.newGame();controller.match=startMatch(ankanGame()
     assert chi_count==({'one':1,'two':2,'three':3,'mixed':2}[mode]) and pon_count==({'mixed':1}.get(mode,0))
     page.mouse.wheel(0,1200)
     page.wait_for_function('scrollY>0')
+    settle_user_scroll()
     manual_y=page.evaluate('scrollY')
     page.wait_for_timeout(1100)
-    assert page.evaluate('scrollY')==manual_y
+    assert page.evaluate('scrollY')==manual_y,{'settledY':manual_y,'laterY':page.evaluate('scrollY')}
     metrics=geometry()
     entries=page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-diagnostics-v2')||'[]')")
     assert any(e['event']=='call_viewport_user_scroll' and e['details'].get('source')=='user' for e in entries),entries[-20:]

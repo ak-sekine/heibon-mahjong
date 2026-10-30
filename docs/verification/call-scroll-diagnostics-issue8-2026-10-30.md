@@ -104,4 +104,10 @@
 - Playwright WebKitは、モバイルWebKitに `Mouse.wheel` が実装されていないため、画面サイズ320×564で手動スクロール操作を開始する時点で試験が停止しました。WebKitでUI挙動の assertion が失敗したわけではありませんが、このrun全体をBrowser UI成功とは数えません。
 - 対策としてWebKitだけ `is_mobile` を無効にし、縦画面のCSS viewportとtouch supportを保ったまま、ホイール入力を可能にします。画面サイズやassertionは変更しません。Playwright WebKitはiPhone Safari実機の代替ではありません。修正後のActions runでChromiumとWebKit両方の結果を確認します。
 
+### 2回目のActions実行（2026-10-30）
+
+- 対象コミット `c9b1ec5eca365c4e3710dd268a4b64a6a126cde0` のDeploy run `41056257477` は `verify`／build成功、Chromiumの同回帰は320／375／390／430／844px幅すべて成功でした。
+- WebKitでホイール操作は通りましたが、`scrollY > 0` を初めて観測した直後の値を安定後の基準位置として扱っていました。慣性スクロールが続いている間に1100ms後の値と比較したため、スクロール位置のassertionが失敗しました。パネル表示後の強制スクロールやviewport処理は、この計測区間では呼ばれていません。
+- 次の試験では `scrollY` が50ms間隔で8回連続一致した時点で手動スクロール後の基準位置を採ります。5秒以内に静止しなければ失敗とし、基準採取後1100msおよびviewport変更後も値が一致することを引き続き要求します。位置差の許容値、画面寸法、実操作、ゲーム進行assertionは変更しません。結果未確認のため、このrunもBrowser UI成功とは数えません。
+
 ブラウザー回帰とmain反映の確認が済むまで、Issue #8はopenのままです。
