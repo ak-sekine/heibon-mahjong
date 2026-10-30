@@ -26,13 +26,14 @@
 - viewportモック単体テストでは、初回表示の必要な補正、表示領域内の補正抑制、タッチ移動中・直後の抑制、viewport `scroll`／`resize` 時の位置維持と下端余白の更新を確認しました。ロン・カンパネルも同じ監視に登録され、viewport変更で追加の位置補正を行わないことを確認しました。
 - ActionPanel単体テストでは候補クリックがハンドラーへ届き、ポインター受信とクリックが同一操作IDを持ち、牌を含む内部候補IDが診断ログに出ないことを確認しました。最大件数テストではviewportイベント800件を記録しても操作ログが残ることを確認しました。
 - ローカル最終確認: `npm test` は68/68成功、`npm run build` 成功、`npm run typecheck:worker` 成功、`git diff --check` 成功。対象の `action-panel`／`call-options`／`call-viewport`／`diagnostics` テストは全件成功し、追加Python browser scriptの構文確認も成功しました。
-- GitHub Actionsはpush後の対象SHAを確認して追記します。実行されていない、または結果を取得できない検証は成功扱いにしません。
+- 最初のGitHub Actions run `41039848331`（`cb8c2d0`）は `verify` に成功しましたが、Chromium専用テストが375px幅で30秒timeoutしました。ログでは、手動スクロール後750msの抑制期間内に初回補正も確認しようとしていたテスト条件が原因でした。コードの不具合と推測せず、補正抑制を確認してから抑制期間が終わるまで待って確認するようテストを修正しました。
+- 修正後のGitHub Actions run `41040771438`（`24de7df`）は成功しました。`detect-changes`、`docs-check`、`verify`、`browser-ui / browser-ui` が成功し、ChromiumとPlaywright WebKitで本Issueのブラウザー回帰が320／375／390／430／844px幅すべて成功しました。Browser UI全体の回帰ジョブも成功です。デプロイ、Worker本番テスト、Pages公開はこの変更では対象外となりskipでした。
 
 ## 推測と未確認事項
 
 - **推測:** 既存実装のviewportイベントごとの再配置は、ユーザーの手動スクロールを戻す報告と一致するコード経路です。報告された鳴きボタン不応答と同一原因かどうかは分かりません。
-- **未確認:** ボタン不応答の根本原因、端末機種・iOSバージョン、Safari実機上のタッチヒットテスト、ブラウザー統合テスト、物理iPhone Safari確認は未完了です。
-- この実行環境のChromiumは起動時に `crashpad setsockopt: Operation not permitted` でSIGTRAPとなりました。Playwright WebKitは実行ファイルが未導入でした。ブラウザー回帰はテストコードを追加しましたが、この作業環境では実行できておらず、Chromium／WebKit検証成功とは扱いません。
+- **未確認:** ボタン不応答の根本原因、端末機種・iOSバージョン、Safari実機上のタッチヒットテスト、物理iPhone Safari確認は未完了です。
+- この実行環境のChromiumは起動時に `crashpad setsockopt: Operation not permitted` でSIGTRAPとなりました。Playwright WebKitは実行ファイルが未導入だったため、ローカルBrowser UIテストは実施していません。Chromium／WebKitのブラウザー回帰結果は上記GitHub Actionsの結果です。WebKitエミュレーションはiPhone Safari実機確認の代替ではありません。
 - iPhone Safariでの確認手順: オフライン対局を開始し、チー2候補＋ポンが出る局面で、①各チー、②ポン、③見送るを別々に選んでフェーズ遷移を確認、④操作パネル表示中に上下スクロールして指を離しても勝手に位置が戻らないこと、⑤アドレスバーを展開・収納しても自動で戻らずボタンを操作できること、⑥ロン・カンパネルを開閉して操作できることを確認します。不応答が出た場合は、診断ログ画面から操作パネル表示・ポインター受信・クリック・状態更新・描画イベントを含むログをコピーし、牌譜やルーム情報を追加せずIssue #8へ共有します。
 
 Issue #8はiPhone Safari実機確認と不応答原因の特定が残るためopenのままにします。
