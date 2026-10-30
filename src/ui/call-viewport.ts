@@ -3,6 +3,30 @@ import { diagnosticLog } from '../online/diagnostics.ts';
 const SCROLL_LOG_QUIET_MS = 350;
 const SCROLL_LOG_MIN_INTERVAL_MS = 750;
 const MANUAL_SCROLL_GRACE_MS = 1000;
+const PROGRAMMATIC_SCROLL_GRACE_MS = 750;
+
+type ProgrammaticScrollReason = 'new_game_start' | 'next_round';
+type ExpectedProgrammaticScroll = { reason: ProgrammaticScrollReason; fromScrollY: number; targetScrollY: number; expiresAt: number; token: number };
+let expectedProgrammaticScroll: ExpectedProgrammaticScroll | null = null;
+let expectedProgrammaticScrollTimer = 0;
+let nextProgrammaticScrollToken = 0;
+
+/** Attribute the two deliberate page resets separately from user and layout movement. */
+export function scrollPageToTop(reason: ProgrammaticScrollReason): void {
+  const fromScrollY = Math.round(window.scrollY);
+  if (fromScrollY === 0) return;
+  const expected = {
+    reason, fromScrollY, targetScrollY: 0,
+    expiresAt: Date.now() + PROGRAMMATIC_SCROLL_GRACE_MS,
+    token: ++nextProgrammaticScrollToken,
+  };
+  expectedProgrammaticScroll = expected;
+  window.clearTimeout(expectedProgrammaticScrollTimer);
+  expectedProgrammaticScrollTimer = window.setTimeout(() => {
+    if (expectedProgrammaticScroll?.token === expected.token) expectedProgrammaticScroll = null;
+  }, PROGRAMMATIC_SCROLL_GRACE_MS);
+  window.scrollTo(0, 0);
+}
 
 /** Keep action panels in normal flow and leave page position under user control. */
 export function installCallViewport(): void {
@@ -20,7 +44,9 @@ export function installCallViewport(): void {
   let pointerStart: { x: number; y: number } | null = null;
   let scrollTimer = 0;
   let lastScrollLogAt = 0;
-  let pendingScrollSource: 'user' | 'programmatic_or_layout' = 'programmatic_or_layout';
+  let pendingScrollSource: 'user' | 'programmatic' | 'unattributed' = 'unattributed';
+  let pendingProgrammaticReason: ProgrammaticScrollReason | null = null;
+  let pendingProgrammaticFromScrollY: number | null = null;
 
   const panelType = (panel: HTMLElement): string => panel.id.includes('ron') ? 'ron' : panel.id.includes('kan') ? 'kan' : 'call';
   const viewportInset = (): number => {
@@ -91,8 +117,14 @@ export function installCallViewport(): void {
     }
     lastScrollLogAt = now;
     const active = panels.find(panel => !panel.hidden && panel.getClientRects().length > 0);
-    diagnosticLog.record('INFO', pendingScrollSource === 'user' ? 'call_viewport_user_scroll' : 'call_viewport_unattributed_scroll', {
+    const event = pendingScrollSource === 'user'
+      ? 'call_viewport_user_scroll'
+      : pendingScrollSource === 'programmatic'
+        ? 'call_viewport_programmatic_scroll'
+        : 'call_viewport_unattributed_scroll';
+    diagnosticLog.record('INFO', event, {
       source: pendingScrollSource,
+      ...(pendingProgrammaticReason ? { reason: pendingProgrammaticReason, fromScrollY: pendingProgrammaticFromScrollY } : {}),
       scrollY: Math.round(window.scrollY),
       panelType: active ? panelType(active) : 'none',
       panelHeight: active ? Math.round(active.getBoundingClientRect().height) : 0,
@@ -106,7 +138,22 @@ export function installCallViewport(): void {
   window.visualViewport?.addEventListener('scroll', () => { inspectPanels(false); recordViewportChange(); });
   window.addEventListener('resize', () => { inspectPanels(); recordViewportChange(); });
   window.addEventListener('scroll', () => {
-    pendingScrollSource = Date.now() < manualScrollUntil ? 'user' : 'programmatic_or_layout';
+    const expected = expectedProgrammaticScroll;
+    const isExpectedProgrammaticScroll = expected !== null &&
+      Date.now() <= expected.expiresAt &&
+      Math.abs(window.scrollY - expected.targetScrollY) <= 1;
+    const isUserScroll = !isExpectedProgrammaticScroll && Date.now() < manualScrollUntil;
+    if (isExpectedProgrammaticScroll && expected) {
+      pendingScrollSource = 'programmatic';
+      pendingProgrammaticReason = expected.reason;
+      pendingProgrammaticFromScrollY = expected.fromScrollY;
+      expectedProgrammaticScroll = null;
+      window.clearTimeout(expectedProgrammaticScrollTimer);
+    } else {
+      pendingScrollSource = isUserScroll ? 'user' : 'unattributed';
+      pendingProgrammaticReason = null;
+      pendingProgrammaticFromScrollY = null;
+    }
     if (pendingScrollSource === 'user') markManualScroll();
     window.clearTimeout(scrollTimer);
     scrollTimer = window.setTimeout(finishScrollLog, SCROLL_LOG_QUIET_MS);

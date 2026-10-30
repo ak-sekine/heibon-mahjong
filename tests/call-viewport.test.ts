@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { installCallViewport } from '../src/ui/call-viewport.ts';
+import { installCallViewport, scrollPageToTop } from '../src/ui/call-viewport.ts';
 import { diagnosticLog } from '../src/online/diagnostics.ts';
 
 type MockPanel = HTMLElement & {
@@ -160,7 +160,31 @@ test('manual touch scrolling remains in control; ron and kan remain in flow', as
   } finally { fixture.restore(); diagnosticLog.clear(); }
 });
 
-test('scrolls without a recent user gesture are logged as unattributed programmatic or layout movement', async () => {
+test('known page resets are logged as programmatic', async () => {
+  const fixture = viewportFixture();
+  diagnosticLog.clear();
+  try {
+    installCallViewport();
+    Object.defineProperty(fixture.mockWindow, 'scrollY', { configurable: true, value: 84 });
+    Object.defineProperty(fixture.mockWindow, 'scrollTo', { configurable: true, value: (_x: number, y: number) => {
+      Object.defineProperty(fixture.mockWindow, 'scrollY', { configurable: true, value: y });
+      fixture.mockWindow.dispatchEvent(new Event('scroll'));
+    } });
+    dispatchTouch(fixture.mockWindow, 'touchstart', [{ clientX: 10, clientY: 100 }]);
+    dispatchTouch(fixture.mockWindow, 'touchmove', [{ clientX: 10, clientY: 80 }]);
+    dispatchTouch(fixture.mockWindow, 'touchend', []);
+    scrollPageToTop('next_round');
+    await new Promise(resolve => setTimeout(resolve, 450));
+    const entry = diagnosticLog.all().find(value => value.event === 'call_viewport_programmatic_scroll');
+    assert.equal(entry?.details.source, 'programmatic');
+    assert.equal(entry?.details.reason, 'next_round');
+    assert.equal(entry?.details.fromScrollY, 84);
+    assert.equal(entry?.details.scrollY, 0);
+    assert.equal(entry?.details.panelHeight, 0);
+  } finally { fixture.restore(); diagnosticLog.clear(); }
+});
+
+test('scrolls without a recent user gesture or known app scroll are logged as unattributed', async () => {
   const fixture = viewportFixture();
   diagnosticLog.clear();
   try {
@@ -169,7 +193,7 @@ test('scrolls without a recent user gesture are logged as unattributed programma
     fixture.mockWindow.dispatchEvent(new Event('scroll'));
     await new Promise(resolve => setTimeout(resolve, 400));
     const entry = diagnosticLog.all().find(value => value.event === 'call_viewport_unattributed_scroll');
-    assert.equal(entry?.details.source, 'programmatic_or_layout');
+    assert.equal(entry?.details.source, 'unattributed');
     assert.equal(entry?.details.scrollY, 84);
     assert.equal(entry?.details.panelHeight, 0);
   } finally { fixture.restore(); diagnosticLog.clear(); }

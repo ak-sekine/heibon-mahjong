@@ -1,4 +1,4 @@
-import { installCallViewport } from './ui/call-viewport.ts';
+import { installCallViewport, scrollPageToTop } from './ui/call-viewport.ts';
 import './style.css';
 import { renderTable, renderSelection } from './rendering/table.ts';
 import { renderMatch } from './rendering/match.ts';
@@ -195,7 +195,7 @@ function newGame(rules: GameRules): void {
   // A synchronous, accepted local start is the persistence boundary. Storage
   // failures are swallowed so they cannot interrupt a playable match.
   rulePreferences.acceptedStart(rules);
-  window.scrollTo(0, 0);
+  scrollPageToTop('new_game_start');
 }
 const rulePreferences = new RulePreferences();
 new RuleSettingsDialog(rulePreferences);
@@ -235,7 +235,7 @@ function dispatchLocalAction(event: ActionPanelEvent): void | Promise<void> {
     case 'select-call': return controller.call(event.optionId);
     case 'next-round':
       if (!controller.canNextRound) return;
-      window.scrollTo(0, 0);
+      scrollPageToTop('next_round');
       return controller.nextRound();
     case 'show-result': resultDialog.open(); return;
     case 'return-local': return;

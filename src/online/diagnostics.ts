@@ -26,7 +26,7 @@ const allowedKeys = new Set([
   'executionMode', 'lastSuccessfulRenderPhase', 'lastSuccessfulRenderSeat', 'lastSuccessfulRenderRunnerState',
   'operationId', 'panelId', 'panelType', 'candidateId', 'candidateCount', 'disabled', 'progressing',
   'delta', 'stateUpdateResult',
-  'scrollY', 'visualViewportHeight', 'offsetTop', 'panelHeight', 'previousHeight',
+  'scrollY', 'fromScrollY', 'visualViewportHeight', 'offsetTop', 'panelHeight', 'previousHeight',
 ]);
 
 function appendBounded(entries: DiagnosticEntry[], entry: DiagnosticEntry): void {
@@ -174,7 +174,7 @@ function isEntry(value: unknown): value is DiagnosticEntry {
 }
 
 function isPriorityEvent(event: string): boolean {
-  return /(?:_failed|_stalled|diagnostic_snapshot|app_build_info|runner_resume_snapshot|cpu_turn_started|cpu_stage_started|cpu_wait_timer_started|cpu_call_(?:judgment|resolution)_started|action_panel_click_received|action_panel_pointer_received|action_panel_displayed|local_action_(?:state_update_started|state_update_succeeded|state_update_failed|progress_completed|progress_failed)|local_game_render_succeeded|call_viewport_(?:panel_displayed|user_scroll|unattributed_scroll))$/u.test(event);
+  return /(?:_failed|_stalled|diagnostic_snapshot|app_build_info|runner_resume_snapshot|cpu_turn_started|cpu_stage_started|cpu_wait_timer_started|cpu_call_(?:judgment|resolution)_started|action_panel_click_received|action_panel_pointer_received|action_panel_displayed|local_action_(?:state_update_started|state_update_succeeded|state_update_failed|progress_completed|progress_failed)|local_game_render_succeeded|call_viewport_(?:panel_displayed|adjustment_skipped|panel_height_changed|(?:user|programmatic|unattributed)_scroll))$/u.test(event);
 }
 
 function safeLegacySessionLog(): string | null {

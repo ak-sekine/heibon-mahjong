@@ -88,13 +88,14 @@
 - 初回表示を含め、ロン・鳴き・カンおよびオンライン側の操作パネル表示維持処理からページをプログラムスクロールしない設計にしました。パネルは通常フローのままにし、画面内に収まらない場合はページをユーザーがスクロールして操作します。操作ボタンの最小高とタップ領域にCSS変更はありません。
 - visualViewport `resize` は下端余白のみ更新し、visualViewport `scroll` では余白・ページ位置のいずれも変更しません。
 - `call_viewport_panel_displayed` に初回表示時の候補数、パネル高、`scrollY`、visualViewport高、`offsetTop` を追加します。表示後の高さ変化は `call_viewport_panel_height_changed`、viewport変更時の位置不変更は `call_viewport_adjustment_skipped` に記録します。
-- ページのscrollイベントは入力イベントと照合し、ユーザー操作に続くスクロールを `call_viewport_user_scroll`、ユーザー操作と結び付かないものを `call_viewport_unattributed_scroll` として記録します。後者だけからアプリのプログラムスクロールかブラウザーのレイアウト補正かを断定しません。スクロールログは350ms静止後にまとめ、最低750ms間隔に制限します。
+- ページのscrollイベントは入力イベントと照合し、ユーザー操作に続くスクロールを `call_viewport_user_scroll`、新規対局／次局の明示的な `scrollTo(0, 0)` を `call_viewport_programmatic_scroll`、どちらとも結び付かない移動を `call_viewport_unattributed_scroll` として記録します。プログラムスクロールには理由と移動前の `scrollY` を含めます。unattributedログだけからブラウザーのレイアウト補正か他のコード起因かは断定しません。スクロールログは350ms静止後にまとめ、最低750ms間隔に制限します。
+- パネルの高さ変化・viewport変更時のスキップ・ユーザー／プログラムスクロールの各イベントはログ上で優先し、最大500件のバッファで通常イベントに押し出されないようにします。
 - 旧 `call_viewport_correction_applied` は補正の実行、`call_viewport_correction_suppressed` は初回補正を抑えた理由を表していました。これらの初回補正経路を削除したため、以後の初回表示は `call_viewport_panel_displayed` の `source=initial_display_no_page_scroll` で確認します。
 
 ### 回帰試験
 
 - 正確な13枚fixtureで、チー1候補（`345m`）、2候補（`3456m`）、3候補（`3467m`）、チー2候補＋ポン（`445567m`）を生成することをゲームロジックで確認しました。チー候補数と「見送る」の表示、各条件の表示前後矩形・`scrollY`、短い縦画面での手動wheelスクロール後の位置と操作を `tests/browser-call-viewport.py` に追加しました。全条件で「見送る」後の判断解除・対局進行を確認し、既存のチー・ポン・ロン・カン回帰も維持します。
-- ここまでのローカル結果: `node tests/call-viewport.test.ts` 成功（3/3）、`npm test` 成功（68/68）、`npm run build` 成功、browser scriptのPython構文確認成功、`git diff --check` 成功。
+- ここまでのローカル結果: `node tests/call-viewport.test.ts` 成功（4/4。初回表示／viewport変更／高さ変化、手動タッチ操作、既知のプログラムスクロール、unattributed移動）、`npm test` 成功（68/68）、`npm run build` 成功、`npm run typecheck:worker` 成功、browser scriptのPython構文確認成功、`git diff --check` 成功。
 - ChromiumとPlaywright WebKitのブラウザー回帰は、変更を反映したGitHub Actionsの完了後に結果と実行SHAを追記します。Codex Cloud内のiPhone Safari実機確認はできません。今回の実機条件で最終確認する場合は、再公開後にiPhone Safariでの測定が必要です。
 
 ### 最初のActions実行（2026-10-30）
