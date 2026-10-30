@@ -960,7 +960,11 @@ with sync_playwright() as p:
       return {background: style.backgroundColor, gap: style.gap, borderRadius: style.borderRadius, buttons};
     }''')
     assert menu_metrics['gap'] == '0px' and menu_metrics['background'] in ('rgb(255, 253, 247)', 'rgb(255, 255, 255)'), menu_metrics
-    assert all(button['height'] >= 44 and button['width'] >= 44 and button['background'] in ('rgba(0, 0, 0, 0)', 'transparent') for button in menu_metrics['buttons']), menu_metrics
+    assert all(button['height'] >= 44 and button['width'] >= 44 for button in menu_metrics['buttons']), menu_metrics
+    assert [button['background'] for button in menu_metrics['buttons']] == [
+      'rgb(248, 220, 145)', 'rgb(248, 247, 242)', 'rgb(248, 247, 242)',
+      'rgb(248, 220, 145)', 'rgb(248, 220, 145)', 'rgb(248, 247, 242)',
+    ], menu_metrics
     assert [item.inner_text() for item in page.locator('#main-menu-items button:not([hidden])').all()] == [
       'オフラインで新規対局', 'ルール確認', '河テスト', '新しくルームを作る', 'ルームに参加する', '診断ログ',
     ], 'the shared menu actions were not available in order'
