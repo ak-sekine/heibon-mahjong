@@ -57,7 +57,8 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
     for a in actions:
      assert a['height']>=44 and a['width']>=44
      assert a['background']==('rgb(157, 162, 124)' if a['disabled'] else 'rgb(248, 220, 145)')
-     assert a['color']=='rgb(21, 78, 60)' and a['opacity']=='1'
+     expected_color='rgb(32, 53, 44)' if a['disabled'] else 'rgb(21, 78, 60)'
+     assert a['color']==expected_color and a['opacity']=='1'
     measurements.append(actions)
    html=page.locator('main').inner_html()
    for player in page.evaluate('riichiCheck().game.players.slice(1)'):
