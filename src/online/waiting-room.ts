@@ -757,16 +757,27 @@ export class OnlineWaitingRoom {
     this.readyButton.hidden = !self || state?.status !== 'waiting';
     this.readyButton.textContent = self?.ready ? '準備を解除' : '準備完了';
     this.readyButton.disabled = pending || !self?.connected || !socketConnected;
+    this.readyButton.setAttribute('aria-pressed', String(self?.ready === true));
+    this.setBusy(this.readyButton, this.pendingAction?.payload.type === 'set-ready');
     this.finalizeButton.hidden = !self?.isHost || state?.status !== 'waiting';
     this.finalizeButton.disabled = pending || !socketConnected || !allReady;
+    this.setBusy(this.finalizeButton, this.pendingAction?.payload.type === 'finalize-seats');
     const allHumansConnected = humans.length > 0 && humans.every(seat => seat.connected);
     this.startGameButton.hidden = !self?.isHost || state?.status !== 'finalized' || this.gameActive;
     this.startGameButton.disabled = pending || !socketConnected || !allHumansConnected;
+    this.setBusy(this.startGameButton, this.pendingGameAction?.payload.type === 'start-game');
     this.leaveButton.hidden = !session || state?.status === 'closed';
     this.leaveButton.disabled = pending || !socketConnected;
+    this.setBusy(this.leaveButton, this.pendingAction?.payload.type === 'leave-room');
     this.closeRoomButton.hidden = !self?.isHost || state?.status === 'closed' || (this.gameActive && !this.gameTerminated);
     this.closeRoomButton.disabled = pending || !socketConnected;
+    this.setBusy(this.closeRoomButton, this.pendingAction?.payload.type === 'close-room');
     if (this.socket?.readyState === WebSocket.OPEN) this.reconnectButton.hidden = true;
+  }
+
+  private setBusy(button: HTMLButtonElement, busy: boolean): void {
+    if (busy) button.setAttribute('aria-busy', 'true');
+    else button.removeAttribute('aria-busy');
   }
 
   private toggleReady(): void {
@@ -938,7 +949,8 @@ export class OnlineWaitingRoom {
   }
 
   private leaveRoom(): void {
-    if (!this.session || !window.confirm('このルームから退出しますか？退出するとこの参加トークンは使えなくなります。')) return;
+    const impact = this.gameActive ? '対局中の席はCPUに引き継がれ、対局は続行します。' : '';
+    if (!this.session || !window.confirm(`このルームから退出しますか？退出するとこの参加トークンは使えなくなります。${impact}`)) return;
     this.sendAction({ type: 'leave-room' });
   }
 

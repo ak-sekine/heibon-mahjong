@@ -409,7 +409,7 @@ export class OnlineGameController {
     item.dataset.tileId = tile.id;
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'tile-choice';
+    button.className = 'tile-choice ui-button ui-button--a';
     button.dataset.tileId = tile.id;
     button.disabled = this.actionPending || !view.self.discardableTileIds.includes(tile.id);
     button.setAttribute('aria-label', tileLabel(tile.tile));

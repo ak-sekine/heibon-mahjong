@@ -13,18 +13,18 @@
   <section class="kan-lab" aria-labelledby="lab-title">
     <h2 id="lab-title">カン実機検証</h2>
     <p>公開の固定局面です。通常のUI・和了判定・得点計算で操作します。</p>
-    <a href="./">通常対局に戻る</a>
+    <a href="./" class="ui-button ui-button--b">通常対局に戻る</a>
     <label for="scenario">検証シナリオ</label>
     <select id="scenario">
       <option value="ankan">暗カン</option><option value="daiminkan">大明カン</option>
       <option value="kakan">加カン</option><option value="chankan">槍槓</option>
       <option value="rinshan">嶺上開花</option><option value="multiple">複数カン</option>
     </select>
-    <button id="load-scenario" type="button">固定局面からやり直す</button>
+    <button id="load-scenario" type="button" class="ui-button ui-button--a">固定局面からやり直す</button>
     <p id="scenario-help" role="status"></p>
-    <button id="start-cpu-kan" type="button" hidden>CPUの加カンを開始</button>
+    <button id="start-cpu-kan" type="button" hidden class="ui-button ui-button--a">CPUの加カンを開始</button>
   </section>
-  <header><div><h1>Heibon Mahjong</h1></div><button id="new-game" type="button">新しい対局</button></header>
+  <header><div><h1>Heibon Mahjong</h1></div><button id="new-game" type="button" class="ui-button ui-button--a">新しい対局</button></header>
   <div id="local-score-strip-host"></div>
   <section id="local-table" class="table" aria-label="4人麻雀卓">
     <section class="seat seat-top" data-player-id="2" aria-label="CPU2の席"><div class="concealed-hand" data-player-id="2" role="img"></div><div class="open-melds" data-player-id="2"></div></section>
@@ -63,30 +63,30 @@
       <div class="action-choice-group" data-panel-part="call-controls" role="group" aria-label="ポン・チーの選択" hidden>
         <p class="action-group-status" data-panel-part="call-status"></p>
         <div class="action-option-list" data-panel-part="call-options"></div>
-        <button class="control-action-button" data-panel-part="pass-call" type="button">見送る</button>
+        <button class="control-action-button ui-button ui-button--c" data-panel-part="pass-call" type="button">見送る</button>
       </div>
       <div class="action-choice-group" data-panel-part="kan-controls" role="group" aria-label="暗カン・加カンの選択" hidden>
         <p class="action-group-status" data-panel-part="kan-status">カンする面子を選択</p>
         <div class="action-option-list" data-panel-part="kan-options"></div>
-        <button class="control-action-button" data-panel-part="cancel-kan" type="button">キャンセル</button>
+        <button class="control-action-button ui-button ui-button--b" data-panel-part="cancel-kan" type="button">キャンセル</button>
       </div>
       <div class="action-choice-group" data-panel-part="ron-controls" role="group" aria-label="ロン判断" hidden>
         <p class="action-group-status" data-panel-part="ron-status"></p>
         <div class="ron-target" data-panel-part="ron-target"></div>
-        <button class="control-action-button" data-panel-part="ron" type="button">ロン和了</button>
-        <button class="control-action-button" data-panel-part="pass-ron" type="button">見逃す</button>
+        <button class="control-action-button ui-button ui-button--a" data-panel-part="ron" type="button">ロン和了</button>
+        <button class="control-action-button ui-button ui-button--c" data-panel-part="pass-ron" type="button">見逃す</button>
       </div>
       <p class="action-status" data-panel-part="action-status" role="status" aria-live="polite"></p>
       <div class="action-buttons">
-        <button class="control-action-button" data-panel-part="discard" type="button" disabled>打牌する</button>
-        <button class="control-action-button" data-panel-part="riichi" type="button" disabled>リーチ</button>
-        <button class="control-action-button" data-panel-part="kan-toggle" type="button" hidden>カン</button>
-        <button class="control-action-button" data-panel-part="tsumo" type="button" disabled>ツモ和了</button>
-        <button class="control-action-button" data-panel-part="kyuushu" type="button" hidden disabled>九種九牌</button>
+        <button class="control-action-button ui-button ui-button--a" data-panel-part="discard" type="button" disabled>打牌する</button>
+        <button class="control-action-button ui-button ui-button--a" data-panel-part="riichi" type="button" disabled>リーチ</button>
+        <button class="control-action-button ui-button ui-button--a" data-panel-part="kan-toggle" type="button" hidden>カン</button>
+        <button class="control-action-button ui-button ui-button--a" data-panel-part="tsumo" type="button" disabled>ツモ和了</button>
+        <button class="control-action-button ui-button ui-button--a" data-panel-part="kyuushu" type="button" hidden disabled>九種九牌</button>
         <div class="round-result-actions" data-panel-part="round-actions" role="group" aria-label="局終了後の操作" hidden>
-          <button class="control-action-button" data-panel-part="show-result" type="button" hidden>結果を見る</button>
-          <button class="control-action-button" data-panel-part="next-round" type="button" hidden>次の局へ</button>
-          <button class="control-action-button" data-panel-part="return-local" type="button" hidden>ローカル卓へ戻る</button>
+          <button class="control-action-button ui-button ui-button--b" data-panel-part="show-result" type="button" hidden>結果を見る</button>
+          <button class="control-action-button ui-button ui-button--a" data-panel-part="next-round" type="button" hidden>次の局へ</button>
+          <button class="control-action-button ui-button ui-button--b" data-panel-part="return-local" type="button" hidden>ローカル卓へ戻る</button>
         </div>
       </div>
       <p class="keyboard-help">Tabで牌とボタンへ移動、Enter／Spaceで選択・確定</p>
@@ -100,15 +100,15 @@
       <section id="online-result-content" aria-label="オンライン対局の結果" hidden></section>
     </div>
     <footer class="result-footer">
-      <button id="view-table" type="button" autofocus>卓を見る</button>
-      <button id="result-new-game" type="button" hidden>新しい対局</button>
+      <button id="view-table" type="button" autofocus class="ui-button ui-button--b">卓を見る</button>
+      <button id="result-new-game" type="button" hidden class="ui-button ui-button--a">新しい対局</button>
     </footer>
   </dialog>
   <dialog id="new-game-dialog" aria-labelledby="new-game-question">
     <p id="new-game-question">現在の対局を終了して、最初から始めますか？</p>
     <div class="new-game-actions">
-      <button id="cancel-new-game" type="button" autofocus>キャンセル</button>
-      <button id="confirm-new-game" type="button">新しい対局を開始</button>
+      <button id="cancel-new-game" type="button" autofocus class="ui-button ui-button--b">キャンセル</button>
+      <button id="confirm-new-game" type="button" class="ui-button ui-button--a">新しい対局を開始</button>
     </div>
   </dialog>
 </main>

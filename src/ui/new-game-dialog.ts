@@ -21,10 +21,15 @@ export class NewGameDialog {
         this.trigger = id === '#new-game'
           ? document.querySelector<HTMLButtonElement>('#main-menu-toggle') ?? button
           : button;
+        const activeGame = hasActiveGame();
         const question = document.querySelector<HTMLElement>('#new-game-question');
-        if (question) question.textContent = hasActiveGame()
-          ? '現在の対局を終了して、最初から始めますか？'
-          : 'ルールを確認して、オフライン対局を開始します。';
+        const confirm = document.querySelector<HTMLButtonElement>('#confirm-new-game')!;
+        confirm.classList.toggle('ui-button--d2', activeGame);
+        confirm.classList.toggle('ui-button--a', !activeGame);
+        confirm.textContent = activeGame ? '現在の対局を終了して開始' : '新しい対局を開始';
+        if (question) question.textContent = activeGame
+          ? '進行中の対局を終了し、現在の局面と点数を破棄して最初から始めます。この対局は復元できません。続行しますか？'
+          : '新しい対局を開始しますか？';
         this.dialog.showModal();
         document.querySelector<HTMLButtonElement>('#cancel-new-game')!.focus({ preventScroll: true });
       });

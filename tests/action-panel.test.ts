@@ -63,6 +63,7 @@ class FakeElement {
     for (const child of children) if (child instanceof FakeElement) child.parent = this;
   }
   setAttribute(name: string, value: string): void { this.attributes.set(name, value); }
+  removeAttribute(name: string): void { this.attributes.delete(name); }
   focus(): void { this.focused = true; this.documentLike.activeElement = this; }
   blur(): void { this.focused = false; if (this.documentLike.activeElement === this) this.documentLike.activeElement = null; }
   scrollIntoView(): void { this.scrolled = true; }
@@ -210,10 +211,58 @@ test('ActionPanel delegates static and choice clicks through one mode callback a
     const callButton = fixture.parts.get('call-options')!.children[0] as FakeElement;
     assert.equal(callButton.dataset.callId, 'call-1');
     assert.equal(callButton.dataset.onlineCall, 'call-1');
+    assert.equal(callButton.className, 'control-option-button ui-button ui-button--a');
     click(fixture.parts.get('discard')!);
     click(callButton);
     assert.deepEqual(events, [{ type: 'discard' }, { type: 'select-call', optionId: 'call-1' }]);
     assert.equal(fixture.parts.get('action-status')!.focused, true);
+  } finally { fixture.restore(); }
+});
+
+test('ActionPanel marks pending static and dynamic actions busy, then clears the state on recovery', () => {
+  let progressing = true;
+  const fixture = panelFixture(() => {}, { getContext: () => ({ progressing }) });
+  const option: ActionChoiceOption = { id: 'call-1', label: 'ポン', tiles: [], enabled: false };
+  try {
+    fixture.panel.update(state({
+      buttons: { ...state().buttons, discard: { visible: true, enabled: false, label: '打牌する' } },
+      callGroup: { visible: true, status: '送信しています…', options: [option] },
+    }));
+    const discard = fixture.parts.get('discard')!;
+    const call = fixture.parts.get('call-options')!.children[0] as FakeElement;
+    assert.equal(discard.disabled, true);
+    assert.equal(discard.attributes.get('aria-busy'), 'true');
+    assert.equal(call.disabled, true);
+    assert.equal(call.attributes.get('aria-busy'), 'true');
+    assert.match(call.className, /ui-button--a/u);
+
+    progressing = false;
+    fixture.panel.update(state({
+      buttons: { ...state().buttons, discard: { visible: true, enabled: true, label: '打牌する' } },
+      callGroup: { visible: true, status: '', options: [{ ...option, enabled: true }] },
+    }));
+    assert.equal(discard.attributes.has('aria-busy'), false);
+    const recoveredCall = fixture.parts.get('call-options')!.children[0] as FakeElement;
+    assert.equal(recoveredCall.disabled, false);
+    assert.equal(recoveredCall.attributes.has('aria-busy'), false);
+  } finally { fixture.restore(); }
+});
+
+test('every legal call and kan candidate receives the same primary role', () => {
+  const fixture = panelFixture();
+  const choices = (prefix: string, labels: string[]): ActionChoiceOption[] => labels.map((label, index) => ({
+    id: `${prefix}-${index}`, label, tiles: [], enabled: true,
+  }));
+  try {
+    fixture.panel.update(state({
+      callGroup: { visible: true, status: '', options: choices('call', ['ポン', 'チー', '大明カン']) },
+      kanGroup: { visible: true, status: '', options: choices('kan', ['暗カン', '加カン']) },
+    }));
+    for (const part of ['call-options', 'kan-options']) {
+      const options = fixture.parts.get(part)!.children as FakeElement[];
+      assert.equal(options.length, part === 'call-options' ? 3 : 2);
+      assert.ok(options.every(button => button.className === 'control-option-button ui-button ui-button--a'), part);
+    }
   } finally { fixture.restore(); }
 });
 

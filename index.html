@@ -10,56 +10,56 @@
 <body>
 <main>
   <header class="app-header"><h1>Heibon Mahjong</h1><div class="main-menu-shell">
-    <button id="main-menu-toggle" class="main-menu-toggle" type="button" aria-label="メニューを開く" aria-expanded="false" aria-controls="main-menu-items">
+    <button id="main-menu-toggle" class="main-menu-toggle ui-button ui-button--b" type="button" aria-label="メニューを開く" aria-expanded="false" aria-controls="main-menu-items">
       <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
     </button>
     <nav id="main-menu-items" class="main-menu-items" aria-label="ゲームメニュー" hidden>
-      <button id="new-game" type="button">オフラインで新規対局</button>
-      <button id="menu-offline-rules" type="button" aria-haspopup="dialog" aria-controls="online-rules-dialog" hidden>ルール確認</button>
-      <button id="river-test-open" type="button" hidden>河テスト</button>
-      <button id="online-create-open" type="button" aria-haspopup="dialog" aria-controls="online-create-dialog">新しくルームを作る</button>
-      <button id="online-join-open" type="button" aria-haspopup="dialog" aria-controls="online-join-dialog">ルームに参加する</button>
-      <button id="menu-room" type="button" aria-haspopup="dialog" aria-controls="online-dialog" hidden>ルーム操作</button>
-      <button id="menu-diagnostics" type="button" aria-haspopup="dialog" aria-controls="diagnostic-dialog">診断ログ</button>
+      <button id="new-game" type="button" class="ui-button ui-button--a">オフラインで新規対局</button>
+      <button id="menu-offline-rules" type="button" aria-haspopup="dialog" aria-controls="online-rules-dialog" hidden class="ui-button ui-button--b">ルール確認</button>
+      <button id="river-test-open" type="button" hidden class="ui-button ui-button--b">河テスト</button>
+      <button id="online-create-open" type="button" aria-haspopup="dialog" aria-controls="online-create-dialog" class="ui-button ui-button--a">新しくルームを作る</button>
+      <button id="online-join-open" type="button" aria-haspopup="dialog" aria-controls="online-join-dialog" class="ui-button ui-button--a">ルームに参加する</button>
+      <button id="menu-room" type="button" aria-haspopup="dialog" aria-controls="online-dialog" hidden class="ui-button ui-button--b">ルーム操作</button>
+      <button id="menu-diagnostics" type="button" aria-haspopup="dialog" aria-controls="diagnostic-dialog" class="ui-button ui-button--b">診断ログ</button>
     </nav>
   </div></header>
   <dialog id="online-create-dialog" class="online-dialog online-form-dialog" aria-labelledby="online-create-title">
-    <header class="online-dialog-header"><h2 id="online-create-title">新しくルームを作る</h2><button id="online-create-close" class="online-dialog-close" type="button" aria-label="ルーム作成を閉じる">閉じる</button></header>
+    <header class="online-dialog-header"><h2 id="online-create-title">新しくルームを作る</h2><button id="online-create-close" class="online-dialog-close ui-button ui-button--b" type="button" aria-label="ルーム作成を閉じる">閉じる</button></header>
     <form id="online-create-form" class="online-entry-form" novalidate>
       <label for="online-create-name">表示名</label>
-      <button id="online-create-rules" class="rule-settings-open" type="button">ルール設定</button>
+      <button id="online-create-rules" class="rule-settings-open ui-button ui-button--b" type="button">ルール設定</button>
       <p id="online-create-rules-summary" class="rule-settings-summary" aria-live="polite">東風戦</p>
       <input id="online-create-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" aria-describedby="online-create-message" required>
       <p id="online-create-message" class="online-form-message" role="status" aria-live="polite" hidden></p>
-      <button id="online-create" type="submit" disabled>ルームを作成</button>
+      <button id="online-create" type="submit" disabled class="ui-button ui-button--a">ルームを作成</button>
     </form>
   </dialog>
   <dialog id="diagnostic-dialog" aria-labelledby="diagnostic-title">
-    <header class="diagnostic-header"><div><h2 id="diagnostic-title">診断ログ</h2><p id="diagnostic-count" aria-live="polite">0件</p><p id="diagnostic-build-info"></p></div><button id="diagnostic-close" type="button">閉じる</button></header>
+    <header class="diagnostic-header"><div><h2 id="diagnostic-title">診断ログ</h2><p id="diagnostic-count" aria-live="polite">0件</p><p id="diagnostic-build-info"></p></div><button id="diagnostic-close" type="button" class="ui-button ui-button--b">閉じる</button></header>
     <div id="diagnostic-entries" tabindex="0" role="region" aria-label="診断ログ一覧"></div>
     <p id="diagnostic-status" role="status" aria-live="polite"></p>
-    <footer class="diagnostic-footer"><button id="diagnostic-copy" type="button">コピー</button><button id="diagnostic-clear" type="button">クリア</button></footer>
+    <footer class="diagnostic-footer"><button id="diagnostic-copy" type="button" class="ui-button ui-button--b">コピー</button><button id="diagnostic-clear" type="button" class="ui-button ui-button--d1">クリア</button></footer>
   </dialog>
   <dialog id="online-join-dialog" class="online-dialog online-form-dialog" aria-labelledby="online-join-title">
-    <header class="online-dialog-header"><h2 id="online-join-title">ルームに参加する</h2><button id="online-join-close" class="online-dialog-close" type="button" aria-label="ルーム参加を閉じる">閉じる</button></header>
+    <header class="online-dialog-header"><h2 id="online-join-title">ルームに参加する</h2><button id="online-join-close" class="online-dialog-close ui-button ui-button--b" type="button" aria-label="ルーム参加を閉じる">閉じる</button></header>
     <form id="online-join-form" class="online-entry-form" novalidate>
       <label for="online-join-name">表示名</label>
       <input id="online-join-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" aria-describedby="online-join-message" required>
       <label for="online-join-code">ルームコード</label>
       <input id="online-join-code" name="roomCode" type="text" maxlength="6" pattern="[A-HJ-NP-Z2-9]{6}" autocapitalize="characters" autocomplete="off" aria-describedby="online-join-message" required>
       <p id="online-join-message" class="online-form-message" role="status" aria-live="polite" hidden></p>
-      <button id="online-join" type="submit" disabled>参加する</button>
+      <button id="online-join" type="submit" disabled class="ui-button ui-button--a">参加する</button>
     </form>
   </dialog>
   <dialog id="online-dialog" class="online-dialog" aria-labelledby="online-title">
-    <header class="online-dialog-header"><h2 id="online-title">オンライン待機</h2><button id="online-close" class="online-dialog-close" type="button" aria-label="オンライン待機を閉じる">閉じる</button></header>
+    <header class="online-dialog-header"><h2 id="online-title">オンライン待機</h2><button id="online-close" class="online-dialog-close ui-button ui-button--b" type="button" aria-label="オンライン待機を閉じる">閉じる</button></header>
     <p id="online-status" role="status" aria-live="polite" hidden></p>
     <section id="online-room" aria-label="ルームの参加者" hidden>
       <div id="online-room-content">
         <div class="online-room-info">
-          <p class="online-room-code-row"><span>ルームコード</span><strong id="online-room-code">—</strong><button id="online-copy-code" type="button">コピー</button></p>
+          <p class="online-room-code-row"><span>ルームコード</span><strong id="online-room-code">—</strong><button id="online-copy-code" type="button" class="ui-button ui-button--b">コピー</button></p>
           <p class="online-room-expiry-row">有効期限：<time id="online-room-expiry">—</time></p>
-          <div class="online-room-rule-row"><p id="online-room-format" class="online-room-expiry-row"></p><button id="online-confirm-rules" type="button">ルール確認</button></div>
+          <div class="online-room-rule-row"><p id="online-room-format" class="online-room-expiry-row"></p><button id="online-confirm-rules" type="button" class="ui-button ui-button--b">ルール確認</button></div>
         </div>
         <p id="online-connection" role="status" aria-live="polite" hidden>接続状態を確認しています。</p>
         <ol id="online-seats" aria-label="参加者とCPUの一覧"></ol>
@@ -67,12 +67,12 @@
         <p id="online-error" role="alert" hidden></p>
       </div>
       <div id="online-actions" aria-label="待機ルームの操作">
-        <button id="online-ready" type="button" hidden>準備完了</button>
-        <button id="online-finalize" type="button" hidden>座席を確定</button>
-        <button id="online-start-game" type="button" hidden>オンライン対局を開始</button>
-        <button id="online-reconnect" type="button" hidden>再接続</button>
-        <button id="online-leave" type="button" hidden>ルームを退出</button>
-        <button id="online-close-room" type="button" hidden>ルームを終了</button>
+        <button id="online-ready" type="button" hidden class="ui-button ui-button--a">準備完了</button>
+        <button id="online-finalize" type="button" hidden class="ui-button ui-button--a">座席を確定</button>
+        <button id="online-start-game" type="button" hidden class="ui-button ui-button--a">オンライン対局を開始</button>
+        <button id="online-reconnect" type="button" hidden class="ui-button ui-button--a">再接続</button>
+        <button id="online-leave" type="button" hidden class="ui-button ui-button--d1">ルームを退出</button>
+        <button id="online-close-room" type="button" hidden class="ui-button ui-button--d2">ルームを終了</button>
       </div>
     </section>
   </dialog>
@@ -137,30 +137,30 @@
       <div class="action-choice-group" data-panel-part="call-controls" role="group" aria-label="ポン・チーの選択" hidden>
         <p class="action-group-status" data-panel-part="call-status"></p>
         <div class="action-option-list" data-panel-part="call-options"></div>
-        <button class="control-action-button" data-panel-part="pass-call" type="button">見送る</button>
+        <button class="control-action-button ui-button ui-button--c" data-panel-part="pass-call" type="button">見送る</button>
       </div>
       <div class="action-choice-group" data-panel-part="kan-controls" role="group" aria-label="暗カン・加カンの選択" hidden>
         <p class="action-group-status" data-panel-part="kan-status">カンする面子を選択</p>
         <div class="action-option-list" data-panel-part="kan-options"></div>
-        <button class="control-action-button" data-panel-part="cancel-kan" type="button">キャンセル</button>
+        <button class="control-action-button ui-button ui-button--b" data-panel-part="cancel-kan" type="button">キャンセル</button>
       </div>
       <div class="action-choice-group" data-panel-part="ron-controls" role="group" aria-label="ロン判断" hidden>
         <p class="action-group-status" data-panel-part="ron-status"></p>
         <div class="ron-target" data-panel-part="ron-target"></div>
-        <button class="control-action-button" data-panel-part="ron" type="button">ロン和了</button>
-        <button class="control-action-button" data-panel-part="pass-ron" type="button">見逃す</button>
+        <button class="control-action-button ui-button ui-button--a" data-panel-part="ron" type="button">ロン和了</button>
+        <button class="control-action-button ui-button ui-button--c" data-panel-part="pass-ron" type="button">見逃す</button>
       </div>
       <p class="action-status" data-panel-part="action-status" role="status" aria-live="polite"></p>
       <div class="action-buttons">
-        <button class="control-action-button" data-panel-part="discard" type="button" disabled>打牌する</button>
-        <button class="control-action-button" data-panel-part="riichi" type="button" disabled>リーチ</button>
-        <button class="control-action-button" data-panel-part="kan-toggle" type="button" hidden>カン</button>
-        <button class="control-action-button" data-panel-part="tsumo" type="button" disabled>ツモ和了</button>
-        <button class="control-action-button" data-panel-part="kyuushu" type="button" hidden disabled>九種九牌</button>
+        <button class="control-action-button ui-button ui-button--a" data-panel-part="discard" type="button" disabled>打牌する</button>
+        <button class="control-action-button ui-button ui-button--a" data-panel-part="riichi" type="button" disabled>リーチ</button>
+        <button class="control-action-button ui-button ui-button--a" data-panel-part="kan-toggle" type="button" hidden>カン</button>
+        <button class="control-action-button ui-button ui-button--a" data-panel-part="tsumo" type="button" disabled>ツモ和了</button>
+        <button class="control-action-button ui-button ui-button--a" data-panel-part="kyuushu" type="button" hidden disabled>九種九牌</button>
         <div class="round-result-actions" data-panel-part="round-actions" role="group" aria-label="局終了後の操作" hidden>
-          <button class="control-action-button" data-panel-part="show-result" type="button" hidden>結果を見る</button>
-          <button class="control-action-button" data-panel-part="next-round" type="button" hidden>次の局へ</button>
-          <button class="control-action-button" data-panel-part="return-local" type="button" hidden>ローカル卓へ戻る</button>
+          <button class="control-action-button ui-button ui-button--b" data-panel-part="show-result" type="button" hidden>結果を見る</button>
+          <button class="control-action-button ui-button ui-button--a" data-panel-part="next-round" type="button" hidden>次の局へ</button>
+          <button class="control-action-button ui-button ui-button--b" data-panel-part="return-local" type="button" hidden>ローカル卓へ戻る</button>
         </div>
       </div>
       <p class="keyboard-help">Tabで牌とボタンへ移動、Enter／Spaceで選択・確定</p>
@@ -174,17 +174,17 @@
       <section id="online-result-content" aria-label="オンライン対局の結果" hidden></section>
     </div>
     <footer class="result-footer">
-      <button id="view-table" type="button" autofocus>卓を見る</button>
-      <button id="result-new-game" type="button" hidden>新しい対局</button>
+      <button id="view-table" type="button" autofocus class="ui-button ui-button--b">卓を見る</button>
+      <button id="result-new-game" type="button" hidden class="ui-button ui-button--a">新しい対局</button>
     </footer>
   </dialog>
   <dialog id="new-game-dialog" aria-labelledby="new-game-question">
     <p id="new-game-question">現在の対局を終了して、最初から始めますか？</p>
-    <button id="new-game-rules" class="rule-settings-open" type="button">ルール設定</button>
+    <button id="new-game-rules" class="rule-settings-open ui-button ui-button--b" type="button">ルール設定</button>
     <p id="new-game-rules-summary" class="rule-settings-summary" aria-live="polite">東風戦</p>
     <div class="new-game-actions">
-      <button id="cancel-new-game" type="button" autofocus>キャンセル</button>
-      <button id="confirm-new-game" type="button">新しい対局を開始</button>
+      <button id="cancel-new-game" type="button" autofocus class="ui-button ui-button--b">キャンセル</button>
+      <button id="confirm-new-game" type="button" class="ui-button ui-button--a">新しい対局を開始</button>
     </div>
   </dialog>
   <dialog id="rule-settings-dialog" class="online-dialog" aria-labelledby="rule-settings-title">
@@ -196,10 +196,10 @@
     </fieldset>
     <section id="rule-settings-details" aria-label="固定ルール"></section>
     <p id="rule-settings-summary" class="rule-settings-summary"></p>
-    <footer class="rule-settings-actions"><button id="cancel-rule-settings" type="button">キャンセル</button><button id="confirm-rule-settings" type="button">設定を確定</button></footer>
+    <footer class="rule-settings-actions"><button id="cancel-rule-settings" type="button" class="ui-button ui-button--b">キャンセル</button><button id="confirm-rule-settings" type="button" class="ui-button ui-button--a">設定を確定</button></footer>
   </dialog>
   <dialog id="online-rules-dialog" class="online-dialog readonly-rules-dialog" aria-labelledby="online-rules-title">
-    <header class="online-dialog-header"><h2 id="online-rules-title">ルール確認</h2><button id="online-rules-close" class="online-dialog-close" type="button">閉じる</button></header>
+    <header class="online-dialog-header"><h2 id="online-rules-title">ルール確認</h2><button id="online-rules-close" class="online-dialog-close ui-button ui-button--b" type="button">閉じる</button></header>
     <p id="online-rules-readonly-label" class="rule-settings-summary">読み取り専用</p>
     <section id="online-rules-list" aria-label="サーバーで確定したルール"></section>
   </dialog>

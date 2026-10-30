@@ -48,7 +48,7 @@ function renderSelf(player: PlayerState, enabled: boolean): void {
 function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = 'tile-choice';
+  button.className = 'tile-choice ui-button ui-button--a';
   button.dataset.tileId = physical.id;
   button.disabled = !enabled;
   button.setAttribute('aria-label', tileLabel(physical.tile));

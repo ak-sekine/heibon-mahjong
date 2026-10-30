@@ -56,7 +56,7 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
      assert max(a['y'] for a in actions)-min(a['y'] for a in actions)<.1
     for a in actions:
      assert a['height']>=44 and a['width']>=44
-     assert a['background']==('rgb(212, 229, 219)' if a['disabled'] else 'rgb(255, 218, 125)')
+     assert a['background']==('rgb(157, 162, 124)' if a['disabled'] else 'rgb(248, 220, 145)')
      assert a['color']=='rgb(21, 78, 60)' and a['opacity']=='1'
     measurements.append(actions)
    html=page.locator('main').inner_html()

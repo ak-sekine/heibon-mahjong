@@ -199,7 +199,7 @@ function newGame(rules: GameRules): void {
 }
 const rulePreferences = new RulePreferences();
 new RuleSettingsDialog(rulePreferences);
-new NewGameDialog(newGame, () => controller.hasGame, rulePreferences);
+new NewGameDialog(newGame, () => controller.hasGame && controller.match.status !== 'match-ended', rulePreferences);
 document.querySelector<HTMLButtonElement>('#menu-offline-rules')?.addEventListener('click', event => {
   if (!controller.hasGame || document.body.classList.contains('online-game-active')) return;
   openReadOnlyRules(event.currentTarget as HTMLButtonElement, rulesForMatch(controller.match), 'offline');

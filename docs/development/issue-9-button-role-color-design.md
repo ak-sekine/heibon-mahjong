@@ -166,8 +166,8 @@
 | `#185640` text | B pressed `#E4E5D8` | **6.75:1** | 合格 |
 | `#185640` text | C `#DCE9E2` | **6.87:1** | 合格 |
 | `#185640` text | C pressed `#C5D8CE` | **5.76:1** | 合格 |
-| `#71382E` text | D1 `#FFE7E1` | **8.13:1** | 合格 |
-| `#71382E` text | D1 pressed `#F2C8BE` | **6.30:1** | 合格 |
+| `#71382E` text | D1 `#FFE7E1` | **7.70:1** | 合格 |
+| `#71382E` text | D1 pressed `#F2C8BE` | **5.97:1** | 合格 |
 | `#FFFFFF` text | D2 `#9B3028` | **7.38:1** | 合格 |
 | `#20352C` text | disabled `#9DA27C` | **4.91:1** | 合格 |
 | UI area A `#F8DC91` | app background `#185640` | **6.40:1** | 3以上、合格 |

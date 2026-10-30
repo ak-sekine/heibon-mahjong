@@ -9,6 +9,9 @@ for (const status of ['playing', 'round-ended', 'match-ended']) {
     test(`new game confirmation preserves ${status} until approved: ${trigger}`, () => {
       class Node {
         open = false;
+        textContent = '';
+        classes = new Set<string>();
+        classList = { toggle: (name: string, force?: boolean) => { if (force ?? !this.classes.has(name)) this.classes.add(name); else this.classes.delete(name); } };
         listeners: Record<string, (event: { preventDefault(): void }) => void> = {};
         addEventListener(name: string, callback: typeof this.listeners[string]) { this.listeners[name] = callback; }
         focus() { focused = this; }
@@ -17,16 +20,21 @@ for (const status of ['playing', 'round-ended', 'match-ended']) {
         click() { this.listeners.click?.({ preventDefault() {} }); }
       }
       let focused: Node | null = null;
-      const nodes = new Map(['#new-game-dialog', '#new-game', '#result-new-game', '#main-menu-toggle', '#cancel-new-game', '#confirm-new-game'].map(id => [id, new Node()]));
+      const nodes = new Map(['#new-game-dialog', '#new-game', '#result-new-game', '#main-menu-toggle', '#cancel-new-game', '#confirm-new-game', '#new-game-question'].map(id => [id, new Node()]));
       const original = globalThis.document;
       globalThis.document = { querySelector: (id: string) => nodes.get(id) } as unknown as Document;
       let match = status === 'playing' ? startMatch() : settleRound({ ...startMatch(), game: status === 'match-ended' ? fixedRon(3, [0], 2) : fixedRon(0, [1]), ...(status === 'match-ended' ? { roundNumber: 4, dealerId: 3 as const } : {}) });
       const snapshot = structuredClone(match);
       let resets = 0;
       try {
-        new NewGameDialog(() => { resets++; match = startMatch(); });
+        new NewGameDialog(() => { resets++; match = startMatch(); }, () => status !== 'match-ended');
         for (const dismissal of ['button', 'escape', 'close']) {
           nodes.get(trigger)!.click();
+          const confirm = nodes.get('#confirm-new-game')!;
+          assert.equal(confirm.classes.has('ui-button--d2'), status !== 'match-ended');
+          assert.equal(confirm.classes.has('ui-button--a'), status === 'match-ended');
+          assert.equal(confirm.textContent, status === 'match-ended' ? '新しい対局を開始' : '現在の対局を終了して開始');
+          assert.equal(nodes.get('#new-game-question')!.textContent.includes('復元できません'), status !== 'match-ended');
           assert.equal(nodes.get('#new-game-dialog')!.open, true);
           assert.equal(focused, nodes.get('#cancel-new-game'));
           assert.deepEqual(match, snapshot);
@@ -58,6 +66,9 @@ for (const status of ['playing', 'round-ended', 'match-ended']) {
 test('new game confirmation supports the verification page without a hamburger menu', () => {
   class Node {
     open = false;
+    textContent = '';
+    classes = new Set<string>();
+    classList = { toggle: (name: string, force?: boolean) => { if (force ?? !this.classes.has(name)) this.classes.add(name); else this.classes.delete(name); } };
     listeners: Record<string, (event: { preventDefault(): void }) => void> = {};
     addEventListener(name: string, callback: typeof this.listeners[string]) { this.listeners[name] = callback; }
     focus() { focused = this; }
@@ -66,7 +77,7 @@ test('new game confirmation supports the verification page without a hamburger m
     click() { this.listeners.click?.({ preventDefault() {} }); }
   }
   let focused: Node | null = null;
-  const nodes = new Map(['#new-game-dialog', '#new-game', '#result-new-game', '#cancel-new-game', '#confirm-new-game'].map(id => [id, new Node()]));
+  const nodes = new Map(['#new-game-dialog', '#new-game', '#result-new-game', '#cancel-new-game', '#confirm-new-game', '#new-game-question'].map(id => [id, new Node()]));
   const original = globalThis.document;
   globalThis.document = { querySelector: (id: string) => nodes.get(id) } as unknown as Document;
   let resets = 0;

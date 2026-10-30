@@ -30,7 +30,7 @@ window.stepFrames=[];let last=performance.now();const frame=t=>{stepFrames.push(
    assert all(b['x']>=0 and b['x']+b['w']<=width+.1 for b in boxes)
    controls=page.locator('#discard,#riichi,#tsumo').evaluate_all('es=>es.map(e=>{let r=e.getBoundingClientRect(),s=getComputedStyle(e);return {w:r.width,h:r.height,y:r.y,bg:s.backgroundColor,disabled:e.disabled}})')
    assert max(c['w'] for c in controls)-min(c['w'] for c in controls)<.1
-   assert all(c['h']==44 and c['y']+44<=height and c['bg']==('rgb(212, 229, 219)' if c['disabled'] else 'rgb(255, 218, 125)') for c in controls)
+   assert all(c['h']==44 and c['y']+44<=height and c['bg']==('rgb(157, 162, 124)' if c['disabled'] else 'rgb(248, 220, 145)') for c in controls)
    g=page.evaluate('stepCheck().game');html=page.locator('main').inner_html()
    if not g['winResult']:
     for player in g['players'][1:]:

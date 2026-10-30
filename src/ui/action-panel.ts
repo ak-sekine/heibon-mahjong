@@ -195,6 +195,7 @@ export class ActionPanel {
       button.hidden = true;
       button.disabled = true;
       button.textContent = '';
+      button.removeAttribute('aria-busy');
     }
     for (const part of ['call-controls', 'kan-controls', 'ron-controls', 'round-actions']) this.part(part).hidden = true;
     for (const part of ['call-options', 'kan-options', 'ron-target']) this.part(part).replaceChildren();
@@ -204,6 +205,7 @@ export class ActionPanel {
   }
 
   update(state: ActionPanelState): void {
+    const progressing = this.context().progressing === true || /送信しています|送信中|操作を確認しています/u.test(state.actionStatus);
     const wasHidden = {
       call: this.part('call-controls').hidden,
       kan: this.part('kan-controls').hidden,
@@ -215,17 +217,19 @@ export class ActionPanel {
       button.hidden = !buttonState.visible;
       button.disabled = !buttonState.enabled;
       button.textContent = buttonState.label;
+      if (progressing && buttonState.visible && !buttonState.enabled) button.setAttribute('aria-busy', 'true');
+      else button.removeAttribute('aria-busy');
     }
 
     const callControls = this.part('call-controls');
     callControls.hidden = !state.callGroup.visible;
     this.part('call-status').textContent = state.callGroup.status;
-    this.renderOptions('call-options', 'call', state.callGroup.options);
+    this.renderOptions('call-options', 'call', state.callGroup.options, progressing);
 
     const kanControls = this.part('kan-controls');
     kanControls.hidden = !state.kanGroup.visible;
     this.part('kan-status').textContent = state.kanGroup.status;
-    this.renderOptions('kan-options', 'kan', state.kanGroup.options);
+    this.renderOptions('kan-options', 'kan', state.kanGroup.options, progressing);
 
     const ronControls = this.part('ron-controls');
     ronControls.hidden = !state.ronGroup.visible;
@@ -340,7 +344,7 @@ export class ActionPanel {
     });
   }
 
-  private renderOptions(part: string, action: 'call' | 'kan', options: readonly ActionChoiceOption[]): void {
+  private renderOptions(part: string, action: 'call' | 'kan', options: readonly ActionChoiceOption[], progressing: boolean): void {
     const list = this.part(part);
     const displayOptions = actionChoicesForDisplay(action, options);
     const signature = JSON.stringify(displayOptions.map(option => [
@@ -348,6 +352,7 @@ export class ActionPanel {
       option.label,
       option.accessibleLabel ?? '',
       option.enabled,
+      progressing,
       option.tiles.map(tile => [tile.id, tileKindKey(tile.tile), tile.tile.isRed]),
     ]));
     if (this.choiceSignatures.get(part) === signature) return;
@@ -355,7 +360,7 @@ export class ActionPanel {
     list.replaceChildren(...displayOptions.map((option, index) => {
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'control-option-button';
+      button.className = 'control-option-button ui-button ui-button--a';
       button.dataset.actionChoice = action;
       button.dataset.optionId = option.id;
       button.dataset.candidateId = `${action}-${index + 1}`;
@@ -369,6 +374,7 @@ export class ActionPanel {
         button.dataset.kanId = option.id;
       }
       button.disabled = !option.enabled;
+      if (progressing && !option.enabled) button.setAttribute('aria-busy', 'true');
       if (option.accessibleLabel) button.setAttribute('aria-label', option.accessibleLabel);
       button.append(document.createTextNode(option.label));
       for (const tile of option.tiles) button.append(createTileElement(tile.tile));

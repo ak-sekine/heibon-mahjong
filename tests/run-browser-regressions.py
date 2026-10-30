@@ -71,6 +71,8 @@ SUITE = [
     run('tests/browser-river-test-mode.py', 'webkit'),
     run('tests/browser-diagnostics.py'),
     run('tests/browser-diagnostics.py', 'webkit'),
+    run('tests/browser-button-roles.py'),
+    run('tests/browser-button-roles.py', 'webkit'),
 ]
 
 
