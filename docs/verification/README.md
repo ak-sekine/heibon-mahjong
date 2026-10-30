@@ -22,7 +22,7 @@
 | 記録 | 主な対象 |
 | --- | --- |
 | [Browser UI・オンラインCPU進行の回帰 — Issue #21](browser-ui-regression-issue21-2026-10-29.md) | リーチ結果から次局、CPU打牌のポンによる河からの除去の固定局面と検証結果。main統合後のChromium／WebKit CIと異常系の検出を確認し、CI検証済み・完了。未確認事項とIssue #22・#23への引き継ぎを記録。 |
-| [Browser UI CI実行時間増加の原因調査 — Issue #23](browser-ui-ci-duration-issue23-2026-10-30.md) | 比較runと同一SHAの追加3run、全52シナリオの平均・最小・最大を記録。実行速度のrun間変動が有力候補（判定B）。runner資源が未計測のためroot causeは未特定、Issue #23はOpen。 |
+| [Browser UI CI実行時間増加の原因調査 — Issue #23](browser-ui-ci-duration-issue23-2026-10-30.md) | Phase 1・Phase 2の計測を記録。同一SHAでも時間が変動し、全runで52シナリオ成功。runner資源等は一部計測したが因果関係と計測オーバーヘッドは未分離で、根本原因未特定。調査完了・Issue #23 Closed。今後の異常は新しいIssueで扱う。 |
 | [Browser UI失敗の原因調査 — Issue #7](browser-ui-issue7-investigation-2026-10-29.md) | 東2局待ちとCPU進行誤判定の別原因、既存修正、検証と未確認事項。回帰強化は #21、別タイムアウト調査は #22。 |
 | [オフライン対局開始後のルール確認 — Issue #20](offline-rules-2026-10-29.md) | 対局開始時スナップショット、オンラインとの共通画面、読み取り専用・開閉の非干渉、前回設定との分離、次局維持、小画面のスクロール。既存の自動検証・Actions・公開結果と初回CI失敗・修正履歴を保持し、2026-10-29のユーザー報告によるiPhone Safari実機確認20項目（すべてOK）と実機未確認事項を追記。実機確認済み・完了。 |
 | [ローカルルール設定・オンラインルール確認 — Issue #6](local-rules-2026-10-29.md) | 設定可能項目（東風戦／半荘戦のみ・初期値東風戦）、固定・未実装ルール、保存復元、Worker正本、Actions run 40857841888の自動検証・本番デプロイ結果、2026-10-29のユーザー報告によるiPhone Safari実機確認、実機未確認事項、後続Issue #16〜#20を記録。主要機能の実機確認済み・完了。 |

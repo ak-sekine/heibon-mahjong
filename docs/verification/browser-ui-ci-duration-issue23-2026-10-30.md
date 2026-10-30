@@ -1,6 +1,6 @@
 # Browser UI CI実行時間増加の原因調査 — Issue #23
 
-**調査状況：調査完了（判定 B：原因候補まで。具体的な根本原因は未確定）。** 既存履歴の比較と同一SHAの反復測定を実施した。run間の実行速度差は確認できたが、runner資源の計測値がないため要因は特定できていない。
+**最終状態：調査完了（原因未特定、2026-10-30）。** Phase 1・Phase 2の計測で、同一SHA・同一52シナリオでもCI実行時間が大きく変動することを確認した。Phase 2ではrunner資源と一部Playwright処理も計測したが、変動との因果関係および計測機能のオーバーヘッドは分離できず、根本原因は特定していない。
 
 ## 1. 調査目的と開始状態
 
@@ -238,11 +238,11 @@ run 2の値はrun 1より52件中51件で長く、run 3はrun 1より50件で短
 
 ## 8. 原因判定・確度
 
-**B：原因候補まで特定。** 原因候補はrunごとの実効throughput差（runner/host/browser実行の時間変動）。これが主因である確度は中程度で、具体的にCPU競合・メモリ圧迫・I/O待ち・ブラウザー内部処理のどれかは特定できていない。
+**最終判定：根本原因未特定。** 同一SHAでも実行時間が大きく変動し、多数のシナリオに影響していることは確認した。runner/hostの負荷や実効throughput差は候補だが、観測値だけでは因果関係を確認できない。Phase 1時点の「判定B（原因候補まで）」は調査途中の評価であり、最終結論として原因を特定したものではない。
 
-根拠は、run Aからrun Bへのコード差分にアプリ・テスト・workflow変更がないのに52件すべて遅くなり、setupが6秒短くartifact差が数秒にとどまったこと、同じSHAで行った3回のscenario合計が712.515〜989.765秒に広がり、その差が特定のscenario一つに限られないこと。run 2とrun 3は同じAzure regionでも約5分のjob時間差がある。run Aの12:51が継続的な短い基準であるとはいえず、main統合後に恒常的な遅延が始まった証拠はない。
+Phase 1では同一SHAの3runのscenario合計が712.515〜989.765秒に広がり、差は特定のscenario一つに限られなかった。Phase 2では同じ計測対象SHA `b97d0e5869d6cf1d3cba0aa66054b32c47195ee9` で、metrics無効1runが955.560秒、metrics有効3runが719.530秒、990.246秒、684.423秒だった。4runすべて52/52シナリオ成功、失敗0、timeout 0。metrics有効runの計測でCPU・memory・pressure等の資源値と一部browser/wait時間を記録したが、異なるrunner ID/regionのrunを比較しており、これらが時間差を生んだとは判断できない。
 
-run Aより約22分前の成功run 40897247248も18:13で、遅いround-end-uiとriichi-discard-layoutを含んでいた。これもmain統合より前に長いrunがあったことを示す。いっぽう、同じrunner/hostの資源値はどのrunにもなく、観測した変動を生む正確な要因は未確認である。Issue #23の問いに対して、速度変動という候補は支持されるが、根本原因は未特定と判断する。
+4runだけでは計測機能のオーバーヘッドと自然変動を分離できない。Playwrightの個別計測も長時間だった3 scriptsに限られ、全scenarioのすべての待機・起動・終了を分解したものではない。したがって、runner負荷などの環境要因は候補にとどめ、根本原因は未特定とする。52シナリオの失敗・timeoutは現時点で確認していない。
 
 ## 9. 未確認事項と次に必要な計測
 
@@ -251,19 +251,21 @@ run Aより約22分前の成功run 40897247248も18:13で、遅いround-end-ui�
 - 同じrunner実装・regionでの追加計測でも同じ変動が出るか。今回run 2・3は同一regionだが別runner IDで、hostが同一かは不明。
 - 3回のrunはいずれも成功し、比較対象の遅いscenarioにはtimeoutやretry失敗の記録はない。成功ログだけでは条件waitが長くなった理由は分からない。
 
-root causeをさらに特定する場合、まず `.github/workflows/browser-ui.yml` のregression step中だけ、5秒間隔の軽量な `/proc` samplerを動かし、CPU、load average、memory/swap、pressure、process数を一時ログへ保存して既存artifactに追加する。低頻度採取と小さいローカル書込みで負荷を抑えるが、採取そのものの影響をゼロとはみなさない。次に `tests/browser-round-end-ui.py` と `tests/browser-riichi-discard-layout.py` にlaunch、主要condition wait、closeの経過時間を記録すると、script内の待ちとbrowser起動・終了のどこで時間が使われたかを切り分けられる。`tests/run-browser-regressions.py` は現状でも各script全体の時間を出力する。今回は計測コードを実装していない。
+将来、新しいIssueで根本原因の調査が必要になった場合は、同一runner条件での反復、全scenarioを対象にした待機・browser起動/終了の時間分解、計測あり/なしの比較を検討する。Phase 2で用いた計測機能は `test/issue-23-browser-ui-metrics` に維持する。今回は追加の反復計測は行わず、計測機能をmainへ統合しない。
 
 ## 10. Issue #21・#22との関係
 
 - **#21 Closed：** regression testsの追加・main統合・Chromium/WebKit 52件成功は完了済み。実行時間の差だけではテスト失敗や回帰無効の証拠にならない。
 - **#22 Open：** `tests/step14-0-1.test.ts` のonline lifecycle親テスト30秒timeout調査。別のunit/integration test上の事象であり、今回のBrowser UI遅延と結び付ける証拠は見つかっていない。状態・内容を変更しない。
-- **#23 Open：** 比較履歴・同一SHAの3run・判定Bを記録した。具体的なroot causeとrunner資源計測は未確認のためOpenを維持する。
+- **#23 Closed：** Phase 1・Phase 2の調査を完了した。原因は未特定であり、将来CI時間の増加や異常が問題になった場合はIssue #23を再オープンせず、新しいIssueで対応する。
 
 ## 11. この調査での変更
 
-ゲーム本体、Browser UIテスト、workflow、timeout、成功条件は変更していない。変更対象はこの調査記録と `docs/verification/README.md` の目次だけ。
+ゲーム本体、Browser UIテスト、workflow、timeout、成功条件は変更していない。今回の最終更新は、この調査記録、`docs/verification/README.md` の目次、`docs/ROADMAP.md` の状態記載のみ。
 
 ## 12. Phase 2 CI再試行とネットワーク手順の調査（2026-10-30）
+
+この節のPhase 2計測結果は同日中に取得した4runとそのmetrics artifactに基づく。下記の最終状態が本記録の結論であり、Issue #23は調査完了後Closedとする。
 
 ### 前回のネットワーク手順について確認できた範囲
 
@@ -353,5 +355,15 @@ run 3はrun 2・4よりcgroup CPU平均、CPU pressure some avg10、process数�
 
 - metrics専用artifactはGitHub connector経由で取得し、run 2 20,307 bytes、run 3 24,217 bytes、run 4 20,059 bytesのJSONLを解析した。run 1は計測無効のためmetric artifactなし。
 - run 1の39.9 MB `browser-ui-*` artifactは`gh run download`経由でAzure artifact URLが403となり、executor 32 MiB転送上限も超えるため全体をローカル展開していない。52 scenario計時はGitHub Actions job logから取得・集計し、workflow成功と照合した。
-- 作業中に確認したIssue状態は #21 Closed、#22 Open、#23 Open。Issue #23をcloseしていない。
+- このPhase 2記録の作成時点で確認したIssue状態は #21 Closed、#22 Open、#23 Open。Issue #23はこの記録作成時点ではcloseしていない。
 - 今回もゲームコード、test code、workflowは変更していない。変更対象は調査記録とIssueコメントのみ。
+
+## 13. 最終状態（2026-10-30）
+
+- **調査終了日：** 2026年10月30日。
+- **最終状態：** 調査完了・原因未特定。Phase 1およびPhase 2の計測を完了した。
+- Phase 1・Phase 2の全計測runで52シナリオすべて成功し、失敗0、timeout 0。
+- 同一SHAでも実行時間が変動し、多数のシナリオに及ぶことを確認した。runner負荷等の環境要因は候補だが、因果関係は未確認。計測機能のオーバーヘッドと自然変動も分離できていない。
+- 現時点では追加の反復計測を実施しない。将来CI実行時間の増加や異常が問題となった場合は、Issue #23を再オープンせず、原則として新しいIssueで対応する。
+- 計測ブランチ [`test/issue-23-browser-ui-metrics`](https://github.com/ak-sekine/heibon-mahjong/tree/test/issue-23-browser-ui-metrics) を維持し、計測機能は変更せず、mainへ統合しない。
+- Issue状態は #21 Closed、#22 Open、#23 Closed。#21・#22の状態・内容は変更していない。
