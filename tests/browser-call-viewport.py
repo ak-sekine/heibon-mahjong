@@ -27,7 +27,10 @@ import {discardTile} from '/heibon-mahjong/src/game/discard.ts';
 import {startMatch} from '/heibon-mahjong/src/game/match.ts';
 """+response.text()+"""
 window.loadCalls=(mode)=>{controller.newGame();let g=callStart(3,
- mode==='chi'?{0:['445567m','234p','19p','12z']}:
+ mode==='one'?{0:['345m','234p','678s','19p','12z']}:
+ mode==='two'?{0:['3456m','234p','678s','19p','1z']}:
+ mode==='three'?{0:['3467m','234p','678s','19p','1z']}:
+ mode==='mixed'?{0:['445567m','234p','19p','12z']}:
  mode==='red'?{0:['4450m','234p','678s','19p','1z']}:
  {0:['555m','234p','678s','19p','12z']},mode==='pon'?'red:man-5':mode==='red'?'man-6':'man-5');
 window.callState=()=>controller.game;
@@ -41,24 +44,34 @@ window.loadKan=()=>{controller.newGame();controller.match=startMatch(ankanGame()
   page.goto('http://127.0.0.1:4173/heibon-mahjong/')
   page.wait_for_function('typeof loadCalls === "function"')
   def visible():
-   page.wait_for_function('''()=>{
-    const v=visualViewport;const top=v?.offsetTop??0,bottom=top+(v?.height??innerHeight);
-    return [...document.querySelectorAll('#call-options button,#pass-calls')].every(e=>{
-     const r=e.getBoundingClientRect();return r.top>=top&&r.bottom<=bottom&&r.left>=0&&r.right<=innerWidth&&r.height>=44;
-    });}''')
+   page.wait_for_function("!document.querySelector('#call-controls').hidden")
+   assert page.evaluate('''()=>[...document.querySelectorAll('#call-options button,#pass-calls')].every(e=>{
+    const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.height>=44&&e.isConnected;
+   })''')
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
    assert page.evaluate('''()=>document.querySelector('#local-game-controls').getBoundingClientRect().top>=document.querySelector('.table').getBoundingClientRect().bottom''')
-  def load_call(height=844):
+  def geometry():
+   return page.evaluate('''()=>{const p=document.querySelector('#call-controls'),r=p.getBoundingClientRect(),v=visualViewport;return {
+    scrollY,innerHeight,visualViewportHeight:v?.height??innerHeight,offsetTop:v?.offsetTop??0,
+    panel:{top:r.top,bottom:r.bottom,height:r.height,width:r.width},
+    buttons:[...p.querySelectorAll('button')].map(b=>{const q=b.getBoundingClientRect();return {label:b.textContent.trim(),top:q.top,bottom:q.bottom,height:q.height};})
+   }}''')
+  def load_call(height=844,mode='mixed',expected=3):
    page.set_viewport_size({'width':width,'height':height})
    page.evaluate("document.querySelector('#call-controls').hidden=true")
    page.wait_for_function("document.querySelector('#call-controls').hidden")
-   page.evaluate('window.scrollTo(0,0);loadCalls("chi")')
+   page.evaluate('window.scrollTo(0,0)')
+   before=geometry()
+   page.evaluate(f'loadCalls("{mode}")')
    visible()
-   assert page.locator('#call-options button').count()==3
-   labels=page.locator('#call-options button').evaluate_all('buttons=>buttons.map(button=>button.dataset.diagnosticActionType)')
-   assert labels.count('chi')==2 and labels.count('pon')==1,labels
+   page.wait_for_timeout(100)
+   after=geometry()
+   assert after['scrollY']==before['scrollY'],{'before':before,'after':after}
+   assert page.locator('#call-options button').count()==expected
+   print(f'{browser_name} {width}x{height} {mode} display metrics: before={before} after={after}')
+   return before,after
   for height in [844,564,448]:
-   load_call(height)
+   load_call(height,'mixed',3)
    # A user scroll followed by Safari visual viewport changes must retain the
    # chosen position; resizing does not run another scroll correction.
    page.evaluate('''()=>{
@@ -71,12 +84,56 @@ window.loadKan=()=>{controller.newGame();controller.match=startMatch(ankanGame()
    assert page.evaluate('scrollY')==0
    # Confirm that the controls remain in normal flow and can be reached by
    # ordinary user scrolling after viewport events.
-   page.locator('#pass-calls').scroll_into_view_if_needed()
+   if height <= 564:
+    page.mouse.wheel(0,1200)
+    page.wait_for_function('scrollY>0')
+    manual_y=page.evaluate('scrollY')
+    page.wait_for_timeout(1100)
+    assert page.evaluate('scrollY')==manual_y
+    assert page.evaluate("""()=>{const r=document.querySelector('#pass-calls').getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}""")
+    page.evaluate('''()=>{window.nativeViewport=visualViewport;window.testViewport=new EventTarget();Object.assign(testViewport,{height:Math.max(300,innerHeight-80),offsetTop:20});Object.defineProperty(window,'visualViewport',{configurable:true,get:()=>testViewport});testViewport.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('resize'));testViewport.dispatchEvent(new Event('scroll'));}''')
+    page.wait_for_timeout(50)
+    assert page.evaluate('scrollY')==manual_y
+    page.evaluate('Object.defineProperty(window,"visualViewport",{configurable:true,get:()=>nativeViewport})')
+    entries=page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-diagnostics-v2')||'[]')")
+    assert any(e['event']=='call_viewport_user_scroll' and e['details'].get('source')=='user' for e in entries),entries[-20:]
    assert page.locator('#pass-calls').is_enabled()
 
   if width==375:
+   # Candidate growth is measured with the page at the top and again after a
+   # real wheel gesture. Skip/pass remains in the normal page flow.
+   for mode,count in [('one',1),('two',2),('three',3),('mixed',3)]:
+    before,after=load_call(448,mode,count)
+    chi_count=page.locator('#call-options button').filter(has_text='チー').count()
+    pon_count=page.locator('#call-options button').filter(has_text='ポン').count()
+    assert chi_count==({'one':1,'two':2,'three':3,'mixed':2}[mode]) and pon_count==({'mixed':1}.get(mode,0))
+    page.mouse.wheel(0,1200)
+    page.wait_for_function('scrollY>0')
+    manual_y=page.evaluate('scrollY')
+    page.wait_for_timeout(1100)
+    assert page.evaluate('scrollY')==manual_y
+    metrics=geometry()
+    entries=page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-diagnostics-v2')||'[]')")
+    assert any(e['event']=='call_viewport_user_scroll' and e['details'].get('source')=='user' for e in entries),entries[-20:]
+    assert metrics['scrollY']==manual_y
+    page.locator('#pass-calls').click()
+    page.wait_for_function('callState().phase!=="awaiting-call"')
+    assert page.evaluate('callState().phase')!='awaiting-call'
+    print(f'{browser_name} 375x448 {mode} manual-scroll metrics: {metrics}; pass advanced match')
+    if mode=='three':
+     for chi_index in range(3):
+      load_call(448,'three',3)
+      page.mouse.wheel(0,1200)
+      page.wait_for_function('scrollY>0')
+      choice=page.locator('#call-options button').filter(has_text='チー').nth(chi_index)
+      assert choice.is_enabled()
+      choice.click()
+      page.wait_for_function('callState().players[0].melds?.length===1')
+      assert page.evaluate('callState().players[0].melds[0].type')=='chi'
+      assert page.evaluate('callState().phase')=='awaiting-discard'
+
    for chi_index in [0,1]:
-    load_call(844)
+    load_call(844,'mixed',3)
     page.locator('#call-options button').filter(has_text='チー').nth(chi_index).click()
     page.wait_for_function('callState().players[0].melds?.length===1')
     assert page.evaluate('callState().players[0].melds[0].type')=='chi'
@@ -93,12 +150,12 @@ window.loadKan=()=>{controller.newGame();controller.match=startMatch(ankanGame()
      assert trace['click'] and trace['success'] and trace['rendered'],trace
      assert trace['click']['details']['candidateId'].startswith('call-')
      assert 'man-' not in trace['serialized'] and 'sou-' not in trace['serialized']
-   load_call(844)
+   load_call(844,'mixed',3)
    page.locator('#call-options button').filter(has_text='ポン').click()
    page.wait_for_function('callState().players[0].melds?.length===1')
    assert page.evaluate('callState().players[0].melds[0].type')=='pon'
    assert page.evaluate('callState().phase')=='awaiting-discard'
-   load_call(844)
+   load_call(844,'mixed',3)
    page.locator('#pass-calls').click()
    page.wait_for_function('callState().phase!=="awaiting-call"')
    assert page.evaluate('callState().players[0].melds?.length??0')==0
@@ -126,20 +183,19 @@ window.loadKan=()=>{controller.newGame();controller.match=startMatch(ankanGame()
    page.locator('#cancel-kan').click()
    assert page.locator('#kan-controls').is_hidden()
 
-   # A touch gesture already in progress, and its immediate release window,
-   # suppress the one-time correction when a panel becomes visible.
+   # A touch gesture already in progress must not reposition the page.
    page.set_viewport_size({'width':width,'height':448})
    page.evaluate('''()=>{
      const event=(name,touches)=>{const e=new Event(name);Object.defineProperty(e,'touches',{value:touches});window.dispatchEvent(e);};
      event('touchstart',[{clientX:10,clientY:200}]);
-     loadCalls('chi');
+     loadCalls('mixed');
      event('touchmove',[{clientX:10,clientY:130}]);
      event('touchend',[]);
    }''')
    page.wait_for_timeout(250)
    assert page.evaluate('''()=>{
      const entries=JSON.parse(localStorage.getItem('heibon-mahjong-diagnostics-v2')||'[]');
-     return entries.some(e=>e.event==='call_viewport_correction_suppressed'&&e.details.reason==='recent_manual_scroll');
+     return entries.some(e=>e.event==='call_viewport_panel_displayed'&&e.details.source==='initial_display_no_page_scroll');
    }''')
    assert page.locator('#call-options button').count()==3
    # Simulate address bar expansion/collapse while the viewport origin remains
@@ -152,23 +208,18 @@ window.loadKan=()=>{controller.newGame();controller.match=startMatch(ankanGame()
      for(const [height,offset] of [[404,24],[700,0],[484,24]]){
        Object.assign(testViewport,{height,offsetTop:offset});
        testViewport.dispatchEvent(new Event('resize'));
+       window.dispatchEvent(new Event('resize'));
        testViewport.dispatchEvent(new Event('scroll'));
      }
    }''')
    page.wait_for_timeout(50)
    assert page.evaluate('scrollY')==0
-   # A final fresh display performs the needed one-time alignment.
-   # Let the deliberate post-touch cooldown expire before checking that path.
-   page.wait_for_timeout(500)
    page.evaluate("document.querySelector('#call-controls').hidden=true")
    page.wait_for_function("document.querySelector('#call-controls').hidden")
-   page.evaluate("Object.defineProperty(window,'visualViewport',{configurable:true,get:()=>nativeViewport});window.scrollTo(0,0);loadCalls('chi')")
+   page.evaluate("Object.defineProperty(window,'visualViewport',{configurable:true,get:()=>nativeViewport});window.scrollTo(0,0);loadCalls('mixed')")
    visible()
-   assert page.evaluate('''()=>{
-     const entries=JSON.parse(localStorage.getItem('heibon-mahjong-diagnostics-v2')||'[]');
-     return entries.some(e=>e.event==='call_viewport_correction_applied') || entries.some(e=>e.event==='call_viewport_correction_suppressed'&&e.details.reason==='already_in_viewport');
-   }''')
+   assert page.evaluate('scrollY')==0
   assert not errors,errors
   page.close()
-  print(f'{browser_name} {width}px: two chi plus pon, each choice, pass, transition, manual scroll, viewport, correction passed')
+  print(f'{browser_name} {width}px: candidate choices, manual scroll, viewport changes, gameplay, ron, and kan passed')
  browser.close()

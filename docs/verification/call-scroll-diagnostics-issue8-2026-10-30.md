@@ -68,3 +68,33 @@
 - 端末機種と正確なiOSバージョン。
 
 今回の基本操作と手動スクロールの成功は、ボタン不応答の根本原因の特定や、全シナリオの修正完了を意味しません。未確認シナリオと根本原因の調査が残るため、Issue #8はopenのままにします。
+
+## 2026-10-30 再発調査と対策
+
+### 報告条件
+
+ユーザーから、オフライン対局の東4局・4本場、山58枚でチー3候補と「見送る」が表示された判断待ち中に、iPhone Safariの画面が下へ動くと報告されました。Safari下部アドレスバーが表示された状態です。今回の報告は、先の実機確認とは別の再発シナリオとして扱います。
+
+### 原因と根拠
+
+- **コード上確認できる原因経路:** `src/ui/call-viewport.ts` の前回実装は、パネルの非表示→表示を検出すると次のanimation frameで矩形を測り、パネル下端とvisual viewport下端が合わなければ `window.scrollBy({ top: delta })` を呼んでいました。鳴き判断の開始がユーザーのタッチ／ホイール操作から750msを過ぎて起きると、この初回補正が実行されます。これは表示中の繰り返し補正とは別の、初回表示の強制スクロールです。
+- 3候補の表示は1候補よりパネルを高くし、下端アドレスバーでvisual viewportが狭い条件では、初回補正の `delta` が正になりやすくなります。前回のBrowser UI試験はチー2候補＋ポンを対象にしていましたが、全ボタンが最初からvisual viewport内に収まることを待っており、候補数別の表示前後の `scrollY` を比較していませんでした。
+- `visualViewport.resize` と `window.resize` は前回修正で余白計算だけになっており、`visualViewport.scroll` もページ位置を変えません。この再発報告で確認すべきアプリ側の残存強制スクロール経路は初回表示補正です。
+- `src/style.css` は画面下端余白を `--call-viewport-inset` で確保し、選択ボタンに44px以上の操作高を設定しています。これはページ末尾の余白・通常フローを調整するもので、CSS上の強制スクロール指定ではありません。鳴きボタンの `focus` は `preventScroll` を指定しています。アプリソースに `scrollIntoView` 呼び出しはありません。
+- **実機イベントの確定範囲:** 今回の報告には、その瞬間の診断ログや `scrollY` 計測値は付いていません。そのため、端末上で `window.scrollBy` が実際に呼ばれたことを事後ログから確認したとは記録しません。実機の局面・残存コード経路・候補数による高さ増加が一致するため、不要な初回ページ補正を廃止して再発経路を除去します。
+
+### 対策と診断
+
+- 初回表示を含め、ロン・鳴き・カンおよびオンライン側の操作パネル表示維持処理からページをプログラムスクロールしない設計にしました。パネルは通常フローのままにし、画面内に収まらない場合はページをユーザーがスクロールして操作します。操作ボタンの最小高とタップ領域にCSS変更はありません。
+- visualViewport `resize` は下端余白のみ更新し、visualViewport `scroll` では余白・ページ位置のいずれも変更しません。
+- `call_viewport_panel_displayed` に初回表示時の候補数、パネル高、`scrollY`、visualViewport高、`offsetTop` を追加します。表示後の高さ変化は `call_viewport_panel_height_changed`、viewport変更時の位置不変更は `call_viewport_adjustment_skipped` に記録します。
+- ページのscrollイベントは入力イベントと照合し、ユーザー操作に続くスクロールを `call_viewport_user_scroll`、ユーザー操作と結び付かないものを `call_viewport_unattributed_scroll` として記録します。後者だけからアプリのプログラムスクロールかブラウザーのレイアウト補正かを断定しません。スクロールログは350ms静止後にまとめ、最低750ms間隔に制限します。
+- 旧 `call_viewport_correction_applied` は補正の実行、`call_viewport_correction_suppressed` は初回補正を抑えた理由を表していました。これらの初回補正経路を削除したため、以後の初回表示は `call_viewport_panel_displayed` の `source=initial_display_no_page_scroll` で確認します。
+
+### 回帰試験
+
+- 正確な13枚fixtureで、チー1候補（`345m`）、2候補（`3456m`）、3候補（`3467m`）、チー2候補＋ポン（`445567m`）を生成することをゲームロジックで確認しました。チー候補数と「見送る」の表示、各条件の表示前後矩形・`scrollY`、短い縦画面での手動wheelスクロール後の位置と操作を `tests/browser-call-viewport.py` に追加しました。全条件で「見送る」後の判断解除・対局進行を確認し、既存のチー・ポン・ロン・カン回帰も維持します。
+- ここまでのローカル結果: `node tests/call-viewport.test.ts` 成功（3/3）、`npm test` 成功（68/68）、`npm run build` 成功、browser scriptのPython構文確認成功、`git diff --check` 成功。
+- ChromiumとPlaywright WebKitのブラウザー回帰は、変更を反映したGitHub Actionsの完了後に結果と実行SHAを追記します。Codex Cloud内のiPhone Safari実機確認はできません。今回の実機条件で最終確認する場合は、再公開後にiPhone Safariでの測定が必要です。
+
+ブラウザー回帰とmain反映の確認が済むまで、Issue #8はopenのままです。

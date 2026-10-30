@@ -26,6 +26,7 @@ function viewportFixture() {
     closest: () => main,
     getClientRects: () => ({ length: 1 }) as unknown as DOMRectList,
     getBoundingClientRect() { return { ...this.rect, width: 300, height: this.rect.bottom - this.rect.top } as DOMRect; },
+    querySelectorAll: () => ({ length: 0 }) as unknown as NodeListOf<Element>,
   } as unknown as MockPanel);
   const observers: Array<{ target: MockPanel | null; trigger: () => void }> = [];
   class MockMutationObserver {
@@ -44,6 +45,8 @@ function viewportFixture() {
     innerHeight: 844,
     visualViewport,
     scrollY: 0,
+    setTimeout: (callback: TimerHandler, delay?: number) => globalThis.setTimeout(callback, delay) as unknown as number,
+    clearTimeout: (timer: number) => globalThis.clearTimeout(timer),
     scrollBy: ({ top }: ScrollToOptions) => {
       const amount = Number(top ?? 0);
       scrollCalls.push(amount);
@@ -87,7 +90,7 @@ function dispatchTouch(target: EventTarget, type: string, touches: Array<{ clien
   target.dispatchEvent(event);
 }
 
-test('call viewport performs one initial correction and viewport events only recalculate the inset', () => {
+test('call viewport never scrolls the page on initial display, resize, or panel height change', () => {
   const fixture = viewportFixture();
   diagnosticLog.clear();
   try {
@@ -96,11 +99,15 @@ test('call viewport performs one initial correction and viewport events only rec
     panel.hidden = false;
     panel.rect = { top: 700, bottom: 920, left: 0, right: 300 };
     fixture.observerFor(panel).trigger();
-    assert.equal(fixture.frames.length, 1);
-    fixture.frames.shift()!(0);
-    assert.equal(fixture.scrollCalls.length, 1);
-    assert.ok(fixture.scrollCalls[0]! > 0);
-    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_correction_applied' && entry.details.reason === 'initial_display_outside_viewport'));
+    assert.equal(fixture.frames.length, 0);
+    assert.equal(fixture.scrollCalls.length, 0);
+    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_panel_displayed' && entry.details.source === 'initial_display_no_page_scroll'));
+
+    panel.rect = { ...panel.rect, bottom: 960 };
+    fixture.observerFor(panel).trigger();
+    assert.equal(fixture.scrollCalls.length, 0);
+    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_panel_height_changed' &&
+      entry.details.previousHeight === 220 && entry.details.panelHeight === 260));
 
     fixture.visualViewport.height = 500;
     fixture.visualViewport.offsetTop = 20;
@@ -108,13 +115,13 @@ test('call viewport performs one initial correction and viewport events only rec
     assert.equal(fixture.values.has('--call-viewport-inset'), false);
     fixture.visualViewport.dispatchEvent(new Event('resize'));
     fixture.mockWindow.dispatchEvent(new Event('resize'));
-    assert.equal(fixture.scrollCalls.length, 1);
+    assert.equal(fixture.scrollCalls.length, 0);
     assert.equal(fixture.values.get('--call-viewport-inset'), '324px');
-    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_correction_suppressed' && entry.details.reason === 'viewport_event_does_not_reposition'));
+    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_adjustment_skipped' && entry.details.reason === 'viewport_change_does_not_reposition'));
   } finally { fixture.restore(); diagnosticLog.clear(); }
 });
 
-test('manual touch movement suppresses call correction during and after movement; ron and kan remain in flow', () => {
+test('manual touch scrolling remains in control; ron and kan remain in flow', async () => {
   const fixture = viewportFixture();
   diagnosticLog.clear();
   try {
@@ -125,18 +132,15 @@ test('manual touch movement suppresses call correction during and after movement
     call.rect = { top: 700, bottom: 920, left: 0, right: 300 };
     fixture.observerFor(call).trigger();
     dispatchTouch(fixture.mockWindow, 'touchmove', [{ clientX: 10, clientY: 130 }]);
-    fixture.frames.shift()!(0);
     assert.equal(fixture.scrollCalls.length, 0);
-    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_correction_suppressed' && entry.details.reason === 'manual_scroll_active'));
+    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_panel_displayed' && entry.details.source === 'initial_display_no_page_scroll'));
 
     dispatchTouch(fixture.mockWindow, 'touchend', []);
-    call.hidden = true;
-    fixture.observerFor(call).trigger();
-    call.hidden = false;
-    fixture.observerFor(call).trigger();
-    fixture.frames.shift()!(0);
+    Object.defineProperty(fixture.mockWindow, 'scrollY', { configurable: true, value: 120 });
+    fixture.mockWindow.dispatchEvent(new Event('scroll'));
+    await new Promise(resolve => setTimeout(resolve, 400));
     assert.equal(fixture.scrollCalls.length, 0);
-    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_correction_suppressed' && entry.details.reason === 'recent_manual_scroll'));
+    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_user_scroll' && entry.details.source === 'user' && entry.details.scrollY === 120));
 
     call.hidden = true;
     fixture.observerFor(call).trigger();
@@ -145,7 +149,6 @@ test('manual touch movement suppresses call correction during and after movement
       panel.hidden = false;
       panel.rect = { top: 200, bottom: 400, left: 0, right: 300 };
       fixture.observerFor(panel).trigger();
-      fixture.frames.shift()!(0);
       panel.hidden = true;
       fixture.observerFor(panel).trigger();
     }
@@ -154,5 +157,20 @@ test('manual touch movement suppresses call correction during and after movement
     assert.equal(fixture.scrollCalls.length, 0);
     assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_panel_displayed' && entry.details.panelType === 'ron'));
     assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_panel_displayed' && entry.details.panelType === 'kan'));
+  } finally { fixture.restore(); diagnosticLog.clear(); }
+});
+
+test('scrolls without a recent user gesture are logged as unattributed programmatic or layout movement', async () => {
+  const fixture = viewportFixture();
+  diagnosticLog.clear();
+  try {
+    installCallViewport();
+    Object.defineProperty(fixture.mockWindow, 'scrollY', { configurable: true, value: 84 });
+    fixture.mockWindow.dispatchEvent(new Event('scroll'));
+    await new Promise(resolve => setTimeout(resolve, 400));
+    const entry = diagnosticLog.all().find(value => value.event === 'call_viewport_unattributed_scroll');
+    assert.equal(entry?.details.source, 'programmatic_or_layout');
+    assert.equal(entry?.details.scrollY, 84);
+    assert.equal(entry?.details.panelHeight, 0);
   } finally { fixture.restore(); diagnosticLog.clear(); }
 });

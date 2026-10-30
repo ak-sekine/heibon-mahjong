@@ -1,8 +1,10 @@
 import { diagnosticLog } from '../online/diagnostics.ts';
 
-const RECENT_MANUAL_SCROLL_MS = 750;
+const SCROLL_LOG_QUIET_MS = 350;
+const SCROLL_LOG_MIN_INTERVAL_MS = 750;
+const MANUAL_SCROLL_GRACE_MS = 1000;
 
-/** Keep the in-flow action panels reachable without fighting the user's scroll. */
+/** Keep action panels in normal flow and leave page position under user control. */
 export function installCallViewport(): void {
   const panels = ['#ron-controls','#call-controls','#kan-controls','#online-ron-controls','#online-call-controls','#online-kan-controls']
     .map(selector => document.querySelector<HTMLElement>(selector))
@@ -10,14 +12,17 @@ export function installCallViewport(): void {
   const main = panels[0]?.closest('main');
   if (!main) return;
 
-  let pendingPanel: HTMLElement | null = null;
-  let correctionPending = false;
+  const visiblePanels = new WeakSet<HTMLElement>();
+  const heightByPanel = new WeakMap<HTMLElement, number>();
+  const viewportChangeLogged = new WeakSet<HTMLElement>();
+  let manualScrollUntil = 0;
   let touchStart: { x: number; y: number } | null = null;
   let pointerStart: { x: number; y: number } | null = null;
-  let manualScrollUntil = 0;
-  const visiblePanels = new WeakSet<HTMLElement>();
-  const viewportSuppressionLogged = new WeakSet<HTMLElement>();
+  let scrollTimer = 0;
+  let lastScrollLogAt = 0;
+  let pendingScrollSource: 'user' | 'programmatic_or_layout' = 'programmatic_or_layout';
 
+  const panelType = (panel: HTMLElement): string => panel.id.includes('ron') ? 'ron' : panel.id.includes('kan') ? 'kan' : 'call';
   const viewportInset = (): number => {
     const viewport = window.visualViewport;
     return Math.max(0, window.innerHeight - (viewport?.height ?? window.innerHeight) - (viewport?.offsetTop ?? 0));
@@ -28,87 +33,84 @@ export function installCallViewport(): void {
     const current = Number.parseFloat(main.style.getPropertyValue('--call-viewport-inset')) || 0;
     if (Math.abs(current - next) >= 1) main.style.setProperty('--call-viewport-inset', `${next}px`);
   };
-  const onViewportChange = (recalculateInset = true): void => {
+  const recordPanelHeight = (panel: HTMLElement): void => {
+    const height = panel.getBoundingClientRect().height;
+    const previous = heightByPanel.get(panel);
+    heightByPanel.set(panel, height);
+    if (previous === undefined || Math.abs(previous - height) < 1) return;
+    const candidateCount = panel.querySelectorAll('[data-action-choice]').length;
+    diagnosticLog.record('INFO', 'call_viewport_panel_height_changed', {
+      panelType: panelType(panel), previousHeight: Math.round(previous), panelHeight: Math.round(height), candidateCount,
+    });
+  };
+  const inspectPanels = (recalculateInset = true): void => {
     if (recalculateInset) updateInset();
-    const active = panels.find(panel => !panel.hidden && panel.getClientRects().length > 0);
-    if (active && !viewportSuppressionLogged.has(active)) {
-      viewportSuppressionLogged.add(active);
-      diagnosticLog.record('INFO', 'call_viewport_correction_suppressed', {
-        panelType: active.id.includes('ron') ? 'ron' : active.id.includes('kan') ? 'kan' : 'call',
-        reason: 'viewport_event_does_not_reposition',
-      });
-    }
-  };
-  const recordSuppressed = (panel: HTMLElement, reason: string): void => {
-    diagnosticLog.record('INFO', 'call_viewport_correction_suppressed', {
-      panelType: panel.id.includes('ron') ? 'ron' : panel.id.includes('kan') ? 'kan' : 'call',
-      reason,
-    });
-  };
-  const correctInitialPosition = (panel: HTMLElement): void => {
-    if (correctionPending) return;
-    correctionPending = true;
-    pendingPanel = panel;
-    requestAnimationFrame(() => {
-      correctionPending = false;
-      const active = pendingPanel;
-      pendingPanel = null;
-      if (!active || active.hidden || active.getClientRects().length === 0) return;
-      const now = Date.now();
-      if (touchStart) {
-        recordSuppressed(active, 'manual_scroll_active');
-        return;
-      }
-      if (now < manualScrollUntil) {
-        recordSuppressed(active, 'recent_manual_scroll');
-        return;
-      }
-
-      const viewport = window.visualViewport;
-      const top = viewport?.offsetTop ?? 0;
-      const bottom = top + (viewport?.height ?? window.innerHeight);
-      const rect = active.getBoundingClientRect();
-      const parent = active.parentElement;
-      const padding = (parent ? Number.parseFloat(getComputedStyle(parent).paddingBottom) || 0 : 0) + 8;
-      const delta = rect.bottom + padding > bottom ? rect.bottom + padding - bottom
-        : rect.top < top ? rect.top - top : 0;
-      if (Math.abs(delta) <= 1) {
-        recordSuppressed(active, 'already_in_viewport');
-        return;
-      }
-
-      diagnosticLog.record('INFO', 'call_viewport_correction_applied', {
-        panelType: active.id.includes('ron') ? 'ron' : active.id.includes('kan') ? 'kan' : 'call',
-        reason: 'initial_display_outside_viewport',
-        delta: Math.round(delta),
-      });
-      window.scrollBy({ top: delta, behavior: 'instant' });
-    });
-  };
-  const inspectPanels = (): void => {
-    updateInset();
-    const active = panels.find(panel => !panel.hidden && panel.getClientRects().length > 0);
     for (const panel of panels) {
       const visible = !panel.hidden && panel.getClientRects().length > 0;
       if (!visible) {
         visiblePanels.delete(panel);
-        viewportSuppressionLogged.delete(panel);
-      }
-      else if (!visiblePanels.has(panel)) {
-        visiblePanels.add(panel);
-        diagnosticLog.record('INFO', 'call_viewport_panel_displayed', {
-          panelType: panel.id.includes('ron') ? 'ron' : panel.id.includes('kan') ? 'kan' : 'call',
-        });
-        if (panel === active) correctInitialPosition(panel);
+        viewportChangeLogged.delete(panel);
+        heightByPanel.delete(panel);
+      } else {
+        recordPanelHeight(panel);
+        if (!visiblePanels.has(panel)) {
+          visiblePanels.add(panel);
+          const viewport = window.visualViewport;
+          diagnosticLog.record('INFO', 'call_viewport_panel_displayed', {
+            panelType: panelType(panel), source: 'initial_display_no_page_scroll',
+            panelHeight: Math.round(panel.getBoundingClientRect().height),
+            candidateCount: panel.querySelectorAll('[data-action-choice]').length,
+            scrollY: Math.round(window.scrollY),
+            visualViewportHeight: Math.round(viewport?.height ?? window.innerHeight),
+            offsetTop: Math.round(viewport?.offsetTop ?? 0),
+          });
+        }
       }
     }
   };
-  const markManualScroll = (): void => { manualScrollUntil = Date.now() + RECENT_MANUAL_SCROLL_MS; };
+  const recordViewportChange = (): void => {
+    const active = panels.find(panel => !panel.hidden && panel.getClientRects().length > 0);
+    if (active && !viewportChangeLogged.has(active)) {
+      viewportChangeLogged.add(active);
+      const viewport = window.visualViewport;
+      diagnosticLog.record('INFO', 'call_viewport_adjustment_skipped', {
+        panelType: panelType(active), reason: 'viewport_change_does_not_reposition',
+        scrollY: Math.round(window.scrollY),
+        visualViewportHeight: Math.round(viewport?.height ?? window.innerHeight),
+        offsetTop: Math.round(viewport?.offsetTop ?? 0),
+      });
+    }
+  };
+  const markManualScroll = (): void => { manualScrollUntil = Date.now() + MANUAL_SCROLL_GRACE_MS; };
+  const finishScrollLog = (): void => {
+    const now = Date.now();
+    if (now - lastScrollLogAt < SCROLL_LOG_MIN_INTERVAL_MS) {
+      window.clearTimeout(scrollTimer);
+      scrollTimer = window.setTimeout(finishScrollLog, SCROLL_LOG_MIN_INTERVAL_MS - (now - lastScrollLogAt));
+      return;
+    }
+    lastScrollLogAt = now;
+    const active = panels.find(panel => !panel.hidden && panel.getClientRects().length > 0);
+    diagnosticLog.record('INFO', pendingScrollSource === 'user' ? 'call_viewport_user_scroll' : 'call_viewport_unattributed_scroll', {
+      source: pendingScrollSource,
+      scrollY: Math.round(window.scrollY),
+      panelType: active ? panelType(active) : 'none',
+      panelHeight: active ? Math.round(active.getBoundingClientRect().height) : 0,
+    });
+  };
 
-  for (const panel of panels) new MutationObserver(inspectPanels).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
-  window.visualViewport?.addEventListener('resize', () => onViewportChange(true));
-  window.visualViewport?.addEventListener('scroll', () => onViewportChange(false));
-  window.addEventListener('resize', () => onViewportChange(true));
+  for (const panel of panels) new MutationObserver(() => inspectPanels()).observe(panel, {
+    attributes: true, attributeFilter: ['hidden'], childList: true, subtree: true,
+  });
+  window.visualViewport?.addEventListener('resize', () => { inspectPanels(); recordViewportChange(); });
+  window.visualViewport?.addEventListener('scroll', () => { inspectPanels(false); recordViewportChange(); });
+  window.addEventListener('resize', () => { inspectPanels(); recordViewportChange(); });
+  window.addEventListener('scroll', () => {
+    pendingScrollSource = Date.now() < manualScrollUntil ? 'user' : 'programmatic_or_layout';
+    if (pendingScrollSource === 'user') markManualScroll();
+    window.clearTimeout(scrollTimer);
+    scrollTimer = window.setTimeout(finishScrollLog, SCROLL_LOG_QUIET_MS);
+  }, { passive: true });
   window.addEventListener('touchstart', event => {
     const touch = event.touches[0];
     if (touch) touchStart = { x: touch.clientX, y: touch.clientY };
