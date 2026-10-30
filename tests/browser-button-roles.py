@@ -104,6 +104,7 @@ with sync_playwright() as playwright:
             assert close_box['height'] == 44 and close_box['width'] >= 64, (width, close_box)
         assert page.locator('#diagnostic-close').evaluate("e => getComputedStyle(e).backgroundColor") == 'rgb(248, 247, 242)'
         page.locator('#diagnostic-close').click()
+        page.wait_for_function("document.activeElement.id === 'main-menu-toggle'")
         assert page.evaluate("document.activeElement.id") == 'main-menu-toggle'
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'post-dialog horizontal overflow')
     for path in ('test.html', 'kan-test.html'):
