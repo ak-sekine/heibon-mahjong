@@ -6,10 +6,14 @@ base = os.environ.get('HEIBON_BASE_URL', 'http://127.0.0.1:4173/heibon-mahjong/'
 widths = [(320, 568), (375, 667), (390, 844), (430, 844), (1280, 800)]
 roles = {
     '#new-game': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
-    '#online-close': ('rgb(248, 247, 242)', 'rgb(24, 86, 64)'),
-    '[data-panel-part="pass-call"]': ('rgb(220, 233, 226)', 'rgb(24, 86, 64)'),
-    '#diagnostic-clear': ('rgb(255, 231, 225)', 'rgb(113, 56, 46)'),
-    '#online-close-room': ('rgb(155, 48, 40)', 'rgb(255, 255, 255)'),
+    '#online-close': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
+    '[data-panel-part="pass-call"]': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
+    '#diagnostic-clear': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
+    '#online-leave': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
+    '#online-close-room': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
+    '#confirm-new-game': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
+    '#cancel-new-game': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
+    '#diagnostic-close': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
 }
 
 def luminance(rgb):
@@ -51,6 +55,14 @@ with sync_playwright() as playwright:
             assert (computed[selector]['background'], computed[selector]['color']) == expected, (width, selector, computed[selector])
             assert contrast(computed[selector]['color'], computed[selector]['background']) >= 4.5, (width, selector, computed[selector])
             assert contrast(computed[selector]['borderColor'], computed[selector]['background']) >= 3, (width, selector, computed[selector])
+        buttons = page.locator('button.ui-button:not(.tile-choice)').evaluate_all('''nodes => nodes.map(button => {
+          const style = getComputedStyle(button), disabled = button.disabled && button.getAttribute('aria-busy') !== 'true';
+          return {id: button.id, background: style.backgroundColor, color: style.color,
+            expectedBackground: disabled ? 'rgb(157, 162, 124)' : 'rgb(248, 220, 145)',
+            expectedColor: disabled ? 'rgb(32, 53, 44)' : 'rgb(21, 78, 60)'};
+        })''')
+        assert all(button['background'] == button['expectedBackground'] and button['color'] == button['expectedColor']
+                   for button in buttons), (width, buttons)
         busy = page.evaluate('''() => {
           const button = document.querySelector('#online-ready');
           button.disabled = true;
@@ -102,7 +114,7 @@ with sync_playwright() as playwright:
         assert close_box['width'] >= 64 and 44 <= close_box['height'] <= 60, (width, close_box)
         assert close_box['x'] >= header_box['x'] and close_box['x'] + close_box['width'] <= \
           header_box['x'] + header_box['width'], (width, header_box, close_box)
-        assert page.locator('#diagnostic-close').evaluate("e => getComputedStyle(e).backgroundColor") == 'rgb(248, 247, 242)'
+        assert page.locator('#diagnostic-close').evaluate("e => getComputedStyle(e).backgroundColor") == 'rgb(248, 220, 145)'
         page.locator('#diagnostic-close').click()
         page.wait_for_function("document.activeElement.id === 'main-menu-toggle'")
         assert page.evaluate("document.activeElement.id") == 'main-menu-toggle'
@@ -149,8 +161,8 @@ with sync_playwright() as playwright:
                 assert geometry['deltaY'] == -8 and geometry['widthDelta'] == 0, (width, geometry)
                 assert geometry['handHeightDelta'] == 0 and geometry['scrollDelta'] == 0, (width, geometry)
                 assert geometry['transform'] != 'none', (width, geometry)
-                assert geometry['selectedColor'] == 'rgb(248, 220, 145)', (width, geometry)
-                assert geometry['disabledColor'] == 'rgb(157, 162, 124)', (width, geometry)
+                assert geometry['selectedColor'] == 'rgba(0, 0, 0, 0)', (width, geometry)
+                assert geometry['disabledColor'] == 'rgba(0, 0, 0, 0)', (width, geometry)
     assert not errors, errors
     print(json.dumps({'browser': os.environ.get('HEIBON_BROWSER', 'chromium'), 'result': 'passed',
                       'viewports': widths, 'checks': ['roles', 'text-and-border-contrast', 'disabled-busy-priority', 'processing-icon',
