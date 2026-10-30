@@ -15,6 +15,15 @@ with sync_playwright() as p:
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto('http://127.0.0.1:4173/heibon-mahjong/')
+        def assert_common_colors(selector):
+            colors = page.locator(selector).evaluate_all('''buttons => buttons.map(button => {
+              const style = getComputedStyle(button), disabled = button.disabled && button.getAttribute('aria-busy') !== 'true';
+              return { background: style.backgroundColor, color: style.color,
+                expectedBackground: disabled ? 'rgb(157, 162, 124)' : 'rgb(248, 220, 145)',
+                expectedColor: disabled ? 'rgb(32, 53, 44)' : 'rgb(21, 78, 60)' };
+            })''')
+            assert all(color['background'] == color['expectedBackground'] and color['color'] == color['expectedColor']
+                       for color in colors), (width, selector, colors)
         page.evaluate("""async () => {
           const { ActionPanel } = await import('/heibon-mahjong/src/ui/action-panel.ts');
           const { createOnlineActionPanelState } = await import('/heibon-mahjong/src/online/action-panel-state.ts');
@@ -91,6 +100,7 @@ with sync_playwright() as p:
         assert page.locator('[data-browser-action-panel] [data-panel-part="discard"]').nth(0).is_disabled()
         assert page.locator('[data-browser-action-panel] [data-panel-part="riichi"]').nth(0).is_hidden()
         assert page.locator('[data-browser-action-panel] [data-panel-part="tsumo"]').nth(0).is_hidden()
+        assert_common_colors('[data-browser-action-panel] button.ui-button:not(.tile-choice)')
 
         page.evaluate("""() => {
           const test = window.actionPanelBrowser;
@@ -126,6 +136,7 @@ with sync_playwright() as p:
           test.update(test.tile.id, false, false, true);
         }""")
         assert page.locator('[data-browser-action-panel] [data-panel-part="kan-controls"]').nth(1).is_visible()
+        assert_common_colors('[data-browser-action-panel] [data-panel-part="kan-options"] button.ui-button')
         online_panel = page.locator('[data-browser-action-panel] > [data-panel-part="root"]').nth(1)
         online_panel.locator('[data-panel-part="kan-options"] button').click()
         online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
@@ -142,6 +153,7 @@ with sync_playwright() as p:
         }""")
         assert page.locator('[data-browser-action-panel] [data-panel-part="call-controls"]').nth(1).is_visible()
         assert page.locator('[data-browser-action-panel] [data-panel-part="pass-call"]').nth(1).is_enabled()
+        assert_common_colors('[data-browser-action-panel] [data-panel-part="call-options"] button.ui-button')
         online_panel.locator('[data-panel-part="call-options"] button').click()
         online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
         assert online_events[-1] == {'type': 'select-call', 'optionId': 'server-call-option'}, online_events

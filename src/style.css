@@ -1,12 +1,9 @@
 :root {
   font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   color:#fffdf7; background:#185640; -webkit-text-size-adjust:100%;
-  --button-a-bg:#f8dc91; --button-a-fg:#154e3c; --button-a-pressed:#e9c66a;
-  --button-b-bg:#f8f7f2; --button-b-fg:#185640; --button-b-pressed:#e4e5d8;
-  --button-c-bg:#dce9e2; --button-c-fg:#185640; --button-c-pressed:#c5d8ce;
-  --button-d1-bg:#ffe7e1; --button-d1-fg:#71382e; --button-d1-pressed:#f2c8be;
-  --button-d2-bg:#9b3028; --button-d2-fg:#fff;
-  --button-disabled-bg:#9da27c; --button-disabled-fg:#20352c;
+  --button-normal-bg:#F8DC91; --button-normal-fg:#154E3C;
+  --button-pressed-bg:#E9C66A;
+  --button-disabled-bg:#9DA27C; --button-disabled-fg:#20352C;
   --button-focus:#82dcff; --button-focus-inner:#123f32;
 }
 * { box-sizing:border-box; }
@@ -600,17 +597,9 @@ header > div { min-width:0; }
  }
 }
 
-/* Shared role and state rules own colors; screen selectors retain geometry. */
-button.ui-button.ui-button--a:not(.tile-choice),.ui-button.ui-button--a:not(.tile-choice) { background-color:var(--button-a-bg); color:var(--button-a-fg); border-color:var(--button-a-fg); box-shadow:inset 0 0 0 1px var(--button-a-fg); }
-button.ui-button.ui-button--b:not(.tile-choice),.ui-button.ui-button--b:not(.tile-choice) { background-color:var(--button-b-bg); color:var(--button-b-fg); border-color:var(--button-b-fg); box-shadow:inset 0 0 0 1px var(--button-b-fg); }
-button.ui-button.ui-button--c:not(.tile-choice),.ui-button.ui-button--c:not(.tile-choice) { background-color:var(--button-c-bg); color:var(--button-c-fg); border-color:var(--button-c-fg); box-shadow:inset 0 0 0 1px var(--button-c-fg); }
-button.ui-button.ui-button--d1:not(.tile-choice),.ui-button.ui-button--d1:not(.tile-choice) { background-color:var(--button-d1-bg); color:var(--button-d1-fg); border-color:var(--button-d1-fg); box-shadow:inset 0 0 0 1px var(--button-d1-fg); }
-button.ui-button.ui-button--d2,.ui-button.ui-button--d2 { background-color:var(--button-d2-bg); color:var(--button-d2-fg); border-color:var(--button-d2-fg); box-shadow:inset 0 0 0 1px var(--button-d2-fg); }
-.ui-button:is(.ui-button--a,.ui-button--b,.ui-button--c,.ui-button--d1,.ui-button--d2) { touch-action:manipulation; }
-button.ui-button--a:active:not(:disabled):not([aria-busy="true"]),.ui-button--a:active:not(:disabled):not([aria-busy="true"]) { background-color:var(--button-a-pressed); }
-button.ui-button--b:active:not(:disabled):not([aria-busy="true"]),.ui-button--b:active:not(:disabled):not([aria-busy="true"]) { background-color:var(--button-b-pressed); }
-button.ui-button--c:active:not(:disabled):not([aria-busy="true"]),.ui-button--c:active:not(:disabled):not([aria-busy="true"]) { background-color:var(--button-c-pressed); }
-button.ui-button--d1:active:not(:disabled):not([aria-busy="true"]),.ui-button--d1:active:not(:disabled):not([aria-busy="true"]) { background-color:var(--button-d1-pressed); }
+/* Shared color/state rules own appearance; screen selectors retain geometry. */
+button.ui-button:not(.tile-choice),.ui-button:not(.tile-choice) { background-color:var(--button-normal-bg); color:var(--button-normal-fg); border-color:var(--button-normal-fg); box-shadow:inset 0 0 0 1px var(--button-normal-fg); touch-action:manipulation; }
+button.ui-button:active:not(:disabled):not([aria-busy="true"]):not(.tile-choice),.ui-button:active:not(:disabled):not([aria-busy="true"]):not(.tile-choice) { background-color:var(--button-pressed-bg); }
 button.ui-button.ui-button:disabled:not([aria-busy="true"]),.ui-button.ui-button:disabled:not([aria-busy="true"]) { background-color:var(--button-disabled-bg); color:var(--button-disabled-fg); border-color:var(--button-disabled-fg); box-shadow:inset 0 0 0 1px var(--button-disabled-fg); opacity:1; cursor:default; }
 button.ui-button[aria-busy="true"],.ui-button[aria-busy="true"] { position:relative; cursor:wait; }
 button.ui-button[aria-busy="true"]::after,.ui-button[aria-busy="true"]::after { content:""; position:absolute; top:4px; right:4px; width:8px; height:8px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:button-wait .8s linear infinite; pointer-events:none; }
@@ -618,6 +607,7 @@ button.ui-button[aria-busy="true"]::after,.ui-button[aria-busy="true"]::after { 
 button.ui-button.ui-button:focus-visible:not(.tile-choice),a.ui-button:focus-visible { outline:3px solid var(--button-focus); outline-offset:2px; box-shadow:inset 0 0 0 2px var(--button-focus-inner); }
 button.tile-choice.ui-button.ui-button:focus-visible { outline:3px solid var(--button-focus); outline-offset:2px; box-shadow:inset 0 0 0 2px var(--button-focus-inner); }
 button.ui-button.ui-button[aria-pressed="true"]:not(.tile-choice):not(:disabled) { box-shadow:inset 0 0 0 2px var(--button-focus-inner); }
-.tile-choice.ui-button--a { background-color:transparent; color:inherit; border-color:transparent; }
-button.tile-choice.ui-button--a[aria-pressed="true"] { background-color:var(--button-a-bg); outline:2px solid var(--button-focus-inner); outline-offset:0; box-shadow:inset 0 0 0 2px var(--button-focus-inner); }
-button.tile-choice.ui-button--a[aria-pressed="true"]:disabled { transform:none; }
+.tile-choice.ui-button { background-color:transparent; color:inherit; border-color:transparent; box-shadow:none; }
+button.tile-choice.ui-button.ui-button:disabled { background-color:transparent; color:inherit; border-color:transparent; box-shadow:none; }
+button.tile-choice.ui-button[aria-pressed="true"] { background-color:transparent; outline:2px solid var(--button-focus-inner); outline-offset:0; box-shadow:inset 0 0 0 2px var(--button-focus-inner); }
+button.tile-choice.ui-button[aria-pressed="true"]:disabled { transform:none; }

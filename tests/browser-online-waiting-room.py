@@ -17,6 +17,16 @@ RULES_ONLY = os.environ.get('HEIBON_ONLINE_RULES_ONLY') == '1'
 NEXT_ROUND_ONLY = os.environ.get('HEIBON_ONLINE_NEXT_ROUND_ONLY') == '1'
 OUT.mkdir(parents=True, exist_ok=True)
 
+def assert_common_button_colors(page, selector):
+    colors = page.locator(selector).evaluate_all('''buttons => buttons.map(button => {
+      const style = getComputedStyle(button), disabled = button.disabled && button.getAttribute('aria-busy') !== 'true';
+      return { background: style.backgroundColor, color: style.color,
+        expectedBackground: disabled ? 'rgb(157, 162, 124)' : 'rgb(248, 220, 145)',
+        expectedColor: disabled ? 'rgb(32, 53, 44)' : 'rgb(21, 78, 60)' };
+    })''')
+    assert all(color['background'] == color['expectedBackground'] and color['color'] == color['expectedColor']
+               for color in colors), colors
+
 MOCK = r"""
 (() => {
   const hostToken = 'a'.repeat(64);
@@ -928,6 +938,7 @@ with sync_playwright() as p:
       page.locator('#online-create-name').fill('テストホスト')
       page.locator('#online-create').click()
       wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234'")
+      assert_common_button_colors(page, '#online-dialog button.ui-button:not(.tile-choice)')
       page.locator('#online-ready').click()
       wait_for('document.querySelector("#online-finalize").disabled === false')
       page.locator('#online-finalize').click()
@@ -962,8 +973,8 @@ with sync_playwright() as p:
     assert menu_metrics['gap'] == '0px' and menu_metrics['background'] in ('rgb(255, 253, 247)', 'rgb(255, 255, 255)'), menu_metrics
     assert all(button['height'] >= 44 and button['width'] >= 44 for button in menu_metrics['buttons']), menu_metrics
     assert [button['background'] for button in menu_metrics['buttons']] == [
-      'rgb(248, 220, 145)', 'rgb(248, 247, 242)', 'rgb(248, 247, 242)',
-      'rgb(248, 220, 145)', 'rgb(248, 220, 145)', 'rgb(248, 247, 242)',
+      'rgb(248, 220, 145)', 'rgb(248, 220, 145)', 'rgb(248, 220, 145)',
+      'rgb(248, 220, 145)', 'rgb(248, 220, 145)', 'rgb(248, 220, 145)',
     ], menu_metrics
     assert [item.inner_text() for item in page.locator('#main-menu-items button:not([hidden])').all()] == [
       'オフラインで新規対局', 'ルール確認', '河テスト', '新しくルームを作る', 'ルームに参加する', '診断ログ',

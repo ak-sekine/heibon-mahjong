@@ -50,7 +50,7 @@ test('local and online hand tile renderers use the same selectable A role', () =
   }
 });
 
-test('diagnostic and room destructive controls retain their distinct D1 and D2 roles', () => {
+test('diagnostic and room destructive controls retain semantic classes without role colors', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   for (const [id, role] of [['diagnostic-clear', 'd1'], ['online-leave', 'd1'], ['online-close-room', 'd2']]) {
     const button = buttons(html).find(node => node.includes(`id="${id}"`));
@@ -59,10 +59,21 @@ test('diagnostic and room destructive controls retain their distinct D1 and D2 r
   }
 });
 
-test('shared CSS defines the approved colors and busy-over-disabled state rules', () => {
+test('shared CSS defines one normal color, pressed and disabled states, and busy priority', () => {
   const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
-  for (const value of ['#f8dc91', '#f8f7f2', '#dce9e2', '#ffe7e1', '#9b3028', '#9da27c']) assert.ok(css.includes(value));
+  for (const value of ['#F8DC91', '#154E3C', '#E9C66A', '#9DA27C', '#20352C']) assert.ok(css.includes(value));
+  for (const obsolete of ['--button-a-bg', '--button-b-bg', '--button-c-bg', '--button-d1-bg', '--button-d2-bg',
+    '#f8f7f2', '#dce9e2', '#ffe7e1', '#9b3028']) assert.ok(!css.includes(obsolete), `obsolete role color: ${obsolete}`);
+  assert.match(css, /\.ui-button:not\(\.tile-choice\).*var\(--button-normal-bg\)/u);
+  assert.match(css, /--button-pressed-bg:#E9C66A/u);
+  assert.match(css, /button\.tile-choice\.ui-button\.ui-button:disabled.*background-color:transparent/u);
+  assert.match(css, /button\.tile-choice\.ui-button\[aria-pressed="true"\].*background-color:transparent/u);
   assert.match(css, /\.ui-button\.ui-button:disabled:not\(\[aria-busy="true"\]\)/u);
   assert.match(css, /\.ui-button\[aria-busy="true"\]/u);
   assert.match(css, /\.ui-button\.ui-button:focus-visible/u);
+});
+
+test('all normal button role selectors resolve to the same common tokens', () => {
+  const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /\.ui-button--(?:a|b|c|d1|d2)\b/u);
 });
