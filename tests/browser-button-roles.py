@@ -54,10 +54,12 @@ with sync_playwright() as playwright:
         busy = page.evaluate('''() => {
           const button = document.querySelector('#online-ready');
           button.disabled = true;
-          const disabled = getComputedStyle(button).backgroundColor;
+          const disabledStyle = getComputedStyle(button);
+          const disabled = { background: disabledStyle.backgroundColor, color: disabledStyle.color,
+            border: disabledStyle.borderColor };
           button.setAttribute('aria-busy', 'true');
           const processing = getComputedStyle(button);
-          return { disabled, disabledColor: getComputedStyle(button).color, disabledBorder: getComputedStyle(button).borderColor,
+          return { disabled: disabled.background, disabledColor: disabled.color, disabledBorder: disabled.border,
             processing: processing.backgroundColor, icon: getComputedStyle(button, '::after').content,
             animation: getComputedStyle(button, '::after').animationName, rect: button.getBoundingClientRect().toJSON() };
         }''')
