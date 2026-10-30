@@ -59,15 +59,16 @@ with sync_playwright() as playwright:
             border: disabledStyle.borderColor };
           button.setAttribute('aria-busy', 'true');
           const processing = getComputedStyle(button);
+          const icon = getComputedStyle(button, '::after');
           return { disabled: disabled.background, disabledColor: disabled.color, disabledBorder: disabled.border,
-            processing: processing.backgroundColor, icon: getComputedStyle(button, '::after').content,
-            animation: getComputedStyle(button, '::after').animationName, rect: button.getBoundingClientRect().toJSON() };
+            processing: processing.backgroundColor, icon: icon.content, iconWidth: icon.width, iconHeight: icon.height,
+            iconBorderWidth: icon.borderTopWidth, animation: icon.animationName, rect: button.getBoundingClientRect().toJSON() };
         }''')
         assert busy['disabled'] == 'rgb(157, 162, 124)', (width, busy)
         assert contrast(busy['disabledColor'], busy['disabled']) >= 4.5, (width, busy)
         assert contrast(busy['disabledBorder'], busy['disabled']) >= 3, (width, busy)
         assert busy['processing'] == 'rgb(248, 220, 145)', (width, busy)
-        assert busy['icon'] not in ('none', 'normal', '""') and busy['animation'] == 'button-wait', (width, busy)
+        assert busy['icon'] not in ('none', 'normal') and (busy['iconWidth'], busy['iconHeight'], busy['iconBorderWidth']) == ('8px', '8px', '2px') and busy['animation'] == 'button-wait', (width, busy)
         page.evaluate("document.querySelector('#online-ready').removeAttribute('aria-busy');document.querySelector('#online-ready').disabled=false")
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'horizontal overflow')
         page.locator('#main-menu-toggle').click()
