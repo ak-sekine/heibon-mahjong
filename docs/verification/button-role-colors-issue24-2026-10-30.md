@@ -1,7 +1,9 @@
 # Issue #24: 全ボタンの共通配色・状態表現
 
 実装日: 2026-10-30
-対象コミット: `77e741266547f098ad5df357415b10de4c776259`
+役割別配色の初回実装コミット: `77e741266547f098ad5df357415b10de4c776259`
+単色統一コミット: `b9b4d7f51982bbe83d2b32f965b01cf29457bf79`
+単色統一Browser UI test追従コミット: `268a7d1d0bb9724d06170f5cdd6e20bebaa092a1`
 Browser UI期待値修正: `499ebc84c4e29593423051f052665f66e7a00eae`
 Browser disabled文字色期待値修正: `2a44e96025947a2161260b10fbf9d62048a83c8e`
 Browser busy／disabled取得順修正: `94b4182159fb4c1acba3ec320ff2423c8689b683`
@@ -12,6 +14,48 @@ Browser spinner ring assertion修正: `e665fb175e31c22d429d12982fcec767abb20f82`
 検証画面コンパクト操作の既存サイズ維持: `658b2d77d3a810868fce8c35675267dc6464cb55`
 Issue: [#24](https://github.com/ak-sekine/heibon-mahjong/issues/24)（Openのまま）
 設計: [Issue #9 button role color design](../development/issue-9-button-role-color-design.md)
+
+> **記録の読み方:** 以下の初回実装結果・A/B/C/D1/D2配色は履歴として保持しています。2026-10-30に追加要件を反映し、役割色を廃止しました。現在の仕様と更新後の検証結果はこの節「単色統一更新」を参照してください。
+
+## 単色統一更新（2026-10-30）
+
+### 現在の共通仕様
+
+| 状態 | 背景 | 文字 |
+|---|---|---|
+| 通常 | `#F8DC91` | `#154E3C` |
+| 押下中 | `#E9C66A` | `#154E3C` |
+| 無効 | `#9DA27C` | `#20352C` |
+| 選択中・処理中 | 通常色を維持 | 通常文字色を維持 |
+
+A/B/C/D1/D2クラスは意味分類の履歴として残りますが、色指定には使用しません。危険操作、見送る・見逃す・キャンセル・閉じるも通常色です。危険性は操作文言と既存確認文で伝えます。処理中 ＞ 無効 ＞ 押下・選択 ＞ 通常を保ち、処理中はnative disabled・二重送信防止・busy indicatorを維持します。手牌牌画像は背景透明、既存の選択輪郭、上方8px移動を維持します。
+
+### 実装
+
+- `src/style.css` の共通トークンを `--button-normal-bg/fg`、`--button-pressed-bg`、既存の無効色に整理しました。旧A/B/C/D1/D2色トークンと役割別色selectorを削除しました。
+- 意味分類クラスは既存DOM・状態テストとの互換用に残し、色へ作用しないことをunit testで確認します。
+- native `disabled`・busy indicator・focus-visibleを維持。手牌ボタンは通常・選択・disabledの背景を透明にし、選択輪郭と8px移動を維持します。
+- 動的な鳴き・カン候補のDOM computed style、危険操作、キャンセル・見送り、確認dialogをBrowser UI検証に含めました。
+
+### ローカル検証状況
+
+- `npm test`: 最終実行2回とも69件成功、失敗0（31.992秒、32.483秒）。初期実行も69件成功（36.236秒）。合計3回、100.711秒。
+- `npm run build`: 3回成功（3.650秒、3.200秒、3.719秒）。合計10.569秒。
+- `git diff --check`: 成功（0.045秒）。
+- `src/**/*.css`、HTMLから旧A/B/C/D1/D2配色token・旧色値を検索し、残存なし（該当なし、検索終了コード1）。単体テストでも旧値と役割色selectorがCSSにないことを確認します。
+- `npm run test:browser`: WebKit実行ファイル欠落でシナリオを開始できませんでした。Chromium/WebKit取得はPlaywright CDNがHTTP 403 `Domain forbidden` を返しました。
+- システムChromium 154では5 viewport（320×568、375×667、390×844、430×844、1280×800）で色・無効/busy・focus・dialog・牌選択と8px移動・検証画面のボタンを確認しました。320×568で診断「閉じる」が66px高となり既存テストの60px上限を超えましたが、ヘッダー内に収まっていました（Issue #10範囲）。後続確認は一時コピーのテスト上限だけ66pxにし、リポジトリの既存テスト値とアプリCSSは変更していません。
+- 更新した`browser-button-roles.py`は代表的なA/B/C/D1/D2ボタンと全ての通常/無効操作ボタンが共通色になることをcomputed styleで確認し、手牌の選択・disabled背景透明と8px移動も確認します。Chromium 154では5 viewportで成功しました（4.648秒）。ローカル差のため、実行時は一時コピーの診断close上限のみ66pxとし、リポジトリ側の60px基準を保持しています。
+- `browser-action-panel.py` はChromium 4幅（320、375、390、430）で成功し、動的カン・鳴き候補を含む共通色、disabled状態、候補操作・盤面幅を確認しました。
+- オンライン待機Browser UIではmenuの旧色期待値を修正し、続く作成ボタンdisabled/timeoutの原因を調査しました。ローカルVite起動に `VITE_ONLINE_API_URL` が設定されず、アプリが接続先未設定として作成操作を無効化していたことを確認しました。CIと同じmock URLとChromium実行権限で `NEXT_ROUND_ONLY` のfocused online flowを再実行し、待機室の共通computed colorを含め成功しました。フル待機室suiteの結果はActions runを参照します。
+- Actions run [41139721748](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41139721748) は55/56 Browser variantsを開始し、54成功・1失敗で終了しました。失敗は`#online-close`の旧B色期待値で、CSS実値は共通黄色でした。test expectationを修正したfollow-up commit `268a7d1d0bb9724d06170f5cdd6e20bebaa092a1` のrun [41142201343](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41142201343) ではChromium35・WebKit21の全56 variantsが成功しました。Pages buildは成功しましたがtest-only SHAのdeploy jobsはskipされ、公開反映は未確認です。
+- 同SHAのProduction Worker diagnostics run [41144329035](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41144329035) はsuccessしましたが、本番Workerの診断であり、Pages/Workerのdeploy結果ではありません。Browser別run、step、test variantの時間は[作業時間調査](issue24-work-duration-investigation-2026-10-31.md)と[計測ログ](issue24-work-timing-2026-10-31.md)に記録しています。
+- Browser UIの作業手順・結果・未実行範囲と過去204分の調査は[作業時間調査](issue24-work-duration-investigation-2026-10-31.md)を参照。
+- iPhone SafariとAndroid Chrome実機確認は未実施です。
+
+### コントラスト比
+
+WCAG相対輝度の式で再計算しました。通常文字/背景は7.15:1、押下中は5.83:1、無効文字/背景は4.91:1です。選択中・処理中は通常色を維持します。
 
 ## 変更概要
 
