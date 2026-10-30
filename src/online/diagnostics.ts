@@ -24,13 +24,20 @@ const allowedKeys = new Set([
   'renderStage', 'operation', 'outcome', 'lastCompletedAt', 'currentTurn', 'selectedSeats',
   'actionPanelUpdated', 'roundInfo', 'buildMode',
   'executionMode', 'lastSuccessfulRenderPhase', 'lastSuccessfulRenderSeat', 'lastSuccessfulRenderRunnerState',
+  'operationId', 'panelId', 'panelType', 'candidateId', 'candidateCount', 'disabled', 'progressing',
+  'delta', 'stateUpdateResult',
 ]);
 
 function appendBounded(entries: DiagnosticEntry[], entry: DiagnosticEntry): void {
   if (entries.length >= MAX_ENTRIES) {
     const routine = entries.findIndex(value => value.level === 'INFO' && !isPriorityEvent(value.event));
-    const anyInfo = entries.findIndex(value => value.level === 'INFO');
-    entries.splice(routine >= 0 ? routine : anyInfo >= 0 ? anyInfo : 0, 1);
+    if (routine >= 0) entries.splice(routine, 1);
+    else if (entry.level === 'INFO' && !isPriorityEvent(entry.event)) return;
+    else {
+      const nonPriority = entries.findIndex(value => !isPriorityEvent(value.event));
+      const anyInfo = entries.findIndex(value => value.level === 'INFO');
+      entries.splice(nonPriority >= 0 ? nonPriority : anyInfo >= 0 ? anyInfo : 0, 1);
+    }
   }
   entries.push(entry);
 }
@@ -166,7 +173,7 @@ function isEntry(value: unknown): value is DiagnosticEntry {
 }
 
 function isPriorityEvent(event: string): boolean {
-  return /(?:_failed|_stalled|diagnostic_snapshot|app_build_info|runner_resume_snapshot|cpu_turn_started|cpu_stage_started|cpu_wait_timer_started|cpu_call_(?:judgment|resolution)_started)$/u.test(event);
+  return /(?:_failed|_stalled|diagnostic_snapshot|app_build_info|runner_resume_snapshot|cpu_turn_started|cpu_stage_started|cpu_wait_timer_started|cpu_call_(?:judgment|resolution)_started|action_panel_click_received|action_panel_pointer_received|action_panel_displayed|local_action_(?:state_update_started|state_update_succeeded|state_update_failed|progress_completed|progress_failed)|local_game_render_succeeded|call_viewport_panel_displayed|call_viewport_correction(?:_applied|_suppressed)?)$/u.test(event);
 }
 
 function safeLegacySessionLog(): string | null {

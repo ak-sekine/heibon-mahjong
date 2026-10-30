@@ -21,6 +21,7 @@
 
 | 記録 | 主な対象 |
 | --- | --- |
+| [オフライン鳴き操作とスクロール診断 — Issue #8](call-scroll-diagnostics-issue8-2026-10-30.md) | 初回表示だけのスクロール補正、ユーザー操作・viewport変更時の抑制、チー2候補＋ポン・各選択・見送る、ロン／カン回帰、相関診断ログ。単体テストは成功。Chromium／WebKitは環境制限で未実行、iPhone Safari実機確認と不応答原因の特定は未完了。Issueはopen。 |
 | [Browser UI・オンラインCPU進行の回帰 — Issue #21](browser-ui-regression-issue21-2026-10-29.md) | リーチ結果から次局、CPU打牌のポンによる河からの除去の固定局面と検証結果。main統合後のChromium／WebKit CIと異常系の検出を確認し、CI検証済み・完了。未確認事項とIssue #22・#23への引き継ぎを記録。 |
 | [Browser UI CI実行時間増加の原因調査 — Issue #23](browser-ui-ci-duration-issue23-2026-10-30.md) | Phase 1・Phase 2の計測を記録。同一SHAでも時間が変動し、全runで52シナリオ成功。runner資源等は一部計測したが因果関係と計測オーバーヘッドは未分離で、根本原因未特定。調査完了・Issue #23 Closed。今後の異常は新しいIssueで扱う。 |
 | [Browser UI失敗の原因調査 — Issue #7](browser-ui-issue7-investigation-2026-10-29.md) | 東2局待ちとCPU進行誤判定の別原因、既存修正、検証と未確認事項。回帰強化は #21、別タイムアウト調査は #22。 |

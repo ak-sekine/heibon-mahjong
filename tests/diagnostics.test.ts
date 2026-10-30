@@ -66,6 +66,15 @@ test('high priority build and CPU starts survive routine log overflow',()=>{
   assert.ok(log.all().some(entry=>entry.event==='local_cpu_turn_started'));
 });
 
+test('important local action traces survive viewport event noise at the bounded log limit',()=>{
+  const log=new DiagnosticLog(null);
+  log.record('INFO','action_panel_click_received',{operationId:41,actionType:'chi',candidateId:'call-2',phase:'awaiting-call'});
+  for(let index=0;index<800;index++)log.record('INFO','call_viewport_resize_observed',{elapsedMs:index});
+  assert.equal(log.all().length,500);
+  assert.ok(log.all().some(entry=>entry.event==='action_panel_click_received'&&entry.details.operationId===41));
+  assert.equal(log.all().at(-1)?.details.elapsedMs,799);
+});
+
 test('exception text is scrubbed before it enters diagnostic entries',()=>{
   const log=new DiagnosticLog(null);
   const info=safeErrorInfo(new Error('failed tile-man-5 token=secret123 at https://private.example/path'));

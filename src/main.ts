@@ -11,7 +11,7 @@ import { getLastLocalGameTransition, waitForTurn } from './game/automatic-turns.
 import { OnlineWaitingRoom } from './online/waiting-room.ts';
 import { OnlineGameController } from './online/game-controller.ts';
 import { MainMenu } from './ui/main-menu.ts';
-import { ActionPanel, mountActionPanel } from './ui/action-panel.ts';
+import { ActionPanel, mountActionPanel, type ActionPanelEvent, type ActionPanelTrace } from './ui/action-panel.ts';
 import { createLocalActionPanelState } from './rendering/local-action-panel-state.ts';
 import { mountScoreStrip, mountTableInfoPanel } from './ui/table-components.ts';
 import { declarationsBetween } from './model/declaration.ts';
@@ -65,6 +65,7 @@ mountDiagnosticDialog(diagnosticLog, () => ({
   lastSuccessfulRenderSeat: getLastSuccessfulRender()?.seat ?? null,
   lastSuccessfulRenderRunnerState: getLastSuccessfulRender()?.runnerState ?? null,
 }));
+let activeLocalActionTrace: ActionPanelTrace | null = null;
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     diagnosticLog.record('INFO', 'page_resumed', { source: 'visibilitychange' });
@@ -117,9 +118,15 @@ function render(): void {
   document.querySelector<HTMLElement>('#round-result-summary')!.hidden = false;
   localActionRoot!.hidden = false;
   const game = controller.game;
+  const operationDetails = activeLocalActionTrace ? {
+    operationId: activeLocalActionTrace.operationId,
+    actionType: activeLocalActionTrace.actionType,
+    candidateId: activeLocalActionTrace.candidateId,
+  } : {};
   const renderId = recordRenderStarted(diagnosticLog, {
     seat: game.turnPlayerId, phase: game.phase, runnerState: controller.progressing ? 'running' : 'idle',
     currentTurn: game.turnPlayerId, remainingTiles: game.liveWall.length, displayState: document.visibilityState,
+    ...operationDetails,
   });
   let renderStage = 'prepare';
   try {
@@ -147,7 +154,7 @@ function render(): void {
       localActionPanel?.update(createLocalActionPanelState(
         controller.match, controller.selectedTileId, controller.progressing, localKanChoicesOpen, controller.playerSeat, controller.playerNames,
       ));
-      diagnosticLog.record('INFO', 'local_action_panel_updated', { renderId }, { persist: false, replace: true });
+      diagnosticLog.record('INFO', 'local_action_panel_updated', { renderId, ...operationDetails }, { persist: false, replace: true });
     } catch (error) {
       diagnosticLog.record('ERROR', 'local_action_panel_update_failed', { renderId, failedStage: renderStage, ...safeErrorInfo(error) });
       throw error;
@@ -156,7 +163,7 @@ function render(): void {
     resultDialog.update(controller.match);
     recordRenderSucceeded(diagnosticLog, { renderId, timestamp: new Date().toISOString(), seat: controller.game.turnPlayerId,
       phase: controller.game.phase, runnerState: controller.progressing ? 'running' : 'idle', actionPanelUpdated: true,
-      remainingTiles: controller.game.liveWall.length });
+      remainingTiles: controller.game.liveWall.length, ...operationDetails });
   } catch (error) {
     recordGameRenderFailure(diagnosticLog, {
       renderId, failedStage: renderStage, lastSuccessfulRenderId: getLastSuccessfulRender()?.renderId ?? null,
@@ -165,6 +172,7 @@ function render(): void {
       round: `${controller.match.roundWind}${controller.match.roundNumber}`, honba: controller.match.honba,
       lastTransition: getLastLocalGameTransition(), runnerState: controller.progressing ? 'running' : 'idle',
       riverCounts: game.players.map(player => player.river.length).join(','),
+      ...operationDetails,
     }, error, `main.render>${renderStage}`);
     console.error('Local game render failed', {
       turnPlayerId: game.turnPlayerId,
@@ -196,51 +204,90 @@ document.querySelector<HTMLButtonElement>('#menu-offline-rules')?.addEventListen
   if (!controller.hasGame || document.body.classList.contains('online-game-active')) return;
   openReadOnlyRules(event.currentTarget as HTMLButtonElement, rulesForMatch(controller.match), 'offline');
 });
-if (localActionRoot) localActionPanel = new ActionPanel(localActionRoot, event => {
+function dispatchLocalAction(event: ActionPanelEvent): void | Promise<void> {
   switch (event.type) {
     case 'discard':
-      void controller.confirm().catch(error => console.error('Turn progression failed', error));
       if (!document.querySelector<HTMLDialogElement>('#result-dialog')!.open) document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
-      break;
+      return controller.confirm();
     case 'riichi':
-      void controller.declareRiichi().catch(error => console.error('Riichi progression failed', error));
-      break;
-    case 'tsumo': controller.declareTsumo(); break;
-    case 'kyuushu': controller.declareKyuushuKyuuhai(); break;
+      return controller.declareRiichi();
+    case 'tsumo': controller.declareTsumo(); return;
+    case 'kyuushu': controller.declareKyuushuKyuuhai(); return;
     case 'ron':
       controller.declareRon();
       if (!document.querySelector<HTMLDialogElement>('#result-dialog')!.open) document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
-      break;
+      return;
     case 'pass-ron':
-      void controller.passRon().catch(error => console.error('Turn progression failed', error));
       if (!document.querySelector<HTMLDialogElement>('#result-dialog')!.open) document.querySelector<HTMLButtonElement>('#new-game')!.focus({ preventScroll: true });
-      break;
-    case 'pass-call':
-      void controller.passCalls().catch(error => console.error('Call pass failed', error));
-      break;
+      return controller.passRon();
+    case 'pass-call': return controller.passCalls();
     case 'kan-toggle':
       localKanChoicesOpen = true;
       render();
-      break;
+      return;
     case 'cancel-kan':
       localKanChoicesOpen = false;
       render();
-      break;
+      return;
     case 'select-kan':
       localKanChoicesOpen = false;
-      void controller.kan(event.optionId).catch(error => console.error('Kan failed', error));
-      break;
-    case 'select-call':
-      void controller.call(event.optionId).catch(error => console.error('Call failed', error));
-      break;
+      return controller.kan(event.optionId);
+    case 'select-call': return controller.call(event.optionId);
     case 'next-round':
       if (!controller.canNextRound) return;
       window.scrollTo(0, 0);
-      void controller.nextRound().catch(error => console.error('Next round failed', error));
-      break;
-    case 'show-result': resultDialog.open(); break;
-    case 'return-local': break;
+      return controller.nextRound();
+    case 'show-result': resultDialog.open(); return;
+    case 'return-local': return;
   }
+}
+function traceDetails(trace: ActionPanelTrace): Record<string, unknown> {
+  return { operationId: trace.operationId, panelId: trace.panelId, actionType: trace.actionType, candidateId: trace.candidateId };
+}
+function runLocalAction(event: ActionPanelEvent, trace: ActionPanelTrace): void {
+  const previousPhase = controller.hasGame ? controller.game.phase : 'none';
+  activeLocalActionTrace = trace;
+  diagnosticLog.record('INFO', 'local_action_state_update_started', {
+    ...traceDetails(trace), previousPhase, phase: previousPhase, progressing: controller.progressing,
+  });
+  let pending: void | Promise<void>;
+  try {
+    pending = dispatchLocalAction(event);
+    diagnosticLog.record('INFO', 'local_action_state_update_succeeded', {
+      ...traceDetails(trace), previousPhase, nextPhase: controller.hasGame ? controller.game.phase : 'none',
+      phase: controller.hasGame ? controller.game.phase : 'none', progressing: controller.progressing,
+      stateUpdateResult: 'accepted',
+    });
+  } catch (error) {
+    diagnosticLog.record('ERROR', 'local_action_state_update_failed', {
+      ...traceDetails(trace), previousPhase, nextPhase: controller.hasGame ? controller.game.phase : 'none',
+      phase: controller.hasGame ? controller.game.phase : 'none', progressing: controller.progressing,
+      stateUpdateResult: 'failed', ...safeErrorInfo(error),
+    });
+    if (activeLocalActionTrace === trace) activeLocalActionTrace = null;
+    console.error('Local action state update failed', error);
+    return;
+  }
+  if (pending) {
+    void pending.then(() => {
+      diagnosticLog.record('INFO', 'local_action_progress_completed', {
+        ...traceDetails(trace), previousPhase, nextPhase: controller.hasGame ? controller.game.phase : 'none',
+        phase: controller.hasGame ? controller.game.phase : 'none', progressing: controller.progressing,
+      });
+      if (activeLocalActionTrace === trace) activeLocalActionTrace = null;
+    }).catch(error => {
+      diagnosticLog.record('ERROR', 'local_action_progress_failed', {
+        ...traceDetails(trace), previousPhase, nextPhase: controller.hasGame ? controller.game.phase : 'none',
+        phase: controller.hasGame ? controller.game.phase : 'none', progressing: controller.progressing,
+        stateUpdateResult: 'failed', ...safeErrorInfo(error),
+      });
+      if (activeLocalActionTrace === trace) activeLocalActionTrace = null;
+      console.error('Local action progression failed', error);
+    });
+  } else if (activeLocalActionTrace === trace) activeLocalActionTrace = null;
+}
+if (localActionRoot) localActionPanel = new ActionPanel(localActionRoot, runLocalAction, {
+  getContext: () => ({ phase: controller.hasGame ? controller.game.phase : 'none', progressing: controller.progressing }),
 });
 if (document.querySelector('#online-create-open')) {
   if (!onlineActionRoot) throw new Error('Online action panel host is missing');

@@ -9,6 +9,7 @@ import { inventory } from './helpers.ts';
 for (const [name, hand, called, count] of [
   ['duplicate pon', ['555m','234p','678s','19p','12z'], 'red:man-5', 1],
   ['duplicate chi and distinct sequences', ['334467m','234p','19p','12z'], 'man-5', 3],
+  ['two chi candidates plus pon', ['445567m','234p','19p','12z'], 'man-5', 3],
   ['red chi', ['4450m','234p','678s','19p','1z'], 'man-6', 2],
   ['red pon', ['550m','234p','678s','19p','12z'], 'man-5', 2],
 ] as const) test(`display ${name} retains executable physical options`, () => {
@@ -28,4 +29,5 @@ for (const [name, hand, called, count] of [
     for (const id of option.handTileIds) assert.ok(!result.players[0].hand.some(t=>t.id===id));
   }
   if (name.startsWith('red')) assert.deepEqual(options.map(o=>o.tiles.some(t=>t.tile.isRed)).sort(),[false,true]);
+  if (name === 'two chi candidates plus pon') assert.deepEqual(options.map(option => option.type).sort(), ['chi','chi','pon']);
 });

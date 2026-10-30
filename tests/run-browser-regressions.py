@@ -30,6 +30,8 @@ SUITE = [
     run('tests/browser-riichi-discard-layout.py'),
     run('tests/browser-action-controls.py'),
     run('tests/browser-action-panel.py'),
+    run('tests/browser-call-viewport.py'),
+    run('tests/browser-call-viewport.py', 'webkit'),
     run('tests/browser-table-ui.py'),
     run('tests/browser-random-seating.py'),
     run('tests/browser-random-seating.py', 'webkit'),

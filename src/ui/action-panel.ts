@@ -1,5 +1,6 @@
 import { createTileElement, tileLabel } from '../rendering/tile-svg.ts';
 import { tileKindKey, type Tile } from '../model/tile.ts';
+import { diagnosticLog } from '../online/diagnostics.ts';
 
 export type ActionPanelMode = 'local' | 'online';
 export type ActionPanelPart =
@@ -62,7 +63,19 @@ export type ActionPanelEvent =
   | { type: 'show-result' }
   | { type: 'return-local' };
 
-export type ActionPanelHandler = (event: ActionPanelEvent) => void;
+export type ActionPanelTrace = Readonly<{
+  operationId: number;
+  panelId: number | null;
+  actionType: string;
+  candidateId?: string;
+}>;
+export type ActionPanelHandler = (event: ActionPanelEvent, trace: ActionPanelTrace) => void;
+export type ActionPanelOptions = Readonly<{
+  getContext?: () => { phase?: string | null; progressing?: boolean };
+}>;
+
+let nextOperationId = 0;
+let nextPanelId = 0;
 
 const LOCAL_IDS: Readonly<Record<string, string>> = {
   root: 'local-game-controls',
@@ -147,10 +160,14 @@ export class ActionPanel {
   private readonly choiceSignatures = new Map<string, string>();
   private handler: ActionPanelHandler;
   private readonly root: HTMLElement;
+  private readonly options: ActionPanelOptions;
+  private readonly visiblePanelIds = new Map<string, number>();
+  private pendingPointerTrace: { target: HTMLButtonElement; trace: ActionPanelTrace } | null = null;
 
-  constructor(root: HTMLElement, handler: ActionPanelHandler = () => {}) {
+  constructor(root: HTMLElement, handler: ActionPanelHandler = () => {}, options: ActionPanelOptions = {}) {
     this.root = root;
     this.handler = handler;
+    this.options = options;
     for (const node of Array.from(root.querySelectorAll<HTMLElement>('[data-panel-part]'))) {
       const part = node.dataset.panelPart;
       if (part) this.parts.set(part, node);
@@ -160,7 +177,11 @@ export class ActionPanel {
     for (const part of [
       'discard', 'riichi', 'tsumo', 'kyuushu', 'kan-toggle', 'ron', 'pass-ron', 'pass-call',
       'cancel-kan', 'next-round', 'show-result', 'return-local',
-    ] as const) this.part(part).dataset.panelAction = part;
+    ] as const) {
+      this.part(part).dataset.panelAction = part;
+      this.part(part).dataset.diagnosticActionType = part;
+    }
+    root.addEventListener('pointerdown', event => this.onPointerDown(event), true);
     root.addEventListener('click', event => this.onClick(event));
   }
 
@@ -183,6 +204,11 @@ export class ActionPanel {
   }
 
   update(state: ActionPanelState): void {
+    const wasHidden = {
+      call: this.part('call-controls').hidden,
+      kan: this.part('kan-controls').hidden,
+      ron: this.part('ron-controls').hidden,
+    };
     const wasRonHidden = this.part('ron-controls').hidden;
     for (const [name, buttonState] of Object.entries(state.buttons) as [ActionPanelPart, ActionButtonState][]) {
       const button = this.part(name) as HTMLButtonElement;
@@ -226,6 +252,47 @@ export class ActionPanel {
     if (!state.ronGroup.visible && this.part('ron-controls').contains(document.activeElement)) {
       (document.activeElement as HTMLElement).blur();
     }
+    this.recordPanelDisplay('call', wasHidden.call, state.callGroup.visible, state.callGroup.options.length,
+      !state.callGroup.options.some(option => option.enabled) && (this.part('pass-call') as HTMLButtonElement).disabled);
+    this.recordPanelDisplay('kan', wasHidden.kan, state.kanGroup.visible, state.kanGroup.options.length,
+      !state.kanGroup.options.some(option => option.enabled));
+    this.recordPanelDisplay('ron', wasHidden.ron, state.ronGroup.visible, state.ronGroup.visible ? 1 : 0,
+      state.ronGroup.visible && !state.buttons.ron.enabled);
+  }
+
+  private context(): { phase?: string | null; progressing?: boolean } {
+    try { return this.options.getContext?.() ?? {}; } catch { return {}; }
+  }
+
+  private trace(button: HTMLButtonElement, actionType: string): ActionPanelTrace {
+    return {
+      operationId: Date.now() * 1000 + (++nextOperationId % 1000),
+      panelId: this.visiblePanelIds.get(button.closest('[data-panel-part="call-controls"]') ? 'call'
+        : button.closest('[data-panel-part="kan-controls"]') ? 'kan'
+          : button.closest('[data-panel-part="ron-controls"]') ? 'ron' : '') ?? null,
+      actionType,
+      ...(button.dataset.candidateId ? { candidateId: button.dataset.candidateId } : {}),
+    };
+  }
+
+  private recordInput(event: 'action_panel_pointer_received' | 'action_panel_click_received', button: HTMLButtonElement, trace: ActionPanelTrace): void {
+    const context = this.context();
+    const hidden = button.hidden || Boolean(button.closest('[hidden]'));
+    diagnosticLog.record('INFO', event, {
+      operationId: trace.operationId, panelId: trace.panelId ?? undefined, actionType: trace.actionType,
+      candidateId: trace.candidateId, disabled: button.disabled, progressing: context.progressing,
+      phase: context.phase, reason: hidden ? 'hidden' : button.disabled ? 'disabled' : undefined,
+    });
+  }
+
+  private onPointerDown(event: Event): void {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const button = target.closest<HTMLButtonElement>('button[data-action-choice],button[data-panel-action]');
+    if (!button || !this.root.contains(button)) return;
+    const trace = this.trace(button, button.dataset.diagnosticActionType ?? 'unknown');
+    this.pendingPointerTrace = { target: button, trace };
+    this.recordInput('action_panel_pointer_received', button, trace);
   }
 
   private onClick(event: Event): void {
@@ -233,23 +300,44 @@ export class ActionPanel {
     if (!(target instanceof Element)) return;
     const choice = target.closest<HTMLButtonElement>('button[data-action-choice]');
     if (choice && this.root.contains(choice)) {
-      if (choice.disabled) return;
+      const trace = (event as MouseEvent).detail > 0 && this.pendingPointerTrace?.target === choice ? this.pendingPointerTrace.trace
+        : this.trace(choice, choice.dataset.diagnosticActionType ?? 'unknown');
+      this.pendingPointerTrace = null;
+      this.recordInput('action_panel_click_received', choice, trace);
+      if (choice.disabled || choice.hidden || choice.closest('[hidden]')) return;
       const optionId = choice.dataset.optionId;
       if (!optionId) return;
-      this.handler({ type: choice.dataset.actionChoice === 'call' ? 'select-call' : 'select-kan', optionId });
+      this.handler({ type: choice.dataset.actionChoice === 'call' ? 'select-call' : 'select-kan', optionId }, trace);
       this.part('action-status').focus({ preventScroll: true });
       return;
     }
     const button = target.closest<HTMLButtonElement>('[data-panel-action]');
-    if (!button || !this.root.contains(button) || button.disabled || button.hidden) return;
+    if (!button || !this.root.contains(button)) return;
+    const trace = (event as MouseEvent).detail > 0 && this.pendingPointerTrace?.target === button ? this.pendingPointerTrace.trace
+      : this.trace(button, button.dataset.diagnosticActionType ?? 'unknown');
+    this.pendingPointerTrace = null;
+    this.recordInput('action_panel_click_received', button, trace);
+    if (button.disabled || button.hidden || button.closest('[hidden]')) return;
     const action = button.dataset.panelAction as ActionPanelPart | undefined;
     if (!action) return;
-    this.handler({ type: action });
-    if (action === 'kan-toggle' && !this.part('kan-controls').hidden) {
-      this.part('kan-controls').scrollIntoView({ block: 'nearest' });
-    } else if (action === 'cancel-kan') {
+    this.handler({ type: action }, trace);
+    if (action === 'cancel-kan') {
       this.part('kan-toggle').focus({ preventScroll: true });
     }
+  }
+
+  private recordPanelDisplay(panelType: 'call' | 'kan' | 'ron', wasHidden: boolean, visible: boolean, candidateCount: number, disabled: boolean): void {
+    if (!visible) {
+      this.visiblePanelIds.delete(panelType);
+      return;
+    }
+    if (!wasHidden) return;
+    const panelId = Date.now() * 1000 + (++nextPanelId % 1000);
+    this.visiblePanelIds.set(panelType, panelId);
+    const context = this.context();
+    diagnosticLog.record('INFO', 'action_panel_displayed', {
+      panelId, panelType, candidateCount, disabled, progressing: context.progressing, phase: context.phase,
+    });
   }
 
   private renderOptions(part: string, action: 'call' | 'kan', options: readonly ActionChoiceOption[]): void {
@@ -264,12 +352,16 @@ export class ActionPanel {
     ]));
     if (this.choiceSignatures.get(part) === signature) return;
     this.choiceSignatures.set(part, signature);
-    list.replaceChildren(...displayOptions.map(option => {
+    list.replaceChildren(...displayOptions.map((option, index) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'control-option-button';
       button.dataset.actionChoice = action;
       button.dataset.optionId = option.id;
+      button.dataset.candidateId = `${action}-${index + 1}`;
+      button.dataset.diagnosticActionType = action === 'call'
+        ? option.label === 'ポン' ? 'pon' : option.label === 'チー' ? 'chi' : 'daiminkan'
+        : option.label === '暗カン' ? 'ankan' : 'kakan';
       if (action === 'call') {
         button.dataset.callId = option.id;
         button.dataset.onlineCall = option.id;

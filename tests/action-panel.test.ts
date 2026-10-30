@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { TILE_KINDS, ordinaryTile } from '../src/model/tile.ts';
 import { tileSvgMarkup } from '../src/rendering/tile-svg.ts';
+import { diagnosticLog } from '../src/online/diagnostics.ts';
 import {
   ACTION_PANEL_TEMPLATE_PARTS,
   ActionPanel,
+  type ActionPanelHandler,
+  type ActionPanelOptions,
   type ActionChoiceOption,
   type ActionPanelEvent,
   type ActionPanelState,
@@ -74,7 +77,7 @@ class FakeElement {
   }
 }
 
-function panelFixture(handler: (event: ActionPanelEvent) => void = () => {}) {
+function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPanelOptions = {}) {
   const doc = {
     activeElement: null as FakeElement | null,
     createElement: (_tag: string) => new FakeElement(doc),
@@ -105,7 +108,7 @@ function panelFixture(handler: (event: ActionPanelEvent) => void = () => {}) {
     node.parent = parent;
     parent.children.push(node);
   }
-  const panel = new ActionPanel(root as unknown as HTMLElement, handler);
+  const panel = new ActionPanel(root as unknown as HTMLElement, handler, options);
   return {
     panel,
     root,
@@ -212,6 +215,46 @@ test('ActionPanel delegates static and choice clicks through one mode callback a
     assert.deepEqual(events, [{ type: 'discard' }, { type: 'select-call', optionId: 'call-1' }]);
     assert.equal(fixture.parts.get('action-status')!.focused, true);
   } finally { fixture.restore(); }
+});
+
+test('call panel diagnostics correlate displayed choices and clicks without retaining internal tile IDs', () => {
+  const events: ActionPanelEvent[] = [];
+  const traces: Array<{ operationId: number; candidateId?: string; actionType: string }> = [];
+  const fixture = panelFixture((event, trace) => { events.push(event); traces.push(trace); }, {
+    getContext: () => ({ phase: 'awaiting-call', progressing: false }),
+  });
+  diagnosticLog.clear();
+  try {
+    const options: ActionChoiceOption[] = [
+      { id: 'chi:man-5:private-tile-a', label: 'チー', tiles: [], enabled: true },
+      { id: 'pon:man-5:private-tile-b', label: 'ポン', tiles: [], enabled: true },
+    ];
+    fixture.panel.update(state({
+      buttons: { ...state().buttons, 'pass-call': { visible: true, enabled: true, label: '見送る' } },
+      callGroup: { visible: true, status: '', options },
+    }));
+    const button = fixture.parts.get('call-options')!.children[0] as FakeElement;
+    fixture.root.listeners.get('pointerdown')!({ target: button } as unknown as Event);
+    fixture.root.listeners.get('click')!({ target: button, detail: 1 } as unknown as Event);
+
+    assert.deepEqual(events, [{ type: 'select-call', optionId: options[0]!.id }]);
+    assert.equal(typeof traces[0]?.operationId, 'number');
+    assert.equal(traces[0]?.candidateId, 'call-1');
+    assert.equal(traces[0]?.actionType, 'chi');
+    const entries = diagnosticLog.all();
+    const displayed = entries.find(entry => entry.event === 'action_panel_displayed');
+    const pointer = entries.find(entry => entry.event === 'action_panel_pointer_received');
+    const click = entries.find(entry => entry.event === 'action_panel_click_received');
+    assert.equal(displayed?.details.panelType, 'call');
+    assert.equal(displayed?.details.candidateCount, 2);
+    assert.equal(pointer?.details.operationId, click?.details.operationId);
+    assert.equal(click?.details.candidateId, 'call-1');
+    assert.equal(click?.details.phase, 'awaiting-call');
+    assert.equal(JSON.stringify(entries).includes('private-tile'), false);
+  } finally {
+    diagnosticLog.clear();
+    fixture.restore();
+  }
 });
 
 test('ActionPanel manages ron focus and result actions centrally', () => {
