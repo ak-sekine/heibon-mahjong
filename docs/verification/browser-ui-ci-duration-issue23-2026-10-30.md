@@ -262,3 +262,96 @@ root causeをさらに特定する場合、まず `.github/workflows/browser-ui.
 ## 11. この調査での変更
 
 ゲーム本体、Browser UIテスト、workflow、timeout、成功条件は変更していない。変更対象はこの調査記録と `docs/verification/README.md` の目次だけ。
+
+## 12. Phase 2 CI再試行とネットワーク手順の調査（2026-10-30）
+
+### 前回のネットワーク手順について確認できた範囲
+
+前回のCodexコマンド履歴・会話トランスクリプトはこの実行環境から取得できなかった。GitHub上で取得できたPhase 2記録とIssueコメントには、「利用可能なGitHub connectorにworkflow_dispatch開始APIがなく、通常の `git fetch` はproxy接続失敗だったためCI実行経路を確認できなかった」とある。一方、次の有無はその記録に残っておらず、前回に実行されなかった理由は **履歴未取得のため未特定** とする。
+
+- 前回Phase 2の担当者がAGENTS.mdを読んだか、ネットワークエラー後の規則を認識していたか。
+- ネットワークアクセス許可付き実行を要求したか、要求しなかった理由、または承認フローが利用できなかったか。
+- `gh` CLIの認証/API接続を試したか。
+- connectorのworkflow_dispatch機能不足とGitHub CLI/API通信の可否を区別して判断したか。
+
+同じ調査記録のPhase 1開始時には、通常の `git fetch origin` がproxyで失敗し、その後の「許可されたネットワーク実行」でfetchに成功したと記録されている。これは少なくともPhase 1では許可付きGit通信の手順を使えた証拠だが、Phase 2でも同じフローを試みたかは証明しない。したがって、Phase 2で承認フローが使えなかったとは判定しない。
+
+今回、通常環境では `git ls-remote`、`git fetch`、`gh api user` がproxy接続段階で失敗した。AGENTS.mdの「通常環境で失敗したら同じ診断を正規のネットワーク許可フローで再試行する」に従い `require_escalated` のネットワーク許可付き実行を要求したところ、実行環境はこれを受理し、同じコマンドと追加のAPI照会が成功した。別の認証情報やproxy設定は変更していない。
+
+| 通常実行の診断 | 接続先・結果 | 失敗段階・メッセージ |
+|---|---|---|
+| `git ls-remote origin refs/heads/main` | `github.com`、失敗（exit 128） | proxy port 8080への接続。「Failed to connect to proxy port 8080 after 1 ms: Could not connect to server」 |
+| `gh auth status` | ローカル認証状態、コマンドexit 0 | `GH_TOKEN` を使ったログイン確認は失敗。「Active account: true」「The token in GH_TOKEN is invalid」。token値は表示・記録していない。 |
+| `gh api user --jq .login` | `api.github.com`、失敗（exit 1） | proxy CONNECT前。「proxyconnect tcp: dial tcp 172.31.1.189:8080: socket: operation not permitted」 |
+| `git fetch origin` | `github.com`、失敗（exit 128） | proxy port 8080への接続。「Failed to connect to proxy port 8080 after 0 ms: Could not connect to server」 |
+
+許可付き再試行では `git ls-remote` がmainの `d109939b6c8157ed0bf3af4cb8ecc803dc58d88d` を返し、`git fetch origin` も成功した。`gh api user --jq .login` は `ak-sekine` を返した。許可付き `gh auth status` は引き続き `GH_TOKEN` 無効と報告したが、ユーザーAPI・repo権限照会・workflow照会・dispatchは成功した。この認証状態とAPI成功との不一致は未解決であり、tokenの値は取得・変更していない。
+
+GitHub APIでrepo権限は `admin: true`, `maintain: true`, `push: true` と確認した。`gh workflow view browser-ui.yml --repo ak-sekine/heibon-mahjong` はworkflow ID `387573159`、activeを返した。対象ブランチ上のworkflowに `workflow_dispatch` とbooleanの `browser_ui_metrics` input（既定false）が存在することを確認した。`browser-ui.yml` はunit test/build、Playwright install、localhost上のVite/previewとブラウザー検証、artifact保存だけを行い、本番Deploy job・本番secret参照はない。repo権限照会とdispatch成功によりActions起動権限も確認した。
+
+### 作業開始状態とSHA
+
+- 作業ディレクトリ `/workspace/heibon-mahjong`、branch `work`、開始HEAD `e01c96e3ee8e5fe32916b19bd0cb8ec320e8b8f3`、開始時の作業ツリーclean。
+- 許可付きfetch後の最新 `origin/main` は `d109939b6c8157ed0bf3af4cb8ecc803dc58d88d`（前回報告のSHAと一致）。開始時のbehind/aheadは `1/0`。
+- `test/issue-23-browser-ui-metrics` はGitHub APIで存在し、HEADは `b97d0e5869d6cf1d3cba0aa66054b32c47195ee9`。今回の4回すべてこの同一SHAで実行した。run中にブランチを更新していない。
+- GitHub上の `b97d0e…` commitのtreeは `d279ec88fb4ee9202d2b5775fad4a9cc410ce74e`。報告されていたローカル同等commit `26d2c7b08fe59af38e8fd0b183b61dffd4f5fc2a` は、このcheckoutにGit objectがなく、GitHub APIも404を返したため、現在の環境からtree同一性を再確認できなかった。SHA同一と推測していない。
+
+### 同一SHAの4回比較
+
+全runでworkflow eventは `workflow_dispatch`、結論はsuccess。回帰ログ上の52 invocationの順序は4runで完全一致し、各runでChromium 33件、WebKit 19件、52件成功、失敗0、timeout 0だった。GitHub job logからscenario全体時間を集計した。時間はUTC。
+
+| 条件 | run | Browser UI job（UTC / 所要） | regression step（所要） | 52件合計 | Chromium 33件 | WebKit 19件 | runner / region |
+|---|---|---|---:|---:|---:|---:|---|
+| metrics=false | [40976061181](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40976061181) | 2026-10-29 23:53:16–2026-10-30 00:10:58 / 17:42 | 15:58 | 955.560s | 578.272s | 377.288s | 1000001798 / Central US |
+| metrics=true (1) | [40978134211](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40978134211) | 2026-10-30 00:12:02–00:25:24 / 13:22 | 12:01 | 719.530s | 434.689s | 284.841s | 1000001801 / Central US |
+| metrics=true (2) | [40979713791](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40979713791) | 2026-10-30 00:26:55–00:45:05 / 18:10 | 16:33 | 990.246s | 589.161s | 401.085s | 1000001804 / East US |
+| metrics=true (3) | [40981785317](https://github.com/ak-sekine/heibon-mahjong/actions/runs/40981785317) | 2026-10-30 00:46:44–00:59:31 / 12:47 | 11:26 | 684.423s | 421.560s | 262.863s | 1000001807 / Central US |
+
+4runのrunner version、Ubuntu 24.04.5 / `ubuntu-24.04` image `20261025.353.1`、Node.js 24.22.1、Python 3.12.15、Playwright 1.64.1、Chromium 156.0.8078.4、WebKit 27.2は一致した。run 1では `Save Browser UI metrics` stepがskipされ、metrics artifactはない（無効時の設定どおり）。
+
+計測有効3runの52件合計平均は **798.066秒**、範囲は684.423–990.246秒。metrics無効runは955.560秒だった。enabled run 2→3では51/52件が遅くなり、合計は+270.716秒。run 2→4では45件が速くなり、6件が遅く、1件同じだった。無効runは1回、計測有効runは3回のみのため、この比較だけで計測負荷と自然なrunner変動を分離できない。計測有効run 2・4は無効runより速く、run 3は遅いので、一貫した計測オーバーヘッドは観測されなかった。
+
+### 計測有効runのrunner資源とbrowser計測
+
+metrics artifactはそれぞれGitHubの専用artifact `browser-ui-metrics-b97d0e5869d6cf1d3cba0aa66054b32c47195ee9-1` から取得した。runner sampleは5秒間隔。browser eventsは全runで286件（全52件のscenario_totalを含み、すべてoutcome=success）。以下のCPU・memory・pressureはsampleごとの平均／最大。GiBは1024³ byte換算。
+
+| 指標 | run 2 | run 3 | run 4 |
+|---|---:|---:|---:|
+| runner resource samples / 計測秒 | 144 / 715.3s | 198 / 985.5s | 137 / 680.2s |
+| host CPU使用率 | 平均31.85%、最大59.04% | 平均34.96%、最大60.58% | 平均31.32%、最大63.67% |
+| cgroup CPU使用率 | 平均31.83%、最大58.89% | 平均34.96%、最大60.29% | 平均31.31%、最大63.34% |
+| host memory使用量 | 平均1.68、最大2.14 GiB | 平均1.63、最大1.94 GiB | 平均1.65、最大2.08 GiB |
+| cgroup memory current | 平均4.37、最大4.70 GiB | 平均4.37、最大4.63 GiB | 平均4.35、最大4.74 GiB |
+| memory limit | 欠測（全sample null） | 欠測（全sample null） | 欠測（全sample null） |
+| host / cgroup swap使用量 | 0 / 0 | 0 / 0 | 0 / 0 |
+| swap limit | 欠測（全sample null） | 欠測（全sample null） | 欠測（全sample null） |
+| CPU pressure some avg10 | 平均5.92%、最大22.05% | 平均6.20%、最大31.55% | 平均5.90%、最大20.81% |
+| CPU pressure full avg10 | 0% | 0% | 0% |
+| memory pressure some/full avg10 | 0% / 0% | 0% / 0% | 0% / 0% |
+| I/O pressure some avg10 | 平均0.76%、最大20.18% | 平均0.27%、最大14.47% | 平均0.80%、最大17.47% |
+| I/O pressure full avg10 | 平均0.68%、最大18.31% | 平均0.26%、最大14.23% | 平均0.70%、最大15.13% |
+| process数 | 平均173.6、範囲162–184 | 平均182.8、範囲172–196 | 平均172.2、範囲161–185 |
+
+logical CPUは各sampleで4。`cpu_quota_status=unlimited` でquota core数はnull。CPUの差分利用率は最初のsampleで基準値がないため、run 2は144中143、run 3は198中197、run 4は137中136 sample。memory/swap limitは未取得を0として扱っていない。
+
+Playwright個別計測は長時間だった3 scriptsだけ（52 invocation全体ではない）。各runでbrowser launch 5件、page creation/navigation 33件、browser close 5件を計測した。平均時間は次のとおり。
+
+| operation | run 2 | run 3 | run 4 |
+|---|---:|---:|---:|
+| browser launch | 87ms | 125ms | 85ms |
+| page create | 112ms | 153ms | 106ms |
+| page navigation | 159ms | 226ms | 152ms |
+| `wait_for_selector:#player-hand svg` | 67ms（最大151ms） | 94ms（最大168ms） | 61ms（最大108ms） |
+| `wait_for_selector:#online-game-controls` | 30ms（最大36ms） | 43ms（最大52ms） | 26ms（最大41ms） |
+| `wait_for_locator:#local-table` | 4ms（最大5ms） | 6ms（最大8ms） | 5ms（最大8ms） |
+| `wait_for_function:roundEndTest` | 14ms（最大19ms） | 22ms（最大34ms） | 13ms（最大20ms） |
+| browser close | 62ms | 66ms | 52ms |
+
+run 3はrun 2・4よりcgroup CPU平均、CPU pressure some avg10、process数がやや高く、51/52 scenarioで遅かった。一方、memory currentは3runでほぼ同じ、memory pressureとswapは0、I/O pressureはrun 3が最も低かった。runner IDとregionもrun 3だけEast US。他のrunとの違いはrunner/host throughput変動という候補と整合するが、CPU pressureも高負荷を断定する値ではなく、同一host比較でもない。計測対象のPlaywright waitは最大168msであり、観測された数分の差を説明しない。ただし全52 scriptsの全待機を計測したわけではない。root causeは未特定で、今回の計測でも計測負荷と自然変動を厳密には分離できない。
+
+### artifact取得と状態
+
+- metrics専用artifactはGitHub connector経由で取得し、run 2 20,307 bytes、run 3 24,217 bytes、run 4 20,059 bytesのJSONLを解析した。run 1は計測無効のためmetric artifactなし。
+- run 1の39.9 MB `browser-ui-*` artifactは`gh run download`経由でAzure artifact URLが403となり、executor 32 MiB転送上限も超えるため全体をローカル展開していない。52 scenario計時はGitHub Actions job logから取得・集計し、workflow成功と照合した。
+- 作業中に確認したIssue状態は #21 Closed、#22 Open、#23 Open。Issue #23をcloseしていない。
+- 今回もゲームコード、test code、workflowは変更していない。変更対象は調査記録とIssueコメントのみ。
