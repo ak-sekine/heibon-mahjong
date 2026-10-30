@@ -158,6 +158,8 @@ window.loadKan=()=>{controller.newGame();controller.match=startMatch(ankanGame()
    page.wait_for_timeout(50)
    assert page.evaluate('scrollY')==0
    # A final fresh display performs the needed one-time alignment.
+   # Let the deliberate post-touch cooldown expire before checking that path.
+   page.wait_for_timeout(500)
    page.evaluate("document.querySelector('#call-controls').hidden=true")
    page.wait_for_function("document.querySelector('#call-controls').hidden")
    page.evaluate("Object.defineProperty(window,'visualViewport',{configurable:true,get:()=>nativeViewport});window.scrollTo(0,0);loadCalls('chi')")
