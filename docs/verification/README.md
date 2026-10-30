@@ -20,6 +20,10 @@
 
 ## 自動・ブラウザー検証
 
+- [Issue #24 ボタン色の単色統一](button-role-colors-issue24-2026-10-30.md) — 初回役割別配色の履歴、単色化の現在仕様、computed style・自動テスト・実機未確認事項。
+- [Issue #24 作業時間調査](issue24-work-duration-investigation-2026-10-31.md) — 前回204分の履歴上の事実と未確認事項、今回の実測分析、Issue #23との比較、改善候補。
+- [Issue #24 作業計測ログ](issue24-work-timing-2026-10-31.md) — 単調時計・UTC壁時計による今回のフェーズ、コマンド、テスト、GitHub Actionsの記録。
+
 | 記録 | 主な対象 |
 | --- | --- |
 | [全ボタンの共通配色・状態表現 — Issue #24](button-role-colors-issue24-2026-10-30.md) | 役割別トークン・静的／動的ボタン、オンライン処理状態、新規対局A/D2切替、returnToLocalGameの分類、単体テストとChromium／WebKit CI結果、コントラスト、未実施のiPhone Safari／Android Chrome実機確認項目。 |
