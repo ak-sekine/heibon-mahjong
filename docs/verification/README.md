@@ -4,7 +4,7 @@
 
 ## Issue調査
 
-- [Browser UI回帰の壁時計時間短縮 — Issue #28、Phase 1・2、2026-10-31](browser-ui-wall-clock-issue28-2026-10-31.md) — Phase 1の56単位（Chromium 35／WebKit 21）と固定baselineを引き継ぎ、Phase 2ではengine別runner matrix・実行結果artifactを実装。通常CIでの実測・gate確認を記録中です。IssueはOpenです。
+- [Browser UI回帰の壁時計時間短縮 — Issue #28、Phase 1・2、2026-10-31](browser-ui-wall-clock-issue28-2026-10-31.md) — 56 scenarioをChromium 34／WebKit 22に分けた通常CI run 41206140603で全件成功し、Browser UI回帰wall clock 18:12.3から8:50.4への短縮を実測しました。engine別artifactとrunner時間を記録。failure／cancel／skip時のdeploy拒否は静的確認のみのためIssueはOpenです。
 - [Open Issue調査結果 — 2026-10-31](open-issue-investigation-2026-10-31.md) — 対象13件の分類、調査SHA、コード実態、テスト結果、原因未特定・仕様判断待ち、およびIssue #24の調査後の完了状態を記録。
 
 ## 実機確認

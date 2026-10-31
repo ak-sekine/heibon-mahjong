@@ -163,6 +163,54 @@ Phase 1ではrunner manifestの`browser`列に基づきChromium 35件・WebKit 2
 - PyYAML 6.0.3でBrowser UI／Deploy workflowをparseし、matrix要素・`fail-fast: false`・2並列上限、担当engineのinstall/run、strict main artifact、Deploy reusable workflow依存と後続gateをassertionで確認。`git diff --check`成功。
 - Codex CloudではBrowser UIを起動していません。Chromium／WebKitを含む実行はGitHub-hosted runnerで検証します。
 
-GitHub Actions CI、engine別の完了時刻・実行重複・queue時間、artifact一覧・CSV内容、workflow全体時間、run内runner時間、deploy関連jobの実行／skip結果は通常CI後に記録します。失敗・cancelを故意に発生させるworkflow検証は行いません。失敗／cancel時のdeploy拒否は、Actions実行の観察結果と静的gate確認を区別します。iPhone Safari実機確認は今回のCI内部変更に含めず、新たな必須条件にしません。
+### 最初のActions runと修正
+
+- run [41205805669](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41205805669)、SHA `4142dff5acabaa7ba332b19292b6d8ccb71c0352`はworkflow failureでした。Chromium runnerは最初の`browser-online-dialog-layout.py`だけを開始し、0.289秒で「WebKit executableが存在しない」と失敗しました。これは上記のmanifest engine誤分類が原因で、skipやassertionの失敗ではありません。
+- `fail-fast: false`によりもう一方は継続し、当時のWebKit manifest分21件は21 success、failure 0、timeout 0で完了しました。Chromium失敗artifact（`browser-ui-chromium-4142dff...-1`、ID `13044378390`）とWebKit success artifact（`browser-ui-webkit-4142dff...-1`、ID `13044760578`）を確認しました。どちらにもengine別timing CSVとログが含まれ、WebKitの`center-round-display` artifact（ID `13044935043`）も保存されました。
+- このrunは56件の全回帰が成功していないため時間短縮比較から除外します。run全体failureで本番Deploy jobは成功扱いにならず、分類もvalidation-onlyだったためproduction deployは実行されていません。manifestを修正したcommit `791439185535f0a96bd5de66fa401f5c683b07c2` をpushし、通常Deploy run `41206140603` で再検証中です。
+
+### 修正後のGitHub Actions検証
+
+- 実装commit `4142dff5acabaa7ba332b19292b6d8ccb71c0352` に続き、manifestの実engine割当を直した `791439185535f0a96bd5de66fa401f5c683b07c2` をpushしました。対象の通常Deploy workflow runは [41206140603](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41206140603)、結果はsuccessです。
+- `detect-changes` と `docs-check` がsuccessし、分類は `validation-only`、`run_full_suite=true`、`deploy_required=false` でした。`verify` はsuccessし、npm suiteの1,304 test caseすべて成功、失敗・skip 0でした。Worker typecheck、build、pages-dist artifactもsuccessです。
+- Chromium job（job ID `124552634937`、runner ID `1000002126`）は13:39:17–13:47:45 UTC、WebKit job（job ID `124552634932`、runner ID `1000002125`）は13:39:18–13:48:52 UTCに別runnerで実行されました。双方のengine専用回帰stepがsuccessし、実scenario区間は約6分50秒重なりました。
+
+| 実行単位 | runner待ち | Browser UI job全体 | 回帰step | 最初のscenario〜最後のscenario | 結果 |
+| --- | ---: | --- | --- | --- | --- |
+| Chromium | 2秒 | 8分28秒 | 7分47秒 | 13:39:54.108–13:47:39.408 UTC、7分45.3秒 | 34 success、failure 0、timeout 0、skip 0 |
+| WebKit | 3秒 | 9分34秒 | 7分56秒 | 13:40:49.362–13:48:44.505 UTC、7分55.1秒 | 22 success、failure 0、timeout 0、skip 0 |
+
+両engineの最初のscenario開始から最後のscenario終了までは8分50.4秒です。baseline runの全56 invocation区間18分12.3秒と比較すると、今回のrunでは9分21.9秒（51.4%）短くなりました。測定は各Actions logのscenario開始／終了UTCを使い、基準と比較区間を揃えています。各runner上のscenario所要時間合計は940.406秒（15分40.4秒）でした。
+
+| 指標 | 改善前 baseline | 修正後 run 41206140603 | 差分・注意 |
+| --- | ---: | ---: | --- |
+| Browser UI回帰scenario区間 | 18分12.3秒 | 8分50.4秒 | 9分21.9秒短縮（51.4%） |
+| Browser UI job全体のwall clock | 19分18.2秒 | 9分35秒 | 9分43.2秒短縮。修正後は2 jobの最早開始〜最遅完了で計算 |
+| Browser UI runner時間の合計 | 19分18.2秒 | 18分02秒（508秒 + 574秒） | 1分16.2秒減。Browser UIのjob log時間の合計 |
+| run全体のrunner時間 | 約22分00.8秒 | 19分22秒 | 2分38.8秒減だが、baselineにはWorker/Pages deploy等があり、修正後はvalidation-onlyでdeploy jobがskipのため同条件比較ではない |
+
+改善前の固定engine別内訳はChromium 10分38秒／WebKit 7分35秒（Phase 1のmanifest label集計）です。manifestの実engineとscenarioコードを揃えてbaseline logを再集計した値はChromium 628.567秒（10分28.6秒）／WebKit 463.698秒（7分43.7秒）です。Phase 1記録の値は固定baselineとして保持し、今回の実engine別比較には補正値を使います。suite合計の18分12.3秒は変わりません。
+
+runは13:33:58 UTC作成、13:48:53 UTC完了で、作成から完了まで14分55秒です。最初のjob開始13:38:04 UTCから完了までは10分49秒でした。workflow-level concurrencyで前のrunを待った時間は約4分06秒です。Browser matrix job自体のqueueは2秒／3秒でした。単一runのため、これを恒常的な改善率や失敗率の変化とはみなしません。理論上の最大7分35秒というPhase 1の見込みも実測値には使っていません。
+
+### Artifactとdeploy gate
+
+- Browser UIのChromium artifact `browser-ui-chromium-791439185535f0a96bd5de66fa401f5c683b07c2-1`（ID `13045050963`、34,789,006 bytes）とWebKit artifact `browser-ui-webkit-791439185535f0a96bd5de66fa401f5c683b07c2-1`（ID `13044801727`、7,996,053 bytes）はどちらもupload successでした。各upload logはtiming CSV（`/tmp/heibon-browser-ui-timings.csv`）、engine log、診断用ファイルを含む98ファイルの保存を報告しています。engineを含むartifact名の衝突はありません。
+- WebKit artifactは取得してCSVを開き、22行すべてが`webkit`、status `success`であることを確認しました。Chromium artifactもupload successと34/34 scenario成功をActions logで確認しましたが、artifact ZIPが32 MiBのローカル転送上限を超えたため、この環境ではZIP全体の展開・CSV直接読込はできませんでした。Chromium artifactの欠落やupload失敗ではありません。
+- `center-round-display`診断artifactもChromium（ID `13044504796`）／WebKit（ID `13045145881`）ごとにupload successでした。river-spacing専用artifactは異常ファイルがなく作成されませんでした（既存の`if-no-files-found: ignore`動作）。主artifact側にはscreenshotsとserver logを含みます。pages-dist artifact（ID `13044279824`）も保存されました。
+- workflow sourceと静的テストで、matrix各要素のfailure・cancel・skipがReusable workflow successにならず、`.github/workflows/deploy.yml`の`release-freshness`、`deploy-worker`、`pages-build`が`needs.browser-ui.result == 'success'`を要求することを確認しました。`continue-on-error`による失敗の成功扱いはありません。成功runではBrowser UIとverifyは実行されましたが、変更分類が`validation-only`のため`release-freshness`、`deploy-worker`、`production-test`、`pages-build`、`pages-deploy`はすべてskipでした。従って既存条件どおりdeployを起動しなかったことは確認しましたが、Browser UIのfailure／cancel／必須job skipを入力した場合にdeploy拒否する実行経路は実際には起動していません。ここは静的確認のみで、実行確認は未実施です。今回のCI/workflow変更にはアプリ変更がないため、デプロイを強制していません。
+
+### 品質・効果判定と未確認事項
+
+- Phase 1とPhase 2でscenario invocation総数は56のままです。実engineに基づく実行数はChromium 34／WebKit 22で、全56成功、failure 0、timeout 0、skip 0でした。Phase 1の35／21はmanifest label誤り1件を含みます。`browser-online-dialog-layout.py`が実際には常にWebKitを起動していたため、その割当だけを直しました。scenario本体、assertion、viewport、online/offline検証は変更していません。
+- **A. 壁時計時間**: 1回のrunでBrowser UI回帰区間を18:12.3から8:50.4へ短縮したことを実測しました。matrix全jobのwall clockも19:18.2から9:35へ短縮しました。
+- **B. runner使用量**: Browser UI runner時間は19:18.2から18:02へ1:16.2減りました。run全体では22:00.8から19:22ですが、deploy jobの有無が異なるため比較できません。
+- **C. 品質**: 全56 scenario、両engine、既存assertionとworkflow success gateを保ち、成功runです。deployのnegative path（failure／cancel／skip時の拒否）は静的確認のみです。artifactはengine別に保存されました。
+- 変更ファイル（Phase 2全体）: `.github/workflows/browser-ui.yml`、`tests/run-browser-regressions.py`、`tests/test_browser_regressions_selection.py`、`tests/ci-change-classifier.test.mjs`、`docs/verification/ci-performance-2026-10-28.md`、`docs/verification/browser-ui-wall-clock-issue28-2026-10-31.md`、`docs/verification/README.md`、`docs/ROADMAP.md`。Deploy workflow本体は変更していません。
+- ローカル検証は上記のPython構文・engine選択5 tests・`npm test` 71 tests・change-classifier test・PyYAML構文／matrix/artifact/gate静的検証・`git diff --check`が成功しました。CIの`verify`は1,304件成功です。Browser UIはCodex Cloudで実行していません。iPhone Safari実機確認もしていません（今回のCI内部変更の必須条件ではありません）。
+- 最初の失敗run [41205805669](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41205805669)は誤ったmanifest labelを特定・修正するために使い、効果測定には含めません。同一目的の手動CI再実行や反復計測は追加していません。
+- 残存リスク: CI一回の測定であり、日ごとのrunner性能変動や長期安定性は未確認です。Chromium ZIPのローカル直接展開は転送上限のため未確認です。Browser UI failure／cancel／skip時のdeploy gate実行経路は未確認です。
+
+**Issue #28はOpenのままです。** 壁時計短縮・suite成功・artifact保存・静的gate確認は完了しましたが、IssueのClose条件であるfailure／cancel／skip時のdeploy禁止をActions上の実行結果として確認していません。iPhone Safari実機確認は今回のCI変更では不要で、自動検証と実機確認を区別しています。
 
 Browser UIをCodex Cloudで起動する環境構築は行いません。
