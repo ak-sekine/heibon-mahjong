@@ -19,8 +19,12 @@ header { display:flex; align-items:center; justify-content:space-between; gap:8p
 #local-table[hidden], #local-table-summary[hidden], #local-game-controls[hidden], #local-table .center-info[hidden] { display:none !important; }
 h1 { margin:0; font-size:clamp(1rem,5vw,1.5rem); white-space:nowrap; }
 .main-menu-shell { position:relative; z-index:8; flex:none; }
-.main-menu-toggle { display:grid; align-content:center; justify-items:center; gap:4px; width:44px; height:44px; padding:8px; border:1px solid currentColor; border-radius:8px; cursor:pointer; touch-action:manipulation; }
-.main-menu-toggle span { display:block; width:20px; height:2px; border-radius:2px; background:#185640; }
+.main-menu-toggle { display:grid; align-content:center; justify-items:center; gap:4px; width:44px; height:44px; padding:8px; border:1px solid transparent; border-radius:8px; background:transparent; color:#fffdf7; box-shadow:none; cursor:pointer; touch-action:manipulation; }
+.main-menu-toggle span { display:block; width:20px; height:2px; border-radius:2px; background:currentColor; }
+.main-menu-toggle:hover { background:#23684b; }
+.main-menu-toggle:active { background:#2d7655; }
+.main-menu-toggle[aria-expanded="true"] { border-color:#82aa91; background:#286b4e; }
+.main-menu-toggle:focus-visible { outline:3px solid var(--button-focus); outline-offset:2px; }
 .main-menu-items { position:absolute; top:calc(100% + 4px); right:0; z-index:20; display:flex; flex-direction:column; gap:0; width:max-content; min-width:216px; max-width:min(240px,calc(100vw - 16px)); padding:4px; border:1px solid #b8cbbd; border-radius:10px; background:#fffdf7; color:#154e3c; box-shadow:0 5px 16px rgb(0 0 0 / 22%); }
 .main-menu-items .main-menu-item { display:block; width:100%; min-width:0; min-height:44px; padding:8px 12px; border:0; border-radius:6px; background:#fffdf7; color:#154e3c; box-shadow:none; font:inherit; font-size:14px; font-weight:500; line-height:1.35; text-align:left; white-space:normal; cursor:pointer; touch-action:manipulation; }
 .main-menu-items .main-menu-item[hidden] { display:none; }

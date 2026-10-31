@@ -3,7 +3,7 @@ import os
 from playwright.sync_api import sync_playwright
 
 base = os.environ.get('HEIBON_BASE_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
-widths = [(320, 568), (375, 667), (390, 844), (430, 844), (1280, 800)]
+widths = [(320, 568), (375, 667), (390, 844), (414, 844), (768, 800), (1280, 800)]
 roles = {
     '#online-close': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
     '[data-panel-part="pass-call"]': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
@@ -40,9 +40,31 @@ with sync_playwright() as playwright:
     }''')
     assert focus['id'] == 'main-menu-toggle' and focus['visible'], focus
     assert focus['outline'] == 'rgb(130, 220, 255)' and focus['outlineWidth'] == '3px', focus
-    assert 'rgb(18, 63, 50)' in focus['ring'], focus
     for width, height in widths:
         page.set_viewport_size({'width': width, 'height': height})
+        toggle = page.locator('#main-menu-toggle')
+        nav_style = toggle.evaluate('''button => {
+          const style = getComputedStyle(button), rect = button.getBoundingClientRect();
+          return {background: style.backgroundColor, color: style.color, shadow: style.boxShadow,
+            width: rect.width, height: rect.height, iconColors: [...button.querySelectorAll('span')].map(icon => getComputedStyle(icon).backgroundColor)};
+        }''')
+        assert nav_style == {'background': 'rgba(0, 0, 0, 0)', 'color': 'rgb(255, 253, 247)',
+                             'shadow': 'none', 'width': 44, 'height': 44,
+                             'iconColors': ['rgb(255, 253, 247)'] * 3}, (width, nav_style)
+        toggle.hover()
+        assert toggle.evaluate('e => getComputedStyle(e).backgroundColor') == 'rgb(35, 104, 75)', (width, 'menu hover')
+        box = toggle.bounding_box()
+        page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+        page.mouse.down()
+        assert toggle.evaluate('e => getComputedStyle(e).backgroundColor') == 'rgb(45, 118, 85)', (width, 'menu pressed')
+        page.mouse.up()
+        toggle.click()
+        expanded = toggle.evaluate('''e => ({expanded: e.getAttribute('aria-expanded'), background: getComputedStyle(e).backgroundColor,
+          border: getComputedStyle(e).borderTopColor, icon: getComputedStyle(e.querySelector('span')).backgroundColor})''')
+        assert expanded == {'expanded': 'true', 'background': 'rgb(40, 107, 78)',
+                            'border': 'rgb(130, 170, 145)', 'icon': 'rgb(255, 253, 247)'}, (width, expanded)
+        toggle.click()
+        assert toggle.get_attribute('aria-expanded') == 'false', (width, 'menu reclick')
         computed = page.evaluate('''selectors => Object.fromEntries(selectors.map(selector => {
           const node = document.querySelector(selector);
           if (!node) throw new Error(`Missing role target: ${selector}`);

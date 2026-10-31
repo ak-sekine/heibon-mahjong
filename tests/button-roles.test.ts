@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 const files = ['index.html', 'test.html', 'kan-test.html'];
 const roleById: Record<string, string> = {
-  'main-menu-toggle': 'b', 'new-game': 'a',
+  'new-game': 'a',
   'online-create-close': 'b', 'online-create-rules': 'b', 'online-create': 'a', 'diagnostic-close': 'b',
   'diagnostic-copy': 'b', 'diagnostic-clear': 'd1', 'online-join-close': 'b', 'online-join': 'a',
   'online-close': 'b', 'online-copy-code': 'b', 'online-confirm-rules': 'b', 'online-ready': 'a',
@@ -23,14 +23,14 @@ function buttons(html: string): string[] {
   return [...html.matchAll(/<button\b[^>]*>/gu)].map(match => match[0]);
 }
 
-test('every static button on product and verification pages has exactly one shared role class', () => {
+test('every static operation button on product and verification pages has exactly one shared role class', () => {
   for (const file of files) {
     const html = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     const nodes = buttons(html);
     assert.equal(nodes.length, file === 'index.html' ? 45 : file === 'kan-test.html' ? 19 : 20);
     for (const button of nodes) {
       const classes = button.match(/\bclass="([^"]*)"/u)?.[1]?.split(/\s+/u) ?? [];
-      if (classes.includes('main-menu-item')) {
+      if (classes.includes('main-menu-item') || classes.includes('main-menu-toggle')) {
         assert.ok(!classes.includes('ui-button'), `${file}: menu items must not inherit normal button styling: ${button}`);
         continue;
       }
@@ -45,11 +45,24 @@ test('every static button on product and verification pages has exactly one shar
   }
 });
 
-test('dropdown items have their own white menu styling and preserve the yellow menu toggle', () => {
+test('dropdown items retain white styling and the navigation toggle stays separate from operation buttons', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const menuItems = html.match(/<button\b[^>]*class="main-menu-item"[^>]*>/gu) ?? [];
   assert.equal(menuItems.length, 7);
   const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+  const toggle = buttons(html).find(button => button.includes('id="main-menu-toggle"')) ?? '';
+  assert.match(toggle, /class="main-menu-toggle"/u);
+  assert.match(toggle, /aria-expanded="false"/u);
+  assert.doesNotMatch(toggle, /ui-button/u);
+  const toggleStyles = css.match(/\.main-menu-toggle\s*\{([^}]*)\}/u)?.[1] ?? '';
+  for (const declaration of ['background:transparent', 'color:#fffdf7', 'box-shadow:none', 'width:44px', 'height:44px']) {
+    assert.ok(toggleStyles.includes(declaration), declaration);
+  }
+  assert.match(css, /\.main-menu-toggle span[^}]*background:currentColor/u);
+  assert.match(css, /\.main-menu-toggle:hover/u);
+  assert.match(css, /\.main-menu-toggle:active/u);
+  assert.match(css, /\.main-menu-toggle\[aria-expanded="true"\]/u);
+  assert.match(css, /\.main-menu-toggle:focus-visible[^}]*outline:3px/u);
   const panel = css.match(/\.main-menu-items\s*\{([^}]*)\}/u)?.[1] ?? '';
   const item = css.match(/\.main-menu-items \.main-menu-item\s*\{([^}]*)\}/u)?.[1] ?? '';
   for (const declaration of ['background:#fffdf7', 'border:1px solid', 'border-radius:10px', 'box-shadow:']) assert.ok(panel.includes(declaration), declaration);

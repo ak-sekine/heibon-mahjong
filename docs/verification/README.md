@@ -21,6 +21,7 @@
 ## 自動・ブラウザー検証
 
 - [右上メニューのドロップダウン表示 — Issue #24関連](menu-dropdown-style-2026-10-31.md) — メニュー項目を通常ボタンの単色配色から分離し、Browser UI・自動デプロイ・実機確認を記録。
+- [右上ハンバーガーメニューボタンのナビゲーション表示 — Issue #24](main-menu-toggle-style-2026-10-31.md) — トグルを通常操作ボタンCSSから分離し、白い三本線・状態表示・キーボードフォーカスを検証。
 - [未デプロイ変更の検出と安全な回収 — 2026-10-31](deploy-pending-changes-recovery-2026-10-31.md) — Worker/Pages別GitHub Deployment SHA、pending app diffの回収、部分成功・古いSHAの処理、20自動テスト、run 41158609151の全ゲート・両deploy・SHA記録成功。公開HTMLとcomputed styleはproxy 403で未確認。
 - [Issue #24 ボタン色の単色統一](button-role-colors-issue24-2026-10-30.md) — 初回役割別配色の履歴、単色化の現在仕様、computed style・自動テスト・実機未確認事項。
 - [Issue #24 作業時間調査](issue24-work-duration-investigation-2026-10-31.md) — 前回204分の履歴上の事実と未確認事項、今回の実測分析、Issue #23との比較、改善候補。

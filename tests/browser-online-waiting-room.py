@@ -973,7 +973,7 @@ with sync_playwright() as p:
       return {background: style.backgroundColor, color: style.color, gap: style.gap, borderRadius: style.borderRadius, left: rect.left, right: rect.right, viewportWidth: innerWidth, toggleBackground: toggle.backgroundColor, buttons};
     }''')
     assert menu_metrics['gap'] == '0px' and menu_metrics['background'] == 'rgb(255, 253, 247)', menu_metrics
-    assert menu_metrics['color'] == 'rgb(21, 78, 60)' and menu_metrics['toggleBackground'] == 'rgb(248, 220, 145)', menu_metrics
+    assert menu_metrics['color'] == 'rgb(21, 78, 60)' and menu_metrics['toggleBackground'] == 'rgb(40, 107, 78)', menu_metrics
     assert menu_metrics['left'] >= 0 and menu_metrics['right'] <= menu_metrics['viewportWidth'], menu_metrics
     assert all(button['height'] >= 44 and button['width'] >= 44 for button in menu_metrics['buttons']), menu_metrics
     assert all(button['background'] == 'rgb(255, 253, 247)' and button['color'] == 'rgb(21, 78, 60)' for button in menu_metrics['buttons']), menu_metrics
