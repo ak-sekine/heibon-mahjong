@@ -18,7 +18,7 @@ Issue：[#25 配牌直後・最初のツモ直後に暗槓できない問題の�
 - `npm run typecheck:worker`：成功。
 - `git diff --check`：成功。
 - Issue #25対象テスト：113件成功。親の初期14枚に候補あり／なし、親が東以外の席、複数候補、通常打牌、子の第一通常ツモ、暗カン後の嶺上牌とドラ、連続カン、四槓散了、九種九牌、リーチ後制限、オンラインの偽造要求拒否を確認。
-- Browser UI：GitHub Actions run [41182711028](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41182711028)（commit `b78abbc8134097dd4d06554d83b3ce4f9afc4ff9`）は、追加した固定UIシナリオを選ぶ際にタイムアウトしました。原因は `kan-test.html` の選択肢に `opening` を登録し忘れたことです。それ以前の既存ブラウザー回帰スクリプトは通過しています。HTMLに選択肢を追加して再pushし、再実行結果を追記します。追加シナリオでは320px・390px幅で複数候補、キャンセル後の通常打牌、選択後の暗カン・嶺上牌・ドラを確認します。
+- Browser UI：run [41182711028](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41182711028)（commit `b78abbc8134097dd4d06554d83b3ce4f9afc4ff9`）は、新シナリオのHTML選択肢不足でタイムアウトしました。選択肢を追加したrun [41184029065](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41184029065)（commit `f89d0381a6dfd2823bbb9c11c8b3a85847ed12cc`）では追加シナリオの操作を通過しましたが、後続の `browser-test-page.py` が古い選択肢数6個を期待して失敗しました。期待数を7個に修正して再実行します。既存の他ブラウザー回帰はこの両runで通過しています。追加シナリオでは320px・390px幅で複数候補、キャンセル後の通常打牌、選択後の暗カン・嶺上牌・ドラを確認します。
 - iPhone Safari実機：未実施。ChromiumやGitHub Actionsの結果とは区別します。
 
 ## iPhone Safariでユーザーが確認する項目

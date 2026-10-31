@@ -110,7 +110,7 @@ with sync_playwright() as playwright:
     assert page.get_by_role('button', name='牌表示確認').count() == 0, 'tile preview menu item is present'
     assert page.get_by_text('開発用：全34種類と赤5を見る').count() == 0, 'development tile catalog remains reachable'
     page.goto(base + 'kan-test.html')
-    assert page.locator('#scenario option').count() == 6, 'kan verification page changed'
+    assert page.locator('#scenario option').count() == 7, 'kan verification page changed'
     assert page.locator('#tile-gallery, .catalog').count() == 0, 'development tile catalog is present on kan verification page'
     assert not errors, errors
     print(json.dumps({'testPage': 'pass', 'scenarios': ['kyuushu-self', *[case[0] for case in cases]],
