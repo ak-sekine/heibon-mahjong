@@ -55,7 +55,11 @@ GitHub Actions runのsuccessだけでは公開状態を判定できません。�
 
 ソース上の単色仕様は通常`#F8DC91 / #154E3C`、押下`#E9C66A / #154E3C`、無効`#9DA27C / #20352C`です。危険操作・見送る・キャンセル・閉じるも通常色です。
 
-GitHubで確認できた既存runでは実装run `41139721748`がBrowser UI失敗、追従test-only run `41142201343`が全56 variant成功し、verifyとbuildもsuccessでしたが、deploy jobsはskipでした。後続のdocs runもdeployなしです。Worker diagnostics successはdeploy successと区別します。新規Actions、本番Worker/Pages結果、配信内容、computed styleはpush後に確認・追記します。現時点で公開反映済みとは扱いません。Issue #24はOpenのままにし、iPhone SafariとAndroid Chromeの実機確認をユーザーへ引き継ぎます。
+GitHubで確認できた既存runでは実装run `41139721748`がBrowser UI失敗、追従test-only run `41142201343`が全56 variant成功し、verifyとbuildもsuccessでしたが、deploy jobsはskipでした。後続のdocs runもdeployなしです。Worker diagnostics successはdeploy successと区別します。
+
+新方式の初回run `41156765268`（SHA `6be9484`）ではdeployment API上にWorker/Pagesの個別記録がなかったため、今回の差分分類はvalidation-onlyでもpendingと判定し、全検証を実行しました。verify、Chromium/WebKit Browser UI、最新main SHA確認、Worker deploy、Production Worker test、Pages buildがsuccessしました。Wrangler出力はWorker URL `https://heibon-mahjong-online.ak-sekine.workers.dev`を報告し、Worker SHAをGitHub Deployment APIへ記録しました。`actions/deploy-pages`もPages build SHA `6be9484`の公開をsuccess報告しましたが、続く独自Pages SHA記録stepはjobにcheckoutがなくscriptを見つけられずfailureでした。したがってActions run全体はfailure、Pagesの実deploy自体はsuccess、独自Pages state recordは未作成です。Pages jobへcheckoutを追加し、次のpushではPages state unknownとしてfull verify後に安全な再試行を行います。
+
+Pages/Worker URLへのHTTP取得はproxyから403となったため、実配信HTML/CSS/JS、computed styleは未確認です。Issue #24はOpenのままにし、iPhone SafariとAndroid Chromeの実機確認をユーザーへ引き継ぎます。
 
 公開環境確認では、ソース確認、Actions、Worker deploy、Pages deploy、HTTP配信物、ブラウザーcomputed style、ユーザー実機確認を別々に報告します。確認できないものは未確認と記録します。
 

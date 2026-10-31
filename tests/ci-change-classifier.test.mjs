@@ -48,10 +48,12 @@ test('missing or empty diffs fail safe', () => {
 
 test('production deployment requires successful full verification and Browser UI', () => {
   const workerJob = deployWorkflow.match(/  deploy-worker:\n([\s\S]*?)\n  production-test:/)?.[1] ?? '';
+  const pagesJob = deployWorkflow.match(/  pages-deploy:\n([\s\S]*)$/)?.[1] ?? '';
   assert.match(workerJob, /needs: \[detect-changes, verify, browser-ui, release-freshness\]/);
   assert.match(workerJob, /needs\.verify\.result == 'success'/);
   assert.match(workerJob, /needs\.browser-ui\.result == 'success'/);
   assert.match(workerJob, /needs\.detect-changes\.outputs\.deploy_required == 'true'/);
+  assert.match(pagesJob, /uses: actions\/checkout@v4[\s\S]*Record successful GitHub Pages deployment SHA/);
   assert.match(deployWorkflow, /deploy_to_production:\n[\s\S]*default: false/);
   assert.doesNotMatch(deployWorkflow, /paths-ignore:/);
   assert.doesNotMatch(browserWorkflow, /paths-ignore:/);
