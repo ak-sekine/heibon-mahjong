@@ -63,6 +63,6 @@ Chromium／WebKitとActionsの結果はiPhone Safari実機の直接操作を意�
 
 ### 完了範囲と未確認事項
 
-今回完了した範囲は、iPhone Safariでのメニュートグルとドロップダウンの表示、および上記のユーザー報告に含まれる開閉・項目選択・通常ボタン操作です。Issue #24全体の実機確認完了とは扱いません。
+今回完了した実機確認範囲は、iPhone Safariでのメニュートグルとドロップダウンの表示、および上記のユーザー報告に含まれる開閉・項目選択・通常ボタン操作です。全ボタン種別・状態を実機で網羅したという意味ではありません。
 
-Android Chrome実機、PC Firefox実機、PWAインストール状態、公開配信CSSのcomputed style、すべてのボタン種別・状態の網羅的な実機確認は未確認です。Issue本文と既存コメントがAndroid Chromeの実機確認も完了前の条件としているため、Issue #24はOpenのままです。全ボタン配色の検証履歴は[Issue #24ボタン配色記録](button-role-colors-issue24-2026-10-30.md)、目次は[検証README](README.md)を参照してください。
+Android Chrome実機、PC Firefox実機、PWAインストール状態、公開配信CSSのcomputed style、すべてのボタン種別・状態の網羅的な実機確認は未確認です。Android端末を所有していないというユーザーの決定に基づき、Android Chrome実機確認はIssue #24の必須完了条件から除外しました。自動検証と上記のiPhone Safari実機報告を根拠に、Issue #24は2026-10-31に完了・Closeしました。全体の判定理由は[Issue #24ボタン配色記録](button-role-colors-issue24-2026-10-30.md)、目次は[検証README](README.md)を参照してください。

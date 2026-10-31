@@ -60,4 +60,10 @@ Issue #24の共通ボタン配色をメニュー項目にも適用していた�
 
 ### 未確認とIssueの状態
 
-Android Chrome実機、PC Firefox実機、PWAインストール状態、公開配信CSSのcomputed style、すべてのボタン種別・状態の網羅的な実機確認は未確認です。Issue本文および既存コメントがAndroid Chrome実機確認も残件としているため、Issue #24はOpenのままです。Chromium／WebKitの自動検証（run [41171398665](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41171398665)）とは別の確認として記録します。
+Android Chrome実機、PC Firefox実機、PWAインストール状態、公開配信CSSのcomputed style、すべてのボタン種別・状態の網羅的な実機確認は未確認です。Chromium／WebKitの自動検証（run [41171398665](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41171398665)）と、iPhone Safariでのユーザー確認は別々の結果として記録しています。当時の「Android実機確認完了までOpen」とした状態は、次の最終判定で更新しました。
+
+## Issue #24最終完了判定 — 2026-10-31
+
+ドロップダウン項目の白系背景・濃緑文字・区切り線・控えめな影・淡い緑のhover／押下表示・キーボードフォーカス表示への修正は完了しています。ハンバーガートグルも通常操作ボタンCSSから分離済みです。自動検証結果とユーザー本人によるiPhone Safariの表示・操作確認を根拠に、Issue #24は完了・Closeしました。
+
+Android Chrome実機（端末なし）、PC Firefox実機、PWAインストール状態、公開配信CSSのcomputed style、全ボタン種別・状態の網羅的な実機確認は未確認で、今回のClose条件からは除外しています。詳細な完了根拠は[全ボタン配色記録](button-role-colors-issue24-2026-10-30.md)、実機の確認者・報告範囲は[ハンバーガーメニュー記録](main-menu-toggle-style-2026-10-31.md)を参照してください。

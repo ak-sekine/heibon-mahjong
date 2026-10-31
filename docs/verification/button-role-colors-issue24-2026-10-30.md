@@ -12,7 +12,7 @@ Browser spinner ring assertion修正: `e665fb175e31c22d429d12982fcec767abb20f82`
 診断ログclose後focus復帰待機: `94b6939ba7b476384eb22c68e4fc543f7354d1d0`
 診断ログヘッダー全viewport寸法baseline: `32cb00f701cc417fa97a3cc165f7d988f4e74ae9`
 検証画面コンパクト操作の既存サイズ維持: `658b2d77d3a810868fce8c35675267dc6464cb55`
-Issue: [#24](https://github.com/ak-sekine/heibon-mahjong/issues/24)（Openのまま）
+Issue: [#24](https://github.com/ak-sekine/heibon-mahjong/issues/24)（2026-10-31完了・Close）
 設計: [Issue #9 button role color design](../development/issue-9-button-role-color-design.md)
 
 > **記録の読み方:** 以下の初回実装結果・A/B/C/D1/D2配色は履歴として保持しています。2026-10-30に追加要件を反映し、役割色を廃止しました。現在の仕様と更新後の検証結果はこの節「単色統一更新」を参照してください。
@@ -157,10 +157,20 @@ D2とアプリ緑の面同士の差は約1.16:1に留まるため、白境界と
 - 診断ログ消去の確認、閉じる1行表示、ダイアログを閉じた後のフォーカス復帰
 - 明るさを変えた時の文字・境界・disabled・押下・focusの視認性。VoiceOver/TalkBack読み上げ
 
-**当初記録時点の実機検証状態: 未実施。** 現在はiPhone Safariでメニュー表示と列挙された操作をユーザーが確認済みですが、上記の全ボタン確認項目は未確認です。Android Chromeの実機確認もIssue本文・既存コメントで残件のため、Issue #24はOpenのままです。
+**当初記録時点の実機検証状態: 未実施。** 現在はiPhone Safariでメニュー表示と列挙された操作をユーザーが確認済みですが、上記の全ボタン確認項目は未確認です。当時のAndroid Chrome実機確認を残件とした記述は、2026-10-31の最終完了判定で更新しました。
 
 ## 実機確認の追記 — 2026-10-31
 
 ユーザー本人がiPhone Safariで公開中のサイトを確認し、右上ハンバーガーメニューと4つのドロップダウン項目の表示、メニューの開閉・選択・外側タップ・連続タップ、通常操作ボタンの使用が正常と報告しました。開／閉スクリーンショットの表示確認結果と、自動検証の記録は[ハンバーガーメニュー記録](main-menu-toggle-style-2026-10-31.md)および[ドロップダウン記録](menu-dropdown-style-2026-10-31.md)を参照してください。Codexは実機操作をしていません。
 
-この確認はメニューと報告された操作範囲に限ります。Android Chrome実機、PC Firefox実機、PWAインストール状態、公開配信CSSのcomputed style、全ボタン種別・状態の網羅的な実機確認は未確認です。Issue本文と既存コメントに基づきAndroid Chrome実機確認を完了条件の残件とし、Issue #24はOpenのままです。
+この確認はメニューと報告された操作範囲に限ります。Android Chrome実機、PC Firefox実機、PWAインストール状態、公開配信CSSのcomputed style、全ボタン種別・状態の網羅的な実機確認は未確認です。これらを未確認として残した最終判定とIssueの状態は、次の節に記録します。
+
+## 最終完了判定 — 2026-10-31
+
+**判定: 完了。Issue #24はCloseしました。** 通常操作ボタンは通常 `#F8DC91 / #154E3C`、押下 `#E9C66A / #154E3C`、無効 `#9DA27C / #20352C` に統一され、メニュー項目とハンバーガートグルは専用UIとして通常ボタンCSSから分離されています。実装内容は本記録と[ドロップダウン記録](menu-dropdown-style-2026-10-31.md)、[ハンバーガーメニュー記録](main-menu-toggle-style-2026-10-31.md)にあります。
+
+- GitHub Actions Deploy run [41171398665](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41171398665) はverify、Browser UI、Worker deploy、本番Worker検証、Pages build/deployを含めsuccessでした。runログの `npm test` は1,292件成功・失敗0件、Worker型検査と `npm run build` は成功、Browser UIはChromium 35件・WebKit 21件が成功です。Worker／Pages配信対象SHAは `11c547d8e2a9d4a6be190e91a9eab4a63d940c00` です。過去コメントやローカル記録には70/70表記がありますが、このrunのverifyログに記録された `npm test` は1,292件成功・失敗0件です。
+- 2026-10-31、ユーザー本人がiPhone Safari実機で公開サイトを確認しました。スクリーンショットで白い三本線、閉じた状態の透明背景、展開中の緑系背景と枠線、白系のドロップダウン、濃緑文字、区切り線、配置と折り返しに問題がないことを確認し、開閉・外側タップ・連続タップ・4項目・通常操作ボタンの操作も正常と報告しました。Codexは実機を操作していません。
+- Android Chrome実機は端末を所有していないため未確認です。今回の完了判定では必須条件にしません。Android実機検証用のIssueは作成しません。PC Firefox実機、PWAインストール状態、公開配信CSSのcomputed style、全ボタン種別・状態の網羅的な実機確認も未確認のまま記録します。いずれも今回のClose条件ではありません。具体的な不具合が見つかった場合は、その時点で別途対応を検討します。
+
+未確認事項を確認済みとは扱わず、通常操作ボタンの単色統一と今回対象のメニュー修正について、自動検証およびユーザーによるiPhone Safari実機確認を根拠に完了と判断しました。
