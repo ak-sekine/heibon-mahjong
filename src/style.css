@@ -302,6 +302,7 @@ header > div { min-width:0; }
  #online-match:has(.discard-controls.result-available) #online-round-result .round-summary-tenpai { margin:0; font-size:14px; line-height:1.2; }
  .round-result-actions { flex:0 0 100%; width:100%; }
  .round-result-actions button { min-width:0; }
+ #online-return-local { white-space:normal; overflow-wrap:anywhere; }
  .discard-controls.result-available { padding:4px 6px; gap:4px; }
 }
 @media (max-width:599px) and (max-height:552px) {
