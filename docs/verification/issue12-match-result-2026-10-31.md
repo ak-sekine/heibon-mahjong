@@ -53,4 +53,12 @@ Issue #12 の追加要件に合わせ、ボタンの表示文言を更新しま�
 - `index.html` と検証用 `test.html`／`kan-test.html` の初期文言、操作状態テスト、Browser UI期待値も揃えます。
 - Issue #13 の次対局開始・再戦導線には変更を加えていません。
 
-この追補で実施した自動検証、Chromium／WebKit Actions、Worker／Pages公開の結果とActions URLは、当該コミットのpush後にここへ記録します。iPhone Safari実機は未確認です。
+#### 自動検証と公開結果
+
+- コード変更commit／公開対象SHA: `fef309d9898ec2e62ac01a4a9769fcbbe9fe3f42`。push後の[GitHub Actions run 41252395828](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41252395828) はsuccessです。
+- 関連単体テスト: `tests/action-panel-state.test.ts`、`tests/action-panel.test.ts` の2ファイル成功。全体 `npm test`: 1,310成功、失敗0、skip 0。
+- `npm run build`（アプリTypeScript型検査を含む）、`npm run typecheck:worker`、docs-check／`git diff --check` は成功。
+- Browser UI: Chromium 34実行、WebKit 22実行がすべて成功。失敗・timeout 0。`browser-round-end-ui.py` と `browser-online-waiting-room.py` も両エンジンで成功し、320px相当の最終操作ボタン表示・横並びを確認しました。
+- Deploy gate の `browser-ui-matrix-audit` と `release-freshness` はsuccess。Worker deploy、Production test、Pages build、Pages deployもsuccessです。
+- Worker: https://heibon-mahjong-online.ak-sekine.workers.dev 。Pages: https://ak-sekine.github.io/heibon-mahjong/ 。
+- iPhone Safari実機確認は未実施です。実機確認と最終判定までIssue #12はOpenのままです。
