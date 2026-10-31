@@ -100,7 +100,7 @@ with sync_playwright() as playwright:
             page.locator('#main-menu-toggle').click()
             page.locator('#menu-diagnostics').click()
             page.evaluate("async ({testCase, normalBuildInfo}) => { const {diagnosticLog} = await import('/heibon-mahjong/src/online/diagnostics.ts'); diagnosticLog.clear(); for(let i=0;i<testCase.count;i++) diagnosticLog.record('WARN', `layout_entry_${i}`, testCase.message ? {errorMessage:'長い診断メッセージ'.repeat(30)} : {requestId:`request-${i}`}); document.querySelector('#diagnostic-build-info').textContent = testCase.longBuild ? `ビルド ${'a'.repeat(128)}` : normalBuildInfo; }", {'testCase': case, 'normalBuildInfo': normal_build_info})
-            page.wait_for_function('(expected) => document.querySelector("#diagnostic-count").textContent === `${expected}件`', case['count'])
+            page.wait_for_function('(expected) => document.querySelector("#diagnostic-count").textContent === `${expected}件`', arg=case['count'])
             result = page.locator('#diagnostic-dialog').evaluate(layout_check)
             assert all(result[key] for key in ('buttonInside', 'oneLine', 'textFits', 'headerInside', 'dialogNoHorizontalOverflow', 'entriesNoHorizontalOverflow', 'documentNoHorizontalOverflow')), {'width': width, 'case': case['name'], **result}
             if case['message']:
