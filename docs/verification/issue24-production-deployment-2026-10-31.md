@@ -16,6 +16,8 @@ Issue #24のボタン単色統一が公開環境へ反映されたかを確認�
 - Actions `41142201343`: `268a7d1`、push、workflow success。verifyとBrowser UIはsuccessだが、deploy-worker / production-test / pages-build / pages-deployはskip。
 - Actions `41146814833`: `8a556e2`、push、docs-only扱いでworkflow success。verify・Browser UI・全deploy jobsはskip。
 - Actions `41146863442`: `8a556e2`から起動したProduction Worker diagnostics。Workerの本番診断はsuccess。デプロイworkflowではありません。
+- 記録push `093dc7d` に対するActions `41148560260`: docs-only workflow success。verify・Browser UI・deploy-worker・production-test・pages-build・pages-deployはskip。
+- 同pushに対するProduction Worker diagnostics `41148607718`: success。Worker診断であり、デプロイworkflowではありません。
 
 ## 公開URLとデプロイ構成
 
@@ -40,7 +42,7 @@ workflowを変更していません。既存のworkflow_dispatchは安全な復�
 
 ## Cloudflare / GitHub Pagesのデプロイ状態
 
-- Cloudflare Workerの最終成功deploy時刻・deploy対象SHAは**未確認**です。アクセス可能なGitHub Actions記録にWorker diagnostics successはありますが、これはdeploy記録ではなく、Worker実装SHAとの照合もしていません。
+- Cloudflare Workerの最終成功deploy時刻・deploy対象SHAは**未確認**です。アクセス可能なGitHub Actions記録にはWorker diagnostics run `41146863442`と`41148607718`のsuccessがありますが、これはdeploy記録ではなく、Worker実装SHAとの照合もしていません。
 - GitHub Pagesの最終成功deploy時刻・公開SHAも**未確認**です。今回確認した3つのDeploy workflowでは`pages-deploy`はすべてskipです。
 - Cloudflare dashboard / Pages deployment history / Worker version APIにはアクセスできませんでした。GitHub Actionsも上記run以降に実deploy成功を示す記録は取得できていません。
 
@@ -69,7 +71,7 @@ workflowを変更していません。既存のworkflow_dispatchは安全な復�
 
 ## 作業時間
 
-作業開始を`2026-10-31 00:05:34 UTC`、記録作成と最初のdiff checkを終えた時刻を`00:08:17 UTC`として、ここまでの経過は2分43秒です。初回調査区間は2分7秒、記録作成・最初のdiff check区間は36秒です。Actions調査とCloudflare/Pages調査は初回調査内で並行しており、個別の計測開始点がないため分割していません。合計値から推測配分していません。
+作業開始は`2026-10-31 00:05:34 UTC`です。最初の検証記録commit・Issueコメント後の確認を含む区間を`00:10:53 UTC`で区切ると、ここまでの経過は5分19秒です。初回調査区間は2分7秒、記録作成・最初のdiff check区間は36秒、残りのGitHub反映・Issueコメント・Actions/Issue状態確認区間は2分36秒（00:08:17–00:10:53）です。最後の記録追記・Issueコメント更新・最終read-only確認はこのcheckpoint後であり、所要時間は未計測です。Actions調査とCloudflare/Pages調査は初回調査内で並行しており、個別の計測開始点がないため分割していません。合計値から推測配分していません。
 
 | 工程 | 時間 |
 | --- | --- |
@@ -79,9 +81,9 @@ workflowを変更していません。既存のworkflow_dispatchは安全な復�
 | GitHub Actions待機、デプロイ待機 | 0分（新しい実行なし） |
 | 公開環境確認 | 未確認。接続試行時間は上の調査区間に含む |
 | 文書更新・ローカルdiff check | 36秒（00:07:41–00:08:17 UTC） |
-| GitHub反映、Issueコメント | API writeの個別所要時間は未計測。全体の終了時刻と総経過時間を最終報告に記載 |
+| GitHub反映、Issueコメント | API writeの個別所要時間は未計測。00:08:17–00:10:53の2分36秒区間に含む |
 
-Actions/デプロイ待ちと文書作業の並行計上はありません。最終の総経過時間を完了時に追記します。
+Actions/デプロイ待ちと文書作業の並行計上はありません。最終記録追記以降の時間を推測で補っていません。
 
 ## iPhone Safari・Android Chrome実機確認への引き継ぎ
 
