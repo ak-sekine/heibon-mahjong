@@ -58,7 +58,6 @@ with sync_playwright() as playwright:
         page.mouse.down()
         assert toggle.evaluate('e => getComputedStyle(e).backgroundColor') == 'rgb(45, 118, 85)', (width, 'menu pressed')
         page.mouse.up()
-        toggle.click()
         expanded = toggle.evaluate('''e => ({expanded: e.getAttribute('aria-expanded'), background: getComputedStyle(e).backgroundColor,
           border: getComputedStyle(e).borderTopColor, icon: getComputedStyle(e.querySelector('span')).backgroundColor})''')
         assert expanded == {'expanded': 'true', 'background': 'rgb(40, 107, 78)',
