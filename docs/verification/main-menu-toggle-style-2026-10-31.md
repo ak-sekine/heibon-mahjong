@@ -42,4 +42,27 @@ Issue #24の共通ボタン配色により、右上のメニュートグルに�
 
 ## 実機確認
 
-iPhone SafariおよびAndroid Chromeの実機確認は未実施です。ユーザーに、縦横向き・各画面幅・タップ応答・フォーカス・開閉・画面端・PWA表示を確認してもらいます。Issue #24はOpenのままです。実機確認が完了するまで閉じません。
+### iPhone Safariでの確認 — 2026-10-31
+
+- 確認者: ユーザー本人（Codexは実機を操作していません）
+- 環境: iPhone Safari
+- 対象: 公開中のHEIBON MAHJONG
+- 画像: ユーザー提供のメニュー開／閉スクリーンショット
+
+スクリーンショットによる表示確認では、ハンバーガーアイコンが白色で、黄色いボタン背景がなく、閉じた状態のボタン背景が透明であることを確認しました。展開中は緑系の背景と枠線が表示され、メニュー項目は白系背景・濃緑文字で、項目間に区切り線があります。配置と文字の折り返しも画像上問題ありませんでした。ドロップダウン項目の表示については[メニュー検証記録](menu-dropdown-style-2026-10-31.md)にも要点を記録しています。
+
+画像とは別に、ユーザーは「すべて正常です」と報告しました。確認した操作は、メニューを開く・閉じる、項目を選ぶ、メニュー外をタップして閉じる、連続タップ、4つの項目を操作する、通常の操作ボタンを使うことです。これはユーザーによる実機操作の報告であり、自動テスト結果とは区別します。
+
+### 自動検証との区別
+
+- `npm test`: 70/70成功。
+- GitHub Actions Deploy run [41171398665](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41171398665): success。Browser UIはChromium 35件、WebKit 21件が成功し、WorkerとPagesのdeployもsuccessしました。
+- 関連Actions記録のWorker／Pages対象SHAは `11c547d8e2a9d4a6be190e91a9eab4a63d940c00` です。前回報告されたmain SHA `d607dc24e451b0ae1cf4284ccedd9ba0dd54c07b` は今回の作業開始時に `origin/main` と一致しました。スクリーンショットから公開配信SHAを特定したものではありません。
+
+Chromium／WebKitとActionsの結果はiPhone Safari実機の直接操作を意味しません。公開配信CSSのcomputed styleも未確認です。
+
+### 完了範囲と未確認事項
+
+今回完了した範囲は、iPhone Safariでのメニュートグルとドロップダウンの表示、および上記のユーザー報告に含まれる開閉・項目選択・通常ボタン操作です。Issue #24全体の実機確認完了とは扱いません。
+
+Android Chrome実機、PC Firefox実機、PWAインストール状態、公開配信CSSのcomputed style、すべてのボタン種別・状態の網羅的な実機確認は未確認です。Issue本文と既存コメントがAndroid Chromeの実機確認も完了前の条件としているため、Issue #24はOpenのままです。全ボタン配色の検証履歴は[Issue #24ボタン配色記録](button-role-colors-issue24-2026-10-30.md)、目次は[検証README](README.md)を参照してください。
