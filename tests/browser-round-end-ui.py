@@ -222,6 +222,7 @@ with sync_playwright() as p:
                 discarderId: entry.winMethod === 'ron' ? entry.discarderId : null,
                 yaku: entry.candidate.yaku.map(yaku => yaku.id),
                 doraHan: entry.doraHan, uraDoraHan: entry.uraDoraHan, redDoraHan: entry.redDoraHan,
+                doraCounts: { normal: entry.doraCount, ura: entry.uraDoraCount, red: entry.redDoraCount },
                 totalHanIncludingDora: entry.totalHanIncludingDora, fu: entry.fu, yakumanCount: entry.yakumanCount,
                 scoreTier: entry.scoreTier, totalPoints: entry.totalPoints,
                 winningTileId: entry.winningTileId })),
@@ -437,7 +438,11 @@ with sync_playwright() as p:
                     assert detail_yaku == [DETAIL_YAKU_NAMES[yaku_id] for yaku_id in result['yaku']], (width, scenario, detail_yaku, result['yaku'])
                     summary_yaku = winner_summary.locator('.round-summary-yaku').inner_text()
                     expected_summary_parts = [SUMMARY_YAKU_NAMES[yaku_id] for yaku_id in result['yaku']]
-                    assert summary_yaku == '・'.join(expected_summary_parts), (width, scenario, expected_summary_parts, summary_yaku)
+                    dora_total = sum(result['doraCounts'].values())
+                    expected_summary = '・'.join(expected_summary_parts)
+                    if dora_total:
+                        expected_summary += ('・' if expected_summary else '') + f'ドラ{dora_total}'
+                    assert summary_yaku == expected_summary, (width, scenario, expected_summary, summary_yaku)
                     assert winner_summary.evaluate('element => element.scrollWidth <= element.clientWidth'), (width, scenario, 'summary overflows horizontally')
                     assert winner_summary.locator('.round-summary-yaku').evaluate('element => element.scrollWidth <= element.clientWidth'), (width, scenario, 'yaku line overflows horizontally')
                     total = winner_summary.locator('.round-summary-value').inner_text()

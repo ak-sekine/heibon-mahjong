@@ -51,6 +51,7 @@ export function renderOnlineWinSummary(container: HTMLElement, view: PlayerGameV
     yakumanCount: winner.yakumanCount,
     points: winner.totalPoints,
     yaku: winner.yaku.map(yaku => yaku.id as YakuId),
+    doraCounts: winner.doraCounts,
   })));
   return true;
 }

@@ -16,7 +16,7 @@ import { SUITS, tileKindKey } from '../src/model/tile.ts';
 import { tileSvgMarkup, tileLabel } from '../src/rendering/tile-svg.ts';
 import { doraKindFromIndicator } from '../src/analysis/dora.ts';
 import { ordinaryTile } from '../src/model/tile.ts';
-import type { GameState, PlayerState } from '../src/model/game.ts';
+import type { GameState, PhysicalTile, PlayerId, PlayerState } from '../src/model/game.ts';
 import { allTiles, inventory } from './helpers.ts';
 
 class ElementStub {
@@ -74,7 +74,7 @@ test('the shared yaku name table uses official Japanese names', () => {
   for (const { id, name } of cases) assert.equal(yakuDisplayName(id), name, id);
 });
 
-for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'normal-multiple', 'ura', 'yakuman'] as const) test(`result separates yaku and bonuses: ${count}`, () => {
+for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'red-only', 'normal-multiple', 'ura', 'yakuman'] as const) test(`result separates yaku and bonuses: ${count}`, () => {
   const nodes = new Map<string, ElementStub>();
   for (const id of [0, 1, 2, 3]) {
     nodes.set(`#label-${id}`, new ElementStub());
@@ -92,6 +92,8 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'normal-multiple', 'u
   try {
     let game = count === 'yakuman'
       ? tsumoGame(['19m', '19p', '19s', '12345677z'], false, undefined, 'man-9')
+      : count === 'red-only'
+        ? tsumoGame(['123m', '456m', '456p', '22p', '456s'], false, ['man'], 'sou-8')
       : count === 'normal-multiple'
         ? tsumoGame(['555m', '456p', '789s', '22p', '123s'], false, ['man'], 'man-4')
         : tsumoGame(['123m', '456m', '456p', '22p', '456s'], false,
@@ -100,16 +102,28 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'normal-multiple', 'u
     if (count === 'ura') {
       const base = tsumoGame();
       const deadWall = [...base.deadWall];
+      const doraSource = base.players.find(player => player.id !== 0 && player.hand.some(tile => tileKindKey(tile.tile) === 'pin-4'))!;
+      const updatedHands = new Map<number, PhysicalTile[]>();
+      const handFor = (playerId: number) => {
+        let hand = updatedHands.get(playerId);
+        if (!hand) { hand = [...base.players[playerId as PlayerId].hand]; updatedHands.set(playerId, hand); }
+        return hand;
+      };
+      const doraSourceHand = handFor(doraSource.id);
+      const doraIndex = doraSourceHand.findIndex(tile => tileKindKey(tile.tile) === 'pin-4');
+      assert.notEqual(doraIndex, -1, 'fixture contains a standard dora indicator');
+      [deadWall[4], doraSourceHand[doraIndex]] = [doraSourceHand[doraIndex]!, deadWall[4]!];
       const source = base.players.find(player => player.id !== 0 && player.hand.some(tile => tileKindKey(tile.tile) === 'man-1'))!;
-      const sourceHand = [...source.hand];
+      const sourceHand = handFor(source.id);
       const uraIndex = sourceHand.findIndex(tile => tileKindKey(tile.tile) === 'man-1');
-      [deadWall[5], sourceHand[uraIndex]] = [sourceHand[uraIndex], deadWall[5]];
+      [deadWall[5], sourceHand[uraIndex]] = [sourceHand[uraIndex]!, deadWall[5]!];
       const declaration = base.players[0].river.at(-1)!;
       game = { ...base, deadWall, players: base.players.map(player => player.id === 0
         ? { ...player, riichi: { declarationTileId: declaration.id } }
-        : player.id === source.id ? { ...player, hand: sourceHand } : player) };
+        : updatedHands.has(player.id) ? { ...player, hand: updatedHands.get(player.id)! } : player) };
     }
     const won = declareTsumo(game, 0);
+    const scoringSnapshot = structuredClone(won.winResult);
     renderTable(won, undefined, startMatch(won).lastSettlement); inventory(won, game);
     const panel = nodes.get('#win-result')!;
     const strings = (node: ElementStub): string[] => [node.textContent, ...node.children.flatMap(strings)];
@@ -130,6 +144,7 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'normal-multiple', 'u
     assert.equal(output.includes('符の内訳'), count !== 'yakuman');
     const summary = nodes.get('#round-result-summary')!;
     const win = won.winResult!;
+    assert.deepEqual(won.winResult, scoringSnapshot, 'summary rendering must not mutate calculated scoring');
     const yaku = win.candidate.yaku.map(entry => yakuDisplayName(entry.id));
     const summarySection = summary.children[0];
     const summaryLine = summarySection.children.find(child => child.className === 'round-summary-winner')!;
@@ -143,24 +158,40 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'normal-multiple', 'u
       : win.totalPoints;
     assert.equal(summaryLine.children.map(child => child.textContent).join(''),
       `自分 ツモ・${summaryValue}・${displayedPoints.toLocaleString('ja-JP')}点`);
-    assert.equal(summarySection.children.find(child => child.className === 'round-summary-yaku')!.textContent, yaku.join('・'));
+    // Issue #11 replaces the old "no dora in summary" expectation; detailed-result assertions remain unchanged.
+    const totalDoraCount = win.doraCount + win.uraDoraCount + win.redDoraCount;
+    assert.equal(summarySection.children.find(child => child.className === 'round-summary-yaku')!.textContent,
+      `${yaku.join('・')}${totalDoraCount > 0 ? `${yaku.length ? '・' : ''}ドラ${totalDoraCount}` : ''}`);
     assert.equal(summarySection.children.length, 2);
     assert.ok(!summarySection.children.some(child => /支払|供託|親連荘|親交代|本場/.test(child.textContent)));
     if (count === 'yakuman') {
       assert.ok(output.includes('国士無双 1役満'));
       assert.ok(output.includes('役満：1役満'));
       assert.ok(!output.some(s => s.includes('翻') || s.includes('合計：') || s.includes('赤ドラ')));
-      assert.ok(!summarySection.children.find(child => child.className === 'round-summary-yaku')!.textContent.includes('ドラ'));
+      assert.equal(summarySection.children.find(child => child.className === 'round-summary-yaku')!.textContent,
+        `${yaku.join('・')}${totalDoraCount > 0 ? `・ドラ${totalDoraCount}` : ''}`);
     } else {
       const expectedYaku = count === 'normal-multiple' || count === 'ura' ? list.children.map(c => c.textContent).sort()
         : ['三色同順 2翻', '平和 1翻', '門前清自摸和 1翻'];
       assert.deepEqual(list.children.map(c => c.textContent).sort(), expectedYaku);
       assert.ok(output.includes(`役合計：${win.yakuHan}翻`));
-      const normal = count === 'zero-normal' || count === 'no-dora' ? 0
-        : count === 'normal-multiple' || count === 'ura' ? win.doraHan : 1;
-      const red = count === 'zero-normal' ? 2 : count === 'normal-multiple' || count === 'ura' ? win.redDoraHan : count;
+      const normal = count === 'zero-normal' || count === 'no-dora' || count === 'red-only' ? 0 : win.doraCount;
+      const red = count === 'zero-normal' ? 2 : count === 'normal-multiple' || count === 'ura' || count === 'red-only'
+        ? win.redDoraCount : count;
       if (count === 'normal-multiple') assert.ok(normal > 1, 'the fixture has multiple normal dora');
-      if (count === 'ura') assert.ok(win.uraDoraHan > 0, 'the fixture has ura dora');
+      if (count === 'ura') {
+        assert.ok(win.doraCount > 0 && win.uraDoraCount > 0 && win.redDoraCount > 0,
+          'fixture combines normal, ura, and red dora');
+      }
+      if (count === 'red-only') assert.deepEqual([win.doraCount, win.uraDoraCount, win.redDoraCount], [0, 0, 1]);
+      if (count === 1) {
+        assert.deepEqual([win.doraCount, win.uraDoraCount, win.redDoraCount], [1, 0, 1]);
+        const winner = won.players[win.winnerId];
+        assert.ok([...winner.hand, ...(winner.drawnTile ? [winner.drawnTile] : []),
+          ...(winner.melds ?? []).flatMap(meld => meld.tiles)].some(tile => tile.tile.isRed && tileKindKey(tile.tile) === 'man-5'),
+        'the single red five also meets the visible dora condition');
+      }
+      if (count !== 'ura') assert.equal(win.uraDoraCount, 0, 'ura dora is excluded without riichi');
       assert.ok(output.includes(`通常ドラ：${normal}枚（${normal}翻）`));
       if (count === 'no-dora') assert.ok(output.includes('赤ドラ：0枚（0翻）'));
       else assert.ok(output.includes(`赤ドラ：${red}枚（${red}翻）`));
@@ -492,7 +523,9 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     assert.ok(summaryText.includes(`${won.winResult!.totalPoints.toLocaleString('en-US')}点`));
     assert.ok(!summaryText.includes('ドラ込み'));
     const summaryYaku = summary.children[0].children.find(n => n.className === 'round-summary-yaku')!.textContent;
-    assert.equal(summaryYaku, won.winResult!.candidate.yaku.map(entry => yakuDisplayName(entry.id)).join('・'));
+    const expectedYaku = won.winResult!.candidate.yaku.map(entry => yakuDisplayName(entry.id)).join('・');
+    const doraCount = won.winResult!.doraCount + won.winResult!.uraDoraCount + won.winResult!.redDoraCount;
+    assert.equal(summaryYaku, `${expectedYaku}${doraCount > 0 ? `・ドラ${doraCount}` : ''}`);
     assert.ok(summaryYaku.includes('門前清自摸和') && summaryYaku.includes('平和'));
     assert.ok(!summaryText.includes('支払') && !summaryText.includes('本場') && !summaryText.includes('赤ドラ'));
     assert.ok(!descend(hand).some(n => n.tagName === 'button'));
@@ -606,8 +639,10 @@ for (const scenario of ['waiting','same-kind','call-waiting','human','double','t
         assert.ok(summarySection, `missing ${winnerId} ron summary`);
         const firstLine = summarySection.children.find(child => child.className === 'round-summary-winner')!;
         assert.match(firstLine.children.map(child => child.textContent).join(''), / ロン・\d+翻 \d+符・[\d,]+点$/);
+        const yaku = winner.candidate.yaku.map(entry => yakuDisplayName(entry.id)).join('・');
+        const doraCount = winner.doraCount + winner.uraDoraCount + winner.redDoraCount;
         assert.equal(summarySection.children.find(child => child.className === 'round-summary-yaku')!.textContent,
-          winner.candidate.yaku.map(entry => yakuDisplayName(entry.id)).join('・'));
+          `${yaku}${doraCount > 0 ? `・ドラ${doraCount}` : ''}`);
         assert.equal(summarySection.children.length, 2);
       }
       if (actualWinners.length) assert.ok(!descend(summary).some(node => /東\d局|本場|支払|供託|親連荘|親交代/.test(node.textContent)));

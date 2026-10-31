@@ -310,10 +310,12 @@ test('online ron and tsumo summaries use Japanese yaku names and omit round and 
         `${resultName} ${method === 'tsumo' ? 'ツモ' : 'ロン'}・${winner.yakumanCount > 0 ? `${winner.yakumanCount}役満` : `${winner.han}翻 ${winner.fu}符`}・${winner.totalPoints.toLocaleString('ja-JP')}点`);
       const yakuLine = section.children[1];
       assert.equal(yakuLine.className, 'round-summary-yaku');
-      assert.deepEqual(yakuLine.textContent, winner.yaku.map(yaku => ({
+      const yaku = winner.yaku.map(yaku => ({
         riichi: '立直', 'menzen-tsumo': '門前清自摸和', pinfu: '平和', tanyao: '断么九',
         'yakuhai-white': '役牌：白', 'yakuhai-green': '役牌：發', 'yakuhai-red': '役牌：中',
-      } as Record<string, string>)[yaku.id] ?? yaku.id).join('・'));
+      } as Record<string, string>)[yaku.id] ?? yaku.id).join('・');
+      const doraCount = winner.doraCounts.normal + winner.doraCounts.ura + winner.doraCounts.red;
+      assert.equal(yakuLine.textContent, `${yaku}${doraCount > 0 ? `・ドラ${doraCount}` : ''}`);
       assert.ok(!section.children.some(node => /東\d局|本場|支払|点数：|増減/.test(node.textContent)));
       assert.ok(yakuLine.textContent !== winner.yaku.map(yaku => yaku.id).join('・'));
     }
@@ -641,6 +643,7 @@ test('JSON recovery preserves pending answers and settled multi-ron scoring', ()
       winningTileId: winner.winningTileId,
       totalPoints: winner.totalPoints,
       yaku: winner.candidate.yaku,
+      doraCounts: { normal: winner.doraCount, ura: winner.uraDoraCount, red: winner.redDoraCount },
       payments: winner.payments,
     })) : [], ended.match.game.winResult?.winMethod === 'ron'
       ? ended.match.game.winResult.winners.map(winner => ({
@@ -648,6 +651,7 @@ test('JSON recovery preserves pending answers and settled multi-ron scoring', ()
         winningTileId: winner.winningTileId,
         totalPoints: winner.totalPoints,
         yaku: winner.candidate.yaku,
+        doraCounts: { normal: winner.doraCount, ura: winner.uraDoraCount, red: winner.redDoraCount },
         payments: winner.payments,
       })) : []);
   assert.deepEqual(restoredResult?.match.lastSettlement, ended.match.lastSettlement);

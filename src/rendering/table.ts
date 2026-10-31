@@ -199,6 +199,7 @@ function renderRoundSummary(game: GameState, settlement: RoundSettlement | null,
         yakumanCount: result.yakumanCount,
         points: receivedPoints,
         yaku: result.candidate.yaku.map(entry => entry.id),
+        doraCounts: { normal: result.doraCount, ura: result.uraDoraCount, red: result.redDoraCount },
       }]);
     }
     return;

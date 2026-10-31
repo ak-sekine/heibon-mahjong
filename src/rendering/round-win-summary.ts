@@ -9,6 +9,7 @@ export type RoundWinSummary = Readonly<{
   yakumanCount: number;
   points: number;
   yaku: readonly YakuId[];
+  doraCounts: Readonly<{ normal: number; ura: number; red: number }>;
 }>;
 
 function text(tag: string, content: string, className?: string): HTMLElement {
@@ -35,7 +36,10 @@ export function renderRoundWinSummary(container: HTMLElement, winners: readonly 
       text('span', `${winner.points.toLocaleString('ja-JP')}点`, 'round-summary-points'),
     );
     section.append(resultLine);
-    section.append(text('p', winner.yaku.map(yakuDisplayName).join('・'), 'round-summary-yaku'));
+    const yaku = winner.yaku.map(yakuDisplayName).join('・');
+    const doraCount = winner.doraCounts.normal + winner.doraCounts.ura + winner.doraCounts.red;
+    const yakuAndDora = doraCount > 0 ? `${yaku}${yaku ? '・' : ''}ドラ${doraCount}` : yaku;
+    section.append(text('p', yakuAndDora, 'round-summary-yaku'));
     container.append(section);
   }
 }
