@@ -20,7 +20,7 @@
 
 ## 自動・ブラウザー検証
 
-- [未デプロイ変更の検出と安全な回収 — 2026-10-31](deploy-pending-changes-recovery-2026-10-31.md) — Worker/Pages別GitHub Deployment SHA、pending app diffの回収、部分成功後の再試行、workflow_dispatch、必須シナリオと品質ゲート。Actionsと公開結果はpush後に追記。
+- [未デプロイ変更の検出と安全な回収 — 2026-10-31](deploy-pending-changes-recovery-2026-10-31.md) — Worker/Pages別GitHub Deployment SHA、pending app diffの回収、部分成功・古いSHAの処理、20自動テスト、run 41158609151の全ゲート・両deploy・SHA記録成功。公開HTMLとcomputed styleはproxy 403で未確認。
 - [Issue #24 ボタン色の単色統一](button-role-colors-issue24-2026-10-30.md) — 初回役割別配色の履歴、単色化の現在仕様、computed style・自動テスト・実機未確認事項。
 - [Issue #24 作業時間調査](issue24-work-duration-investigation-2026-10-31.md) — 前回204分の履歴上の事実と未確認事項、今回の実測分析、Issue #23との比較、改善候補。
 - [Issue #24 作業計測ログ](issue24-work-timing-2026-10-31.md) — 単調時計・UTC壁時計による今回のフェーズ、コマンド、テスト、GitHub Actionsの記録。
