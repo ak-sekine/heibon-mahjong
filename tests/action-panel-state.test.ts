@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { createLocalActionPanelState } from '../src/rendering/local-action-panel-state.ts';
 import { createOnlineActionPanelState } from '../src/online/action-panel-state.ts';
 import { actionChoicesForDisplay } from '../src/ui/action-panel.ts';
-import { startMatch } from '../src/game/match.ts';
+import { startMatch, settleRound } from '../src/game/match.ts';
 import { canDiscard } from '../src/game/discard.ts';
 import { getCallOptions } from '../src/game/calls.ts';
 import { getKanOptions } from '../src/game/kan.ts';
@@ -20,6 +20,7 @@ import { riichiStart } from './riichi-fixture.ts';
 import { ronGame } from './ron-fixture.ts';
 import { tsumoGame } from './tsumo-fixture.ts';
 import { parentOpeningKanGame,parentKyuushuGame } from './step13-10-fixture.ts';
+import { fixedRon } from './match-fixture.ts';
 
 function onlineViewFor(game: GameState, options: {
   status?: PlayerGameView['status'];
@@ -109,6 +110,42 @@ test('normal own turn keeps discard visible without selection and enables it aft
   assert.equal(localSelected.buttons.discard.enabled, true);
   assert.equal(localSelected.buttons.riichi.visible, true);
   assert.equal(localSelected.buttons.riichi.enabled, true);
+});
+
+test('round-end and confirmed match-end expose the distinct result actions', () => {
+  const round = settleRound({ ...startMatch(), game: fixedRon(0, [1]) });
+  const localRound = createLocalActionPanelState(round, null, false, false);
+  assert.deepEqual(localRound.buttons['show-result'], { visible: true, enabled: true, label: '結果を見る' });
+  assert.deepEqual(localRound.buttons['show-match-result'], { visible: false, enabled: false, label: '対局結果' });
+  assert.deepEqual(localRound.buttons['next-round'], { visible: true, enabled: true, label: '次の局へ' });
+  const onlineRound = createOnlineActionPanelState(onlineViewFor(round.game, { status: 'round-ended' }), null, false, false, false, null);
+  assert.equal(onlineRound.buttons['show-match-result'].visible, false);
+  assert.equal(onlineRound.buttons['next-round'].visible, true);
+
+  const finalDealerRepeat = settleRound({ ...startMatch(), roundNumber: 4, game: fixedRon(0, [0]) });
+  assert.equal(finalDealerRepeat.status, 'round-ended');
+  assert.equal(finalDealerRepeat.lastSettlement?.matchEnded, false);
+  const repeatButtons = createLocalActionPanelState(finalDealerRepeat, null, false, false).buttons;
+  assert.equal(repeatButtons['show-match-result'].visible, false);
+  assert.equal(repeatButtons['next-round'].visible, true);
+
+  const final = settleRound({ ...startMatch(), roundNumber: 4, dealerId: 0, game: fixedRon(0, [1]) });
+  assert.equal(final.status, 'match-ended');
+  const localFinal = createLocalActionPanelState(final, null, false, false);
+  assert.deepEqual(localFinal.buttons['show-result'], { visible: true, enabled: true, label: '結果を見る' });
+  assert.deepEqual(localFinal.buttons['show-match-result'], { visible: true, enabled: true, label: '対局結果' });
+  assert.equal(localFinal.buttons['next-round'].visible, false);
+
+  const onlineFinalView = {
+    ...onlineViewFor(final.game, { status: 'match-ended' }),
+    format: 'tonpu',
+    result: { matchEnded: true },
+    seats: onlineViewFor(final.game).seats.map((seat, id) => ({ ...seat, points: final.points[id] })),
+  } as unknown as PlayerGameView;
+  const onlineFinal = createOnlineActionPanelState(onlineFinalView, null, false, false, false, null);
+  assert.deepEqual(onlineFinal.buttons['show-result'], { visible: true, enabled: true, label: '結果を見る' });
+  assert.deepEqual(onlineFinal.buttons['show-match-result'], { visible: true, enabled: true, label: '対局結果' });
+  assert.equal(onlineFinal.buttons['next-round'].visible, false);
 });
 
 test('riichi and tsumo controls appear only when the local rules and server view permit them', () => {

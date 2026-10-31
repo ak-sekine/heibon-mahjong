@@ -148,6 +148,20 @@ header > div { min-width:0; }
 @supports (height:100svh) { #result-dialog { --result-height:100svh; } }
 @supports (height:100dvh) { #result-dialog { --result-height:100dvh; } }
 #result-dialog[open] { display:flex; flex-direction:column; }
+#match-result-dialog { --result-height:100vh; --safe-top:max(12px,env(safe-area-inset-top,0px)); --safe-bottom:max(12px,env(safe-area-inset-bottom,0px)); position:fixed; inset:var(--safe-top) max(3vw,env(safe-area-inset-right,0px)) var(--safe-bottom) max(3vw,env(safe-area-inset-left,0px)); margin:auto; box-sizing:border-box; width:94%; max-width:600px; max-height:calc(var(--result-height) - var(--safe-top) - var(--safe-bottom)); padding:0; border:2px solid #ffda7d; border-radius:12px; color:#fffdf7; background:#185640; overflow:hidden; }
+@supports (height:100svh) { #match-result-dialog { --result-height:100svh; } }
+@supports (height:100dvh) { #match-result-dialog { --result-height:100dvh; } }
+#match-result-dialog[open] { display:flex; flex-direction:column; }
+#match-result-dialog::backdrop { background:rgb(0 0 0 / 60%); }
+#match-result-body { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:8px; overflow-wrap:anywhere; }
+#match-result-body:focus-visible { outline:3px solid #82dcff; outline-offset:-3px; }
+#match-result-dialog button { min-height:44px; padding:8px 12px; border:1px solid currentColor; border-radius:8px; font:inherit; font-weight:600; touch-action:manipulation; cursor:pointer; white-space:nowrap; }
+.match-result-format { margin:0 0 8px; font-weight:700; }
+.match-result-standings { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.match-result-standings li { display:grid; grid-template-columns:2.25em minmax(0,1fr) auto; align-items:start; gap:8px; padding:8px; border:1px solid #63947a; border-radius:8px; }
+.match-result-rank { font-weight:700; white-space:nowrap; }
+.match-result-name { min-width:0; overflow-wrap:anywhere; }
+.match-result-points { font-variant-numeric:tabular-nums; white-space:nowrap; }
 #result-dialog::backdrop { background:rgb(0 0 0 / 60%); }
 .result-header,.result-footer { flex:none; padding:10px 12px; background:#154e3c; }
 .result-header h2 { margin:0; font-size:clamp(1rem,4vw,1.3rem); }

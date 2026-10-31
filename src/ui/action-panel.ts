@@ -6,7 +6,7 @@ export type ActionPanelMode = 'local' | 'online';
 export type ActionPanelPart =
   | 'discard' | 'riichi' | 'tsumo' | 'kyuushu' | 'kan-toggle'
   | 'ron' | 'pass-ron' | 'pass-call' | 'cancel-kan'
-  | 'next-round' | 'show-result' | 'return-local';
+  | 'next-round' | 'show-result' | 'show-match-result' | 'return-local';
 
 export type ActionButtonState = Readonly<{
   visible: boolean;
@@ -61,6 +61,7 @@ export type ActionPanelEvent =
   | { type: 'select-call'; optionId: string }
   | { type: 'next-round' }
   | { type: 'show-result' }
+  | { type: 'show-match-result' }
   | { type: 'return-local' };
 
 export type ActionPanelTrace = Readonly<{
@@ -100,6 +101,7 @@ const LOCAL_IDS: Readonly<Record<string, string>> = {
   kyuushu: 'kyuushu-kyuuhai',
   'round-actions': 'round-result-actions',
   'show-result': 'show-result',
+  'show-match-result': 'show-match-result',
   'next-round': 'next-round',
   'return-local': 'local-return-local',
 };
@@ -127,6 +129,7 @@ const ONLINE_IDS: Readonly<Record<string, string>> = {
   kyuushu: 'online-kyuushu',
   'round-actions': 'online-round-result-actions',
   'show-result': 'online-show-result',
+  'show-match-result': 'online-show-match-result',
   'next-round': 'online-next-round',
   'return-local': 'online-return-local',
 };
@@ -176,7 +179,7 @@ export class ActionPanel {
     this.part('action-status').tabIndex = -1;
     for (const part of [
       'discard', 'riichi', 'tsumo', 'kyuushu', 'kan-toggle', 'ron', 'pass-ron', 'pass-call',
-      'cancel-kan', 'next-round', 'show-result', 'return-local',
+      'cancel-kan', 'next-round', 'show-result', 'show-match-result', 'return-local',
     ] as const) {
       this.part(part).dataset.panelAction = part;
       this.part(part).dataset.diagnosticActionType = part;
@@ -190,7 +193,7 @@ export class ActionPanel {
   }
 
   clear(): void {
-    for (const part of ['discard', 'riichi', 'tsumo', 'kyuushu', 'kan-toggle', 'ron', 'pass-ron', 'pass-call', 'cancel-kan', 'next-round', 'show-result', 'return-local']) {
+    for (const part of ['discard', 'riichi', 'tsumo', 'kyuushu', 'kan-toggle', 'ron', 'pass-ron', 'pass-call', 'cancel-kan', 'next-round', 'show-result', 'show-match-result', 'return-local']) {
       const button = this.part(part) as HTMLButtonElement;
       button.hidden = true;
       button.disabled = true;

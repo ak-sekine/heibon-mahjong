@@ -606,6 +606,53 @@ with sync_playwright() as p:
         assert final['status'] == 'match-ended' and not page.locator('#result-dialog').is_visible()
         assert not page.locator('#next-round').is_visible()
         assert page.locator('#round-result-summary').locator('p').all_inner_texts() == ['東4局 0本場・流局', 'テンパイ：CPU2']
+        page.evaluate("window.roundEndTest.controller.playerNames = ['とても長い表示名を含むプレイヤー', 'CPU1の長い表示名を含む席', 'CPU2の長い表示名を含む席', 'CPU3の長い表示名を含む席']; window.roundEndTest.render()")
+        assert page.locator('#show-result').is_visible()
+        assert page.locator('#show-match-result').is_visible()
+        assert page.locator('#show-match-result').inner_text() == '対局結果'
+        before_match_result = page.evaluate('''() => ({status:window.roundEndTest.controller.match.status,
+          points:[...window.roundEndTest.controller.match.points],round:window.roundEndTest.controller.match.roundNumber,
+          nextHidden:document.querySelector('#next-round').hidden})''')
+        page.locator('#show-match-result').click()
+        assert page.locator('#match-result-dialog').is_visible()
+        assert page.locator('#match-result-title').inner_text() == '対局結果'
+        assert page.locator('#match-result-body').locator('.match-result-format').inner_text() == '東風戦'
+        assert page.locator('#match-result-body .match-result-standings li').count() == 4
+        standing_text = page.locator('#match-result-body .match-result-standings').inner_text()
+        assert 'とても長い表示名を含むプレイヤー' in standing_text
+        assert '点数増減' not in standing_text and '＋' not in standing_text and '－' not in standing_text
+        expected_standings = page.evaluate('''() => window.roundEndTest.controller.match.points
+          .map((points, playerId) => ({ points, playerId, name:window.roundEndTest.controller.playerNames[playerId] }))
+          .sort((a,b) => b.points-a.points || a.playerId-b.playerId)
+          .map((player,index) => [`${index+1}位`,player.name,`${player.points.toLocaleString('ja-JP')}点`])''')
+        actual_standings = page.locator('#match-result-body .match-result-standings li').evaluate_all(
+            'rows => rows.map(row => [...row.children].map(cell => cell.textContent))')
+        assert actual_standings == expected_standings, (width, actual_standings, expected_standings)
+        page.set_viewport_size({'width': width, 'height': 320})
+        dialog_layout = page.evaluate('''() => {
+          const dialog=document.querySelector('#match-result-dialog'),body=document.querySelector('#match-result-body');
+          const close=document.querySelector('#match-result-close'),rect=close.getBoundingClientRect();
+          body.scrollTop=body.scrollHeight;
+          return {overflow:getComputedStyle(body).overflowY,scrollHeight:body.scrollHeight,clientHeight:body.clientHeight,
+            scrollTop:body.scrollTop,footerBottom:close.getBoundingClientRect().bottom,
+            closeSingleLine:getComputedStyle(close).whiteSpace==='nowrap' && rect.height<=44,
+            horizontalOverflow:dialog.scrollWidth>dialog.clientWidth};
+        }''')
+        assert dialog_layout['overflow'] == 'auto' and dialog_layout['scrollHeight'] > dialog_layout['clientHeight'] and dialog_layout['scrollTop'] > 0, (width, dialog_layout)
+        assert not dialog_layout['horizontalOverflow'] and dialog_layout['footerBottom'] <= 320, (width, dialog_layout)
+        assert dialog_layout['closeSingleLine'], (width, dialog_layout)
+        assert page.locator('#match-result-close').inner_text() == '閉じる'
+        page.locator('#match-result-close').click()
+        assert not page.locator('#match-result-dialog').is_visible()
+        assert page.locator('#show-match-result').evaluate('(button) => document.activeElement === button')
+        assert page.evaluate('''() => ({status:window.roundEndTest.controller.match.status,
+          points:[...window.roundEndTest.controller.match.points],round:window.roundEndTest.controller.match.roundNumber,
+          nextHidden:document.querySelector('#next-round').hidden})''') == before_match_result
+        page.locator('#show-match-result').click()
+        assert page.locator('#match-result-dialog').is_visible()
+        assert page.locator('#match-result-body').evaluate('(body) => body.scrollTop === 0')
+        page.locator('#match-result-close').click()
+        page.set_viewport_size({'width': width, 'height': height})
         page.locator('#show-result').click()
         assert page.locator('#result-title').inner_text() == '東風戦終了'
         assert not page.locator('#next-round').is_visible()

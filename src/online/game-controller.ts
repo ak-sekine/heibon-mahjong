@@ -8,6 +8,7 @@ import { renderSeatLabel, renderTableRoundInfo } from '../rendering/shared-table
 import { TILE_KINDS, tileKindKey } from '../model/tile.ts';
 import { ActionPanel, type ActionPanelEvent } from '../ui/action-panel.ts';
 import { ResultDialog } from '../ui/result-dialog.ts';
+import { MatchResultDialog } from '../ui/match-result-dialog.ts';
 import { createOnlineActionPanelState } from './action-panel-state.ts';
 import { renderOnlineWinSummary } from './result-content.ts';
 import { onlinePlayerName } from './player-name.ts';
@@ -99,6 +100,7 @@ export class OnlineGameController {
   constructor(
     actionPanel: ActionPanel,
     private readonly resultDialog: ResultDialog,
+    private readonly matchResultDialog: MatchResultDialog,
     private readonly onSessionEnded: () => void = () => {},
   ) {
     this.actionPanel = actionPanel;
@@ -138,6 +140,7 @@ export class OnlineGameController {
       case 'select-call': this.sendDecision({ type: 'declare-call', optionId: event.optionId }); break;
       case 'next-round': this.send({ type: 'next-round' }); break;
       case 'show-result': this.resultDialog.open(document.querySelector<HTMLButtonElement>('#online-show-result')); break;
+      case 'show-match-result': this.matchResultDialog.open(document.querySelector<HTMLButtonElement>('#online-show-match-result')); break;
       case 'return-local': this.returnToLocalGame(); break;
     }
   }
@@ -161,6 +164,7 @@ export class OnlineGameController {
       this.setTableClasses(false);
       document.body.classList.remove('online-game-active');
       this.resultDialog.updateOnline(null);
+      this.matchResultDialog.updateOnline(null);
       document.querySelector<HTMLButtonElement>('#new-game')!.disabled = false;
       this.onSessionEnded();
       return;
@@ -312,6 +316,7 @@ export class OnlineGameController {
       this.renderActions(view);
       renderStage = 'resultDialog';
       this.resultDialog.updateOnline(view);
+      this.matchResultDialog.updateOnline(view);
     } catch (error) {
       recordGameRenderFailure(diagnosticLog, {
         turnId: `online-${view.gameRevision}`, seat: view.turnPlayerId, phase: view.phase,
@@ -549,6 +554,7 @@ export class OnlineGameController {
     this.setTableClasses(false);
     document.body.classList.remove('online-game-active');
     this.resultDialog.updateOnline(null);
+    this.matchResultDialog.updateOnline(null);
     document.querySelector<HTMLButtonElement>('#new-game')!.disabled = false;
     this.onSessionEnded();
   }

@@ -9,14 +9,14 @@ const roleById: Record<string, string> = {
   'diagnostic-copy': 'b', 'diagnostic-clear': 'd1', 'online-join-close': 'b', 'online-join': 'a',
   'online-close': 'b', 'online-copy-code': 'b', 'online-confirm-rules': 'b', 'online-ready': 'a',
   'online-finalize': 'a', 'online-start-game': 'a', 'online-reconnect': 'a', 'online-leave': 'd1',
-  'online-close-room': 'd2', 'view-table': 'b', 'result-new-game': 'a', 'new-game-rules': 'b',
+  'online-close-room': 'd2', 'view-table': 'b', 'result-new-game': 'a', 'match-result-close': 'b', 'new-game-rules': 'b',
   'cancel-new-game': 'b', 'confirm-new-game': 'a', 'cancel-rule-settings': 'b',
   'confirm-rule-settings': 'a', 'online-rules-close': 'b', 'load-scenario': 'a',
   'start-cpu-kan': 'a', 'repeat-scenario': 'a', 'start-river-test': 'a',
 };
 const roleByPart: Record<string, string> = {
   'pass-call': 'c', 'cancel-kan': 'b', ron: 'a', 'pass-ron': 'c', discard: 'a', riichi: 'a',
-  'kan-toggle': 'a', tsumo: 'a', kyuushu: 'a', 'show-result': 'b', 'next-round': 'a', 'return-local': 'b',
+  'kan-toggle': 'a', tsumo: 'a', kyuushu: 'a', 'show-result': 'b', 'show-match-result': 'b', 'next-round': 'a', 'return-local': 'b',
 };
 
 function buttons(html: string): string[] {
@@ -27,7 +27,7 @@ test('every static operation button on product and verification pages has exactl
   for (const file of files) {
     const html = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     const nodes = buttons(html);
-    assert.equal(nodes.length, file === 'index.html' ? 45 : file === 'kan-test.html' ? 19 : 20);
+    assert.equal(nodes.length, file === 'index.html' ? 47 : file === 'kan-test.html' ? 20 : 22);
     for (const button of nodes) {
       const classes = button.match(/\bclass="([^"]*)"/u)?.[1]?.split(/\s+/u) ?? [];
       if (classes.includes('main-menu-item') || classes.includes('main-menu-toggle')) {

@@ -85,6 +85,8 @@ export function createLocalActionPanelState(
       'cancel-kan': button(kanChoicesOpen && kanChoices.length > 0, kanChoicesOpen && kanChoices.length > 0 && !progressing, 'キャンセル'),
       'next-round': button(match.status === 'round-ended', match.status === 'round-ended' && !progressing, '次の局へ'),
       'show-result': button(roundResultAvailable, roundResultAvailable, '結果を見る'),
+      'show-match-result': button(match.status === 'match-ended' && Boolean(match.lastSettlement?.matchEnded),
+        match.status === 'match-ended' && Boolean(match.lastSettlement?.matchEnded), '対局結果'),
       'return-local': button(false, false, 'ローカル卓へ戻る'),
     },
     actionStatus,

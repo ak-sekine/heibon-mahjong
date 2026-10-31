@@ -95,6 +95,8 @@ export function createOnlineActionPanelState(
         nextRound && !nextRoundReady && !actionPending,
         nextRoundReady ? '他のプレイヤーを待っています…' : '次の局へ'),
       'show-result': button(showResult, showResult, '結果を見る'),
+      'show-match-result': button(view.status === 'match-ended' && Boolean(view.result?.matchEnded),
+        view.status === 'match-ended' && Boolean(view.result?.matchEnded), '対局結果'),
       'return-local': button(returnLocal, returnLocal, 'ローカル卓へ戻る'),
     },
     actionStatus,

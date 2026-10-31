@@ -3,6 +3,7 @@ import './style.css';
 import { renderTable, renderSelection } from './rendering/table.ts';
 import { renderMatch } from './rendering/match.ts';
 import { ResultDialog } from './ui/result-dialog.ts';
+import { MatchResultDialog } from './ui/match-result-dialog.ts';
 import { NewGameDialog } from './ui/new-game-dialog.ts';
 import { openReadOnlyRules, RulePreferences, RuleSettingsDialog } from './ui/rule-settings.ts';
 import { rulesForMatch, type GameRules } from './model/rules.ts';
@@ -44,6 +45,7 @@ if (document.querySelector('#main-menu-toggle')) {
   new MainMenu();
 }
 const resultDialog = new ResultDialog();
+const matchResultDialog = new MatchResultDialog();
 let onlineGameController: OnlineGameController | null = null;
 const localTable = document.querySelector<HTMLElement>('#local-table')!;
 const idleState = document.querySelector<HTMLElement>('#app-idle');
@@ -88,6 +90,7 @@ function render(): void {
   const rulesButton = document.querySelector<HTMLButtonElement>('#menu-offline-rules');
   if (rulesButton) rulesButton.hidden = !controller.hasGame || document.body.classList.contains('online-game-active');
   if (!controller.hasGame) {
+    matchResultDialog.updateLocal(controller.match, controller.playerNames);
     document.body.dataset.gameMode = 'none';
     localDeclarationBubbles.clearAll();
     if (idleState) idleState.hidden = false;
@@ -161,6 +164,7 @@ function render(): void {
     }
     renderStage = 'resultDialog';
     resultDialog.update(controller.match);
+    matchResultDialog.updateLocal(controller.match, controller.playerNames);
     recordRenderSucceeded(diagnosticLog, { renderId, timestamp: new Date().toISOString(), seat: controller.game.turnPlayerId,
       phase: controller.game.phase, runnerState: controller.progressing ? 'running' : 'idle', actionPanelUpdated: true,
       remainingTiles: controller.game.liveWall.length, ...operationDetails });
@@ -238,6 +242,7 @@ function dispatchLocalAction(event: ActionPanelEvent): void | Promise<void> {
       scrollPageToTop('next_round');
       return controller.nextRound();
     case 'show-result': resultDialog.open(); return;
+    case 'show-match-result': matchResultDialog.open(); return;
     case 'return-local': return;
   }
 }
@@ -291,7 +296,7 @@ if (localActionRoot) localActionPanel = new ActionPanel(localActionRoot, runLoca
 });
 if (document.querySelector('#online-create-open')) {
   if (!onlineActionRoot) throw new Error('Online action panel host is missing');
-  onlineGameController = new OnlineGameController(new ActionPanel(onlineActionRoot), resultDialog, () => {
+  onlineGameController = new OnlineGameController(new ActionPanel(onlineActionRoot), resultDialog, matchResultDialog, () => {
     controller.clearGame();
     render();
   });
@@ -307,6 +312,7 @@ document.querySelector('#player-hand')!.addEventListener('click', event => {
     controller.match, controller.selectedTileId, controller.progressing, localKanChoicesOpen, controller.playerSeat, controller.playerNames,
   ));
   resultDialog.update(controller.match);
+  matchResultDialog.updateLocal(controller.match, controller.playerNames);
 });
 render();
 
