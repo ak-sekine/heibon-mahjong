@@ -13,7 +13,7 @@ export class MainMenu {
       if ((event.target as Element).closest('button')) this.close(false);
     });
     this.menu.addEventListener('focusout', event => {
-      if (event.relatedTarget instanceof Node && !this.menu.contains(event.relatedTarget)) this.close(false);
+      if (event.relatedTarget instanceof Node && !this.shell.contains(event.relatedTarget)) this.close(false);
     });
     document.addEventListener('pointerdown', event => {
       if (!this.shell.contains(event.target as Node)) this.close(false);
