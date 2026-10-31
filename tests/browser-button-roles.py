@@ -5,7 +5,6 @@ from playwright.sync_api import sync_playwright
 base = os.environ.get('HEIBON_BASE_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 widths = [(320, 568), (375, 667), (390, 844), (430, 844), (1280, 800)]
 roles = {
-    '#new-game': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
     '#online-close': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
     '[data-panel-part="pass-call"]': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
     '#diagnostic-clear': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
@@ -89,12 +88,21 @@ with sync_playwright() as playwright:
         menu_box = menu.bounding_box()
         assert menu_box['x'] >= 0 and menu_box['x'] + menu_box['width'] <= width, (width, menu_box)
         new_game_button = page.locator('#new-game')
+        item_style = new_game_button.evaluate('''e => {
+          const style = getComputedStyle(e), rect = e.getBoundingClientRect();
+          return {background: style.backgroundColor, color: style.color, borderWidth: style.borderTopWidth,
+            minHeight: rect.height};
+        }''')
+        assert item_style == {'background': 'rgb(255, 253, 247)', 'color': 'rgb(21, 78, 60)',
+                              'borderWidth': '0px', 'minHeight': 44}, (width, item_style)
         before_press = new_game_button.bounding_box()
         page.mouse.move(before_press['x'] + before_press['width'] / 2, before_press['y'] + before_press['height'] / 2)
+        hovered = new_game_button.evaluate('e => getComputedStyle(e).backgroundColor')
+        assert hovered == 'rgb(237, 243, 238)', (width, 'menu hover', hovered)
         page.mouse.down()
         pressed = new_game_button.evaluate('''e => ({ background: getComputedStyle(e).backgroundColor,
           rect: e.getBoundingClientRect().toJSON() })''')
-        assert pressed['background'] == 'rgb(233, 198, 106)', (width, pressed)
+        assert pressed['background'] == 'rgb(226, 236, 228)', (width, pressed)
         assert (pressed['rect']['x'], pressed['rect']['y'], pressed['rect']['width'], pressed['rect']['height']) == \
           (before_press['x'], before_press['y'], before_press['width'], before_press['height']), (width, before_press, pressed)
         page.mouse.up()
