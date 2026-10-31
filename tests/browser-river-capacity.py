@@ -53,10 +53,11 @@ with sync_playwright() as p:
           const {OnlineGameController}=await import('/heibon-mahjong/src/online/game-controller.ts');
           const {ActionPanel}=await import('/heibon-mahjong/src/ui/action-panel.ts');
           const {ResultDialog}=await import('/heibon-mahjong/src/ui/result-dialog.ts');
+          const {MatchResultDialog}=await import('/heibon-mahjong/src/ui/match-result-dialog.ts');
           const {startMatch}=await import('/heibon-mahjong/src/game/match.ts');
           const {createPlayerGameView}=await import('/heibon-mahjong/src/online/game-view.ts');
           window.riverFixture={renderer,base,pool,OnlineGameController,ActionPanel,ResultDialog,startMatch,createPlayerGameView,
-            online:new OnlineGameController(new ActionPanel(document.querySelector('#online-game-controls')),new ResultDialog())};
+            online:new OnlineGameController(new ActionPanel(document.querySelector('#online-game-controls')),new ResultDialog(),new MatchResultDialog())};
         }''')
         for count in [18, 19, 20, 23, 24, 25, 32, 33]:
             for declaration_seat in [0, 1, 2, 3]:
