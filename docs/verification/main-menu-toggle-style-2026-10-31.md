@@ -34,8 +34,12 @@ Issue #24の共通ボタン配色により、右上のメニュートグルに�
 
 ## Browser UI、Actions、デプロイ
 
-push後に対象SHAのActions run、Browser UIのChromium/WebKit結果、WorkerとPagesのデプロイ結果を追記します。公開環境の配信物を取得できるかも確認し、確認できなければ理由とともに未確認と記録します。
+- 最初のDeploy run [41170842630](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41170842630) は、Browser UIで追加したテストがマウス解放クリックの後にもう一度クリックし、展開中を確認する前に閉じていたため失敗しました。製品コードではなくテスト手順の重複でした。`11c547d8e2a9d4a6be190e91a9eab4a63d940c00` で余分なクリックを除き、修正版runで再検証しました。
+- 修正版のDeploy run [41171398665](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41171398665) はsuccessです。`detect-changes`、`docs-check`、`verify`、Browser UI、`release-freshness`、Worker deploy、本番Worker検証、Pages build/deployの全jobがsuccessしました。自動デプロイ判定は対象SHAをデプロイ対象とし、手動デプロイは不要でした。
+- Browser UIはChromium 35件、WebKit 21件の全56検証がsuccessしました。`tests/browser-button-roles.py` は両ブラウザーでsuccessし、透明背景・白い三本線・影なし・44×44px、hover／押下／展開中、フォーカス表示、通常操作ボタンの黄色、メニュー項目の白系配色を確認しました。幅320/375/390/414/768/1280pxと、既存の回転・開閉・Escape・外側タップ・キーボード・対局／ダイアログ／オンライン操作回帰も確認しています。
+- GitHub ActionsはWorker `https://heibon-mahjong-online.ak-sekine.workers.dev` のdeploy、本番HTTPS・ルーム・WebSocket・再接続・認証・プライバシー検証、Pages build/deployをすべて成功として記録しました。Worker SHAとPages SHAはいずれも `11c547d8e2a9d4a6be190e91a9eab4a63d940c00` です。
+- 公開Pagesの `https://ak-sekine.github.io/heibon-mahjong/` は、通常のcurlがproxy port 8080への接続失敗、許可付きcurlもHTTP 403 Forbiddenとなりました。そのため公開HTML/CSSと配信後のcomputed styleは未確認です。これはActions上のdeploy successとは別の確認結果です。
 
 ## 実機確認
 
-iPhone SafariおよびAndroid Chromeの実機確認は未実施です。ユーザーに、縦横向き・各画面幅・タップ応答・フォーカス・開閉・画面端・PWA表示を確認してもらいます。Issue #24は実機確認が完了するまでOpenのままにします。
+iPhone SafariおよびAndroid Chromeの実機確認は未実施です。ユーザーに、縦横向き・各画面幅・タップ応答・フォーカス・開閉・画面端・PWA表示を確認してもらいます。Issue #24はOpenのままです。実機確認が完了するまで閉じません。
