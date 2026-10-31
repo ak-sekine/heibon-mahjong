@@ -15,7 +15,7 @@ import { ankanGame } from './kan-fixture.ts';
 import { callStart } from './calls-fixture.ts';
 import { cpuMadeProgress } from './cpu-progress.ts';
 import { riichiStart } from './riichi-fixture.ts';
-import { childKyuushuGame, parentKyuushuGame } from './step13-10-fixture.ts';
+import { childKyuushuGame, parentOpeningKanGame, parentKyuushuGame } from './step13-10-fixture.ts';
 import { tsumoGame } from './tsumo-fixture.ts';
 import { cpuRiichiStart } from './cpu-riichi-fixture.ts';
 import {
@@ -473,6 +473,32 @@ test('online action reducer validates riichi, tsumo, kan, kyuushu, and starts th
   assert.equal(next.match.roundNumber, tsumo.match.lastSettlement?.next?.roundNumber);
   assert.equal(next.gameRevision, tsumo.gameRevision + 1);
   assert.deepEqual(next.match.points, tsumo.match.points);
+});
+
+test('online dealer opening kan options come from server legality and forged choices are rejected', () => {
+  const game = parentOpeningKanGame(true);
+  const options = getKanOptions(game, 0);
+  assert.equal(options.length, 2);
+  const session = sessionForGame(game, [0]);
+  const snapshot = structuredClone(session);
+  const view = createPlayerGameView(session, 0, 'A2CDEF', new Set([0]));
+  assert.deepEqual(view.self.kanOptions.map(option => option.id), options.map(option => option.id));
+  const panel = createOnlineActionPanelState(view, null, false, false, false, null);
+  assert.equal(panel.buttons['kan-toggle'].visible, true);
+  assert.equal(panel.buttons.discard.visible, true);
+  assert.equal(panel.kanGroup.options.length, 2);
+
+  assert.throws(() => applyOnlineGameAction(session, 0, {
+    type: 'declare-kan', requestId: 'forged-opening-kan', expectedGameRevision: 1, optionId: 'ankan:forged',
+  }, new Set<PlayerId>([0]), 4000), RangeError);
+  assert.deepEqual(session, snapshot);
+
+  const accepted = applyOnlineGameAction(session, 0, {
+    type: 'declare-kan', requestId: 'legal-opening-kan', expectedGameRevision: 1, optionId: options[1].id,
+  }, new Set<PlayerId>([0]), 5000);
+  assert.equal(accepted.match.game.kanCount, 1);
+  assert.equal(accepted.match.game.players[0].melds?.[0].type, 'ankan');
+  assert.equal(accepted.match.game.players[0].drawnTileSource, 'rinshan');
 });
 
 test('CPU progress survives a discard called for pon', async () => {

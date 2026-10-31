@@ -25,6 +25,7 @@
 
 ## 自動・ブラウザー検証
 
+- [Issue #25 配牌直後・第一ツモ直後の暗カン — 2026-10-31](issue25-opening-ankan-2026-10-31.md) — 初期配牌の合法性、オフライン・オンライン候補、複数候補選択、通常打牌、嶺上牌・ドラ、九種九牌・四槓散了との整合性とSafari実機確認項目を記録。Browser UIの対象コミット結果はpush後に追記します。
 - [右上メニューのドロップダウン表示 — Issue #24関連](menu-dropdown-style-2026-10-31.md) — メニュー項目を通常ボタンの単色配色から分離し、Browser UI・自動デプロイと、ユーザーによるiPhone Safari実機確認を記録。
 - [右上ハンバーガーメニューボタンのナビゲーション表示 — Issue #24](main-menu-toggle-style-2026-10-31.md) — トグルを通常操作ボタンCSSから分離し、白い三本線・状態表示・キーボードフォーカスを検証。2026-10-31のユーザー実機報告と未確認範囲を追記。
 - [未デプロイ変更の検出と安全な回収 — 2026-10-31](deploy-pending-changes-recovery-2026-10-31.md) — Worker/Pages別GitHub Deployment SHA、pending app diffの回収、部分成功・古いSHAの処理、20自動テスト、run 41158609151の全ゲート・両deploy・SHA記録成功。公開HTMLとcomputed styleはproxy 403で未確認。

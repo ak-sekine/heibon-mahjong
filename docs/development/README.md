@@ -47,5 +47,6 @@ READMEから移した各Stepの本文と、本文にあった検証資料・ス�
 | 14.4 | メニューとオンラインダイアログの分離 | 2026-10-21 | [開発記録](step-14.4.md) · [検証記録](../verification/step14.4/README.md) · [処理時間記録](../verification/codex-performance/step14-4-menu-dialog-separation.md) |
 | 14.5 | オンライン・オフライン操作欄の状態描画とイベント委譲の共通化 | 2026-10-21 | [開発記録](step-14.5.md) · [検証記録](../verification/step14.5/README.md) · [処理時間記録](../verification/codex-performance/step14-5-action-panel.md) |
 | 14.6 | 明示的退出した人間席のCPU交代、ホスト移行と状態維持 | 2026-10-21 | [開発記録](step-14.6.md) · [検証記録](../verification/step14.6/README.md) |
+| Issue #25 | 親の配牌直後・子の第一通常ツモ後の暗カン | 2026-10-31 | [開発記録](issue-25-opening-ankan-2026-10-31.md) · [検証記録](../verification/issue25-opening-ankan-2026-10-31.md) |
 
 Step 13.5のiPhone Safari実機確認は[2026-10-18の検証記録](../verification/kan-safari-2026-10-18.md)を参照してください。

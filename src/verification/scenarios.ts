@@ -1,7 +1,8 @@
-import { ankanGame, kakanGame, kanGame } from './kan-fixture.ts';
+import { ankanGame, kakanGame, kanGame, openingAnkanGame } from './kan-fixture.ts';
 import { discardTile } from '../game/discard.ts';
 
 export const scenarioHelp = {
+  opening: '親の配牌直後に暗カン候補が2つあります。「カン」から選択するか、キャンセルして通常打牌できます。',
   ankan: '「カン」→「暗カン」を選択。嶺上牌を選んで「打牌する」、または「ツモ和了」で結果を確認。',
   daiminkan: 'CPUの打牌に対して「大明カン」を選択。嶺上牌を打牌するか「ツモ和了」。見送る操作も可能です。',
   kakan: '「カン」→「加カン」を選択。ポンへの重なりと追加ドラを確認し、打牌またはツモ和了。',
@@ -13,6 +14,7 @@ export type Scenario = keyof typeof scenarioHelp;
 
 /** Same physical-wall fixtures and setup actions as browser-step13-5.py. */
 export function scenarioGame(mode: Scenario) {
+  if (mode === 'opening') return openingAnkanGame();
   if (mode === 'ankan' || mode === 'rinshan') return ankanGame();
   if (mode === 'kakan') return kakanGame();
   if (mode === 'daiminkan') {

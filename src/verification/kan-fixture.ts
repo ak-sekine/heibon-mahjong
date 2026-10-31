@@ -1,5 +1,6 @@
-import { createWall } from '../game/wall.ts';
+import { createWall, reserveDeadWall } from '../game/wall.ts';
 import { shuffle } from '../game/shuffle.ts';
+import { deal } from '../game/deal.ts';
 const seeded=(seed:number)=>()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
 import { startGame } from '../game/start.ts';
 import { TILE_KINDS, tileKindKey } from '../model/tile.ts';
@@ -41,6 +42,20 @@ export function kanGame(spec:KanFixture):GameState {
  const deadWall=reserved.map(t=>t);
  for(let i=0;i<14;i++) if(!deadWall[i]) deadWall[i]=pool.pop()!;
  return {...base,turnPlayerId:turn,players,deadWall:deadWall as PhysicalTile[],liveWall:pool,kanCount:melds.flat().filter(m=>m.tiles.length===4).length};
+}
+export function openingAnkanGame():GameState {
+ const wall=shuffle(createWall(),seeded(947)),occupied=new Set<number>();
+ const placeKind=(kind:string,slots:readonly number[])=>{
+  for(const slot of slots){
+   const source=wall.findIndex((tile,index)=>!occupied.has(index)&&tileKindKey(tile.tile)===kind);
+   if(source<0)throw new RangeError(`Missing opening kan tile ${kind}`);
+   [wall[slot],wall[source]]=[wall[source],wall[slot]];occupied.add(slot);
+  }
+ };
+ // Dealer's concealed hand occupies slots 0, 4, ... 48; slot 52 is the deal tile.
+ placeKind('man-1',[0,4,8,52]);
+ placeKind('east',[12,16,20,24]);
+ return deal(reserveDeadWall(wall),0);
 }
 export const ankanGame=()=>kanGame({hands:{0:['111z','234m','456p','678s','2z']},draw:'east',rinshan:['south']});
 export const kakanGame=()=>kanGame({hands:{0:['234m','456p','678s','2z']},melds:{0:[{type:'pon',group:'111z'}]},draw:'east',rinshan:['south']});

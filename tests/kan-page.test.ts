@@ -17,6 +17,17 @@ test('public multiple scenario allows two real kans', () => {
   assert.equal(g.kanCount, 2);
   assert.equal(allTiles(g).length, 136);
 });
+test('public opening deal scenario offers selectable ankan options before the first discard', () => {
+  const game = scenarioGame('opening');
+  const options = getKanOptions(game, 0);
+  assert.equal(game.players[0].drawnTileSource, 'deal');
+  assert.equal(options.length, 2);
+  assert.equal(new Set(options.map(option => option.id)).size, 2);
+  const declared = declareKan(game, 0, options[1].id);
+  assert.equal(declared.kanCount, 1);
+  assert.equal(declared.players[0].drawnTileSource, 'rinshan');
+  assert.equal(declared.players[0].melds![0].type, 'ankan');
+});
 test('public robbery supports both normal ron scoring and passing', () => {
   const g = scenarioGame('chankan');
   const pending = declareKan(g, 1, getKanOptions(g, 1)[0].id);

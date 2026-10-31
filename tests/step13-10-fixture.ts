@@ -56,6 +56,15 @@ export function parentKyuushuGame(orphanCount = 9, seed = 101): GameState {
   return arrangedDeal({ handKinds: { 0: keys }, firstDrawKinds: { 0: draw }, seed });
 }
 
+export function parentOpeningKanGame(multiple = false, seed = 131, dealerId: PlayerId = 0): GameState {
+  const hand = multiple
+    ? ['man-1','man-1','man-1','east','east','east','east','man-2','man-3','man-4','pin-2','pin-3','pin-4']
+    : ['man-1','man-1','man-1','man-2','man-3','man-4','pin-2','pin-3','pin-4','sou-2','sou-3','sou-4','east'];
+  const handKinds: Partial<Record<PlayerId, readonly string[]>> = { [dealerId]: hand };
+  const firstDrawKinds: Partial<Record<PlayerId, string>> = { [dealerId]: 'man-1' };
+  return arrangedDeal({ dealerId, handKinds, firstDrawKinds, seed });
+}
+
 export function childKyuushuGame(orphanCount = 9, winningDraw = false, seed = 107): GameState {
   if (orphanCount < 0 || orphanCount > 13) throw new RangeError('Invalid orphan count');
   const keys = [...orphanKinds.slice(0, orphanCount), 'man-2','pin-3','sou-4','man-6','pin-6'].slice(0, 13);

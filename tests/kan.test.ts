@@ -8,12 +8,14 @@ import {getRonCandidates,declareRon,passRon} from '../src/game/ron.ts';
 import {canDeclareTsumo,declareTsumo} from '../src/game/tsumo.ts';
 import {exposedDoraIndicators,uraDoraIndicators} from '../src/game/dora.ts';
 import {isClosedForRiichi,getRiichiDiscardOptions,declareRiichi} from '../src/game/riichi.ts';
+import {canDeclareKyuushuKyuuhai} from '../src/game/special-draws.ts';
 import {winningMelds} from '../src/game/melds.ts';
 import {startMatch,assertPointConservation,nextRound,updateMatchGame} from '../src/game/match.ts';
 import {AutomaticTurnRunner} from '../src/game/automatic-turns.ts';
 import {allTiles,freeze} from './helpers.ts';
 import {tileKindKey} from '../src/model/tile.ts';
 import type {GameState} from '../src/model/game.ts';
+import {childKyuushuKanGame,parentOpeningKanGame,parentKyuushuGame} from './step13-10-fixture.ts';
 function conserved(g:GameState,initial:GameState) {
  assert.equal(allTiles(g).length,136);assert.equal(new Set(allTiles(g).map(t=>t.id)).size,136);
  assert.deepEqual(allTiles(g).map(t=>t.id).sort(),allTiles(initial).map(t=>t.id).sort());assert.equal(g.deadWall.length,14);
@@ -39,6 +41,35 @@ test('two own choices use unique physical IDs and stale/forged requests are immu
  for(const o of getKanOptions(g,0))conserved(declareKan(g,0,o.id),g);
  const snapshot=structuredClone(g);assert.throws(()=>declareKan(g,0,'bad'),RangeError);assert.deepEqual(g,snapshot);
  const r=kan(g);assert.throws(()=>declareKan(r,0,getKanOptions(g,0)[0].id),RangeError);
+});
+test('dealer can ankan from a genuine initial deal before the first discard',()=>{
+ const g=parentOpeningKanGame();assert.equal(g.players[0].drawnTileSource,'deal');assert.equal(getKanOptions(g,0).length,1);
+ const option=getKanOptions(g,0)[0],r=declareKan(g,0,option.id);conserved(r,g);
+ assert.equal(r.kanCount,1);assert.equal(r.callsMade,true);assert.equal(r.players[0].drawnTileSource,'rinshan');
+ assert.equal(r.players[0].melds![0].type,'ankan');assert.equal(r.players[0].hand.length,10);assert.ok(canDiscard(r,0));
+ assert.equal(exposedDoraIndicators(r).length,2);assert.equal(r.deadWall[0],g.liveWall.at(-1));
+});
+test('opening ankan follows the dealer seat after seating advances',()=>{
+ const g=parentOpeningKanGame(false,137,2),options=getKanOptions(g,2);assert.equal(g.dealerId,2);assert.equal(g.turnPlayerId,2);
+ assert.equal(g.players[2].drawnTileSource,'deal');assert.equal(options.length,1);
+ const r=declareKan(g,2,options[0].id);conserved(r,g);assert.equal(r.players[2].drawnTileSource,'rinshan');
+});
+test('dealer without an opening quad can make an ordinary first discard',()=>{
+ const g=parentKyuushuGame(9);assert.deepEqual(getKanOptions(g,0),[]);assert.ok(canDiscard(g,0));
+ const r=discardTile(g,0,g.players[0].drawnTile!.id);conserved(r,g);assert.equal(r.kanCount,0);assert.equal(r.players[0].river.length,1);
+});
+test('dealer may choose either opening ankan candidate while retaining all physical IDs',()=>{
+ const g=parentOpeningKanGame(true),options=getKanOptions(g,0);assert.equal(options.length,2);
+ for(const option of options){
+  const r=declareKan(g,0,option.id);conserved(r,g);assert.equal(r.players[0].melds!.length,1);
+  assert.equal(tileKindKey(r.players[0].melds![0].tiles[0].tile),tileKindKey(option.meld.tiles[0].tile));
+ }
+});
+test('child first live-wall draw keeps ankan and 九種九牌 ordering intact',()=>{
+ const g=childKyuushuKanGame();assert.equal(g.turnPlayerId,1);assert.equal(g.players[1].drawnTileSource,'live-wall');
+ assert.ok(getKanOptions(g,1).some(option=>option.meld.type==='ankan'));assert.ok(canDeclareKyuushuKyuuhai(g,1));
+ const r=declareKan(g,1,getKanOptions(g,1)[0].id);conserved(r,g);assert.equal(r.players[1].drawnTileSource,'rinshan');
+ assert.equal(canDeclareKyuushuKyuuhai(r,1),false,'kan cancels the first-turn 九種九牌 option');
 });
 for(const patch of [{liveWall:[]},{deadWall:[]},{kanCount:4},{phase:'awaiting-draw'},{pendingRiichi:{playerId:0,declarationTileId:'x'}}] as const)test(`illegal kan ${JSON.stringify(patch)}`,()=>{
  const g={...ankanGame(),...patch} as GameState;assert.deepEqual(getKanOptions(g,0),[]);assert.throws(()=>declareKan(g,0,'bad'),RangeError);

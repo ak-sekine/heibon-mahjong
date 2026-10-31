@@ -19,7 +19,7 @@ import { callStart } from './calls-fixture.ts';
 import { riichiStart } from './riichi-fixture.ts';
 import { ronGame } from './ron-fixture.ts';
 import { tsumoGame } from './tsumo-fixture.ts';
-import { parentKyuushuGame } from './step13-10-fixture.ts';
+import { parentOpeningKanGame,parentKyuushuGame } from './step13-10-fixture.ts';
 
 function onlineViewFor(game: GameState, options: {
   status?: PlayerGameView['status'];
@@ -143,6 +143,19 @@ test('kan options are shared and processing disables legal controls without hidi
   const localRunning = createLocalActionPanelState(match, match.game.players[0].drawnTile!.id, true, false);
   assert.equal(localRunning.buttons.discard.visible, true);
   assert.equal(localRunning.buttons.discard.enabled, false);
+});
+
+test('dealer opening kan choices and ordinary discard are available in both action panels', () => {
+  const game = parentOpeningKanGame(true);
+  const match = startMatch(game);
+  const local = createLocalActionPanelState(match, null, false, false);
+  const online = createOnlineActionPanelState(onlineViewFor(game), null, false, false, false, null);
+  assertSharedButtons(local, online, ['discard', 'kan-toggle', 'kyuushu']);
+  assert.equal(local.buttons.discard.visible, true);
+  assert.equal(local.buttons['kan-toggle'].visible, true);
+  assert.equal(local.buttons['kan-toggle'].enabled, true);
+  assert.equal(local.kanGroup.options.length, 2);
+  assert.deepEqual(local.kanGroup.options.map(option => option.id), online.kanGroup.options.map(option => option.id));
 });
 
 test('call choices and pass state match between a local call window and server legal options', () => {

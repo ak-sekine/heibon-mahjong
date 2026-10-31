@@ -5,6 +5,7 @@ import { cancelAllIppatsu } from './ippatsu.ts';
 import { getWaitingTileKinds, resolveDiscardRon } from './ron.ts';
 import { analyzeWinningShapes } from '../analysis/winning-shape.ts';
 import { calculateShanten } from '../analysis/shanten.ts';
+import { isTenhouState } from './first-turn-wins.ts';
 
 export interface KanOption {
   readonly id: string;
@@ -33,7 +34,10 @@ function riichiAnkanAllowed(p: PlayerState, tiles: readonly PhysicalTile[]): boo
 }
 export function getKanOptions(game: GameState, playerId: PlayerId): readonly KanOption[] {
   const p=game.players[playerId];
-  if(!p || p.id!==playerId || game.turnPlayerId!==playerId || game.phase!=='awaiting-discard' || game.pendingRiichi || game.ronWindow || game.winResult || !canTakeRinshan(game) || !p.drawnTile || !['live-wall','rinshan'].includes(p.drawnTileSource ?? '') || p.callDiscard || p.hand.length!==concealedSize(p)) return [];
+  if(!p || p.id!==playerId) return [];
+  const hasLegalDraw = ['live-wall','rinshan'].includes(p.drawnTileSource ?? '') ||
+    p.drawnTileSource==='deal' && isTenhouState(game,playerId);
+  if(game.turnPlayerId!==playerId || game.phase!=='awaiting-discard' || game.pendingRiichi || game.ronWindow || game.winResult || !canTakeRinshan(game) || !p.drawnTile || !hasLegalDraw || p.callDiscard || p.hand.length!==concealedSize(p)) return [];
   const all=[...p.hand,p.drawnTile], physical=[...all,...(p.melds ?? []).flatMap(m=>m.tiles)];
   if(new Set(physical.map(t=>t.id)).size!==physical.length) return [];
   const options:KanOption[]=[];
