@@ -105,6 +105,11 @@
       <button id="result-new-game" type="button" hidden class="ui-button ui-button--a">新しい対局</button>
     </footer>
   </dialog>
+  <dialog id="match-result-dialog" aria-labelledby="match-result-title">
+    <header class="result-header"><h2 id="match-result-title">対局結果</h2></header>
+    <div id="match-result-body" tabindex="0" role="region" aria-label="対局結果の順位と持ち点"></div>
+    <footer class="result-footer"><button id="match-result-close" type="button" class="ui-button ui-button--b">閉じる</button></footer>
+  </dialog>
   <dialog id="new-game-dialog" aria-labelledby="new-game-question">
     <p id="new-game-question">現在の対局を終了して、最初から始めますか？</p>
     <div class="new-game-actions">
