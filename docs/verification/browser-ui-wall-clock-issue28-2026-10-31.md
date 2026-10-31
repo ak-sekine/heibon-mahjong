@@ -249,7 +249,7 @@ Browser UIをCodex Cloudで起動する環境構築は行いません。
 - `tests/ci-change-classifier.test.mjs`はworkflowの実condition文字列を抽出して対応する条件式を評価し、success／failure／cancelled／skippedの集約値ごとに`release-freshness`、`deploy-worker`、`pages-build`が許可するのはsuccessだけであること、verify等の必須job skipを許可しないことを確認します。これは条件式の静的評価であり、GitHub Actions式ランタイムそのものを実行した証拠とは区別します。
 - PyYAML 6.0.3でBrowser UI／Deploy YAMLを解析し、2要素matrix、依存job、Permissions、auditの配置を確認しました。YAML parsing・条件式評価は静的検証です。
 - 既存run [41205805669](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41205805669)ではChromium job failure／WebKit job successが実際に記録され、`fail-fast: false`でWebKit側は完了しました。run自体はfailureです。ただしそのrunは`deploy_required=false`だったため、release/deploy jobは分類条件によりskipでした。これは失敗matrix時の本番gate拒否を直接実行した証拠ではありません。
-- 既存run [41206140603](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41206140603)ではChromium／WebKit両jobがsuccessし、Browser UI matrixも成功しました。一方`deploy_required=false`のためrelease/deploy jobはskipでした。今回追加したauditの実API queryは、push後に自動実行されるvalidation-only runで成功pathを実行して確認します。production deployやCloudflare secretは使用しません。
+- 既存run [41206140603](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41206140603)ではChromium／WebKit両jobがsuccessし、Browser UI matrixも成功しました。一方`deploy_required=false`のためrelease/deploy jobはskipでした。
 - cancelled／skipped legを意図的に作る追加Actions runは起動していません。個別job APIを照会して各legの結論を直接fail-closedで判定するコードと、各stateの自動テストで確認し、実施していないActions異常runを実績扱いしません。actual negative-path workflow runは未確認です。
 
 ### Phase 3に関連する性能・artifact・CIの再確認
@@ -262,7 +262,9 @@ Browser UIをCodex Cloudで起動する環境構築は行いません。
 
 - `node tests/ci-change-classifier.test.mjs`: 17 tests成功。
 - `tests/deploy-gate-matrix.test.mjs`: 2 tests成功。
-- `npm test`: 72 test files成功、失敗0、skip 0（Phase 3 test追加後のローカル実行）。
-- PyYAML YAML parse、`git diff --check`、Browser UI selection 5 testsも実行しました。push後のActions結果と実API audit成功は別途追記します。
-- 静的検証はmatrix gateがsuccess以外を拒否するコード構造とunit validatorを確認します。既存Actions runはfailure+successとsuccess+successの実matrixを確認しています。新規validation-only runではjobs API auditのsuccess pathを実行します。cancelled／skippedの実Actions matrix runやnegative deploy pathの実行は行わず、個別leg API監査が非success／欠落を拒否するunit testsで扱います。
-- 完了条件の評価: 短縮計測、全56件success、scope維持、既存CI成功、artifact保存はPhase 2 runで充足。failure/cancel/skip gateはPhase 3の個別job API auditと静的status tableで補強し、GitHub上のaudit successも確認後に完了判定します。再現性、Chromium CSV直接展開、iPhone Safariは残存riskとして明記します。
+- `npm test`: 72 test files成功、失敗0、skip 0（Phase 3 test追加後のローカル実行）。`tests/ci-change-classifier.test.mjs` 17 tests、`tests/deploy-gate-matrix.test.mjs` 2 tests、Browser UI selection 5 testsも成功しました。PyYAMLで両workflowをparseし、`git diff --check`も成功しました。
+- Phase 3 commit `171a4089e77f12698b8ae702ea94e2658f05e6d7` のvalidation-only Actions run [41208917661](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41208917661) はsuccessです。`verify`、Chromium、WebKit、matrix audit、docs-checkがsuccessし、release-freshness、deploy-worker、production-test、pages-build、pages-deployはすべてskipしました（`deploy_required=false`）。本番デプロイ・Cloudflare secretは実行されていません。
+- 同runのjob logでChromiumは34/34、WebKitは22/22 script success、timeout／failure 0を確認しました。Browser artifactはChromium ID `13045694097`（34,731,167 bytes）、WebKit ID `13045886386`（7,995,569 bytes）でupload success。center-round-display artifactも両engineでupload successです。`browser-ui-matrix-audit` job ID `124562113382`のlogに、current run attemptから両engineのjob successを確認した実出力があります。
+- 静的検証ではworkflowの実condition文字列を評価し、各Browser result値と各engine組合せ、required job skipがdeployへ進まないことを確認しました。unit testsは個別engineのjob conclusionを検査するvalidatorへfailure／cancelled／skipped／missing等を与え、success-successだけを許可します。さらに新runでGitHub jobs APIを照会する監査経路自体を成功pathで実行しました。cancelled／skippedの実Actions matrix run、またはproduction deploy jobを意図的に失敗させる検証は行っていません。
+- Issue完了条件の評価: 壁時計短縮、34＋22 scenario全成功、テスト範囲とCI条件の維持、正常CI、engine別artifact、failure／cancel／skipを個別job API結論で閉じるgate、自動status tests、残存riskの文書化を確認しました。実cancel／skip runはありませんが、production runを危険にさらさず個別matrix job APIを直接監査する構造を実workflowで実行できたため、追加の隔離workflowは不要と判断しました。
+- 残存risk: 性能改善の複数run再現性は未確認です。Chromium artifact ZIPは32 MiB転送上限を超え、CSVの直接展開・確認は未確認です。iPhone Safari実機確認はCI内部変更のため必須でなく、今回は未実施です。性能値は単一比較runの計測で、恒常的な改善率とは断定しません。
