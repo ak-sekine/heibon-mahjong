@@ -86,13 +86,14 @@ jobs:
           echo "Release target SHA: $HEAD_REF"
 
   release-freshness:
-    needs: [detect-changes, verify, browser-ui]
+    needs: [detect-changes, verify, browser-ui, browser-ui-matrix-audit]
     if: >-
       ${{
         always() &&
         needs.detect-changes.outputs.deploy_required == 'true' &&
         needs.verify.result == 'success' &&
-        needs.browser-ui.result == 'success'
+        needs.browser-ui.result == 'success' &&
+        needs.browser-ui-matrix-audit.result == 'success'
       }}
     runs-on: ubuntu-latest
     steps:
@@ -169,14 +170,40 @@ jobs:
     with:
       reuse_build: ${{ needs.detect-changes.outputs.run_full_suite == 'true' }}
 
+  browser-ui-matrix-audit:
+    needs: [detect-changes, browser-ui]
+    if: >-
+      ${{
+        always() &&
+        needs.detect-changes.outputs.run_full_suite == 'true'
+      }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require both Browser UI engine jobs in this run attempt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          JOBS_FILE: ${{ runner.temp }}/browser-ui-jobs.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT/jobs?per_page=100" > "$JOBS_FILE"
+          node .github/scripts/check-browser-ui-matrix.mjs "$JOBS_FILE"
+
   deploy-worker:
-    needs: [detect-changes, verify, browser-ui, release-freshness]
+    needs: [detect-changes, verify, browser-ui, browser-ui-matrix-audit, release-freshness]
     if: >-
       ${{
         always() &&
         needs.detect-changes.outputs.deploy_required == 'true' &&
         needs.verify.result == 'success' &&
         needs.browser-ui.result == 'success' &&
+        needs.browser-ui-matrix-audit.result == 'success' &&
         needs.release-freshness.result == 'success' &&
         (github.event_name != 'workflow_dispatch' || inputs.deploy_to_production == true)
       }}
@@ -240,13 +267,14 @@ jobs:
         run: npm run test:online:production
 
   pages-build:
-    needs: [detect-changes, verify, browser-ui, deploy-worker, production-test]
+    needs: [detect-changes, verify, browser-ui, browser-ui-matrix-audit, deploy-worker, production-test]
     if: >-
       ${{
         always() &&
         needs.detect-changes.outputs.deploy_required == 'true' &&
         needs.verify.result == 'success' &&
         needs.browser-ui.result == 'success' &&
+        needs.browser-ui-matrix-audit.result == 'success' &&
         needs.deploy-worker.result == 'success' &&
         needs.production-test.result == 'success'
       }}

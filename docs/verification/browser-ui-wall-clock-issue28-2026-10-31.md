@@ -214,3 +214,55 @@ runは13:33:58 UTC作成、13:48:53 UTC完了で、作成から完了まで14分
 **Issue #28はOpenのままです。** 壁時計短縮・suite成功・artifact保存・静的gate確認は完了しましたが、IssueのClose条件であるfailure／cancel／skip時のdeploy禁止をActions上の実行結果として確認していません。iPhone Safari実機確認は今回のCI変更では不要で、自動検証と実機確認を区別しています。
 
 Browser UIをCodex Cloudで起動する環境構築は行いません。
+
+## Phase 3 deploy gate最終検証（2026-10-31）
+
+### 作業開始点と再利用した記録
+
+- `origin/main`をfetchし、Phase 2文書commit `53dc02faa396ef537d8b86dadd0bc860e79579e1` を最新SHAとして確認して開始しました。Phase 2実装commit `4142dff5acabaa7ba332b19292b6d8ccb71c0352`／`791439185535f0a96bd5de66fa401f5c683b07c2`へ巻き戻していません。
+- Issue #28本文とPhase 1・2コメント、Baseline run [41196608100](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41196608100)、改善後run [41206140603](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41206140603)、Phase 2記録を再利用しました。56 scenarioを再測定していません。
+
+### Deploy依存関係とmatrix集約の扱い
+
+- `.github/workflows/browser-ui.yml`は`chromium`／`webkit`の2要素matrix、`fail-fast: false`、`max-parallel: 2`です。matrix jobにjob-levelのengine別skip条件も`continue-on-error`もありません。
+- GitHubのmatrix job結果は集約値です。2026-10-30公開の[GitHub Community報告](https://github.com/orgs/community/discussions/211624)では、runner割当より前にcancelledとなったmatrix legがあっても`needs.<matrix-job>.result`が`success`となった再現例が複数報告され、個別jobのAPI結果確認が回避策として示されています。これはCommunityの再現報告でGitHub公式仕様説明ではありませんが、集約値だけに依存する設計の残存リスクとして扱いました。
+- `.github/workflows/deploy.yml`へ`browser-ui-matrix-audit`を追加しました。`run_full_suite == 'true'`のrunで`always()`条件から実行し、current `run_id`／`run_attempt`のActions jobs APIを読みます。実job名`browser-ui / browser-ui (chromium)`と`browser-ui / browser-ui (webkit)`がそれぞれ1件存在し、両方の`conclusion`が`success`であることを要求します。API取得失敗、job欠落・重複、failure／cancelled／skipped／その他のconclusionはaudit failureになります。現在のattemptを参照するため、job単体rerun後も古いattemptの結果を混同しません。必要権限は`actions: read`と`contents: read`です。
+- `release-freshness`、`deploy-worker`、`pages-build`は従来の`needs.browser-ui.result == 'success'`に加え、auditのsuccessも必要とします。さらにverifyと各前提jobのsuccess、`deploy_required`、workflow_dispatchの明示入力を維持します。`production-test`はWorker deploy successに依存し、`pages-deploy`はPages build successをneedsに持ちます。これらのjobはproduction処理を行う前にauditを通過します。
+- docs-only変更では既存classifierが`run_full_suite=false`かつ`deploy_required=false`を返します。このときmatrix auditをskipし、既存どおりverify／Browser UI／production deployを省略します。deployment decisionは未完了releaseがあればdocs-only pushでもsuiteをtrueにするため、その場合はmatrix auditを必須にします。
+
+### 異常系のテスト結果と検証範囲
+
+| Chromium | WebKit | 個別job監査の期待 | downstream gateの期待 |
+| --- | --- | --- | --- |
+| success | success | 許可 | 他の条件もsuccessなら続行可能 |
+| failure | success | 拒否 | 停止 |
+| success | failure | 拒否 | 停止 |
+| cancelled | success | 拒否 | 停止 |
+| success | cancelled | 拒否 | 停止 |
+| skipped | success | 拒否 | 停止 |
+| success | skipped | 拒否 | 停止 |
+| failure | failure | 拒否 | 停止 |
+| cancelled | cancelled | 拒否 | 停止 |
+| skipped | skipped | 拒否 | 停止 |
+
+- `tests/deploy-gate-matrix.test.mjs`は、実Actions jobs APIレスポンスを検査する`.github/scripts/check-browser-ui-matrix.mjs`を直接テストします。両engineの全status組み合わせに加え、matrix全体のfailure／cancelled／skipped相当、job欠落、重複、null payloadを拒否します。
+- `tests/ci-change-classifier.test.mjs`はworkflowの実condition文字列を抽出して対応する条件式を評価し、success／failure／cancelled／skippedの集約値ごとに`release-freshness`、`deploy-worker`、`pages-build`が許可するのはsuccessだけであること、verify等の必須job skipを許可しないことを確認します。これは条件式の静的評価であり、GitHub Actions式ランタイムそのものを実行した証拠とは区別します。
+- PyYAML 6.0.3でBrowser UI／Deploy YAMLを解析し、2要素matrix、依存job、Permissions、auditの配置を確認しました。YAML parsing・条件式評価は静的検証です。
+- 既存run [41205805669](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41205805669)ではChromium job failure／WebKit job successが実際に記録され、`fail-fast: false`でWebKit側は完了しました。run自体はfailureです。ただしそのrunは`deploy_required=false`だったため、release/deploy jobは分類条件によりskipでした。これは失敗matrix時の本番gate拒否を直接実行した証拠ではありません。
+- 既存run [41206140603](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41206140603)ではChromium／WebKit両jobがsuccessし、Browser UI matrixも成功しました。一方`deploy_required=false`のためrelease/deploy jobはskipでした。今回追加したauditの実API queryは、push後に自動実行されるvalidation-only runで成功pathを実行して確認します。production deployやCloudflare secretは使用しません。
+- cancelled／skipped legを意図的に作る追加Actions runは起動していません。個別job APIを照会して各legの結論を直接fail-closedで判定するコードと、各stateの自動テストで確認し、実施していないActions異常runを実績扱いしません。actual negative-path workflow runは未確認です。
+
+### Phase 3に関連する性能・artifact・CIの再確認
+
+- 改善前後は既存Actions runとPhase 2のscenario開始・終了ログの記録を再照合しました。比較値は18分12.3秒から8分50.4秒、9分21.9秒短縮、単一run比較で51.4%です。今回の性能測定runは起動しておらず、この値を恒常的な改善率とは断定しません。
+- run 41206140603のartifact metadataではChromium artifact ID `13045050963`、34,789,006 bytes、WebKit ID `13044801727`、7,996,053 bytesが存在し、両方とも非expiredです。WebKit CSVは22行を直接展開確認済みです。Chromium CSVはZIPが32 MiB転送上限を超えるため直接展開未確認で、artifact metadata・upload log・34/34 success logまでを根拠とします。
+- 複数runでの性能再現性は未確認です。iPhone Safari実機確認は今回必須ではなく、実施していません。
+
+### Phase 3ローカル検証と完了条件
+
+- `node tests/ci-change-classifier.test.mjs`: 17 tests成功。
+- `tests/deploy-gate-matrix.test.mjs`: 2 tests成功。
+- `npm test`: 72 test files成功、失敗0、skip 0（Phase 3 test追加後のローカル実行）。
+- PyYAML YAML parse、`git diff --check`、Browser UI selection 5 testsも実行しました。push後のActions結果と実API audit成功は別途追記します。
+- 静的検証はmatrix gateがsuccess以外を拒否するコード構造とunit validatorを確認します。既存Actions runはfailure+successとsuccess+successの実matrixを確認しています。新規validation-only runではjobs API auditのsuccess pathを実行します。cancelled／skippedの実Actions matrix runやnegative deploy pathの実行は行わず、個別leg API監査が非success／欠落を拒否するunit testsで扱います。
+- 完了条件の評価: 短縮計測、全56件success、scope維持、既存CI成功、artifact保存はPhase 2 runで充足。failure/cancel/skip gateはPhase 3の個別job API auditと静的status tableで補強し、GitHub上のaudit successも確認後に完了判定します。再現性、Chromium CSV直接展開、iPhone Safariは残存riskとして明記します。
