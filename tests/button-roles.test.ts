@@ -27,7 +27,7 @@ test('every static operation button on product and verification pages has exactl
   for (const file of files) {
     const html = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     const nodes = buttons(html);
-    assert.equal(nodes.length, file === 'index.html' ? 47 : file === 'kan-test.html' ? 20 : 22);
+    assert.equal(nodes.length, file === 'index.html' ? 47 : file === 'kan-test.html' ? 21 : 22);
     for (const button of nodes) {
       const classes = button.match(/\bclass="([^"]*)"/u)?.[1]?.split(/\s+/u) ?? [];
       if (classes.includes('main-menu-item') || classes.includes('main-menu-toggle')) {
