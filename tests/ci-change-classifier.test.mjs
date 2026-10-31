@@ -62,6 +62,31 @@ test('production deployment requires successful full verification and Browser UI
   assert.doesNotMatch(deployWorkflow, /test:file|test:browser/);
 });
 
+test('Browser UI engine matrix keeps scenarios independent and avoids duplicate test/build work', () => {
+  const buildJob = browserWorkflow.match(/  verify-build:\n([\s\S]*?)\n  browser-ui:/)?.[1] ?? '';
+  const browserJob = browserWorkflow.match(/  browser-ui:\n([\s\S]*)$/)?.[1] ?? '';
+  assert.match(browserJob, /fail-fast: false/);
+  assert.match(browserJob, /max-parallel: 2/);
+  assert.match(browserJob, /browser: \[chromium, webkit\]/);
+  assert.match(browserJob, /run-browser-regressions\.py --browser/);
+  assert.match(browserJob, /playwright install --with-deps "\$\{\{ matrix\.browser \}\}"/);
+  assert.match(browserJob, /if-no-files-found: error/);
+  assert.doesNotMatch(browserJob, /run: npm test|run: npm run build/);
+  assert.match(buildJob, /run: npm test/);
+  assert.match(buildJob, /run: npm run build/);
+  assert.match(buildJob, /if-no-files-found: error/);
+
+  const resultArtifactNames = [...browserJob.matchAll(/^\s+name: (.+)$/gm)]
+    .map((match) => match[1])
+    .filter((name) => /browser-ui-|center-round-display-|river-spacing-diagnostics-/.test(name));
+  assert.equal(resultArtifactNames.length, 3);
+  for (const name of resultArtifactNames) {
+    assert.match(name, /\$\{\{ matrix\.browser \}\}/);
+    assert.match(name, /\$\{\{ github\.sha \}\}/);
+    assert.match(name, /\$\{\{ github\.run_attempt \}\}/);
+  }
+});
+
 const released = {
   stateReliable: true,
   workerSha: '1'.repeat(40),
@@ -80,7 +105,9 @@ test('required recovery scenarios: app changes require a verified deployment', (
   const deployJobEnabled = (verify, browserUi) =>
     failedVerification.deploy_required === 'true' && verify === 'success' && browserUi === 'success';
   assert.equal(deployJobEnabled('failure', 'success'), false);
-  assert.equal(deployJobEnabled('success', 'failure'), false);
+  for (const browserResult of ['failure', 'cancelled', 'skipped', 'neutral']) {
+    assert.equal(deployJobEnabled('success', browserResult), false, browserResult);
+  }
   assert.equal(deployJobEnabled('success', 'success'), true);
 });
 

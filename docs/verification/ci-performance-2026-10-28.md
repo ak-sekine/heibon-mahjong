@@ -71,7 +71,7 @@ npm run test:browser -- --script tests/browser-app-idle.py --browser webkit
 npm run test:browser -- --script tests/browser-app-idle.py --browser both
 ```
 
-対象スクリプトに manifest 上のChromium／WebKit両方の実行がある場合だけ`both`を指定できます。対応のないengineを要求するとrunnerはエラーになります。Browser runnerはログに開始・終了UTC時刻、秒単位時間、成功／失敗／タイムアウト／キャンセルを出し、既定で`/tmp/heibon-browser-ui-timings.csv`へ45件分の結果を書きます。失敗前に開始されなかったスクリプトは`skipped`として記録します。Browser UI artifactにも`heibon-browser-ui-timings.csv`が入ります。Playwrightケース単位の所要時間は未計測です。
+`--browser chromium`または`--browser webkit`でmanifest内の全scenarioをengine別に選べます。`--script`と組み合わせる場合も、対応のないengineを要求するとrunnerはエラーになります。`--browser both`は全engineを選びます（`--script`と併用する場合はそのscriptの両engine実行が必要です）。Browser runnerはログに開始・終了UTC時刻、秒単位時間、成功／失敗／タイムアウト／キャンセルを出し、既定で`/tmp/heibon-browser-ui-timings.csv`へ結果を書きます。失敗前に開始されなかったスクリプトは`skipped`として記録します。Browser UI artifactにもtiming CSVが入ります。Playwrightケース単位の所要時間は未計測です。
 
 高速テストは本番deploy経路から呼ばれず、成功だけでdeploy条件を満たせません。
 

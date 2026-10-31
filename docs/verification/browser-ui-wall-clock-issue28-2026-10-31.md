@@ -126,6 +126,39 @@ ChromiumとWebKitの実測時間差は183.089秒（3分03.1秒）で、別runner
 - 既存ローカルmock等の実行時副作用に関する全スクリプト横断の動的検証。今回は追加CIを行わず、Phase 2の通常runで確認します。
 - GitHub repository外側の組織ポリシーがある場合のbranch protection設定。deploy gateのソースと対象runの動作は確認済み。
 
-## Phase 1結果
+## Phase 1時点の結果（2026-10-31）
 
-推奨設計をA（Chromium/WebKit別job）に固定します。Phase 2のrunner・workflow実装、CIの追加実行、IssueのCloseは未実施です。Issue #28はOpenを維持し、次の指示があるまでPhase 2を開始しません。
+推奨設計をA（Chromium/WebKit別job）に固定しました。この時点ではPhase 2のrunner・workflow実装とCI実行は未実施でした。
+
+## Phase 2実装・検証（2026-10-31）
+
+### 作業開始点と既存成果
+
+- 最新mainをfetchして開始SHA `ebc684bccecfb96415e1cdb979342c61a3d133c0` を確認しました。Phase 1記録commitが開始時点のmainでした。作業ツリーはcleanでした。
+- Issue #28本文と最新コメント、Issue #15の[CI重複解消記録](ci-performance-2026-10-28.md)、Issue #23の[調査記録](browser-ui-ci-duration-issue23-2026-10-30.md)、Browser UI・Deploy workflow、`tests/run-browser-regressions.py`を再利用し、先行調査を繰り返していません。
+- 比較baselineはPhase 1のActions run [41196608100](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41196608100)、SHA `4172c2444a65b3bcf8e2138e6c49d0715a2609fd` です。Chromium 35件／10:37.7、WebKit 21件／7:34.6、全56件／18:12.3、Browser UI job全体19:18.2、run内runner時間合計22:00.8を固定値として引き継ぎます。run内runner時間はDeploy run全体のrunner log時間合計で、Browser UI専用runner時間ではありません。
+
+### 実装
+
+- `tests/run-browser-regressions.py`の既存`--browser`引数を全suiteにも適用し、`--browser chromium`、`--browser webkit`、全engine互換の`--browser both`を使えるようにしました。`--script`選択との併用と、manifestにないengine／scriptのエラーを維持します。engine単独のCSVはそのengineの実行単位のみを含み、既存`--script`選択時は他のmanifest行を`skipped`で記録する従来の形式を保ちます。
+- `.github/workflows/browser-ui.yml`を2要素のChromium／WebKit matrixにし、`fail-fast: false`と`max-parallel: 2`を設定しました。各runnerは担当engineだけPlaywrightをinstall・起動し、runner内のmanifest順序は従来どおり逐次です。
+- 呼び出し側からbuildを再利用しないPR／workflow実行では、`verify-build`で`npm test`とbuildを1回だけ実施・artifact保存し、matrixの各runnerはそのdistを取得します。main Deployからの呼び出しでは既存`verify` jobのartifactを使うため、同じSHAでunit test/buildを重ねません。engine runnerに必要な`npm ci`とVite／previewはそれぞれのrunnerに残します。
+- timing CSV、回帰ログ、Vite／previewログと既存screenshotsをartifactへ保存します。Browser UI artifact、center-round-display、river-spacing diagnosticsの名前にengineを含め、SHA／run attemptも保持します。主artifactはartifact upload失敗をjob失敗として扱い、Deploy gateを閉じます。
+- `.github/workflows/deploy.yml`のgateは変更していません。`browser-ui` reusable workflow全体がsuccessの場合だけ後続のrelease-freshness、Worker／Pages処理へ進みます。matrixの一部失敗・cancelをsuccessに変換する`continue-on-error`は設定していません。`workflow_dispatch`の安全条件、docs-only/validation-only分類も維持します。
+- エンジン選択を検証するPython標準ライブラリ単体テストを追加し、Chromium 35件・WebKit 21件の網羅・排他、`both`と従来の`--script`、不正engine拒否を確認します。
+
+### 変更ファイル
+
+`tests/run-browser-regressions.py`、`tests/test_browser_regressions_selection.py`、`.github/workflows/browser-ui.yml`、`docs/verification/ci-performance-2026-10-28.md`、本記録、`docs/verification/README.md`、`docs/ROADMAP.md`。
+
+### ローカル検証
+
+- `python -m py_compile tests/run-browser-regressions.py tests/test_browser_regressions_selection.py`成功。
+- `python tests/test_browser_regressions_selection.py`: 5 tests成功。Chromium 35件、WebKit 21件の網羅・排他、default／`both`での全56件互換、`--script`併用、engine別CSV行数・engine値、不明scriptと不正engineのエラーを確認。
+- `npm test`: 71 tests成功、失敗0、skip 0。関連する`node --test tests/ci-change-classifier.test.mjs`も成功。静的テストにmatrix並列性、テスト/build重複防止、engine別artifact名、failure/cancel/skip時にsuccess条件を満たさないことを追加。
+- PyYAML 6.0.3でBrowser UI／Deploy workflowをparseし、matrix要素・`fail-fast: false`・2並列上限、担当engineのinstall/run、strict main artifact、Deploy reusable workflow依存と後続gateをassertionで確認。`git diff --check`成功。
+- Codex CloudではBrowser UIを起動していません。Chromium／WebKitを含む実行はGitHub-hosted runnerで検証します。
+
+GitHub Actions CI、engine別の完了時刻・実行重複・queue時間、artifact一覧・CSV内容、workflow全体時間、run内runner時間、deploy関連jobの実行／skip結果は通常CI後に記録します。失敗・cancelを故意に発生させるworkflow検証は行いません。失敗／cancel時のdeploy拒否は、Actions実行の観察結果と静的gate確認を区別します。iPhone Safari実機確認は今回のCI内部変更に含めず、新たな必須条件にしません。
+
+Browser UIをCodex Cloudで起動する環境構築は行いません。

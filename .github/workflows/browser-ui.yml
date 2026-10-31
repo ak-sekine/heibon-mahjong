@@ -64,9 +64,9 @@ jobs:
             git show --check --format= --no-renames "$HEAD_REF"
           fi
 
-  browser-ui:
+  verify-build:
     needs: detect-changes
-    if: ${{ always() && (inputs.reuse_build || needs.detect-changes.outputs.run_full_suite == 'true') }}
+    if: ${{ always() && !inputs.reuse_build && needs.detect-changes.result == 'success' && needs.detect-changes.outputs.run_full_suite == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -74,24 +74,71 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - run: npm ci
+      - name: Run all unit and integration tests
+        run: npm test
+      - name: Build the browser test site
+        run: npm run build
+      - name: Save the verified browser test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist
+          if-no-files-found: error
+
+  browser-ui:
+    needs: [detect-changes, verify-build]
+    if: >-
+      ${{
+        always() &&
+        (inputs.reuse_build || (
+          needs.detect-changes.result == 'success' &&
+          needs.detect-changes.outputs.run_full_suite == 'true' &&
+          needs.verify-build.result == 'success'
+        ))
+      }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        browser: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare engine-specific diagnostics
+        env:
+          BROWSER: ${{ matrix.browser }}
+        run: |
+          mkdir -p /tmp/heibon-table-ui
+          printf 'script,browser,start_utc,end_utc,duration_seconds,status,timed_out\n' > "/tmp/heibon-browser-ui-timings.csv"
+          : > "/tmp/heibon-browser-ui-${BROWSER}.log"
+          : > /tmp/heibon-vite.log
+          : > /tmp/heibon-preview.log
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Test Browser UI engine selection
+        if: ${{ matrix.browser == 'chromium' }}
+        run: python tests/test_browser_regressions_selection.py
       - run: npm ci
-      - name: Run all unit and integration tests
-        if: ${{ !inputs.reuse_build }}
-        run: npm test
-      - name: Build the browser test site
-        if: ${{ !inputs.reuse_build }}
-        run: npm run build
       - name: Download verified build from Deploy workflow
         if: ${{ inputs.reuse_build }}
         uses: actions/download-artifact@v4
         with:
           name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
           path: dist
+      - name: Download verified build from this workflow
+        if: ${{ !inputs.reuse_build }}
+        uses: actions/download-artifact@v4
+        with:
+          name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist
       - run: python -m pip install playwright
-      - run: python -m playwright install --with-deps chromium webkit
+      - run: python -m playwright install --with-deps "${{ matrix.browser }}"
       - name: Run Vite and browser regressions
         shell: bash
         env:
@@ -110,17 +157,21 @@ jobs:
           done
           curl --fail --silent http://127.0.0.1:4173/heibon-mahjong/ > /dev/null
           curl --fail --silent http://127.0.0.1:4174/heibon-mahjong/ > /dev/null
-          export HEIBON_CHROMIUM="$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
+          if [[ "${{ matrix.browser }}" == chromium ]]; then
+            export HEIBON_CHROMIUM="$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
+          fi
           export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
-          python tests/run-browser-regressions.py
+          set -o pipefail
+          python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
       - name: Save browser results, script timings, and screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: browser-ui-${{ github.sha }}-${{ github.run_attempt }}
-          if-no-files-found: warn
+          name: browser-ui-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          if-no-files-found: error
           path: |
             /tmp/heibon-browser-ui-timings.csv
+            /tmp/heibon-browser-ui-${{ matrix.browser }}.log
             /tmp/heibon-table-ui
             /tmp/heibon-vite.log
             /tmp/heibon-preview.log
@@ -129,14 +180,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: center-round-display-${{ github.sha }}-${{ github.run_attempt }}
+          name: center-round-display-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
           if-no-files-found: warn
           path: /tmp/heibon-table-ui/center-round-display
       - name: Save river spacing failure diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: river-spacing-diagnostics-${{ github.sha }}-${{ github.run_attempt }}
+          name: river-spacing-diagnostics-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
           if-no-files-found: ignore
           path: |
             /tmp/heibon-table-ui/river-spacing-failure-*.png

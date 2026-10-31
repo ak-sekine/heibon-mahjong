@@ -76,6 +76,28 @@ SUITE = [
 ]
 
 
+def select_scenarios(script_names=None, browser=None):
+    """Return manifest indexes selected by script name and engine."""
+    selected = list(range(len(SUITE)))
+    if script_names:
+        names = {Path(name).name for name in script_names}
+        known = {Path(item['script']).name for item in SUITE}
+        unknown = names - known
+        if unknown:
+            raise ValueError(f"unknown script(s): {', '.join(sorted(unknown))}")
+        selected = [i for i, item in enumerate(SUITE) if Path(item['script']).name in names]
+
+    if browser:
+        engines = {'chromium', 'webkit'} if browser == 'both' else {browser}
+        selected = [i for i in selected if SUITE[i]['browser'] in engines]
+        if script_names:
+            found = {SUITE[i]['browser'] for i in selected}
+            missing = engines - found
+            if missing:
+                raise ValueError(f"selected script has no manifest entry for: {', '.join(sorted(missing))}")
+    return selected
+
+
 def timestamp():
     return datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
 
@@ -93,37 +115,25 @@ def save_report(path, rows):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--script', action='append', help='Run a named script from the full-suite manifest; repeat to select more scripts.')
-    parser.add_argument('--browser', choices=['chromium', 'webkit', 'both'], help='Select a supported engine for --script. Defaults to every manifest variant.')
+    parser.add_argument('--browser', choices=['chromium', 'webkit', 'both'], help='Select all scenarios for one engine, or filter --script; defaults to every manifest variant.')
     parser.add_argument('--timings-file', type=Path, default=Path(os.environ.get('HEIBON_BROWSER_TIMINGS', '/tmp/heibon-browser-ui-timings.csv')))
     args = parser.parse_args()
 
-    if args.browser and not args.script:
-        parser.error('--browser requires at least one --script')
+    try:
+        selected = select_scenarios(args.script, args.browser)
+    except ValueError as error:
+        parser.error(str(error))
 
-    selected = list(range(len(SUITE)))
-    if args.script:
-        names = {Path(name).name for name in args.script}
-        known = {Path(item['script']).name for item in SUITE}
-        unknown = names - known
-        if unknown:
-            parser.error(f"unknown script(s): {', '.join(sorted(unknown))}")
-        selected = [i for i, item in enumerate(SUITE) if Path(item['script']).name in names]
-        if args.browser:
-            engines = {'chromium', 'webkit'} if args.browser == 'both' else {args.browser}
-            selected = [i for i in selected if SUITE[i]['browser'] in engines]
-            found = {SUITE[i]['browser'] for i in selected}
-            missing = engines - found
-            if missing:
-                parser.error(f"selected script has no manifest entry for: {', '.join(sorted(missing))}")
-
-    selected_set = set(selected)
+    report_indexes = selected if args.browser and not args.script else range(len(SUITE))
+    report_rows = {}
     rows = [
         {
             'script': item['script'], 'browser': item['browser'], 'start_utc': '', 'end_utc': '',
             'duration_seconds': '', 'status': 'skipped', 'timed_out': 'no',
         }
-        for item in SUITE
+        for index, item in enumerate(SUITE) if index in report_indexes
     ]
+    report_rows.update((index, row) for index, row in zip(report_indexes, rows))
     save_report(args.timings_file, rows)
     cancelled = False
     current_process = None
@@ -169,7 +179,7 @@ def main():
             status, timed_out = 'failure', 'no'
         end = timestamp()
         elapsed = (datetime.now(timezone.utc) - start_clock).total_seconds()
-        rows[index].update({
+        report_rows[index].update({
             'start_utc': start, 'end_utc': end, 'duration_seconds': f'{elapsed:.3f}',
             'status': status, 'timed_out': timed_out,
         })
