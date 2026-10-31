@@ -28,12 +28,14 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
         all_engines = select_scenarios(browser='both')
 
         self.assertEqual(len(SUITE), 56)
-        self.assertEqual(len(chromium), 35)
-        self.assertEqual(len(webkit), 21)
+        self.assertEqual(len(chromium), 34)
+        self.assertEqual(len(webkit), 22)
         self.assertEqual(set(chromium).intersection(webkit), set())
         self.assertEqual(set(chromium).union(webkit), set(all_engines))
         self.assertEqual(all_engines, list(range(len(SUITE))))
         self.assertEqual(default, all_engines)
+        dialog_layout = next(item for item in SUITE if item['script'] == 'tests/browser-online-dialog-layout.py')
+        self.assertEqual(dialog_layout['browser'], 'webkit')
 
     def test_engine_runs_write_only_the_selected_engine_to_csv(self):
         class SuccessfulProcess:
@@ -45,7 +47,7 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
             def poll(self):
                 return None
 
-        for engine, expected_count in [('chromium', 35), ('webkit', 21)]:
+        for engine, expected_count in [('chromium', 34), ('webkit', 22)]:
             with self.subTest(engine=engine), tempfile.TemporaryDirectory() as directory:
                 report = Path(directory) / 'timings.csv'
                 argv = [str(RUNNER), '--browser', engine, '--timings-file', str(report)]

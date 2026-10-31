@@ -17,7 +17,7 @@ def run(script, browser='chromium', **extra_env):
 
 
 SUITE = [
-    run('tests/browser-online-dialog-layout.py', HEIBON_PRODUCTION_URL='http://127.0.0.1:4174/heibon-mahjong/'),
+    run('tests/browser-online-dialog-layout.py', 'webkit', HEIBON_PRODUCTION_URL='http://127.0.0.1:4174/heibon-mahjong/'),
     run('tests/browser-app-idle.py'),
     run('tests/browser-app-idle.py', 'webkit'),
     run('tests/browser-offline-rules.py'),

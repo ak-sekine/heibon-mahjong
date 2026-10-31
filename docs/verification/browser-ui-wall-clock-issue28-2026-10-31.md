@@ -145,7 +145,11 @@ ChromiumとWebKitの実測時間差は183.089秒（3分03.1秒）で、別runner
 - 呼び出し側からbuildを再利用しないPR／workflow実行では、`verify-build`で`npm test`とbuildを1回だけ実施・artifact保存し、matrixの各runnerはそのdistを取得します。main Deployからの呼び出しでは既存`verify` jobのartifactを使うため、同じSHAでunit test/buildを重ねません。engine runnerに必要な`npm ci`とVite／previewはそれぞれのrunnerに残します。
 - timing CSV、回帰ログ、Vite／previewログと既存screenshotsをartifactへ保存します。Browser UI artifact、center-round-display、river-spacing diagnosticsの名前にengineを含め、SHA／run attemptも保持します。主artifactはartifact upload失敗をjob失敗として扱い、Deploy gateを閉じます。
 - `.github/workflows/deploy.yml`のgateは変更していません。`browser-ui` reusable workflow全体がsuccessの場合だけ後続のrelease-freshness、Worker／Pages処理へ進みます。matrixの一部失敗・cancelをsuccessに変換する`continue-on-error`は設定していません。`workflow_dispatch`の安全条件、docs-only/validation-only分類も維持します。
-- エンジン選択を検証するPython標準ライブラリ単体テストを追加し、Chromium 35件・WebKit 21件の網羅・排他、`both`と従来の`--script`、不正engine拒否を確認します。
+- エンジン選択を検証するPython標準ライブラリ単体テストを追加し、56件の網羅・排他、`both`と従来の`--script`、不正engine拒否を確認します。
+
+### Phase 1基準とのsuite差分
+
+Phase 1ではrunner manifestの`browser`列に基づきChromium 35件・WebKit 21件と報告しました。engine別installを実装して実行コードを突合したところ、manifest先頭の`browser-online-dialog-layout.py`は`run()`既定値によってChromiumとラベルされていた一方、シナリオ本体が常に`playwright.webkit.launch()`を呼ぶことが分かりました。この1 invocationをWebKitへ再分類し、Phase 2実行時の実engine配分は**Chromium 34件・WebKit 22件**です。全scenario数56件、シナリオ本体・viewport・assertion・online/offline検証数は変更していません。Phase 1の固定baseline 10:37.7／7:34.6はrunner manifest labelによるengine別集計なので、この1件は実ブラウザー別の内訳と異なります。Phase 1 runのGitHub Actions logで当該WebKit invocationは9.110秒でした。これを再分類したbaselineはChromium 628.567秒（10:28.6）、WebKit 463.698秒（7:43.7）で、全56件の合計18:12.3秒は不変です。元のPhase 1値と補正後の実engine集計を区別して比較します。
 
 ### 変更ファイル
 
@@ -154,7 +158,7 @@ ChromiumとWebKitの実測時間差は183.089秒（3分03.1秒）で、別runner
 ### ローカル検証
 
 - `python -m py_compile tests/run-browser-regressions.py tests/test_browser_regressions_selection.py`成功。
-- `python tests/test_browser_regressions_selection.py`: 5 tests成功。Chromium 35件、WebKit 21件の網羅・排他、default／`both`での全56件互換、`--script`併用、engine別CSV行数・engine値、不明scriptと不正engineのエラーを確認。
+- `python tests/test_browser_regressions_selection.py`: 5 tests成功。Chromium 34件、WebKit 22件の網羅・排他、default／`both`での全56件互換、`--script`併用、engine別CSV行数・engine値、不明scriptと不正engineのエラーを確認。
 - `npm test`: 71 tests成功、失敗0、skip 0。関連する`node --test tests/ci-change-classifier.test.mjs`も成功。静的テストにmatrix並列性、テスト/build重複防止、engine別artifact名、failure/cancel/skip時にsuccess条件を満たさないことを追加。
 - PyYAML 6.0.3でBrowser UI／Deploy workflowをparseし、matrix要素・`fail-fast: false`・2並列上限、担当engineのinstall/run、strict main artifact、Deploy reusable workflow依存と後続gateをassertionで確認。`git diff --check`成功。
 - Codex CloudではBrowser UIを起動していません。Chromium／WebKitを含む実行はGitHub-hosted runnerで検証します。
