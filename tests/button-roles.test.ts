@@ -4,8 +4,7 @@ import { test } from 'node:test';
 
 const files = ['index.html', 'test.html', 'kan-test.html'];
 const roleById: Record<string, string> = {
-  'main-menu-toggle': 'b', 'new-game': 'a', 'menu-offline-rules': 'b', 'river-test-open': 'b',
-  'online-create-open': 'a', 'online-join-open': 'a', 'menu-room': 'b', 'menu-diagnostics': 'b',
+  'main-menu-toggle': 'b', 'new-game': 'a',
   'online-create-close': 'b', 'online-create-rules': 'b', 'online-create': 'a', 'diagnostic-close': 'b',
   'diagnostic-copy': 'b', 'diagnostic-clear': 'd1', 'online-join-close': 'b', 'online-join': 'a',
   'online-close': 'b', 'online-copy-code': 'b', 'online-confirm-rules': 'b', 'online-ready': 'a',
@@ -31,6 +30,10 @@ test('every static button on product and verification pages has exactly one shar
     assert.equal(nodes.length, file === 'index.html' ? 45 : file === 'kan-test.html' ? 19 : 20);
     for (const button of nodes) {
       const classes = button.match(/\bclass="([^"]*)"/u)?.[1]?.split(/\s+/u) ?? [];
+      if (classes.includes('main-menu-item')) {
+        assert.ok(!classes.includes('ui-button'), `${file}: menu items must not inherit normal button styling: ${button}`);
+        continue;
+      }
       assert.ok(classes.includes('ui-button'), `${file}: ${button}`);
       assert.equal(classes.filter(name => /^ui-button--(?:a|b|c|d1|d2)$/u.test(name)).length, 1, `${file}: ${button}`);
       const id = button.match(/\bid="([^"]+)"/u)?.[1];
@@ -40,6 +43,19 @@ test('every static button on product and verification pages has exactly one shar
       assert.ok(classes.includes(`ui-button--${expected}`), `${file}: ${button} should be ${expected}`);
     }
   }
+});
+
+test('dropdown items have their own white menu styling and preserve the yellow menu toggle', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const menuItems = html.match(/<button\b[^>]*class="main-menu-item"[^>]*>/gu) ?? [];
+  assert.equal(menuItems.length, 7);
+  const css = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+  const panel = css.match(/\.main-menu-items\s*\{([^}]*)\}/u)?.[1] ?? '';
+  const item = css.match(/\.main-menu-items \.main-menu-item\s*\{([^}]*)\}/u)?.[1] ?? '';
+  for (const declaration of ['background:#fffdf7', 'border:1px solid', 'border-radius:10px', 'box-shadow:']) assert.ok(panel.includes(declaration), declaration);
+  for (const declaration of ['min-height:44px', 'background:#fffdf7', 'color:#154e3c', 'box-shadow:none']) assert.ok(item.includes(declaration), declaration);
+  assert.match(css, /\.main-menu-items \.main-menu-item:focus-visible/u);
+  assert.match(css, /\.main-menu-items \.main-menu-item:hover/u);
 });
 
 test('local and online hand tile renderers use the same selectable A role', () => {

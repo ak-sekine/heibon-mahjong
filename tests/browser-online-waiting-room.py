@@ -966,16 +966,26 @@ with sync_playwright() as p:
       const buttons = [...menu.querySelectorAll('button:not([hidden])')].map(button => {
         const rect = button.getBoundingClientRect();
         const computed = getComputedStyle(button);
-        return {width: rect.width, height: rect.height, background: computed.backgroundColor, padding: computed.padding};
+        return {width: rect.width, height: rect.height, background: computed.backgroundColor, color: computed.color, border: computed.borderTopWidth, padding: computed.padding};
       });
-      return {background: style.backgroundColor, gap: style.gap, borderRadius: style.borderRadius, buttons};
+      const toggle = getComputedStyle(document.querySelector('#main-menu-toggle'));
+      const rect = menu.getBoundingClientRect();
+      return {background: style.backgroundColor, color: style.color, gap: style.gap, borderRadius: style.borderRadius, left: rect.left, right: rect.right, viewportWidth: innerWidth, toggleBackground: toggle.backgroundColor, buttons};
     }''')
-    assert menu_metrics['gap'] == '0px' and menu_metrics['background'] in ('rgb(255, 253, 247)', 'rgb(255, 255, 255)'), menu_metrics
+    assert menu_metrics['gap'] == '0px' and menu_metrics['background'] == 'rgb(255, 253, 247)', menu_metrics
+    assert menu_metrics['color'] == 'rgb(21, 78, 60)' and menu_metrics['toggleBackground'] == 'rgb(248, 220, 145)', menu_metrics
+    assert menu_metrics['left'] >= 0 and menu_metrics['right'] <= menu_metrics['viewportWidth'], menu_metrics
     assert all(button['height'] >= 44 and button['width'] >= 44 for button in menu_metrics['buttons']), menu_metrics
-    assert [button['background'] for button in menu_metrics['buttons']] == [
-      'rgb(248, 220, 145)', 'rgb(248, 220, 145)', 'rgb(248, 220, 145)',
-      'rgb(248, 220, 145)', 'rgb(248, 220, 145)', 'rgb(248, 220, 145)',
-    ], menu_metrics
+    assert all(button['background'] == 'rgb(255, 253, 247)' and button['color'] == 'rgb(21, 78, 60)' for button in menu_metrics['buttons']), menu_metrics
+    assert menu_metrics['buttons'][0]['border'] == '0px' and all(button['border'] == '1px' for button in menu_metrics['buttons'][1:]), menu_metrics
+    for width in [320, 375, 390, 414, 768, 1280]:
+      page.set_viewport_size({'width': width, 'height': 812})
+      bounds = page.locator('#main-menu-items').evaluate('element => { const {left, right} = element.getBoundingClientRect(); return {left, right, width: innerWidth}; }')
+      assert bounds['left'] >= 0 and bounds['right'] <= bounds['width'], (width, bounds)
+    page.set_viewport_size({'width': 844, 'height': 390})
+    landscape = page.locator('#main-menu-items').evaluate('element => { const {top, bottom, left, right} = element.getBoundingClientRect(); return {top, bottom, left, right, width: innerWidth, height: innerHeight}; }')
+    assert landscape['left'] >= 0 and landscape['right'] <= landscape['width'] and landscape['top'] >= 0 and landscape['bottom'] <= landscape['height'], landscape
+    page.set_viewport_size({'width': 1280, 'height': 812})
     assert [item.inner_text() for item in page.locator('#main-menu-items button:not([hidden])').all()] == [
       'オフラインで新規対局', 'ルール確認', '河テスト', '新しくルームを作る', 'ルームに参加する', '診断ログ',
     ], 'the shared menu actions were not available in order'
