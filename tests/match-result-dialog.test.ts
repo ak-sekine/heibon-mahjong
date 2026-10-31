@@ -74,6 +74,21 @@ test('offline match result shows all ranked players and opens/closes without cha
   } finally { globalThis.document = original; }
 });
 
+test('clearing a local match removes its result without opening the dialog', () => {
+  const { ui, nodes, original } = mount();
+  try {
+    const match = settleRound({ ...startMatch(), roundNumber: 4, game: fixedRon(0, [1]) });
+    ui.updateLocal(match, ['自分', 'CPU1', 'CPU2', 'CPU3']);
+    ui.open(nodes.get('#show-match-result') as unknown as HTMLButtonElement);
+    assert.equal(nodes.get('#match-result-dialog')!.open, true);
+
+    ui.clear();
+    ui.open(nodes.get('#show-match-result') as unknown as HTMLButtonElement);
+    assert.equal(nodes.get('#match-result-dialog')!.open, false);
+    assert.equal(nodes.get('#match-result-body')!.children.length, 0);
+  } finally { globalThis.document = original; }
+});
+
 test('online match result uses server-confirmed seats, points and seat-id tie order', () => {
   const { ui, nodes, original } = mount();
   try {

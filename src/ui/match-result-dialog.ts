@@ -35,6 +35,10 @@ export class MatchResultDialog {
     this.setResult({ format: match.format ?? 'tonpu', standings });
   }
 
+  clear(): void {
+    this.setResult(null);
+  }
+
   updateOnline(view: PlayerGameView | null): void {
     if (!view || view.status !== 'match-ended' || !view.result?.matchEnded) {
       this.setResult(null);

@@ -90,7 +90,7 @@ function render(): void {
   const rulesButton = document.querySelector<HTMLButtonElement>('#menu-offline-rules');
   if (rulesButton) rulesButton.hidden = !controller.hasGame || document.body.classList.contains('online-game-active');
   if (!controller.hasGame) {
-    matchResultDialog.updateLocal(controller.match, controller.playerNames);
+    matchResultDialog.clear();
     document.body.dataset.gameMode = 'none';
     localDeclarationBubbles.clearAll();
     if (idleState) idleState.hidden = false;
