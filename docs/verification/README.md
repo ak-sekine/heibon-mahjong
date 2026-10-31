@@ -2,6 +2,10 @@
 
 このディレクトリには過去の自動テスト、ビルド、Chromiumブラウザー確認などのログを保存しています。**iPhone Safari実機の確認結果は、確認者と報告範囲が分かる専用記録に分けます。** 各ログの数値や未完了事項は実施当時の結果です。
 
+## Issue調査
+
+- [Open Issue調査結果 — 2026-10-31](open-issue-investigation-2026-10-31.md) — 対象13件の分類、調査SHA、コード実態、テスト結果、原因未特定・仕様判断待ち、およびIssue #24の調査後の完了状態を記録。
+
 ## 実機確認
 
 - [右上ハンバーガー／ドロップダウンメニュー — Issue #24、iPhone Safari実機、2026-10-31](main-menu-toggle-style-2026-10-31.md)。ユーザー提供の開／閉画像とユーザー本人による操作報告を記録。自動検証と合わせてIssue #24を完了・Closeしました。Android Chrome実機、PC Firefox実機、PWAインストール、公開配信CSSのcomputed style、全ボタンの網羅実機確認は未確認で、今回の必須条件ではありません。詳細は[ドロップダウン記録](menu-dropdown-style-2026-10-31.md)と[ボタン配色記録](button-role-colors-issue24-2026-10-30.md)を参照。 |
