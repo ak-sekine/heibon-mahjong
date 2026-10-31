@@ -51,7 +51,68 @@ with sync_playwright() as playwright:
     page.once('dialog', lambda dialog: dialog.accept())
     page.locator('#diagnostic-clear').click()
     assert page.locator('#diagnostic-count').inner_text() == '0件'
+    page.locator('#diagnostic-close').click()
+    assert not page.locator('#diagnostic-dialog').is_visible()
+
+    # Keep a neighboring dialog's close flow covered while exercising the
+    # diagnostic header at the smallest supported widths.
+    page.locator('#main-menu-toggle').click()
+    page.locator('#online-create-open').click()
+    assert page.locator('#online-create-dialog').is_visible()
+    page.locator('#online-create-close').click()
+    assert not page.locator('#online-create-dialog').is_visible()
+
+    cases = [
+        {'name': 'empty', 'count': 0, 'message': False, 'longBuild': False},
+        {'name': 'multiple', 'count': 8, 'message': False, 'longBuild': False},
+        {'name': 'long-build-id', 'count': 8, 'message': False, 'longBuild': True},
+        {'name': 'long-messages', 'count': 24, 'message': True, 'longBuild': False},
+    ]
+    normal_build_info = page.locator('#diagnostic-build-info').inner_text()
+    layout_check = """() => {
+      const dialog = document.querySelector('#diagnostic-dialog');
+      const header = document.querySelector('.diagnostic-header');
+      const button = document.querySelector('#diagnostic-close');
+      const entries = document.querySelector('#diagnostic-entries');
+      const d = dialog.getBoundingClientRect(), h = header.getBoundingClientRect(), b = button.getBoundingClientRect();
+      const range = document.createRange(); range.selectNodeContents(button);
+      const text = [...range.getClientRects()].map(r => ({left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}));
+      const style = getComputedStyle(button);
+      const innerLeft = d.left + dialog.clientLeft, innerRight = innerLeft + dialog.clientWidth;
+      const textLeft = b.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft);
+      const textRight = b.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight);
+      const textTop = b.top + parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop);
+      const textBottom = b.bottom - parseFloat(style.borderBottomWidth) - parseFloat(style.paddingBottom);
+      return {
+        buttonInside: b.left >= innerLeft - 1 && b.right <= innerRight + 1,
+        oneLine: text.length === 1,
+        textFits: text.length === 1 && text[0].left >= textLeft - 1 && text[0].right <= textRight + 1 && text[0].top >= textTop - 1 && text[0].bottom <= textBottom + 1,
+        headerInside: h.left >= innerLeft - 1 && h.right <= innerRight + 1 && header.scrollWidth <= header.clientWidth,
+        dialogNoHorizontalOverflow: dialog.scrollWidth <= dialog.clientWidth,
+        entriesNoHorizontalOverflow: entries.scrollWidth <= entries.clientWidth,
+        documentNoHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth,
+        buttonWidth: b.width, textWidth: text[0]?.width ?? 0,
+      };
+    }"""
+    for width in (320, 375, 390, 414):
+        page.set_viewport_size({'width': width, 'height': 812})
+        for case in cases:
+            page.locator('#main-menu-toggle').click()
+            page.locator('#menu-diagnostics').click()
+            page.evaluate("async ({testCase, normalBuildInfo}) => { const {diagnosticLog} = await import('/heibon-mahjong/src/online/diagnostics.ts'); diagnosticLog.clear(); for(let i=0;i<testCase.count;i++) diagnosticLog.record('WARN', `layout_entry_${i}`, testCase.message ? {errorMessage:'長い診断メッセージ'.repeat(30)} : {requestId:`request-${i}`}); document.querySelector('#diagnostic-build-info').textContent = testCase.longBuild ? `ビルド ${'a'.repeat(128)}` : normalBuildInfo; }", {'testCase': case, 'normalBuildInfo': normal_build_info})
+            page.wait_for_function('(expected) => document.querySelector("#diagnostic-count").textContent === `${expected}件`', case['count'])
+            result = page.locator('#diagnostic-dialog').evaluate(layout_check)
+            assert all(result[key] for key in ('buttonInside', 'oneLine', 'textFits', 'headerInside', 'dialogNoHorizontalOverflow', 'entriesNoHorizontalOverflow', 'documentNoHorizontalOverflow')), {'width': width, 'case': case['name'], **result}
+            if case['message']:
+                scroll = page.locator('#diagnostic-entries')
+                metrics = scroll.evaluate('(el) => ({scrollHeight:el.scrollHeight,clientHeight:el.clientHeight})')
+                assert metrics['scrollHeight'] > metrics['clientHeight'], {'width': width, 'case': case['name'], **metrics}
+                scroll.evaluate('(el) => { el.scrollTop = el.scrollHeight; }')
+                assert scroll.evaluate('(el) => el.scrollTop > 0'), {'width': width, 'case': case['name']}
+            page.locator('#diagnostic-close').click()
+            assert not page.locator('#diagnostic-dialog').is_visible(), {'width': width, 'case': case['name']}
     assert not errors, errors
-    print(json.dumps({'diagnosticsDialog': 'pass', 'viewport': '375x812', 'persistentReload': 'pass', 'buildInfo': 'pass',
-                      'copyFallback': 'pass', 'clearConfirmation': 'pass'}, ensure_ascii=False))
+    print(json.dumps({'diagnosticsDialog': 'pass', 'viewports': [320, 375, 390, 414], 'cases': [case['name'] for case in cases],
+                      'persistentReload': 'pass', 'buildInfo': 'pass', 'copyFallback': 'pass', 'clearConfirmation': 'pass',
+                      'diagnosticClose': 'pass', 'onlineDialogClose': 'pass', 'longMessageScroll': 'pass'}, ensure_ascii=False))
     browser.close()

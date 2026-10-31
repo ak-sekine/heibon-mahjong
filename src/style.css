@@ -178,6 +178,7 @@ header > div { min-width:0; }
 .diagnostic-header #diagnostic-build-info { overflow-wrap:anywhere; }
 .diagnostic-header h2 { font-size:1.1rem; }
 .diagnostic-header p,#diagnostic-status { font-size:.82rem; }
+#diagnostic-close { flex:0 0 auto; white-space:nowrap; }
 #diagnostic-dialog button { min-width:64px; min-height:44px; padding:8px 12px; border:1px solid currentColor; border-radius:8px; font:inherit; font-weight:600; touch-action:manipulation; }
 #diagnostic-entries { flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; border:1px solid #63947a; border-radius:8px; padding:6px; }
 .diagnostic-entry { padding:7px 4px; border-bottom:1px solid #63947a; overflow-wrap:anywhere; }
