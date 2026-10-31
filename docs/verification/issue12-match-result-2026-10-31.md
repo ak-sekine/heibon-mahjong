@@ -10,7 +10,7 @@ GitHub Actions: [Verify and deploy main @ 844913b](https://github.com/ak-sekine/
 - `settleRound()` が親連荘・流局・東風戦／半荘戦の終了条件を処理し、終了状態を `status: 'match-ended'` と `lastSettlement.matchEnded` で確定します。最終局の連荘中は `round-ended` のままです。
 - `rankPlayers()` は持ち点降順、同点時は小さいPlayer ID順です。SPECにも同じ規則が記載されています。
 - オフラインは `MatchState` と `controller.playerNames`、オンラインはサーバーが作る `PlayerGameView` の `status`・`result`・`seats`（名前・持ち点）を使えます。オンラインの再接続・CPU交代後もこのビュー復元経路を再利用し、新しい通信メッセージは追加していません。
-- 通常の局結果は既存の `ResultDialog` と「結果を見る」を維持します。次局操作は既存の `next-round` 経路のままです。
+- 通常の局結果は既存の `ResultDialog` と「局の結果」から開きます。次局操作は既存の `next-round` 経路のままです。
 - 関連Issue #13はオンライン対局後に同じルームで再戦する別仕様です。本変更ではオンラインの既存「ローカル卓へ戻る」導線を維持し、再戦状態や通信を変更していません。
 
 ## ローカル検証
@@ -43,3 +43,14 @@ GitHub Actions: [Verify and deploy main @ 844913b](https://github.com/ak-sekine/
 ## iPhone Safari実機確認
 
 未実施です。ユーザー確認後、縦画面での表示、4人の順位と最終点、長い名前、小画面スクロール、「閉じる」の1行表示、閉じる後の再表示、局結果画面の継続利用をこの記録へ追記します。自動ブラウザー検証は実機確認の代替にしません。
+
+## 2026-10-31 追補：結果ボタン表記
+
+Issue #12 の追加要件に合わせ、ボタンの表示文言を更新しました。画面タイトル「対局結果」と操作ID、配置、結果表示処理は変更していません。
+
+- 通常局終了時はオフライン／オンラインとも「局の結果」「次の局へ」を表示します。
+- 対局確定終了時はオフライン／オンラインとも「局の結果」「順位確認」を表示します。
+- `index.html` と検証用 `test.html`／`kan-test.html` の初期文言、操作状態テスト、Browser UI期待値も揃えます。
+- Issue #13 の次対局開始・再戦導線には変更を加えていません。
+
+この追補で実施した自動検証、Chromium／WebKit Actions、Worker／Pages公開の結果とActions URLは、当該コミットのpush後にここへ記録します。iPhone Safari実機は未確認です。

@@ -408,7 +408,10 @@ with sync_playwright() as p:
             assert not page.locator('#result-dialog').is_visible(), (width, scenario, 'result auto-opened')
             assert page.locator('#round-result-summary').is_visible(), (width, scenario, 'summary hidden')
             assert page.locator('#show-result').is_visible(), (width, scenario)
+            assert page.locator('#show-result').inner_text() == '局の結果', (width, scenario)
             assert page.locator('#next-round').is_visible() == (meta['status'] == 'round-ended'), (width, scenario, meta)
+            if meta['status'] == 'round-ended':
+                assert page.locator('#next-round').inner_text() == '次の局へ', (width, scenario)
             if width <= 430 and meta['status'] == 'round-ended' and not meta['winners']:
                 fit = page.evaluate('''() => {
                   const rect = selector => { const r=document.querySelector(selector).getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}; };
@@ -608,8 +611,17 @@ with sync_playwright() as p:
         assert page.locator('#round-result-summary').locator('p').all_inner_texts() == ['東4局 0本場・流局', 'テンパイ：CPU2']
         page.evaluate("window.roundEndTest.controller.playerNames = ['とても長い表示名を含むプレイヤー', 'CPU1の長い表示名を含む席', 'CPU2の長い表示名を含む席', 'CPU3の長い表示名を含む席']; window.roundEndTest.render()")
         assert page.locator('#show-result').is_visible()
+        assert page.locator('#show-result').inner_text() == '局の結果'
         assert page.locator('#show-match-result').is_visible()
-        assert page.locator('#show-match-result').inner_text() == '対局結果'
+        assert page.locator('#show-match-result').inner_text() == '順位確認'
+        if width <= 430:
+            final_actions = page.evaluate('''() => {
+              const round=document.querySelector('#show-result').getBoundingClientRect();
+              const match=document.querySelector('#show-match-result').getBoundingClientRect();
+              return {round,match,within:round.left>=0&&match.right<=innerWidth,
+                sameRow:Math.abs(round.top-match.top)<1,notOverlapping:round.right<=match.left};
+            }''')
+            assert final_actions['within'] and final_actions['sameRow'] and final_actions['notOverlapping'], (width, final_actions)
         before_match_result = page.evaluate('''() => ({status:window.roundEndTest.controller.match.status,
           points:[...window.roundEndTest.controller.match.points],round:window.roundEndTest.controller.match.roundNumber,
           nextHidden:document.querySelector('#next-round').hidden})''')

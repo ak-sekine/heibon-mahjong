@@ -1706,6 +1706,18 @@ with sync_playwright() as p:
           ({'true' if expected_winner is None else f'view.result.winners?.[0]?.winnerId === {expected_winner}'}) &&
           document.querySelector('#online-show-result').hidden === false && document.querySelector('#result-dialog').open === false;
       }})()""")
+      assert page.locator('#online-show-result').inner_text() == '局の結果', scenario
+      if scenario == 'match-ended':
+        assert page.locator('#online-show-match-result').is_visible(), 'final online rank button was hidden'
+        assert page.locator('#online-show-match-result').inner_text() == '順位確認'
+        assert page.locator('#online-next-round').is_hidden(), 'final online result showed next-round action'
+        assert page.evaluate('''() => {
+          const round=document.querySelector('#online-show-result').getBoundingClientRect();
+          const match=document.querySelector('#online-show-match-result').getBoundingClientRect();
+          return round.left>=0&&match.right<=innerWidth&&Math.abs(round.top-match.top)<1&&round.right<=match.left;
+        }'''), 'final online result buttons did not fit without wrapping or overlap at 320px'
+      else:
+        assert page.locator('#online-next-round').inner_text() == '次の局へ'
       orientation = page.evaluate('''() => {
         const faces=[...document.querySelectorAll('#online-table .public-hand-tile')];
         const backs=[...document.querySelectorAll('#online-table .tile-back')];

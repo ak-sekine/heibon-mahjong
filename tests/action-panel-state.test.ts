@@ -115,8 +115,8 @@ test('normal own turn keeps discard visible without selection and enables it aft
 test('round-end and confirmed match-end expose the distinct result actions', () => {
   const round = settleRound({ ...startMatch(), game: fixedRon(0, [1]) });
   const localRound = createLocalActionPanelState(round, null, false, false);
-  assert.deepEqual(localRound.buttons['show-result'], { visible: true, enabled: true, label: '結果を見る' });
-  assert.deepEqual(localRound.buttons['show-match-result'], { visible: false, enabled: false, label: '対局結果' });
+  assert.deepEqual(localRound.buttons['show-result'], { visible: true, enabled: true, label: '局の結果' });
+  assert.deepEqual(localRound.buttons['show-match-result'], { visible: false, enabled: false, label: '順位確認' });
   assert.deepEqual(localRound.buttons['next-round'], { visible: true, enabled: true, label: '次の局へ' });
   const onlineRound = createOnlineActionPanelState(onlineViewFor(round.game, { status: 'round-ended' }), null, false, false, false, null);
   assert.equal(onlineRound.buttons['show-match-result'].visible, false);
@@ -132,8 +132,8 @@ test('round-end and confirmed match-end expose the distinct result actions', () 
   const final = settleRound({ ...startMatch(), roundNumber: 4, dealerId: 0, game: fixedRon(0, [1]) });
   assert.equal(final.status, 'match-ended');
   const localFinal = createLocalActionPanelState(final, null, false, false);
-  assert.deepEqual(localFinal.buttons['show-result'], { visible: true, enabled: true, label: '結果を見る' });
-  assert.deepEqual(localFinal.buttons['show-match-result'], { visible: true, enabled: true, label: '対局結果' });
+  assert.deepEqual(localFinal.buttons['show-result'], { visible: true, enabled: true, label: '局の結果' });
+  assert.deepEqual(localFinal.buttons['show-match-result'], { visible: true, enabled: true, label: '順位確認' });
   assert.equal(localFinal.buttons['next-round'].visible, false);
 
   const onlineFinalView = {
@@ -143,8 +143,8 @@ test('round-end and confirmed match-end expose the distinct result actions', () 
     seats: onlineViewFor(final.game).seats.map((seat, id) => ({ ...seat, points: final.points[id] })),
   } as unknown as PlayerGameView;
   const onlineFinal = createOnlineActionPanelState(onlineFinalView, null, false, false, false, null);
-  assert.deepEqual(onlineFinal.buttons['show-result'], { visible: true, enabled: true, label: '結果を見る' });
-  assert.deepEqual(onlineFinal.buttons['show-match-result'], { visible: true, enabled: true, label: '対局結果' });
+  assert.deepEqual(onlineFinal.buttons['show-result'], { visible: true, enabled: true, label: '局の結果' });
+  assert.deepEqual(onlineFinal.buttons['show-match-result'], { visible: true, enabled: true, label: '順位確認' });
   assert.equal(onlineFinal.buttons['next-round'].visible, false);
 });
 
