@@ -30,7 +30,7 @@
 
 | 記録 | 主な対象 |
 | --- | --- |
-| [全ボタンの共通配色・状態表現 — Issue #24](button-role-colors-issue24-2026-10-30.md) | 役割別トークン・静的／動的ボタン、オンライン処理状態、新規対局A/D2切替、returnToLocalGameの分類、単体テストとChromium／WebKit CI結果、コントラスト、未実施のiPhone Safari／Android Chrome実機確認項目。 |
+| [全ボタンの共通配色・状態表現 — Issue #24](button-role-colors-issue24-2026-10-30.md) | 役割別トークン・静的／動的ボタン、オンライン処理状態、新規対局A/D2切替、returnToLocalGameの分類、単体テストとChromium／WebKit CI結果、コントラストを記録。iPhone Safariのメニュー表示と操作はユーザー確認済み。Android Chromeおよび全ボタン種別・状態の網羅的な実機確認は未確認。 |
 | [オフライン鳴き操作とスクロール診断 — Issue #8](call-scroll-diagnostics-issue8-2026-10-30.md) | 再発原因の初回表示 `scrollBy` 経路、削除したviewport補正、スクロール元・パネル高さ診断を記録。375×448pxの候補別 `scrollY`／矩形、手動位置維持、ボタン操作・対局進行をChromium／Playwright WebKitで確認。Actions run 41059814959でBrowser UI、本番Worker検証、Pages公開まで成功。再修正後のユーザーによるiPhone Safari実機確認は5項目すべてOK。スクロール不具合は今回の確認範囲で修正完了、鳴きボタン不応答の根本原因は未特定のためIssueはOpen。 |
 | [Browser UI・オンラインCPU進行の回帰 — Issue #21](browser-ui-regression-issue21-2026-10-29.md) | リーチ結果から次局、CPU打牌のポンによる河からの除去の固定局面と検証結果。main統合後のChromium／WebKit CIと異常系の検出を確認し、CI検証済み・完了。未確認事項とIssue #22・#23への引き継ぎを記録。 |
 | [Browser UI CI実行時間増加の原因調査 — Issue #23](browser-ui-ci-duration-issue23-2026-10-30.md) | Phase 1・Phase 2の計測を記録。同一SHAでも時間が変動し、全runで52シナリオ成功。runner資源等は一部計測したが因果関係と計測オーバーヘッドは未分離で、根本原因未特定。調査完了・Issue #23 Closed。今後の異常は新しいIssueで扱う。 |
