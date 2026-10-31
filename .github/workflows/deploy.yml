@@ -1,4 +1,5 @@
 name: Deploy to GitHub Pages and Cloudflare Workers
+run-name: Verify and deploy ${{ github.ref_name }} @ ${{ github.sha }}
 
 on:
   push:
@@ -21,31 +22,98 @@ concurrency:
 jobs:
   detect-changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: read
     outputs:
       run_full_suite: ${{ steps.classify.outputs.run_full_suite }}
       deploy_required: ${{ steps.classify.outputs.deploy_required }}
       classification: ${{ steps.classify.outputs.classification }}
+      pending_release: ${{ steps.classify.outputs.pending_release }}
+      state_reliable: ${{ steps.classify.outputs.state_reliable }}
+      target_sha: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Classify changed files
+      - name: Read successful Worker and Pages deployment records
+        id: state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/deployment-state.mjs inspect
+      - name: Compare current changes and pending releases
         id: classify
         env:
           BASE_REF: ${{ github.event.before }}
           HEAD_REF: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          DEPLOY_TO_PRODUCTION: ${{ inputs.deploy_to_production }}
+          WORKER_SHA: ${{ steps.state.outputs.worker_sha }}
+          PAGES_SHA: ${{ steps.state.outputs.pages_sha }}
+          API_STATE_RELIABLE: ${{ steps.state.outputs.state_reliable }}
         shell: bash
         run: |
-          if [[ -n "$BASE_REF" ]] && git rev-parse --verify "${BASE_REF}^{commit}" >/dev/null 2>&1 \
-            && git rev-parse --verify "${HEAD_REF}^{commit}" >/dev/null 2>&1; then
-            if git diff --no-renames --name-only -z "$BASE_REF" "$HEAD_REF" -- > "$RUNNER_TEMP/changed-paths"; then
-              node .github/scripts/classify-changes.mjs < "$RUNNER_TEMP/changed-paths"
-            else
-              node .github/scripts/classify-changes.mjs --unsafe
-            fi
+          set +e
+          STATE_RELIABLE="$API_STATE_RELIABLE"
+          CURRENT_DIFF_RELIABLE=true
+          : > "$RUNNER_TEMP/current-paths"
+          : > "$RUNNER_TEMP/worker-paths"
+          : > "$RUNNER_TEMP/pages-paths"
+          git rev-parse --verify "${HEAD_REF}^{commit}" >/dev/null 2>&1 || CURRENT_DIFF_RELIABLE=false
+          if [[ -n "$BASE_REF" ]] && git rev-parse --verify "${BASE_REF}^{commit}" >/dev/null 2>&1; then
+            git diff --no-renames --name-only -z "$BASE_REF" "$HEAD_REF" -- > "$RUNNER_TEMP/current-paths" || CURRENT_DIFF_RELIABLE=false
           else
-            node .github/scripts/classify-changes.mjs --unsafe
+            CURRENT_DIFF_RELIABLE=false
           fi
+          if [[ "$WORKER_SHA" =~ ^[0-9a-fA-F]{40}$ ]] && git rev-parse --verify "${WORKER_SHA}^{commit}" >/dev/null 2>&1; then
+            git diff --no-renames --name-only -z "$WORKER_SHA" "$HEAD_REF" -- > "$RUNNER_TEMP/worker-paths" || STATE_RELIABLE=false
+          else
+            STATE_RELIABLE=false
+          fi
+          if [[ "$PAGES_SHA" =~ ^[0-9a-fA-F]{40}$ ]] && git rev-parse --verify "${PAGES_SHA}^{commit}" >/dev/null 2>&1; then
+            git diff --no-renames --name-only -z "$PAGES_SHA" "$HEAD_REF" -- > "$RUNNER_TEMP/pages-paths" || STATE_RELIABLE=false
+          else
+            STATE_RELIABLE=false
+          fi
+          set -e
+          CURRENT_PATHS="$RUNNER_TEMP/current-paths" \
+          WORKER_PATHS="$RUNNER_TEMP/worker-paths" \
+          PAGES_PATHS="$RUNNER_TEMP/pages-paths" \
+          STATE_RELIABLE="$STATE_RELIABLE" \
+          CURRENT_DIFF_RELIABLE="$CURRENT_DIFF_RELIABLE" \
+          node .github/scripts/deployment-decision.mjs
+          echo "target_sha=$HEAD_REF" >> "$GITHUB_OUTPUT"
+          echo "Release target SHA: $HEAD_REF"
+
+  release-freshness:
+    needs: [detect-changes, verify, browser-ui]
+    if: >-
+      ${{
+        always() &&
+        needs.detect-changes.outputs.deploy_required == 'true' &&
+        needs.verify.result == 'success' &&
+        needs.browser-ui.result == 'success'
+      }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the latest main SHA before publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.sha }}
+          EVENT_REF: ${{ github.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_REF" != "refs/heads/main" ]]; then
+            echo "::error::Production deployment requires refs/heads/main; requested target is $EVENT_REF at $TARGET_SHA."
+            exit 1
+          fi
+          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [[ "$latest_sha" != "$TARGET_SHA" ]]; then
+            echo "::error::Refusing to publish stale SHA $TARGET_SHA; main is now $latest_sha. The newer run must publish the latest commit."
+            exit 1
+          fi
+          echo "Verified release target $TARGET_SHA is current main."
 
   docs-check:
     runs-on: ubuntu-latest
@@ -102,16 +170,20 @@ jobs:
       reuse_build: ${{ needs.detect-changes.outputs.run_full_suite == 'true' }}
 
   deploy-worker:
-    needs: [detect-changes, verify, browser-ui]
+    needs: [detect-changes, verify, browser-ui, release-freshness]
     if: >-
       ${{
         always() &&
         needs.detect-changes.outputs.deploy_required == 'true' &&
         needs.verify.result == 'success' &&
         needs.browser-ui.result == 'success' &&
+        needs.release-freshness.result == 'success' &&
         (github.event_name != 'workflow_dispatch' || inputs.deploy_to_production == true)
       }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
     outputs:
       worker_url: ${{ steps.deploy.outputs.worker_url }}
     steps:
@@ -144,6 +216,11 @@ jobs:
           fi
           echo "worker_url=$worker_url" >> "$GITHUB_OUTPUT"
           echo "Published Worker URL: $worker_url"
+      - name: Record successful Worker deployment SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.sha }}
+        run: node .github/scripts/deployment-state.mjs record worker
 
   production-test:
     needs: deploy-worker
@@ -204,6 +281,7 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      deployments: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -211,3 +289,8 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Record successful GitHub Pages deployment SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.sha }}
+        run: node .github/scripts/deployment-state.mjs record pages

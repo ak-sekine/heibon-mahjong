@@ -27,6 +27,45 @@ export function classifyChanges(changedFiles, reliableDiff = true) {
   };
 }
 
+export function isApplicationChange(file) {
+  if (typeof file !== 'string' || file.length === 0 || file.endsWith('.md')) return false;
+  return !file.startsWith('.github/') && !file.startsWith('tests/') && file !== 'package.json';
+}
+
+/**
+ * Combine the current push classification with each service's recorded release
+ * point. A missing/unknown release record is deliberately treated as pending.
+ */
+export function decideDeployment({
+  currentFiles = [],
+  workerFiles = [],
+  pagesFiles = [],
+  stateReliable = false,
+  workerSha = '',
+  pagesSha = '',
+  eventName = 'push',
+  deployToProduction = false,
+  currentDiffReliable = true,
+}) {
+  const current = classifyChanges(currentFiles, currentDiffReliable);
+  const manualDeploy = eventName === 'workflow_dispatch' && deployToProduction === true;
+  const stateComplete = stateReliable && Boolean(workerSha) && Boolean(pagesSha);
+  const pendingRelease = !stateComplete
+    || [...workerFiles, ...pagesFiles].some(isApplicationChange);
+  const runFullSuite = current.run_full_suite === 'true' || pendingRelease || manualDeploy;
+  const deployRequired = eventName === 'workflow_dispatch'
+    ? manualDeploy
+    : pendingRelease;
+
+  return {
+    run_full_suite: String(runFullSuite),
+    deploy_required: String(deployRequired),
+    pending_release: String(pendingRelease),
+    state_reliable: String(stateReliable),
+    classification: current.classification,
+  };
+}
+
 function main() {
   const reliableDiff = process.argv[2] !== '--unsafe';
   const changedFiles = reliableDiff
