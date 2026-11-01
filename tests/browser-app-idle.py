@@ -39,7 +39,7 @@ with sync_playwright() as playwright:
     assert page.locator('#player-hand li').count() in (13, 14)
     page.locator('#main-menu-toggle').click()
     page.locator('#menu-offline-rules').click()
-    assert page.locator('#online-rules-list dd').first.inner_text() == '東風戦'
+    assert page.locator('#online-rules-list dd').first.inner_text() == '半荘戦（東南戦）'
     page.locator('#online-rules-close').click()
 
     page.locator('#main-menu-toggle').click()
