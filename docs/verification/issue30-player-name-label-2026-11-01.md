@@ -40,10 +40,12 @@
 
 ## GitHub Actions・公開
 
-- 実装コミットSHA: push後に記録。
-- Deploy workflow run ID・URL・対象SHA・結果: 未確認。成功扱いしていません。
-- verify、Browser UI Chromium、Browser UI WebKit、engine matrix audit、release freshness、Worker deploy、production-test、Pages build／deploy: run完了後に個別結果を記録。
-- 公開URLと公開対象SHA: run完了後に記録。
+- 実装コミットSHA: `7c61044cf1837b77f482b7251cf9e1a25f63592a`（mainへ直接push）。
+- Deploy workflow: [run #503](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41306177500)、run ID `41306177500`、対象SHAは上記コミット、全体結果はsuccess。
+- `verify`: success。regression tests、Worker型検査、Pages buildが成功。
+- Browser UI: Chromium success、WebKit success。両engine jobを含むmatrix auditもsuccess。Codex Cloud内では実ブラウザーを起動せず、GitHub Actionsの結果を根拠にしています。
+- Deploy gate `release-freshness`: success。Worker deploy、Worker `production-test`、Pages build、Pages deployはいずれもsuccess。
+- 公開対象SHA: WorkerとPagesともに`7c61044cf1837b77f482b7251cf9e1a25f63592a`。Worker URLは https://heibon-mahjong-online.ak-sekine.workers.dev 、Pages URLは https://ak-sekine.github.io/heibon-mahjong/ 。Pages Deploy actionはsuccessしましたが、Pagesの独立HTTP応答確認は行っていません。
 - Deploy gateは変更・迂回していません。
 
 ## iPhone Safari実機確認
@@ -56,4 +58,4 @@
 4. 入力名がオンライン対局画面に表示されること。
 5. 文字折返し・重なり・横はみ出しがないこと。
 
-自動テスト・Chromium／WebKitの結果は実機確認の代替ではありません。実機確認結果が報告されるまではIssue #30をOpenのまま維持します。
+自動テスト・Chromium／WebKitの結果は実機確認の代替ではありません。実機確認結果が報告されるまではIssue #30をOpenのまま維持します。GitHub確認時点のIssue状態はOpenです。
