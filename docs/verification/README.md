@@ -4,6 +4,7 @@
 
 ## Issue調査
 
+- [オンラインのルーム作成・参加画面のプレイヤー名表記 — Issue #30、2026-11-01](issue30-player-name-label-2026-11-01.md) — ラベル・入力検証文言とBrowser UI回帰を記録。自動テスト・Chromium／WebKit・Worker／Pages公開結果とiPhone Safari実機確認の状態を記録します。実機確認は未報告のためIssue #30はOpenです。
 - [赤ドラ・裏ドラ・一発・カンドラの個別設定 — Issue #16、2026-11-01](issue16-local-rules-2026-11-01.md) — 初期値、4項目の独立判定、牌・和了・得点・CPU・Worker同期と固定局面テスト、Actions run #499とWorker／Pages deploy、ユーザー本人のiPhone Safari実機確認を記録。実機確認は7件OK、NG 0件、未確認1件（一発OFF）。Issue #16はcompletedとしてClosed。
 - [新規対局画面へのルール設定統合 — Issue #27、2026-11-01](issue27-new-game-rules-2026-11-01.md) — オフライン・オンラインのルール統合、保存／Worker同期、run #490のBrowser UI・Worker／Pages公開、docs-only run #491、iPhone Safari実機確認（追加修正の6項目がOK）と未確認範囲・Close判定を記録。Issue #27はcompletedとしてClose。
 - [対局結果画面と同じオンラインルームでの再戦 — Issue #13、2026-11-01](issue13-rematch-2026-11-01.md) — 実装、Worker統合テスト、連続3対局、Chromium／WebKit検証、run 41262624930・41267773516のDeploy gate／Worker／Pages成功と完了判定を記録。ユーザー本人の「問題ありません」報告は確認範囲のみ記録し、追加修正後のiPhone Safari実機確認など詳細条件は未確認です。Pages直接HTTP応答は未確認です。

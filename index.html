@@ -29,7 +29,7 @@
       <div class="dialog-scroll-panel">
         <div id="online-create-content" class="dialog-scroll-content" role="region" aria-label="ルーム設定">
           <div class="online-create-fields">
-            <label for="online-create-name">表示名</label>
+            <label for="online-create-name">プレイヤー名</label>
             <input id="online-create-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" aria-describedby="online-create-message" required>
             <div id="online-create-rules-editor" class="rules-editor" aria-label="新しいルームのルール"></div>
             <p id="online-create-message" class="online-form-message" role="status" aria-live="polite" hidden></p>
@@ -52,7 +52,7 @@
   <dialog id="online-join-dialog" class="online-dialog online-form-dialog" aria-labelledby="online-join-title">
     <header class="online-dialog-header"><h2 id="online-join-title">ルームに参加する</h2><button id="online-join-close" class="online-dialog-close ui-button ui-button--b" type="button" aria-label="ルーム参加を閉じる">閉じる</button></header>
     <form id="online-join-form" class="online-entry-form" novalidate>
-      <label for="online-join-name">表示名</label>
+      <label for="online-join-name">プレイヤー名</label>
       <input id="online-join-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" aria-describedby="online-join-message" required>
       <label for="online-join-code">ルームコード</label>
       <input id="online-join-code" name="roomCode" type="text" maxlength="6" pattern="[A-HJ-NP-Z2-9]{6}" autocapitalize="characters" autocomplete="off" aria-describedby="online-join-message" required>

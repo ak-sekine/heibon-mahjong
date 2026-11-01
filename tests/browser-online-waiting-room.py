@@ -785,6 +785,8 @@ with sync_playwright() as p:
         page.locator('#online-start-game').click()
         wait_for("document.querySelector('#online-match').hidden === false")
         guest_page.wait_for_function("document.querySelector('#online-match').hidden === false")
+        assert 'テストホスト' in page.locator('#online-score-strip').inner_text(), 'the created player name was not shown in the online match'
+        assert 'テスト参加者' in guest_page.locator('#online-score-strip').inner_text(), 'the joined player name was not shown in the online match'
         page.evaluate("window.onlineMock.setResultScenario('match-ended', 0)")
         wait_for("window.onlineUiTest.onlineGameController.view?.status === 'match-ended'")
         wait_guest("window.onlineUiTest.onlineGameController.view?.status === 'match-ended'")
@@ -1399,7 +1401,8 @@ with sync_playwright() as p:
     assert page.locator('#online-create-dialog').evaluate('element => element.open'), 'room creation did not open its dedicated dialog'
     assert page.locator('#online-join-dialog').evaluate('element => !element.open'), 'room creation also opened the join dialog'
     assert page.locator('#online-create-dialog h2').inner_text() == '新しくルームを作る', 'room creation dialog title was not shown'
-    assert page.locator('#online-create-dialog label[for="online-create-name"]').all_inner_texts() == ['表示名'], 'room creation dialog display-name label changed'
+    assert page.locator('#online-create-dialog label[for="online-create-name"]').all_inner_texts() == ['プレイヤー名'], 'room creation dialog player-name label changed'
+    assert page.locator('#online-create-dialog').get_by_label('プレイヤー名', exact=True).count() == 1, 'room creation name input did not expose the player-name accessible label'
     assert page.locator('#online-create-rules-editor').is_visible(), 'room creation dialog omitted inline rules'
     assert page.locator('#online-create-dialog #online-create-rules').count() == 0, 'room creation still needs a rules navigation button'
     assert page.locator('#rule-settings-dialog').count() == 0, 'standalone rules dialog remains available'
@@ -1464,7 +1467,8 @@ with sync_playwright() as p:
     assert page.locator('#online-join-dialog').evaluate('element => element.open'), 'room joining did not open its dedicated dialog'
     assert page.locator('#online-create-dialog').evaluate('element => !element.open'), 'room joining also opened the create dialog'
     assert page.locator('#online-join-dialog h2').inner_text() == 'ルームに参加する', 'room join dialog title was not shown'
-    assert page.locator('#online-join-dialog label').all_inner_texts() == ['表示名', 'ルームコード'], 'room join dialog did not show only its required fields'
+    assert page.locator('#online-join-dialog label').all_inner_texts() == ['プレイヤー名', 'ルームコード'], 'room join dialog did not show only its required fields'
+    assert page.locator('#online-join-dialog').get_by_label('プレイヤー名', exact=True).count() == 1, 'room join name input did not expose the player-name accessible label'
     assert page.locator('#online-join-dialog #online-create').count() == 0, 'room join dialog contains a create button'
     assert page.locator('#online-join-close').evaluate('element => document.activeElement === element'), 'opening the join dialog did not focus its close button'
     assert page.locator('#online-join-name').evaluate('element => document.activeElement !== element'), 'opening the join dialog focused its display-name input'
@@ -1479,6 +1483,10 @@ with sync_playwright() as p:
     assert page.locator('#online-join-close').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to the join close button'
     assert page.locator('#online-join-code').get_attribute('maxlength') == '6', 'room code length limit changed'
     assert page.locator('#online-join-name').input_value() == 'テストホスト', 'the previous display name was not initially shown in the join dialog'
+    page.locator('#online-join-name').fill('')
+    page.locator('#online-join-form').evaluate('form => form.requestSubmit()')
+    assert page.locator('#online-join-message').inner_text() == 'プレイヤー名を1〜24文字で入力してください。', 'the join player-name validation message changed'
+    page.locator('#online-join-name').fill('テストホスト')
     page.locator('#online-join-name').click()
     assert page.locator('#online-join-name').evaluate('element => document.activeElement === element'), 'manually selecting the join name input did not focus it'
     page.keyboard.press('End')
@@ -1539,6 +1547,9 @@ with sync_playwright() as p:
     before_empty_submit = page.evaluate('window.onlineMock.requests.length')
     assert page.locator('#online-create').is_disabled(), 'room creation was enabled while the display name was empty'
     assert page.evaluate('window.onlineMock.requests.length') == before_empty_submit, 'an empty display name was sent to the server'
+    page.locator('#online-create-form').evaluate('form => form.requestSubmit()')
+    assert page.locator('#online-create-message').inner_text() == 'プレイヤー名を1〜24文字で入力してください。', 'the create player-name validation message changed'
+    assert page.evaluate('window.onlineMock.requests.length') == before_empty_submit, 'an empty player name was sent to the server'
     page.locator('#online-create-name').fill('テストホスト')
     assert page.locator('#online-create').is_enabled(), 'room creation remained disabled after restoring a valid display name'
     assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').is_checked(), 'online creation did not restore the last started format'

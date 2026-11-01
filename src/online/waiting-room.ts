@@ -44,7 +44,7 @@ const SESSION_KEY = 'heibon-mahjong-online-session';
 const ROOM_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/u;
 const SEAT_NAMES = ['東', '南', '西', '北'] as const;
 const roomErrorMessages: Record<string, string> = {
-  invalid_display_name: '表示名を1〜24文字で入力してください。',
+  invalid_display_name: 'プレイヤー名を1〜24文字で入力してください。',
   invalid_room_code: 'ルームコードを確認してください。',
   room_not_found: 'そのルームコードは見つかりません。',
   room_expired: 'ルームの有効期限が切れています。',
@@ -360,7 +360,7 @@ export class OnlineWaitingRoom {
   private validatedDisplayName(input: HTMLInputElement, message: HTMLElement): string | null {
     const name = input.value.trim();
     if (!this.isValidDisplayName(name)) {
-      this.setFormMessage(message, '表示名を1〜24文字で入力してください。');
+      this.setFormMessage(message, 'プレイヤー名を1〜24文字で入力してください。');
       input.focus({ preventScroll: true });
       return null;
     }
