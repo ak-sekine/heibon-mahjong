@@ -37,9 +37,10 @@
 
 ## GitHub Actions・デプロイ
 
-- 対象commit SHA: 実装を含むmain commitをActions実行後に記録。
-- GitHub Actions run URL: main push後に記録。Deploy workflowの`verify`、Chromium／WebKit Browser UI matrix、Worker production test、Deploy gate、Worker／Pages deployment結果を確認。
-- Worker・Pages公開結果: Actions完了後に追記。
+- 検証対象commit SHA: `98b0b5235d9faf62b5dfbf34c115154b416f2af1`（Issue #16実装と最終Browser UI fixture修正を含むmain commit）。
+- GitHub Actions: [run #499](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41287810895) がsuccess。`verify`は1,319 tests成功・失敗0、Worker型チェック、production buildを通過。Chromium Browser UI、WebKit Browser UI、既存engine matrix audit、release freshness、Worker production test、Deploy gateもsuccess。
+- Worker deploy: success。公開URLは https://heibon-mahjong-online.ak-sekine.workers.dev 。production testもsuccess。
+- Pages build／deploy: どちらもsuccess。公開URLは https://ak-sekine.github.io/heibon-mahjong/ 。
 - Codex Cloud内のChromium／WebKit実行: GitHub Actionsの既存engine別matrixで実行するため未実施。
 
 ## iPhone Safari実機確認
@@ -53,6 +54,6 @@
 
 ## 未確認事項とIssue状態
 
-- iPhone Safari実機確認、GitHub Actions、Worker・Pagesデプロイは未確認。これらの結果をこの記録へ追記する。
-- 対象SHA、Actions run URL、公開URLはActions実行後に追記する。
+- ユーザー本人によるiPhone Safari実機確認は未実施。ActionsのBrowser UI成功を実機確認済みとは扱いません。
+- Pagesのデプロイ後の独立したHTTP応答確認は未実施。GitHub Pages Deploy action自体はsuccessしました。
 - Issue #16はユーザー本人のiPhone Safari確認を受けるまでOpenのまま維持する。
