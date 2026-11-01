@@ -41,11 +41,12 @@
 - GitHub Actions: [run #499](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41287810895) がsuccess。`verify`は1,319 tests成功・失敗0、Worker型チェック、production buildを通過。Chromium Browser UI、WebKit Browser UI、既存engine matrix audit、release freshness、Worker production test、Deploy gateもsuccess。
 - Worker deploy: success。公開URLは https://heibon-mahjong-online.ak-sekine.workers.dev 。production testもsuccess。
 - Pages build／deploy: どちらもsuccess。公開URLは https://ak-sekine.github.io/heibon-mahjong/ 。
+- 後続のdocs-only run [41288931249](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41288931249)はsuccess。文書チェックが成功し、verify・Browser UI・Worker／Pages build・deployは分類どおりskip。
 - Codex Cloud内のChromium／WebKit実行: GitHub Actionsの既存engine別matrixで実行するため未実施。
 
 ## iPhone Safari実機確認
 
-当初未実施。下記にユーザー本人の確認結果を追記。自動テスト・Chromium／WebKit結果を実機確認済みとは扱いません。ユーザー本人による以下の確認を待ちます。
+当初の確認対象は以下のとおり。実機結果は後述の表に記録し、自動テスト・Chromium／WebKit結果と区別します。
 
 1. オフライン新規対局で4項目を個別にON/OFFでき、初期状態がすべてONであること。開始後の読み取り専用画面と、次局でも設定が維持されること。
 2. オンラインでホストが選んだ設定が待機中に参加者全員へ表示され、参加者側では変更できないこと。対局中の読み取り専用画面も同じ値であること。
@@ -54,9 +55,9 @@
 
 ## 未確認事項とIssue状態
 
-- ユーザー本人のiPhone Safari実機確認は7件OK、1件未確認。ActionsのBrowser UI成功を実機確認済みとは扱いません。
-- Pagesのデプロイ後の独立したHTTP応答確認は未実施。GitHub Pages Deploy action自体はsuccessしました。
-- 実機確認報告を受領。下記Close判定を参照。
+- ユーザー本人のiPhone Safari実機確認は7件OK、0件NG、1件未確認。一発OFFの実機動作は未確認で、下記の自動テスト結果と区別します。ActionsのBrowser UI成功を実機確認済みとは扱いません。
+- Pagesデプロイ後の独立したHTTP応答確認は未実施。GitHub Pages Deploy action自体はsuccessしました。
+- Issue #16は2026-11-01にclosed（completed）。実装・自動検証・Actions／Worker／Pagesデプロイが成功し、主要な実機確認が7件OK、未確認の一発OFFには決定的な自動テストがあることを根拠に完了と判定しました。一発OFFの実機未確認は完了記録に残します。
 
 ## iPhone Safari実機確認結果（2026-11-01、ユーザー本人報告）
 
@@ -71,4 +72,4 @@
 | 7 | 一発OFF：成立局面で役が付かない | 未確認 |
 | 8 | カンドラOFF：槓可能、追加ドラ抑制 | OK |
 
-**OK 7件、NG 0件、未確認 1件。** 実機確認者はユーザー本人。端末詳細、iOSバージョン、確認時刻は報告されていない。一発OFFは実機成功扱いしない。`tests/local-rule-variants.test.ts`に一発ON/OFFでの役の有無とリーチ役維持の決定的なテストが存在する。既存のActions成功報告を踏まえ、未確認を明記してIssue #16はcompletedでClose可能と判断する。Pagesの独立HTTP応答確認は未実施。
+**OK 7件、NG 0件、未確認 1件。** 実機確認者はユーザー本人。端末詳細、iOSバージョン、確認時刻は報告されていない。一発OFFは実機成功扱いしない。`tests/local-rule-variants.test.ts`に一発ON/OFFでの役の有無とリーチ役維持を確認する決定的なテストがあり、自動検証で成功している。Issue #16は未確認事項を明記したうえでcompletedとしてClosed。
