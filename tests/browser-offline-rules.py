@@ -62,7 +62,7 @@ with sync_playwright() as playwright:
         assert page.locator('#online-rules-readonly-label').inner_text() == '読み取り専用：現在の対局開始時に確定したルール'
         assert page.locator('#online-rules-dialog input, #online-rules-dialog select, #online-rules-dialog textarea, #online-rules-dialog [contenteditable], #online-rules-dialog button:not(#online-rules-close)').count() == 0
         assert page.locator('#online-rules-list dt').all_text_contents() == [
-            '対局形式', '赤ドラ', '喰いタン', '和了条件', '後付け', 'リーチ・一発',
+            '対局形式', '赤ドラ', '喰いタン', '和了条件', '後付け', 'リーチ', '一発',
             '裏ドラ', 'カンドラ', '通常流局', '途中流局', '連荘', '対局終了',
         ]
         assert page.evaluate('''() => {
