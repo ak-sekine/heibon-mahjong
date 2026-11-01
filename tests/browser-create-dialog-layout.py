@@ -32,7 +32,7 @@ with sync_playwright() as playwright:
               const shouldShow=content.scrollHeight-content.clientHeight>1;
               const expectedHeight=Math.min(indicator.clientHeight,Math.max(20,indicator.clientHeight*content.clientHeight/content.scrollHeight));
               return indicator.hidden===!shouldShow && (!shouldShow || Math.abs(parseFloat(thumb.style.height||'0')-expectedHeight)<=1);
-            }''', {'dialog':dialog_selector,'content':content_selector}, timeout=3000)
+            }''', arg={'dialog':dialog_selector,'content':content_selector}, timeout=3000)
             layout = page.locator(dialog_selector).evaluate('''(dialog, selectors) => {
               const panel = dialog.querySelector('.dialog-scroll-panel');
               const content = dialog.querySelector(selectors.content);
