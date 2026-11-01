@@ -152,3 +152,54 @@ Codex Cloud内ではBrowser UIブラウザーを起動していません。Brows
 - verify、Chromium／WebKit Browser UI、browser matrix audit、release freshness、本番Worker検証、Pages build／deployがすべて成功しました。今回追加したネイティブスクロールバー非表示指定は、Chromium／WebKit双方でオフライン・オンラインの両本文について検査されました。
 - WorkerとPagesの公開対象SHA：`c06cc554cfa0ef7ba343ac9d4b2ef7d1d18413d9`。Worker URL=`https://heibon-mahjong-online.ak-sekine.workers.dev`、Pages URL=`https://ak-sekine.github.io/heibon-mahjong/`。
 - iPhone Safari実機での修正後再確認は未実施です。ユーザー本人の確認完了までIssue #27はOpenのままとします。
+
+## 2026-11-01 修正後のiPhone Safari実機確認と受け入れ判定
+
+### 今回の実機確認
+
+確認日：2026-11-01、確認環境：iPhone Safari、確認者：ユーザー本人。端末機種、iOSバージョン、詳細な検証時刻は報告されていません。
+
+以下はユーザー本人から今回報告された6項目だけの結果です。自動テスト結果とは別に記録します。
+
+| # | 確認項目 | 結果 |
+| --- | --- | --- |
+| 1 | スクロール操作中も黒色のバーが表示されない | OK |
+| 2 | 黄色のスクロールバーだけが表示される | OK |
+| 3 | 黄色のバーがスクロール位置に連動する | OK |
+| 4 | 最後のルール項目までスクロールできる | OK |
+| 5 | 操作ボタンが固定され、説明文と重ならない | OK |
+| 6 | オンラインの新規対局画面でも同様に動作する | OK |
+
+**集計：OK 6件、NG 0件、未確認 0件。** これは上記6項目に限った集計であり、他の機能・画面・端末の実機確認を示しません。
+
+### Issue #27の受け入れ条件と証拠
+
+Issue本文の要求と受け入れ条件を、今回のiPhone Safari報告、Issue #6の過去の実機記録、自動テスト、公開後検証に分けて照合しました。
+
+| 対象 | 自動テスト／公開側の証拠 | ユーザー本人による実機証拠 | 判定と境界 |
+| --- | --- | --- | --- |
+| オフライン新規対局へのルール統合 | `tests/new-game-dialog.test.ts`、`tests/browser-offline-rules.py`、`tests/browser-online-waiting-room.py`。run #490 のverifyとBrowser UI両エンジン成功 | 今回の実機報告は画面統合そのものではなくスクロール表示・操作性を確認。旧ルール画面の操作はIssue #6記録にあり | 統合は自動確認済み。統合後の新規対局開始操作そのものを今回実機で確認したとは扱わない |
+| オンラインルーム作成へのルール統合 | `tests/browser-online-waiting-room.py`とBrowser UI。run #490でChromium／WebKit成功、Worker本番検証成功 | 今回はオンライン新規対局画面のスクロール・固定ボタン表示のみOK。統合後の作成完了を実機確認した報告ではない | 統合は自動確認済み。今回の実機確認範囲を超えて成功扱いしない |
+| 東風戦／半荘戦 | `tests/rules.test.ts`、offline／online Browser UIで選択・表示・進行を検査。Worker側保存は`tests/step14-0-1.test.ts` | Issue #6記録で半荘戦の選択・保存・次回復元、オンライン半荘戦の東4局から南1局への進行を確認済み | 現行自動テストと先行実機記録で確認。今回の6項目の実機確認には含まれない |
+| 固定ルールの読み取り専用表示 | `tests/rules.test.ts`と`tests/browser-online-waiting-room.py`。参加者のfieldsetと全radioのdisabled状態を検査 | Issue #6記録で固定ルール表示と読み取り専用を確認済み | 既存ルール確認機能は実機確認済み。今回の統合画面の固定ルール全項目を読み上げて確認したとは扱わない |
+| キャンセル・保存・復元 | `tests/new-game-dialog.test.ts`、`tests/rules.test.ts`、`tests/browser-offline-rules.py`、`tests/browser-online-waiting-room.py`が保存タイミング、キャンセル、復元を検査 | Issue #6記録で設定キャンセル、オフライン次回値復元を確認済み | 自動検証済み。統合後UIでの保存・キャンセル一連の実機再確認は未報告 |
+| Workerを正本とするオンラインルール同期 | `tests/step14-0-1.test.ts`、`tests/browser-online-waiting-room.py`、run #490のWorker production-testが成功 | Issue #6記録でオンラインの確定ルールを表示し、ホストと同一iPhone別タブ参加者で一致を確認済み | Worker同期と既存ルール表示は自動・先行実機で確認。今回の新UIでルーム作成後の確定値を実機確認したとは扱わない |
+| 参加者の読み取り専用表示 | online Browser UIが参加者側の作成制御無効とルール表示を検査。run #490の両ブラウザー成功 | Issue #6記録で別タブ参加者から表示・変更不可を確認済み | 自動・先行実機で確認。別の物理端末での実機一致は未確認 |
+| 再接続後のルール維持 | WorkerテストにDurable Object再生成後の保存値保持があり、run #490のproduction-testでWebSocket再接続系が成功 | Issue #6記録では待機中の再読み込み後とホスト退出後の維持を確認。対局中再接続後のルール維持は未確認 | 自動検証済み。対局中再接続のiPhone実機確認は未確認 |
+| スマートフォン向けスクロールと固定フッター | `tests/browser-create-dialog-layout.py`が両画面の5 viewport、最終項目、本文／フッター分離、ボタン、thumb同期、ネイティブバー非表示を検査。run #490のChromium／WebKit両job成功 | 今回の6項目すべてOK。前回のNG（黒色の標準バーとの二重表示、ルール説明とボタンの重なり）を修正後に再確認 | 今回の不具合修正とオンライン・オフライン画面の実機確認は完了 |
+| 既存機能への回帰 | run #490のverify（回帰テスト、Worker型検査、Pages build）、Browser UI両job、matrix audit、本番Worker検証が成功 | 今回は既存ゲーム全機能の実機回帰確認ではない | 自動検証で回帰を確認。網羅的な実機回帰確認とは扱わない |
+
+### Actions・公開状態の再取得
+
+- 最新 `main` は `1f9c07dad1135d1cdd0be38db0c7c25ace93515d`。このSHAには検証記録更新が含まれます。
+- Deploy run #490 [41281181383](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41281181383) のGitHub Actionsジョブを再取得しました。verify、Chromium／WebKit Browser UI、browser matrix audit、release freshness、Worker deploy、production-test、Pages build／deployはすべてcompleted / successです。対象コードSHAは `c06cc554cfa0ef7ba343ac9d4b2ef7d1d18413d9`。
+- 同SHAに対する公開記録はWorker／Pagesとも `c06cc554cfa0ef7ba343ac9d4b2ef7d1d18413d9` です。Worker本番テストを含むrun #490の成功を公開根拠とします。公開URLへの直接HTTP応答とWorker／Pages内部の現在値を別途照会した結果は未確認です。
+- 検証記録だけを含む最新main SHAのrun #491 [41282235866](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41282235866) もcompleted / successです。docs-checkが成功し、コード検証、Browser UI、Worker／Pages deploy関連jobはdocs-only判定によりskipされました。skipを成功検証や再公開とは数えません。
+
+### Close判定
+
+**Close可能と判断します。** Issueの実装範囲は自動テスト、Chromium／WebKit Browser UI、Worker本番検証と公開で確認され、今回の追加修正で問題になったiPhone Safariの6項目もすべてOKです。過去のNGは削除せず、上表と前節までの時系列に修正後の解消結果を追記しました。
+
+Android実機、PC実機、PWA standalone／セーフエリア、統合後画面でのキャンセル・保存・復元、統合後のオンラインルーム作成と参加者画面、対局中再接続後の実機確認、公開URLへの直接HTTP応答は未確認です。Issueの受け入れ条件はこれらをすべて**実機**で確認することまでは要求していません。画面サイズと2エンジンのレイアウト・操作は自動Browser UI、ルール保存・Worker同期・参加者表示・再接続は回帰テストと本番Worker検証で確認し、今回の修正対象はiPhone Safari実機で確認済みです。既存機能に未解決の重大な不具合を示す失敗や報告はありません。これらの未確認事項は記録に残し、今回のIssue完了を妨げる必須条件とは扱いません。
+
+今回の6項目を超える操作の実機確認が必要になった場合は、別途対象を明示して確認します。今回の報告からそれらを実施済みとは推定しません。

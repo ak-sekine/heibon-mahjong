@@ -4,7 +4,7 @@
 
 ## Issue調査
 
-- [新規対局画面へのルール設定統合 — Issue #27、2026-11-01](issue27-new-game-rules-2026-11-01.md) — オフライン・オンラインのルール設定統合、保存／Worker同期、関連Issue、local test、run #483のChromium／WebKit・Deploy gate・Worker／Pages公開結果を記録。iPhone Safari／Android／PC実機確認待ちのためIssueはOpenです。
+- [新規対局画面へのルール設定統合 — Issue #27、2026-11-01](issue27-new-game-rules-2026-11-01.md) — オフライン・オンラインのルール統合、保存／Worker同期、run #490のBrowser UI・Worker／Pages公開、docs-only run #491、iPhone Safari実機確認（追加修正の6項目がOK）と未確認範囲・Close判定を記録。Issue #27はcompletedとしてClose。
 - [対局結果画面と同じオンラインルームでの再戦 — Issue #13、2026-11-01](issue13-rematch-2026-11-01.md) — 実装、Worker統合テスト、連続3対局、Chromium／WebKit検証、run 41262624930・41267773516のDeploy gate／Worker／Pages成功と完了判定を記録。ユーザー本人の「問題ありません」報告は確認範囲のみ記録し、追加修正後のiPhone Safari実機確認など詳細条件は未確認です。Pages直接HTTP応答は未確認です。
 - [対局終了時の最終順位・持ち点 — Issue #12、2026-10-31〜11-01](issue12-match-result-2026-10-31.md) — 終了判定、既存順位ルール、オフライン／サーバー確定ビューの再利用、ボタン表記・フォント修正、単体・全体テスト、Chromium／WebKit Actions結果を記録。2026-11-01にユーザー本人がiPhone Safariで修正後のボタン表示・操作4項目すべてOK（NG 0、未確認0）と報告し、Issue #12を完了判定。報告外の実機条件は未確認として区別。
 - [Browser UI回帰の壁時計時間短縮 — Issue #28、Phase 1〜3、2026-10-31](browser-ui-wall-clock-issue28-2026-10-31.md) — run 41206140603で56 scenario (Chromium 34／WebKit 22) の成功とwall clock 18:12.3から8:50.4への短縮を確認。Phase 3のmatrix auditはrun 41208917661で実Actions API queryを実行してsuccessしました。失敗・cancel・skip・job欠落を拒否するstatus tests、artifact、残存riskを記録。
