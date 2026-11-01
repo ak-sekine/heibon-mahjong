@@ -5,6 +5,7 @@ import { renderMatch } from './rendering/match.ts';
 import { ResultDialog } from './ui/result-dialog.ts';
 import { MatchResultDialog } from './ui/match-result-dialog.ts';
 import { NewGameDialog } from './ui/new-game-dialog.ts';
+import { mountDialogScrollIndicators } from './ui/dialog-scroll-indicator.ts';
 import { openReadOnlyRules, RulePreferences } from './ui/rule-settings.ts';
 import { rulesForMatch, type GameRules } from './model/rules.ts';
 import { GameController } from './ui/controller.ts';
@@ -302,6 +303,7 @@ if (document.querySelector('#online-create-open')) {
   matchResultDialog.setOnlineRematchHandler(() => waitingRoom.prepareRematch());
   onlineGameController.setActionSender((action, expectedGameRevision) => waitingRoom.sendGameAction(action, expectedGameRevision));
 }
+mountDialogScrollIndicators();
 document.querySelector('#player-hand')!.addEventListener('click', event => {
   const button = (event.target as Element).closest<HTMLButtonElement>('button[data-tile-id]');
   if (!button) return;

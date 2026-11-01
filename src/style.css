@@ -171,18 +171,27 @@ header > div { min-width:0; }
 #next-round { margin:0; }
 .result-footer { display:flex; justify-content:space-between; gap:16px; }
 .result-footer button { white-space:nowrap; min-width:0; }
-#new-game-dialog { width:calc(100% - 32px); max-width:480px; box-sizing:border-box; max-height:calc(100svh - max(16px,env(safe-area-inset-top)) - max(16px,env(safe-area-inset-bottom))); overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:16px; border:2px solid #ffda7d; border-radius:12px; background:#185640; color:#fffdf7; }
+#new-game-dialog { width:calc(100% - 32px); max-width:480px; box-sizing:border-box; max-height:calc(100svh - max(16px,env(safe-area-inset-top)) - max(16px,env(safe-area-inset-bottom))); overflow:hidden; padding:16px; border:2px solid #ffda7d; border-radius:12px; background:#185640; color:#fffdf7; }
 @supports (height:100dvh) { #new-game-dialog { max-height:calc(100dvh - max(16px,env(safe-area-inset-top)) - max(16px,env(safe-area-inset-bottom))); } }
 #new-game-dialog::backdrop { background:rgb(0 0 0 / 60%); }
 #new-game-dialog[open] { display:flex; flex-direction:column; gap:8px; }
-.new-game-header { flex:none; }
-.new-game-header h2 { margin:0; font-size:1.15rem; }
-#new-game-question { flex:none; margin:0; line-height:1.45; overflow-wrap:anywhere; }
+.new-game-header { flex:none; min-width:0; }
+.new-game-header h2 { margin:0 0 6px; font-size:1.15rem; }
+#new-game-question { margin:0; line-height:1.45; overflow-wrap:anywhere; }
+.dialog-scroll-panel { display:grid; grid-template-columns:minmax(0,1fr) 8px; align-items:stretch; gap:8px; flex:1 1 auto; min-width:0; min-height:0; overflow:hidden; }
+.dialog-scroll-content { min-width:0; min-height:0; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; scrollbar-width:thin; scrollbar-color:#ffda7d #154e3c; padding:0 8px 4px 0; }
+.dialog-scroll-content:focus-visible { outline:3px solid #82dcff; outline-offset:-3px; }
+.dialog-scroll-content::-webkit-scrollbar { width:6px; }
+.dialog-scroll-content::-webkit-scrollbar-track { background:#154e3c; border-radius:6px; }
+.dialog-scroll-content::-webkit-scrollbar-thumb { background:#ffda7d; border-radius:6px; }
+.dialog-scroll-indicator { position:relative; align-self:stretch; width:6px; min-height:0; margin:0 1px; border-radius:6px; background:#154e3c; }
+.dialog-scroll-indicator[hidden] { display:none; }
+.dialog-scroll-indicator span { position:absolute; top:0; left:0; width:100%; min-height:20px; border-radius:6px; background:#ffda7d; will-change:transform,height; }
 .rules-editor { min-width:0; }
 .rules-editor .match-format-options { margin:0 0 10px; }
 .rule-settings-fixed h3 { margin:8px 0 0; font-size:.92rem; }
 .rule-settings-fixed-list .confirmed-rule-row:first-child { border-top:0; }
-.new-game-actions { position:sticky; z-index:1; bottom:0; display:flex; justify-content:space-between; gap:12px; flex:none; margin-top:2px; padding:8px 0 0; background:#185640; }
+.new-game-actions { position:static; z-index:auto; display:flex; justify-content:space-between; gap:12px; flex:none; margin-top:2px; padding:8px 0 0; border-top:1px solid #63947a; background:#185640; }
 .new-game-actions button { flex:1 1 50%; min-width:0; }
 .match-format-options { display:grid; gap:6px; margin:0 0 16px; padding:10px; border:1px solid #63947a; border-radius:8px; }
 .match-format-options legend { padding:0 4px; font-weight:700; }
@@ -223,6 +232,7 @@ header > div { min-width:0; }
 @supports (height:100dvh) { .online-dialog { max-height:calc(100dvh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom))); } }
 .online-dialog[open] { display:block; }
 .online-form-dialog[open] { display:flex; flex-direction:column; }
+.online-create-dialog[open] { min-height:0; overflow:hidden; }
 #online-dialog[open] { display:flex; flex-direction:column; min-height:0; }
 .online-dialog::backdrop { background:rgb(0 0 0 / 60%); }
 .online-dialog-header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex:none; margin-bottom:8px; padding:0; }
@@ -234,9 +244,10 @@ header > div { min-width:0; }
 .online-dialog .online-dialog-close { box-sizing:border-box; flex:none; width:max-content; min-width:44px; height:44px; padding:4px 8px; white-space:nowrap; font-size:.82rem; }
 .online-form-dialog { width:min(calc(100vw - 24px),420px); }
 .online-entry-form { display:grid; gap:10px; min-width:0; }
-.online-entry-form > .rules-editor { min-width:0; }
-.online-entry-form .new-game-actions { bottom:0; margin-top:0; background:#185640; }
-.online-entry-form .new-game-actions button { width:auto; white-space:normal; overflow-wrap:anywhere; }
+.online-create-dialog #online-create-form { display:flex; flex:1 1 auto; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
+.online-create-fields { display:grid; gap:10px; min-width:0; }
+.online-create-dialog #online-create-actions { flex:none; margin-top:8px; background:#185640; }
+.online-create-dialog #online-create-actions button { width:auto; white-space:normal; overflow-wrap:anywhere; }
 .online-entry-form label { margin:0; font-weight:600; }
 .online-entry-form input { box-sizing:border-box; width:100%; min-width:0; min-height:48px; padding:10px; border:1px solid #9dc5b2; border-radius:6px; font:inherit; }
 .online-entry-form button { width:100%; }

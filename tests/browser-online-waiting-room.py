@@ -1350,11 +1350,16 @@ with sync_playwright() as p:
     page.set_viewport_size({'width': 320, 'height': 600})
     settings_layout = page.locator('#new-game-dialog').evaluate('''dialog => {
       const box = dialog.getBoundingClientRect();
+      const content = dialog.querySelector('#new-game-content');
+      const panel = content.parentElement;
+      const footer = dialog.querySelector('.new-game-actions');
       return {top: box.top, bottom: box.bottom, width: box.width, clientWidth: dialog.clientWidth,
-        scrollWidth: dialog.scrollWidth, clientHeight: dialog.clientHeight, scrollHeight: dialog.scrollHeight,
+        scrollWidth: dialog.scrollWidth, contentClientHeight: content.clientHeight, contentScrollHeight: content.scrollHeight,
+        contentBottom: content.getBoundingClientRect().bottom, panelBottom: panel.getBoundingClientRect().bottom,
+        footerTop: footer.getBoundingClientRect().top,
         noPageHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth};
     }''')
-    assert settings_layout['top'] >= 0 and settings_layout['bottom'] <= 600 and settings_layout['scrollWidth'] <= settings_layout['clientWidth'] and settings_layout['scrollHeight'] > settings_layout['clientHeight'] and settings_layout['noPageHorizontalOverflow'], f'new-game dialog did not scroll at 320x600: {settings_layout}'
+    assert settings_layout['top'] >= 0 and settings_layout['bottom'] <= 600 and settings_layout['scrollWidth'] <= settings_layout['clientWidth'] and settings_layout['contentScrollHeight'] > settings_layout['contentClientHeight'] and settings_layout['contentBottom'] <= settings_layout['footerTop'] and settings_layout['panelBottom'] <= settings_layout['footerTop'] and settings_layout['noPageHorizontalOverflow'], f'new-game dialog content did not scroll above its fixed footer at 320x600: {settings_layout}'
     page.locator('#confirm-new-game').scroll_into_view_if_needed()
     assert page.locator('#confirm-new-game').is_visible(), 'offline start action was unreachable on a short screen'
     page.locator('#cancel-new-game').scroll_into_view_if_needed()
@@ -1398,9 +1403,13 @@ with sync_playwright() as p:
     page.keyboard.press('Tab')
     assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Tab did not move from the create close button to the display-name input'
     page.keyboard.press('Tab')
-    assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').evaluate('element => document.activeElement === element'), 'Tab did not move from display name to the inline rule editor'
+    assert page.locator('#online-create-content').evaluate('element => document.activeElement === element'), 'Tab did not reach the keyboard-scrollable room settings region'
+    page.keyboard.press('Tab')
+    assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').evaluate('element => document.activeElement === element'), 'Tab did not move from the settings region to the inline rule editor'
     page.keyboard.press('Shift+Tab')
-    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return from rules to display name'
+    assert page.locator('#online-create-content').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return from rules to the scrollable settings region'
+    page.keyboard.press('Shift+Tab')
+    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return from settings to display name'
     page.keyboard.press('Shift+Tab')
     assert page.locator('#online-create-close').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to the create close button'
     assert page.locator('#online-create').is_disabled(), 'room creation was enabled without a display name'

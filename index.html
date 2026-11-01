@@ -23,13 +23,20 @@
       <button id="menu-diagnostics" type="button" aria-haspopup="dialog" aria-controls="diagnostic-dialog" class="main-menu-item">診断ログ</button>
     </nav>
   </div></header>
-  <dialog id="online-create-dialog" class="online-dialog online-form-dialog" aria-labelledby="online-create-title">
+  <dialog id="online-create-dialog" class="online-dialog online-form-dialog online-create-dialog" aria-labelledby="online-create-title">
     <header class="online-dialog-header"><h2 id="online-create-title">新しくルームを作る</h2><button id="online-create-close" class="online-dialog-close ui-button ui-button--b" type="button" aria-label="ルーム作成を閉じる">閉じる</button></header>
     <form id="online-create-form" class="online-entry-form" novalidate>
-      <label for="online-create-name">表示名</label>
-      <input id="online-create-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" aria-describedby="online-create-message" required>
-      <div id="online-create-rules-editor" class="rules-editor" aria-label="新しいルームのルール"></div>
-      <p id="online-create-message" class="online-form-message" role="status" aria-live="polite" hidden></p>
+      <div class="dialog-scroll-panel">
+        <div id="online-create-content" class="dialog-scroll-content" tabindex="0" role="region" aria-label="ルーム設定">
+          <div class="online-create-fields">
+            <label for="online-create-name">表示名</label>
+            <input id="online-create-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" aria-describedby="online-create-message" required>
+            <div id="online-create-rules-editor" class="rules-editor" aria-label="新しいルームのルール"></div>
+            <p id="online-create-message" class="online-form-message" role="status" aria-live="polite" hidden></p>
+          </div>
+        </div>
+        <div class="dialog-scroll-indicator" aria-hidden="true"><span></span></div>
+      </div>
       <footer id="online-create-actions" class="new-game-actions">
         <button id="online-create-cancel" type="button" class="ui-button ui-button--b">キャンセル</button>
         <button id="online-create" type="submit" disabled class="ui-button ui-button--a">ルーム作成</button>
@@ -185,13 +192,17 @@
     <footer class="result-footer"><button id="match-result-close" type="button" class="ui-button ui-button--b">閉じる</button><button id="match-result-new-game" type="button" hidden class="ui-button ui-button--a">次の対局を始める</button></footer>
   </dialog>
   <dialog id="new-game-dialog" class="new-game-dialog" aria-labelledby="new-game-title">
-    <header class="new-game-header"><h2 id="new-game-title">オフラインで新規対局</h2></header>
-    <p id="new-game-question">新しい対局を開始しますか？</p>
-    <div id="new-game-rules-editor" class="rules-editor" aria-label="新しい対局のルール"></div>
-    <div class="new-game-actions">
+    <header class="new-game-header"><h2 id="new-game-title">オフラインで新規対局</h2><p id="new-game-question">新しい対局を開始しますか？</p></header>
+    <div class="dialog-scroll-panel">
+      <div id="new-game-content" class="dialog-scroll-content" tabindex="0" role="region" aria-label="対局形式とルール">
+        <div id="new-game-rules-editor" class="rules-editor" aria-label="新しい対局のルール"></div>
+      </div>
+      <div class="dialog-scroll-indicator" aria-hidden="true"><span></span></div>
+    </div>
+    <footer class="new-game-actions">
       <button id="cancel-new-game" type="button" autofocus class="ui-button ui-button--b">キャンセル</button>
       <button id="confirm-new-game" type="button" class="ui-button ui-button--a">対局開始</button>
-    </div>
+    </footer>
   </dialog>
   <dialog id="online-rules-dialog" class="online-dialog readonly-rules-dialog" aria-labelledby="online-rules-title">
     <header class="online-dialog-header"><h2 id="online-rules-title">ルール確認</h2><button id="online-rules-close" class="online-dialog-close ui-button ui-button--b" type="button">閉じる</button></header>
