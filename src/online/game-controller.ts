@@ -17,6 +17,7 @@ import type { PublicDeclarationEvent } from '../model/declaration.ts';
 import { collectRecentDeclarations } from './declaration-cursor.ts';
 import { riichiRiverReference } from '../rendering/riichi-river-reference.ts';
 import { diagnosticLog, recordGameRenderFailure } from './diagnostics.ts';
+import { isValidGameRules, normalizeGameRules } from '../model/rules.ts';
 
 type ActionSender = (action: GameActionPayload, expectedGameRevision: number) => void;
 type DecisionAction = { type: 'declare-ron' } | { type: 'pass-ron' } | { type: 'declare-call'; optionId: string } | { type: 'pass-call' };
@@ -40,6 +41,10 @@ function asView(value: unknown): PlayerGameView | null {
       !Number.isInteger(view.viewerSeat) || view.viewerSeat! < 0 || view.viewerSeat! > 3 ||
       view.self?.seat !== view.viewerSeat || !Array.isArray(view.seats) || view.seats.length !== 4 ||
       !['playing', 'round-ended', 'match-ended', 'aborted'].includes(String(view.status))) return null;
+  const legacyRules = { schemaVersion: 1, matchFormat: view.format ?? view.round?.format ?? 'tonpu' };
+  const rules = view.rules === undefined ? normalizeGameRules(legacyRules)
+    : isValidGameRules(view.rules) ? normalizeGameRules(view.rules) : null;
+  if (!rules) return null;
   const declarations = view.declarations;
   if (declarations !== undefined && (!Array.isArray(declarations) || declarations.some(event =>
     !event || !Number.isSafeInteger(event.id) || !Number.isInteger(event.roundNumber) ||
@@ -48,7 +53,7 @@ function asView(value: unknown): PlayerGameView | null {
     !Number.isInteger(event.seat) || event.seat! < 0 || event.seat! > 3 ||
     !['riichi', 'pon', 'kan', 'chi', 'ron'].includes(String(event.kind)) ||
     !Number.isFinite(event.occurredAt)))) return null;
-  return { ...view, declarations: (declarations ?? []) as readonly PublicDeclarationEvent[] } as PlayerGameView;
+  return { ...view, rules, declarations: (declarations ?? []) as readonly PublicDeclarationEvent[] } as PlayerGameView;
 }
 
 export class OnlineGameController {
