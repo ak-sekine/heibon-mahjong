@@ -2,7 +2,8 @@
 
 ## 対象と実装
 
-- 対象コミットSHA: 実装コミットをpush後に記録します。
+- 対象実装コミットSHA: `4fe2da7dcce420ada6d9dbbbca3bbf5fa6bad281`。
+- GitHub Actions／Deployの対象SHAと結果はpush後に追記します。
 - 対象Issue: [#17](https://github.com/ak-sekine/heibon-mahjong/issues/17)。この記録は自動検証・GitHub Actions／公開・ユーザー本人の実機確認を分けます。
 - `GameRules` schemaをv3にし、喰いタンを新規対局画面の共通ローカルルールとして追加しました。初期値はONです。対局開始時の既存snapshotと`localStorage`、オンラインWorker正本、ルール確認表示をそのまま拡張しています。
 - 旧schema v1/v2と保存version 1/2では、従来どおり喰いタンONへ正規化します。旧ルームにルールJSONがない場合もONです。
