@@ -7,13 +7,20 @@ export function mountDialogScrollIndicators(root: ParentNode = document): void {
     if (!content || !track || !thumb) return;
 
     const update = (): void => {
-      const trackHeight = track.clientHeight;
       const scrollRange = content.scrollHeight - content.clientHeight;
-      const canScroll = scrollRange > 1 && trackHeight > 0;
-      track.hidden = !canScroll;
-      if (!canScroll) {
+      if (scrollRange <= 1) {
+        track.hidden = true;
         thumb.style.removeProperty('height');
         thumb.style.removeProperty('transform');
+        return;
+      }
+
+      // A hidden track reports zero height. Reveal it before measuring so a
+      // dialog opened after initialization can still get its first thumb.
+      track.hidden = false;
+      const trackHeight = track.clientHeight;
+      if (trackHeight <= 0) {
+        track.hidden = true;
         return;
       }
 
