@@ -34,7 +34,7 @@
 
 ## 自動・ブラウザー検証
 
-- [喰いタン切替と後付け禁止の仕様調査 — Issue #17](issue17-local-rules-2026-11-01.md) — `GameRules` v3、ON/OFFの役・翻数・点数、CPU鳴き、保存・オンライン同期、CI・公開結果と、複数解釈がある後付け禁止の未確定範囲を記録します。iPhone Safari確認前のためIssueはOpenです。
+- [喰いタンON/OFF — Issue #17](issue17-local-rules-2026-11-01.md) — `GameRules` v3、ON/OFFの役・翻数・点数、CPU鳴き、保存・オンライン同期、自動テスト・GitHub Actions結果を記録します。後付けありは固定、後付け禁止・片和了禁止は採用しません。iPhone Safari実機確認は未確認のためIssueはOpenです。
 
 - [和了概要のドラ合計 — Issue #11、2026-10-31](issue11-dora-summary-2026-10-31.md) — オフライン・オンライン共通表示、既存 `doraCounts` による合算、点数系不変、オンライン結果のJSON復元、自動検証とActions run 41196608100（実装SHA一致、検証・Browser UI・production-test・Worker/Pages deploy成功）を記録。ユーザー本人によるiPhone Safari実機確認はOK 4件、NG 0件、未確認4件で、実機未確認事項は自動検証と区別しています。
 - [診断ログの「閉じる」折り返し — Issue #10、2026-10-31](diagnostic-close-issue10-2026-10-31.md) — 320/375/390/414pxの寸法ベースBrowser UI確認、初回テスト呼び出しエラーと修正後のCI/deploy successを記録。ユーザー本人のiPhone Safari実機確認（5項目OK）を追記し、実機確認結果と自動検証を区別してIssueを完了・Closeしました。
