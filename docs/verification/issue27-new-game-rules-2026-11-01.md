@@ -120,5 +120,9 @@ Codex Cloud内ではBrowser UIブラウザーを起動していません。Brows
 
 - `tests/browser-create-dialog-layout.py`を追加し、オフライン／オンライン双方で320×320、320×568、375×667、812×375（横向き相当）、390×844を検査します。本文下端とフッター上端、固定ボタンの表示・タップ領域、最終ルールへのスクロール、インジケーターの表示・thumb寸法・位置同期を確認します。
 - Browser UI manifestにChromium／WebKitの両方を追加し、選択テストの期待件数を更新しました。
-- ローカル検証結果とGitHub Actions、Deploy gate、Worker／Pagesの公開結果は、この追補コミットの結果を後日ここに記録します。既知のCodex Cloud Chromium起動制限により、ローカルBrowser UIを成功扱いしません。
+- Browser UI専用検査：**Chromium成功／WebKit成功**。両方でオフライン・オンライン、5 viewport、本文／フッター境界、最終ルールまでのスクロール、ボタン固定、インジケーター同期を確認しました。
+- Deploy workflow run #488 — [GitHub Actions](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41279527377)：**completed / success**。`verify`、Chromium／WebKit Browser UI、matrix audit、release freshness、Worker公開、本番テスト、Pages build／deployが成功しました。
+- Worker production test：**成功**。実Worker URLに対する5シナリオ（2人対局・CPU引継ぎ・再接続、切断・再接続、ホスト引継ぎ、4人対局、3人＋CPU）を確認しました。
+- 公開記録SHA：Worker=`118245731a408389fc312f1713a8d018615ec490`、Pages=`118245731a408389fc312f1713a8d018615ec490`。Worker URL=`https://heibon-mahjong-online.ak-sekine.workers.dev`、Pages URL=`https://ak-sekine.github.io/heibon-mahjong/`。
+- Codex Cloud内ではBrowser UIブラウザーを起動していません。Browser UI結果はGitHub ActionsのChromium／WebKit jobとmatrix auditで確認しました。
 - iPhone Safari実機での再確認は未実施です。確認完了まではIssue #27をOpenのままにします。
