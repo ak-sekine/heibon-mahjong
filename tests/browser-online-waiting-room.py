@@ -706,7 +706,8 @@ with sync_playwright() as p:
             'args': ['--no-sandbox'],
         }
     browser = browser_type.launch(**launch_options)
-    page = browser.new_page(viewport={'width': 390, 'height': 844})
+    context = browser.new_context(viewport={'width': 390, 'height': 844})
+    page = context.new_page()
     errors = []
     console_errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
