@@ -24,6 +24,8 @@ SUITE = [
     run('tests/browser-offline-rules.py', 'webkit'),
     run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_NEXT_ROUND_ONLY='1'),
     run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_NEXT_ROUND_ONLY='1'),
+    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_RESULT_BUTTON_FONTS_ONLY='1'),
+    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_RESULT_BUTTON_FONTS_ONLY='1'),
     run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_EXIT_NOTICE_ONLY='1'),
     run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_EXIT_NOTICE_ONLY='1'),
     run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_RULES_ONLY='1'),

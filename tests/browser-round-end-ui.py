@@ -412,6 +412,15 @@ with sync_playwright() as p:
             assert page.locator('#next-round').is_visible() == (meta['status'] == 'round-ended'), (width, scenario, meta)
             if meta['status'] == 'round-ended':
                 assert page.locator('#next-round').inner_text() == '次の局へ', (width, scenario)
+                round_button_fonts = page.evaluate('''() => {
+                  const properties=['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing'];
+                  const values=selector=>{
+                    const style=getComputedStyle(document.querySelector(selector));
+                    return Object.fromEntries(properties.map(property=>[property,style[property]]));
+                  };
+                  return {show:values('#show-result'),next:values('#next-round')};
+                }''')
+                assert round_button_fonts['show'] == round_button_fonts['next'], (width, scenario, round_button_fonts)
             if width <= 430 and meta['status'] == 'round-ended' and not meta['winners']:
                 fit = page.evaluate('''() => {
                   const rect = selector => { const r=document.querySelector(selector).getBoundingClientRect(); return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}; };
@@ -614,6 +623,15 @@ with sync_playwright() as p:
         assert page.locator('#show-result').inner_text() == '局の結果'
         assert page.locator('#show-match-result').is_visible()
         assert page.locator('#show-match-result').inner_text() == '順位確認'
+        final_button_fonts = page.evaluate('''() => {
+          const properties=['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing'];
+          const values=selector=>{
+            const style=getComputedStyle(document.querySelector(selector));
+            return Object.fromEntries(properties.map(property=>[property,style[property]]));
+          };
+          return {round:values('#show-result'),match:values('#show-match-result')};
+        }''')
+        assert final_button_fonts['round'] == final_button_fonts['match'], (width, final_button_fonts)
         if width <= 430:
             final_actions = page.evaluate('''() => {
               const round=document.querySelector('#show-result').getBoundingClientRect();

@@ -166,7 +166,7 @@ header > div { min-width:0; }
 .result-header,.result-footer { flex:none; padding:10px 12px; background:#154e3c; }
 .result-header h2 { margin:0; font-size:clamp(1rem,4vw,1.3rem); }
 #result-body { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:8px; overflow-wrap:anywhere; }
-#result-dialog button,#show-result { min-height:44px; padding:8px 12px; border:1px solid currentColor; border-radius:8px; font:inherit; font-weight:600; touch-action:manipulation; cursor:pointer; }
+#result-dialog button { min-height:44px; padding:8px 12px; border:1px solid currentColor; border-radius:8px; font:inherit; font-weight:600; touch-action:manipulation; cursor:pointer; }
 #result-body:focus-visible { outline:3px solid #82dcff; outline-offset:-3px; }
 #next-round { margin:0; }
 .result-footer { display:flex; justify-content:space-between; gap:16px; }

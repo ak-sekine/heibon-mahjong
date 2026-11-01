@@ -15,6 +15,7 @@ EXIT_NOTICE_ONLY = os.environ.get('HEIBON_ONLINE_EXIT_NOTICE_ONLY') == '1'
 RIVER_SPACING_ONLY = os.environ.get('HEIBON_ONLINE_RIVER_SPACING_ONLY') == '1'
 RULES_ONLY = os.environ.get('HEIBON_ONLINE_RULES_ONLY') == '1'
 NEXT_ROUND_ONLY = os.environ.get('HEIBON_ONLINE_NEXT_ROUND_ONLY') == '1'
+RESULT_BUTTON_FONTS_ONLY = os.environ.get('HEIBON_ONLINE_RESULT_BUTTON_FONTS_ONLY') == '1'
 OUT.mkdir(parents=True, exist_ok=True)
 
 def assert_common_button_colors(page, selector):
@@ -957,6 +958,62 @@ with sync_playwright() as p:
       browser.close()
       raise SystemExit(0)
 
+    if RESULT_BUTTON_FONTS_ONLY:
+      select_menu_item('#online-create-open')
+      page.locator('#online-create-name').fill('テストホスト')
+      page.locator('#online-create').click()
+      wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234'")
+      page.locator('#online-ready').click()
+      wait_for('document.querySelector("#online-finalize").disabled === false')
+      page.locator('#online-finalize').click()
+      wait_for("document.querySelector('#online-finalized-message').hidden === false")
+      page.locator('#online-start-game').click()
+      wait_for("document.querySelector('#online-match').hidden === false")
+      for width in (320, 375, 390, 430):
+        page.set_viewport_size({'width': width, 'height': 844})
+        page.evaluate("window.onlineMock.setResultScenario('self-tsumo', 0)")
+        wait_for("window.onlineUiTest.onlineGameController.view?.status === 'round-ended' && document.querySelector('#online-next-round').hidden === false")
+        fonts = page.evaluate('''() => {
+          const properties=['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing'];
+          const values=selector=>{
+            const style=getComputedStyle(document.querySelector(selector));
+            return Object.fromEntries(properties.map(property=>[property,style[property]]));
+          };
+          const rect=selector=>{
+            const box=document.querySelector(selector).getBoundingClientRect();
+            return {left:box.left,top:box.top,right:box.right,bottom:box.bottom};
+          };
+          const show=rect('#online-show-result'), next=rect('#online-next-round');
+          return {show:values('#online-show-result'),next:values('#online-next-round'),showRect:show,nextRect:next,
+            within:show.left>=0&&next.right<=innerWidth,sameRow:Math.abs(show.top-next.top)<1,
+            notOverlapping:show.right<=next.left};
+        }''')
+        assert fonts['show'] == fonts['next'], (ENGINE, width, 'round-ended', fonts)
+        assert fonts['within'] and fonts['sameRow'] and fonts['notOverlapping'], (ENGINE, width, 'round-ended', fonts)
+        page.evaluate("window.onlineMock.setResultScenario('match-ended', 0)")
+        wait_for("window.onlineUiTest.onlineGameController.view?.status === 'match-ended' && document.querySelector('#online-show-match-result').hidden === false")
+        fonts = page.evaluate('''() => {
+          const properties=['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing'];
+          const values=selector=>{
+            const style=getComputedStyle(document.querySelector(selector));
+            return Object.fromEntries(properties.map(property=>[property,style[property]]));
+          };
+          const rect=selector=>{
+            const box=document.querySelector(selector).getBoundingClientRect();
+            return {left:box.left,top:box.top,right:box.right,bottom:box.bottom};
+          };
+          const show=rect('#online-show-result'), rank=rect('#online-show-match-result');
+          return {show:values('#online-show-result'),rank:values('#online-show-match-result'),showRect:show,rankRect:rank,
+            within:show.left>=0&&rank.right<=innerWidth,sameRow:Math.abs(show.top-rank.top)<1,
+            notOverlapping:show.right<=rank.left};
+        }''')
+        assert fonts['show'] == fonts['rank'], (ENGINE, width, 'match-ended', fonts)
+        assert fonts['within'] and fonts['sameRow'] and fonts['notOverlapping'], (ENGINE, width, 'match-ended', fonts)
+      assert not errors, f'{ENGINE} page errors: {errors}'
+      print(json.dumps({'browser': ENGINE, 'scenario': 'online result button typography', 'widths': [320,375,390,430], 'result': 'pass'}, ensure_ascii=False), flush=True)
+      browser.close()
+      raise SystemExit(0)
+
     assert page.locator('#main-menu-toggle').is_visible(), 'the shared hamburger menu was not rendered'
     page.locator('#main-menu-toggle').click()
     assert page.locator('#main-menu-items').is_visible(), 'the hamburger menu did not open'
@@ -1707,9 +1764,28 @@ with sync_playwright() as p:
           document.querySelector('#online-show-result').hidden === false && document.querySelector('#result-dialog').open === false;
       }})()""")
       assert page.locator('#online-show-result').inner_text() == '局の結果', scenario
+      if expected_status == 'round-ended':
+        round_button_fonts = page.evaluate('''() => {
+          const properties=['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing'];
+          const values=selector=>{
+            const style=getComputedStyle(document.querySelector(selector));
+            return Object.fromEntries(properties.map(property=>[property,style[property]]));
+          };
+          return {show:values('#online-show-result'),next:values('#online-next-round')};
+        }''')
+        assert round_button_fonts['show'] == round_button_fonts['next'], (scenario, round_button_fonts)
       if scenario == 'match-ended':
         assert page.locator('#online-show-match-result').is_visible(), 'final online rank button was hidden'
         assert page.locator('#online-show-match-result').inner_text() == '順位確認'
+        final_button_fonts = page.evaluate('''() => {
+          const properties=['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing'];
+          const values=selector=>{
+            const style=getComputedStyle(document.querySelector(selector));
+            return Object.fromEntries(properties.map(property=>[property,style[property]]));
+          };
+          return {round:values('#online-show-result'),match:values('#online-show-match-result')};
+        }''')
+        assert final_button_fonts['round'] == final_button_fonts['match'], (scenario, final_button_fonts)
         assert page.locator('#online-next-round').is_hidden(), 'final online result showed next-round action'
         assert page.evaluate('''() => {
           const round=document.querySelector('#online-show-result').getBoundingClientRect();

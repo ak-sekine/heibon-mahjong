@@ -62,3 +62,24 @@ Issue #12 の追加要件に合わせ、ボタンの表示文言を更新しま�
 - Deploy gate の `browser-ui-matrix-audit` と `release-freshness` はsuccess。Worker deploy、Production test、Pages build、Pages deployもsuccessです。
 - Worker: https://heibon-mahjong-online.ak-sekine.workers.dev 。Pages: https://ak-sekine.github.io/heibon-mahjong/ 。
 - iPhone Safari実機確認は未実施です。実機確認と最終判定までIssue #12はOpenのままです。
+
+## 2026-11-01 追補：結果操作ボタンのフォント統一
+
+### 報告とコード調査
+
+- ユーザーのiPhone Safari実機スクリーンショットで、通常局終了時の「局の結果」が「次の局へ」より太く見えるとの報告を受けました。これは修正前の不具合報告であり、修正後の成功確認ではありません。
+- `index.html` の共通操作テンプレートにある3ボタン（`data-panel-part="show-result"`、`next-round`、`show-match-result`）は、オフラインとオンラインで `src/ui/action-panel.ts` の `mountActionPanel()` が同じ `control-action-button` クラスのまま複製し、それぞれ `#show-result`／`#next-round`／`#show-match-result` と `#online-show-result`／`#online-next-round`／`#online-show-match-result` のIDを割り当てます。
+- 原因はローカルの `#show-result` にだけ適用されていた `#result-dialog button,#show-result` ルールです。`#show-result` の高詳細度セレクターにある `font:inherit` が、共通 `.control-action-button` の `font-size:14px` を上書きし、親から16pxを継承していました。「次の局へ」と「順位確認」は14pxです。3ボタンはいずれもweight `600` でした。CSS上のフォントファミリーはrootの `system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`、line-heightとletter-spacingは共通の継承値（`normal`）です。
+- ネイティブ `button` のブラウザー既定フォントは `.control-action-button { font:inherit; ... }` で上書きされます。`disabled` ルールはcursor、`:active` ルールは背景色だけを変更し、フォント関連の指定差はありません。結果ダイアログの `#result-dialog button` と `#match-result-dialog button` は別UIのままです。オンライン操作ボタンには `#show-result` セレクターが当たらず、修正前から3対象ボタンは共通の14pxでした。
+- 共通CSSの `.control-action-button` がすでに対象全ボタンの基準です。専用指定を足さず、`#result-dialog button,#show-result` から `#show-result` だけを除き、結果ダイアログ内のボタン指定を維持しました。通常操作ボタン全体や色・押下・無効状態のルールには変更を加えていません。
+
+### 修正・自動検証
+
+- 修正後は対象の3ボタンすべてでroot system UIフォント、14px、weight `600`、継承line-height、継承letter-spacingを共通操作ボタンから使用します。CSS変更前のローカル「局の結果」は16pxで、それ以外の対象は14pxでした。
+- `tests/browser-round-end-ui.py` にオフライン通常局／対局確定終了時のcomputed style比較を追加しました。既存の320、375、390、430px幅を含みます。
+- `tests/browser-online-waiting-room.py` にオンライン用の専用Browser UI検証を追加し、320、375、390、430pxの通常局／対局確定終了時に同一ブラウザー内のcomputed `font-family`、`font-size`、`font-weight`、`line-height`、`letter-spacing` と横並び・画面内配置を比較します。CI matrixではChromiumとWebKitの両方で実行します。
+- コード変更、テスト、Actions、公開の結果は本追補を更新してから記録します。
+
+### iPhone Safari実機確認
+
+修正後のiPhone Safari実機表示は未確認です。ユーザーの修正前画像を成功確認として扱いません。公開後、通常局終了時に「局の結果」「次の局へ」、対局確定終了時に「局の結果」「順位確認」の文字の見た目が揃い、320px相当でも横並び・非折返し・画面内表示が保たれることをユーザーに確認いただきます。Issue #12はその報告までOpenのままです。
