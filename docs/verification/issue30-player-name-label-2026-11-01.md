@@ -4,7 +4,7 @@
 
 - Issue: [#30](https://github.com/ak-sekine/heibon-mahjong/issues/30)
 - 対象: オンラインのルーム作成画面とルーム参加画面の入力項目
-- IssueはOpen。本文・コメント（コメントなし）・状態を確認しました。
+- 実機確認後、Issue本文の受け入れ条件と最新状態をGitHubで再取得しました。すべての条件を満たしたため、検証記録のpush後にcompletedでCloseします。
 - 作業開始時のmain基点: `ad3dfcf3cba08ca44aa0d20fb6c6588bce992246`。fetch後の`origin/main`と一致し、作業ツリーはcleanでした。
 - `表示名`の出現箇所を確認し、フォームラベル・入力検証メッセージは今回変更対象としました。Worker/APIの`displayName`、エラーコード`invalid_display_name`、変数・データキー・保存形式と、天和・地和の役名や長い名前を扱う別用途は維持します。
 - 対象入力欄にプレースホルダーや別の説明文はありません。アクセシビリティ名は`label`から提供され、説明は`aria-describedby`でフォームメッセージを参照します。
@@ -48,14 +48,25 @@
 - 公開対象SHA: WorkerとPagesともに`7c61044cf1837b77f482b7251cf9e1a25f63592a`。Worker URLは https://heibon-mahjong-online.ak-sekine.workers.dev 、Pages URLは https://ak-sekine.github.io/heibon-mahjong/ 。Pages Deploy actionはsuccessしましたが、Pagesの独立HTTP応答確認は行っていません。
 - Deploy gateは変更・迂回していません。
 
+- docs-onlyコミットSHA: `e82a1751f46f82b3c1075e15be7dcf031c6dee39`。Actions [run `41307412228`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41307412228) はsuccessし、`detect-changes`と`docs-check`がsuccessしました。アプリ検証、Browser UI、production-test、Deploy gate、Worker／Pages build・deployはdocs-only分類によりskipされました。
+
 ## iPhone Safari実機確認
 
-ユーザー本人の確認結果は未報告です。以下はすべて未確認です。
+2026-11-01、ユーザー本人がiPhone Safariで実機確認しました。結果は **OK 6件、NG 0件、未確認 0件** です。
 
-1. 作成画面・参加画面のラベルが「プレイヤー名」であること。
-2. 両画面で名前を入力できること。
-3. ルーム作成・参加が動作すること。
-4. 入力名がオンライン対局画面に表示されること。
-5. 文字折返し・重なり・横はみ出しがないこと。
+| 実機確認項目 | 結果 |
+| --- | --- |
+| ルーム作成画面に「プレイヤー名」と表示される | OK |
+| ルーム参加画面に「プレイヤー名」と表示される | OK |
+| 両画面で名前を正常に入力できる | OK |
+| ルーム作成・参加が正常に動作する | OK |
+| 入力した名前がオンライン対局画面に正しく表示される | OK |
+| 文字の折返し・重なり・横はみ出しがない | OK |
 
-自動テスト・Chromium／WebKitの結果は実機確認の代替ではありません。実機確認結果が報告されるまではIssue #30をOpenのまま維持します。GitHub確認時点のIssue状態はOpenです。
+この表はユーザー本人の実機報告です。自動テスト・Chromium／WebKit結果とは別に記録しています。端末機種、iOSバージョン、確認時刻は報告されていません。
+
+## 受け入れ条件と完了判定
+
+Issue #30の最新本文にある受け入れ条件を、実機6項目と既存の自動検証結果に照合しました。両画面のラベル、既存の入力・作成・参加・対局画面での名前表示、更新済み関連自動テストの成功、iPhone Safari実機確認がすべて確認できたため、受け入れ条件を満たしています。検証記録のpush確認後、Issueに結果をコメントし、`completed`としてCloseします。
+
+未確認事項はPagesの独立HTTP応答確認です。Pages Deploy actionのsuccessは確認済みですが、独立HTTP応答は確認していないため成功扱いしていません。この確認はIssue #30の受け入れ条件には含まれていません。
