@@ -686,7 +686,11 @@ with sync_playwright() as p:
         page.locator('#show-result').click()
         assert page.locator('#result-title').inner_text() == '東風戦終了'
         assert not page.locator('#next-round').is_visible()
-        page.locator('#result-new-game').click()
+        assert page.locator('#result-dialog #result-new-game').count() == 0
+        assert page.locator('#match-result-dialog #match-result-new-game').inner_text() == '次の対局を始める'
+        page.locator('#view-table').click()
+        page.locator('#show-match-result').click()
+        page.locator('#match-result-new-game').click()
         page.locator('#confirm-new-game').click()
         reset = page.evaluate('''() => {
           const game=window.roundEndTest.controller.game,html=document.querySelector('main').innerHTML;

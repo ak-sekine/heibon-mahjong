@@ -13,6 +13,7 @@ class ElementStub {
   className = '';
   focused = false;
   opens = 0;
+  clicks = 0;
   children: ElementStub[] = [];
   attributes: Record<string, string> = {};
   listeners = new Map<string, (event?: { preventDefault(): void }) => void>();
@@ -24,11 +25,11 @@ class ElementStub {
   focus() { this.focused = true; }
   showModal() { this.open = true; this.opens++; }
   close() { this.open = false; this.listeners.get('close')?.(); }
-  click() { this.listeners.get('click')?.(); }
+  click() { this.clicks++; this.listeners.get('click')?.(); }
 }
 
 function mount(): { ui: MatchResultDialog; nodes: Map<string, ElementStub>; original: Document } {
-  const nodes = new Map(['#match-result-dialog', '#match-result-body', '#match-result-close', '#show-match-result', '#new-game-dialog']
+  const nodes = new Map(['#match-result-dialog', '#match-result-body', '#match-result-close', '#match-result-new-game', '#show-match-result', '#new-game-dialog', '#new-game']
     .map(id => [id, new ElementStub()]));
   const original = globalThis.document;
   globalThis.document = {
@@ -48,6 +49,8 @@ test('offline match result shows all ranked players and opens/closes without cha
   const snapshot = structuredClone(match);
   const names = ['長いプレイヤー名が続いても順位を読める名前', 'CPU1', 'CPU2', 'CPU3'];
   ui.updateLocal(match, names);
+  assert.equal(nodes.get('#match-result-new-game')!.hidden, false);
+  assert.equal(nodes.get('#match-result-new-game')!.textContent, '次の対局を始める');
   ui.open(nodes.get('#show-match-result') as unknown as HTMLButtonElement);
 
   const dialog = nodes.get('#match-result-dialog')!;
@@ -61,6 +64,9 @@ test('offline match result shows all ranked players and opens/closes without cha
   assert.equal(rows.length, 4);
   assert.equal(JSON.stringify(rows).includes('点数増減'), false);
   assert.deepEqual(match, snapshot);
+  nodes.get('#match-result-new-game')!.click();
+  assert.equal(dialog.open, false);
+  assert.equal(nodes.get('#new-game')!.clicks, 1, 'local action routes through the existing new-game confirmation');
 
   nodes.get('#match-result-close')!.click();
   assert.equal(dialog.open, false);
@@ -104,7 +110,11 @@ test('online match result uses server-confirmed seats, points and seat-id tie or
     ],
   } as unknown as PlayerGameView;
   const snapshot = structuredClone(view);
+  let rematches = 0;
+  ui.setOnlineRematchHandler(() => { rematches++; });
   ui.updateOnline(view);
+  assert.equal(nodes.get('#match-result-new-game')!.hidden, false);
+  assert.equal(nodes.get('#match-result-new-game')!.textContent, '新しい対局を始める');
   ui.open();
   assert.equal(nodes.get('#match-result-body')!.children[0].textContent, '半荘戦');
   const rows = nodes.get('#match-result-body')!.children[1].children.map(row => row.children.map(cell => cell.textContent));
@@ -119,6 +129,9 @@ test('online match result uses server-confirmed seats, points and seat-id tie or
   assert.deepEqual(nodes.get('#match-result-body')!.children[1].children.map(row => row.children.map(cell => cell.textContent)), rows,
     'the host and guest views use the same finalized seat data');
   nodes.get('#match-result-close')!.click();
+  ui.open();
+  nodes.get('#match-result-new-game')!.click();
+  assert.equal(rematches, 1);
   ui.updateOnline({ ...guestView, gameRevision: 7, roomCode: 'REJOIN' } as PlayerGameView);
   ui.open();
   assert.deepEqual(nodes.get('#match-result-body')!.children[1].children.map(row => row.children.map(cell => cell.textContent)), rows,

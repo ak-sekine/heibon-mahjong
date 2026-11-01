@@ -95,7 +95,7 @@ function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPan
     'call-status': 'call-controls', 'call-options': 'call-controls', 'pass-call': 'call-controls',
     'kan-status': 'kan-controls', 'kan-options': 'kan-controls', 'cancel-kan': 'kan-controls',
     'ron-status': 'ron-controls', 'ron-target': 'ron-controls', ron: 'ron-controls', 'pass-ron': 'ron-controls',
-    'show-result': 'round-actions', 'next-round': 'round-actions', 'return-local': 'round-actions',
+    'show-result': 'round-actions', 'next-round': 'round-actions',
   };
   for (const part of ACTION_PANEL_TEMPLATE_PARTS) {
     if (part === 'root') continue;
@@ -127,7 +127,7 @@ function state(overrides: Partial<ActionPanelState> = {}): ActionPanelState {
   const labels: Record<ActionPanelPart, string> = {
     discard: '打牌する', riichi: 'リーチ', tsumo: 'ツモ和了', kyuushu: '九種九牌', 'kan-toggle': 'カン',
     ron: 'ロン和了', 'pass-ron': '見逃す', 'pass-call': '見送る', 'cancel-kan': 'キャンセル',
-    'next-round': '次の局へ', 'show-result': '局の結果', 'show-match-result': '順位確認', 'return-local': 'ローカル卓へ戻る',
+    'next-round': '次の局へ', 'show-result': '局の結果', 'show-match-result': '順位確認',
   };
   const buttons = Object.fromEntries(Object.entries(labels).map(([part, label]) => [part, {
     visible: false, enabled: false, label,

@@ -5,7 +5,7 @@ import { startMatch, settleRound } from '../src/game/match.ts';
 import { fixedRon } from './match-fixture.ts';
 
 for (const status of ['playing', 'round-ended', 'match-ended']) {
-  for (const trigger of ['#new-game', '#result-new-game']) {
+  for (const trigger of ['#new-game']) {
     test(`new game confirmation preserves ${status} until approved: ${trigger}`, () => {
       class Node {
         open = false;
@@ -20,7 +20,7 @@ for (const status of ['playing', 'round-ended', 'match-ended']) {
         click() { this.listeners.click?.({ preventDefault() {} }); }
       }
       let focused: Node | null = null;
-      const nodes = new Map(['#new-game-dialog', '#new-game', '#result-new-game', '#main-menu-toggle', '#cancel-new-game', '#confirm-new-game', '#new-game-question'].map(id => [id, new Node()]));
+      const nodes = new Map(['#new-game-dialog', '#new-game', '#main-menu-toggle', '#cancel-new-game', '#confirm-new-game', '#new-game-question'].map(id => [id, new Node()]));
       const original = globalThis.document;
       globalThis.document = { querySelector: (id: string) => nodes.get(id) } as unknown as Document;
       let match = status === 'playing' ? startMatch() : settleRound({ ...startMatch(), game: status === 'match-ended' ? fixedRon(3, [0], 2) : fixedRon(0, [1]), ...(status === 'match-ended' ? { roundNumber: 4, dealerId: 3 as const } : {}) });
@@ -77,7 +77,7 @@ test('new game confirmation supports the verification page without a hamburger m
     click() { this.listeners.click?.({ preventDefault() {} }); }
   }
   let focused: Node | null = null;
-  const nodes = new Map(['#new-game-dialog', '#new-game', '#result-new-game', '#cancel-new-game', '#confirm-new-game', '#new-game-question'].map(id => [id, new Node()]));
+  const nodes = new Map(['#new-game-dialog', '#new-game', '#cancel-new-game', '#confirm-new-game', '#new-game-question'].map(id => [id, new Node()]));
   const original = globalThis.document;
   globalThis.document = { querySelector: (id: string) => nodes.get(id) } as unknown as Document;
   let resets = 0;

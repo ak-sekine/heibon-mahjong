@@ -44,7 +44,10 @@ test('offline entry pages expose the same shared result dialog structure', () =>
     assert.ok(match, `${file} must include #result-dialog`);
     return normalized(match[0]);
   };
-  assert.equal(dialog(pages[1].html, pages[1].file), dialog(pages[0].html, pages[0].file));
+  const dialogs = pages.map(({ html, file }) => dialog(html, file));
+  assert.equal(dialogs[1], dialogs[0]);
+  assert.doesNotMatch(dialogs[0], /result-new-game/u);
+  assert.doesNotMatch(dialogs[0], /match-result-new-game/u);
 });
 
 test('shared templates provide all mode-specific mount parts and positions', () => {

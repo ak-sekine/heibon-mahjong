@@ -29,6 +29,10 @@ export type OnlineRoomState = {
   rules?: GameRules;
   hostSeat: number | null;
   revision: number;
+  /** Monotonic across every match in the room; also rejects delayed prior-match actions. */
+  gameRevision?: number;
+  /** True while a finalized room is collecting readiness for its next match. */
+  rematchWaiting?: boolean;
   createdAt: number;
   expiresAt: number;
   seats: OnlineRoomSeat[];
@@ -37,6 +41,7 @@ export type OnlineRoomState = {
 export type RoomActionPayload =
   | { type: 'set-ready'; ready: boolean }
   | { type: 'finalize-seats' }
+  | { type: 'prepare-rematch' }
   | { type: 'leave-room' }
   | { type: 'close-room' };
 

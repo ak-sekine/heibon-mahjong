@@ -10,7 +10,7 @@ export class NewGameDialog {
   constructor(start: (rules: GameRules) => void, hasActiveGame: () => boolean = () => true,
     preferences?: RulePreferences) {
     this.preferences = preferences;
-    for (const id of ['#new-game', '#result-new-game']) {
+    for (const id of ['#new-game']) {
       const button = document.querySelector<HTMLButtonElement>(id)!;
       button.addEventListener('click', () => {
         if (this.dialog.open) return;

@@ -45,6 +45,7 @@ type RoomRow = {
   status: RoomStatus;
   host_seat: number | null;
   revision: number;
+  rematch_waiting: number;
 };
 type SeatRow = {
   seat: number;
@@ -173,6 +174,7 @@ export class RoomDurableObject {
     this.ensureColumn('room', 'status', "TEXT NOT NULL DEFAULT 'waiting'");
     this.ensureColumn('room', 'revision', 'INTEGER NOT NULL DEFAULT 0');
     this.ensureColumn('room', 'format', "TEXT NOT NULL DEFAULT 'tonpu'");
+    this.ensureColumn('room', 'rematch_waiting', 'INTEGER NOT NULL DEFAULT 0');
     this.ensureColumn('seats', 'kind', "TEXT NOT NULL DEFAULT 'human'");
     this.ensureColumn('seats', 'ready', 'INTEGER NOT NULL DEFAULT 0');
     this.ensureColumn('seats', 'connection_id', 'TEXT');
@@ -249,6 +251,7 @@ export class RoomDurableObject {
   }
 
   private sendGameState(socket: WebSocket, session = this.gameSession()): void {
+    if (this.room()?.rematch_waiting === 1) return;
     const attachment = this.attachment(socket);
     if (!attachment || !session || !session.identities.some(identity =>
       (identity.participantSeat ?? identity.seat) === attachment.seat && identity.control === 'human')) return;
@@ -260,7 +263,7 @@ export class RoomDurableObject {
   }
 
   private broadcastGame(session = this.gameSession()): void {
-    if (!session) return;
+    if (!session || this.room()?.rematch_waiting === 1) return;
     for (const socket of this.ctx.getWebSockets()) {
       if (socket.readyState === 1) this.sendGameState(socket, session);
     }
@@ -327,7 +330,7 @@ export class RoomDurableObject {
 
   private room(): RoomRow | undefined {
     return this.ctx.storage.sql.exec<RoomRow>(
-      'SELECT code, created_at, expires_at, status, host_seat, revision, format FROM room LIMIT 1',
+      'SELECT code, created_at, expires_at, status, host_seat, revision, format, rematch_waiting FROM room LIMIT 1',
     ).toArray()[0];
   }
 
@@ -352,7 +355,7 @@ export class RoomDurableObject {
       const kind = player.kind;
       return {
         seat,
-        gameSeat: room.status === 'finalized' ? player.game_seat : null,
+        gameSeat: room.status === 'finalized' && room.rematch_waiting !== 1 ? player.game_seat : null,
         kind,
         name: player.name,
         connected: kind === 'human' && player.connected === 1,
@@ -367,6 +370,8 @@ export class RoomDurableObject {
       rules: rulesForFormat(room.format === 'tonnan' ? 'tonnan' : 'tonpu'),
       hostSeat: room.host_seat,
       revision: room.revision,
+      gameRevision: this.gameSession()?.gameRevision ?? 0,
+      rematchWaiting: room.rematch_waiting === 1,
       createdAt: room.created_at,
       expiresAt: room.expires_at,
       seats,
@@ -671,7 +676,7 @@ export class RoomDurableObject {
     const message = value as Record<string, unknown>;
     if (message.type === 'request-state') return Object.keys(message).length === 1 ? 'request-state' : null;
     if (message.type === 'request-game-state') return Object.keys(message).length === 1 ? 'request-game-state' : null;
-    const roomMutation = message.type === 'set-ready' || message.type === 'finalize-seats' ||
+    const roomMutation = message.type === 'set-ready' || message.type === 'finalize-seats' || message.type === 'prepare-rematch' ||
       message.type === 'leave-room' || message.type === 'close-room';
     const gameMutation = message.type === 'start-game' || message.type === 'discard' ||
       message.type === 'declare-riichi' || message.type === 'declare-tsumo' ||
@@ -686,6 +691,7 @@ export class RoomDurableObject {
     const allowedByType: Record<string, string[]> = {
       'set-ready': ['type', 'requestId', 'expectedRevision', 'ready'],
       'finalize-seats': ['type', 'requestId', 'expectedRevision'],
+      'prepare-rematch': ['type', 'requestId', 'expectedRevision'],
       'leave-room': ['type', 'requestId', 'expectedRevision'],
       'close-room': ['type', 'requestId', 'expectedRevision'],
       'start-game': ['type', 'requestId', 'expectedGameRevision'],
@@ -774,11 +780,22 @@ export class RoomDurableObject {
       else if (actor.token_hash !== attachment.participantId) code = 'unauthorized';
       else if (actor.connection_id !== attachment.connectionId || actor.connected !== 1) code = 'stale_connection';
       else if (room.expires_at <= Date.now() || room.status === 'closed') code = 'room_closed';
-      else if (action.expectedRevision !== room.revision) code = 'revision_conflict';
+      else if (action.expectedRevision !== room.revision &&
+          !(action.type === 'prepare-rematch' && room.rematch_waiting === 1)) code = 'revision_conflict';
       else if (action.type === 'set-ready') {
-        if (room.status !== 'waiting') code = 'room_finalized';
+        if (room.status !== 'waiting' && !(room.status === 'finalized' && room.rematch_waiting === 1)) code = 'room_finalized';
         else if (actor.ready !== (action.ready ? 1 : 0)) {
           this.ctx.storage.sql.exec('UPDATE seats SET ready = ? WHERE seat = ?', action.ready ? 1 : 0, actor.seat);
+          this.incrementRevision();
+        }
+      } else if (action.type === 'prepare-rematch') {
+        if (room.rematch_waiting === 1) {
+          // Another participant already made this transition; do not reset twice.
+        } else if (room.status !== 'finalized') code = 'room_not_finalized';
+        else if (this.gameSession()?.status !== 'match-ended') code = 'game_not_ended';
+        else {
+          this.ctx.storage.sql.exec('UPDATE seats SET ready = 0, game_seat = NULL');
+          this.ctx.storage.sql.exec('UPDATE room SET rematch_waiting = 1');
           this.incrementRevision();
         }
       } else if (action.type === 'finalize-seats') {
@@ -839,6 +856,8 @@ export class RoomDurableObject {
             cpuRoomSeats.forEach((cpuSeat, index) => {
               this.ctx.storage.sql.exec("UPDATE seats SET name = ? WHERE seat = ? AND kind = 'cpu'", `CPU${index + 1}`, cpuSeat);
             });
+            this.ctx.storage.sql.exec('UPDATE seats SET ready = 0 WHERE kind = \'human\'');
+            if (room.rematch_waiting === 1) this.ctx.storage.sql.exec('UPDATE seats SET game_seat = NULL');
             this.ctx.storage.sql.exec('UPDATE room SET status = \'finalized\', host_seat = ?', nextHost);
             this.saveGameSession(nextSession);
             this.incrementRevision();
@@ -899,7 +918,7 @@ export class RoomDurableObject {
         ? { type: 'action-result', requestId: action.requestId, ok: false, revision: this.room()?.revision ?? currentRevision, code }
         : { type: 'action-result', requestId: action.requestId, ok: true, revision: this.room()?.revision ?? currentRevision };
       this.rememberOperation(attachment.participantId, attachment.seat, action.requestId, payload, result);
-      const changed = result.ok && ['set-ready', 'finalize-seats', 'leave-room', 'close-room'].includes(action.type) &&
+      const changed = result.ok && ['set-ready', 'prepare-rematch', 'finalize-seats', 'leave-room', 'close-room'].includes(action.type) &&
         result.revision !== currentRevision;
       return {
         result,
@@ -921,6 +940,7 @@ export class RoomDurableObject {
     session: OnlineGameSession | null;
     started: boolean;
     sendState: boolean;
+    roomChanged: boolean;
   } {
     const payload = JSON.stringify(Object.fromEntries(Object.entries(action)
       .filter(([key]) => key !== 'requestId').sort(([a], [b]) => a.localeCompare(b))));
@@ -940,6 +960,7 @@ export class RoomDurableObject {
             session: previousSession,
             started: false,
             sendState: true,
+            roomChanged: false,
           };
         }
         logWorker({ event: 'game_operation_duplicate_rejected', level: 'WARN', actionType: action.type, requestId: action.requestId, gameRevision: previousSession?.gameRevision, errorCode: 'request_id_reused' });
@@ -950,6 +971,7 @@ export class RoomDurableObject {
           session: previousSession,
           started: false,
           sendState: false,
+          roomChanged: false,
         };
       }
 
@@ -959,6 +981,7 @@ export class RoomDurableObject {
       let nextSession: OnlineGameSession | null = previousSession;
       let code: string | undefined;
       let started = false;
+      let roomChanged = false;
       let expiredDecision = false;
       if (!room || room.status !== 'finalized') code = room?.status === 'closed' ? 'room_closed' : 'room_not_finalized';
       else if (!actor || actor.kind !== 'human' || actor.token_hash !== attachment.participantId) code = 'unauthorized';
@@ -974,15 +997,23 @@ export class RoomDurableObject {
         try {
           if (action.type === 'start-game') {
             if (room.host_seat !== actor.seat) throw new OnlineGameRuleError('not_host');
-            if (previousSession) throw new OnlineGameRuleError('already_started');
-            if (action.expectedGameRevision !== 0) throw new OnlineGameRuleError('stale_revision');
+            const rematch = room.rematch_waiting === 1;
+            if (rematch ? previousSession?.status !== 'match-ended' : previousSession !== null) {
+              throw new OnlineGameRuleError('already_started');
+            }
+            if (action.expectedGameRevision !== currentRevision) throw new OnlineGameRuleError('stale_revision');
+            const humans = this.seats().filter(seat => seat.kind === 'human');
+            if (humans.some(seat => seat.ready !== 1)) throw new OnlineGameRuleError('players_not_ready');
+            if (humans.some(seat => seat.connected !== 1 || !connected.has(seat.seat as PlayerId))) {
+              throw new OnlineGameRuleError('player_disconnected');
+            }
             let seats = this.seats();
             if (seats.length !== 4 || [0, 1, 2, 3].some(seat => !seats.some(item => item.seat === seat))) {
               throw new OnlineGameRuleError('seat_assignment_invalid');
             }
-            // Finalized rooms created by older deployments have no persisted map.
-            // Assign them once on first start and keep the mapping in SQLite.
-            if (seats.every(seat => seat.game_seat === null)) {
+            // Draw a fresh seat map for every match while preserving the stable
+            // participant seats used for identity, host rights, and reconnects.
+            if (rematch || seats.every(seat => seat.game_seat === null)) {
               const shuffled = drawSecureRoomSeatAssignment(seats.map(item => item.seat) as [number, number, number, number]);
               shuffled.forEach((participantSeat, gameSeat) => {
                 this.ctx.storage.sql.exec('UPDATE seats SET game_seat = ? WHERE seat = ?', gameSeat, participantSeat);
@@ -1003,9 +1034,16 @@ export class RoomDurableObject {
             if (identities.some(identity => identity.control === 'human' && !connected.has(identity.participantSeat ?? identity.seat))) {
               throw new OnlineGameRuleError('player_disconnected');
             }
-            nextSession = startOnlineGameWithSeatAssignment(identities, actor.seat as PlayerId, room.format === 'tonnan' ? 'tonnan' : 'tonpu');
+            const freshSession = startOnlineGameWithSeatAssignment(identities, actor.seat as PlayerId, room.format === 'tonnan' ? 'tonnan' : 'tonpu');
+            nextSession = { ...freshSession, gameRevision: currentRevision + 1 };
+            if (rematch) {
+              this.ctx.storage.sql.exec("UPDATE room SET rematch_waiting = 0");
+              this.incrementRevision();
+              roomChanged = true;
+            }
             started = true;
           } else {
+            if (room.rematch_waiting === 1) throw new OnlineGameRuleError('room_not_finalized');
             if (!previousSession) throw new OnlineGameRuleError('game_not_started');
             if (action.type === 'next-round') {
               nextSession = readyForNextOnlineRound(previousSession, actor.seat as PlayerId, action.expectedGameRevision);
@@ -1034,6 +1072,7 @@ export class RoomDurableObject {
         session: nextSession,
         started,
         sendState: !code || code === 'stale_revision' || code === 'stale_decision',
+        roomChanged,
       };
     });
   }
@@ -1168,6 +1207,7 @@ export class RoomDurableObject {
       logWorker({ event: outcome.result.ok ? 'game_action_succeeded' : 'game_action_failed', level: outcome.result.ok ? 'INFO' : 'WARN', actionType: action.type, requestId: action.requestId, gameRevision: outcome.result.gameRevision, result: outcome.result.ok ? 'accepted' : 'rejected', errorCode: outcome.result.code, durationMs: Date.now() - startedAt });
       if (outcome.changed) logWorker({ event: 'game_state_updated', level: 'INFO', actionType: action.type, requestId: action.requestId, gameRevision: outcome.result.gameRevision });
       try { socket.send(JSON.stringify(outcome.result)); } catch { /* Result remains durable for requestId replay. */ }
+      if (outcome.roomChanged) this.broadcast();
       if (outcome.changed && outcome.session) {
         if (outcome.started) this.broadcastGameStarted(outcome.session);
         this.broadcastGame(outcome.session);

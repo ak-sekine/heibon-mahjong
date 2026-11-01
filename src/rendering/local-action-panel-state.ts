@@ -87,7 +87,6 @@ export function createLocalActionPanelState(
       'show-result': button(roundResultAvailable, roundResultAvailable, '局の結果'),
       'show-match-result': button(match.status === 'match-ended' && Boolean(match.lastSettlement?.matchEnded),
         match.status === 'match-ended' && Boolean(match.lastSettlement?.matchEnded), '順位確認'),
-      'return-local': button(false, false, 'ローカル卓へ戻る'),
     },
     actionStatus,
     callGroup: { visible: callChoices.length > 0, status: '', options: callChoices },

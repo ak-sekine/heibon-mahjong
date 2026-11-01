@@ -3,7 +3,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import { RateLimitDurableObject } from '../worker/rate-limit.ts';
 import { RoomDurableObject } from '../worker/room.ts';
-import { startMatch } from '../src/game/match.ts';
+import { settleRound, startMatch } from '../src/game/match.ts';
+import { fixedRon } from './match-fixture.ts';
 import { ronGame } from './ron-fixture.ts';
 import { callStart } from './calls-fixture.ts';
 import { cpuMadeProgress } from './cpu-progress.ts';
@@ -1359,6 +1360,181 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     const expiredGame = expiredMatch.game as Record<string, unknown>;
     const expiredPlayers = expiredGame.players as Array<Record<string, unknown>>;
     assert.equal(expiredPlayers[0].temporaryFuriten, true, 'timeout did not apply furiten to the ron passer');
+  });
+
+  await t.test('rematch keeps the room, resets readiness and starts fresh matches once across generations', async () => {
+    const fixture = await makeRoom('Rematch host', token('b'));
+    const guestInfo = await joinRoom(fixture, 'Rematch guest', token('c'));
+    const host = await connectParticipant(fixture, fixture.hostToken);
+    let guest = await connectParticipant(fixture, guestInfo.token);
+    await readyAndFinalize(fixture, [host, guest]);
+    assert.equal((await sendGameAction(fixture, host, {
+      type: 'start-game', requestId: 'rematch-first-start', expectedGameRevision: 0,
+    })).ok, true);
+
+    const installEndedMatch = (revision: number): void => {
+      const current = persistedGame(fixture) as unknown as OnlineGameSession;
+      const endedMatch = settleRound({
+        ...current.match,
+        roundNumber: 4,
+        dealerId: 3,
+        game: fixedRon(3, [0], 2),
+      });
+      saveGameSession(fixture, { ...current, match: endedMatch, status: 'match-ended', gameRevision: revision });
+    };
+
+    let roomState = await readState(fixture);
+    const roomCode = roomState.roomCode;
+    const roomRules = roomState.rules;
+    const roomComposition = publicSeats(roomState).map(seat => [seat.kind, seat.name]);
+    assert.deepEqual(publicSeats(roomState).filter(seat => seat.kind === 'cpu').map(seat => seat.name), ['CPU1', 'CPU2']);
+    let matchRevision = 40;
+    installEndedMatch(matchRevision);
+    for (let matchNumber = 2; matchNumber <= 3; matchNumber++) {
+      const staleExpectedRevision = roomState.revision;
+      const initiator = matchNumber === 2 ? guest : host;
+      const prepared = sendAction(fixture, initiator, {
+        type: 'prepare-rematch', requestId: `rematch-prepare-${matchNumber}`,
+        expectedRevision: staleExpectedRevision,
+      });
+      assert.equal(prepared.ok, true, 'any connected human can begin rematch preparation');
+      roomState = await readState(fixture);
+      assert.equal(roomState.status, 'finalized');
+      assert.equal(roomState.rematchWaiting, true);
+      assert.equal(roomState.roomCode, roomCode);
+      assert.deepEqual(roomState.rules, roomRules, 'the room rule snapshot is preserved');
+      assert.deepEqual(publicSeats(roomState).map(seat => [seat.kind, seat.name]), roomComposition, 'human and CPU composition is preserved');
+      assert.deepEqual(publicSeats(roomState).map(seat => seat.ready), [false, false, false, false]);
+      assert.deepEqual(publicSeats(roomState).map(seat => seat.gameSeat), [null, null, null, null]);
+
+      const duplicatePrepare = sendAction(fixture, initiator === host ? guest : host, {
+        type: 'prepare-rematch', requestId: `rematch-prepare-race-${matchNumber}`,
+        expectedRevision: staleExpectedRevision,
+      });
+      assert.equal(duplicatePrepare.ok, true, 'a competing preparation request is idempotent');
+      assert.equal((await readState(fixture)).revision, roomState.revision, 'duplicate preparation did not reset or revise the room again');
+      if (matchNumber === 2) {
+        guest = await connectParticipant(fixture, guest.token);
+        const reconnectMessages = guest.client.sent.map(item => JSON.parse(item) as Record<string, unknown>);
+        assert.ok(reconnectMessages.some(message => message.type === 'room-state' && message.rematchWaiting === true),
+          'reconnection restores the current rematch waiting state');
+        assert.equal(reconnectMessages.some(message => message.type === 'game-state' || message.type === 'match-ended'), false,
+          'reconnection does not restore the previous match view during rematch preparation');
+      }
+
+      const nonHost = await sendGameAction(fixture, guest, {
+        type: 'start-game', requestId: `rematch-nonhost-${matchNumber}`,
+        expectedGameRevision: matchRevision,
+      });
+      assert.equal(nonHost.ok, false);
+      assert.equal(nonHost.code, 'not_host');
+      const early = await sendGameAction(fixture, host, {
+        type: 'start-game', requestId: `rematch-early-${matchNumber}`,
+        expectedGameRevision: matchRevision,
+      });
+      assert.equal(early.ok, false);
+      assert.equal(early.code, 'players_not_ready');
+
+      for (const participant of [guest, host]) {
+        roomState = await readState(fixture);
+        const ready = sendAction(fixture, participant, {
+          type: 'set-ready', requestId: `rematch-ready-${matchNumber}-${participant.seat}`,
+          expectedRevision: roomState.revision, ready: true,
+        });
+        assert.equal(ready.ok, true);
+      }
+      assert.equal((await readState(fixture)).rematchWaiting, true, 'all ready does not auto-start');
+      const concurrentStarts = await Promise.all([
+        sendGameAction(fixture, host, {
+          type: 'start-game', requestId: `rematch-start-${matchNumber}`,
+          expectedGameRevision: matchRevision,
+        }),
+        sendGameAction(fixture, guest, {
+          type: 'start-game', requestId: `rematch-start-race-${matchNumber}`,
+          expectedGameRevision: matchRevision,
+        }),
+      ]);
+      assert.equal(concurrentStarts.filter(result => result.ok).length, 1, 'only the host creates the new session');
+      assert.equal(concurrentStarts.find(result => result.code === 'not_host')?.ok, false);
+      roomState = await readState(fixture);
+      assert.equal(roomState.status, 'finalized');
+      assert.equal(roomState.roomCode, roomCode);
+      assert.deepEqual(roomState.rules, roomRules);
+      assert.deepEqual(publicSeats(roomState).map(seat => [seat.kind, seat.name]), roomComposition);
+      assert.deepEqual(publicSeats(roomState).filter(seat => seat.kind === 'human').map(seat => seat.name).sort(),
+        ['Rematch guest', 'Rematch host']);
+      const current = persistedGame(fixture) as unknown as OnlineGameSession;
+      assert.equal(current.status, 'playing');
+      assert.equal(current.match.roundNumber, 1);
+      assert.equal(current.match.honba, 0);
+      assert.equal(current.match.depositSticks, 0);
+      assert.equal(current.match.lastSettlement, null);
+      assert.deepEqual(current.match.points, [25000, 25000, 25000, 25000]);
+      assert.equal(current.match.game.phase, 'awaiting-discard');
+      assert.equal(current.match.game.pendingRiichi, null);
+      assert.equal(current.match.game.ronWindow, null);
+      assert.equal(current.match.game.winResult, null);
+      assert.equal(current.match.game.kanCount ?? 0, 0);
+      assert.deepEqual(current.declarations, []);
+      assert.equal(current.decision, null);
+      assert.deepEqual(current.match.game.players.map(player => player.hand.length), [13, 13, 13, 13]);
+      assert.deepEqual(current.match.game.players.map(player => player.river.length), [0, 0, 0, 0]);
+      assert.deepEqual(current.match.game.players.map(player => player.melds?.length ?? 0), [0, 0, 0, 0]);
+      assert.deepEqual(current.match.game.players.map(player => player.riichi), [null, null, null, null]);
+      assert.deepEqual(current.match.game.players.map(player => player.temporaryFuriten), [false, false, false, false]);
+      assert.equal(current.gameRevision, matchRevision + 1, 'game revisions stay monotonic across matches');
+      assert.equal(new Set(current.identities.map(identity => identity.seat)).size, 4, 'CPU and human game seats do not overlap');
+      assert.equal(new Set(current.identities.map(identity => identity.participantSeat)).size, 4, 'each room participant maps to one game seat');
+
+      const duplicateStart = await sendGameAction(fixture, host, {
+        type: 'start-game', requestId: `rematch-start-duplicate-${matchNumber}`,
+        expectedGameRevision: matchRevision,
+      });
+      assert.equal(duplicateStart.ok, false);
+      assert.equal(persistedGame(fixture).gameRevision, current.gameRevision, 'a second start did not generate another session');
+      const delayed = await sendGameAction(fixture, guest, {
+        type: 'declare-tsumo', requestId: `rematch-delayed-${matchNumber}`,
+        expectedGameRevision: matchRevision,
+      });
+      assert.equal(delayed.ok, false);
+      assert.equal(delayed.code, 'stale_revision', 'actions from the prior match are rejected');
+      matchRevision = current.gameRevision + 20;
+      installEndedMatch(matchRevision);
+      roomState = await readState(fixture);
+    }
+
+    const prepareBeforeHostExit = sendAction(fixture, guest, {
+      type: 'prepare-rematch', requestId: 'rematch-prepare-host-exit', expectedRevision: roomState.revision,
+    });
+    assert.equal(prepareBeforeHostExit.ok, true);
+    roomState = await readState(fixture);
+    const leaveDuringRematch = sendAction(fixture, host, {
+      type: 'leave-room', requestId: 'rematch-host-leaves', expectedRevision: roomState.revision,
+    });
+    assert.equal(leaveDuringRematch.ok, true);
+    roomState = await readState(fixture);
+    assert.equal(roomState.status, 'finalized');
+    assert.equal(roomState.rematchWaiting, true, 'host leave preserves rematch preparation');
+    assert.equal(roomState.roomCode, roomCode);
+    assert.deepEqual(roomState.rules, roomRules, 'host transfer preserves the rule snapshot');
+    assert.equal(roomState.hostSeat, guestInfo.seat, 'the connected human inherits host rights');
+    assert.equal(publicSeats(roomState)[0].kind, 'cpu', 'the departed host seat becomes CPU controlled');
+    assert.ok(publicSeats(roomState).every(seat => seat.gameSeat === null));
+    const endedAfterHandoff = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.equal(endedAfterHandoff.status, 'match-ended');
+    assert.ok(endedAfterHandoff.gameRevision > matchRevision);
+    const guestReady = sendAction(fixture, guest, {
+      type: 'set-ready', requestId: 'rematch-successor-ready', expectedRevision: roomState.revision, ready: true,
+    });
+    assert.equal(guestReady.ok, true);
+    const successorStart = await sendGameAction(fixture, guest, {
+      type: 'start-game', requestId: 'rematch-successor-start', expectedGameRevision: endedAfterHandoff.gameRevision,
+    });
+    assert.equal(successorStart.ok, true, 'the migrated host can start the rematch');
+    const afterSuccessorStart = persistedGame(fixture) as unknown as OnlineGameSession;
+    assert.equal(afterSuccessorStart.status, 'playing');
+    assert.deepEqual(afterSuccessorStart.match.points, [25000, 25000, 25000, 25000]);
+    assert.equal(afterSuccessorStart.identities.filter(identity => identity.control === 'human').length, 1);
   });
 
   await t.test('uses bounded, expiring IP rate buckets', async () => {

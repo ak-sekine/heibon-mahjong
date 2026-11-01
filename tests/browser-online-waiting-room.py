@@ -16,6 +16,7 @@ RIVER_SPACING_ONLY = os.environ.get('HEIBON_ONLINE_RIVER_SPACING_ONLY') == '1'
 RULES_ONLY = os.environ.get('HEIBON_ONLINE_RULES_ONLY') == '1'
 NEXT_ROUND_ONLY = os.environ.get('HEIBON_ONLINE_NEXT_ROUND_ONLY') == '1'
 RESULT_BUTTON_FONTS_ONLY = os.environ.get('HEIBON_ONLINE_RESULT_BUTTON_FONTS_ONLY') == '1'
+REMATCH_MULTI_CLIENT_ONLY = os.environ.get('HEIBON_ONLINE_REMATCH_MULTI_CLIENT_ONLY') == '1'
 OUT.mkdir(parents=True, exist_ok=True)
 
 def assert_common_button_colors(page, selector):
@@ -33,9 +34,11 @@ MOCK = r"""
   const hostToken = 'a'.repeat(64);
   const guestToken = 'b'.repeat(64);
   const code = 'ABC234';
+  const remoteGuest = window.__onlineMockRole === 'guest';
+  const roomChannel = new BroadcastChannel(`heibon-online-mock-${code}`);
   const empty = seat => ({ seat, gameSeat: null, kind: 'empty', name: null, connected: false, ready: false, isHost: false });
   const state = {
-    roomCode: code, status: 'waiting', hostSeat: 0, revision: 0, format: 'tonpu', rules: {schemaVersion: 1, matchFormat: 'tonpu'},
+    roomCode: code, status: 'waiting', hostSeat: 0, revision: 0, gameRevision: 0, rematchWaiting: false, format: 'tonpu', rules: {schemaVersion: 1, matchFormat: 'tonpu'},
     createdAt: Date.now(), expiresAt: Date.now() + 86400000,
     seats: [
       { seat: 0, gameSeat: null, kind: 'human', name: 'テストホスト', connected: false, ready: false, isHost: true },
@@ -107,6 +110,7 @@ MOCK = r"""
   const broadcastGame = type => sockets.forEach(socket => {
     const viewer = viewerOverride === null ? socket.seat : viewerOverride;
     send(socket, { type, view: makeView(viewer) });
+    publishToGuest({ type, view: makeView(1) });
   });
   let dropNextGameResult = false;
   const gameResult = (socket, message, ok, codeName) => {
@@ -122,7 +126,15 @@ MOCK = r"""
   const send = (socket, message) => {
     if (socket.readyState === MockWebSocket.OPEN) socket.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(message) }));
   };
-  const broadcast = () => sockets.forEach(socket => send(socket, { type: 'room-state', ...JSON.parse(JSON.stringify(state)) }));
+  const publishToGuest = message => {
+    if (!remoteGuest) roomChannel.postMessage({ kind: 'server-message', message });
+  };
+  const broadcast = () => {
+    state.gameRevision = gameRevision;
+    const message = { type: 'room-state', ...JSON.parse(JSON.stringify(state)) };
+    sockets.forEach(socket => send(socket, message));
+    publishToGuest(message);
+  };
   const result = (socket, message, ok, codeName) => send(socket, {
     type: 'action-result', requestId: message.requestId, ok, revision: state.revision,
     ...(codeName ? { code: codeName } : {}),
@@ -136,12 +148,17 @@ MOCK = r"""
     constructor() {
       super();
       this.readyState = MockWebSocket.CONNECTING;
-      this.seat = nextSocketSeat;
+      this.seat = remoteGuest ? 1 : nextSocketSeat;
       nextSocketSeat = 0;
       sockets.push(this);
       setTimeout(() => {
         if (this.readyState !== MockWebSocket.CONNECTING) return;
         this.readyState = MockWebSocket.OPEN;
+        if (remoteGuest) {
+          this.dispatchEvent(new Event('open'));
+          roomChannel.postMessage({ kind: 'guest-message', message: { type: 'request-state' } });
+          return;
+        }
         if (state.seats[this.seat].connected === false) state.revision++;
         state.seats[this.seat].connected = true;
         this.dispatchEvent(new Event('open'));
@@ -151,6 +168,10 @@ MOCK = r"""
     }
     send(raw) {
       const message = JSON.parse(raw);
+      if (remoteGuest) {
+        roomChannel.postMessage({ kind: 'guest-message', message });
+        return;
+      }
       if (['discard', 'declare-riichi', 'declare-tsumo', 'declare-kyuushu-kyuuhai', 'declare-kan', 'declare-ron', 'pass-ron', 'declare-call', 'pass-call', 'next-round'].includes(message.type)) gameActions.push(message.type);
       if (message.type === 'request-state') {
         send(this, { type: 'room-state', ...JSON.parse(JSON.stringify(state)) });
@@ -161,13 +182,29 @@ MOCK = r"""
         return;
       }
       if (message.type === 'start-game') {
-        if (this.seat !== 0) return gameResult(this, message, false, 'not_host');
+        if (this.seat !== state.hostSeat) return gameResult(this, message, false, 'not_host');
         if (gameStarted) return gameResult(this, message, false, 'already_started');
+        if (message.expectedGameRevision !== gameRevision) return gameResult(this, message, false, 'stale_revision');
+        if (!state.seats.filter(seat => seat.kind === 'human').every(seat => seat.connected && seat.ready)) return gameResult(this, message, false, 'players_not_ready');
+        const rematch = state.rematchWaiting;
         gameStarted = true;
-        gameRevision = 1;
+        gameRevision++;
+        state.gameRevision = gameRevision;
+        if (rematch) {
+          state.rematchWaiting = false;
+          const gameSeats = [3, 1, 0, 2];
+          state.seats = state.seats.map(seat => ({ ...seat, gameSeat: gameSeats[seat.seat] }));
+          state.revision++;
+          broadcast();
+        }
+        gameStatus = 'playing'; phase = 'awaiting-discard'; roundNumber = 1; turnPlayerId = 0; decision = null; roundResult = null;
+        rivers = [[], [], [], []]; declarationIndexes = [-1, -1, -1, -1];
+        hands = [0, 1, 2, 3].map(seat => Array.from({ length: 13 }, (_, i) => makeTile(`online-match-${gameRevision}-${seat}-${i}`, seat + i)));
+        drawnTiles = [makeTile(`online-match-${gameRevision}-0-draw`, 7), null, null, null];
         declarations = [];
         gameResult(this, message, true);
         send(this, { type: 'game-started', view: makeView(this.seat) });
+        publishToGuest({ type: 'game-started', view: makeView(1) });
         broadcastGame('game-state');
         return;
       }
@@ -212,8 +249,17 @@ MOCK = r"""
         broadcastGame('game-state');
         return;
       }
-      if (message.type === 'set-ready') {
-        if (state.status !== 'waiting') return result(this, message, false, 'room_finalized');
+      if (message.type === 'prepare-rematch') {
+        if (state.rematchWaiting) return result(this, message, true);
+        if (state.status !== 'finalized' || gameStatus !== 'match-ended') return result(this, message, false, 'game_not_ended');
+        state.rematchWaiting = true;
+        state.seats = state.seats.map(seat => ({ ...seat, ready: false, gameSeat: null }));
+        gameStarted = false;
+        state.revision++;
+        result(this, message, true);
+        broadcast();
+      } else if (message.type === 'set-ready') {
+        if (state.status !== 'waiting' && !state.rematchWaiting) return result(this, message, false, 'room_finalized');
         state.seats[0].ready = message.ready;
         state.revision++;
         result(this, message, true);
@@ -286,6 +332,7 @@ MOCK = r"""
     close(code = 1000, reason = '') {
       if (this.readyState >= MockWebSocket.CLOSING) return;
       if (state.seats[this.seat].connected && state.status !== 'closed') {
+        if (remoteGuest) return this.finish(code, reason);
         state.seats[this.seat].connected = false;
         state.seats[this.seat].ready = false;
         state.revision++;
@@ -309,6 +356,64 @@ MOCK = r"""
       this.dispatchEvent(event);
     }
   }
+
+  roomChannel.addEventListener('message', event => {
+    const envelope = event.data;
+    if (!envelope || typeof envelope !== 'object') return;
+    if (remoteGuest && envelope.kind === 'server-message') {
+      const message = envelope.message;
+      if (!message || typeof message !== 'object') return;
+      if (message.type === 'room-state') {
+        for (const key of ['roomCode', 'status', 'hostSeat', 'revision', 'gameRevision', 'rematchWaiting', 'format', 'rules', 'createdAt', 'expiresAt', 'seats']) {
+          if (Object.prototype.hasOwnProperty.call(message, key)) state[key] = message[key];
+        }
+      }
+      sockets.filter(socket => socket.readyState === MockWebSocket.OPEN).forEach(socket => send(socket, message));
+      return;
+    }
+    if (remoteGuest || envelope.kind !== 'guest-message') return;
+    const message = envelope.message;
+    if (!message || typeof message !== 'object') return;
+    const guest = {
+      seat: 1,
+      readyState: MockWebSocket.OPEN,
+      dispatchEvent(event) {
+        const message = JSON.parse(event.data);
+        publishToGuest(message);
+        return true;
+      },
+    };
+    if (message.type === 'request-state') {
+      state.gameRevision = gameRevision;
+      publishToGuest({ type: 'room-state', ...JSON.parse(JSON.stringify(state)) });
+      if (gameStarted) publishToGuest({ type: 'game-state', view: makeView(1) });
+    } else if (message.type === 'request-game-state') {
+      if (gameStarted) publishToGuest({ type: 'game-state', view: makeView(1) });
+    } else if (message.type === 'set-ready') {
+      if (state.status !== 'waiting' && !state.rematchWaiting) result(guest, message, false, 'room_finalized');
+      else {
+        state.seats[1].ready = Boolean(message.ready);
+        state.revision++;
+        result(guest, message, true);
+        broadcast();
+      }
+    } else if (message.type === 'prepare-rematch') {
+      if (!state.rematchWaiting && (state.status !== 'finalized' || gameStatus !== 'match-ended')) {
+        result(guest, message, false, 'game_not_ended');
+      } else {
+        if (!state.rematchWaiting) {
+          state.rematchWaiting = true;
+          state.seats = state.seats.map(seat => ({ ...seat, ready: false, gameSeat: null }));
+          gameStarted = false;
+          state.revision++;
+        }
+        result(guest, message, true);
+        broadcast();
+      }
+    } else if (message.type === 'start-game') {
+      gameResult(guest, message, false, 'not_host');
+    }
+  });
 
   window.WebSocket = MockWebSocket;
   const requests = [];
@@ -534,6 +639,16 @@ MOCK = r"""
       value = { ticket: 'c'.repeat(64), expiresAt: Date.now() + 60000 };
     } else if (requestUrl.pathname === `/api/rooms/${code}/join`) {
       const displayName = JSON.parse(init.body).displayName;
+      if (remoteGuest) {
+        nextSocketSeat = 1;
+        value = { roomCode: code, participantToken: guestToken, playerSeat: 1, createdAt: state.createdAt, expiresAt: state.expiresAt, format: state.format,
+          seats: [
+            { seat: 0, gameSeat: null, kind: 'human', name: 'テストホスト', connected: true, ready: false, isHost: true },
+            { seat: 1, gameSeat: null, kind: 'human', name: displayName, connected: false, ready: false, isHost: false },
+            empty(2), empty(3),
+          ] };
+        return new Response(JSON.stringify(value), { status: 201, headers: { 'Content-Type': 'application/json' } });
+      }
       state.format = 'tonpu';
       state.rules = {schemaVersion: 1, matchFormat: 'tonpu'};
       state.status = 'waiting';
@@ -557,6 +672,8 @@ MOCK = r"""
       hands = [0, 1, 2, 3].map(seat => Array.from({ length: 13 }, (_, i) => makeTile(`rejoined-${seat}-${i}`, seat + i)));
       drawnTiles = [makeTile('rejoined-0-draw', 7), null, null, null];
       gameRevision = 0;
+      state.gameRevision = 0;
+      state.rematchWaiting = false;
       nextSocketSeat = 1;
       value = { roomCode: code, participantToken: guestToken, playerSeat: 1, createdAt: state.createdAt, expiresAt: state.expiresAt, format: state.format, seats: state.seats };
     } else {
@@ -617,6 +734,141 @@ with sync_playwright() as p:
             return page.wait_for_function(expression, **kwargs)
         except PlaywrightTimeoutError as error:
             raise AssertionError(f'online browser UI wait timed out: {expression}: {error}') from error
+
+    if REMATCH_MULTI_CLIENT_ONLY:
+        guest_page = page.context.new_page()
+        guest_errors = []
+        guest_page.on('pageerror', lambda error: guest_errors.append(str(error)))
+        guest_page.on('console', lambda message: guest_errors.append(message.text) if message.type == 'error' else None)
+        guest_page.add_init_script("window.__onlineMockRole = 'guest';")
+        guest_page.add_init_script(MOCK)
+        guest_page.route('**/src/main.ts', expose_app)
+        guest_page.goto(BASE_URL)
+
+        def wait_guest(expression):
+            try:
+                return guest_page.wait_for_function(expression)
+            except PlaywrightTimeoutError as error:
+                raise AssertionError(f'{ENGINE} rematch guest browser UI wait timed out: {expression}: {error}') from error
+
+        def open_menu_item(target, selector):
+            if target.locator('#main-menu-items').is_hidden():
+                target.locator('#main-menu-toggle').click()
+            target.locator(selector).click()
+
+        open_menu_item(page, '#online-create-open')
+        page.locator('#online-create-name').fill('テストホスト')
+        page.locator('#online-create').click()
+        wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234'")
+        page.evaluate('window.onlineMock.addGuest()')
+
+        open_menu_item(guest_page, '#online-join-open')
+        guest_page.locator('#online-join-name').fill('テスト参加者')
+        guest_page.locator('#online-join-code').fill('ABC234')
+        guest_page.locator('#online-join').click()
+        wait_guest("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234' && document.querySelector('#online-seats').innerText.includes('テストホスト')")
+        wait_for("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
+
+        page.locator('#online-ready').click()
+        guest_page.locator('#online-ready').click()
+        wait_for('document.querySelector("#online-finalize").disabled === false')
+        page.locator('#online-finalize').click()
+        wait_for("document.querySelector('#online-finalized-message').hidden === false")
+        guest_page.wait_for_function("document.querySelector('#online-finalized-message').hidden === false")
+        state_before = page.evaluate('window.onlineMock.snapshot()')
+        assert state_before['room']['roomCode'] == guest_page.evaluate('window.onlineMock.snapshot().room.roomCode')
+        assert [seat['name'] for seat in state_before['room']['seats'] if seat['kind'] == 'human'] == ['テストホスト', 'テスト参加者']
+        assert [seat['kind'] for seat in state_before['room']['seats']] == ['human', 'human', 'cpu', 'cpu']
+        assert state_before['room']['format'] == 'tonpu' and state_before['room']['rules']['matchFormat'] == 'tonpu'
+
+        page.locator('#online-start-game').click()
+        wait_for("document.querySelector('#online-match').hidden === false")
+        guest_page.wait_for_function("document.querySelector('#online-match').hidden === false")
+        page.evaluate("window.onlineMock.setResultScenario('match-ended', 0)")
+        wait_for("window.onlineUiTest.onlineGameController.view?.status === 'match-ended'")
+        wait_guest("window.onlineUiTest.onlineGameController.view?.status === 'match-ended'")
+        assert page.locator('#online-show-match-result').is_visible()
+        assert guest_page.locator('#online-show-match-result').is_visible()
+
+        before_viewing = page.evaluate('window.onlineMock.snapshot()')
+        page.locator('#online-show-match-result').click()
+        page.locator('#match-result-close').click()
+        assert page.evaluate('window.onlineMock.snapshot()') == before_viewing, 'opening and closing the result dialog changed room or game state'
+        page.locator('#online-show-match-result').click()
+        assert page.locator('#match-result-dialog').is_visible()
+        guest_page.locator('#online-show-match-result').click()
+        assert guest_page.locator('#match-result-new-game').inner_text() == '新しい対局を始める'
+        guest_page.set_viewport_size({'width': 320, 'height': 360})
+        standings_layout = guest_page.locator('#match-result-dialog').evaluate('''dialog => {
+          const box = dialog.getBoundingClientRect();
+          const footer = dialog.querySelector('.result-footer').getBoundingClientRect();
+          const body = dialog.querySelector('#match-result-body');
+          const rows = [...dialog.querySelectorAll('.match-result-standings li')].map(row => {
+            const rank = row.querySelector('.match-result-rank').getBoundingClientRect();
+            const name = row.querySelector('.match-result-name').getBoundingClientRect();
+            const points = row.querySelector('.match-result-points').getBoundingClientRect();
+            return {sequential: rank.right <= name.left && name.right <= points.left, contained: points.right <= row.getBoundingClientRect().right};
+          });
+          return {fits: box.left >= 0 && box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight,
+            footerVisible: footer.left >= 0 && footer.right <= innerWidth && footer.bottom <= innerHeight,
+            buttonFits: [...dialog.querySelectorAll('button:not([hidden])')].every(button => {
+              const rect = button.getBoundingClientRect();
+              return rect.left >= box.left && rect.right <= box.right && getComputedStyle(button).whiteSpace === 'nowrap';
+            }), bodyScrollable: getComputedStyle(body).overflowY === 'auto', bodyCanScroll: body.scrollHeight > body.clientHeight,
+            rowsFit: rows.every(row => row.sequential && row.contained)};
+        }''')
+        assert standings_layout['fits'] and standings_layout['footerVisible'], standings_layout
+        assert standings_layout['buttonFits'] and standings_layout['rowsFit'], standings_layout
+        assert standings_layout['bodyScrollable'], standings_layout
+        if standings_layout['bodyCanScroll']:
+            guest_page.locator('#match-result-body').evaluate('element => { element.scrollTop = element.scrollHeight; }')
+            assert guest_page.locator('#match-result-body').evaluate('element => element.scrollTop > 0'), standings_layout
+        guest_page.set_viewport_size({'width': 390, 'height': 844})
+        guest_page.locator('#match-result-new-game').click()
+        wait_for("document.querySelector('#online-dialog').open && window.onlineMock.snapshot().room.rematchWaiting === true")
+        wait_guest("document.querySelector('#online-dialog').open && window.onlineMock.snapshot().room.rematchWaiting === true")
+        prepared = page.evaluate('window.onlineMock.snapshot()')
+        assert prepared['room']['roomCode'] == state_before['room']['roomCode']
+        assert [seat['name'] for seat in prepared['room']['seats'] if seat['kind'] == 'human'] == ['テストホスト', 'テスト参加者']
+        assert [seat['kind'] for seat in prepared['room']['seats']] == ['human', 'human', 'cpu', 'cpu']
+        assert prepared['room']['format'] == state_before['room']['format'] and prepared['room']['rules'] == state_before['room']['rules']
+        assert all(not seat['ready'] and seat['gameSeat'] is None for seat in prepared['room']['seats'])
+        assert page.locator('#online-match').is_hidden() and guest_page.locator('#online-match').is_hidden()
+        assert page.locator('#match-result-dialog').is_hidden() and guest_page.locator('#match-result-dialog').is_hidden()
+        assert page.locator('#match-result-body').inner_text() == '' and guest_page.locator('#match-result-body').inner_text() == ''
+        assert page.locator('#match-result-new-game').is_hidden() and guest_page.locator('#match-result-new-game').is_hidden()
+        assert '準備中' in page.locator('#online-finalized-message').inner_text()
+        assert '準備中' in guest_page.locator('#online-finalized-message').inner_text()
+        assert page.locator('#online-start-game').is_visible() and guest_page.locator('#online-start-game').is_hidden()
+        assert page.locator('#online-start-game').is_disabled(), 'host could start before the new readiness round'
+
+        guest_page.locator('#online-ready').click()
+        wait_for("window.onlineMock.snapshot().room.seats[1].ready === true")
+        assert page.locator('#online-start-game').is_disabled(), 'host could start before every human was ready'
+        page.locator('#online-ready').click()
+        wait_for("document.querySelector('#online-start-game').disabled === false")
+        wait_guest("document.querySelector('#online-start-game').hidden === true")
+        assert page.evaluate("window.onlineMock.snapshot().gameStatus") == 'match-ended', 'all-ready state auto-started the rematch'
+        page.locator('#online-start-game').click()
+        wait_for("document.querySelector('#online-dialog').open === false && window.onlineUiTest.onlineGameController.view?.status === 'playing'")
+        wait_guest("document.querySelector('#online-dialog').open === false && window.onlineUiTest.onlineGameController.view?.status === 'playing'")
+        after_rematch = page.evaluate('window.onlineMock.snapshot()')
+        guest_after_rematch = guest_page.evaluate('window.onlineMock.snapshot()')
+        assert after_rematch['room']['roomCode'] == guest_after_rematch['room']['roomCode'] == state_before['room']['roomCode']
+        assert after_rematch['room']['seats'] == guest_after_rematch['room']['seats']
+        assert [seat['kind'] for seat in after_rematch['room']['seats']] == ['human', 'human', 'cpu', 'cpu']
+        assert [seat['name'] for seat in after_rematch['room']['seats'] if seat['kind'] == 'human'] == ['テストホスト', 'テスト参加者']
+        assert after_rematch['room']['rules'] == state_before['room']['rules']
+        assert after_rematch['room']['rematchWaiting'] is False
+        assert after_rematch['gameStatus'] == 'playing' and after_rematch['roundNumber'] == 1
+        assert after_rematch['roundResult'] is None and after_rematch['points'] == [25000] * 4
+        assert all(not river for river in after_rematch['rivers']) and all(len(hand) == 13 for hand in after_rematch['hands'])
+        assert len({seat['gameSeat'] for seat in after_rematch['room']['seats']}) == 4
+        assert [seat['gameSeat'] for seat in after_rematch['room']['seats']] != [seat['gameSeat'] for seat in state_before['room']['seats']]
+        assert not errors and not guest_errors, f'{ENGINE} browser errors: host={errors}, guest={guest_errors}'
+        print(json.dumps({'browser': ENGINE, 'scenario': 'online rematch with two browser clients', 'clients': 2, 'result': 'pass'}, ensure_ascii=False), flush=True)
+        browser.close()
+        raise SystemExit(0)
 
     def capture_river_diagnostics(label, width, height, viewer, count, declaration_index):
       details = page.evaluate('''() => {
@@ -1873,7 +2125,7 @@ with sync_playwright() as p:
       result_text = page.locator('#online-result-content').inner_text()
       assert all(label in result_text for label in expected), f'{scenario}: expected result detail was missing: {expected}; got {result_text}'
       assert page.locator('#online-result-content .result-dora').count() == (0 if scenario in ('draw', 'kyuushu') else 2), f'{scenario}: public dora rows did not match the result'
-      assert page.locator('#result-new-game').is_hidden(), f'{scenario}: the offline new-game action appeared during an online match'
+      assert page.locator('#result-new-game').count() == 0, f'{scenario}: an offline new-game action remained in the round result dialog'
       assert page.evaluate('''() => {
         const dialog = document.querySelector('#result-dialog').getBoundingClientRect();
         const body = document.querySelector('#result-body');
@@ -1991,22 +2243,51 @@ with sync_playwright() as p:
     assert all(tile_id not in diagnostic_text for tile_id in hidden_guest_ids), 'a concealed tile identifier was recorded in diagnostics'
     page.locator('#diagnostic-close').click()
 
+    page.evaluate("window.onlineMock.setResultScenario('match-ended', 0)")
+    wait_for("window.onlineUiTest.onlineGameController.view?.status === 'match-ended' && document.querySelector('#return-local') === null")
+    assert page.locator('#online-show-match-result').is_visible(), 'the online final result action was removed'
+    page.locator('#online-show-match-result').click()
+    assert page.locator('#match-result-new-game').inner_text() == '新しい対局を始める'
+    before_rematch = page.evaluate('window.onlineMock.snapshot()')
+    page.locator('#match-result-close').click()
+    assert page.evaluate('window.onlineMock.snapshot()') == before_rematch, 'opening and closing standings changed room state'
+    page.locator('#online-show-match-result').click()
+    page.locator('#match-result-new-game').click()
+    wait_for("document.querySelector('#online-dialog').open && window.onlineMock.snapshot().room.rematchWaiting === true")
+    prepared = page.evaluate('window.onlineMock.snapshot()')
+    assert prepared['room']['roomCode'] == before_rematch['room']['roomCode']
+    assert [seat['name'] for seat in prepared['room']['seats'] if seat['kind'] == 'human'] == ['テストホスト', 'テスト参加者']
+    assert all(not seat['ready'] and seat['gameSeat'] is None for seat in prepared['room']['seats']), prepared['room']
+    assert prepared['gameStatus'] == 'match-ended' and prepared['roundNumber'] == before_rematch['roundNumber'], 'result viewing or preparation changed the completed result'
+    assert page.locator('#online-ready').is_visible() and page.locator('#online-start-game').is_visible()
+    assert page.locator('#online-start-game').is_disabled(), 'the host could start before all humans are ready'
+    page.locator('#online-ready').click()
+    page.evaluate('window.onlineMock.setGuestReady(true)')
+    wait_for("document.querySelector('#online-start-game').disabled === false")
+    assert page.evaluate("window.onlineMock.snapshot().gameStatus") == 'match-ended', 'all-ready state auto-started the rematch'
+    page.locator('#online-start-game').click()
+    wait_for("document.querySelector('#online-dialog').open === false && window.onlineUiTest.onlineGameController.view?.round.roundNumber === 1")
+    after_rematch = page.evaluate('window.onlineMock.snapshot()')
+    assert after_rematch['room']['roomCode'] == before_rematch['room']['roomCode']
+    assert [seat['kind'] for seat in after_rematch['room']['seats']] == ['human', 'human', 'cpu', 'cpu']
+    assert after_rematch['room']['rematchWaiting'] is False
+    assert after_rematch['gameStatus'] == 'playing' and after_rematch['roundNumber'] == 1
+    assert after_rematch['roundResult'] is None and after_rematch['points'] == [25000] * 4
+    assert all(not river for river in after_rematch['rivers']) and all(len(hand) == 13 for hand in after_rematch['hands'])
+    assert len({seat['gameSeat'] for seat in after_rematch['room']['seats']}) == 4
+
     page.evaluate('''() => { window.onlineMock.setGuestAsHost(); window.onlineMock.simulateGuestExit(); }''')
     wait_for("document.querySelector('#online-game-action-status').innerText.includes('テスト参加者が退出し、CPU1が席を引き継ぎました。 新ホストはテストホストです。')")
     wait_for("document.querySelector('#online-score-strip [data-online-label=right]')?.innerText.startsWith('CPU1')")
     after_guest_handoff = page.evaluate('window.onlineMock.snapshot()')
     assert after_guest_handoff['room']['seats'][1]['kind'] == 'cpu' and after_guest_handoff['room']['seats'][1]['name'] == 'CPU1', after_guest_handoff['room']
     assert after_guest_handoff['gameStatus'] == 'playing' and after_guest_handoff['room']['hostSeat'] == 0, 'a non-host exit ended the game or changed its host'
-    assert after_guest_handoff['roundNumber'] == 2 and after_guest_handoff['points'] == [25000] * 4, 'a CPU handoff changed the current round or points'
+    assert after_guest_handoff['roundNumber'] == 1 and after_guest_handoff['points'] == [25000] * 4, 'a CPU handoff changed the current round or points'
     assert page.locator('#online-match').is_visible() and page.locator('[data-online-hand="right"] .tile-back').count() == 13, 'the replacement CPU hand was shown in public'
     assert all(tile_id not in page.locator('#online-match').inner_html() for tile_id in hidden_guest_ids), 'the replacement CPU private hand leaked after handoff'
 
-    page.evaluate("window.onlineMock.setResultScenario('match-ended', 0)")
-    wait_for("window.onlineUiTest.onlineGameController.view?.status === 'match-ended' && document.querySelector('#online-return-local').hidden === false")
-    page.locator('#online-return-local').click()
-    assert page.locator('body').get_attribute('data-game-mode') == 'none', 'returning from online match results started offline play'
-    assert page.locator('#app-idle').is_visible(), 'returning from online match results did not restore the idle screen'
-    assert page.locator('#online-match').is_hidden() and page.locator('#online-game-controls').is_hidden(), 'online game content remained visible after returning to idle'
+    select_menu_item('#menu-room')
+    assert page.locator('#online-game-controls').is_visible(), 'room menu did not preserve the finished online session'
 
     select_menu_item('#menu-room')
     before_exit = page.evaluate('window.onlineMock.snapshot()')

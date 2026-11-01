@@ -76,7 +76,6 @@ export function createOnlineActionPanelState(
   const showResult = resultAvailable;
   const nextRound = view.status === 'round-ended';
   const nextRoundReady = view.self.nextRoundReady;
-  const returnLocal = view.status === 'match-ended' || view.status === 'aborted';
 
   return {
     buttons: {
@@ -97,7 +96,6 @@ export function createOnlineActionPanelState(
       'show-result': button(showResult, showResult, '局の結果'),
       'show-match-result': button(view.status === 'match-ended' && Boolean(view.result?.matchEnded),
         view.status === 'match-ended' && Boolean(view.result?.matchEnded), '順位確認'),
-      'return-local': button(returnLocal, returnLocal, 'ローカル卓へ戻る'),
     },
     actionStatus,
     callGroup: { visible: decision?.type === 'call', status: decisionStatus, options: callChoices },
@@ -114,7 +112,7 @@ export function createOnlineActionPanelState(
         description: `${tileLabel(view.self.ronTile.tile)} · この牌でロンできます`,
       } : null,
     },
-    roundActionsVisible: showResult || nextRound || returnLocal,
+    roundActionsVisible: showResult || nextRound,
     ronPending: decision?.type === 'ron' && ronAllowed,
     gameEnded: false,
     resultAvailable,

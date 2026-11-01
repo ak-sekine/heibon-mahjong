@@ -13,7 +13,6 @@ export class ResultDialog {
   private readonly onlineContent = document.querySelector<HTMLElement>('#online-result-content')!;
   private readonly title = document.querySelector<HTMLElement>('#result-title')!;
   private readonly body = document.querySelector<HTMLElement>('#result-body')!;
-  private readonly newGame = document.querySelector<HTMLButtonElement>('#result-new-game')!;
   private reopen = this.localReopen;
   constructor() {
     document.querySelector('#view-table')!.addEventListener('click', () => this.close());
@@ -32,7 +31,6 @@ export class ResultDialog {
       this.onlineContent.replaceChildren();
     }
     this.onlineContent.hidden = true;
-    this.newGame.hidden = match.status !== 'match-ended';
     if (!sourceChanged && result === this.result) return;
     this.result = result;
     this.resultAvailable = result !== null;
@@ -54,7 +52,6 @@ export class ResultDialog {
     const sourceChanged = this.mode !== 'online';
     this.mode = 'online';
     if (sourceChanged) this.onlineKey = null;
-    this.newGame.hidden = true;
     if (!view?.result) {
       this.onlineKey = null;
       this.resultAvailable = false;

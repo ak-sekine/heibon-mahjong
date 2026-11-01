@@ -63,6 +63,7 @@ const socketErrorMessages: Record<string, string> = {
   revision_conflict: 'ルーム状態が更新されました。最新状態を確認して、もう一度操作してください。',
   not_host: 'この操作はホストだけが行えます。',
   room_finalized: '座席確定後は準備状態を変更できません。',
+  game_not_ended: '対局終了後に再戦準備へ進めます。',
   already_finalized: '座席はすでに確定しています。',
   no_participants: '座席確定には人間の参加者が必要です。',
   player_disconnected: '接続中の人間プレイヤーがそろっていません。',
@@ -199,7 +200,7 @@ export class OnlineWaitingRoom {
     });
     this.readyButton.addEventListener('click', () => this.toggleReady());
     this.finalizeButton.addEventListener('click', () => this.sendAction({ type: 'finalize-seats' }));
-    this.startGameButton.addEventListener('click', () => this.sendGameAction({ type: 'start-game' }, 0));
+    this.startGameButton.addEventListener('click', () => this.sendGameAction({ type: 'start-game' }, this.state?.gameRevision ?? 0));
     this.confirmRulesButton.addEventListener('click', () => {
       if (this.state) openReadOnlyRules(this.confirmRulesButton,
         this.state.rules ?? rulesForFormat(this.state.format));
@@ -608,6 +609,13 @@ export class OnlineWaitingRoom {
       diagnosticLog.record('INFO', 'room_state_updated', { revision: roomState.revision });
       this.setConnection('接続中');
       this.renderState(roomState);
+      if (roomState.rematchWaiting) {
+        this.gameActive = false;
+        this.gameTerminated = true;
+        this.onGameMessage({ type: 'online-rematch-preparing' });
+        this.renderControls();
+        if (!this.dialog.open) this.dialog.showModal();
+      }
       if (this.pendingAction) this.sendPendingAction(socket, generation);
       if (roomState.status === 'closed') this.finishSession('ルームが終了しました。');
       return;
@@ -655,7 +663,7 @@ export class OnlineWaitingRoom {
   private normalizeState(message: Record<string, unknown>): RoomState | null {
     if (typeof message.roomCode !== 'string' ||
         (message.status !== 'waiting' && message.status !== 'finalized' && message.status !== 'closed') ||
-        !Number.isSafeInteger(message.revision) || !Number.isSafeInteger(message.createdAt) ||
+        !Number.isSafeInteger(message.revision) || (message.gameRevision !== undefined && !Number.isSafeInteger(message.gameRevision)) || !Number.isSafeInteger(message.createdAt) ||
         !Number.isSafeInteger(message.expiresAt) || !Array.isArray(message.seats) || message.seats.length !== 4) return null;
     const seats: RoomSeat[] = [];
     for (const value of message.seats) {
@@ -673,10 +681,11 @@ export class OnlineWaitingRoom {
         (message.hostSeat !== null && (!Number.isInteger(message.hostSeat) || (message.hostSeat as number) < 0 || (message.hostSeat as number) > 3)) ||
         !Number.isFinite(message.createdAt) || !Number.isFinite(message.expiresAt)) return null;
     const assignedSeats = seats.map(seat => seat.gameSeat).filter((seat): seat is number => seat !== null);
-    if ((message.status === 'waiting' && assignedSeats.length !== 0) ||
+    if (((message.status === 'waiting' || message.rematchWaiting === true) && assignedSeats.length !== 0) ||
+        (message.rematchWaiting !== undefined && typeof message.rematchWaiting !== 'boolean') ||
         (assignedSeats.length !== 0 && assignedSeats.length !== 4) ||
         new Set(assignedSeats).size !== assignedSeats.length) return null;
-    return message as unknown as RoomState;
+    return { ...message, gameRevision: Number.isSafeInteger(message.gameRevision) ? message.gameRevision as number : 0 } as unknown as RoomState;
   }
 
   private renderState(state: RoomState): void {
@@ -732,8 +741,13 @@ export class OnlineWaitingRoom {
     this.codeOutput.textContent = state.roomCode;
     this.expiryOutput.textContent = new Date(state.expiresAt).toLocaleString();
     this.formatOutput.textContent = `対局形式：${state.format === 'tonnan' ? '半荘戦' : '東風戦'}`;
-    this.finalizedMessage.hidden = state.status !== 'finalized' || this.gameActive;
-    if (state.status === 'finalized') {
+    this.finalizedMessage.hidden = state.status !== 'finalized' || (this.gameActive && !state.rematchWaiting);
+    this.finalizedMessage.textContent = state.rematchWaiting
+      ? '次の対局の準備中です。全員の準備後、ホストが開始します。'
+      : '座席が確定しました。ホストはオンライン対局を開始できます。';
+    if (state.rematchWaiting) {
+      this.setStatus('次の対局の準備中です。人間プレイヤー全員の準備完了後、ホストが開始します。');
+    } else if (state.status === 'finalized') {
       this.setStatus(this.gameActive ? 'オンライン対局を進行しています。' : '座席が確定しました。ホストはオンライン対局を開始できます。');
     }
     this.roomPanel.hidden = false;
@@ -754,7 +768,8 @@ export class OnlineWaitingRoom {
     const allReady = humans.length > 0 && humans.every(seat => seat.connected && seat.ready);
     const pending = this.pendingAction !== null || this.pendingGameAction !== null;
     const socketConnected = this.isSocketOpen();
-    this.readyButton.hidden = !self || state?.status !== 'waiting';
+    const readyPhase = state?.status === 'waiting' || state?.rematchWaiting === true;
+    this.readyButton.hidden = !self || !readyPhase;
     this.readyButton.textContent = self?.ready ? '準備を解除' : '準備完了';
     this.readyButton.disabled = pending || !self?.connected || !socketConnected;
     this.readyButton.setAttribute('aria-pressed', String(self?.ready === true));
@@ -763,8 +778,9 @@ export class OnlineWaitingRoom {
     this.finalizeButton.disabled = pending || !socketConnected || !allReady;
     this.setBusy(this.finalizeButton, this.pendingAction?.payload.type === 'finalize-seats');
     const allHumansConnected = humans.length > 0 && humans.every(seat => seat.connected);
-    this.startGameButton.hidden = !self?.isHost || state?.status !== 'finalized' || this.gameActive;
-    this.startGameButton.disabled = pending || !socketConnected || !allHumansConnected;
+    const startable = !this.gameActive && (state?.rematchWaiting === true || (state?.gameRevision ?? 0) === 0);
+    this.startGameButton.hidden = !self?.isHost || state?.status !== 'finalized' || !startable;
+    this.startGameButton.disabled = pending || !socketConnected || !allReady || !allHumansConnected;
     this.setBusy(this.startGameButton, this.pendingGameAction?.payload.type === 'start-game');
     this.leaveButton.hidden = !session || state?.status === 'closed';
     this.leaveButton.disabled = pending || !socketConnected;
@@ -823,6 +839,10 @@ export class OnlineWaitingRoom {
     diagnosticLog.record('INFO', 'operation_wait_started', { actionType: payload.type, requestId: this.pendingGameAction.requestId, gameRevision: expectedGameRevision });
     this.renderControls();
     this.sendPendingGameAction(this.socket, this.connectGeneration);
+  }
+
+  prepareRematch(): void {
+    this.sendAction({ type: 'prepare-rematch' });
   }
 
   private sendPendingAction(socket: WebSocket, generation: number): void {

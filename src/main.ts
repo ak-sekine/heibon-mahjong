@@ -243,7 +243,6 @@ function dispatchLocalAction(event: ActionPanelEvent): void | Promise<void> {
       return controller.nextRound();
     case 'show-result': resultDialog.open(); return;
     case 'show-match-result': matchResultDialog.open(); return;
-    case 'return-local': return;
   }
 }
 function traceDetails(trace: ActionPanelTrace): Record<string, unknown> {
@@ -301,6 +300,7 @@ if (document.querySelector('#online-create-open')) {
     render();
   });
   const waitingRoom = new OnlineWaitingRoom(import.meta.env.VITE_ONLINE_API_URL, message => onlineGameController?.receive(message), rulePreferences);
+  matchResultDialog.setOnlineRematchHandler(() => waitingRoom.prepareRematch());
   onlineGameController.setActionSender((action, expectedGameRevision) => waitingRoom.sendGameAction(action, expectedGameRevision));
 }
 document.querySelector('#player-hand')!.addEventListener('click', event => {

@@ -18,7 +18,7 @@ for (const scenario of ['human-ron','human-tsumo','cpu-ron','cpu-tsumo','draw','
     close() { this.open = false; this.listeners.close?.({ preventDefault() {} }); }
     click() { this.listeners.click?.({ preventDefault() {} }); }
   }
-  const nodes = new Map(['#result-dialog','#show-result','#view-table','#result-new-game','#result-title','#result-body','#online-result-content'].map(id => [id,new Node()]));
+  const nodes = new Map(['#result-dialog','#show-result','#view-table','#result-title','#result-body','#online-result-content'].map(id => [id,new Node()]));
   const original = globalThis.document;
   globalThis.document = { querySelector: (s: string) => nodes.get(s), documentElement: new Node() } as unknown as Document;
   try {
@@ -35,7 +35,6 @@ for (const scenario of ['human-ron','human-tsumo','cpu-ron','cpu-tsumo','draw','
     ui.update(match);
     assert.equal(nodes.get('#result-dialog')!.open,false);
     assert.equal(nodes.get('#result-body')!.scrollTop,0);
-    assert.equal(nodes.get('#result-new-game')!.hidden,scenario !== 'end');
     for (let i=0;i<10;i++) {
       ui.open();
       assert.equal(nodes.get('#result-dialog')!.open,true);

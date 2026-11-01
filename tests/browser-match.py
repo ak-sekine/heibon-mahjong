@@ -41,11 +41,11 @@ import { cpuTsumoStart } from '/heibon-mahjong/tests/cpu-tsumo-fixture.ts';
    assert box['y']>=12 and box['y']+box['height']<=height-12+1,box
    assert abs(box['y']+box['height']/2-height/2)<=2,box
    assert page.evaluate('document.activeElement.id')=='view-table'
-   for selector in ['#view-table','#next-round' if page.evaluate('matchCheck().status')=='round-ended' else '#result-new-game']:
+   for selector in ['#view-table','#next-round' if page.evaluate('matchCheck().status')=='round-ended' else '#match-result-new-game']:
     b=page.locator(selector).bounding_box();assert b['height']>=44 and b['y']>=0 and b['y']+b['height']<=height
    assert page.locator('.result-header #view-table').count()==0
    left=page.locator('#view-table').bounding_box()
-   right=page.locator('#next-round' if page.evaluate('matchCheck().status')=='round-ended' else '#result-new-game').bounding_box()
+   right=page.locator('#next-round' if page.evaluate('matchCheck().status')=='round-ended' else '#match-result-new-game').bounding_box()
    behind=page.locator('#new-game').bounding_box()
    assert left['x']+left['width']+15<=right['x'] and abs(left['y']-right['y'])<=1
    assert left['y']>=behind['y']+behind['height'] or left['x']+left['width']<=behind['x']
@@ -147,9 +147,9 @@ import { cpuTsumoStart } from '/heibon-mahjong/tests/cpu-tsumo-fixture.ts';
   ranking=page.evaluate('matchCheck().points.map((points,playerId)=>({points,playerId})).sort((a,b)=>b.points-a.points||a.playerId-b.playerId)')
   for rank,player in enumerate(ranking,1):assert f'{rank}位' in page.locator('#match-result ol').inner_text()
   modal();toggle();geometry();page.screenshot(path=str(out/f'{width}x{height}-match-result.png'))
-  confirmation('#result-new-game','match')
+  confirmation('#match-result-new-game','match')
   page.locator('#view-table').click();confirmation('#new-game','match-table');page.locator('#show-result').click()
-  page.locator('#result-new-game').click();page.locator('#confirm-new-game').click();page.evaluate('scrollTo(0,0)');assert page.evaluate('matchCheck().points')==[25000]*4;assert page.evaluate('matchCheck().lastSettlement') is None
+  page.locator('#match-result-new-game').click();page.locator('#confirm-new-game').click();page.evaluate('scrollTo(0,0)');assert page.evaluate('matchCheck().points')==[25000]*4;assert page.evaluate('matchCheck().lastSettlement') is None
   geometry(True);assert not errors,errors
   reports.append({'width':width,'height':height,'result':'passed','checks':['initial','ron','points','cpu-tsumo','repeat','next-round','dealer-winds','draw','noten','honba-double','final-rank','reset','geometry','dora','cpu-hidden','modal-center','internal-scroll','touch-44','background-inert','focus','escape','toggle-10','state-unchanged','rerender-stays-closed','footer-left-right','header-title-only','no-reset-overlap','footer-fixed','confirm-playing-round-match','cancel-escape-unchanged','confirm-focus-inert','confirmed-reset-only']})
   page.close()

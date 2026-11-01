@@ -141,13 +141,31 @@ export class OnlineGameController {
       case 'next-round': this.send({ type: 'next-round' }); break;
       case 'show-result': this.resultDialog.open(document.querySelector<HTMLButtonElement>('#online-show-result')); break;
       case 'show-match-result': this.matchResultDialog.open(document.querySelector<HTMLButtonElement>('#online-show-match-result')); break;
-      case 'return-local': this.returnToLocalGame(); break;
     }
   }
 
   setActionSender(sender: ActionSender): void { this.sender = sender; }
 
   receive(message: Record<string, unknown>): void {
+    if (message.type === 'online-rematch-preparing') {
+      this.stopDecisionCountdown();
+      this.clearRoomNotice();
+      this.declarationBubbles.clearAll();
+      this.clearRenderedGame();
+      this.view = null;
+      this.declarationCursor = null;
+      this.finalRanks = null;
+      this.actionPending = false;
+      this.decisionPending = false;
+      this.actionNotice = '';
+      this.root.hidden = true;
+      this.setTableClasses(false);
+      document.body.classList.remove('online-game-active');
+      this.resultDialog.updateOnline(null);
+      this.matchResultDialog.updateOnline(null);
+      document.querySelector<HTMLButtonElement>('#new-game')!.disabled = false;
+      return;
+    }
     if (message.type === 'online-session-ended') {
       this.stopDecisionCountdown();
       this.clearRoomNotice();
@@ -536,27 +554,6 @@ export class OnlineGameController {
       this.roomNotice || this.actionNotice,
     ));
     this.syncDecisionCountdown(view.self.decision);
-  }
-
-  private returnToLocalGame(): void {
-    if (!this.view || (this.view.status !== 'match-ended' && this.view.status !== 'aborted')) return;
-    this.stopDecisionCountdown();
-    this.clearRoomNotice();
-    this.declarationBubbles.clearAll();
-    this.clearRenderedGame();
-    this.view = null;
-    this.declarationCursor = null;
-    this.finalRanks = null;
-    this.actionPending = false;
-    this.decisionPending = false;
-    this.actionNotice = '';
-    this.root.hidden = true;
-    this.setTableClasses(false);
-    document.body.classList.remove('online-game-active');
-    this.resultDialog.updateOnline(null);
-    this.matchResultDialog.updateOnline(null);
-    document.querySelector<HTMLButtonElement>('#new-game')!.disabled = false;
-    this.onSessionEnded();
   }
 
   private clearRenderedGame(): void {
