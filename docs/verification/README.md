@@ -4,7 +4,7 @@
 
 ## Issue調査
 
-- [対局結果ボタンの左右配置 — Issue #13、2026-11-01](issue13-rematch-2026-11-01.md) — ユーザー本人によるiPhone Safari実機報告、追加修正後のChromium／WebKit検証成功、GitHub Actions run 41267773516でのDeploy gate／Worker／Pages公開成功を記録。Pagesの直接HTTP確認はCodex環境のEnvoy CONNECT 403により未実施。追加修正後の実機確認は未実施です。
+- [対局結果画面と同じオンラインルームでの再戦 — Issue #13、2026-11-01](issue13-rematch-2026-11-01.md) — 実装、Worker統合テスト、連続3対局、Chromium／WebKit検証、run 41262624930・41267773516のDeploy gate／Worker／Pages成功と完了判定を記録。ユーザー本人の「問題ありません」報告は確認範囲のみ記録し、追加修正後のiPhone Safari実機確認など詳細条件は未確認です。Pages直接HTTP応答は未確認です。
 - [対局終了時の最終順位・持ち点 — Issue #12、2026-10-31〜11-01](issue12-match-result-2026-10-31.md) — 終了判定、既存順位ルール、オフライン／サーバー確定ビューの再利用、ボタン表記・フォント修正、単体・全体テスト、Chromium／WebKit Actions結果を記録。2026-11-01にユーザー本人がiPhone Safariで修正後のボタン表示・操作4項目すべてOK（NG 0、未確認0）と報告し、Issue #12を完了判定。報告外の実機条件は未確認として区別。
 - [Browser UI回帰の壁時計時間短縮 — Issue #28、Phase 1〜3、2026-10-31](browser-ui-wall-clock-issue28-2026-10-31.md) — run 41206140603で56 scenario (Chromium 34／WebKit 22) の成功とwall clock 18:12.3から8:50.4への短縮を確認。Phase 3のmatrix auditはrun 41208917661で実Actions API queryを実行してsuccessしました。失敗・cancel・skip・job欠落を拒否するstatus tests、artifact、残存riskを記録。
 - [Open Issue調査結果 — 2026-10-31](open-issue-investigation-2026-10-31.md) — 対象13件の分類、調査SHA、コード実態、テスト結果、原因未特定・仕様判断待ち、およびIssue #24の調査後の完了状態を記録。
@@ -31,7 +31,6 @@
 
 ## 自動・ブラウザー検証
 
-- [オンライン再戦と対局結果画面 — Issue #13、2026-11-01](issue13-rematch-2026-11-01.md) — Workerを状態管理の正として、同じルームでの再戦遷移、Readyリセット、ホスト開始権限、冪等性、対局revision、座席再抽選を記録。Chromium／WebKitの2ブラウザクライアントBrowser UI、Actions run 41262624930のDeploy gate／Worker／Pages公開成功、公開SHAを記録しています。ユーザー本人のiPhone Safari確認は未実施で、Issue #13はOpenのままです。
 - [和了概要のドラ合計 — Issue #11、2026-10-31](issue11-dora-summary-2026-10-31.md) — オフライン・オンライン共通表示、既存 `doraCounts` による合算、点数系不変、オンライン結果のJSON復元、自動検証とActions run 41196608100（実装SHA一致、検証・Browser UI・production-test・Worker/Pages deploy成功）を記録。ユーザー本人によるiPhone Safari実機確認はOK 4件、NG 0件、未確認4件で、実機未確認事項は自動検証と区別しています。
 - [診断ログの「閉じる」折り返し — Issue #10、2026-10-31](diagnostic-close-issue10-2026-10-31.md) — 320/375/390/414pxの寸法ベースBrowser UI確認、初回テスト呼び出しエラーと修正後のCI/deploy successを記録。ユーザー本人のiPhone Safari実機確認（5項目OK）を追記し、実機確認結果と自動検証を区別してIssueを完了・Closeしました。
 - [Issue #25 配牌直後・第一ツモ直後の暗カン — 2026-10-31](issue25-opening-ankan-2026-10-31.md) — 初期配牌の合法性、オフライン・オンライン候補、複数候補選択、通常打牌、嶺上牌・ドラ、九種九牌・四槓散了との整合性、Actions run 41185324829とユーザー本人のSafari総括確認を記録。通常対局での親の初手暗カンは実機未確認です。
