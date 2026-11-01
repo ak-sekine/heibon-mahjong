@@ -1685,7 +1685,12 @@ with sync_playwright() as p:
     assert page.locator('#online-create').is_disabled(), 'a second room was allowed while a session was active'
     assert 'すでにルームに参加' in page.locator('#online-create-message').inner_text(), 'the active-session restriction was not explained in the create form'
     assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') !== null"), 'opening create form discarded the current session'
-    assert page.locator('#online-create-rules-editor .match-format-options').is_disabled(), 'a joined participant could still edit room creation rules'
+    disabled_rule_controls = page.locator('#online-create-rules-editor .match-format-options').evaluate('''fieldset => ({
+      fieldsetDisabled: fieldset instanceof HTMLFieldSetElement && fieldset.disabled,
+      ruleControlsDisabled: [...fieldset.querySelectorAll('input[type="radio"]')].map(input => input.matches(':disabled')),
+    })''')
+    assert disabled_rule_controls['fieldsetDisabled'] and len(disabled_rule_controls['ruleControlsDisabled']) == 2 and all(disabled_rule_controls['ruleControlsDisabled']), \
+      f'a joined participant could still edit room creation rules: {disabled_rule_controls}'
     page.locator('#online-create-close').click()
     select_menu_item('#online-join-open')
     assert page.locator('#online-join').is_disabled(), 'joining another room was allowed while a session was active'
