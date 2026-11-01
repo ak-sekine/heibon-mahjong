@@ -78,7 +78,20 @@ Issue #12 の追加要件に合わせ、ボタンの表示文言を更新しま�
 - 修正後は対象の3ボタンすべてでroot system UIフォント、14px、weight `600`、継承line-height、継承letter-spacingを共通操作ボタンから使用します。CSS変更前のローカル「局の結果」は16pxで、それ以外の対象は14pxでした。
 - `tests/browser-round-end-ui.py` にオフライン通常局／対局確定終了時のcomputed style比較を追加しました。既存の320、375、390、430px幅を含みます。
 - `tests/browser-online-waiting-room.py` にオンライン用の専用Browser UI検証を追加し、320、375、390、430pxの通常局／対局確定終了時に同一ブラウザー内のcomputed `font-family`、`font-size`、`font-weight`、`line-height`、`letter-spacing` と横並び・画面内配置を比較します。CI matrixではChromiumとWebKitの両方で実行します。
-- コード変更、テスト、Actions、公開の結果は本追補を更新してから記録します。
+
+### 自動検証と公開結果
+
+- コードcommit: `567a348eb76e59f4f68d923069b71678db7bc897`。Browser UI matrix件数の期待値を修正したfollow-up commit: `47f91b3414eb108f7137aaab598b6b1eb71beb62`（2026-11-01の検証対象SHA）。
+- `npm test`: 73/73テストファイル成功、失敗0、skip 0。`npm run build`、`npm run typecheck:worker`、Browser UI Python構文検査も成功。
+- Browser UI matrixの実行選択テストは初回にChromium 35件／WebKit 23件に対して旧件数34／22を期待して失敗しました。この時点ではChromiumブラウザーの起動前でした。manifest期待値を58合計、35 Chromium、23 WebKitに更新し、`python tests/test_browser_regressions_selection.py` は5件成功しました。
+- [最終検証・公開対象のGitHub Actions run 41256973128](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41256973128) はsuccess。`detect-changes`、`docs-check`、`verify`、Browser UI、matrix audit、release-freshness、Worker deploy、Production test、Pages build、Pages deployがすべてsuccessです。Chromiumは35/35件、WebKitは23/23件成功し、失敗・timeoutはありません。
+- computed style回帰は、オフライン通常局「局の結果」対「次の局へ」、対局確定終了時「局の結果」対「順位確認」を検証します。オンラインも同じ2状態を検証します。Chromium／WebKitの両方でオンライン字体シナリオは320、375、390、430pxすべてpassし、横並び・画面内表示もpassしました。`browser-round-end-ui.py` はオフラインの幅320、375、390、430pxを含む各viewportでsuccessしました。
+- 操作ラベルとクリック動作について、従来の操作状態・Browser UIの対局終了シナリオがsuccessしました。結果ダイアログ専用ボタンCSSは今回変更せず、結果操作共通ボタンの既存デザイン・有効状態を維持しています。
+- Worker: https://heibon-mahjong-online.ak-sekine.workers.dev （deploy success、Production test success）。Pages: https://ak-sekine.github.io/heibon-mahjong/ （build／deploy success）。
+
+初回Actions run [41256771438](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41256771438) では、Chromium選択件数の旧期待値が原因でBrowser UI前段が失敗し、matrix auditはfailure、公開工程は実行されませんでした。WebKit 23件はこのrunでもsuccessでした。件数テストを修正したfollow-up SHA `47f91b3` のrun 41256973128でChromium／WebKit両方とmatrix auditを再実行し、公開までsuccessを確認しています。
+
+`git diff --check` はcommit前に成功しました。Codex CloudではChromium／WebKitを起動していません。既知の実行環境制限に従い、Browser UIはGitHub Actions上で実行しました。
 
 ### iPhone Safari実機確認
 
