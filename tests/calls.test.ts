@@ -16,6 +16,7 @@ import { ordinaryTile, TILE_KINDS, tileKindKey } from '../src/model/tile.ts';
 import type { GameState, PlayerId } from '../src/model/game.ts';
 import { inventory, freeze } from './helpers.ts';
 import { AutomaticTurnRunner } from '../src/game/automatic-turns.ts';
+import { DEFAULT_GAME_RULES } from '../src/model/rules.ts';
 const discard=(g:GameState)=>discardTile(g,g.turnPlayerId,g.players[g.turnPlayerId].drawnTile!.id);
 const call=(g:GameState,type='pon')=>declareCall(g,0,getCallOptions(g,0).find(c=>c.type===type)!.id);
 const faces=(groups:readonly string[])=>groups.flatMap(g=>[...g.slice(0,-1)].map(n=>ordinaryTile(TILE_KINDS[({m:0,p:9,s:18,z:27}[g.at(-1)!]!)+Number(n)-1])));
@@ -70,7 +71,7 @@ test('ron before call: human pass sets furiten then permits independent chi choi
  assert.equal(call(passed,'chi').players[0].melds!.length,1);
 });
 test('CPU yakuhai pon uses only own/public information and is deterministic',()=>{
- const initial=callStart(3,{1:['55z','234m','456p','678s','19p']});const g=discard(initial);
+ const initial={...callStart(3,{1:['55z','234m','456p','678s','19p']}),rules:{...DEFAULT_GAME_RULES,kuitan:false}};const g=discard(initial);
  assert.equal(g.turnPlayerId,1);assert.equal(g.players[1].melds![0].type,'pon');assert.equal(g.players[1].drawnTile,null);inventory(g,initial);
 });
 test('CPU pon outranks human chi on the same discard',()=>{
@@ -161,4 +162,12 @@ test('CPU rejects riichi and hopeless open hands',()=>{
  const source=initial.players[3];const g={...initial,phase:'awaiting-call',players:initial.players.map(p=>p.id===3?{...p,drawnTile:null,drawnTileSource:null,river:[p.drawnTile!]}:p),ronWindow:{discarderId:3,tileId:source.drawnTile!.id}} as GameState;
  const options=getCallOptions(g,1);assert.ok(options.length);assert.equal(chooseCpuCall(g.players[1],options),null);
  assert.equal(chooseCpuCall({...g.players[1],riichi:{declarationTileId:'past'}},options),null);
+});
+test('CPU call policy suppresses an otherwise pointless open-tanyao pon when kuitan is OFF',()=>{
+ const initial=callStart(3,{1:['55m','234m','456p','678s','67p']},'man-5');
+ const source=initial.players[3],called=source.drawnTile!;
+ const g={...initial,phase:'awaiting-call',players:initial.players.map(p=>p.id===3?{...p,drawnTile:null,drawnTileSource:null,river:[called]}:p),ronWindow:{discarderId:3,tileId:called.id}} as GameState;
+ const option=getCallOptions(g,1).find(candidate=>candidate.type==='pon');assert.ok(option);
+ assert.equal(chooseCpuCall(g.players[1],[option],true)?.id,option.id);
+ assert.equal(chooseCpuCall(g.players[1],[option],false),null);
 });

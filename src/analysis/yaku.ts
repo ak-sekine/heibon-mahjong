@@ -25,6 +25,8 @@ export interface WinningContext {
   readonly riichi?: boolean;
   readonly ippatsuEligible?: boolean;
   readonly doubleRiichi?: boolean;
+  /** Allow open tanyao (kuitan). Omitted contexts retain the historical default. */
+  readonly kuitan?: boolean;
 }
 export type YakuId = 'rinshan' | 'chankan' | 'sankantsu' | 'suukantsu' | 'ippatsu' | 'double-riichi' | 'riichi' | 'menzen-tsumo' | 'tanyao' | 'yakuhai-white' | 'yakuhai-green' |
   'yakuhai-red' | 'yakuhai-seat-wind' | 'yakuhai-round-wind' | 'pinfu' |
@@ -70,6 +72,7 @@ function validateContext(context: WinningContext, tiles: readonly Tile[]): void 
       (['rinshan', 'chankan', 'haitei', 'houtei', 'tenhou', 'chiihou', 'ippatsuEligible', 'doubleRiichi'] as const)
         .some(key => context[key] !== undefined && typeof context[key] !== 'boolean') ||
       (context.riichi !== undefined && typeof context.riichi !== 'boolean') ||
+      (context.kuitan !== undefined && typeof context.kuitan !== 'boolean') ||
       (context.isClosed !== undefined && context.isClosed !== true && !(context.isClosed === false && context.openMelds?.length))) {
     throw new RangeError('Invalid winning context; only closed hands are supported');
   }
@@ -162,7 +165,7 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
     if (context.ippatsuEligible) add(common, 'ippatsu');
   }
   if (closed && context.winMethod === 'tsumo') add(common, 'menzen-tsumo');
-  if (allTiles.every(t => t.category === 'suited' && t.rank >= 2 && t.rank <= 8)) add(common, 'tanyao');
+  if ((closed || context.kuitan !== false) && allTiles.every(t => t.category === 'suited' && t.rank >= 2 && t.rank <= 8)) add(common, 'tanyao');
   if (allTiles.every(t => t.category === 'honor' || t.rank === 1 || t.rank === 9)) add(common, 'honroutou', 2);
   const suits = new Set(allTiles.flatMap(tile => tile.category === 'suited' ? [tile.suit] : []));
   const hasHonors = allTiles.some(tile => tile.category === 'honor');

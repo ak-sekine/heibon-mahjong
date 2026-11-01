@@ -37,7 +37,7 @@ test('CPU riichi strategy prefers maximum waits, then expected hand value, then 
 test('CPU expected riichi value includes the configured ippatsu han',()=>{
   const source=cpuRiichiStart(),players=source.players.map(p=>p.id===1?{...p,control:'cpu' as const}:p) as unknown as GameState['players'];
   const option=getRiichiDiscardOptions({...source,players},1,25000)[0];assert.ok(option);
-  const on={...source,players,rules:{schemaVersion:2 as const,matchFormat:'tonpu' as const,redDora:true,uraDora:true,ippatsu:true,kanDora:true}};
+  const on={...source,players,rules:{schemaVersion:3 as const,matchFormat:'tonpu' as const,redDora:true,kuitan:true,uraDora:true,ippatsu:true,kanDora:true}};
   const off={...on,rules:{...on.rules,ippatsu:false}};
   assert.ok(estimateCpuRiichiOptionHan(on,1,option)>estimateCpuRiichiOptionHan(off,1,option));
 });

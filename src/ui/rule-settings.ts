@@ -76,6 +76,7 @@ export class RuleEditor {
     this.optionalRules.append(optionalLegend);
     const options = [
       ['redDora', '赤ドラ', '赤5牌を使用し、ドラとして数えます'],
+      ['kuitan', '喰いタン', '副露した断么九を役として認めます'],
       ['uraDora', '裏ドラ', 'リーチ和了時に裏ドラを数えます'],
       ['ippatsu', '一発', '成立条件を満たす一発を役として数えます'],
       ['kanDora', 'カンドラ', '槓成立時に表ドラと槓裏ドラを追加します'],
@@ -112,7 +113,7 @@ export class RuleEditor {
       input.checked = input.value === normalized.matchFormat;
     });
     this.optionalRules.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(input => {
-      const key = input.dataset.ruleKey as 'redDora' | 'uraDora' | 'ippatsu' | 'kanDora' | undefined;
+      const key = input.dataset.ruleKey as 'redDora' | 'kuitan' | 'uraDora' | 'ippatsu' | 'kanDora' | undefined;
       if (key) input.checked = normalized[key];
     });
     this.renderFixedRules(normalized);
@@ -123,7 +124,7 @@ export class RuleEditor {
   }
   private renderFixedRules(rules: GameRules): void {
     if (!this.fixedRules) return;
-    const rows = describeConfirmedRules(rules).filter(entry => !['対局形式', '赤ドラ', '裏ドラ', '一発', 'カンドラ'].includes(entry.label));
+    const rows = describeConfirmedRules(rules).filter(entry => !['対局形式', '赤ドラ', '喰いタン', '裏ドラ', '一発', 'カンドラ'].includes(entry.label));
     const list = document.createElement('dl');
     list.className = 'confirmed-rules-list';
     for (const entry of rows) {

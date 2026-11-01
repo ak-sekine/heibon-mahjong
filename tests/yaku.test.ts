@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TILE_KINDS, ordinaryTile, redFive } from '../src/model/tile.ts';
-import type { Tile } from '../src/model/tile.ts';
+import type { Tile, TileKind } from '../src/model/tile.ts';
 import { analyzeYaku } from '../src/analysis/yaku.ts';
 import type { WinningContext, YakuCandidate, YakuId } from '../src/analysis/yaku.ts';
 function hand(...groups: string[]): Tile[] {
@@ -30,6 +30,17 @@ test('red five does not change yaku or assignment', () => {
   const expected = analyzeYaku(tiles, context('5p'));
   tiles[5] = redFive('pin');
   assert.deepEqual(analyzeYaku(tiles, context('5p')), expected);
+});
+test('kuitan OFF keeps menzen tanyao but removes open tanyao', () => {
+  const closedTiles = hand('234m', '345p', '678s', '222p', '66m');
+  assert.ok(analyzeYaku(closedTiles, context('2m', { kuitan: false })).candidates.some(c => has(c, 'tanyao')));
+  const openMelds = [{ type: 'sequence' as const, tiles: hand('234m').map(t => ({ category: t.category,
+    ...(t.category === 'suited' ? { suit: t.suit, rank: t.rank } : { honor: t.honor }) })) as unknown as readonly [TileKind, TileKind, TileKind] }];
+  const openTiles = hand('345p', '678s', '222p', '66m');
+  const off = analyzeYaku(openTiles, context('3p', { isClosed: false, openMelds, kuitan: false }));
+  const on = analyzeYaku(openTiles, context('3p', { isClosed: false, openMelds, kuitan: true }));
+  assert.ok(off.isWinningShape && !off.candidates.some(c => has(c, 'tanyao')));
+  assert.ok(on.candidates.some(c => has(c, 'tanyao')));
 });
 for (const [honor, id] of [['5z', 'yakuhai-white'], ['6z', 'yakuhai-green'], ['7z', 'yakuhai-red'],
   ['1z', 'yakuhai-seat-wind'], ['2z', 'yakuhai-round-wind']] as const) test(`yakuhai: ${id}`, () => {

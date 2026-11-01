@@ -1172,7 +1172,7 @@ with sync_playwright() as p:
       }""")
       assert fixture['status'] == 'round-ended' and fixture['round'] == 1, fixture
       assert fixture['riichi'] and fixture['reference'] and fixture['reference'] in fixture['river'], fixture
-      assert fixture['rules'] == {'schemaVersion': 2, 'matchFormat': fixture['format'], 'redDora': True, 'uraDora': True, 'ippatsu': True, 'kanDora': True}, fixture
+      assert fixture['rules'] == {'schemaVersion': 3, 'matchFormat': fixture['format'], 'redDora': True, 'kuitan': True, 'uraDora': True, 'ippatsu': True, 'kanDora': True}, fixture
       assert page.locator('[data-online-river] [data-riichi-declaration="true"]').count() == 1, 'riichi declaration tile was not rendered'
       return fixture
 
@@ -1331,9 +1331,9 @@ with sync_playwright() as p:
     assert page.locator('#rule-settings-dialog').count() == 0, 'standalone rules dialog remains in the document'
     assert page.locator('#new-game-dialog #new-game-rules').count() == 0, 'offline rules still require a separate navigation button'
     assert page.locator('input[name="new-game-rules-editor-match-format"][value="tonpu"]').is_checked(), 'offline match format did not default to tonpu'
-    assert page.locator('#new-game-rules-editor .optional-rule-option input:checked').count() == 4, 'the four local rules should default to ON'
+    assert page.locator('#new-game-rules-editor .optional-rule-option input:checked').count() == 5, 'the five local rules should default to ON'
     assert page.locator('#new-game-rules-editor .confirmed-rule-row dt').all_text_contents() == [
-      '喰いタン', '和了条件', '後付け', 'リーチ', '通常流局', '途中流局', '連荘', '対局終了',
+      '和了条件', '後付け', 'リーチ', '通常流局', '途中流局', '連荘', '対局終了',
     ], 'fixed implemented rules were not displayed alongside the editable format'
     format_layouts = []
     for width in [320, 375, 390, 414]:
@@ -1380,17 +1380,17 @@ with sync_playwright() as p:
     select_menu_item('#new-game')
     assert page.locator('input[name="new-game-rules-editor-match-format"][value="tonpu"]').is_checked(), 'last started offline rules were not restored'
     page.locator('input[name="new-game-rules-editor-match-format"][value="tonnan"]').check()
-    for key in ['redDora', 'uraDora', 'ippatsu', 'kanDora']:
+    for key in ['redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora']:
       page.locator(f'#new-game-rules-editor input[data-rule-key="{key}"]').uncheck()
     page.locator('#confirm-new-game').click()
     assert page.evaluate('window.onlineUiTest.controller.match.format') == 'tonnan', 'offline selection was not stored in match state'
     assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'"), 'accepted offline start did not save the last rules'
-    assert page.evaluate('''() => Object.values(JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules).filter(value => value === false).length === 4'''), 'accepted offline start did not persist all four OFF values'
+    assert page.evaluate('''() => Object.values(JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules).filter(value => value === false).length === 5'''), 'accepted offline start did not persist all five OFF values'
     select_menu_item('#menu-offline-rules')
     assert '現在の対局開始時に確定' in page.locator('#online-rules-readonly-label').inner_text()
     assert page.locator('#online-rules-list dd').first.inner_text() == '半荘戦（東南戦）'
     rule_rows = dict(zip(page.locator('#online-rules-list dt').all_text_contents(), page.locator('#online-rules-list dd').all_text_contents()))
-    assert rule_rows['赤ドラ'] == 'なし（赤牌を使わない）' and rule_rows['裏ドラ'] == 'なし' and rule_rows['一発'] == 'なし' and rule_rows['カンドラ'] == 'なし（槓裏も追加しない）'
+    assert rule_rows['赤ドラ'] == 'なし（赤牌を使わない）' and rule_rows['喰いタン'] == 'なし（門前の断么九は有効）' and rule_rows['裏ドラ'] == 'なし' and rule_rows['一発'] == 'なし' and rule_rows['カンドラ'] == 'なし（槓裏も追加しない）'
     page.locator('#online-rules-close').click()
 
     assert page.locator('#online-create-name').count() == 1 and page.locator('#online-join-name').count() == 1, 'create and join must have separate display-name fields'
@@ -1559,7 +1559,7 @@ with sync_playwright() as p:
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'canceling room creation did not restore menu focus'
     select_menu_item('#online-create-open')
     assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').is_checked(), 'room creation did not restore after cancel'
-    for key in ['redDora', 'uraDora', 'ippatsu', 'kanDora']:
+    for key in ['redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora']:
       assert not page.locator(f'#online-create-rules-editor input[data-rule-key="{key}"]').is_checked(), f'online creation did not restore the accepted offline {key}=OFF setting'
     page.locator('#online-create').click()
     wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234'")
@@ -1567,7 +1567,7 @@ with sync_playwright() as p:
     assert not page.locator('#online-join-dialog').evaluate('element => element.open'), 'join form opened after room creation'
     assert page.locator('#online-dialog #online-create-form, #online-dialog #online-join-form').count() == 0, 'input forms were mixed into the room management screen'
     host_rules = page.evaluate('window.onlineMock.requests[0].body.rules')
-    assert host_rules == {'schemaVersion': 2, 'matchFormat': 'tonnan', 'redDora': False, 'uraDora': False, 'ippatsu': False, 'kanDora': False}, host_rules
+    assert host_rules == {'schemaVersion': 3, 'matchFormat': 'tonnan', 'redDora': False, 'kuitan': False, 'uraDora': False, 'ippatsu': False, 'kanDora': False}, host_rules
     assert page.evaluate('window.onlineMock.snapshot().room.rules') == host_rules, 'Worker mock did not keep the accepted host rules as room state'
     assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'"), 'successful Worker room creation did not persist its confirmed rules'
     assert page.locator('#online-room-format').inner_text() == '対局形式：半荘戦', 'selected format was not shown in the waiting room'
@@ -1584,7 +1584,7 @@ with sync_playwright() as p:
     assert page.locator('#online-rules-list').get_attribute('aria-label') == 'サーバーで確定したルール'
     assert '半荘戦' in page.locator('#online-rules-list').inner_text(), 'confirmed room rules did not show the host format'
     online_rule_rows = dict(zip(page.locator('#online-rules-list dt').all_text_contents(), page.locator('#online-rules-list dd').all_text_contents()))
-    assert online_rule_rows['赤ドラ'] == 'なし（赤牌を使わない）' and online_rule_rows['裏ドラ'] == 'なし' and online_rule_rows['一発'] == 'なし' and online_rule_rows['カンドラ'] == 'なし（槓裏も追加しない）', online_rule_rows
+    assert online_rule_rows['赤ドラ'] == 'なし（赤牌を使わない）' and online_rule_rows['喰いタン'] == 'なし（門前の断么九は有効）' and online_rule_rows['裏ドラ'] == 'なし' and online_rule_rows['一発'] == 'なし' and online_rule_rows['カンドラ'] == 'なし（槓裏も追加しない）', online_rule_rows
     assert page.locator('#online-rules-dialog input, #online-rules-dialog select, #online-rules-dialog button:not(#online-rules-close)').count() == 0, 'read-only rule confirmation exposed editing controls'
     page.set_viewport_size({'width': 320, 'height': 600})
     readonly_layout = page.locator('#online-rules-dialog').evaluate('''dialog => {

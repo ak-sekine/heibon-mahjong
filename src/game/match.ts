@@ -11,7 +11,7 @@ import { getNagashiManganWinners } from './special-draws.ts';
 const ids = [0, 1, 2, 3] as const;
 function snapshotGame(game: GameState, rules: GameRules): GameState {
   // Historical all-on games need no game-level copy: MatchState is authoritative.
-  if (rules.redDora && rules.uraDora && rules.ippatsu && rules.kanDora) return game;
+  if (rules.redDora && rules.kuitan && rules.uraDora && rules.ippatsu && rules.kanDora) return game;
   const normalizeTile = (tile: import('../model/game.ts').PhysicalTile) =>
     !rules.redDora && tile.tile.isRed ? { ...tile, tile: ordinaryTile(tile.tile) } : tile;
   const players = game.players.map(player => ({

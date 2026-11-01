@@ -15,6 +15,7 @@ import {AutomaticTurnRunner} from '../src/game/automatic-turns.ts';
 import {GameController} from '../src/ui/controller.ts';
 import {ronStart} from './ron-fixture.ts';
 import {chooseShantenDiscard,chooseShantenDiscardAsync} from '../src/game/cpu.ts';
+import {DEFAULT_GAME_RULES} from '../src/model/rules.ts';
 import type {GameState} from '../src/model/game.ts';
 for(const method of ['ron','tsumo'] as const)for(const [name,hand,open,han] of [
  ['tanyao',['345p','678s','222p','66m'],['234m'],1],
@@ -29,6 +30,29 @@ for(const method of ['ron','tsumo'] as const)for(const [name,hand,open,han] of [
  assert.equal(result.yakuHan,han);assert.equal(result.uraDoraCount,0);
  assert.ok(!result.fuBreakdown.some(e=>e.type==='menzen-ron'));
  assert.ok(result.fu!>=30 || method==='tsumo');
+});
+for (const method of ['ron', 'tsumo'] as const) test(`kuitan OFF rejects open tanyao-only ${method}, but retains other yaku and scoring`, () => {
+ const tanyaoOnly = openWinGame(['234p','234s','678m','66m'],['555m'],method);
+ const winOnly = method === 'ron' ? tanyaoOnly.players[3].river.at(-1)! : tanyaoOnly.players[0].drawnTile!;
+ const on = evaluateWin({ ...tanyaoOnly, rules: { ...DEFAULT_GAME_RULES, kuitan: true } },0,winOnly,method);
+ const off = evaluateWin({ ...tanyaoOnly, rules: { ...DEFAULT_GAME_RULES, kuitan: false } },0,winOnly,method);
+ assert.ok(on?.candidate.yaku.some(y => y.id === 'tanyao'));
+ assert.equal(on?.totalHan,1);
+ assert.equal(off,null,'a shape with no remaining yaku is not a legal win');
+ if (method === 'tsumo') {
+  assert.equal(canDeclareTsumo({ ...tanyaoOnly, rules: { ...DEFAULT_GAME_RULES, kuitan: true } },0),true,'CPU and human tsumo share the ON result');
+  assert.equal(canDeclareTsumo({ ...tanyaoOnly, rules: { ...DEFAULT_GAME_RULES, kuitan: false } },0),false,'CPU and human tsumo reject tanyao-only when OFF');
+ }
+
+ const alsoToitoi = openWinGame(['234p','234s','555m','66p'],['234m'],method);
+ const winningTile = method === 'ron' ? alsoToitoi.players[3].river.at(-1)! : alsoToitoi.players[0].drawnTile!;
+ const withKuitan = evaluateWin({ ...alsoToitoi, rules: { ...DEFAULT_GAME_RULES, kuitan: true } },0,winningTile,method)!;
+ const withoutKuitan = evaluateWin({ ...alsoToitoi, rules: { ...DEFAULT_GAME_RULES, kuitan: false } },0,winningTile,method)!;
+ assert.ok(withKuitan && withoutKuitan);
+ assert.ok(withKuitan.candidate.yaku.some(y => y.id === 'tanyao'));
+ assert.ok(withoutKuitan.candidate.yaku.some(y => y.id === 'sanshoku-doujun'));
+ assert.equal(withKuitan.totalHan, withoutKuitan.totalHan + 1);
+ assert.ok(withKuitan.totalPoints > withoutKuitan.totalPoints);
 });
 for(const method of ['ron','tsumo'] as const)test(`dora-only open hand cannot ${method}`,()=>{
  const g=openWinGame(['456p','789s','123p','66m'],['123m'],method);

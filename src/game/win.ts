@@ -44,7 +44,8 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
       haitei: winMethod==='tsumo' && player.drawnTileSource==='live-wall' && game.liveWall.length===0,
       houtei,
       seatWind: player.wind, roundWind: game.roundWind ?? ROUND_WIND, riichi: player.riichi !== null,
-      ippatsuEligible: rules.ippatsu && player.riichi?.ippatsuEligible, doubleRiichi: player.riichi?.doubleRiichi });
+      ippatsuEligible: rules.ippatsu && player.riichi?.ippatsuEligible, doubleRiichi: player.riichi?.doubleRiichi,
+      kuitan: rules.kuitan });
     if (!analysis.isWinningShape || !analysis.hasSupportedYaku) return null;
     const doraCount = countDora(allFaces, exposedDoraIndicators(game, rules).map(t => t.tile));
     const uraDoraCount = rules.uraDora && player.riichi ? countDora(allFaces, uraDoraIndicators(game, rules).map(t => t.tile)) : 0;

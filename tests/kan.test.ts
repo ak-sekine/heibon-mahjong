@@ -168,7 +168,7 @@ test('dora counts every fourth tile and red five; matching kan ura only for riic
  const ready={...g,players:g.players.map(p=>p.id===0?{...p,riichi:{declarationTileId:'past'}}:p) as unknown as GameState['players']};const r=declareTsumo(ready,0).winResult!;assert.equal(r.uraDoraCount,6);assert.equal(r.uraDoraHan,6);
 });
 for (const [type, make] of [['ankan', ankanGame], ['kakan', kakanGame]] as const) test(`${type}: kan dora OFF leaves the kan, rinshan and only the initial dora indicator`, () => {
- const source = make(), rules = { schemaVersion: 2 as const, matchFormat: 'tonpu' as const, redDora: true, uraDora: true, ippatsu: true, kanDora: false };
+ const source = make(), rules = { schemaVersion: 3 as const, matchFormat: 'tonpu' as const, redDora: true, kuitan: true, uraDora: true, ippatsu: true, kanDora: false };
  const game = { ...source, rules };
  const result = declareKan(game, 0, getKanOptions(game, 0)[0].id);
  conserved(result, source);
@@ -179,7 +179,7 @@ for (const [type, make] of [['ankan', ankanGame], ['kakan', kakanGame]] as const
  assert.equal(uraDoraIndicators(result, rules).length, 1);
 });
 test('daiminkan remains available with kan dora OFF and does not reveal its extra indicator', () => {
- const rules = { schemaVersion: 2 as const, matchFormat: 'tonpu' as const, redDora: true, uraDora: true, ippatsu: true, kanDora: false };
+ const rules = { schemaVersion: 3 as const, matchFormat: 'tonpu' as const, redDora: true, kuitan: true, uraDora: true, ippatsu: true, kanDora: false };
  const source = { ...kanGame({ hands: { 0: ['111m', '234p', '456s', '22z', '78m'] }, turn: 1, draw: 'man-1' }), rules };
  const discarded = discardTile(source, 1, source.players[1].drawnTile!.id);
  const option = getCallOptions(discarded, 0).find(candidate => candidate.type === 'daiminkan');
