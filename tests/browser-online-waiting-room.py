@@ -803,6 +803,8 @@ with sync_playwright() as p:
         standings_layout = guest_page.locator('#match-result-dialog').evaluate('''dialog => {
           const box = dialog.getBoundingClientRect();
           const footer = dialog.querySelector('.result-footer').getBoundingClientRect();
+          const close = dialog.querySelector('#match-result-close').getBoundingClientRect();
+          const rematch = dialog.querySelector('#match-result-new-game').getBoundingClientRect();
           const body = dialog.querySelector('#match-result-body');
           const rows = [...dialog.querySelectorAll('.match-result-standings li')].map(row => {
             const rank = row.querySelector('.match-result-rank').getBoundingClientRect();
@@ -812,6 +814,10 @@ with sync_playwright() as p:
           });
           return {fits: box.left >= 0 && box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight,
             footerVisible: footer.left >= 0 && footer.right <= innerWidth && footer.bottom <= innerHeight,
+            closeLeft: close.left < rematch.left && close.right <= rematch.left,
+            actionsSameRow: Math.abs(close.top - rematch.top) < 1,
+            actionsContained: close.left >= box.left && rematch.right <= box.right,
+            actionsSingleLine: [close, rematch].every(rect => rect.height <= 44),
             buttonFits: [...dialog.querySelectorAll('button:not([hidden])')].every(button => {
               const rect = button.getBoundingClientRect();
               return rect.left >= box.left && rect.right <= box.right && getComputedStyle(button).whiteSpace === 'nowrap';
@@ -819,6 +825,8 @@ with sync_playwright() as p:
             rowsFit: rows.every(row => row.sequential && row.contained)};
         }''')
         assert standings_layout['fits'] and standings_layout['footerVisible'], standings_layout
+        assert standings_layout['closeLeft'] and standings_layout['actionsSameRow'] and standings_layout['actionsContained'], standings_layout
+        assert standings_layout['actionsSingleLine'], standings_layout
         assert standings_layout['buttonFits'] and standings_layout['rowsFit'], standings_layout
         assert standings_layout['bodyScrollable'], standings_layout
         if standings_layout['bodyCanScroll']:

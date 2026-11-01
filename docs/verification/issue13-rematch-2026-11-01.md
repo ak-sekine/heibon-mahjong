@@ -58,9 +58,20 @@ Codex Cloud環境ではブラウザー起動を行っていません。Browser U
 
 最終run [41262624930](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41262624930) は全job成功しました。`verify`、Browser UI Chromium／WebKit、Browser UI matrix audit、release-freshness、Worker deploy、production-test、Pages build／deployが成功し、Deploy gateを通過しました。production-testでは2人対局、CPU引継ぎ、再接続、ホスト移譲など5シナリオが成功しました。公開対象SHA `2dc23cea94f81d7e61fb82f1deb9f51ff1a5fb4f` に対する Worker と GitHub Pages の公開が完了しています。
 
+## 2026-11-01 追加修正：対局結果ボタンの左右配置
+
+- 起点は更新済み`origin/main`と同じSHA `78df436a572939a8462a7856b1c6b930dc700fdd`です。
+- オフライン／オンライン共通の対局結果ダイアログでDOM順を「閉じる」→「次の対局」に変更しました。これにより左に「閉じる」、右にオフライン「次の対局を始める」／オンライン「新しい対局を始める」が並び、DOM／Tab順も視覚順と一致します。共通ボタンclass、クリック処理、順位・点数表示、オンライン再戦処理、CSSは変更していません。
+- `match-result-dialog.test.ts`にDOM順検証を追加しました。既存のオフライン新規対局ルート・オンライン再戦handler・順位表示テストは維持しています。
+- `browser-round-end-ui.py`はオフラインの320〜430pxを含む各幅でボタンの実座標、同一行、非重複、ダイアログ内包含、1行表示を検証します。`browser-online-waiting-room.py`はChromium／WebKitの2クライアント再戦シナリオで320×360px時の左右順、非重複、折返し、包含を検証します。
+- 関連テスト、`npm test`（73成功、失敗0、skip 0）、`npm run build`、`npm run typecheck:worker`、Browser UIスクリプトのPython構文検査、`git diff --check`はローカルで成功しました。
+- この追加修正を含むGitHub ActionsのBrowser UI（Chromium／WebKit）、Deploy gate、GitHub Pages公開の実行結果はpush後に追記します。Codex環境から直接Browser UIを起動していません。
+
 ## iPhone Safari実機確認
 
-ユーザー本人のiPhone Safari確認は未実施です。以下を公開済み環境で確認し、報告された項目だけを実機成功として追記します。
+2026-11-01、ユーザー本人がiPhone Safari実機でオフラインの対局結果画面を確認しました。対局結果画面の機能上の問題は報告されていません。一方、「閉じる」が右、「次の対局を始める」が左に配置されていたため、操作の意味に合わせて左右を入れ替える追加修正が依頼されました。オンライン動作について実機確認済みとの報告はありません。今回の追加修正後の実機確認は未実施です。
+
+修正後は、公開済み環境で以下を確認してください。実機で確認した項目だけを追記します。
 
 1. オフライン対局終了後、「対局結果」を開き、順位・持ち点を確認する。「閉じる」後に再度開いて値が変わらないことを確認し、「次の対局を始める」から既存確認画面を通じて新しい対局が始まることを確認する。局結果画面に同じボタンが出ていないことも確認する。
 2. 2クライアントでオンライン対局を終了し、「対局結果」を開閉しただけでは再戦準備にならないことを確認する。非ホストから「新しい対局を始める」を押し、両端末が同じルームの待機画面へ移ることを確認する。

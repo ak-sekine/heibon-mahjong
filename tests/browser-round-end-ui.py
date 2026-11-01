@@ -647,6 +647,15 @@ with sync_playwright() as p:
         assert page.locator('#match-result-dialog').is_visible()
         assert page.locator('#match-result-title').inner_text() == '対局結果'
         assert page.locator('#match-result-body').locator('.match-result-format').inner_text() == '東風戦'
+        match_result_actions = page.evaluate('''() => {
+          const close=document.querySelector('#match-result-close').getBoundingClientRect();
+          const next=document.querySelector('#match-result-new-game').getBoundingClientRect();
+          const dialog=document.querySelector('#match-result-dialog').getBoundingClientRect();
+          return {closeLeft:close.left < next.left, sameRow:Math.abs(close.top-next.top)<1,
+            noOverlap:close.right<=next.left, contained:close.left>=dialog.left&&next.right<=dialog.right,
+            singleLine:[close,next].every(rect=>rect.height<=44)};
+        }''')
+        assert all(match_result_actions.values()), (width, match_result_actions)
         assert page.locator('#match-result-body .match-result-standings li').count() == 4
         standing_text = page.locator('#match-result-body .match-result-standings').inner_text()
         assert 'とても長い表示名を含むプレイヤー' in standing_text

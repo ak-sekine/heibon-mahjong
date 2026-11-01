@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { rankPlayers, startMatch, settleRound } from '../src/game/match.ts';
 import { MatchResultDialog } from '../src/ui/match-result-dialog.ts';
@@ -40,6 +41,15 @@ function mount(): { ui: MatchResultDialog; nodes: Map<string, ElementStub>; orig
   const ui = new MatchResultDialog();
   return { ui, nodes, original };
 }
+
+test('match result actions follow visual left-to-right order in the DOM', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const dialog = html.match(/<dialog id="match-result-dialog"[\s\S]*?<\/dialog>/u)?.[0] ?? '';
+  const close = dialog.indexOf('id="match-result-close"');
+  const nextGame = dialog.indexOf('id="match-result-new-game"');
+  assert.ok(close >= 0 && nextGame >= 0, 'both match result actions are present');
+  assert.ok(close < nextGame, 'close precedes the next-match action in keyboard and visual order');
+});
 
 test('offline match result shows all ranked players and opens/closes without changing the match', () => {
   const { ui, nodes, original } = mount();
