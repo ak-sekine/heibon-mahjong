@@ -3,9 +3,11 @@
 更新日: 2026-11-01
 Issue: [#13](https://github.com/ak-sekine/heibon-mahjong/issues/13)
 実装起点: `origin/main` `67fc6873b2973edd6933ee8cb7ee235173b2f12e`
-実装commit SHA: push後に追記
-GitHub Actions run: push後に追記
-公開対象SHA／Worker・Pages公開結果: push後に追記
+実装commit SHA: `36654ff23951881521bd14e4a639d1cefe040b5b`（Browser UI修正 `026894cf8c8752de183c3161771eaf4c8077c81e`、検証フロー修正 `2dc23cea94f81d7e61fb82f1deb9f51ff1a5fb4f`）
+GitHub Actions run: [41262624930](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41262624930) 成功
+公開対象SHA: `2dc23cea94f81d7e61fb82f1deb9f51ff1a5fb4f`
+Worker: 成功 — `https://heibon-mahjong-online.ak-sekine.workers.dev`
+GitHub Pages: 成功 — `https://ak-sekine.github.io/heibon-mahjong/`
 
 ## 調査した既存仕様
 
@@ -45,19 +47,20 @@ GitHub Actions run: push後に追記
 | `npm run typecheck:worker` | 成功。 |
 | Browser UI Python構文検査 | 成功。 |
 | Browser UI engine manifest選択テスト | 5件成功。Issue #28のengine別matrixを維持し、計60シナリオ（Chromium 36、WebKit 24）に更新。 |
+| GitHub Actions Browser UI | run 41262624930でChromium 36／WebKit 24のmatrix全件成功。2ページ・2クライアントの再戦シナリオはChromium／WebKit双方で成功し、320×360pxの順位画面レイアウトも検査。matrix audit成功。 |
 | `git diff --check` | 成功。 |
 
 Worker統合シナリオは同じルームで初回対局と2回の再戦を行い、準備競合の冪等性、再戦待機状態への再接続、再接続時に前回ゲームビューを送らないこと、非ホスト開始拒否、未準備開始拒否、全員Ready後の自動開始がないこと、同時開始、初期点・局・本場・供託・手牌・河・副露・宣言状態のリセット、CPU／人間の席重複防止、前回revisionの遅延操作拒否を検証します。さらに再戦待機中のホスト退出後、CPU引継ぎ・新ホスト移譲・再戦開始が成立することを確認します。Browser UIにはChromiumとWebKitのそれぞれで、ホストと別ページの参加者を起動し、参加者側の再戦開始から待機同期、Ready、ホスト開始までを確認する専用2クライアントシナリオを追加しました。
 
-Codex Cloud環境ではブラウザー起動を行っていません。Browser UIの実結果はGitHub ActionsのChromium／WebKit jobで確認し、未実行を成功扱いにしません。Actions結果とDeploy gateはpush後に追記します。
+Codex Cloud環境ではブラウザー起動を行っていません。Browser UIの実結果はGitHub ActionsのChromium／WebKit jobで確認しました。初回run [41261581310](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41261581310)はテストがPlaywrightの独立ページ生成APIを誤用して失敗しました。続くrun [41261829731](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41261829731)では2クライアント再戦シナリオが両engineで成功した一方、Chromiumの後続退出テストで重複したメニュークリックが見つかりました。テスト手順を修正した最終run 41262624930では両engineのmatrixが全件成功しました。失敗をskipやassertion変更で隠していません。
 
 ## GitHub Actions・公開
 
-push前です。`verify`、`production-test`、Browser UI Chromium／WebKit、Browser UI matrix audit、Deploy gate、Worker公開、Pages公開、公開URLをActions完了後に追記します。公開済みとしては扱いません。
+最終run [41262624930](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41262624930) は全job成功しました。`verify`、Browser UI Chromium／WebKit、Browser UI matrix audit、release-freshness、Worker deploy、production-test、Pages build／deployが成功し、Deploy gateを通過しました。production-testでは2人対局、CPU引継ぎ、再接続、ホスト移譲など5シナリオが成功しました。公開対象SHA `2dc23cea94f81d7e61fb82f1deb9f51ff1a5fb4f` に対する Worker と GitHub Pages の公開が完了しています。
 
 ## iPhone Safari実機確認
 
-ユーザー本人のiPhone Safari確認は未実施です。以下を公開後に確認し、報告された項目だけを実機成功として追記します。
+ユーザー本人のiPhone Safari確認は未実施です。以下を公開済み環境で確認し、報告された項目だけを実機成功として追記します。
 
 1. オフライン対局終了後、「対局結果」を開き、順位・持ち点を確認する。「閉じる」後に再度開いて値が変わらないことを確認し、「次の対局を始める」から既存確認画面を通じて新しい対局が始まることを確認する。局結果画面に同じボタンが出ていないことも確認する。
 2. 2クライアントでオンライン対局を終了し、「対局結果」を開閉しただけでは再戦準備にならないことを確認する。非ホストから「新しい対局を始める」を押し、両端末が同じルームの待機画面へ移ることを確認する。
