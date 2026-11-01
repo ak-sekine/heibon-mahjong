@@ -359,7 +359,7 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.equal(state.revision, 0);
     assert.equal(state.expiresAt, expiresAt);
     assert.equal(state.format, 'tonpu');
-    assert.deepEqual(state.rules, { schemaVersion: 1, matchFormat: 'tonpu' }, 'legacy room without a format should use the old East-only default');
+    assert.deepEqual(state.rules, { schemaVersion: 2, matchFormat: 'tonpu', redDora: true, uraDora: true, ippatsu: true, kanDora: true }, 'legacy room without rules should use historical defaults');
     assert.deepEqual(publicSeats(state).map(seat => seat.kind), ['human', 'empty', 'empty', 'empty']);
     assert.equal(ctx.storage.sql.exec<{ token_hash: string }>('SELECT token_hash FROM seats WHERE seat = 0').toArray()[0].token_hash, legacyHash);
     const client = await connectParticipant(fixture, legacyToken);
@@ -375,10 +375,11 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
   });
 
   await t.test('persists the host match format in Worker state and rejects attempted rule mutations', async () => {
-    const fixture = await makeRoom('Rules host', token('9'), { schemaVersion: 1, matchFormat: 'tonnan' });
+    const selectedRules = { schemaVersion: 2, matchFormat: 'tonnan', redDora: false, uraDora: true, ippatsu: false, kanDora: false };
+    const fixture = await makeRoom('Rules host', token('9'), selectedRules);
     const state = await readState(fixture);
     assert.equal(state.format, 'tonnan');
-    assert.deepEqual(state.rules, { schemaVersion: 1, matchFormat: 'tonnan' });
+    assert.deepEqual(state.rules, selectedRules);
     const host = await connectParticipant(fixture, fixture.hostToken);
     const before = host.client.sent.length;
     fixture.room.webSocketMessage(host.server as unknown as WebSocket, JSON.stringify({
@@ -386,9 +387,16 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
       ready: true, rules: { schemaVersion: 1, matchFormat: 'tonpu' },
     }));
     assert.equal(JSON.parse(host.client.sent.slice(before).at(-1)!).code, 'invalid_message');
-    assert.deepEqual((await readState(fixture)).rules, { schemaVersion: 1, matchFormat: 'tonnan' });
+    assert.deepEqual((await readState(fixture)).rules, selectedRules);
     fixture.room = new RoomDurableObject(fixture.ctx as unknown as DurableObjectState, {} as Env);
-    assert.deepEqual((await readState(fixture)).rules, { schemaVersion: 1, matchFormat: 'tonnan' });
+    assert.deepEqual((await readState(fixture)).rules, selectedRules, 'room settings survive Durable Object reconstruction');
+    const invalidCtx = new TestRoomContext();
+    const invalidRoom = new RoomDurableObject(invalidCtx as unknown as DurableObjectState, {} as Env);
+    const invalidCreate = await invalidRoom.fetch(new Request('https://room.internal/internal/create', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: nextCode(), displayName: 'Bad', participantToken: token('8'), rules: { ...selectedRules, kanDora: 'false' } }),
+    }));
+    assert.equal(invalidCreate.status, 400, 'malformed rule types are rejected before creating a room');
   });
 
   await t.test('supports two humans, Ready, conflict responses, CPU fill and idempotent finalization', async () => {

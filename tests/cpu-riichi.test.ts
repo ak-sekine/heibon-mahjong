@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { MatchState } from '../src/model/match.ts';
 import type { GameState, PlayerState } from '../src/model/game.ts';
-import { chooseCpuRiichiDiscard } from '../src/game/cpu.ts';
+import { chooseCpuRiichiDiscard, estimateCpuRiichiOptionHan } from '../src/game/cpu.ts';
 import { canDeclareRiichi, declareRiichi, getRiichiDiscardOptions, resolvePendingRiichi } from '../src/game/riichi.ts';
 import { startMatch, updateMatchGame, assertPointConservation, settleRound } from '../src/game/match.ts';
 import { canDeclareRon, declareRon, passRon } from '../src/game/ron.ts';
@@ -28,11 +28,18 @@ for(const id of [1,2,3] as const) test(`CPU${id} declares, pays once, gains riic
   assert.throws(()=>discardTile(g,id,g.players[id].hand[0].id),RangeError);
   const next=discardTile(g,id,declaration(g));assert.deepEqual(next.players[id].hand,m.game.players[id].hand);inventory(next,initial);
 });
-test('pure strategy chooses maximum wait-kind count and physical ID tie-break',()=>{
+test('CPU riichi strategy prefers maximum waits, then expected hand value, then physical ID',()=>{
   const g=cpuTsumoGame(1,['123m','123m','789p','22p','456s']);const snapshot=structuredClone(g);freeze(g);const options=getRiichiDiscardOptions(g,1,25000);
   assert.ok(new Set(options.map(o=>o.waitKindCount)).size>1);const maximum=Math.max(...options.map(o=>o.waitKindCount));
-  const ties=options.filter(o=>o.waitKindCount===maximum).map(o=>o.tileId).sort();assert.ok(ties.length>1);
-  assert.equal(chooseCpuRiichiDiscard(g,1,25000),ties[0]);assert.equal(chooseCpuRiichiDiscard(g,1,25000),ties[0]);assert.deepEqual(g,snapshot);
+  const ties=options.filter(o=>o.waitKindCount===maximum).sort((a,b)=>estimateCpuRiichiOptionHan(g,1,b)-estimateCpuRiichiOptionHan(g,1,a)||(a.tileId<b.tileId?-1:a.tileId>b.tileId?1:0));assert.ok(ties.length>1);
+  assert.equal(chooseCpuRiichiDiscard(g,1,25000),ties[0].tileId);assert.equal(chooseCpuRiichiDiscard(g,1,25000),ties[0].tileId);assert.deepEqual(g,snapshot);
+});
+test('CPU expected riichi value includes the configured ippatsu han',()=>{
+  const source=cpuRiichiStart(),players=source.players.map(p=>p.id===1?{...p,control:'cpu' as const}:p) as unknown as GameState['players'];
+  const option=getRiichiDiscardOptions({...source,players},1,25000)[0];assert.ok(option);
+  const on={...source,players,rules:{schemaVersion:2 as const,matchFormat:'tonpu' as const,redDora:true,uraDora:true,ippatsu:true,kanDora:true}};
+  const off={...on,rules:{...on.rules,ippatsu:false}};
+  assert.ok(estimateCpuRiichiOptionHan(on,1,option)>estimateCpuRiichiOptionHan(off,1,option));
 });
 for(const reason of ['points','wall','already','turn','ron','ended'] as const) test(`CPU riichi rejection: ${reason}`,()=>{
   let g=cpuRiichiStart();let points=25000;

@@ -3,8 +3,10 @@ import type { WinningMeld } from '../analysis/winning-shape.ts';
 import { ShantenCalculator, tileCounts } from '../analysis/shanten.ts';
 import { isWinningShape } from '../analysis/winning-shape.ts';
 import { TILE_KINDS, ordinaryTile, tileKindKey } from '../model/tile.ts';
+import { evaluateWin } from './win.ts';
 import { exposedDoraIndicators } from './dora.ts';
 import { getRiichiDiscardOptions, getRiichiDiscardOptionsWithinBudget } from './riichi.ts';
+import { rulesForGame } from '../model/rules.ts';
 import type { GameState, PlayerId, PlayerState } from '../model/game.ts';
 import type { RandomSource } from './shuffle.ts';
 
@@ -30,8 +32,30 @@ export function chooseCpuRiichiDiscard(game: GameState, playerId: PlayerId, poin
     ? getRiichiDiscardOptionsWithinBudget(game, playerId, points, budgetMs)
     : getRiichiDiscardOptions(game, playerId, points);
   if (options === null) return null;
-  return [...options]
-    .sort((a,b) => b.waitKindCount - a.waitKindCount || (a.tileId < b.tileId ? -1 : a.tileId > b.tileId ? 1 : 0))[0]?.tileId ?? null;
+  return [...options].map(option => ({ option, expectedHan: estimateCpuRiichiOptionHan(game, playerId, option) }))
+    .sort((a,b) => b.option.waitKindCount - a.option.waitKindCount || b.expectedHan-a.expectedHan ||
+      (a.option.tileId < b.option.tileId ? -1 : a.option.tileId > b.option.tileId ? 1 : 0))[0]?.option.tileId ?? null;
+}
+
+/** Average supported han across this wait after declaring riichi. The same win
+ * evaluator used in live CPU play includes the configured ippatsu and dora rules. */
+export function estimateCpuRiichiOptionHan(
+  game: GameState,
+  playerId: PlayerId,
+  option: import('./riichi.ts').RiichiDiscardOption,
+): number {
+  const player = game.players[playerId];
+  if (!player || !player.drawnTile || !option.waitingTileKinds.length) return 0;
+  const tiles = [...player.hand, player.drawnTile].filter(tile => tile.id !== option.tileId);
+  if (tiles.length !== player.hand.length || !tiles.length) return 0;
+  const rules = rulesForGame(game);
+  const players = [...game.players] as [PlayerState, PlayerState, PlayerState, PlayerState];
+  players[playerId] = { ...player, hand: tiles, drawnTile: null, drawnTileSource: null,
+    riichi: { declarationTileId: option.tileId, ippatsuEligible: rules.ippatsu, doubleRiichi: false } };
+  const hypothetical = { ...game, players };
+  const han = option.waitingTileKinds.map((kind, index) => evaluateWin(hypothetical, playerId,
+    { id: `cpu-riichi-preview-${playerId}-${index}`, tile: ordinaryTile(kind) }, 'tsumo')?.totalHanIncludingDora ?? 0);
+  return han.reduce((total, value) => total + value, 0) / han.length;
 }
 
 /** Only own tiles and public tiles cross the strategy boundary. */
@@ -133,7 +157,7 @@ export async function chooseShantenDiscardAsync(
   const player=game.players[playerId];
   if (player.riichi || player.hand.length+Number(Boolean(player.drawnTile))!==concealedSize(player)+1) throw new RangeError('Invalid normal discard');
   const steps=evaluationSteps({tiles:[...player.hand,...(player.drawnTile?[player.drawnTile]:[])], openMelds:winningMelds(player.melds), forbiddenKinds:player.callDiscard?.forbiddenKinds,
-    visibleTiles:[...game.players.flatMap(p=>[...p.river,...(p.melds ?? []).flatMap(m=>m.tiles)]),...exposedDoraIndicators(game)]});
+    visibleTiles:[...game.players.flatMap(p=>[...p.river,...(p.melds ?? []).flatMap(m=>m.tiles)]),...exposedDoraIndicators(game, game.rules)]});
   const slice = Math.max(0.5, Math.min(6, sliceMilliseconds));
   let deadline=performance.now()+slice;
   for (;;) {
@@ -156,5 +180,5 @@ export function chooseShantenDiscard(game: GameState, playerId: PlayerId): strin
   if (player.riichi) throw new RangeError('Shanten strategy cannot bypass riichi tsumogiri');
   if (player.hand.length+Number(Boolean(player.drawnTile))!==concealedSize(player)+1) throw new RangeError('CPU selection requires fourteen tiles');
   return chooseShantenDiscardFromPublic({tiles:[...player.hand,...(player.drawnTile?[player.drawnTile]:[])], openMelds:winningMelds(player.melds), forbiddenKinds:player.callDiscard?.forbiddenKinds,
-    visibleTiles:[...game.players.flatMap(p=>[...p.river,...(p.melds ?? []).flatMap(m=>m.tiles)]),...exposedDoraIndicators(game)]});
+    visibleTiles:[...game.players.flatMap(p=>[...p.river,...(p.melds ?? []).flatMap(m=>m.tiles)]),...exposedDoraIndicators(game, game.rules)]});
 }

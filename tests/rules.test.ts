@@ -9,7 +9,7 @@ import { RulePreferences } from '../src/ui/rule-settings.ts';
 import { GameController } from '../src/ui/controller.ts';
 import { nextRound, startMatch, updateMatchGame } from '../src/game/match.ts';
 import { startGame } from '../src/game/start.ts';
-import type { MatchFormat, MatchState } from '../src/model/match.ts';
+import type { MatchState } from '../src/model/match.ts';
 import { fixedRound } from './match-fixture.ts';
 
 class MemoryStorage implements RulesStorage {
@@ -22,7 +22,7 @@ class MemoryStorage implements RulesStorage {
 
 test('rules default to East-only and safely normalize invalid and unknown values', () => {
   assert.deepEqual(loadLastGameRules(new MemoryStorage()), DEFAULT_GAME_RULES);
-  assert.deepEqual(normalizeGameRules({ schemaVersion: 1, matchFormat: 'tonnan' }), { schemaVersion: 1, matchFormat: 'tonnan' });
+  assert.deepEqual(normalizeGameRules({ schemaVersion: 1, matchFormat: 'tonnan' }), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' });
   for (const value of [null, 'tonnan', { schemaVersion: 2, matchFormat: 'tonnan' },
     { schemaVersion: 1, matchFormat: 'unknown' }, { schemaVersion: 1, matchFormat: 'tonpu', futureRule: true }]) {
     assert.deepEqual(normalizeGameRules(value), DEFAULT_GAME_RULES);
@@ -33,9 +33,11 @@ test('last started rules persist in a versioned format and restore on the next m
   const storage = new MemoryStorage();
   assert.equal(saveLastGameRules({ schemaVersion: 1, matchFormat: 'tonnan' }, storage), true);
   assert.deepEqual(JSON.parse(storage.values.get(GAME_RULES_STORAGE_KEY)!), {
-    version: 1, rules: { schemaVersion: 1, matchFormat: 'tonnan' },
+    version: 2, rules: { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' },
   });
-  assert.deepEqual(loadLastGameRules(storage), { schemaVersion: 1, matchFormat: 'tonnan' });
+  assert.deepEqual(loadLastGameRules(storage), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' });
+  storage.values.set(GAME_RULES_STORAGE_KEY, JSON.stringify({ version: 1, rules: { schemaVersion: 1, matchFormat: 'tonnan' } }));
+  assert.deepEqual(loadLastGameRules(storage), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' }, 'v1 saved rules receive historical all-on defaults');
 });
 
 test('corrupt data, old versions, and unknown setting values fall back without throwing', () => {
@@ -55,17 +57,20 @@ test('canceled preference edits are not persisted; accepted start saves best-eff
   preferences.commit({ schemaVersion: 1, matchFormat: 'tonnan' });
   assert.deepEqual(loadLastGameRules(storage), DEFAULT_GAME_RULES);
   storage.failWrite = true;
-  assert.deepEqual(preferences.acceptedStart(preferences.current), { schemaVersion: 1, matchFormat: 'tonnan' });
+  assert.deepEqual(preferences.acceptedStart(preferences.current), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' });
   assert.deepEqual(loadLastGameRules(storage), DEFAULT_GAME_RULES);
   storage.failWrite = false;
   preferences.acceptedStart(preferences.current);
-  assert.deepEqual(loadLastGameRules(storage), { schemaVersion: 1, matchFormat: 'tonnan' });
+  assert.deepEqual(loadLastGameRules(storage), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' });
 });
 
 test('confirmed rule descriptions expose the complete current rule set as read-only values', () => {
   const rules = describeConfirmedRules({ schemaVersion: 1, matchFormat: 'tonnan' });
   assert.equal(rules.find(rule => rule.label === '対局形式')?.value, '半荘戦（東南戦）');
   assert.equal(rules.find(rule => rule.label === '赤ドラ')?.value, 'あり（各色の五に1枚）');
+  assert.equal(rules.find(rule => rule.label === '裏ドラ')?.value, 'リーチ和了時にあり');
+  assert.equal(rules.find(rule => rule.label === '一発')?.value, 'あり');
+  assert.equal(rules.find(rule => rule.label === 'カンドラ')?.value, 'カン成立ごとに追加');
   assert.equal(rules.find(rule => rule.label === '喰いタン')?.value, 'あり');
   assert.match(rules.find(rule => rule.label === '対局終了')!.value, /南4局/);
 });
@@ -74,7 +79,7 @@ test('active rules are a frozen start snapshot, independent of later edits and s
   for (const format of ['tonpu', 'tonnan'] as const) {
     const storage = new MemoryStorage();
     const preferences = new RulePreferences(storage);
-    const selection = { schemaVersion: 1 as const, matchFormat: format as MatchFormat };
+    const selection = { ...DEFAULT_GAME_RULES, matchFormat: format };
     const controller = new GameController(() => startGame(), { startImmediately: false });
     controller.newGame(selection);
     preferences.acceptedStart(selection);
@@ -85,10 +90,10 @@ test('active rules are a frozen start snapshot, independent of later edits and s
     assert.equal(match.format, format);
     assert.notEqual(match.rules, selection);
     assert.ok(Object.isFrozen(match.rules));
-    selection.matchFormat = format === 'tonpu' ? 'tonnan' : 'tonpu';
-    preferences.commit(selection);
-    saveLastGameRules(selection, storage);
-    assert.equal(loadLastGameRules(storage).matchFormat, selection.matchFormat);
+    const edited = { ...selection, matchFormat: format === 'tonpu' ? 'tonnan' : 'tonpu' };
+    preferences.commit(edited);
+    saveLastGameRules(edited, storage);
+    assert.equal(loadLastGameRules(storage).matchFormat, edited.matchFormat);
     assert.equal(rulesForMatch(controller.match).matchFormat, format);
     const rows = describeConfirmedRules(rulesForMatch(controller.match));
     assert.equal(rows[0].value, format === 'tonpu' ? '東風戦' : '半荘戦（東南戦）');
@@ -100,7 +105,7 @@ test('active rules are a frozen start snapshot, independent of later edits and s
 
 test('the same confirmed rules survive settlement and the next round in both match formats', () => {
   for (const format of ['tonpu', 'tonnan'] as const) {
-    const match = startMatch(startGame(), { schemaVersion: 1, matchFormat: format });
+    const match = startMatch(startGame(), { ...DEFAULT_GAME_RULES, matchFormat: format });
     const snapshot = match.rules;
     const ended = updateMatchGame(match, fixedRound(0, []));
     assert.equal(ended.status, 'round-ended');

@@ -1,26 +1,55 @@
 import type { MatchFormat, MatchState } from './match.ts';
 
-/** Rules selected for a newly created match. This version only exposes implemented match formats. */
+/** Immutable local rules selected for one match. */
 export type GameRules = Readonly<{
-  schemaVersion: 1;
+  schemaVersion: 2;
   matchFormat: MatchFormat;
+  redDora: boolean;
+  uraDora: boolean;
+  ippatsu: boolean;
+  kanDora: boolean;
 }>;
 
-export const DEFAULT_GAME_RULES: GameRules = Object.freeze({ schemaVersion: 1, matchFormat: 'tonpu' });
+export const DEFAULT_GAME_RULES: GameRules = Object.freeze({
+  schemaVersion: 2, matchFormat: 'tonpu', redDora: true, uraDora: true, ippatsu: true, kanDora: true,
+});
 export const GAME_RULES_STORAGE_KEY = 'heibon-mahjong-last-rules';
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
 
 export function rulesForFormat(format: MatchFormat): GameRules {
-  return Object.freeze({ schemaVersion: 1, matchFormat: format });
+  return Object.freeze({ ...DEFAULT_GAME_RULES, matchFormat: format });
 }
 
-/** Unknown versions and formats safely resolve to the established default. */
+/** Legacy format-only rules receive the established fixed-rule defaults. */
 export function normalizeGameRules(value: unknown): GameRules {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return DEFAULT_GAME_RULES;
   const candidate = value as Record<string, unknown>;
-  return candidate.schemaVersion === 1 && (candidate.matchFormat === 'tonpu' || candidate.matchFormat === 'tonnan')
-    ? rulesForFormat(candidate.matchFormat)
-    : DEFAULT_GAME_RULES;
+  if ((candidate.schemaVersion !== 1 && candidate.schemaVersion !== 2) ||
+      (candidate.matchFormat !== 'tonpu' && candidate.matchFormat !== 'tonnan')) return DEFAULT_GAME_RULES;
+  const legacy = candidate.schemaVersion === 1;
+  const allowed = new Set(legacy ? ['schemaVersion', 'matchFormat'] :
+    ['schemaVersion', 'matchFormat', 'redDora', 'uraDora', 'ippatsu', 'kanDora']);
+  if (Object.keys(candidate).some(key => !allowed.has(key))) return DEFAULT_GAME_RULES;
+  const keys = ['redDora', 'uraDora', 'ippatsu', 'kanDora'] as const;
+  if (!legacy && keys.some(key => typeof candidate[key] !== 'boolean')) return DEFAULT_GAME_RULES;
+  return Object.freeze({ schemaVersion: 2, matchFormat: candidate.matchFormat,
+    redDora: legacy ? true : candidate.redDora as boolean,
+    uraDora: legacy ? true : candidate.uraDora as boolean,
+    ippatsu: legacy ? true : candidate.ippatsu as boolean,
+    kanDora: legacy ? true : candidate.kanDora as boolean });
+}
+
+/** Strict boundary check for untrusted room-creation requests. */
+export function isValidGameRules(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  if (candidate.schemaVersion === 1) return normalizeGameRules(candidate).matchFormat === candidate.matchFormat &&
+    (candidate.matchFormat === 'tonpu' || candidate.matchFormat === 'tonnan') &&
+    Object.keys(candidate).every(key => key === 'schemaVersion' || key === 'matchFormat');
+  return candidate.schemaVersion === 2 &&
+    (candidate.matchFormat === 'tonpu' || candidate.matchFormat === 'tonnan') &&
+    ['redDora', 'uraDora', 'ippatsu', 'kanDora'].every(key => typeof candidate[key] === 'boolean') &&
+    Object.keys(candidate).every(key => ['schemaVersion', 'matchFormat', 'redDora', 'uraDora', 'ippatsu', 'kanDora'].includes(key));
 }
 
 /** The active match is authoritative. Legacy matches retain their original format. */
@@ -28,6 +57,11 @@ export function rulesForMatch(match: Pick<MatchState, 'rules' | 'format'>): Game
   return match.rules === undefined
     ? normalizeGameRules({ schemaVersion: 1, matchFormat: match.format ?? 'tonpu' })
     : normalizeGameRules(match.rules);
+}
+
+/** Omitted snapshots are legacy states and retain the historical fixed rules. */
+export function rulesForGame(game: { readonly rules?: unknown }): GameRules {
+  return game.rules === undefined ? DEFAULT_GAME_RULES : normalizeGameRules(game.rules);
 }
 
 export interface RulesStorage {
@@ -47,7 +81,7 @@ export function loadLastGameRules(storage: RulesStorage | null = browserStorage(
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return DEFAULT_GAME_RULES;
     const record = parsed as Record<string, unknown>;
-    if (record.version !== STORAGE_VERSION) return DEFAULT_GAME_RULES;
+    if (record.version !== 1 && record.version !== STORAGE_VERSION) return DEFAULT_GAME_RULES;
     return normalizeGameRules(record.rules);
   } catch { return DEFAULT_GAME_RULES; }
 }
@@ -67,13 +101,14 @@ export function describeConfirmedRules(rulesValue: unknown): readonly Readonly<{
   const rules = normalizeGameRules(rulesValue);
   return [
     { label: '対局形式', value: rules.matchFormat === 'tonnan' ? '半荘戦（東南戦）' : '東風戦' },
-    { label: '赤ドラ', value: 'あり（各色の五に1枚）' },
+    { label: '赤ドラ', value: rules.redDora ? 'あり（各色の五に1枚）' : 'なし（赤牌を使わない）' },
     { label: '喰いタン', value: 'あり' },
     { label: '和了条件', value: '役が必要（ドラのみでは和了不可）' },
     { label: '後付け', value: '完成した手牌に役があれば和了可' },
-    { label: 'リーチ・一発', value: 'あり（ダブル立直を含む）' },
-    { label: '裏ドラ', value: 'リーチ和了時にあり' },
-    { label: 'カンドラ', value: 'カン成立ごとに追加' },
+    { label: 'リーチ', value: 'あり（ダブル立直を含む）' },
+    { label: '一発', value: rules.ippatsu ? 'あり' : 'なし' },
+    { label: '裏ドラ', value: rules.uraDora ? 'リーチ和了時にあり' : 'なし' },
+    { label: 'カンドラ', value: rules.kanDora ? 'カン成立ごとに追加' : 'なし（槓裏も追加しない）' },
     { label: '通常流局', value: 'テンパイ・ノーテンを精算' },
     { label: '途中流局', value: '九種九牌・四風連打・四家立直・四開槓。親維持で本場を加算' },
     { label: '連荘', value: '親和了・親テンパイ流局で継続' },

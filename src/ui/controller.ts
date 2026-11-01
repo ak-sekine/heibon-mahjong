@@ -4,6 +4,7 @@ import { isForbiddenDiscard } from '../game/melds.ts';
 import type { MatchState, MatchFormat } from '../model/match.ts';
 import type { GameRules } from '../model/rules.ts';
 import { startMatch, updateMatchGame, nextRound } from '../game/match.ts';
+import { normalizeGameRules, rulesForMatch } from '../model/rules.ts';
 import type { GameState, PlayerId } from '../model/game.ts';
 import { canDeclareTsumo, declareTsumo } from '../game/tsumo.ts';
 import { canDeclareRon, declareRon, passRon } from '../game/ron.ts';
@@ -36,7 +37,7 @@ export class GameController {
   selectedTileId: string | null = null;
   playerSeat: PlayerId = 0;
   playerNames: readonly string[] = ['自分', 'CPU1', 'CPU2', 'CPU3'];
-  private readonly start: (dealerId?: PlayerId) => GameState;
+  private readonly start: (dealerId?: PlayerId, rules?: GameRules) => GameState;
   private readonly random: RandomSource;
   private participants: readonly [MatchParticipant, MatchParticipant, MatchParticipant, MatchParticipant] = [
     { id: 'human', control: 'human', name: '自分' },
@@ -48,7 +49,7 @@ export class GameController {
   private readonly runner: AutomaticTurnRunner;
   private readonly onChange: () => void;
   constructor(start: ((dealerId?: PlayerId) => GameState) | undefined = undefined, options: AutomaticTurnOptions & { onChange?: () => void; startImmediately?: boolean; random?: RandomSource; randomizeSeating?: boolean } = {}) {
-    this.start = start ?? (id => startGame(Math.random, id));
+    this.start = start ?? ((id, rules) => startGame(Math.random, id, 'east', rules));
     this.randomizeSeating = options.randomizeSeating ?? (start === undefined);
     this.random = options.random ?? Math.random;
     const { startImmediately = true, ...runnerOptions } = options;
@@ -59,14 +60,15 @@ export class GameController {
       this.startInitialCpuTurns();
     }
   }
-  private createRosterGame(dealerId: PlayerId): GameState {
-    const game = this.start(dealerId);
+  private createRosterGame(dealerId: PlayerId, rules?: GameRules): GameState {
+    const game = this.start(dealerId, rules);
     if (!this.randomizeSeating) return game;
     return { ...game, players: game.players.map((player, seat) => ({
       ...player, control: this.participants[seat].control,
     })) as unknown as GameState['players'] };
   }
   private beginMatch(rules: MatchFormat | GameRules): void {
+    const snapshot = normalizeGameRules(typeof rules === 'string' ? { ...rulesForMatch({ format: rules }), matchFormat: rules } : rules);
     if (this.randomizeSeating) this.participants = drawSeatAssignment([
       { id: 'human', control: 'human', name: '自分' },
       { id: 'cpu1', control: 'cpu', name: 'CPU1' },
@@ -75,7 +77,7 @@ export class GameController {
     ], this.random);
     this.playerSeat = this.participants.findIndex(participant => participant.control === 'human') as PlayerId;
     this.playerNames = this.participants.map(participant => participant.name);
-    this.match = startMatch(this.createRosterGame(0), rules);
+    this.match = startMatch(this.createRosterGame(0, snapshot), snapshot);
   }
   get progressing(): boolean { return this.runner.running; }
   reportIfStalled(source?: string): void { this.runner.reportIfStalled(source); }
@@ -190,7 +192,7 @@ export class GameController {
     if (!this.canNextRound) return Promise.resolve();
     const previous = this.game;
     this.runner.cancel();
-    this.match = nextRound(this.match, id => this.createRosterGame(id));
+    this.match = nextRound(this.match, id => this.createRosterGame(id, rulesForMatch(this.match)));
     recordLocalGameTransition(previous, this.game, 'GameController.nextRound');
     this.selectedTileId = null;
     this.onChange();

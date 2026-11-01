@@ -14,7 +14,8 @@ import type { RandomSource } from '../game/shuffle.ts';
 import { tileKindKey } from '../model/tile.ts';
 import { drawSeatAssignment } from '../game/seating.ts';
 import type { GameState, PlayerId, PlayerState } from '../model/game.ts';
-import type { MatchState } from '../model/match.ts';
+import type { MatchState, MatchFormat } from '../model/match.ts';
+import { normalizeGameRules, rulesForMatch, rulesForFormat, type GameRules } from '../model/rules.ts';
 import { declarationsBetween, type PublicDeclarationEvent } from '../model/declaration.ts';
 import type { GameMutationMessage } from './protocol.ts';
 import type { OnlineGameSession, OnlineSeatIdentity, PlayerDecisionWindow } from './game-view.ts';
@@ -58,28 +59,33 @@ function nextSecureGame(
   dealerId: PlayerId,
   identities: OnlineGameSession['identities'],
   random: RandomSource = secureRandomSource,
+  rules?: GameRules,
 ): GameState {
-  return applyControls(startGame(random, dealerId), identities);
+  return applyControls(startGame(random, dealerId, 'east', rules), identities);
+}
+
+function selectionRules(selection: MatchFormat | GameRules): GameRules {
+  return normalizeGameRules(typeof selection === 'string' ? rulesForFormat(selection) : selection);
 }
 
 export function startOnlineGame(
   identities: OnlineGameSession['identities'],
   hostSeat: PlayerId,
   random: RandomSource = secureRandomSource,
-  format: import('../model/match.ts').MatchFormat = 'tonpu',
+  selection: MatchFormat | GameRules = 'tonpu',
 ): OnlineGameSession {
   const shuffled = drawSeatAssignment(identities.map(identity => ({
     ...identity, participantSeat: identity.participantSeat ?? identity.seat,
   })) as unknown as OnlineGameSession['identities'], random);
   const assigned = shuffled.map((identity, seat) => ({ ...identity, seat: seat as PlayerId })) as unknown as OnlineGameSession['identities'];
-  return startOnlineGameWithSeatAssignment(assigned, hostSeat, format, random);
+  return startOnlineGameWithSeatAssignment(assigned, hostSeat, selection, random);
 }
 
 /** Starts a match from a server-persisted seat assignment without drawing again. */
 export function startOnlineGameWithSeatAssignment(
   assigned: OnlineGameSession['identities'],
   hostSeat: PlayerId,
-  format: import('../model/match.ts').MatchFormat = 'tonpu',
+  selection: MatchFormat | GameRules = 'tonpu',
   random: RandomSource = secureRandomSource,
 ): OnlineGameSession {
   if (assigned.length !== 4 || assigned.some((identity, seat) => identity.seat !== seat) ||
@@ -87,8 +93,9 @@ export function startOnlineGameWithSeatAssignment(
       new Set(assigned.map(identity => identity.participantSeat ?? identity.seat)).size !== 4) {
     throw new OnlineGameRuleError('seat_assignment_invalid');
   }
-  const game = nextSecureGame(0, assigned, random);
-  const match = startMatch(game, format);
+  const rules = selectionRules(selection);
+  const game = nextSecureGame(0, assigned, random, rules);
+  const match = startMatch(game, rules);
   assertPointConservation(match);
   return {
     schemaVersion: 1,
@@ -482,7 +489,8 @@ export function startNextOnlineRound(
   if (session.status !== 'round-ended' || session.match.status !== 'round-ended') {
     throw new OnlineGameRuleError('round_not_ended');
   }
-  const match = nextRound(session.match, dealer => nextSecureGame(dealer, session.identities, random));
+  const rules = rulesForMatch(session.match);
+  const match = nextRound(session.match, dealer => nextSecureGame(dealer, session.identities, random, rules));
   if (match.status !== 'playing') throw new OnlineGameRuleError('round_not_available');
   return {
     ...session,

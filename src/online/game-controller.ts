@@ -59,6 +59,7 @@ export class OnlineGameController {
   private readonly playerHand = document.querySelector<HTMLUListElement>('#online-player-hand')!;
   private readonly declarationBubbles = new DeclarationBubbleRenderer(this.table);
   private view: PlayerGameView | null = null;
+  get confirmedRules() { return this.view?.rules ?? null; }
   private declarationCursor: number | null = null;
   private selectedTileId: string | null = null;
   private actionPending = false;

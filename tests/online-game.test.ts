@@ -38,6 +38,7 @@ import {
 import { ronGame, ronStart } from './ron-fixture.ts';
 import { renderOnlineWinSummary } from '../src/online/result-content.ts';
 import { createOnlineActionPanelState } from '../src/online/action-panel-state.ts';
+import { DEFAULT_GAME_RULES } from '../src/model/rules.ts';
 
 const allTiles = (game: GameState) => [
   ...game.liveWall,
@@ -124,6 +125,19 @@ test('online game start fills four seats with secure-wall inventory and 25,000 p
     assert.ok(game.players.every(player => player.hand.length === 13));
     assert.ok(game.players[0].drawnTile);
   }
+});
+
+test('online match snapshot and public rules view use the host rules instead of local defaults', () => {
+  const selected = { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' as const, redDora: false, uraDora: false, ippatsu: false, kanDora: false };
+  const session = startOnlineGame(identities([0, 1]), 0, orderedRandom, selected);
+  assert.deepEqual(session.match.rules, selected);
+  assert.deepEqual(session.match.game.rules, selected);
+  assert.equal(session.match.game.liveWall.filter(tile => tile.tile.isRed).length +
+    session.match.game.deadWall.filter(tile => tile.tile.isRed).length +
+    session.match.game.players.flatMap(player => [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]).filter(tile => tile.tile.isRed).length, 0);
+  const view = createPlayerGameView(session, 0, 'ABC234', new Set());
+  assert.deepEqual(view.rules, selected);
+  assert.equal(view.format, 'tonnan');
 });
 
 test('online start draws all 24 participant orders once and preserves host, reconnect, takeover, and next-round seats', () => {

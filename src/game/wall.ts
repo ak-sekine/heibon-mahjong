@@ -1,11 +1,13 @@
 import { TILE_KINDS, ordinaryTile, redFive, tileKindKey } from '../model/tile.ts';
 import type { PhysicalTile, WallState } from '../model/game.ts';
+import { normalizeGameRules, type GameRules } from '../model/rules.ts';
 
-export function createWall(): PhysicalTile[] {
+export function createWall(rulesValue?: GameRules): PhysicalTile[] {
+  const redDora = normalizeGameRules(rulesValue).redDora;
   return TILE_KINDS.flatMap(kind => Array.from({ length: 4 }, (_, copy) => ({
     id: `${tileKindKey(kind)}-${copy}`,
     tile: kind.category === 'suited' && kind.rank === 5 && copy === 0
-      ? redFive(kind.suit) : ordinaryTile(kind),
+      ? redDora ? redFive(kind.suit) : ordinaryTile(kind) : ordinaryTile(kind),
   })));
 }
 

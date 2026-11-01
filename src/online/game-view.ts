@@ -4,6 +4,7 @@ import type { GameState, OpenMeld, PhysicalTile, PlayerId, PlayerState, WinDetai
 import type { MatchState, MatchFormat, RoundSettlement, RoundWind } from '../model/match.ts';
 import type { Tile } from '../model/tile.ts';
 import type { PublicDeclarationEvent } from '../model/declaration.ts';
+import { rulesForMatch, type GameRules } from '../model/rules.ts';
 import { exposedDoraIndicators, uraDoraIndicators } from '../game/dora.ts';
 import { canDiscard } from '../game/discard.ts';
 import { getCallOptions, type CallOption } from '../game/calls.ts';
@@ -75,6 +76,7 @@ export type PublicRoundResult = Readonly<{
 
 export type PlayerGameView = Readonly<{
   type: 'game-state';
+  rules: GameRules;
   format: MatchFormat;
   roomCode: string;
   gameRevision: number;
@@ -272,6 +274,7 @@ export function createPlayerGameView(
   const winningSeats = new Set(winningResults.map(result => result.winnerId));
   const publicTenpai = match.lastSettlement?.reason === 'draw' ? match.lastSettlement.tenpai : null;
   const revealUra = winningResults.some(result => Boolean(game.players[result.winnerId].riichi));
+  const rules = rulesForMatch(match);
   const selfPlayer = game.players[viewerSeat];
   const decisionMatchesPhase = decision?.type === 'ron' ? game.phase === 'awaiting-ron'
     : decision?.type === 'call' ? game.phase === 'awaiting-call' : false;
@@ -324,6 +327,7 @@ export function createPlayerGameView(
 
   return {
     type: 'game-state',
+    rules,
     format: match.format ?? 'tonpu',
     roomCode,
     gameRevision: session.gameRevision,
@@ -345,8 +349,8 @@ export function createPlayerGameView(
     pendingDiscard,
     liveWallCount: game.liveWall.length,
     seats,
-    doraIndicators: exposedDoraIndicators(game).map(publicTile),
-    ...(revealUra ? { uraDoraIndicators: uraDoraIndicators(game).map(publicTile) } : {}),
+    doraIndicators: exposedDoraIndicators(game, rules).map(publicTile),
+    ...(rules.uraDora && revealUra ? { uraDoraIndicators: uraDoraIndicators(game, rules).map(publicTile) } : {}),
     self: {
       seat: viewerSeat,
       isHost: session.hostSeat === (session.identities[viewerSeat].participantSeat ?? viewerSeat),

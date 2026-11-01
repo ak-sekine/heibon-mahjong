@@ -86,10 +86,10 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
     ? game.winResult.winMethod === 'ron' ? game.winResult.winners : [game.winResult]
     : [];
   const winnersById = new Map(winningResults.map(result => [result.winnerId, result]));
-  const revealUra = game.phase === 'won' && (game.winResult?.winMethod === 'ron'
+  const revealUra = game.rules?.uraDora !== false && game.phase === 'won' && (game.winResult?.winMethod === 'ron'
     ? game.winResult.winners.some(winner => Boolean(game.players[winner.winnerId].riichi))
     : Boolean(game.winResult && game.players[game.winResult.winnerId].riichi));
-  renderDoraIndicators(document.querySelector<HTMLElement>('#dora-indicators')!, exposedDoraIndicators(game), revealUra ? uraDoraIndicators(game) : []);
+  renderDoraIndicators(document.querySelector<HTMLElement>('#dora-indicators')!, exposedDoraIndicators(game, game.rules), revealUra ? uraDoraIndicators(game, game.rules) : []);
   for (const player of game.players) {
     const id: PlayerId = player.id;
     const winningResult = winnersById.get(id);
@@ -349,10 +349,10 @@ function renderWinResult(game: GameState, settlement: RoundSettlement | null, se
       section.append(bonuses);
       section.append(text('p', `合計：${result.totalHanIncludingDora}翻`));
     }
-    section.append(createResultDoraRow(exposedDoraIndicators(game), false));
+    section.append(createResultDoraRow(exposedDoraIndicators(game, game.rules), false));
     // Read hidden indicators only for a confirmed winner with established riichi.
-    if (game.phase === 'won' && player.riichi) {
-      section.append(createResultDoraRow(uraDoraIndicators(game), true));
+    if (game.rules?.uraDora !== false && game.phase === 'won' && player.riichi) {
+      section.append(createResultDoraRow(uraDoraIndicators(game, game.rules), true));
     }
     if (result.fu !== null) section.append(text('p', `符：${result.fu}符`));
     const tier = scoreTierNames[result.scoreTier];

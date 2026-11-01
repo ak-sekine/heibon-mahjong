@@ -2,6 +2,7 @@ import type { FuResult } from '../analysis/fu.ts';
 import type { ScoreResult } from '../analysis/score.ts';
 import type { YakuAnalysis, YakuCandidate } from '../analysis/yaku.ts';
 import type { Tile } from './tile.ts';
+import type { GameRules } from './rules.ts';
 
 /** Identity is unique within one game; tile describes its face only. */
 export type PhysicalTile = Readonly<{ id: string; tile: Tile }>;
@@ -96,6 +97,8 @@ export interface PendingRiichi {
   readonly declarationTileId: string;
 }
 export interface GameState extends WallState {
+  /** Immutable snapshot for this match; omitted only by legacy fixtures/states. */
+  readonly rules?: GameRules;
   /** Missing in legacy game states means east. */
   readonly roundWind?: RoundWind;
   readonly abortiveDraw?: 'four-kans' | 'kyuushu-kyuuhai' | 'four-winds' | 'four-riichi';

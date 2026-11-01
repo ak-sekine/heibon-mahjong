@@ -1,17 +1,33 @@
 import { winningMelds } from './melds.ts';
 import type { GameState, PlayerId } from '../model/game.ts';
 import type { MatchState, MatchFormat, Points, RoundSettlement, SettlementPayment, RoundWind } from '../model/match.ts';
-import { normalizeGameRules, rulesForFormat, type GameRules } from '../model/rules.ts';
+import { normalizeGameRules, rulesForFormat, rulesForMatch, type GameRules } from '../model/rules.ts';
+import { ordinaryTile } from '../model/tile.ts';
 import { calculateTsumoPayments } from '../analysis/score.ts';
 import { getWaitingTileKinds } from './ron.ts';
 import { resolvePendingRiichi } from './riichi.ts';
 import { startGame } from './start.ts';
 import { getNagashiManganWinners } from './special-draws.ts';
 const ids = [0, 1, 2, 3] as const;
+function snapshotGame(game: GameState, rules: GameRules): GameState {
+  // Historical all-on games need no game-level copy: MatchState is authoritative.
+  if (rules.redDora && rules.uraDora && rules.ippatsu && rules.kanDora) return game;
+  const normalizeTile = (tile: import('../model/game.ts').PhysicalTile) =>
+    !rules.redDora && tile.tile.isRed ? { ...tile, tile: ordinaryTile(tile.tile) } : tile;
+  const players = game.players.map(player => ({
+    ...player,
+    hand: player.hand.map(normalizeTile),
+    drawnTile: player.drawnTile ? normalizeTile(player.drawnTile) : null,
+    river: player.river.map(normalizeTile),
+    melds: (player.melds ?? []).map(meld => ({ ...meld, tiles: meld.tiles.map(normalizeTile) })),
+  })) as unknown as GameState['players'];
+  return { ...game, rules, players,
+    liveWall: game.liveWall.map(normalizeTile), deadWall: game.deadWall.map(normalizeTile) };
+}
 export function startMatch(game: GameState = startGame(), selection: MatchFormat | GameRules = 'tonpu'): MatchState {
   const rules = normalizeGameRules(typeof selection === 'string' ? rulesForFormat(selection) : selection);
   return settleRound({ rules, format: rules.matchFormat, roundWind: game.roundWind ?? 'east', roundNumber: 1, dealerId: game.dealerId, honba: 0,
-    points: [25000,25000,25000,25000], depositSticks: 0, game, lastSettlement: null, status: 'playing' });
+    points: [25000,25000,25000,25000], depositSticks: 0, game: snapshotGame(game, rules), lastSettlement: null, status: 'playing' });
 }
 export function assertPointConservation(match: MatchState): void {
   if (!Number.isSafeInteger(match.depositSticks) || match.depositSticks < 0 ||
@@ -103,7 +119,8 @@ export function updateMatchGame(match: MatchState, game: GameState): MatchState 
 export function nextRound(match: MatchState, create: (dealerId: PlayerId)=>GameState = id=>startGame(Math.random,id)): MatchState {
   if (match.status !== 'round-ended' || !match.lastSettlement?.next) return match;
   const next = match.lastSettlement.next;
-  const game = create(next.dealerId);
+  const rules = rulesForMatch(match);
+  const game = snapshotGame(create(next.dealerId), rules);
   if (game.dealerId !== next.dealerId) throw new RangeError('Wrong dealer for next round');
   const gameWithWind = { ...game, roundWind: next.roundWind };
   return {...match,...next,game:gameWithWind,status:'playing',lastSettlement:null};

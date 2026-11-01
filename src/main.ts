@@ -89,7 +89,7 @@ let localKanChoicesOpen = false;
 let localActionPanel: ActionPanel | null = null;
 function render(): void {
   const rulesButton = document.querySelector<HTMLButtonElement>('#menu-offline-rules');
-  if (rulesButton) rulesButton.hidden = !controller.hasGame || document.body.classList.contains('online-game-active');
+  if (rulesButton) rulesButton.hidden = !controller.hasGame && !document.body.classList.contains('online-game-active');
   if (!controller.hasGame) {
     matchResultDialog.clear();
     document.body.dataset.gameMode = 'none';
@@ -205,7 +205,11 @@ function newGame(rules: GameRules): void {
 const rulePreferences = new RulePreferences();
 new NewGameDialog(newGame, () => controller.hasGame && controller.match.status !== 'match-ended', rulePreferences);
 document.querySelector<HTMLButtonElement>('#menu-offline-rules')?.addEventListener('click', event => {
-  if (!controller.hasGame || document.body.classList.contains('online-game-active')) return;
+  if (document.body.classList.contains('online-game-active')) {
+    if (onlineGameController?.confirmedRules) openReadOnlyRules(event.currentTarget as HTMLButtonElement, onlineGameController.confirmedRules, 'online');
+    return;
+  }
+  if (!controller.hasGame) return;
   openReadOnlyRules(event.currentTarget as HTMLButtonElement, rulesForMatch(controller.match), 'offline');
 });
 function dispatchLocalAction(event: ActionPanelEvent): void | Promise<void> {

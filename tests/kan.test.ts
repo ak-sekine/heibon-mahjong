@@ -167,6 +167,30 @@ test('dora counts every fourth tile and red five; matching kan ura only for riic
  const w=declareTsumo(g,0).winResult!;assert.equal(w.doraCount,6);assert.equal(w.redDoraCount,1);assert.equal(w.uraDoraCount,0);
  const ready={...g,players:g.players.map(p=>p.id===0?{...p,riichi:{declarationTileId:'past'}}:p) as unknown as GameState['players']};const r=declareTsumo(ready,0).winResult!;assert.equal(r.uraDoraCount,6);assert.equal(r.uraDoraHan,6);
 });
+for (const [type, make] of [['ankan', ankanGame], ['kakan', kakanGame]] as const) test(`${type}: kan dora OFF leaves the kan, rinshan and only the initial dora indicator`, () => {
+ const source = make(), rules = { schemaVersion: 2 as const, matchFormat: 'tonpu' as const, redDora: true, uraDora: true, ippatsu: true, kanDora: false };
+ const game = { ...source, rules };
+ const result = declareKan(game, 0, getKanOptions(game, 0)[0].id);
+ conserved(result, source);
+ assert.equal(result.kanCount, 1);
+ assert.equal(result.players[0].drawnTile, game.deadWall[0]);
+ assert.equal(result.players[0].drawnTileSource, 'rinshan');
+ assert.equal(exposedDoraIndicators(result, rules).length, 1);
+ assert.equal(uraDoraIndicators(result, rules).length, 1);
+});
+test('daiminkan remains available with kan dora OFF and does not reveal its extra indicator', () => {
+ const rules = { schemaVersion: 2 as const, matchFormat: 'tonpu' as const, redDora: true, uraDora: true, ippatsu: true, kanDora: false };
+ const source = { ...kanGame({ hands: { 0: ['111m', '234p', '456s', '22z', '78m'] }, turn: 1, draw: 'man-1' }), rules };
+ const discarded = discardTile(source, 1, source.players[1].drawnTile!.id);
+ const option = getCallOptions(discarded, 0).find(candidate => candidate.type === 'daiminkan');
+ assert.ok(option);
+ const result = declareCall(discarded, 0, option.id);
+ assert.equal(result.players[0].melds?.at(-1)?.type, 'daiminkan');
+ assert.equal(result.players[0].drawnTileSource, 'rinshan');
+ assert.equal(result.kanCount, 1);
+ assert.equal(exposedDoraIndicators(result, rules).length, 1);
+ assert.equal(uraDoraIndicators(result, rules).length, 1);
+});
 test('standard hand cannot rob ankan; riichi cannot kan without the actual drawn fourth',()=>{
  const g=kanGame({hands:{0:['111m','234p','678s','22z','45s'],1:['23m','456p','789s','333z','66s']},draw:'man-1'});const r=kan(g);assert.equal(r.phase,'awaiting-discard');assert.equal(r.kanCount,1);conserved(r,g);
  const four=kanGame({hands:{0:['1111z','234m','456p','67s','2z']},draw:'sou-8'});const ready={...four,players:four.players.map(p=>p.id===0?{...p,riichi:{declarationTileId:'past'}}:p) as unknown as GameState['players']};assert.equal(getKanOptions(ready,0).length,0);

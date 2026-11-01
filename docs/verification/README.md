@@ -4,6 +4,7 @@
 
 ## Issue調査
 
+- [赤ドラ・裏ドラ・一発・カンドラの個別設定 — Issue #16、2026-11-01](issue16-local-rules-2026-11-01.md) — 初期値、4項目の独立判定、牌・和了・得点・CPU・Worker同期と固定局面テストを記録。Chromium／WebKit、Actions、デプロイ、iPhone Safari実機確認は実施結果を追記します。Issueは実機確認前のためOpenを維持します。
 - [新規対局画面へのルール設定統合 — Issue #27、2026-11-01](issue27-new-game-rules-2026-11-01.md) — オフライン・オンラインのルール統合、保存／Worker同期、run #490のBrowser UI・Worker／Pages公開、docs-only run #491、iPhone Safari実機確認（追加修正の6項目がOK）と未確認範囲・Close判定を記録。Issue #27はcompletedとしてClose。
 - [対局結果画面と同じオンラインルームでの再戦 — Issue #13、2026-11-01](issue13-rematch-2026-11-01.md) — 実装、Worker統合テスト、連続3対局、Chromium／WebKit検証、run 41262624930・41267773516のDeploy gate／Worker／Pages成功と完了判定を記録。ユーザー本人の「問題ありません」報告は確認範囲のみ記録し、追加修正後のiPhone Safari実機確認など詳細条件は未確認です。Pages直接HTTP応答は未確認です。
 - [対局終了時の最終順位・持ち点 — Issue #12、2026-10-31〜11-01](issue12-match-result-2026-10-31.md) — 終了判定、既存順位ルール、オフライン／サーバー確定ビューの再利用、ボタン表記・フォント修正、単体・全体テスト、Chromium／WebKit Actions結果を記録。2026-11-01にユーザー本人がiPhone Safariで修正後のボタン表示・操作4項目すべてOK（NG 0、未確認0）と報告し、Issue #12を完了判定。報告外の実機条件は未確認として区別。

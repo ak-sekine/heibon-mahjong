@@ -1,7 +1,7 @@
 import { RateLimitDurableObject } from './rate-limit.ts';
 import { RoomDurableObject } from './room.ts';
 import { logWorker } from './diagnostics.ts';
-import { normalizeGameRules, rulesForFormat, type GameRules } from '../src/model/rules.ts';
+import { isValidGameRules, normalizeGameRules, rulesForFormat, type GameRules } from '../src/model/rules.ts';
 
 const allowedOrigins = new Set([
   'https://ak-sekine.github.io',
@@ -166,6 +166,7 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
     const body = await parseJson(request);
     const displayName = cleanDisplayName(body?.displayName);
     if (!displayName) return json({ error: 'invalid_display_name' }, 400, origin);
+    if (body?.rules !== undefined && !isValidGameRules(body.rules)) return json({ error: 'invalid_rules' }, 400, origin);
     const rules = body?.rules === undefined
       ? rulesForFormat(body?.format === 'tonnan' ? 'tonnan' : 'tonpu')
       : normalizeGameRules(body.rules);

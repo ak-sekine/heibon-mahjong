@@ -10,7 +10,7 @@ import {
   type SeatTakenOverMessage,
 } from '../src/online/protocol.ts';
 import type { PlayerId } from '../src/model/game.ts';
-import { normalizeGameRules, rulesForFormat } from '../src/model/rules.ts';
+import { isValidGameRules, normalizeGameRules, rulesForFormat } from '../src/model/rules.ts';
 import {
   advanceOnlineCpu,
   applyOnlineGameAction,
@@ -39,6 +39,7 @@ const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/u;
 
 type RoomRow = {
   format: 'tonpu' | 'tonnan';
+  rules_json: string | null;
   code: string;
   created_at: number;
   expires_at: number;
@@ -90,6 +91,12 @@ function cleanDisplayName(value: unknown): string | null {
 function randomToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function roomRules(room: Pick<RoomRow, 'rules_json' | 'format'>) {
+  if (!room.rules_json) return rulesForFormat(room.format === 'tonnan' ? 'tonnan' : 'tonpu');
+  try { return normalizeGameRules(JSON.parse(room.rules_json)); }
+  catch { return rulesForFormat(room.format === 'tonnan' ? 'tonnan' : 'tonpu'); }
 }
 
 function drawSecureRoomSeatAssignment(participantSeats: [number, number, number, number]): [number, number, number, number] {
@@ -174,6 +181,7 @@ export class RoomDurableObject {
     this.ensureColumn('room', 'status', "TEXT NOT NULL DEFAULT 'waiting'");
     this.ensureColumn('room', 'revision', 'INTEGER NOT NULL DEFAULT 0');
     this.ensureColumn('room', 'format', "TEXT NOT NULL DEFAULT 'tonpu'");
+    this.ensureColumn('room', 'rules_json', 'TEXT');
     this.ensureColumn('room', 'rematch_waiting', 'INTEGER NOT NULL DEFAULT 0');
     this.ensureColumn('seats', 'kind', "TEXT NOT NULL DEFAULT 'human'");
     this.ensureColumn('seats', 'ready', 'INTEGER NOT NULL DEFAULT 0');
@@ -330,7 +338,7 @@ export class RoomDurableObject {
 
   private room(): RoomRow | undefined {
     return this.ctx.storage.sql.exec<RoomRow>(
-      'SELECT code, created_at, expires_at, status, host_seat, revision, format, rematch_waiting FROM room LIMIT 1',
+      'SELECT code, created_at, expires_at, status, host_seat, revision, format, rules_json, rematch_waiting FROM room LIMIT 1',
     ).toArray()[0];
   }
 
@@ -367,7 +375,7 @@ export class RoomDurableObject {
       roomCode: room.code,
       status: room.status,
       format: room.format === 'tonnan' ? 'tonnan' : 'tonpu',
-      rules: rulesForFormat(room.format === 'tonnan' ? 'tonnan' : 'tonpu'),
+      rules: roomRules(room),
       hostSeat: room.host_seat,
       revision: room.revision,
       gameRevision: this.gameSession()?.gameRevision ?? 0,
@@ -503,6 +511,7 @@ export class RoomDurableObject {
 
     if (url.pathname === '/internal/create' && request.method === 'POST') {
       const body = await internalJson(request);
+      if (body?.rules !== undefined && !isValidGameRules(body.rules)) return json({ error: 'invalid_rules' }, 400, origin);
       const rules = body?.rules === undefined
         ? rulesForFormat(body?.format === 'tonnan' ? 'tonnan' : 'tonpu')
         : normalizeGameRules(body.rules);
@@ -518,8 +527,8 @@ export class RoomDurableObject {
       const created = this.ctx.storage.transactionSync(() => {
         if (this.room()) return false;
         this.ctx.storage.sql.exec(
-          "INSERT INTO room (code, created_at, expires_at, status, host_seat, revision, format) VALUES (?, ?, ?, 'waiting', 0, 0, ?)",
-          body.code, now, expiresAt, rules.matchFormat,
+          "INSERT INTO room (code, created_at, expires_at, status, host_seat, revision, format, rules_json) VALUES (?, ?, ?, 'waiting', 0, 0, ?, ?)",
+          body.code, now, expiresAt, rules.matchFormat, JSON.stringify(rules),
         );
         this.ctx.storage.sql.exec(
           'INSERT INTO seats (seat, name, token_hash, connected, kind, ready, connection_id) VALUES (0, ?, ?, 0, \'human\', 0, NULL)',
@@ -1034,7 +1043,7 @@ export class RoomDurableObject {
             if (identities.some(identity => identity.control === 'human' && !connected.has(identity.participantSeat ?? identity.seat))) {
               throw new OnlineGameRuleError('player_disconnected');
             }
-            const freshSession = startOnlineGameWithSeatAssignment(identities, actor.seat as PlayerId, room.format === 'tonnan' ? 'tonnan' : 'tonpu');
+            const freshSession = startOnlineGameWithSeatAssignment(identities, actor.seat as PlayerId, roomRules(room));
             nextSession = { ...freshSession, gameRevision: currentRevision + 1 };
             if (rematch) {
               this.ctx.storage.sql.exec("UPDATE room SET rematch_waiting = 0");

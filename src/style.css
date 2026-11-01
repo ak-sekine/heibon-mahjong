@@ -196,6 +196,13 @@ header > div { min-width:0; }
 .match-format-options label { display:flex; align-items:center; gap:10px; min-height:44px; font-weight:600; touch-action:manipulation; }
 .match-format-options input[type="radio"],.online-entry-form .match-format-options input[type="radio"] { flex:none; width:22px; min-width:22px; min-height:22px; height:22px; margin:0; padding:0; accent-color:#ffda7d; }
 .online-entry-form .match-format-options { margin:0; }
+.optional-rule-options { display:grid; gap:4px; margin:0 0 12px; padding:10px; border:1px solid #63947a; border-radius:8px; }
+.optional-rule-options legend { padding:0 4px; font-weight:700; }
+.optional-rule-option { display:flex; align-items:center; gap:10px; min-height:48px; padding:2px 0; touch-action:manipulation; }
+.optional-rule-option input[type="checkbox"] { flex:none; width:24px; min-width:24px; min-height:24px; height:24px; margin:0; accent-color:#ffda7d; }
+.optional-rule-option span { display:grid; gap:2px; min-width:0; }
+.optional-rule-option strong { font-size:.92rem; }
+.optional-rule-option small { color:#e3eee7; font-size:.77rem; line-height:1.3; }
 #new-game-dialog button { min-height:44px; padding:8px; border:1px solid currentColor; border-radius:8px; font:inherit; font-weight:600; white-space:nowrap; touch-action:manipulation; cursor:pointer; }
 #new-game-dialog .new-game-actions button { min-width:0; white-space:normal; overflow-wrap:anywhere; }
 #diagnostic-dialog { position:fixed; inset:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); box-sizing:border-box; width:min(720px,calc(100vw - 24px)); max-width:calc(100vw - 24px); max-height:calc(100dvh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom))); margin:auto; padding:12px; border:2px solid #ffda7d; border-radius:12px; background:#185640; color:#fffdf7; overflow:hidden; }

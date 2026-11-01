@@ -7,6 +7,7 @@ import { analyzeYaku, type YakuAnalysis, type YakuCandidate } from '../analysis/
 import { countDora, countRedDora } from '../analysis/dora.ts';
 import { exposedDoraIndicators, uraDoraIndicators } from './dora.ts';
 import { isChiihouState, isTenhouState } from './first-turn-wins.ts';
+import { rulesForGame } from '../model/rules.ts';
 
 /** Default round wind for legacy game states without an explicit wind. */
 export const ROUND_WIND: SeatWind = 'east';
@@ -30,6 +31,7 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
     const faces = tiles.map(t => t.tile);
     const openMelds = winningMelds(player.melds);
     const isClosed = isClosedHand(player);
+    const rules = rulesForGame(game);
     const allFaces = [...faces, ...(player.melds ?? []).flatMap(m=>m.tiles.map(t=>t.tile))];
     const ronWindow = game.ronWindow;
     const houtei = winMethod === 'ron' && Boolean(ronWindow && !ronWindow.kan &&
@@ -42,11 +44,11 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
       haitei: winMethod==='tsumo' && player.drawnTileSource==='live-wall' && game.liveWall.length===0,
       houtei,
       seatWind: player.wind, roundWind: game.roundWind ?? ROUND_WIND, riichi: player.riichi !== null,
-      ippatsuEligible: player.riichi?.ippatsuEligible, doubleRiichi: player.riichi?.doubleRiichi });
+      ippatsuEligible: rules.ippatsu && player.riichi?.ippatsuEligible, doubleRiichi: player.riichi?.doubleRiichi });
     if (!analysis.isWinningShape || !analysis.hasSupportedYaku) return null;
-    const doraCount = countDora(allFaces, exposedDoraIndicators(game).map(t => t.tile));
-    const uraDoraCount = player.riichi ? countDora(allFaces, uraDoraIndicators(game).map(t => t.tile)) : 0;
-    const redDoraCount = countRedDora(allFaces);
+    const doraCount = countDora(allFaces, exposedDoraIndicators(game, rules).map(t => t.tile));
+    const uraDoraCount = rules.uraDora && player.riichi ? countDora(allFaces, uraDoraIndicators(game, rules).map(t => t.tile)) : 0;
+    const redDoraCount = rules.redDora ? countRedDora(allFaces) : 0;
     const evaluated = analysis.candidates.filter(c => c.yaku.length > 0).map(candidate => {
       const doraHan = candidate.yakumanCount > 0 ? 0 : doraCount;
       const uraDoraHan = candidate.yakumanCount > 0 ? 0 : uraDoraCount;

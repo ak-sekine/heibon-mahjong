@@ -160,7 +160,7 @@ function renderWin(container: HTMLElement, view: PlayerGameView, winner: PublicW
     section.append(bonuses, text('p', `合計：${winner.han}翻`));
   }
   section.append(createResultDoraRow(view.doraIndicators, false));
-  if (seat.riichi && view.uraDoraIndicators) section.append(createResultDoraRow(view.uraDoraIndicators, true));
+  if (view.rules.uraDora && seat.riichi && view.uraDoraIndicators) section.append(createResultDoraRow(view.uraDoraIndicators, true));
   if (winner.fu !== null) {
     section.append(text('p', `符：${winner.fu}符`));
     const details = document.createElement('details');
