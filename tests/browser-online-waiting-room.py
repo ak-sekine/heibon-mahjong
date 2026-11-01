@@ -2290,7 +2290,6 @@ with sync_playwright() as p:
     select_menu_item('#menu-room')
     assert page.locator('#online-game-controls').is_visible(), 'room menu did not preserve the finished online session'
 
-    select_menu_item('#menu-room')
     before_exit = page.evaluate('window.onlineMock.snapshot()')
     page.evaluate('window.__shortExitNoticeTimeout = true')
     page.locator('#online-leave').click()
