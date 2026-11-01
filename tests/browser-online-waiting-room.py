@@ -1548,13 +1548,15 @@ with sync_playwright() as p:
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'canceling room creation did not restore menu focus'
     select_menu_item('#online-create-open')
     assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').is_checked(), 'room creation did not restore after cancel'
+    for key in ['redDora', 'uraDora', 'ippatsu', 'kanDora']:
+      assert not page.locator(f'#online-create-rules-editor input[data-rule-key="{key}"]').is_checked(), f'online creation did not restore the accepted offline {key}=OFF setting'
     page.locator('#online-create').click()
     wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234'")
     assert not page.locator('#online-create-dialog').evaluate('element => element.open'), 'room creation form remained open after success'
     assert not page.locator('#online-join-dialog').evaluate('element => element.open'), 'join form opened after room creation'
     assert page.locator('#online-dialog #online-create-form, #online-dialog #online-join-form').count() == 0, 'input forms were mixed into the room management screen'
     host_rules = page.evaluate('window.onlineMock.requests[0].body.rules')
-    assert host_rules == {'schemaVersion': 2, 'matchFormat': 'tonnan', 'redDora': True, 'uraDora': True, 'ippatsu': True, 'kanDora': True}, host_rules
+    assert host_rules == {'schemaVersion': 2, 'matchFormat': 'tonnan', 'redDora': False, 'uraDora': False, 'ippatsu': False, 'kanDora': False}, host_rules
     assert page.evaluate('window.onlineMock.snapshot().room.rules') == host_rules, 'Worker mock did not keep the accepted host rules as room state'
     assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'"), 'successful Worker room creation did not persist its confirmed rules'
     assert page.locator('#online-room-format').inner_text() == '対局形式：半荘戦', 'selected format was not shown in the waiting room'
@@ -1563,13 +1565,15 @@ with sync_playwright() as p:
       page.evaluate('window.onlineMock.forceDisconnect()')
       wait_for("document.querySelector('#online-connection').textContent.includes('再接続')")
       wait_for(f'window.onlineMock.ticketRequests > {tickets_before_rules_reconnect}', timeout=10000)
-      assert page.evaluate("window.onlineMock.snapshot().room.rules.matchFormat === 'tonnan'"), 'confirmed Worker rules changed after reconnect'
+      assert page.evaluate('window.onlineMock.snapshot().room.rules') == host_rules, 'confirmed Worker rules changed after reconnect'
     page.locator('#online-confirm-rules').click()
     assert page.locator('#online-rules-dialog').evaluate('element => element.open'), 'waiting-room rule confirmation did not open'
     assert '読み取り専用' in page.locator('#online-rules-readonly-label').inner_text(), 'rule confirmation was not marked read-only'
     assert 'ホストがルーム作成時に確定' in page.locator('#online-rules-readonly-label').inner_text(), 'offline viewer context leaked into the waiting room'
     assert page.locator('#online-rules-list').get_attribute('aria-label') == 'サーバーで確定したルール'
     assert '半荘戦' in page.locator('#online-rules-list').inner_text(), 'confirmed room rules did not show the host format'
+    online_rule_rows = dict(zip(page.locator('#online-rules-list dt').all_text_contents(), page.locator('#online-rules-list dd').all_text_contents()))
+    assert online_rule_rows['赤ドラ'] == 'なし（赤牌を使わない）' and online_rule_rows['裏ドラ'] == 'なし' and online_rule_rows['一発'] == 'なし' and online_rule_rows['カンドラ'] == 'なし（槓裏も追加しない）', online_rule_rows
     assert page.locator('#online-rules-dialog input, #online-rules-dialog select, #online-rules-dialog button:not(#online-rules-close)').count() == 0, 'read-only rule confirmation exposed editing controls'
     page.set_viewport_size({'width': 320, 'height': 600})
     readonly_layout = page.locator('#online-rules-dialog').evaluate('''dialog => {
