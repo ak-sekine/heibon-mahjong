@@ -126,3 +126,21 @@ Codex Cloud内ではBrowser UIブラウザーを起動していません。Brows
 - 公開記録SHA：Worker=`118245731a408389fc312f1713a8d018615ec490`、Pages=`118245731a408389fc312f1713a8d018615ec490`。Worker URL=`https://heibon-mahjong-online.ak-sekine.workers.dev`、Pages URL=`https://ak-sekine.github.io/heibon-mahjong/`。
 - Codex Cloud内ではBrowser UIブラウザーを起動していません。Browser UI結果はGitHub ActionsのChromium／WebKit jobとmatrix auditで確認しました。
 - iPhone Safari実機での再確認は未実施です。確認完了まではIssue #27をOpenのままにします。
+
+## 2026-11-01 追加修正：iPhone Safariでスクロールバーが二重表示される
+
+### 実機で確認された不具合
+
+ユーザー本人のiPhone Safari実機確認で、本文を操作すると黒色のSafari標準スクロールバーが現れ、本文右側には黄色の独自インジケーターも常時表示されることが確認されました。二つの表示が並んでいました。前回追加したインジケーターは維持していましたが、同じ本文要素のネイティブスクロールバーを非表示にしていませんでした。
+
+### 修正
+
+- 実際の本文スクロール要素である`.dialog-scroll-content`だけに`scrollbar-width: none`と`::-webkit-scrollbar { display: none; }`を適用しました。このクラスはオフライン新規対局とオンラインルーム作成の本文に使われています。
+- `overflow-y: auto`と`-webkit-overflow-scrolling: touch`を維持し、本文のタッチスクロールを継続します。黄色のインジケーターとスクロール位置の同期、本文・固定フッターの分離、最終ルールまでの到達性には変更を加えていません。
+- 他の画面のスクロールバーには変更を加えていません。
+
+### 追加検証
+
+- `tests/browser-create-dialog-layout.py`でChromium／WebKit双方について、オフライン・オンライン本文の`overflow-y: auto`、標準およびWebKitのネイティブスクロールバー非表示指定を検査します。
+- 既存の同テストで、320×320を含む5 viewportにおける最終ルール到達、黄色thumbの位置・長さ同期、固定フッターとの分離と操作ボタン領域も引き続き検査します。
+- iPhone Safari実機での修正後確認は未実施です。ユーザー本人の再確認が完了するまでIssue #27はOpenのままにします。

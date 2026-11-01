@@ -43,8 +43,12 @@ with sync_playwright() as playwright:
               const rect = element => { const r = element.getBoundingClientRect(); return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height}; };
               const expectedVisible = content.scrollHeight - content.clientHeight > 1;
               const contentBox = rect(content), panelBox = rect(panel), footerBox = rect(footer), dialogBox = rect(dialog);
+              const contentStyle = getComputedStyle(content);
+              const webkitScrollbarStyle = getComputedStyle(content, '::-webkit-scrollbar');
               return {dialog:dialogBox, panel:panelBox, content:contentBox, footer:footerBox, action:rect(action),
                 clientHeight:content.clientHeight, scrollHeight:content.scrollHeight, scrollTop:content.scrollTop,
+                overflowY:contentStyle.overflowY, scrollbarWidth:contentStyle.scrollbarWidth,
+                webkitScrollbarDisplay:webkitScrollbarStyle.display,
                 indicatorHidden:indicator.hidden, expectedVisible, trackHeight:indicator.clientHeight,
                 thumbHeight:parseFloat(thumb.style.height || '0'), thumbTransform:thumb.style.transform,
                 expectedThumbHeight:Math.min(indicator.clientHeight, Math.max(20, indicator.clientHeight * content.clientHeight / content.scrollHeight)),
@@ -55,6 +59,9 @@ with sync_playwright() as playwright:
             assert layout['panel']['bottom'] <= layout['footer']['top'] + 0.5, f'{name} panel crossed its footer at {width}x{height}: {layout}'
             assert layout['action']['top'] >= layout['footer']['top'] and layout['action']['bottom'] <= layout['footer']['bottom'], f'{name} action is outside the fixed footer: {layout}'
             assert layout['action']['height'] >= 44 and layout['actionEnabled'], f'{name} action is not tappable at {width}x{height}: {layout}'
+            assert layout['overflowY'] == 'auto', f'{name} body must remain natively scrollable at {width}x{height}: {layout}'
+            assert layout['scrollbarWidth'] == 'none', f'{name} native scrollbar is not hidden at {width}x{height}: {layout}'
+            assert layout['webkitScrollbarDisplay'] == 'none', f'{name} WebKit scrollbar is not hidden at {width}x{height}: {layout}'
             assert layout['indicatorHidden'] == (not layout['expectedVisible']), f'{name} indicator visibility disagrees with scrolling at {width}x{height}: {layout}'
             if layout['expectedVisible']:
                 assert abs(layout['thumbHeight'] - layout['expectedThumbHeight']) <= 1, f'{name} indicator size disagrees with the visible content ratio: {layout}'
