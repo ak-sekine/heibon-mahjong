@@ -65,7 +65,9 @@ Codex Cloud環境ではブラウザー起動を行っていません。Browser U
 - `match-result-dialog.test.ts`にDOM順検証を追加しました。既存のオフライン新規対局ルート・オンライン再戦handler・順位表示テストは維持しています。
 - `browser-round-end-ui.py`はオフラインの320〜430pxを含む各幅でボタンの実座標、同一行、非重複、ダイアログ内包含、1行表示を検証します。`browser-online-waiting-room.py`はChromium／WebKitの2クライアント再戦シナリオで320×360px時の左右順、非重複、折返し、包含を検証します。
 - 関連テスト、`npm test`（73成功、失敗0、skip 0）、`npm run build`、`npm run typecheck:worker`、Browser UIスクリプトのPython構文検査、`git diff --check`はローカルで成功しました。
-- この追加修正を含むGitHub ActionsのBrowser UI（Chromium／WebKit）、Deploy gate、GitHub Pages公開の実行結果はpush後に追記します。Codex環境から直接Browser UIを起動していません。
+- GitHub Actions run [41267773516](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41267773516)（head SHA `ca8be6027c4fdb57841ba3ab18ca36f6ebdbfeff`）は全job成功しました。Chromium／WebKit Browser UI、Browser UI matrix audit、回帰テスト、Worker型チェック、Pages build、release-freshnessを確認しました。Deploy gateを通過し、Workerデプロイとproduction-test、Pages deployも成功しました。
+- 公開記録のWorker／Pages SHAはいずれも`ca8be6027c4fdb57841ba3ab18ca36f6ebdbfeff`です。Worker URLは`https://heibon-mahjong-online.ak-sekine.workers.dev`、GitHub Pages URLは`https://ak-sekine.github.io/heibon-mahjong/`です。Pagesのdeploy jobはdeployment SHAを記録し`Reported success!`を返しました。
+- Codex環境からGitHub Pages URLへHTTPアクセスした確認は、Envoy proxyのCONNECT 403で実施できませんでした。Pages公開の確認根拠は、このActions runのPages deploy成功記録です。Codex環境内ではBrowser UIも起動しておらず、ブラウザー結果はActions上のChromium／WebKitです。
 
 ## iPhone Safari実機確認
 
