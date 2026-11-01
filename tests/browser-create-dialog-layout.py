@@ -26,7 +26,13 @@ with sync_playwright() as playwright:
         for width, height in VIEWPORTS:
             page.set_viewport_size({'width': width, 'height': height})
             page.locator(content_selector).evaluate("element => element.scrollTo({top: 0, behavior: 'auto'})")
-            page.wait_for_timeout(30)
+            page.wait_for_function('''selectors => {
+              const dialog=document.querySelector(selectors.dialog), content=dialog.querySelector(selectors.content);
+              const indicator=dialog.querySelector('.dialog-scroll-indicator'), thumb=indicator.querySelector('span');
+              const shouldShow=content.scrollHeight-content.clientHeight>1;
+              const expectedHeight=Math.min(indicator.clientHeight,Math.max(20,indicator.clientHeight*content.clientHeight/content.scrollHeight));
+              return indicator.hidden===!shouldShow && (!shouldShow || Math.abs(parseFloat(thumb.style.height||'0')-expectedHeight)<=1);
+            }''', {'dialog':dialog_selector,'content':content_selector}, timeout=3000)
             layout = page.locator(dialog_selector).evaluate('''(dialog, selectors) => {
               const panel = dialog.querySelector('.dialog-scroll-panel');
               const content = dialog.querySelector(selectors.content);

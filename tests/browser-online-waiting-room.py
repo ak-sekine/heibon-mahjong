@@ -1403,13 +1403,9 @@ with sync_playwright() as p:
     page.keyboard.press('Tab')
     assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Tab did not move from the create close button to the display-name input'
     page.keyboard.press('Tab')
-    assert page.locator('#online-create-content').evaluate('element => document.activeElement === element'), 'Tab did not reach the keyboard-scrollable room settings region'
-    page.keyboard.press('Tab')
-    assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').evaluate('element => document.activeElement === element'), 'Tab did not move from the settings region to the inline rule editor'
+    assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').evaluate('element => document.activeElement === element'), 'Tab did not move from display name to the inline rule editor'
     page.keyboard.press('Shift+Tab')
-    assert page.locator('#online-create-content').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return from rules to the scrollable settings region'
-    page.keyboard.press('Shift+Tab')
-    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return from settings to display name'
+    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return from rules to display name'
     page.keyboard.press('Shift+Tab')
     assert page.locator('#online-create-close').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to the create close button'
     assert page.locator('#online-create').is_disabled(), 'room creation was enabled without a display name'

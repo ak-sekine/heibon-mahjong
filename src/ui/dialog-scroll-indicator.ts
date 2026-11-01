@@ -33,12 +33,14 @@ export function mountDialogScrollIndicators(root: ParentNode = document): void {
 
     content.addEventListener('scroll', update, { passive: true });
     window.addEventListener('resize', update, { passive: true });
+    window.addEventListener('orientationchange', update, { passive: true });
     window.visualViewport?.addEventListener('resize', update, { passive: true });
 
     if (typeof ResizeObserver !== 'undefined') {
       const resizeObserver = new ResizeObserver(update);
       resizeObserver.observe(panel);
       resizeObserver.observe(content);
+      resizeObserver.observe(track);
       content.querySelectorAll<HTMLElement>(':scope > *').forEach(child => resizeObserver.observe(child));
       const mutationObserver = new MutationObserver(() => {
         content.querySelectorAll<HTMLElement>(':scope > *').forEach(child => resizeObserver.observe(child));
