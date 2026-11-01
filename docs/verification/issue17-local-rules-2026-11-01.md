@@ -2,8 +2,8 @@
 
 ## 対象と実装
 
-- 対象実装コミットSHA: `4fe2da7dcce420ada6d9dbbbca3bbf5fa6bad281`。
-- GitHub Actions／Deployの対象SHAと結果はpush後に追記します。
+- 喰いタン実装コミットSHA: `4fe2da7dcce420ada6d9dbbbca3bbf5fa6bad281`。
+- GitHub Actions・公開の対象SHA: `46b98dfa3090d8e5b9f5ff5df3a715c708f79ad6`。
 - 対象Issue: [#17](https://github.com/ak-sekine/heibon-mahjong/issues/17)。この記録は自動検証・GitHub Actions／公開・ユーザー本人の実機確認を分けます。
 - `GameRules` schemaをv3にし、喰いタンを新規対局画面の共通ローカルルールとして追加しました。初期値はONです。対局開始時の既存snapshotと`localStorage`、オンラインWorker正本、ルール確認表示をそのまま拡張しています。
 - 旧schema v1/v2と保存version 1/2では、従来どおり喰いタンONへ正規化します。旧ルームにルールJSONがない場合もONです。
@@ -43,21 +43,24 @@
 
 ### 自動テスト
 
-- `npm test`: 成功（74 test files, 0 failure, 0 skipped）。
-- `npm run build`: 作業ツリー変更後の最終結果を記録します。
+- `npm test`: 成功（74 test files, 0 failure, 0 skipped）。GitHub Actionsでも成功。
+- `npm run build`: 成功。GitHub ActionsでもPagesビルド成功。
 - `npm run typecheck:worker`: 成功。
 - 喰いタン固有テスト: ON/OFFの門前・副露役、役なし拒否、別役との複合、翻数・得点差、CPUの鳴き判断を追加しました。
-- Browser UIはCodex Cloud内では実行していません。ChromiumとWebKitの両方を既存GitHub Actions matrixで確認します。
+- Codex Cloud内ではBrowser UIを実行していません。正式なGitHub Actions Browser UI matrixでChromium・WebKitの全回帰シナリオが成功しました。
 
 ### GitHub Actions・公開
 
-- GitHub Actions run URL: push後に記録します。
-- Chromium Browser UI: 未確認。
-- WebKit Browser UI: 未確認。
-- Deploy gate: 未確認。
-- Worker公開とproduction test: 未確認。
-- GitHub Pages build／公開: 未確認。
-- 公開SHA照合: 未確認。
+- GitHub Actions run: [Deploy workflow #41308997688](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41308997688)、結論 `success`。workflowのhead SHAは `46b98dfa3090d8e5b9f5ff5df3a715c708f79ad6`。
+- `verify`: npm regression tests、Worker型検査、Pages build、ブラウザー用buildがすべて成功。
+- Chromium Browser UI: 成功。
+- WebKit Browser UI: 成功。
+- Deploy gate: release freshnessとChromium/WebKit matrix auditが成功。
+- Worker公開: 成功。公開URLは https://heibon-mahjong-online.ak-sekine.workers.dev/ 。Worker deployment記録のSHAは `46b98dfa3090d8e5b9f5ff5df3a715c708f79ad6`。
+- production online smoke test（HTTPS、room、WebSocket、再接続、認証、プライバシー）: 成功。
+- GitHub Pages build／公開: 成功。公開URLは https://ak-sekine.github.io/heibon-mahjong/ 。Pages deployment記録のSHAは `46b98dfa3090d8e5b9f5ff5df3a715c708f79ad6`。
+- 公開SHA照合: Actions runの対象SHAとWorker／Pages両方の成功deployment記録が一致。
+- 実機確認: ユーザー本人のiPhone Safari確認は未実施。自動Browser UIの結果には含めません。
 
 ### ユーザー本人によるiPhone Safari実機確認
 
