@@ -128,7 +128,7 @@ with sync_playwright() as playwright:
           (before_press['x'], before_press['y'], before_press['width'], before_press['height']), (width, before_press, pressed)
         page.mouse.up()
         assert page.locator('#new-game-dialog').is_visible()
-        assert page.locator('#confirm-new-game').inner_text() == '新しい対局を開始'
+        assert page.locator('#confirm-new-game').inner_text() == '対局開始'
         assert page.locator('#confirm-new-game').evaluate("e => e.classList.contains('ui-button--a')")
         dialog_box = page.locator('#new-game-dialog').bounding_box()
         assert dialog_box['x'] >= 0 and dialog_box['x'] + dialog_box['width'] <= width, (width, dialog_box)

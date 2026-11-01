@@ -25,6 +25,10 @@ with sync_playwright() as playwright:
 
     page.locator('#main-menu-toggle').click()
     page.locator('#new-game').click()
+    assert page.locator('#new-game-dialog #new-game-rules-editor').is_visible()
+    assert page.locator('#rule-settings-dialog').count() == 0
+    assert page.locator('input[name="new-game-rules-editor-match-format"][value="tonpu"]').is_checked()
+    page.locator('input[name="new-game-rules-editor-match-format"][value="tonnan"]').check()
     page.locator('#confirm-new-game').click()
     page.locator('#local-table').wait_for(state='visible')
     assert page.locator('body').get_attribute('data-game-mode') == 'offline'
@@ -40,9 +44,7 @@ with sync_playwright() as playwright:
 
     page.locator('#main-menu-toggle').click()
     page.locator('#new-game').click()
-    page.locator('#new-game-rules').click()
-    page.locator('input[name="rules-match-format"][value="tonnan"]').check()
-    page.locator('#confirm-rule-settings').click()
+    page.locator('input[name="new-game-rules-editor-match-format"][value="tonnan"]').check()
     page.locator('#confirm-new-game').click()
     assert page.locator('body').get_attribute('data-game-mode') == 'offline'
     assert page.locator('#table-round').inner_text() == '東1局'
@@ -58,16 +60,14 @@ with sync_playwright() as playwright:
     page.locator('#online-rules-close').click()
     page.locator('#main-menu-toggle').click()
     page.locator('#new-game').click()
-    assert page.locator('#new-game-rules-summary').inner_text() == '現在：半荘戦'
-    page.locator('#new-game-rules').click()
-    page.locator('input[name="rules-match-format"][value="tonpu"]').check()
-    page.locator('#cancel-rule-settings').click()
-    assert page.locator('#new-game-rules-summary').inner_text() == '現在：半荘戦', 'cancel did not restore the prior draft'
+    assert page.locator('input[name="new-game-rules-editor-match-format"][value="tonnan"]').is_checked()
+    page.locator('input[name="new-game-rules-editor-match-format"][value="tonpu"]').check()
     page.locator('#cancel-new-game').click()
     assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'")
+    assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'cancel did not restore focus to the menu button'
     page.locator('#main-menu-toggle').click()
     page.locator('#new-game').click()
-    assert page.locator('#new-game-rules-summary').inner_text() == '現在：半荘戦', 'last started rules were not restored'
+    assert page.locator('input[name="new-game-rules-editor-match-format"][value="tonnan"]').is_checked(), 'last started rules were not restored'
     page.locator('#cancel-new-game').click()
     print('Initial load and reload stay idle at 320px; confirmed Tonpu/Tonnan settings, cancel, and restoration work in Chromium/WebKit.')
     browser.close()

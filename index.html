@@ -27,11 +27,13 @@
     <header class="online-dialog-header"><h2 id="online-create-title">新しくルームを作る</h2><button id="online-create-close" class="online-dialog-close ui-button ui-button--b" type="button" aria-label="ルーム作成を閉じる">閉じる</button></header>
     <form id="online-create-form" class="online-entry-form" novalidate>
       <label for="online-create-name">表示名</label>
-      <button id="online-create-rules" class="rule-settings-open ui-button ui-button--b" type="button">ルール設定</button>
-      <p id="online-create-rules-summary" class="rule-settings-summary" aria-live="polite">東風戦</p>
       <input id="online-create-name" name="displayName" type="text" maxlength="24" autocomplete="nickname" aria-describedby="online-create-message" required>
+      <div id="online-create-rules-editor" class="rules-editor" aria-label="新しいルームのルール"></div>
       <p id="online-create-message" class="online-form-message" role="status" aria-live="polite" hidden></p>
-      <button id="online-create" type="submit" disabled class="ui-button ui-button--a">ルームを作成</button>
+      <footer id="online-create-actions" class="new-game-actions">
+        <button id="online-create-cancel" type="button" class="ui-button ui-button--b">キャンセル</button>
+        <button id="online-create" type="submit" disabled class="ui-button ui-button--a">ルーム作成</button>
+      </footer>
     </form>
   </dialog>
   <dialog id="diagnostic-dialog" aria-labelledby="diagnostic-title">
@@ -182,25 +184,14 @@
     <div id="match-result-body" tabindex="0" role="region" aria-label="対局結果の順位と持ち点"></div>
     <footer class="result-footer"><button id="match-result-close" type="button" class="ui-button ui-button--b">閉じる</button><button id="match-result-new-game" type="button" hidden class="ui-button ui-button--a">次の対局を始める</button></footer>
   </dialog>
-  <dialog id="new-game-dialog" aria-labelledby="new-game-question">
-    <p id="new-game-question">現在の対局を終了して、最初から始めますか？</p>
-    <button id="new-game-rules" class="rule-settings-open ui-button ui-button--b" type="button">ルール設定</button>
-    <p id="new-game-rules-summary" class="rule-settings-summary" aria-live="polite">東風戦</p>
+  <dialog id="new-game-dialog" class="new-game-dialog" aria-labelledby="new-game-title">
+    <header class="new-game-header"><h2 id="new-game-title">オフラインで新規対局</h2></header>
+    <p id="new-game-question">新しい対局を開始しますか？</p>
+    <div id="new-game-rules-editor" class="rules-editor" aria-label="新しい対局のルール"></div>
     <div class="new-game-actions">
       <button id="cancel-new-game" type="button" autofocus class="ui-button ui-button--b">キャンセル</button>
-      <button id="confirm-new-game" type="button" class="ui-button ui-button--a">新しい対局を開始</button>
+      <button id="confirm-new-game" type="button" class="ui-button ui-button--a">対局開始</button>
     </div>
-  </dialog>
-  <dialog id="rule-settings-dialog" class="online-dialog" aria-labelledby="rule-settings-title">
-    <header class="online-dialog-header"><h2 id="rule-settings-title">ルール設定</h2></header>
-    <p>新しい対局で使用するルールを選びます。</p>
-    <fieldset class="match-format-options"><legend>対局形式</legend>
-      <label><input type="radio" name="rules-match-format" value="tonpu" checked> 東風戦（東1局〜東4局）</label>
-      <label><input type="radio" name="rules-match-format" value="tonnan"> 半荘戦（東場・南場）</label>
-    </fieldset>
-    <section id="rule-settings-details" aria-label="固定ルール"></section>
-    <p id="rule-settings-summary" class="rule-settings-summary"></p>
-    <footer class="rule-settings-actions"><button id="cancel-rule-settings" type="button" class="ui-button ui-button--b">キャンセル</button><button id="confirm-rule-settings" type="button" class="ui-button ui-button--a">設定を確定</button></footer>
   </dialog>
   <dialog id="online-rules-dialog" class="online-dialog readonly-rules-dialog" aria-labelledby="online-rules-title">
     <header class="online-dialog-header"><h2 id="online-rules-title">ルール確認</h2><button id="online-rules-close" class="online-dialog-close ui-button ui-button--b" type="button">閉じる</button></header>

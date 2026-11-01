@@ -1323,16 +1323,19 @@ with sync_playwright() as p:
     page.locator('h1').click()
     assert page.locator('#main-menu-items').is_hidden(), 'clicking outside did not close the menu'
     select_menu_item('#new-game')
-    assert page.locator('#new-game-dialog').evaluate('element => element.open'), 'new-game menu item did not open the existing confirmation'
-    assert page.locator('#new-game-rules-summary').inner_text() == '現在：東風戦', 'offline rules did not default to East-only'
-    page.locator('#new-game-rules').click()
-    assert page.locator('#rule-settings-dialog').evaluate('element => element.open'), 'offline rule settings did not open'
-    assert page.locator('input[name="rules-match-format"][value="tonpu"]').is_checked(), 'offline match format did not default to tonpu'
+    assert page.locator('#new-game-dialog').evaluate('element => element.open'), 'new-game menu item did not open the creation dialog'
+    assert page.locator('#new-game-dialog #new-game-rules-editor').is_visible(), 'offline rules were not rendered in the new-game dialog'
+    assert page.locator('#rule-settings-dialog').count() == 0, 'standalone rules dialog remains in the document'
+    assert page.locator('#new-game-dialog #new-game-rules').count() == 0, 'offline rules still require a separate navigation button'
+    assert page.locator('input[name="new-game-rules-editor-match-format"][value="tonpu"]').is_checked(), 'offline match format did not default to tonpu'
+    assert page.locator('#new-game-rules-editor .confirmed-rule-row dt').all_text_contents() == [
+      '赤ドラ', '喰いタン', '和了条件', '後付け', 'リーチ・一発', '裏ドラ', 'カンドラ', '通常流局', '途中流局', '連荘', '対局終了',
+    ], 'fixed implemented rules were not displayed alongside the editable format'
     format_layouts = []
     for width in [320, 375, 390, 414]:
       page.set_viewport_size({'width': width, 'height': 812})
       layout = page.evaluate('''() => {
-        const dialog = document.querySelector('#rule-settings-dialog');
+        const dialog = document.querySelector('#new-game-dialog');
         const options = dialog.querySelector('.match-format-options').getBoundingClientRect();
         const labels = [...dialog.querySelectorAll('.match-format-options label')].map(label => {
           const box = label.getBoundingClientRect();
@@ -1343,32 +1346,31 @@ with sync_playwright() as p:
       }''')
       assert layout['noHorizontalScroll'] and layout['optionsVisible'] and all(label['fits'] and label['height'] >= 44 for label in layout['labels']), f'rule settings layout failed at {width}px: {layout}'
       format_layouts.append({'width': width, **layout})
-    page.locator('input[name="rules-match-format"][value="tonnan"]').check()
+    page.locator('input[name="new-game-rules-editor-match-format"][value="tonpu"]').check()
     page.set_viewport_size({'width': 320, 'height': 600})
-    settings_layout = page.locator('#rule-settings-dialog').evaluate('''dialog => {
+    settings_layout = page.locator('#new-game-dialog').evaluate('''dialog => {
       const box = dialog.getBoundingClientRect();
       return {top: box.top, bottom: box.bottom, width: box.width, clientWidth: dialog.clientWidth,
         scrollWidth: dialog.scrollWidth, clientHeight: dialog.clientHeight, scrollHeight: dialog.scrollHeight,
         noPageHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth};
     }''')
-    assert settings_layout['top'] >= 0 and settings_layout['bottom'] <= 600 and settings_layout['scrollWidth'] <= settings_layout['clientWidth'] and settings_layout['noPageHorizontalOverflow'], f'rule settings dialog did not fit or scroll at 320x600: {settings_layout}'
-    page.locator('#cancel-rule-settings').scroll_into_view_if_needed()
-    assert page.locator('#cancel-rule-settings').is_visible(), 'rule settings cancel action was unreachable on a short screen'
+    assert settings_layout['top'] >= 0 and settings_layout['bottom'] <= 600 and settings_layout['scrollWidth'] <= settings_layout['clientWidth'] and settings_layout['scrollHeight'] > settings_layout['clientHeight'] and settings_layout['noPageHorizontalOverflow'], f'new-game dialog did not scroll at 320x600: {settings_layout}'
+    page.locator('#confirm-new-game').scroll_into_view_if_needed()
+    assert page.locator('#confirm-new-game').is_visible(), 'offline start action was unreachable on a short screen'
+    page.locator('#cancel-new-game').scroll_into_view_if_needed()
+    assert page.locator('#cancel-new-game').is_visible(), 'offline cancel action was unreachable on a short screen'
     page.set_viewport_size({'width': 390, 'height': 812})
-    page.locator('#cancel-rule-settings').click()
-    assert page.locator('#new-game-rules-summary').inner_text() == '現在：東風戦', 'canceling rule settings changed the draft match format'
-    page.locator('#new-game-rules').click()
-    page.locator('input[name="rules-match-format"][value="tonnan"]').check()
-    page.locator('#confirm-rule-settings').click()
-    assert page.locator('#new-game-rules-summary').inner_text() == '現在：半荘戦', 'confirmed rules were not applied to the pending match'
     page.locator('#cancel-new-game').click()
-    assert page.evaluate("localStorage.getItem('heibon-mahjong-last-rules')") == saved_rules_before_draft, 'canceling a new match overwrote the last-started rules'
+    assert page.evaluate("localStorage.getItem('heibon-mahjong-last-rules')") == saved_rules_before_draft, 'canceling an offline draft overwrote the last-started rules'
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'dismissing the new-game dialog did not restore focus to the visible menu button'
     select_menu_item('#new-game')
-    assert page.locator('#new-game-rules-summary').inner_text() == '現在：東風戦', 'unstarted rules replaced the last-started default'
-    page.locator('#new-game-rules').click()
-    page.locator('input[name="rules-match-format"][value="tonnan"]').check()
-    page.locator('#confirm-rule-settings').click()
+    assert page.locator('input[name="new-game-rules-editor-match-format"][value="tonpu"]').is_checked(), 'an unstarted offline draft replaced the last-started rules'
+    page.locator('input[name="new-game-rules-editor-match-format"][value="tonnan"]').check()
+    page.locator('#cancel-new-game').click()
+    assert page.evaluate("localStorage.getItem('heibon-mahjong-last-rules')") == saved_rules_before_draft, 'canceling a changed offline draft overwrote the last-started rules'
+    select_menu_item('#new-game')
+    assert page.locator('input[name="new-game-rules-editor-match-format"][value="tonpu"]').is_checked(), 'last started offline rules were not restored'
+    page.locator('input[name="new-game-rules-editor-match-format"][value="tonnan"]').check()
     page.locator('#confirm-new-game').click()
     assert page.evaluate('window.onlineUiTest.controller.match.format') == 'tonnan', 'offline selection was not stored in match state'
     assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'"), 'accepted offline start did not save the last rules'
@@ -1386,16 +1388,19 @@ with sync_playwright() as p:
     assert page.locator('#online-join-dialog').evaluate('element => !element.open'), 'room creation also opened the join dialog'
     assert page.locator('#online-create-dialog h2').inner_text() == '新しくルームを作る', 'room creation dialog title was not shown'
     assert page.locator('#online-create-dialog label[for="online-create-name"]').all_inner_texts() == ['表示名'], 'room creation dialog display-name label changed'
-    assert page.locator('#online-create-rules').inner_text() == 'ルール設定', 'room creation dialog omitted rule settings'
+    assert page.locator('#online-create-rules-editor').is_visible(), 'room creation dialog omitted inline rules'
+    assert page.locator('#online-create-dialog #online-create-rules').count() == 0, 'room creation still needs a rules navigation button'
+    assert page.locator('#rule-settings-dialog').count() == 0, 'standalone rules dialog remains available'
+    assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').is_checked(), 'room creation did not restore the last accepted format'
     assert page.locator('#online-create-dialog #online-join').count() == 0, 'room creation dialog contains a join button'
     assert page.locator('#online-create-close').evaluate('element => document.activeElement === element'), 'opening the create dialog did not focus its close button'
     assert page.locator('#online-create-name').evaluate('element => document.activeElement !== element'), 'opening the create dialog focused its display-name input'
     page.keyboard.press('Tab')
-    assert page.locator('#online-create-rules').evaluate('element => document.activeElement === element'), 'Tab did not move from the create close button to rule settings'
+    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Tab did not move from the create close button to the display-name input'
     page.keyboard.press('Tab')
-    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Tab did not move from rule settings to the create display-name input'
+    assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').evaluate('element => document.activeElement === element'), 'Tab did not move from display name to the inline rule editor'
     page.keyboard.press('Shift+Tab')
-    assert page.locator('#online-create-rules').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to rule settings'
+    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return from rules to display name'
     page.keyboard.press('Shift+Tab')
     assert page.locator('#online-create-close').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to the create close button'
     assert page.locator('#online-create').is_disabled(), 'room creation was enabled without a display name'
@@ -1410,7 +1415,7 @@ with sync_playwright() as p:
     assert page.locator('#online-create-name').input_value() == 'テストホスト', 'typing a valid create name did not update the input'
     assert page.locator('#online-join-name').input_value() == 'テストホスト', 'the display name was not shared with the join form'
     create_form_layouts = []
-    for width, height in [[320,700],[375,812],[390,844],[414,896]]:
+    for width, height in [[320,700],[375,812],[390,844],[414,896],[1280,800]]:
       page.set_viewport_size({'width': width, 'height': height})
       assert_online_dialog_header('#online-create-dialog', '#online-create-close', width)
       layout = page.locator('#online-create-dialog').evaluate('''dialog => {
@@ -1434,6 +1439,10 @@ with sync_playwright() as p:
     page.set_viewport_size({'width': 390, 'height': 320})
     page.locator('#online-create-name').scroll_into_view_if_needed()
     assert page.locator('#online-create-name').evaluate('element => { const rect = element.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight; }'), 'the create name input could not be reached after manual selection and scrolling in a short viewport'
+    page.locator('#online-create-rules-editor .confirmed-rule-row:last-child').scroll_into_view_if_needed()
+    assert page.locator('#online-create-rules-editor .confirmed-rule-row:last-child').evaluate('element => { const rect = element.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight; }'), 'the final fixed rule could not be reached in a short viewport'
+    page.locator('#online-create-cancel').scroll_into_view_if_needed()
+    assert page.locator('#online-create-cancel').evaluate('element => { const rect = element.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight; }'), 'the room creation cancel action could not be reached in a short viewport'
     page.locator('#online-create').scroll_into_view_if_needed()
     assert page.locator('#online-create').evaluate('element => { const rect = element.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight; }'), 'the create action could not be reached after manual selection and scrolling in a short viewport'
     page.set_viewport_size({'width': 390, 'height': 844})
@@ -1520,17 +1529,28 @@ with sync_playwright() as p:
     assert page.evaluate('window.onlineMock.requests.length') == before_empty_submit, 'an empty display name was sent to the server'
     page.locator('#online-create-name').fill('テストホスト')
     assert page.locator('#online-create').is_enabled(), 'room creation remained disabled after restoring a valid display name'
-    assert page.locator('#online-create-rules-summary').inner_text() == '設定：半荘戦', 'online creation did not restore the last started format'
-    page.locator('#online-create-rules').click()
-    assert page.locator('input[name="rules-match-format"][value="tonnan"]').is_checked(), 'online rules did not use the shared last-started setting'
-    page.locator('#confirm-rule-settings').click()
+    assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').is_checked(), 'online creation did not restore the last started format'
+    page.locator('input[name="online-create-rules-editor-match-format"][value="tonpu"]').check()
+    page.locator('#online-create-cancel').click()
+    assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'"), 'canceling room creation saved an unaccepted format'
+    assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'canceling room creation did not restore menu focus'
+    select_menu_item('#online-create-open')
+    assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').is_checked(), 'room creation did not restore after cancel'
     page.locator('#online-create').click()
     wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234'")
     assert not page.locator('#online-create-dialog').evaluate('element => element.open'), 'room creation form remained open after success'
     assert not page.locator('#online-join-dialog').evaluate('element => element.open'), 'join form opened after room creation'
     assert page.locator('#online-dialog #online-create-form, #online-dialog #online-join-form').count() == 0, 'input forms were mixed into the room management screen'
     assert page.evaluate("window.onlineMock.requests[0].body.rules.matchFormat === 'tonnan' && window.onlineMock.requests[0].body.rules.schemaVersion === 1"), 'host rules were not sent to the server'
+    assert page.evaluate("window.onlineMock.snapshot().room.rules.matchFormat === 'tonnan'"), 'Worker mock did not keep the accepted host rules as room state'
+    assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'"), 'successful Worker room creation did not persist its confirmed rules'
     assert page.locator('#online-room-format').inner_text() == '対局形式：半荘戦', 'selected format was not shown in the waiting room'
+    if RULES_ONLY:
+      tickets_before_rules_reconnect = page.evaluate('window.onlineMock.ticketRequests')
+      page.evaluate('window.onlineMock.forceDisconnect()')
+      wait_for("document.querySelector('#online-connection').textContent.includes('再接続')")
+      wait_for(f'window.onlineMock.ticketRequests > {tickets_before_rules_reconnect}', timeout=10000)
+      assert page.evaluate("window.onlineMock.snapshot().room.rules.matchFormat === 'tonnan'"), 'confirmed Worker rules changed after reconnect'
     page.locator('#online-confirm-rules').click()
     assert page.locator('#online-rules-dialog').evaluate('element => element.open'), 'waiting-room rule confirmation did not open'
     assert '読み取り専用' in page.locator('#online-rules-readonly-label').inner_text(), 'rule confirmation was not marked read-only'
@@ -1665,6 +1685,7 @@ with sync_playwright() as p:
     assert page.locator('#online-create').is_disabled(), 'a second room was allowed while a session was active'
     assert 'すでにルームに参加' in page.locator('#online-create-message').inner_text(), 'the active-session restriction was not explained in the create form'
     assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session') !== null"), 'opening create form discarded the current session'
+    assert page.locator('#online-create-rules-editor .match-format-options').is_disabled(), 'a joined participant could still edit room creation rules'
     page.locator('#online-create-close').click()
     select_menu_item('#online-join-open')
     assert page.locator('#online-join').is_disabled(), 'joining another room was allowed while a session was active'

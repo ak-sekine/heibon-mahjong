@@ -35,81 +35,71 @@ export function renderRulesList(root: HTMLElement, rules: unknown, label = '現�
   root.setAttribute('aria-label', label);
 }
 
-/** One editor is shared by offline new matches and online room creation. */
-export class RuleSettingsDialog {
-  private readonly dialog: HTMLDialogElement | null;
-  private trigger: HTMLButtonElement | null = null;
-  private accepted: ((rules: GameRules) => void) | null = null;
-  private draft: GameRules;
+/** The same inline editor is mounted in the offline and online creation dialogs. */
+export class RuleEditor {
+  private readonly root: HTMLElement | null;
+  private readonly formatOptions: HTMLFieldSetElement | null;
+  private readonly fixedRules: HTMLElement | null;
   private readonly preferences: RulePreferences;
-  constructor(preferences: RulePreferences) {
+  constructor(rootSelector: string, preferences: RulePreferences) {
+    this.root = document.querySelector<HTMLElement>(rootSelector);
     this.preferences = preferences;
-    this.draft = preferences.current;
-    const dialog = document.querySelector<HTMLDialogElement>('#rule-settings-dialog');
-    this.dialog = dialog;
-    // Verification pages reuse main.ts without the production settings dialog.
-    if (!dialog) return;
-    document.querySelectorAll<HTMLInputElement>('input[name="rules-match-format"]').forEach(input => {
+    if (!this.root) { this.formatOptions = null; this.fixedRules = null; return; }
+    this.formatOptions = document.createElement('fieldset');
+    this.formatOptions.className = 'match-format-options';
+    const legend = document.createElement('legend');
+    legend.textContent = '対局形式';
+    this.formatOptions.append(legend);
+    for (const [value, text] of [
+      ['tonpu', '東風戦（東1局〜東4局）'],
+      ['tonnan', '半荘戦（東場・南場）'],
+    ]) {
+      const label = document.createElement('label');
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = `${this.root.id}-match-format`;
+      input.value = value;
       input.addEventListener('change', () => {
         if (!input.checked) return;
-        this.draft = normalizeGameRules({ schemaVersion: 1, matchFormat: input.value });
-        const display = document.querySelector<HTMLElement>('#rule-settings-summary');
-        if (display) display.textContent = this.draft.matchFormat === 'tonnan' ? '現在：半荘戦' : '現在：東風戦';
-        const details = document.querySelector<HTMLElement>('#rule-settings-details');
-        if (details) renderRulesList(details, this.draft);
+        const rules = normalizeGameRules({ schemaVersion: 1, matchFormat: input.value });
+        this.preferences.commit(rules);
+        this.renderFixedRules(rules);
       });
-    });
-    for (const id of ['#new-game-rules', '#online-create-rules']) {
-      document.querySelector<HTMLButtonElement>(id)?.addEventListener('click', event => {
-        const button = event.currentTarget as HTMLButtonElement;
-        this.open(button);
-      });
+      label.append(input, document.createTextNode(` ${text}`));
+      this.formatOptions.append(label);
     }
-    document.querySelector<HTMLButtonElement>('#cancel-rule-settings')?.addEventListener('click', () => this.cancel());
-    dialog.addEventListener('cancel', event => { event.preventDefault(); this.cancel(); });
-    dialog.addEventListener('close', () => {
-      this.trigger?.focus({ preventScroll: true });
-      this.trigger = null;
-      this.accepted = null;
+    const fixedSection = document.createElement('section');
+    fixedSection.className = 'rule-settings-fixed';
+    const heading = document.createElement('h3');
+    heading.textContent = '変更できないルール';
+    this.fixedRules = document.createElement('div');
+    this.fixedRules.className = 'rule-settings-fixed-list';
+    fixedSection.append(heading, this.fixedRules);
+    this.root.replaceChildren(this.formatOptions, fixedSection);
+    this.update(preferences.current);
+  }
+  update(rules: unknown = this.preferences.current): void {
+    if (!this.root || !this.formatOptions) return;
+    const normalized = normalizeGameRules(rules);
+    this.formatOptions.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach(input => {
+      input.checked = input.value === normalized.matchFormat;
     });
-    document.querySelector<HTMLButtonElement>('#confirm-rule-settings')?.addEventListener('click', () => {
-      if (!dialog.open) return;
-      const format = document.querySelector<HTMLInputElement>('input[name="rules-match-format"]:checked')?.value;
-      this.draft = normalizeGameRules({ schemaVersion: 1, matchFormat: format });
-      const done = this.accepted;
-      this.preferences.commit(this.draft);
-      this.updateSummaries();
-      this.accepted = null;
-      dialog.close();
-      done?.(this.draft);
-    });
+    this.renderFixedRules(normalized);
   }
-  open(trigger: HTMLButtonElement, accepted?: (rules: GameRules) => void): void {
-    if (!this.dialog || this.dialog.open) return;
-    this.trigger = trigger;
-    this.accepted = accepted ?? null;
-    this.draft = this.preferences.current;
-    const selected = document.querySelector<HTMLInputElement>(`input[name="rules-match-format"][value="${this.draft.matchFormat}"]`);
-    if (selected) selected.checked = true;
-    const display = document.querySelector<HTMLElement>('#rule-settings-summary');
-    if (display) display.textContent = this.draft.matchFormat === 'tonnan' ? '現在：半荘戦' : '現在：東風戦';
-    const details = document.querySelector<HTMLElement>('#rule-settings-details');
-    if (details) renderRulesList(details, this.draft);
-    this.dialog.showModal();
-    document.querySelector<HTMLButtonElement>('#cancel-rule-settings')?.focus({ preventScroll: true });
-  }
-  private cancel(): void {
-    if (!this.dialog) return;
-    this.draft = this.preferences.current;
-    this.accepted = null;
-    this.dialog.close();
-  }
-  private updateSummaries(): void {
-    const label = this.preferences.current.matchFormat === 'tonnan' ? '半荘戦' : '東風戦';
-    const offline = document.querySelector<HTMLElement>('#new-game-rules-summary');
-    const online = document.querySelector<HTMLElement>('#online-create-rules-summary');
-    if (offline) offline.textContent = `現在：${label}`;
-    if (online) online.textContent = `設定：${label}`;
+  setDisabled(disabled: boolean): void { if (this.formatOptions) this.formatOptions.disabled = disabled; }
+  private renderFixedRules(rules: GameRules): void {
+    if (!this.fixedRules) return;
+    const rows = describeConfirmedRules(rules).filter(entry => entry.label !== '対局形式');
+    const list = document.createElement('dl');
+    list.className = 'confirmed-rules-list';
+    for (const entry of rows) {
+      const row = document.createElement('div');
+      row.className = 'confirmed-rule-row';
+      const term = document.createElement('dt'); term.textContent = entry.label;
+      const description = document.createElement('dd'); description.textContent = entry.value;
+      row.append(term, description); list.append(row);
+    }
+    this.fixedRules.replaceChildren(list);
   }
 }
 

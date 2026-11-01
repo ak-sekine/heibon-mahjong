@@ -33,7 +33,7 @@ for (const status of ['playing', 'round-ended', 'match-ended']) {
           const confirm = nodes.get('#confirm-new-game')!;
           assert.equal(confirm.classes.has('ui-button--d2'), status !== 'match-ended');
           assert.equal(confirm.classes.has('ui-button--a'), status === 'match-ended');
-          assert.equal(confirm.textContent, status === 'match-ended' ? '新しい対局を開始' : '現在の対局を終了して開始');
+          assert.equal(confirm.textContent, status === 'match-ended' ? '対局開始' : '現在の対局を終了して開始');
           assert.equal(nodes.get('#new-game-question')!.textContent.includes('復元できません'), status !== 'match-ended');
           assert.equal(nodes.get('#new-game-dialog')!.open, true);
           assert.equal(focused, nodes.get('#cancel-new-game'));

@@ -5,7 +5,7 @@ import { renderMatch } from './rendering/match.ts';
 import { ResultDialog } from './ui/result-dialog.ts';
 import { MatchResultDialog } from './ui/match-result-dialog.ts';
 import { NewGameDialog } from './ui/new-game-dialog.ts';
-import { openReadOnlyRules, RulePreferences, RuleSettingsDialog } from './ui/rule-settings.ts';
+import { openReadOnlyRules, RulePreferences } from './ui/rule-settings.ts';
 import { rulesForMatch, type GameRules } from './model/rules.ts';
 import { GameController } from './ui/controller.ts';
 import { getLastLocalGameTransition, waitForTurn } from './game/automatic-turns.ts';
@@ -202,7 +202,6 @@ function newGame(rules: GameRules): void {
   scrollPageToTop('new_game_start');
 }
 const rulePreferences = new RulePreferences();
-new RuleSettingsDialog(rulePreferences);
 new NewGameDialog(newGame, () => controller.hasGame && controller.match.status !== 'match-ended', rulePreferences);
 document.querySelector<HTMLButtonElement>('#menu-offline-rules')?.addEventListener('click', event => {
   if (!controller.hasGame || document.body.classList.contains('online-game-active')) return;

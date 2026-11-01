@@ -84,9 +84,10 @@ with sync_playwright() as playwright:
     for fmt, label in [('tonpu', '東風戦'), ('tonnan', '半荘戦（東南戦）')]:
         page.locator('#main-menu-toggle').click()
         page.locator('#new-game').click()
-        page.locator('#new-game-rules').click()
-        page.locator(f'input[name="rules-match-format"][value="{fmt}"]').check()
-        page.locator('#confirm-rule-settings').click()
+        assert page.locator('#new-game-dialog #new-game-rules-editor').is_visible()
+        assert page.locator('#rule-settings-dialog').count() == 0, 'standalone rules dialog remained available'
+        assert page.locator('#new-game-dialog #new-game-rules').count() == 0, 'offline creation still requires a rules navigation button'
+        page.locator(f'input[name="new-game-rules-editor-match-format"][value="{fmt}"]').check()
         page.locator('#confirm-new-game').click()
         # Use the real selection UI; opening rules must not clear the selected tile.
         page.locator('#player-hand button').first.click()
@@ -95,16 +96,16 @@ with sync_playwright() as playwright:
         assert_same_state()
         close_rules()
 
-        # Saving a different next-match preference (e.g. in another tab) cannot
-        # change the current match, nor can editing and canceling a new match.
+        # An unaccepted inline edit is canceled without changing the saved
+        # preference or the active match.
         other = 'tonnan' if fmt == 'tonpu' else 'tonpu'
-        page.evaluate('''other => window.rulesModel.saveLastGameRules({ schemaVersion: 1, matchFormat: other })''', other)
         page.locator('#main-menu-toggle').click()
         page.locator('#new-game').click()
-        page.locator('#new-game-rules').click()
-        page.locator(f'input[name="rules-match-format"][value="{other}"]').check()
-        page.locator('#confirm-rule-settings').click()
+        assert page.locator(f'input[name="new-game-rules-editor-match-format"][value="{fmt}"]').is_checked()
+        page.locator(f'input[name="new-game-rules-editor-match-format"][value="{other}"]').check()
         page.locator('#cancel-new-game').click()
+        assert page.evaluate('''fmt => JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === fmt''', fmt)
+        assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element')
         capture_state()
         open_rules(label)
         close_rules(escape=True)

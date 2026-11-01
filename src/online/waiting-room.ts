@@ -9,7 +9,7 @@ import {
 } from './protocol.ts';
 import { diagnosticLog } from './diagnostics.ts';
 import { DEFAULT_GAME_RULES, rulesForFormat, type GameRules } from '../model/rules.ts';
-import { openReadOnlyRules, RulePreferences } from '../ui/rule-settings.ts';
+import { openReadOnlyRules, RuleEditor, RulePreferences } from '../ui/rule-settings.ts';
 
 type RoomSeat = OnlineRoomSeat;
 type RoomState = OnlineRoomState & { type?: string };
@@ -108,6 +108,7 @@ export class OnlineWaitingRoom {
   private readonly createButton = document.querySelector<HTMLButtonElement>('#online-create')!;
   private readonly joinButton = document.querySelector<HTMLButtonElement>('#online-join')!;
   private readonly createCloseButton = document.querySelector<HTMLButtonElement>('#online-create-close')!;
+  private readonly createCancelButton = document.querySelector<HTMLButtonElement>('#online-create-cancel');
   private readonly joinCloseButton = document.querySelector<HTMLButtonElement>('#online-join-close')!;
   private readonly createMessage = document.querySelector<HTMLElement>('#online-create-message')!;
   private readonly joinMessage = document.querySelector<HTMLElement>('#online-join-message')!;
@@ -152,10 +153,12 @@ export class OnlineWaitingRoom {
   private gameTerminated = false;
   private readonly onGameMessage: (message: Record<string, unknown>) => void;
   private readonly rulePreferences?: RulePreferences;
+  private readonly ruleEditor?: RuleEditor;
 
   constructor(apiUrl: string | undefined, onGameMessage: (message: Record<string, unknown>) => void = () => {},
     rulePreferences?: RulePreferences) {
     this.rulePreferences = rulePreferences;
+    if (rulePreferences) this.ruleEditor = new RuleEditor('#online-create-rules-editor', rulePreferences);
     this.apiUrl = (apiUrl ?? '').replace(/\/+$/u, '');
     this.onlineUnavailableMessage = !this.apiUrl
       ? 'オンライン接続先はまだ設定されていません。'
@@ -163,12 +166,13 @@ export class OnlineWaitingRoom {
     this.onGameMessage = onGameMessage;
     document.querySelector<HTMLButtonElement>('#online-create-open')!.addEventListener('click', () => {
       this.rulePreferences?.resetToLastStarted();
-      this.updateCreateRulesSummary();
+      this.ruleEditor?.update();
       this.openEntryDialog(this.createDialog, this.createCloseButton);
     });
     document.querySelector<HTMLButtonElement>('#online-join-open')!.addEventListener('click', () => this.openEntryDialog(this.joinDialog, this.joinCloseButton));
     this.roomMenuItem.addEventListener('click', () => this.openRoomDialog());
     this.createCloseButton.addEventListener('click', () => this.closeEntryDialog(this.createDialog));
+    this.createCancelButton?.addEventListener('click', () => this.closeEntryDialog(this.createDialog));
     this.joinCloseButton.addEventListener('click', () => this.closeEntryDialog(this.joinDialog));
     document.querySelector<HTMLButtonElement>('#online-close')!.addEventListener('click', () => this.closeDialog());
     this.dialog.addEventListener('close', () => {
@@ -270,6 +274,9 @@ export class OnlineWaitingRoom {
     const validCode = ROOM_CODE_PATTERN.test(code.toUpperCase());
     const blocked = Boolean(this.onlineUnavailableMessage || this.session || this.roomRequestPending);
     this.createButton.disabled = !validName || blocked;
+    this.createCloseButton.disabled = this.roomRequestPending;
+    if (this.createCancelButton) this.createCancelButton.disabled = this.roomRequestPending;
+    this.ruleEditor?.setDisabled(Boolean(this.onlineUnavailableMessage || this.session || this.roomRequestPending));
     this.joinButton.disabled = !validName || !validCode || blocked;
 
     const message = this.onlineUnavailableMessage || (this.session
@@ -334,6 +341,10 @@ export class OnlineWaitingRoom {
 
   private closeEntryDialog(dialog: HTMLDialogElement): void {
     if (!dialog.open) return;
+    if (dialog === this.createDialog) {
+      this.rulePreferences?.resetToLastStarted();
+      this.ruleEditor?.update();
+    }
     dialog.close();
     this.restoreMenuFocusIfNoDialogIsOpen();
   }
@@ -753,11 +764,6 @@ export class OnlineWaitingRoom {
     this.roomPanel.hidden = false;
     this.confirmRulesButton.hidden = state.status === 'closed';
     this.renderControls();
-  }
-
-  private updateCreateRulesSummary(): void {
-    const summary = document.querySelector<HTMLElement>('#online-create-rules-summary');
-    if (summary) summary.textContent = this.rulePreferences?.current.matchFormat === 'tonnan' ? '設定：半荘戦' : '設定：東風戦';
   }
 
   private renderControls(): void {
