@@ -141,6 +141,14 @@ Codex Cloud内ではBrowser UIブラウザーを起動していません。Brows
 
 ### 追加検証
 
-- `tests/browser-create-dialog-layout.py`でChromium／WebKit双方について、オフライン・オンライン本文の`overflow-y: auto`、標準およびWebKitのネイティブスクロールバー非表示指定を検査します。
+- `tests/browser-create-dialog-layout.py`でChromium／WebKit双方について、オフライン・オンライン本文の`overflow-y: auto`、標準およびWebKitのネイティブスクロールバー非表示指定を検査しました。
 - 既存の同テストで、320×320を含む5 viewportにおける最終ルール到達、黄色thumbの位置・長さ同期、固定フッターとの分離と操作ボタン領域も引き続き検査します。
 - iPhone Safari実機での修正後確認は未実施です。ユーザー本人の再確認が完了するまでIssue #27はOpenのままにします。
+
+### GitHub Actionsと公開結果
+
+- Deploy workflow run #490 — [GitHub Actions](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41281181383)：commit `c06cc554cfa0ef7ba343ac9d4b2ef7d1d18413d9`、**completed / success**。
+- ローカル`npm test`：**成功**、73 tests。`npm run build`：**成功**。Browser UI Pythonスクリプトの構文検査と`git diff --check`も成功しました。
+- verify、Chromium／WebKit Browser UI、browser matrix audit、release freshness、本番Worker検証、Pages build／deployがすべて成功しました。今回追加したネイティブスクロールバー非表示指定は、Chromium／WebKit双方でオフライン・オンラインの両本文について検査されました。
+- WorkerとPagesの公開対象SHA：`c06cc554cfa0ef7ba343ac9d4b2ef7d1d18413d9`。Worker URL=`https://heibon-mahjong-online.ak-sekine.workers.dev`、Pages URL=`https://ak-sekine.github.io/heibon-mahjong/`。
+- iPhone Safari実機での修正後再確認は未実施です。ユーザー本人の確認完了までIssue #27はOpenのままとします。
