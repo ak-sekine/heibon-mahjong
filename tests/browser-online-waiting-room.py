@@ -1553,8 +1553,9 @@ with sync_playwright() as p:
     assert not page.locator('#online-create-dialog').evaluate('element => element.open'), 'room creation form remained open after success'
     assert not page.locator('#online-join-dialog').evaluate('element => element.open'), 'join form opened after room creation'
     assert page.locator('#online-dialog #online-create-form, #online-dialog #online-join-form').count() == 0, 'input forms were mixed into the room management screen'
-    assert page.evaluate("window.onlineMock.requests[0].body.rules.matchFormat === 'tonnan' && window.onlineMock.requests[0].body.rules.schemaVersion === 1"), 'host rules were not sent to the server'
-    assert page.evaluate("window.onlineMock.snapshot().room.rules.matchFormat === 'tonnan'"), 'Worker mock did not keep the accepted host rules as room state'
+    host_rules = page.evaluate('window.onlineMock.requests[0].body.rules')
+    assert host_rules == {'schemaVersion': 2, 'matchFormat': 'tonnan', 'redDora': True, 'uraDora': True, 'ippatsu': True, 'kanDora': True}, host_rules
+    assert page.evaluate('window.onlineMock.snapshot().room.rules') == host_rules, 'Worker mock did not keep the accepted host rules as room state'
     assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'"), 'successful Worker room creation did not persist its confirmed rules'
     assert page.locator('#online-room-format').inner_text() == '対局形式：半荘戦', 'selected format was not shown in the waiting room'
     if RULES_ONLY:
