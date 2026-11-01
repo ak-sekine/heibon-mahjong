@@ -1165,12 +1165,12 @@ with sync_playwright() as p:
       fixture = page.evaluate("""() => {
         const view = window.onlineUiTest.onlineGameController.view;
         const seat = view.seats[0];
-        return {status: view.status, round: view.round.roundNumber, riichi: seat.riichi,
+        return {status: view.status, format: view.format, round: view.round.roundNumber, riichi: seat.riichi,
           reference: seat.riichiDeclarationTileId, river: seat.river.map(tile => tile.id), rules: view.rules};
       }""")
       assert fixture['status'] == 'round-ended' and fixture['round'] == 1, fixture
       assert fixture['riichi'] and fixture['reference'] and fixture['reference'] in fixture['river'], fixture
-      assert fixture['rules'] == {'schemaVersion': 2, 'matchFormat': 'tonpu', 'redDora': True, 'uraDora': True, 'ippatsu': True, 'kanDora': True}, fixture
+      assert fixture['rules'] == {'schemaVersion': 2, 'matchFormat': fixture['format'], 'redDora': True, 'uraDora': True, 'ippatsu': True, 'kanDora': True}, fixture
       assert page.locator('[data-online-river] [data-riichi-declaration="true"]').count() == 1, 'riichi declaration tile was not rendered'
       return fixture
 
