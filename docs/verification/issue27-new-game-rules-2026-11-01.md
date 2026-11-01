@@ -1,6 +1,6 @@
 # Issue #27 — 新規対局画面へのルール設定統合
 
-実施日：2026-11-01。Issue：[#27](https://github.com/ak-sekine/heibon-mahjong/issues/27)。開始基準：`origin/main` / `c9eeb62c861ee2bfc007586795d7822f0b70ec40`。実装・ローカル検証後のユーザー本人による実機確認待ちのため、IssueはOpenのままにします。
+実施日：2026-11-01。Issue：[#27](https://github.com/ak-sekine/heibon-mahjong/issues/27)。開始時の作業ブランチは`work`、開始HEADは`78df436a572939a8462a7856b1c6b930dc700fdd`でした。fetch後の`origin/main` / `c9eeb62c861ee2bfc007586795d7822f0b70ec40`に対して3 commit behind／0 aheadで、独自コミットはありませんでした。実装SHA `5a643e37132193a72c488a193273d458eefbc339`に対し、Browser UIの期待値・検査方法を修正した`f2685db0c8c4e0bdcef1ff6933a19a512220b8ed`、`91e5e420e2055dbbf33157be0d93e4ea2513cf2f`を追加しました。Deploy gate、Worker、Pages公開まで成功しています。ユーザー本人による実機確認待ちのため、IssueはOpenのままにします。
 
 ## 変更内容
 
@@ -69,22 +69,25 @@
 | `npm test` | **成功**：73 tests、pass 73、fail 0、skip 0 |
 | `npm run build` | **成功**：TypeScript型検査とVite production build |
 | `npm run typecheck:worker` | **成功** |
-| `python -m py_compile`（変更したBrowser UIスクリプト4本） | **成功** |
+| Python構文検査 | **成功**：変更したBrowser UIスクリプトを`py_compile`で検査。2回のBrowser UI期待値更新後も`ast.parse`で再検査 |
 | `git diff --check` | **成功** |
-| GitHub Actions Browser UI Chromium／WebKit | push後に確認予定 |
-| GitHub Actions Deploy gate／Worker／Pages | push後に確認予定 |
+| GitHub Actions `npm test` | **成功**：run #483で1309 tests、pass 1309、fail 0 |
+| GitHub Actions Browser UI | **成功**：run #483のChromium 36 script executions、WebKit 24 script executions。offline／online rules、全対局回帰、320〜414pxの狭幅・1280px幅、フォーカス復帰を含む |
+| Browser UI matrix audit | **成功**：Chromium・WebKit両jobの実在とsuccessを確認 |
+| Deploy gate | **成功**：verify、Browser UI、matrix audit、release freshnessがすべてsuccess |
+| Worker production test | **成功**：本番HTTPS、ルーム、WebSocket、再接続、認証・プライバシーを含む5シナリオ |
+| Pages build／deploy | **成功** |
+| run #483 | **成功**：[GitHub Actions run #483](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41277122584) |
 
-Codex Cloud内ではBrowser UIブラウザーを起動していません。Chromium／WebKitの結果は未実施を成功扱いせず、既存のmain向けGitHub Actionsで確認します。
+Codex Cloud内ではBrowser UIブラウザーを起動していません。Browser UI結果はGitHub Actionsの同一SHAのChromium／WebKit jobとmatrix auditで確認しました。検証中、run #481は半荘戦を選んだ後の既存期待値が東風戦のままだったため失敗しました。run #482はPlaywrightのfieldsetに対する`is_disabled()`判定が失敗しました。期待値を正しい半荘戦表示へ修正し、参加者側はnative fieldsetのdisabled状態とすべてのラジオ入力の`:disabled`状態を直接検証するように更新した後、run #483で両エンジンの全回帰が成功しました。期待値は緩めていません。
 
 ## GitHub Actionsと公開
 
-- 対象commit：記録更新後に追記
-- Deploy workflow run：記録更新後に追記
-- Run URL：記録更新後に追記
-- Deploy gate／production-test：未確認
-- Worker公開SHA・結果：未確認
-- Pages公開SHA・結果：未確認
-- 公開URLの直接HTTP確認：未確認
+- 検証・公開対象commit：`91e5e420e2055dbbf33157be0d93e4ea2513cf2f`
+- Deploy workflow run：#483 — [https://github.com/ak-sekine/heibon-mahjong/actions/runs/41277122584](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41277122584)、**completed / success**
+- Worker：**公開成功**。`https://heibon-mahjong-online.ak-sekine.workers.dev`。Worker記録SHA=`91e5e420e2055dbbf33157be0d93e4ea2513cf2f`。本番オンラインシナリオ5件成功。
+- Pages：**公開成功**。`https://ak-sekine.github.io/heibon-mahjong/`。Pages記録SHA=`91e5e420e2055dbbf33157be0d93e4ea2513cf2f`。
+- 公開URLの直接HTTP応答確認：**未確認**。ActionsのWorker本番テストとPages deployment action・SHA記録を公開成功の根拠としています。
 
 ## 実機確認が必要な項目
 
@@ -96,8 +99,8 @@ Codex Cloud内ではBrowser UIブラウザーを起動していません。Chrom
 - iPhone Safari：PWA standalone表示領域・セーフエリアで同じ操作ができること。
 - オンライン参加者側から確定ルールを読み取り専用で確認でき、再接続後も同じルールが表示されること。
 - Android実機：未確認。
-- PC実機：未確認（Browser UIのCI結果とは区別）。
+- PC実機：未確認（Playwrightの1280×900 viewport CI結果とは区別）。
 
 ### 完了状態
 
-実装・ローカル自動検証は完了しました。GitHub Actionsと公開結果はこの記録を更新して追記します。ユーザー本人の実機確認前のため、Issue #27はCloseしません。
+実装、自動検証、GitHub Actions、Deploy gate、Worker／Pages公開は完了しました。iPhone Safari実機での新規対局／ルーム作成、保存・キャンセル、狭幅・横向き・safe area・PWA standalone、内部スクロール、操作ボタン到達、閉じた後のフォーカスをユーザー本人が確認するまでIssue #27はCloseしません。Android実機、PC実機、公開URLへの直接HTTP確認も未確認です。
