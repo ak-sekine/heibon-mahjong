@@ -5,7 +5,7 @@ import type { PublicMeld, PlayerGameView, PublicWinSummary } from './game-view.t
 import { createResultDoraRow } from '../rendering/dora.ts';
 import { createTileElement, tileLabel } from '../rendering/tile-svg.ts';
 import { yakuDisplayName } from '../rendering/yaku-names.ts';
-import { yakumanMultiplierName, winTotalLabel } from '../rendering/yakuman-display-name.ts';
+import { scoreTierDisplayName, yakumanMultiplierName, winTotalLabel } from '../rendering/yakuman-display-name.ts';
 import { renderRoundWinSummary } from '../rendering/round-win-summary.ts';
 import { onlinePlayerName } from './player-name.ts';
 
@@ -16,11 +16,6 @@ const abortiveNames = {
   'four-winds': '四風連打',
   'four-riichi': '四家立直',
 } as const;
-const scoreTierNames = {
-  normal: '', mangan: '満貫', haneman: '跳満', baiman: '倍満', sanbaiman: '三倍満',
-  'kazoe-yakuman': '数え役満', yakuman: '役満',
-} as const;
-
 function text(tag: string, content: string, className?: string): HTMLElement {
   const node = document.createElement(tag);
   node.textContent = content;
@@ -49,6 +44,7 @@ export function renderOnlineWinSummary(container: HTMLElement, view: PlayerGameV
     method: winner.method,
     han: winner.han,
     fu: winner.fu,
+    scoreTier: winner.scoreTier,
     yakumanCount: winner.yakumanCount,
     points: winner.totalPoints,
     yaku: winner.yaku.map(yaku => ({ id: yaku.id as YakuId, yakuman: yaku.yakuman })),
@@ -176,7 +172,7 @@ function renderWin(container: HTMLElement, view: PlayerGameView, winner: PublicW
   const depositPoints = view.result!.deposits?.recipientId === winner.winnerId ? view.result!.deposits.points : 0;
   const settledPoints = payments.reduce((sum, payment) => sum + payment.points, 0) + depositPoints;
   const received = settledPoints || winner.totalPoints;
-  const tier = scoreTierNames[winner.scoreTier];
+  const tier = scoreTierDisplayName(winner.scoreTier, winner.yakumanCount);
   const method = `${seat.isDealer ? '親' : '子'}の${winner.method === 'ron' ? 'ロン' : 'ツモ'}`;
   section.append(text('p', `獲得点数：${tier ? `${tier} ` : ''}${received.toLocaleString('ja-JP')}点（${method}）`, 'win-score'));
   section.append(text('p', '支払い：'));

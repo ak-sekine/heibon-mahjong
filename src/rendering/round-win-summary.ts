@@ -1,12 +1,14 @@
 import type { YakuId } from '../analysis/yaku.ts';
+import type { ScoreTier } from '../analysis/score.ts';
 import { yakuDisplayName } from './yaku-names.ts';
-import { yakumanMultiplierName } from './yakuman-display-name.ts';
+import { scoreTierDisplayName, yakumanMultiplierName } from './yakuman-display-name.ts';
 
 export type RoundWinSummary = Readonly<{
   winnerName: string;
   method: 'ron' | 'tsumo';
   han: number;
   fu: number | null;
+  scoreTier: ScoreTier;
   yakumanCount: number;
   points: number;
   yaku: readonly (YakuId | Readonly<{ id: YakuId; yakuman: number }>)[];
@@ -26,9 +28,12 @@ export function renderRoundWinSummary(container: HTMLElement, winners: readonly 
     const section = document.createElement('section');
     section.className = 'round-win-summary';
 
-    const scoreLabel = winner.yakumanCount > 0
-      ? yakumanMultiplierName(winner.yakumanCount)
-      : `${winner.han}翻${winner.fu === null ? '' : ` ${winner.fu}符`}`;
+    const tierName = scoreTierDisplayName(winner.scoreTier, winner.yakumanCount);
+    const scoreLabel = winner.yakumanCount > 0 || winner.scoreTier === 'kazoe-yakuman'
+      ? tierName
+      : winner.scoreTier === 'normal'
+        ? `${winner.han}翻${winner.fu === null ? '' : ` ${winner.fu}符`}`
+        : `${winner.han}翻 ${tierName}`;
     const resultLine = text('p', '', 'round-summary-winner');
     resultLine.append(
       text('span', `${winner.winnerName} ${winner.method === 'tsumo' ? 'ツモ' : 'ロン'}・`),

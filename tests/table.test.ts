@@ -6,7 +6,7 @@ import { tsumoGame } from './tsumo-fixture.ts';
 import { declareTsumo } from '../src/game/tsumo.ts';
 import { startGame } from '../src/game/start.ts';
 import { renderTable, renderSelection, yakuDisplayName } from '../src/rendering/table.ts';
-import { yakumanMultiplierName, winTotalLabel } from '../src/rendering/yakuman-display-name.ts';
+import { scoreTierDisplayName, yakumanMultiplierName, winTotalLabel } from '../src/rendering/yakuman-display-name.ts';
 import { renderRoundWinSummary } from '../src/rendering/round-win-summary.ts';
 import type { YakuId } from '../src/analysis/yaku.ts';
 import { renderMatch } from '../src/rendering/match.ts';
@@ -20,6 +20,14 @@ import { doraKindFromIndicator } from '../src/analysis/dora.ts';
 import { ordinaryTile } from '../src/model/tile.ts';
 import type { GameState, PhysicalTile, PlayerId, PlayerState } from '../src/model/game.ts';
 import { allTiles, inventory } from './helpers.ts';
+import type { ScoreTier } from '../src/analysis/score.ts';
+
+function summaryScoreLabel(han: number, fu: number | null, scoreTier: ScoreTier, yakumanCount: number): string {
+  const tier = scoreTierDisplayName(scoreTier, yakumanCount);
+  return yakumanCount > 0 || scoreTier === 'kazoe-yakuman' ? tier
+    : scoreTier === 'normal' ? `${han}翻${fu === null ? '' : ` ${fu}符`}`
+      : `${han}翻 ${tier}`;
+}
 
 class ElementStub {
   readonly tagName: string;
@@ -90,7 +98,7 @@ test('yakuman multiplier labels are shared by individual yaku and total summarie
       assert.equal(winTotalLabel(multiplier, 0), `合計：${label}`);
       const summary = new SummaryNode('div');
       renderRoundWinSummary(summary as unknown as HTMLElement, [{
-        winnerName: '自分', method: 'tsumo', han: 0, fu: null, yakumanCount: multiplier,
+        winnerName: '自分', method: 'tsumo', han: 0, fu: null, scoreTier: 'yakuman', yakumanCount: multiplier,
         points: 32000 * multiplier,
         yaku: [{ id: 'daisangen', yakuman: multiplier === 3 ? 2 : 1 },
           ...(multiplier === 3 ? [{ id: 'tsuuiisou' as const, yakuman: 1 }] : [])],
@@ -180,8 +188,7 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'red-only', 'normal-m
       `${yakuDisplayName(entry.id)}${entry.yakuman > 0 ? ` ${yakumanMultiplierName(entry.yakuman)}` : ''}`);
     const summarySection = summary.children[0];
     const summaryLine = summarySection.children.find(child => child.className === 'round-summary-winner')!;
-    const summaryValue = win.yakumanCount > 0 ? yakumanMultiplierName(win.yakumanCount)
-      : `${win.totalHanIncludingDora}翻${win.fu === null ? '' : ` ${win.fu}符`}`;
+    const summaryValue = summaryScoreLabel(win.totalHanIncludingDora, win.fu, win.scoreTier, win.yakumanCount);
     const settlement = startMatch(won).lastSettlement!;
     const settledPayments = settlement.payments.filter(payment => payment.recipientId === win.winnerId);
     const depositPoints = settlement.deposits?.recipientId === win.winnerId ? settlement.deposits.points : 0;
@@ -555,7 +562,7 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     const summaryText = descend(summary).map(n => n.textContent).join(' ');
     const summaryLine = summary.children[0].children.find(n => n.className === 'round-summary-winner')!;
     assert.equal(summaryLine.children.map(n => n.textContent).join(''),
-      `CPU${id} ツモ・${won.winResult!.totalHanIncludingDora}翻 ${won.winResult!.fu}符・${won.winResult!.totalPoints.toLocaleString('ja-JP')}点`);
+      `CPU${id} ツモ・${summaryScoreLabel(won.winResult!.totalHanIncludingDora, won.winResult!.fu, won.winResult!.scoreTier, won.winResult!.yakumanCount)}・${won.winResult!.totalPoints.toLocaleString('ja-JP')}点`);
     assert.ok(summaryText.includes(`${won.winResult!.totalPoints.toLocaleString('en-US')}点`));
     assert.ok(!summaryText.includes('ドラ込み'));
     const summaryYaku = summary.children[0].children.find(n => n.className === 'round-summary-yaku')!.textContent;
@@ -674,7 +681,8 @@ for (const scenario of ['waiting','same-kind','call-waiting','human','double','t
           ?? summary.children.find(section => section.children[0].children[0].textContent === `自分 ロン・`);
         assert.ok(summarySection, `missing ${winnerId} ron summary`);
         const firstLine = summarySection.children.find(child => child.className === 'round-summary-winner')!;
-        assert.match(firstLine.children.map(child => child.textContent).join(''), / ロン・\d+翻 \d+符・[\d,]+点$/);
+        assert.equal(firstLine.children.map(child => child.textContent).join(''),
+          `${winner.winnerId === 0 ? '自分' : `CPU${winner.winnerId}`} ロン・${summaryScoreLabel(winner.totalHanIncludingDora, winner.fu, winner.scoreTier, winner.yakumanCount)}・${firstLine.children[3].textContent}`);
         const yaku = winner.candidate.yaku.map(entry => yakuDisplayName(entry.id)).join('・');
         const doraCount = winner.doraCount + winner.uraDoraCount + winner.redDoraCount;
         assert.equal(summarySection.children.find(child => child.className === 'round-summary-yaku')!.textContent,

@@ -37,7 +37,7 @@ import {
 } from '../src/online/game-view.ts';
 import { ronGame, ronStart } from './ron-fixture.ts';
 import { renderOnlineWinSummary } from '../src/online/result-content.ts';
-import { yakumanMultiplierName } from '../src/rendering/yakuman-display-name.ts';
+import { scoreTierDisplayName } from '../src/rendering/yakuman-display-name.ts';
 import { createOnlineActionPanelState } from '../src/online/action-panel-state.ts';
 import { DEFAULT_GAME_RULES } from '../src/model/rules.ts';
 
@@ -321,8 +321,12 @@ test('online ron and tsumo summaries use Japanese yaku names and omit round and 
       assert.equal(section.children.length, 2);
       const resultLine = section.children[0];
       assert.equal(resultLine.className, 'round-summary-winner');
+      const tierName = scoreTierDisplayName(winner.scoreTier, winner.yakumanCount);
+      const scoreLabel = winner.yakumanCount > 0 || winner.scoreTier === 'kazoe-yakuman' ? tierName
+        : winner.scoreTier === 'normal' ? `${winner.han}翻${winner.fu === null ? '' : ` ${winner.fu}符`}`
+          : `${winner.han}翻 ${tierName}`;
       assert.equal(resultLine.children.map(node => node.textContent).join(''),
-        `${resultName} ${method === 'tsumo' ? 'ツモ' : 'ロン'}・${winner.yakumanCount > 0 ? yakumanMultiplierName(winner.yakumanCount) : `${winner.han}翻 ${winner.fu}符`}・${winner.totalPoints.toLocaleString('ja-JP')}点`);
+        `${resultName} ${method === 'tsumo' ? 'ツモ' : 'ロン'}・${scoreLabel}・${winner.totalPoints.toLocaleString('ja-JP')}点`);
       const yakuLine = section.children[1];
       assert.equal(yakuLine.className, 'round-summary-yaku');
       const yaku = winner.yaku.map(yaku => ({
