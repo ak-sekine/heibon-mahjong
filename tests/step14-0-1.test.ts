@@ -12,6 +12,7 @@ import { tsumoGame } from './tsumo-fixture.ts';
 import { discardTileForOnline } from '../src/game/discard.ts';
 import { getCallOptions } from '../src/game/calls.ts';
 import { applyOnlineGameAction } from '../src/online/game-engine.ts';
+import { DEFAULT_GAME_RULES, normalizeGameRules } from '../src/model/rules.ts';
 import type { OnlineGameSession, PlayerDecisionWindow } from '../src/online/game-view.ts';
 import type { GameState, PlayerId, PlayerState } from '../src/model/game.ts';
 
@@ -359,7 +360,7 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.equal(state.revision, 0);
     assert.equal(state.expiresAt, expiresAt);
     assert.equal(state.format, 'tonpu');
-    assert.deepEqual(state.rules, { schemaVersion: 3, matchFormat: 'tonpu', redDora: true, kuitan: true, uraDora: true, ippatsu: true, kanDora: true }, 'legacy room without rules should use historical defaults');
+    assert.deepEqual(state.rules, { ...DEFAULT_GAME_RULES, matchFormat: 'tonpu' }, 'legacy room without rules should use historical defaults');
     assert.deepEqual(publicSeats(state).map(seat => seat.kind), ['human', 'empty', 'empty', 'empty']);
     assert.equal(ctx.storage.sql.exec<{ token_hash: string }>('SELECT token_hash FROM seats WHERE seat = 0').toArray()[0].token_hash, legacyHash);
     const client = await connectParticipant(fixture, legacyToken);
@@ -375,8 +376,9 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
   });
 
   await t.test('persists the host match format in Worker state and rejects attempted rule mutations', async () => {
-    const selectedRules = { schemaVersion: 3, matchFormat: 'tonnan', redDora: false, kuitan: false, uraDora: true, ippatsu: false, kanDora: false };
-    const fixture = await makeRoom('Rules host', token('9'), selectedRules);
+    const legacyRules = { schemaVersion: 3, matchFormat: 'tonnan', redDora: false, kuitan: false, uraDora: true, ippatsu: false, kanDora: false };
+    const selectedRules = normalizeGameRules(legacyRules);
+    const fixture = await makeRoom('Rules host', token('9'), legacyRules);
     const state = await readState(fixture);
     assert.equal(state.format, 'tonnan');
     assert.deepEqual(state.rules, selectedRules);

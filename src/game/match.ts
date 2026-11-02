@@ -1,7 +1,7 @@
 import { winningMelds } from './melds.ts';
 import type { GameState, PlayerId } from '../model/game.ts';
 import type { MatchState, MatchFormat, Points, RoundSettlement, SettlementPayment, RoundWind } from '../model/match.ts';
-import { normalizeGameRules, rulesForFormat, rulesForMatch, type GameRules } from '../model/rules.ts';
+import { hasNonDefaultGameRules, normalizeGameRules, rulesForFormat, rulesForMatch, type GameRules } from '../model/rules.ts';
 import { ordinaryTile } from '../model/tile.ts';
 import { calculateTsumoPayments } from '../analysis/score.ts';
 import { getWaitingTileKinds } from './ron.ts';
@@ -10,8 +10,7 @@ import { startGame } from './start.ts';
 import { getNagashiManganWinners } from './special-draws.ts';
 const ids = [0, 1, 2, 3] as const;
 function snapshotGame(game: GameState, rules: GameRules): GameState {
-  // Historical all-on games need no game-level copy: MatchState is authoritative.
-  if (rules.redDora && rules.kuitan && rules.uraDora && rules.ippatsu && rules.kanDora) return game;
+  if (!hasNonDefaultGameRules(rules)) return game;
   const normalizeTile = (tile: import('../model/game.ts').PhysicalTile) =>
     !rules.redDora && tile.tile.isRed ? { ...tile, tile: ordinaryTile(tile.tile) } : tile;
   const players = game.players.map(player => ({
@@ -84,12 +83,19 @@ export function settleRound(match: MatchState): MatchState {
       : [...nagashiWinners].sort((a,b)=>(a-match.dealerId+4)%4-(b-match.dealerId+4)%4)[0];
     deposits = {recipientId,points:match.depositSticks*1000}; after[recipientId] += deposits.points;
   }
+  const rules = rulesForMatch(match);
   const repeat = win ? winners.some(w=>w.winnerId===match.dealerId)
     : nagashiWinners.length ? nagashiWinners.includes(match.dealerId)
-      : abortive || tenpai![match.dealerId];
+      : abortive || rules.dealerTenpaiRenchan && tenpai![match.dealerId];
   const format: MatchFormat = match.format ?? 'tonpu';
   const finalWind: RoundWind = format === 'tonnan' ? 'south' : 'east';
-  const matchEnded = !repeat && match.roundNumber === 4 && match.roundWind === finalWind;
+  const finalRound = match.roundNumber === 4 && match.roundWind === finalWind;
+  const dealerSoleTop = after.every((points, id) => id === match.dealerId || after[match.dealerId] > points);
+  const dealerWon = Boolean(win && winners.some(winner => winner.winnerId === match.dealerId)) || nagashiWinners.includes(match.dealerId);
+  const agariYame = finalRound && rules.agariYame && dealerWon && dealerSoleTop;
+  const tenpaiYame = finalRound && rules.tenpaiYame && rules.dealerTenpaiRenchan && !win && !nagashiWinners.length &&
+    !abortive && Boolean(tenpai?.[match.dealerId]) && dealerSoleTop;
+  const matchEnded = agariYame || tenpaiYame || !repeat && finalRound;
   const entersSouth = !repeat && match.roundNumber === 4 && match.roundWind === 'east' && format === 'tonnan';
   const nextWind = entersSouth ? 'south' : match.roundWind;
   const nextRoundNumber = entersSouth ? 1 : match.roundNumber + Number(!repeat);

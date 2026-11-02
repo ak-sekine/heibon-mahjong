@@ -1,5 +1,6 @@
 import type { GameState, PlayerId, PlayerState } from '../model/game.ts';
 import { tileKindKey } from '../model/tile.ts';
+import { rulesForGame } from '../model/rules.ts';
 
 const playerIds: readonly PlayerId[] = [0, 1, 2, 3];
 
@@ -24,6 +25,7 @@ export function getNagashiManganWinners(game: GameState): readonly PlayerId[] {
 
 /** A four-winds draw is checked after the fourth discard's full ron window. */
 export function isFourWindsDraw(game: GameState): boolean {
+  if (!rulesForGame(game).fourWinds) return false;
   if (!['awaiting-call', 'awaiting-draw'].includes(game.phase) || game.winResult || game.callsMade ||
       (game.kanCount ?? 0) !== 0 || game.players.some(player => player.melds?.length)) return false;
   if (game.phase === 'awaiting-call' && (!game.ronWindow || game.ronWindow.kan)) return false;
@@ -43,6 +45,7 @@ export function isFourWindsDraw(game: GameState): boolean {
 }
 
 export function canDeclareKyuushuKyuuhai(game: GameState, playerId: PlayerId): boolean {
+  if (!rulesForGame(game).kyuushuKyuuhai) return false;
   const player = game.players[playerId];
   const hand = player ? [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])] : [];
   if (!player || player.id !== playerId ||

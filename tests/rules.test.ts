@@ -33,13 +33,15 @@ test('last started rules persist in a versioned format and restore on the next m
   const storage = new MemoryStorage();
   assert.equal(saveLastGameRules({ schemaVersion: 1, matchFormat: 'tonnan' }, storage), true);
   assert.deepEqual(JSON.parse(storage.values.get(GAME_RULES_STORAGE_KEY)!), {
-    version: 3, rules: { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' },
+    version: 4, rules: { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' },
   });
   assert.deepEqual(loadLastGameRules(storage), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' });
   storage.values.set(GAME_RULES_STORAGE_KEY, JSON.stringify({ version: 1, rules: { schemaVersion: 1, matchFormat: 'tonnan' } }));
   assert.deepEqual(loadLastGameRules(storage), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' }, 'v1 saved rules receive historical all-on defaults');
   storage.values.set(GAME_RULES_STORAGE_KEY, JSON.stringify({ version: 2, rules: { schemaVersion: 2, matchFormat: 'tonnan', redDora: false, uraDora: true, ippatsu: false, kanDora: false } }));
   assert.deepEqual(loadLastGameRules(storage), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan', redDora: false, ippatsu: false, kanDora: false }, 'v2 settings receive the historical kuitan-on default');
+  storage.values.set(GAME_RULES_STORAGE_KEY, JSON.stringify({ version: 3, rules: { schemaVersion: 3, matchFormat: 'tonnan', redDora: false, kuitan: false, uraDora: true, ippatsu: false, kanDora: false } }));
+  assert.deepEqual(loadLastGameRules(storage), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan', redDora: false, kuitan: false, ippatsu: false, kanDora: false }, 'v3 rules receive the seven new defaults');
 });
 
 test('corrupt data, old versions, and unknown setting values fall back without throwing', () => {

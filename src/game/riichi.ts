@@ -6,6 +6,7 @@ import { canDiscard, discardTile } from './discard.ts';
 import { getWaitingTileKinds, getWaitingTileKindsBefore } from './ron.ts';
 import { assertPointConservation, settleRound } from './match.ts';
 import { isFourWindsDraw } from './special-draws.ts';
+import { rulesForGame } from '../model/rules.ts';
 
 export interface RiichiDiscardOption {
   readonly tileId: string;
@@ -85,7 +86,8 @@ export function resolvePendingRiichi(match: MatchState): MatchState {
   const points = match.points.map((value,id) => value - (id === playerId ? 1000 : 0)) as unknown as Points;
   const riichiGame = { ...game, players, pendingRiichi: null };
   const allRiichi = players.every(candidate => candidate.riichi !== null);
-  const established = { ...match, game: allRiichi
+  const fourRiichi = allRiichi && rulesForGame(game).fourRiichi;
+  const established = { ...match, game: fourRiichi
     ? { ...riichiGame, phase: 'wall-exhausted' as const, abortiveDraw: 'four-riichi' as const, ronWindow: null }
     : riichiGame, points, depositSticks: match.depositSticks + 1 };
   assertPointConservation(established);

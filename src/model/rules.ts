@@ -2,46 +2,72 @@ import type { MatchFormat, MatchState } from './match.ts';
 
 /** Immutable local rules selected for one match. */
 export type GameRules = Readonly<{
-  schemaVersion: 3;
+  schemaVersion: 4;
   matchFormat: MatchFormat;
   redDora: boolean;
   kuitan: boolean;
   uraDora: boolean;
   ippatsu: boolean;
   kanDora: boolean;
+  dealerTenpaiRenchan: boolean;
+  kyuushuKyuuhai: boolean;
+  fourWinds: boolean;
+  fourRiichi: boolean;
+  fourKans: boolean;
+  agariYame: boolean;
+  tenpaiYame: boolean;
 }>;
 
 export const DEFAULT_GAME_RULES: GameRules = Object.freeze({
-  schemaVersion: 3, matchFormat: 'tonpu', redDora: true, kuitan: true, uraDora: true, ippatsu: true, kanDora: true,
+  schemaVersion: 4, matchFormat: 'tonpu', redDora: true, kuitan: true, uraDora: true, ippatsu: true, kanDora: true,
+  dealerTenpaiRenchan: true, kyuushuKyuuhai: true, fourWinds: true, fourRiichi: true, fourKans: true,
+  agariYame: false, tenpaiYame: false,
 });
 export const GAME_RULES_STORAGE_KEY = 'heibon-mahjong-last-rules';
-const STORAGE_VERSION = 3;
+const STORAGE_VERSION = 4;
 
 export function rulesForFormat(format: MatchFormat): GameRules {
   return Object.freeze({ ...DEFAULT_GAME_RULES, matchFormat: format });
+}
+
+/** Game-level snapshots are only needed when behavior differs from the legacy defaults. */
+export function hasNonDefaultGameRules(rules: GameRules): boolean {
+  return !rules.redDora || !rules.kuitan || !rules.uraDora || !rules.ippatsu || !rules.kanDora ||
+    !rules.dealerTenpaiRenchan || !rules.kyuushuKyuuhai || !rules.fourWinds || !rules.fourRiichi || !rules.fourKans ||
+    rules.agariYame || rules.tenpaiYame;
 }
 
 /** Legacy format-only rules receive the established fixed-rule defaults. */
 export function normalizeGameRules(value: unknown): GameRules {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return DEFAULT_GAME_RULES;
   const candidate = value as Record<string, unknown>;
-  if (![1, 2, 3].includes(candidate.schemaVersion as number) ||
+  if (![1, 2, 3, 4].includes(candidate.schemaVersion as number) ||
       (candidate.matchFormat !== 'tonpu' && candidate.matchFormat !== 'tonnan')) return DEFAULT_GAME_RULES;
-  const version = candidate.schemaVersion as 1 | 2 | 3;
+  const version = candidate.schemaVersion as 1 | 2 | 3 | 4;
   const legacy = version === 1;
   const allowed = new Set(version === 1 ? ['schemaVersion', 'matchFormat'] : version === 2 ?
     ['schemaVersion', 'matchFormat', 'redDora', 'uraDora', 'ippatsu', 'kanDora'] :
-    ['schemaVersion', 'matchFormat', 'redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora']);
+    version === 3 ? ['schemaVersion', 'matchFormat', 'redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora'] :
+    ['schemaVersion', 'matchFormat', 'redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora', 'dealerTenpaiRenchan', 'kyuushuKyuuhai', 'fourWinds', 'fourRiichi', 'fourKans', 'agariYame', 'tenpaiYame']);
   if (Object.keys(candidate).some(key => !allowed.has(key))) return DEFAULT_GAME_RULES;
-  const keys = version === 3 ? ['redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora'] as const :
+  const keys = version >= 3 ? ['redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora'] as const :
     ['redDora', 'uraDora', 'ippatsu', 'kanDora'] as const;
+  const added = ['dealerTenpaiRenchan', 'kyuushuKyuuhai', 'fourWinds', 'fourRiichi', 'fourKans', 'agariYame', 'tenpaiYame'] as const;
   if (!legacy && keys.some(key => typeof candidate[key] !== 'boolean')) return DEFAULT_GAME_RULES;
-  return Object.freeze({ schemaVersion: 3, matchFormat: candidate.matchFormat,
+  if (version === 4 && added.some(key => typeof candidate[key] !== 'boolean')) return DEFAULT_GAME_RULES;
+  return Object.freeze({ schemaVersion: 4, matchFormat: candidate.matchFormat,
     redDora: legacy ? true : candidate.redDora as boolean,
     kuitan: version < 3 ? true : candidate.kuitan as boolean,
     uraDora: legacy ? true : candidate.uraDora as boolean,
     ippatsu: legacy ? true : candidate.ippatsu as boolean,
-    kanDora: legacy ? true : candidate.kanDora as boolean });
+    kanDora: legacy ? true : candidate.kanDora as boolean,
+    dealerTenpaiRenchan: version < 4 ? true : candidate.dealerTenpaiRenchan as boolean,
+    kyuushuKyuuhai: version < 4 ? true : candidate.kyuushuKyuuhai as boolean,
+    fourWinds: version < 4 ? true : candidate.fourWinds as boolean,
+    fourRiichi: version < 4 ? true : candidate.fourRiichi as boolean,
+    fourKans: version < 4 ? true : candidate.fourKans as boolean,
+    agariYame: version < 4 ? false : candidate.agariYame as boolean,
+    tenpaiYame: version < 4 ? false : candidate.tenpaiYame as boolean });
 }
 
 /** Strict boundary check for untrusted room-creation requests. */
@@ -53,10 +79,13 @@ export function isValidGameRules(value: unknown): boolean {
     Object.keys(candidate).every(key => candidate.schemaVersion === 1 ? key === 'schemaVersion' || key === 'matchFormat' :
       ['schemaVersion', 'matchFormat', 'redDora', 'uraDora', 'ippatsu', 'kanDora'].includes(key)) &&
     (candidate.schemaVersion === 1 || ['redDora', 'uraDora', 'ippatsu', 'kanDora'].every(key => typeof candidate[key] === 'boolean'));
-  return candidate.schemaVersion === 3 &&
-    (candidate.matchFormat === 'tonpu' || candidate.matchFormat === 'tonnan') &&
-    ['redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora'].every(key => typeof candidate[key] === 'boolean') &&
-    Object.keys(candidate).every(key => ['schemaVersion', 'matchFormat', 'redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora'].includes(key));
+  if (![3, 4].includes(candidate.schemaVersion as number) ||
+      (candidate.matchFormat !== 'tonpu' && candidate.matchFormat !== 'tonnan')) return false;
+  const oldKeys = ['redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora'];
+  const added = ['dealerTenpaiRenchan', 'kyuushuKyuuhai', 'fourWinds', 'fourRiichi', 'fourKans', 'agariYame', 'tenpaiYame'];
+  const expected = ['schemaVersion', 'matchFormat', ...oldKeys, ...(candidate.schemaVersion === 4 ? added : [])];
+  return [...oldKeys, ...(candidate.schemaVersion === 4 ? added : [])].every(key => typeof candidate[key] === 'boolean') &&
+    Object.keys(candidate).every(key => expected.includes(key));
 }
 
 /** The active match is authoritative. Legacy matches retain their original format. */
@@ -88,7 +117,7 @@ export function loadLastGameRules(storage: RulesStorage | null = browserStorage(
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return DEFAULT_GAME_RULES;
     const record = parsed as Record<string, unknown>;
-    if (![1, 2, STORAGE_VERSION].includes(record.version as number)) return DEFAULT_GAME_RULES;
+    if (![1, 2, 3, STORAGE_VERSION].includes(record.version as number)) return DEFAULT_GAME_RULES;
     return normalizeGameRules(record.rules);
   } catch { return DEFAULT_GAME_RULES; }
 }
@@ -103,7 +132,7 @@ export function saveLastGameRules(value: unknown, storage: RulesStorage | null =
   } catch { return false; }
 }
 
-/** Fixed rules confirmed by the current engine; these are not editable in this release. */
+/** Rules confirmed for the active match and shown in read-only rule summaries. */
 export function describeConfirmedRules(rulesValue: unknown): readonly Readonly<{ label: string; value: string }>[] {
   const rules = normalizeGameRules(rulesValue);
   return [
@@ -117,8 +146,13 @@ export function describeConfirmedRules(rulesValue: unknown): readonly Readonly<{
     { label: '裏ドラ', value: rules.uraDora ? 'リーチ和了時にあり' : 'なし' },
     { label: 'カンドラ', value: rules.kanDora ? 'カン成立ごとに追加' : 'なし（槓裏も追加しない）' },
     { label: '通常流局', value: 'テンパイ・ノーテンを精算' },
-    { label: '途中流局', value: '九種九牌・四風連打・四家立直・四開槓。親維持で本場を加算' },
-    { label: '連荘', value: '親和了・親テンパイ流局で継続' },
-    { label: '対局終了', value: rules.matchFormat === 'tonnan' ? '南4局後、親が連荘しないとき' : '東4局後、親が連荘しないとき' },
+    { label: '親テンパイ連荘', value: rules.dealerTenpaiRenchan ? 'あり' : 'なし（通常流局では親交代）' },
+    { label: '九種九牌', value: rules.kyuushuKyuuhai ? 'あり（途中流局）' : 'なし（通常進行）' },
+    { label: '四風連打', value: rules.fourWinds ? 'あり（途中流局）' : 'なし（通常進行）' },
+    { label: '四家立直', value: rules.fourRiichi ? 'あり（途中流局）' : 'なし（通常進行）' },
+    { label: '四開槓', value: rules.fourKans ? 'あり（途中流局）' : 'なし（通常進行）' },
+    { label: 'アガリやめ', value: rules.agariYame ? '最終局に親が単独トップなら終了' : 'なし' },
+    { label: 'テンパイやめ', value: rules.tenpaiYame ? '最終局、親テンパイ連荘時に単独トップなら終了' : 'なし' },
+    { label: '対局終了', value: rules.matchFormat === 'tonnan' ? '南4局後、終了条件を満たしたとき' : '東4局後、終了条件を満たしたとき' },
   ];
 }

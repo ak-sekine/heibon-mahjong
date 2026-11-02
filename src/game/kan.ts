@@ -6,6 +6,7 @@ import { getWaitingTileKinds, resolveDiscardRon } from './ron.ts';
 import { analyzeWinningShapes } from '../analysis/winning-shape.ts';
 import { calculateShanten } from '../analysis/shanten.ts';
 import { isTenhouState } from './first-turn-wins.ts';
+import { rulesForGame } from '../model/rules.ts';
 
 export interface KanOption {
   readonly id: string;
@@ -67,7 +68,7 @@ export function completeKan(game: GameState, option: Omit<KanOption,'id'>): Game
   const deadWall=[...game.deadWall],rinshan=deadWall[count];deadWall[count]=game.liveWall.at(-1)!;
   const players=[...game.players] as [PlayerState,PlayerState,PlayerState,PlayerState];
   players[p.id]={...p,hand,melds,drawnTile:rinshan,drawnTileSource:'rinshan',temporaryFuriten:false,callDiscard:null};
-  const distributed=count===3 && players.filter(p=>(p.melds ?? []).some(m=>m.tiles.length===4)).length>1;
+  const distributed=count===3 && rulesForGame(game).fourKans && players.filter(p=>(p.melds ?? []).some(m=>m.tiles.length===4)).length>1;
   // Four distributed kans end immediately on confirmation, before any win/discard.
   // The reserved fourth rinshan is still transferred to keep all 136 IDs unique.
   return cancelAllIppatsu({...game,turnPlayerId:p.id,players,deadWall,liveWall:game.liveWall.slice(0,-1),kanCount:count+1,callsMade:true,ronWindow:null,phase:distributed?'wall-exhausted':'awaiting-discard',...(distributed?{abortiveDraw:'four-kans' as const}:{})});

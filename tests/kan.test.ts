@@ -10,6 +10,7 @@ import {exposedDoraIndicators,uraDoraIndicators} from '../src/game/dora.ts';
 import {isClosedForRiichi,getRiichiDiscardOptions,declareRiichi} from '../src/game/riichi.ts';
 import {canDeclareKyuushuKyuuhai} from '../src/game/special-draws.ts';
 import {winningMelds} from '../src/game/melds.ts';
+import {DEFAULT_GAME_RULES} from '../src/model/rules.ts';
 import {startMatch,assertPointConservation,nextRound,updateMatchGame} from '../src/game/match.ts';
 import {AutomaticTurnRunner} from '../src/game/automatic-turns.ts';
 import {allTiles,freeze} from './helpers.ts';
@@ -121,6 +122,14 @@ for(const distributed of [false,true])test(`four kans distributed=${distributed}
  const r=kan(g);conserved(r,g);assert.equal(r.kanCount,4);assert.equal(r.players[0].drawnTile,g.deadWall[3]);assert.equal(exposedDoraIndicators(r).length,5);assert.equal(uraDoraIndicators(r).length,5);assert.equal(canTakeRinshan(r),false);
  if(distributed){assert.equal(r.abortiveDraw,'four-kans');const m=startMatch(r);assert.equal(m.lastSettlement!.reason,'four-kans');assert.equal(m.lastSettlement!.payments.length,0);assert.equal(m.lastSettlement!.next!.honba,1);assert.equal(m.lastSettlement!.next!.dealerId,m.dealerId);assertPointConservation(m);assert.equal(nextRound(m).game.kanCount,0);}
  else {assert.ok(canDeclareTsumo(r,0));const w=declareTsumo(r,0).winResult!;assert.equal(w.yakumanCount,4);assert.deepEqual(w.candidate.yaku.map(y=>y.id).sort(),['daisuushii','suuankou','suukantsu','tsuuiisou']);assert.equal(w.doraHan,0);assert.equal(w.redDoraHan,0);}
+});
+test('four kans OFF leaves the fourth kan, rinshan and dora transition active without allowing a fifth',()=>{
+ const rules={...DEFAULT_GAME_RULES,fourKans:false};
+ const source=kanGame({hands:{0:['444z','234m','456p','5z']},melds:{0:[{type:'ankan',group:'1111z'}],1:[{type:'ankan',group:'2222z'},{type:'ankan',group:'3333z'}]},draw:'north',rinshan:['sou-9','pin-9','man-9','white']});
+ const game={...source,rules};
+ const fourth=kan(game);conserved(fourth,source);assert.equal(fourth.kanCount,4);assert.equal(fourth.abortiveDraw,undefined);
+ assert.equal(fourth.phase,'awaiting-discard');assert.equal(fourth.players[0].drawnTile,game.deadWall[3]);assert.equal(exposedDoraIndicators(fourth,rules).length,5);
+ assert.equal(canTakeRinshan(fourth),false);assert.equal(getKanOptions(fourth,0).length,0);
 });
 test('three kans give two han and ura follows established riichi',()=>{
  const g=kanGame({hands:{0:['123m','2z']},melds:{0:[{type:'ankan',group:'1111z'},{type:'ankan',group:'3333z'},{type:'ankan',group:'5555z'}]},draw:'south'});

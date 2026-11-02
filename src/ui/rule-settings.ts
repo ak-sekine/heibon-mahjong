@@ -80,6 +80,13 @@ export class RuleEditor {
       ['uraDora', '裏ドラ', 'リーチ和了時に裏ドラを数えます'],
       ['ippatsu', '一発', '成立条件を満たす一発を役として数えます'],
       ['kanDora', 'カンドラ', '槓成立時に表ドラと槓裏ドラを追加します'],
+      ['dealerTenpaiRenchan', '親テンパイ連荘', '通常流局で親がテンパイなら親を維持します'],
+      ['kyuushuKyuuhai', '九種九牌', '第一ツモ時の宣言による途中流局を認めます'],
+      ['fourWinds', '四風連打', '4人の第一打が同じ風牌なら途中流局します'],
+      ['fourRiichi', '四家立直', '4人全員がリーチしたら途中流局します'],
+      ['fourKans', '四開槓', '複数人の合計4回のカンで途中流局します'],
+      ['agariYame', 'アガリやめ', '最終局で親が和了し、精算後に単独トップなら終了します'],
+      ['tenpaiYame', 'テンパイやめ', '最終局で親テンパイ連荘となり、精算後に単独トップなら終了します'],
     ] as const;
     for (const [key, title, hint] of options) {
       const label = document.createElement('label');
@@ -113,8 +120,8 @@ export class RuleEditor {
       input.checked = input.value === normalized.matchFormat;
     });
     this.optionalRules.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(input => {
-      const key = input.dataset.ruleKey as 'redDora' | 'kuitan' | 'uraDora' | 'ippatsu' | 'kanDora' | undefined;
-      if (key) input.checked = normalized[key];
+      const key = input.dataset.ruleKey as keyof GameRules | undefined;
+      if (key && key !== 'schemaVersion' && key !== 'matchFormat') input.checked = normalized[key];
     });
     this.renderFixedRules(normalized);
   }
@@ -124,7 +131,7 @@ export class RuleEditor {
   }
   private renderFixedRules(rules: GameRules): void {
     if (!this.fixedRules) return;
-    const rows = describeConfirmedRules(rules).filter(entry => !['対局形式', '赤ドラ', '喰いタン', '裏ドラ', '一発', 'カンドラ'].includes(entry.label));
+    const rows = describeConfirmedRules(rules).filter(entry => !['対局形式', '赤ドラ', '喰いタン', '裏ドラ', '一発', 'カンドラ', '親テンパイ連荘', '九種九牌', '四風連打', '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ'].includes(entry.label));
     const list = document.createElement('dl');
     list.className = 'confirmed-rules-list';
     for (const entry of rows) {
