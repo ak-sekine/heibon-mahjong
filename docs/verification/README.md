@@ -4,8 +4,8 @@
 
 ## Issue調査
 
-- [オンライン待機画面の進行ボタン — Issue #41、2026-11-02](issue41-online-waiting-room-progress-buttons-2026-11-02.md) — ホストの準備・座席確定・対局開始を同じ位置で切り替え、非ホスト・再戦・退出・再接続を含む状態遷移とIssue #34のレイアウト回帰を検証します。自動検証・Actions／公開・iPhone Safari実機確認を分けて記録します。実機確認完了までIssueはOpenを維持します。
-- [座席確定メッセージの重複表示 — Issue #41追加修正、2026-11-02](issue41-seat-finalized-message-duplicate-2026-11-02.md) — iPhone Safariで発見された二重表示の原因、最小修正、回帰検証、修正後の実機再確認項目を記録します。
+- [オンライン待機画面の進行ボタン — Issue #41、2026-11-02〜11-03](issue41-online-waiting-room-progress-buttons-2026-11-02.md) — ホストの準備・座席確定・対局開始の同位置切替と回帰、最終Deploy run `41474025754`の検証・Chromium／WebKit・Worker／Pages成功、追加修正後のiPhone Safari報告、実機未確認項目、completed／Close判定を記録します。
+- [座席確定メッセージの重複表示 — Issue #41追加修正、2026-11-02〜11-03](issue41-seat-finalized-message-duplicate-2026-11-02.md) — 原因と修正、回帰検証、iPhone Safariでの重複解消OK、Actionsと公開結果、実機未確認範囲を記録します。文書更新run `41476660809`の検証・公開ジョブは、文書のみの変更分類により正常にskipされました。
 - [オンライン待機画面の操作ボタン配置 — Issue #34、2026-11-02](issue34-online-waiting-room-buttons-2026-11-02.md) — 左右の退出・準備完了、下段全幅の再接続を固定し、Chromium／WebKitの複数幅で配置・接続遷移を検証する。自動検証・公開・iPhone Safari実機確認の状態を記録。ユーザー本人のiPhone Safari実機確認5件OK（NG 0、未確認0）を記録し、IssueはcompletedでClose。
 - [人和・責任払い・ダブル役満・三家和 — Issue #19、2026-11-02](issue19-unimplemented-rules-2026-11-02.md) — 調査対象commit `834bdc8`のコード調査、確定仕様、連盟公式「～2024年度」資料の取得確認とHEIBON MAHJONG独自仕様との差、実装設計、テスト計画、残リスクを記録。実装Issueは[#37](https://github.com/ak-sekine/heibon-mahjong/issues/37)特殊形ダブル役満、[#38](https://github.com/ak-sekine/heibon-mahjong/issues/38)人和、[#39](https://github.com/ak-sekine/heibon-mahjong/issues/39)パオ、[#40](https://github.com/ak-sekine/heibon-mahjong/issues/40)複数ロン・三家和。Issue #19は設計完了条件を満たしcompletedでClose。
 - [連荘・途中流局・オーラス終了条件 — Issue #18、2026-11-02](issue18-local-rules-2026-11-02.md) — `GameRules` schema v4の7設定、既定値補完、オフライン・オンライン・CPU・再接続・再戦、自動テストとActions run `41382073027`（Chromium 37／WebKit 25、Worker／Pages Deploy成功）を記録。ユーザー本人のiPhone Safari実機確認は指定6項目すべてOK（NG 0、未確認0）。特殊局面は自動検証と実機未確認を区別し、Issue #18はcompletedとしてClose。

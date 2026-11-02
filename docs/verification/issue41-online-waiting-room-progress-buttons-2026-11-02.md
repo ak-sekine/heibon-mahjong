@@ -2,7 +2,7 @@
 
 ## 状態
 
-- Issue #41「オンライン待機画面の操作ボタンを進行状態に応じて切り替える」。iPhone Safari実機確認が終わるまでOpenを維持し、結果を受けてClose可否を判断する。
+- Issue #41「オンライン待機画面の操作ボタンを進行状態に応じて切り替える」。2026-11-03の追加修正後の実機確認と最終Deploy結果を確認し、必須条件を満たしたためcompletedとしてCloseする。
 - Issue本文と最新の`main`を確認して着手。開始時ブランチ`work`、作業ツリーclean、開始時HEAD `559af2fefac7c49c498e756b11f813cbb97516f8`。通常の`git fetch origin`はプロキシ接続不可。許可付き`git fetch origin`は成功し、`origin/main`も同じSHA `559af2fefac7c49c498e756b11f813cbb97516f8`。behind/aheadは`0/0`、`origin/main..HEAD`の未pushコミットなし。
 - Issue #34は左側「ルームを退出」・右側「準備完了」・下段全幅「再接続」を2列gridで配置済み。進行ボタンの同位置配置はこの領域に追加する。
 
@@ -37,10 +37,14 @@
 - 修正後run [#41458786517](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41458786517)（SHA `9c91447102ac8199ac8a54b55108059c0d6d0c7c`）では`verify`がsuccess。Chromium／WebKit Browser UIは、ホストだけが準備した直後に未準備の参加者の準備ボタンが消えるとテストが誤認して両方failure。参加者自身が準備するまでは同ボタンが表示されるのが仕様のため、テスト順と期待を修正。`browser-ui-matrix-audit`はfailure、Deploy gateは不成立。Worker／Pages公開はskip。
 - run [#41460386920](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41460386920)（SHA `d394da14ddd39420278ecd3c0086b77d12767832`）では`verify`success。Chromium／WebKit Browser UIは、参加者準備後の退出ボタンの画面上のy座標が18.5px変化したためfailure。ルーム表示内容の高さが状態により変わる座標を比較していたテストの問題で、ボタン領域の配置自体は同じ。進行ボタン同士は操作領域からの相対位置で比較し、進行ボタンがない参加者状態では退出ボタンの横位置を同じブラウザー内で比較するよう回帰チェックを修正。`browser-ui-matrix-audit`failure、Deploy gate不成立、Worker／Pages公開はskip。
 - run [#41461599181](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41461599181)（SHA `cb14fe7dd24cc85afdf3448ed9eac54f6c7cab31`）では`verify`success。Chromium／WebKit Browser UIは再戦待機でホスト未準備なのに「対局開始」が表示されると旧テストが期待しfailure。新仕様ではホストが準備するまでは「準備完了」を表示するため、再戦テストもこの切り替え順へ修正。`browser-ui-matrix-audit`failure、Deploy gate不成立、Worker／Pages公開はskip。
-- 修正後のmainコミットSHA、再実行run、Chromium／WebKit、Deploy gate、Worker／Pagesの公開結果は確認後に追記する。
+- 最終Deploy run [#41474025754](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41474025754)をGitHubから再取得。対象はmain SHA `5d9121fa6e5b2f00c441c9c51c85878ea22a0a5f`、run status/conclusionはcompleted/success。`verify`、`browser-ui / browser-ui (chromium)`、`browser-ui / browser-ui (webkit)`、`browser-ui-matrix-audit`、`release-freshness`、`deploy-worker`、`production-test`、`pages-build`、`pages-deploy`はすべてsuccess。Chromium／WebKitの実機操作ではなく、GitHub Actions上の自動UI検証。
+- 文書更新run [#41476660809](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41476660809)はmain SHA `cfb7e17bf75d9b284b81a0d950091c5371c9ca1d`、completed/success。`docs-check`はsuccess。`verify`、Chromium／WebKit Browser UI、matrix audit、release freshness、Worker／Pages関連ジョブはすべてskip。変更分類jobが文書のみの変更と判定したことによる正常なskipであり、検証・公開成功を意味しない。
+- 2026-11-03、ユーザー本人がiPhone Safariで、座席確定メッセージがルームコードより上の1か所だけに表示され、プレイヤー一覧の下には重複表示されないことをOKと報告。ボタン操作については追加修正前に「動作は問題ありません」と総括報告あり。個別操作項目すべての実機OKを意味するとは扱わない。
+- 実機で個別に確認済み：座席確定メッセージの上部1か所表示OK、プレイヤー一覧下の重複なしOK、追加修正前のボタン操作全般について問題なしとの総括報告。個別実機確認のNG報告なし。エラー通知、再接続、CPU補充、非ホストの各操作、ボタン遷移の個々の条件、各画面幅・PC表示などは個別の実機OK報告なし。これらはBrowser UI・自動テスト結果と区別し、実機未確認とする。
+- Issue本文の操作仕様は実装され、対応するChromium／WebKit自動UI検証と公開が成功。座席確定メッセージ重複はiPhone Safariで解消を確認。報告範囲外の個別実機項目を成功扱いせず記録した。必須受け入れ条件に未解決項目は残らないと判定し、Issue #41をcompletedとしてCloseする。
 - PRは作成しない。
 
 ## iPhone Safari実機確認
 
-- ユーザー本人による実機確認結果は未報告。確認できるまでは未確認とし、推測で結果を記載しない。
-- 受け入れ確認項目：ホスト準備前・準備後・座席確定後の同じ位置での切替、他参加者が未準備時の無効表示、全員準備完了時の有効表示、非ホストの表示・操作権限、CPU補充後の座席と固定、開始、ホスト／参加者退出、再接続後の復元、左の退出位置固定、再接続の下段全幅、縦向きでの折返し・重なり・横はみ出し。
+- 実機確認は[追加修正記録](issue41-seat-finalized-message-duplicate-2026-11-02.md)に記録。機種名の詳細、iOSバージョン、確認時刻は報告されていないため補完しない。
+- 個別の実機確認範囲：ボタン操作は追加修正前に「動作は問題ありません」と総括報告。追加修正後は座席確定メッセージ位置と重複解消の2点を明示的にOK報告。エラー通知、再接続、CPU補充、非ホスト操作、各ボタン遷移、他の画面幅は個別未確認。自動Browser UI結果を実機結果として扱わない。
