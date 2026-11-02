@@ -56,12 +56,15 @@
 
 ### 初回GitHub Actions確認と修正
 
-実装SHA `20b11cb6773325d16c377992eb65d51b19889ad7` のDeploy run [`41381185539`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41381185539) はverify成功でした。Chromium／WebKit Browser UIは両方、既存の`tests/browser-app-idle.py`に残っていた`localStorage` version `3`の期待値で失敗し、schema v4で保存された実際値`4`と不一致になりました。ログを確認し、テスト期待値を4へ更新しました。matrix auditはBrowser UI失敗により失敗し、release freshness、Deploy gate後続、Worker／Pages公開はskipされ、このrunでは公開していません。修正版のActions結果は次のcommit後に記録します。
+実装SHA `20b11cb6773325d16c377992eb65d51b19889ad7` のDeploy run [`41381185539`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41381185539) はverify成功でした。Chromium／WebKit Browser UIは両方、既存の`tests/browser-app-idle.py`に残っていた`localStorage` version `3`の期待値で失敗し、schema v4で保存された実際値`4`と不一致になりました。ログを確認し、テスト期待値を4へ更新しました。matrix auditはBrowser UI失敗により失敗し、release freshness、Deploy gate後続、Worker／Pages公開はskipされ、このrunでは公開していません。
+
+期待値更新コミット`4ea0047523913e3d04a3fec71a4031dc0ce4f14d`のDeploy run [`41381543798`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41381543798) はverify成功でしたが、Chromium／WebKitの両方で既存`tests/browser-offline-rules.py`の読み取り専用ルール名リストが更新前の13項目のままで失敗しました。アプリ表示・ルールモデルの比較以前のテスト期待値不整合と判明したため、一覧を新設7項目込みの全18行に更新し、ブラウザーで7項目の既定値も確認するようにしました。matrix auditは失敗し、release freshness、Deploy gate後続、Worker／Pages公開はskipされ、このrunでも公開していません。
 
 ## GitHub Actionsと公開
 
 - 初回実装コミットSHA: `20b11cb6773325d16c377992eb65d51b19889ad7`（直接push済み）。
-- 修正版コミットSHA: 追記予定。
+- 保存version期待値修正版SHA: `4ea0047523913e3d04a3fec71a4031dc0ce4f14d`（直接push済み）。
+- 読み取り専用項目・既定値のBrowser UI期待値修正SHA: 追記予定。
 - GitHub Actions Deploy run: 追記予定。verify、Browser UI Chromium／WebKit、Deploy gate、Worker公開、production test、Pages build/deployを対象SHAで確認します。
 - Worker公開SHAと結果: 追記予定。
 - GitHub Pages公開SHAと結果: 追記予定。Pagesの独立HTTP応答を確認したかも区別して記録します。
