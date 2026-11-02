@@ -30,7 +30,7 @@
 
 修正版run [#41444838765](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41444838765) はSHA `9db1af62844baaa350daf95a76783772f82bfa4c` を対象に実行。`docs-check`、`detect-changes`、`verify`、WebKit Browser UIはsuccess。Chromiumは待機画面の配置・接続遷移アサーションを通過した後、後続のオンライン対局診断テストで `game_action_response_timeout` が記録されずfailureしました。原因は、手動再接続中の表示確認用にテストmockへ追加した100ms遅延が、以降のゲーム再接続にも残ったことです。遅延を手動再接続1回で消費するようmockを修正しました。このrunではmatrix auditがfailureとなり、Worker／Pages公開工程はskipされました。
 
-最終Deploy run [#41446809663](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41446809663) はSHA `6214f8cc73cf509acfe189cc5852a6deba855d97` を対象に実行し、全体がsuccessしました。`verify` は回帰テスト1,356件成功、Worker typecheck、Pages buildもsuccess。ChromiumとWebKitのBrowser UIは両方successし、待機画面回帰スクリプトを含むブラウザー検証を完了しました。通常接続と切断状態で、幅320、375、390、414、430、1280pxを検証し、配置、上段位置の維持、再接続の下段全幅、既存配色、横スクロールなしを確認しています。再接続中から成功後への表示遷移と既存操作の検証も通過しました。
+最終Deploy run [#41446809663](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41446809663) はSHA `6214f8cc73cf509acfe189cc5852a6deba855d97` を対象に実行し、全体がsuccessしました。`verify` は回帰テスト1,356件成功、Worker typecheck、Pages buildもsuccess。ChromiumとWebKitのBrowser UIは両方successし、待機画面回帰スクリプトを含むブラウザー検証を完了しました。通常接続では幅320、375、390、414、430、1280px、切断状態では幅320、375、390、430、1280pxを検証し、配置、上段位置の維持、再接続の下段全幅、既存配色、横スクロールなしを確認しています。再接続中から成功後への表示遷移と既存操作の検証も通過しました。
 
 同runでは`browser-ui-matrix-audit`、`release-freshness`、`deploy-worker`、`production-test`、`pages-build`、`pages-deploy`もsuccess。Deploy gateを通過してWorkerとGitHub Pagesを公開し、公開対象SHAは`6214f8cc73cf509acfe189cc5852a6deba855d97`です。mainの公開対象SHAはこの値と一致します。Worker: https://heibon-mahjong-online.ak-sekine.workers.dev 、Pages: https://ak-sekine.github.io/heibon-mahjong/ 。
 
