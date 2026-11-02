@@ -120,6 +120,7 @@ MOCK = r"""
   };
   const sockets = [];
   const gameActions = [];
+  let rejectNextFinalize = false;
   let tickets = 0;
   let nextSocketSeat = 0;
   let copied = '';
@@ -270,6 +271,10 @@ MOCK = r"""
         const humans = state.seats.filter(seat => seat.kind === 'human');
         if (state.hostSeat !== 0) return result(this, message, false, 'not_host');
         if (!humans.every(seat => seat.connected && seat.ready)) return result(this, message, false, 'players_not_ready');
+        if (rejectNextFinalize) {
+          rejectNextFinalize = false;
+          return result(this, message, false, 'players_not_ready');
+        }
         const gameSeats = [2, 0, 3, 1];
         state.seats = state.seats.map(seat => ({
           ...seat,
@@ -619,10 +624,7 @@ MOCK = r"""
         hands: JSON.parse(JSON.stringify(hands)), drawnTiles: JSON.parse(JSON.stringify(drawnTiles)) };
     },
     forceDisconnect() { sockets.filter(socket => socket.readyState === MockWebSocket.OPEN).at(-1)?.forceDisconnect(); },
-    sendSocketError(code = 'players_not_ready') {
-      const socket = sockets.find(value => value.readyState === MockWebSocket.OPEN);
-      if (socket) send(socket, { type: 'error', code });
-    },
+    rejectNextFinalize() { rejectNextFinalize = true; },
     dropNextGameResult() { dropNextGameResult = true; },
     get ticketRequests() { return tickets; },
     get gameActions() { return [...gameActions]; },
@@ -857,13 +859,17 @@ with sync_playwright() as p:
         wait_for('document.querySelector("#online-finalize").disabled === false')
         assert page.locator('#online-finalize').is_visible() and page.locator('#online-ready').is_hidden()
         assert page.locator('#online-close-room').count() == 0, 'the room-end button remained in the waiting UI'
+        page.evaluate('window.onlineMock.rejectNextFinalize()')
+        page.locator('#online-finalize').click()
+        wait_for("document.querySelector('#online-error').hidden === false")
+        assert page.locator('#online-error').get_attribute('role') == 'alert'
+        assert page.locator('#online-error').inner_text() == 'すべての人間プレイヤーが準備完了していません。', 'server action errors stopped appearing in the dedicated alert region'
+        assert page.locator('#online-finalize').is_visible(), 'a rejected finalize action hid the host control'
         page.locator('#online-finalize').click()
         wait_for("document.querySelector('#online-status').textContent === '座席が確定しました。ホストはオンライン対局を開始できます。'")
         assert page.locator('#online-status').is_visible(), 'the upper seat-finalized status was hidden'
         assert page.locator('#online-finalized-message').is_hidden(), 'the seat-finalized message was duplicated below the player list'
-        assert page.locator('#online-error').get_attribute('role') == 'alert', 'the independent error notification region was removed'
-        page.evaluate("window.onlineMock.sendSocketError('players_not_ready')")
-        assert page.locator('#online-error').is_visible() and page.locator('#online-error').inner_text() == 'すべての人間プレイヤーが準備完了していません。', 'server errors stopped appearing in the dedicated alert region'
+        assert page.locator('#online-error').is_hidden(), 'a successful seat finalization did not clear the prior error'
         assert page.locator('#online-finalized-message').is_hidden(), 'showing an error restored the duplicate seat-finalized message'
         assert page.locator('#online-start-game').inner_text() == '対局開始'
         guest_page.wait_for_function("document.querySelector('#online-status').textContent === '座席が確定しました。ホストはオンライン対局を開始できます。'")
