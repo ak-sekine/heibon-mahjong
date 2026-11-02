@@ -164,7 +164,7 @@ MOCK = r"""
         this.dispatchEvent(new Event('open'));
         send(this, { type: 'room-state', ...JSON.parse(JSON.stringify(state)) });
         if (gameStarted) send(this, { type: 'game-state', view: makeView(this.seat) });
-      }, 5);
+      }, window.__onlineMockConnectDelay ?? 5);
     }
     send(raw) {
       const message = JSON.parse(raw);
@@ -340,13 +340,13 @@ MOCK = r"""
       }
       this.finish(code, reason);
     }
-    forceDisconnect() {
+    forceDisconnect(closeCode = 1006) {
       if (this.readyState !== MockWebSocket.OPEN) return;
       state.seats[this.seat].connected = false;
       state.seats[this.seat].ready = false;
       state.revision++;
       broadcast();
-      this.finish(1006, 'Network interruption');
+      this.finish(closeCode, 'Network interruption');
     }
     finish(code, reason) {
       if (this.readyState >= MockWebSocket.CLOSING) return;
@@ -735,6 +735,61 @@ with sync_playwright() as p:
             return page.wait_for_function(expression, **kwargs)
         except PlaywrightTimeoutError as error:
             raise AssertionError(f'online browser UI wait timed out: {expression}: {error}') from error
+
+    waiting_action_position_baselines = {}
+
+    def assert_waiting_action_layout(width, height, reconnect_visible):
+      page.set_viewport_size({'width': width, 'height': height})
+      layout = page.evaluate('''() => {
+        const actions = document.querySelector('#online-actions');
+        const rect = selector => {
+          const {left, right, top, bottom, width, height} = document.querySelector(selector).getBoundingClientRect();
+          return {left, right, top, bottom, width, height};
+        };
+        const {left, right, top, bottom, width, height} = actions.getBoundingClientRect();
+        const parent = {left, right, top, bottom, width, height};
+        const leave = rect('#online-leave'), ready = rect('#online-ready'), reconnect = rect('#online-reconnect');
+        return {
+          leaveVisible: !document.querySelector('#online-leave').hidden,
+          readyVisible: !document.querySelector('#online-ready').hidden,
+          reconnectVisible: !document.querySelector('#online-reconnect').hidden,
+          leave, ready, reconnect, parent,
+          viewportWidth: innerWidth,
+          documentWidth: document.documentElement.scrollWidth,
+          dialogWidth: document.querySelector('#online-dialog').scrollWidth,
+          dialogClientWidth: document.querySelector('#online-dialog').clientWidth,
+          buttonsInsideViewport: [...actions.querySelectorAll('button:not([hidden])')].every(button => {
+            const buttonRect = button.getBoundingClientRect();
+            return buttonRect.left >= 0 && buttonRect.right <= innerWidth;
+          }),
+        };
+      }''')
+      assert layout['leaveVisible'] and layout['readyVisible'], f'primary waiting actions were not visible at {width}px: {layout}'
+      assert layout['leave']['left'] < layout['ready']['left'] and layout['leave']['right'] <= layout['ready']['left'], \
+        f'leave and ready actions were not left/right at {width}px: {layout}'
+      assert abs(layout['leave']['top'] - layout['ready']['top']) <= 1, \
+        f'leave and ready actions did not share the upper row at {width}px: {layout}'
+      primary_position = tuple(layout[button][coordinate] - layout['parent'][origin]
+                               for button, coordinate, origin in (
+                                 ('leave', 'left', 'left'), ('ready', 'left', 'left'),
+                                 ('leave', 'top', 'top'), ('ready', 'top', 'top')))
+      if reconnect_visible:
+        baseline = waiting_action_position_baselines.get(width)
+        assert baseline is not None and all(abs(actual - expected) <= 1 for actual, expected in zip(primary_position, baseline)), \
+          f'primary action positions changed when reconnect appeared at {width}px: {layout}'
+      else:
+        waiting_action_position_baselines[width] = primary_position
+      assert layout['reconnectVisible'] is reconnect_visible, f'reconnect visibility did not match the connection state at {width}px: {layout}'
+      if reconnect_visible:
+        assert layout['reconnect']['top'] >= max(layout['leave']['bottom'], layout['ready']['bottom']), \
+          f'reconnect was not below the primary actions at {width}px: {layout}'
+        assert abs(layout['reconnect']['left'] - layout['parent']['left']) <= 1 and \
+          abs(layout['reconnect']['right'] - layout['parent']['right']) <= 1, \
+          f'reconnect did not span the action area at {width}px: {layout}'
+      assert layout['buttonsInsideViewport'], f'waiting action exceeded the viewport at {width}px: {layout}'
+      assert layout['documentWidth'] <= layout['viewportWidth'] and layout['dialogWidth'] <= layout['dialogClientWidth'], \
+        f'waiting actions caused horizontal overflow at {width}px: {layout}'
+      assert_common_button_colors(page, '#online-actions button:not([hidden])')
 
     if REMATCH_MULTI_CLIENT_ONLY:
         guest_page = page.context.new_page()
@@ -1661,6 +1716,7 @@ with sync_playwright() as p:
     layout_results = []
     for width, height in [(320, 700), (375, 667), (375, 812), (390, 844), (414, 896), (1280, 900)]:
       page.set_viewport_size({'width': width, 'height': height})
+      assert_waiting_action_layout(width, height, False)
       assert_online_dialog_header('#online-dialog', '#online-close', width)
       layout = page.evaluate('''() => {
         const dialog = document.querySelector('#online-dialog');
@@ -1756,10 +1812,21 @@ with sync_playwright() as p:
     page.evaluate('window.onlineMock.setGuestReady(true)')
     wait_for('document.querySelector("#online-finalize").disabled === false')
 
-    page.evaluate('window.onlineMock.forceDisconnect()')
+    tickets_before_manual_reconnect = page.evaluate('window.onlineMock.ticketRequests')
+    page.evaluate('window.onlineMock.forceDisconnect(4001)')
     wait_for("document.querySelector('#online-connection').textContent.includes('再接続')")
     wait_for("document.querySelector('#online-seats').innerText.includes('切断中')")
-    wait_for('window.onlineMock.ticketRequests >= 3', timeout=10000)
+    wait_for("document.querySelector('#online-reconnect').hidden === false")
+    for width, height in [(320, 700), (375, 812), (390, 844), (430, 932), (1280, 900)]:
+      assert_waiting_action_layout(width, height, True)
+    page.set_viewport_size({'width': 390, 'height': 844})
+    page.evaluate('window.__onlineMockConnectDelay = 100')
+    page.locator('#online-reconnect').click()
+    assert '接続しています' in page.locator('#online-connection').inner_text(), 'manual reconnection did not show its connecting status'
+    assert page.locator('#online-reconnect').is_hidden(), 'manual reconnection left its retry button visible while connecting'
+    wait_for(f'window.onlineMock.ticketRequests > {tickets_before_manual_reconnect}', timeout=10000)
+    wait_for("document.querySelector('#online-connection').textContent === '接続中'", timeout=10000)
+    wait_for("document.querySelector('#online-reconnect').hidden === true", timeout=10000)
     wait_for("document.querySelector('#online-seats').innerText.includes('接続中')")
     wait_for("document.querySelector('#online-ready').textContent === '準備完了'", timeout=10000)
     page.locator('#online-ready').click()
