@@ -4,7 +4,7 @@
 
 ## Issue調査
 
-- [和了結果の点数区分 — Issue #36、2026-11-02](issue36-win-score-tier-2026-11-02.md) — scoreTierにもとづくオフライン／オンライン共通表示、run #557の旧期待値不一致の修正、run #558のverify・Chromium／WebKit・matrix audit・Worker／Pages公開成功、iPhone Safari実機未確認のチェック項目を記録。
+- [和了結果の点数区分 — Issue #36、2026-11-02〜11-03](issue36-win-score-tier-2026-11-02.md) — 計算済みscoreTierによる共通表示、run #558のverify・Chromium／WebKit・matrix audit・Worker／Pages公開成功、2026-11-03のiPhone Safari実機OK 6件・NG 0件・未確認1件（数え役満／通常・複合役満）、個別満貫境界の実機未報告を自動検証と区別して記録。完了条件を満たしIssue #36はcompletedでClose。
 - [オンライン待機画面の進行ボタン — Issue #41、2026-11-02〜11-03](issue41-online-waiting-room-progress-buttons-2026-11-02.md) — ホストの準備・座席確定・対局開始の同位置切替と回帰、最終Deploy run `41474025754`の検証・Chromium／WebKit・Worker／Pages成功、追加修正後のiPhone Safari報告、実機未確認項目、completed／Close判定を記録します。
 - [座席確定メッセージの重複表示 — Issue #41追加修正、2026-11-02〜11-03](issue41-seat-finalized-message-duplicate-2026-11-02.md) — 原因と修正、回帰検証、iPhone Safariでの重複解消OK、Actionsと公開結果、実機未確認範囲を記録します。文書更新run `41476660809`の検証・公開ジョブは、文書のみの変更分類により正常にskipされました。
 - [オンライン待機画面の操作ボタン配置 — Issue #34、2026-11-02](issue34-online-waiting-room-buttons-2026-11-02.md) — 左右の退出・準備完了、下段全幅の再接続を固定し、Chromium／WebKitの複数幅で配置・接続遷移を検証する。自動検証・公開・iPhone Safari実機確認の状態を記録。ユーザー本人のiPhone Safari実機確認5件OK（NG 0、未確認0）を記録し、IssueはcompletedでClose。
