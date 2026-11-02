@@ -36,7 +36,7 @@
 
 ## 自動・ブラウザー検証
 
-- [特殊形ダブル役満・GameRules v5 — Issue #37、2026-11-02](issue37-double-yakuman-2026-11-02.md) — 4形の判定・倍率、v1〜v4移行とv5保存、オフライン／オンライン／Worker同期、iPhone Safari実機確認待ちを記録。結果詳細の合計ラベル統一を含む公開SHA `87d5bf0`、Actions run [#41439154842](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41439154842)はverify・Chromium／WebKit・Worker／Pages gate成功。
+- [特殊形ダブル役満・GameRules v5 — Issue #37、2026-11-02](issue37-double-yakuman-2026-11-02.md) — 4形の判定・倍率、v1〜v4移行とv5保存、オフライン／オンライン／Worker同期、iPhone Safari実機OK 7件（表示・点数）、その他の実機未報告項目は自動検証と区別して記録。completedでClose。結果詳細の合計ラベル統一を含む公開SHA `87d5bf0`、Actions run [#41439154842](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41439154842)はverify・Chromium／WebKit・Worker／Pages gate成功。
 - [喰いタンON/OFF — Issue #17](issue17-local-rules-2026-11-01.md) — `GameRules` v3、ON/OFFの役・翻数・点数、CPU鳴き、保存・オンライン同期、自動テスト・GitHub Actions結果を記録します。2026-11-02のユーザー本人によるiPhone Safari実機確認はOK 4件、NG 0件、未確認2件。CPU判断は自動テスト根拠あり。片和了の一方のみ役成立する専用ケースは自動テスト未確認で、その範囲を記録してIssue #17をcompletedとしてClose。
 
 - [和了概要のドラ合計 — Issue #11、2026-10-31](issue11-dora-summary-2026-10-31.md) — オフライン・オンライン共通表示、既存 `doraCounts` による合算、点数系不変、オンライン結果のJSON復元、自動検証とActions run 41196608100（実装SHA一致、検証・Browser UI・production-test・Worker/Pages deploy成功）を記録。ユーザー本人によるiPhone Safari実機確認はOK 4件、NG 0件、未確認4件で、実機未確認事項は自動検証と区別しています。
