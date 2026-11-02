@@ -221,6 +221,7 @@ with sync_playwright() as p:
               winners: result.map(entry => ({ winnerId: entry.winnerId, winMethod: entry.winMethod,
                 discarderId: entry.winMethod === 'ron' ? entry.discarderId : null,
                 yaku: entry.candidate.yaku.map(yaku => yaku.id),
+                yakuDetails: entry.candidate.yaku.map(yaku => ({ id: yaku.id, yakuman: yaku.yakuman })),
                 doraHan: entry.doraHan, uraDoraHan: entry.uraDoraHan, redDoraHan: entry.redDoraHan,
                 doraCounts: { normal: entry.doraCount, ura: entry.uraDoraCount, red: entry.redDoraCount },
                 totalHanIncludingDora: entry.totalHanIncludingDora, fu: entry.fu, yakumanCount: entry.yakumanCount,
@@ -449,7 +450,10 @@ with sync_playwright() as p:
                     detail_yaku = [re.sub(r'\s+\d+(?:翻|役満)$', '', line) for line in yaku_lines]
                     assert detail_yaku == [DETAIL_YAKU_NAMES[yaku_id] for yaku_id in result['yaku']], (width, scenario, detail_yaku, result['yaku'])
                     summary_yaku = winner_summary.locator('.round-summary-yaku').inner_text()
-                    expected_summary_parts = [SUMMARY_YAKU_NAMES[yaku_id] for yaku_id in result['yaku']]
+                    expected_summary_parts = [
+                        SUMMARY_YAKU_NAMES[yaku['id']] + (f' {yaku["yakuman"]}役満' if yaku['yakuman'] else '')
+                        for yaku in result['yakuDetails']
+                    ]
                     dora_total = sum(result['doraCounts'].values())
                     expected_summary = '・'.join(expected_summary_parts)
                     if dora_total:
