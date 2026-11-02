@@ -111,6 +111,9 @@ function startScenario(id: string): void {
 }
 
 document.querySelector('#load-scenario')!.addEventListener('click', () => startScenario(select.value));
+select.addEventListener('change', () => {
+  issue37Controls.hidden = !select.value.startsWith('issue37-');
+});
 document.querySelector('#start-river-test')!.addEventListener('click', () => startRiverScenario(riverCountSelect.value));
 document.querySelector('#repeat-scenario')!.addEventListener('click', () => {
   select.value = activeScenarioId;
