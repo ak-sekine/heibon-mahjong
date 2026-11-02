@@ -4,6 +4,7 @@
 
 ## Issue調査
 
+- [人和・責任払い・ダブル役満・三家和 — Issue #19、2026-11-02](issue19-unimplemented-rules-2026-11-02.md) — 最新main `d2e25ca`の再確認、前回調査との照合、4ルール比較、選択肢・実装設計・具体精算例・テスト計画・Issue分割案を記録。外部公式資料の再取得はプロキシ403で未確認。ゲームコード／テストコードは変更せず、Issue #19はOpen維持。
 - [連荘・途中流局・オーラス終了条件 — Issue #18、2026-11-02](issue18-local-rules-2026-11-02.md) — `GameRules` schema v4の7設定、既定値補完、オフライン・オンライン・CPU・再接続・再戦、自動テストとActions run `41382073027`（Chromium 37／WebKit 25、Worker／Pages Deploy成功）を記録。ユーザー本人のiPhone Safari実機確認は指定6項目すべてOK（NG 0、未確認0）。特殊局面は自動検証と実機未確認を区別し、Issue #18はcompletedとしてClose。
 - [オンラインのルーム作成・参加画面のプレイヤー名表記 — Issue #30、2026-11-01](issue30-player-name-label-2026-11-01.md) — ラベル・入力検証文言、実機と自動検証の結果を区別して記録。iPhone Safari実機は6項目OK、NG 0件、未確認0件。実装run #503でverify、Chromium／WebKit、production-test、Worker／Pages Deployがsuccessし、docs-only run `41307412228`も文書検査success。Pagesの独立HTTP応答は未確認です。完了条件充足・Issue #30はcompletedでClose。
 - [赤ドラ・裏ドラ・一発・カンドラの個別設定 — Issue #16、2026-11-01](issue16-local-rules-2026-11-01.md) — 初期値、4項目の独立判定、牌・和了・得点・CPU・Worker同期と固定局面テスト、Actions run #499とWorker／Pages deploy、ユーザー本人のiPhone Safari実機確認を記録。実機確認は7件OK、NG 0件、未確認1件（一発OFF）。Issue #16はcompletedとしてClosed。
