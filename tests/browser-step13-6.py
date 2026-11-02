@@ -4,6 +4,7 @@ import os
 import pathlib
 import shutil
 from playwright.sync_api import sync_playwright
+from browser_score_labels import score_summary_label
 
 BASE_URL = os.environ.get('HEIBON_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-step13-6'))
@@ -95,7 +96,7 @@ with sync_playwright() as p:
                   ['sanshoku-doujun','ittsu','honitsu','chinitsu'].includes(yaku.id))?.han,
                 yaku: win.candidate.yaku.map(yaku => ({ id: yaku.id, han: yaku.han })),
                 totalHan: win.totalHanIncludingDora, points: win.totalPoints, fu: win.fu,
-                scoreTier: win.scoreTier, redHan: win.redDoraHan,
+                scoreTier: win.scoreTier, yakumanCount: win.yakumanCount, redHan: win.redDoraHan,
                 privateIds: game.players.slice(1).flatMap(player => [...player.hand,
                   ...(player.drawnTile ? [player.drawnTile] : [])]).map(tile => tile.id),
                 idsUnique: physical.length === 136 && new Set(physical.map(tile => tile.id)).size === 136 };
@@ -109,7 +110,8 @@ with sync_playwright() as p:
             assert result['redHan'] == 0, (width, name, result)
             summary = page.locator('.round-summary-yaku').first.inner_text()
             assert NAMES[expected_id][0] in summary, (width, name, summary)
-            assert page.locator('.round-summary-value').first.inner_text() == f'{result["totalHan"]}翻 {result["fu"]}符', (width, name, result)
+            assert page.locator('.round-summary-value').first.inner_text() == score_summary_label(
+                result['scoreTier'], result['yakumanCount'], result['totalHan'], result['fu']), (width, name, result)
             assert page.locator('.round-summary-points').first.inner_text() == f'{result["points"]:,}点', (width, name, result)
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, name, 'table horizontal overflow')
             assert page.locator('.round-win-summary').evaluate('element => element.scrollWidth <= element.clientWidth'), (width, name, 'summary overflow')

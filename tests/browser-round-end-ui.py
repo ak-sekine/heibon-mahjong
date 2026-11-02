@@ -5,6 +5,7 @@ import pathlib
 import re
 import shutil
 from playwright.sync_api import sync_playwright
+from browser_score_labels import score_summary_label
 
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-round-end-ui'))
 OUT.mkdir(parents=True, exist_ok=True)
@@ -443,11 +444,8 @@ with sync_playwright() as p:
                     section = page.locator(f'.winner-result[data-winner-id="{result["winnerId"]}"]')
                     winner_summary = page.locator(f'.round-win-summary').nth(meta['winners'].index(result))
                     method = 'ツモ' if result['winMethod'] == 'tsumo' else 'ロン'
-                    score = ({1: '役満', 2: 'ダブル役満', 3: 'トリプル役満', 4: '4倍役満'}.get(
-                        result['yakumanCount'], f'{result["yakumanCount"]}倍役満') if result['yakumanCount'] else
-                        '数え役満' if result['scoreTier'] == 'kazoe-yakuman' else
-                        f'{result["totalHanIncludingDora"]}翻 {result["fu"]}符' if result['scoreTier'] == 'normal' else
-                        f'{result["totalHanIncludingDora"]}翻 ' + {'mangan':'満貫','haneman':'跳満','baiman':'倍満','sanbaiman':'三倍満'}[result['scoreTier']])
+                    score = score_summary_label(
+                        result['scoreTier'], result['yakumanCount'], result['totalHanIncludingDora'], result['fu'])
                     expected_heading = f'{seat_names[result["winnerId"]]} {method}・{score}・{result["totalPoints"]:,}点'
                     assert winner_summary.locator('.round-summary-winner').inner_text() == expected_heading, (width, scenario, expected_heading)
                     yaku_lines = section.locator('ul').first.locator('li').all_inner_texts()
@@ -473,17 +471,15 @@ with sync_playwright() as p:
                     assert winner_summary.evaluate('element => element.scrollWidth <= element.clientWidth'), (width, scenario, 'summary overflows horizontally')
                     assert winner_summary.locator('.round-summary-yaku').evaluate('element => element.scrollWidth <= element.clientWidth'), (width, scenario, 'yaku line overflows horizontally')
                     total = winner_summary.locator('.round-summary-value').inner_text()
-                    if result['yakumanCount']:
-                        expected_multiplier = {1: '役満', 2: 'ダブル役満', 3: 'トリプル役満', 4: '4倍役満'}.get(
-                            result['yakumanCount'], f'{result["yakumanCount"]}倍役満')
-                        assert total == expected_multiplier and '翻' not in total and '1役満' not in total, (width, scenario, total)
-                    elif result['scoreTier'] == 'kazoe-yakuman':
-                        assert total == '数え役満', (width, scenario, total)
-                    elif result['scoreTier'] == 'normal':
-                        assert total == f'{result["totalHanIncludingDora"]}翻 {result["fu"]}符', (width, scenario, total)
-                    else:
-                        tier = {'mangan':'満貫','haneman':'跳満','baiman':'倍満','sanbaiman':'三倍満'}[result['scoreTier']]
-                        assert total == f'{result["totalHanIncludingDora"]}翻 {tier}' and '符' not in total, (width, scenario, total)
+                    expected_score = score_summary_label(
+                        result['scoreTier'], result['yakumanCount'], result['totalHanIncludingDora'], result['fu'])
+                    assert total == expected_score, (width, scenario, total, expected_score)
+                    if result['yakumanCount'] > 0 or result['scoreTier'] == 'kazoe-yakuman':
+                        assert '翻' not in total, (width, scenario, total)
+                    if result['scoreTier'] != 'normal':
+                        assert '符' not in total, (width, scenario, total)
+                    if result['yakumanCount'] > 0:
+                        assert '1役満' not in total, (width, scenario, total)
                     points = f'{result["totalPoints"]:,}点'
                     points_node = winner_summary.locator('.round-summary-points')
                     assert points_node.inner_text() == points, (width, scenario, result, points_node.inner_text())

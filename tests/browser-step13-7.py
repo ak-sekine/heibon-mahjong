@@ -4,6 +4,7 @@ import os
 import pathlib
 import shutil
 from playwright.sync_api import sync_playwright
+from browser_score_labels import score_summary_label
 
 BASE_URL = os.environ.get('HEIBON_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
@@ -56,6 +57,7 @@ with sync_playwright() as p:
       return { role: win.candidate.yaku.find(yaku => yaku.id === 'ryanpeikou')?.id,
         roleHan: win.candidate.yaku.find(yaku => yaku.id === 'ryanpeikou')?.han,
         shape: win.candidate.shape, totalHan: win.totalHanIncludingDora, points: win.totalPoints, fu: win.fu,
+        scoreTier: win.scoreTier, yakumanCount: win.yakumanCount,
         yaku: win.candidate.yaku.map(yaku => ({ id: yaku.id, han: yaku.han })),
         privateIds: game.players.slice(1).flatMap(player => [...player.hand,
           ...(player.drawnTile ? [player.drawnTile] : [])]).map(tile => tile.id),
@@ -66,7 +68,8 @@ with sync_playwright() as p:
     assert result['idsUnique'], result
     summary = page.locator('.round-summary-yaku').first.inner_text()
     assert '二盃口' in summary, summary
-    assert page.locator('.round-summary-value').first.inner_text() == f'{result["totalHan"]}翻 {result["fu"]}符', result
+    assert page.locator('.round-summary-value').first.inner_text() == score_summary_label(
+        result['scoreTier'], result['yakumanCount'], result['totalHan'], result['fu']), result
     assert page.locator('.round-summary-points').first.inner_text() == f'{result["points"]:,}点', result
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'table horizontal overflow'
     assert page.locator('.round-win-summary').evaluate('element => element.scrollWidth <= element.clientWidth'), 'summary overflow'
