@@ -8,7 +8,7 @@
 - 実装コミット：`8beb174a989849f9b27295fa82eb77cbf43b777d`。Browser UI回帰の安定化修正を含む最終公開SHA：`4b2c1bf4adb8150fcabbcd001a76f76ca9b946f4`。
 - GitHub Actions run [#41414647412](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41414647412)（run #526、2026-11-02、push event）：全必須ジョブsuccess。verify、Browser UI Chromium／WebKit、matrix audit、release freshness、Worker deploy、production-test、Pages build／deployが成功した。
 - Workerは`https://heibon-mahjong-online.ak-sekine.workers.dev`へ公開し、Pagesは`https://ak-sekine.github.io/heibon-mahjong/`へ同じSHAで公開。Workerのproduction-testはHTTPS、ルーム、WebSocket、再接続、認証・プライバシーと5種類のオンライン進行シナリオを通過。Pages deploy actionはGitHub Pages側でdeployment successを報告した。Pagesトップと固定局面URLへのCodex Cloudからの独立HTTP GETは、接続proxyのCONNECT 403で取得できなかった。
-- iPhone Safari：未確認。ユーザー本人の報告待ち。
+- iPhone Safari：2026-11-02にユーザー本人が最終表示・点数確認7項目を報告。OK 7件、NG 0件、未確認 0件。特殊形全種類・オンライン再接続等の個別実機確認はこの報告からは確認できず、自動検証と区別する。
 
 ## 実装内容
 
@@ -67,7 +67,7 @@
 - Actions run [#41437604604](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41437604604)は、Chromium `browser-step13-11.py`で役配列の順序を固定して比較していた新規テストが失敗し、gateにより公開されませんでした。表示値は3倍・144,000点で一致していました。比較を順不同に修正しました。
 - Actions run [#41439154842](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41439154842)（run #535、push event、最終SHA `87d5bf0c8d45904f64c96868a143132127bbf85c`）は`verify`、Chromium／WebKit Browser UI、matrix audit、release freshness、Worker deploy、production-test、Pages build／deployがすべてsuccessしました。Workerは`https://heibon-mahjong-online.ak-sekine.workers.dev`へ公開しproduction-testが成功。Pages deploymentはSHA `87d5bf0c8d45904f64c96868a143132127bbf85c`でGitHub Pagesのsuccessを報告し、公開先は`https://ak-sekine.github.io/heibon-mahjong/`です。公開URLへのCodex環境からの独立HTTP GETはproxyのCONNECT 403で未確認です。
 - 変更差分は3つの表示ソースと表示テスト／Browser UI期待値に限られ、役判定、翻数・ドラ・倍率・点数・精算・Workerゲームロジックのソースには触れていません。既存計算結果をラベル関数へ渡すだけであることと、全テスト成功で確認しました。
-- iPhone Safari実機確認は未実施です。和了結果詳細で通常役のドラ込み合計と3種の内訳、単独・複合役満の個別倍率と「合計：倍率」、旧ラベル不在を確認する必要があります。Issue #37はOpenのまま維持します。
+- 本節作成時点ではiPhone Safari実機確認は未実施でした。その後のユーザー本人の実機報告は次節に記録します。
 
 未報告の項目は未確認として残し、NodeテストやActionsの成功から実機確認済みとは判断しない。確認結果が揃った後に受け入れ条件と照合し、Issue #37のClose可否を判断する。
 
@@ -76,3 +76,21 @@
 - #38 人和：型・既定値・正規化・保存・Worker同期の共通基盤を利用。人和の判定と表示UIは未実装。
 - #39 パオ：同一和了候補の役名ごとに`yakuman: 1 | 2`を保持する。責任払いの金額配賦・本場処理は未実装。
 - #40 複数ロン・三家和：`multipleRon`と`tripleRonAbortiveDraw`の既定値、v5互換・Worker同期基盤を利用。複数ロン設定、頭ハネ、三家和流局は未実装。
+
+## iPhone Safari実機報告・Close判定 — 2026-11-02
+
+ユーザー本人によるiPhone Safariでの確認結果を記録する。**OK 7件、NG 0件、未確認 0件**（以下の報告7項目に限る）。
+
+1. OK：通常役に「役合計：」が表示されない。
+2. OK：通常役のドラ内訳と「合計：N翻」が正しい。
+3. OK：単独役満が「合計：役満」と表示される。
+4. OK：ダブル役満が「合計：ダブル役満」と表示される。
+5. OK：複合役満の合計倍率が正しい。
+6. OK：役満の旧合計ラベル「役満：」が表示されない。
+7. OK：点数・支払いに問題がない。
+
+**証拠の区別：** これはユーザーの実機報告であり、端末機種・iOS詳細・確認時刻、全4特殊形の個別実機再現、オンライン再接続・ホスト移行・再戦の実機確認は報告されていない。これらを実機OKとして補完しない。4形のON/OFF、非対象形、13枚判定、v1〜v4移行・v5復元、Worker同期、オンライン結果は既存Node／Chromium／WebKit／production-testの自動検証を根拠とする。
+
+**自動検証との照合：** 最終公開SHA `87d5bf0c8d45904f64c96868a143132127bbf85c`、[Actions run #41439154842](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41439154842)のverify、Chromium、WebKit、matrix audit、release freshness、Worker deploy、production-test、Pages build/deployのsuccessをGitHubから再取得して確認。報告された実機7項目は表示変更の受け入れ条件を満たす。実機未再現項目は自動テストによる根拠として扱い、実機確認済みとはしない。
+
+**Close判断：** 実装範囲・自動検証・報告された実機確認を総合し、Issue #37をcompletedとしてClose可能と判定する。後続 #38〜#40の実装は別Issue。
