@@ -54,9 +54,14 @@
 - WebKit Browser UI: Codex Cloudでは未実施です。既存GitHub Actionsで実行し、結果を追記します。
 - 特殊局面: 親テンパイ連荘・通常流局精算、4種類の途中流局、東4局／南4局のやめ条件、同点・2位以下、精算後供託、流し満貫、旧schema、オンライン作成・復元・再戦を自動テストで確認しました。
 
+### 初回GitHub Actions確認と修正
+
+実装SHA `20b11cb6773325d16c377992eb65d51b19889ad7` のDeploy run [`41381185539`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41381185539) はverify成功でした。Chromium／WebKit Browser UIは両方、既存の`tests/browser-app-idle.py`に残っていた`localStorage` version `3`の期待値で失敗し、schema v4で保存された実際値`4`と不一致になりました。ログを確認し、テスト期待値を4へ更新しました。matrix auditはBrowser UI失敗により失敗し、release freshness、Deploy gate後続、Worker／Pages公開はskipされ、このrunでは公開していません。修正版のActions結果は次のcommit後に記録します。
+
 ## GitHub Actionsと公開
 
-- 実装コミットSHA: 追記予定。
+- 初回実装コミットSHA: `20b11cb6773325d16c377992eb65d51b19889ad7`（直接push済み）。
+- 修正版コミットSHA: 追記予定。
 - GitHub Actions Deploy run: 追記予定。verify、Browser UI Chromium／WebKit、Deploy gate、Worker公開、production test、Pages build/deployを対象SHAで確認します。
 - Worker公開SHAと結果: 追記予定。
 - GitHub Pages公開SHAと結果: 追記予定。Pagesの独立HTTP応答を確認したかも区別して記録します。
