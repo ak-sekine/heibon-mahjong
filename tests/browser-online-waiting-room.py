@@ -1390,7 +1390,13 @@ with sync_playwright() as p:
     page.locator('#confirm-new-game').click()
     assert page.evaluate('window.onlineUiTest.controller.match.format') == 'tonnan', 'offline selection was not stored in match state'
     assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'"), 'accepted offline start did not save the last rules'
-    assert page.evaluate('''() => Object.values(JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules).filter(value => value === false).length === 13'''), 'accepted offline start did not persist all selected OFF values and the three OFF defaults'
+    assert page.evaluate('''() => {
+      const rules = JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules;
+      return ['redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora', 'dealerTenpaiRenchan', 'kyuushuKyuuhai', 'fourWinds', 'fourRiichi', 'fourKans']
+        .every(key => rules[key] === false) && rules.agariYame === false && rules.tenpaiYame === false &&
+        rules.renhou === 'off' && rules.pao === false && rules.doubleYakuman === false &&
+        rules.multipleRon === true && rules.tripleRonAbortiveDraw === false;
+    }'''), 'accepted offline start did not persist all selected OFF values and schema v5 defaults'
     select_menu_item('#menu-offline-rules')
     assert '現在の対局開始時に確定' in page.locator('#online-rules-readonly-label').inner_text()
     assert page.locator('#online-rules-list dd').first.inner_text() == '半荘戦（東南戦）'
