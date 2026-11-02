@@ -824,6 +824,7 @@ with sync_playwright() as p:
         page.locator('#online-create-name').fill('テストホスト')
         page.locator('#online-create').click()
         wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234'")
+        wait_for("!document.querySelector('#online-ready').hidden && document.querySelector('#online-seats').innerText.includes('テストホスト')")
         assert page.locator('#online-ready').is_visible()
         assert page.locator('#online-ready').inner_text() == '準備完了'
         assert page.locator('#online-finalize, #online-start-game, #online-close-room').evaluate_all('buttons => buttons.every(button => button.hidden)')

@@ -33,7 +33,8 @@
 
 ## GitHub Actions・公開
 
-- mainへのコミットSHA、Actions run URLと対象SHA、Chromium／WebKit、Deploy gate、Worker／Pagesの公開結果を確認後に追記する。現時点では未実施。
+- 初回main Deploy run [#41457690810](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41457690810) はSHA `5bf833582734afed9f363b614d230c29f7ffc662` を対象に実行。`docs-check`と`verify`（回帰テスト、Worker型検査、Pages build）はsuccess。Chromium Browser UIは新規ルーム作成後、WebSocketの初期状態を待つ前にテストが準備ボタンの表示を確認しfailureした。これは回帰スクリプトの待機不足と確認し、ホスト行と準備ボタンが描画されるまで待つ条件を追加して再検証する。Deploy gateはChromium失敗を受けて通過していない。WebKitとrun全体の最終結果は確認後に追記する。
+- 修正後のmainコミット、再実行run、Chromium／WebKit、Deploy gate、Worker／Pagesの公開結果を確定後に追記する。
 - PRは作成しない。
 
 ## iPhone Safari実機確認
