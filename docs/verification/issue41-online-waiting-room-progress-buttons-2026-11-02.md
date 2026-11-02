@@ -33,7 +33,7 @@
 
 ## GitHub Actions・公開
 
-- 初回main Deploy run [#41457690810](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41457690810) はSHA `5bf833582734afed9f363b614d230c29f7ffc662` を対象に実行。`docs-check`と`verify`（回帰テスト、Worker型検査、Pages build）はsuccess。Chromium Browser UIは新規ルーム作成後、WebSocketの初期状態を待つ前にテストが準備ボタンの表示を確認しfailureした。これは回帰スクリプトの待機不足と確認し、ホスト行と準備ボタンが描画されるまで待つ条件を追加して再検証する。Deploy gateはChromium失敗を受けて通過していない。WebKitとrun全体の最終結果は確認後に追記する。
+- 初回main Deploy run [#41457690810](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41457690810) はSHA `5bf833582734afed9f363b614d230c29f7ffc662` を対象に実行。`docs-check`と`verify`（回帰テスト、Worker型検査、Pages build）はsuccess。Chromium Browser UIは新規ルーム作成後、WebSocket初期状態を待つ前にテストが準備ボタンを確認してfailure。WebKitはホストだけが準備済みで参加者はまだ未準備なのに、参加者の準備ボタンが非表示になると誤って期待しfailure。いずれもテスト側のタイミング／期待順の誤りであり、画面実装の失敗ではないことをログから確認。初期状態の描画を待ち、ホスト準備後も未準備の参加者には準備ボタンを残し、その参加者自身の準備後に非表示となることを待つ形へ回帰スクリプトを修正した。`browser-ui-matrix-audit`はfailure、Deploy gateは不成立。Worker／Pages公開はskip。
 - 修正後のmainコミット、再実行run、Chromium／WebKit、Deploy gate、Worker／Pagesの公開結果を確定後に追記する。
 - PRは作成しない。
 

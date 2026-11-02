@@ -843,11 +843,13 @@ with sync_playwright() as p:
         page.locator('#online-ready').click()
         wait_for("document.querySelector('#online-ready').hidden && !document.querySelector('#online-finalize').hidden")
         assert page.locator('#online-finalize').inner_text() == '席を確定'
-        assert guest_page.locator('#online-ready').is_hidden(), 'a ready non-host still had a readiness control'
+        assert guest_page.locator('#online-ready').is_visible(), 'an unready non-host lost the readiness control'
         assert guest_page.locator('#online-finalize, #online-start-game').evaluate_all('buttons => buttons.every(button => button.hidden)'), 'a non-host was shown host progress controls'
         leave_after_ready = guest_page.locator('#online-leave').evaluate('element => { const box = element.getBoundingClientRect(); return {left: box.left, top: box.top}; }')
         assert all(abs(leave_before_ready[key] - leave_after_ready[key]) <= 1 for key in ('left', 'top')), (leave_before_ready, leave_after_ready)
         guest_page.locator('#online-ready').click()
+        wait_guest("document.querySelector('#online-ready').hidden")
+        assert guest_page.locator('#online-finalize, #online-start-game').evaluate_all('buttons => buttons.every(button => button.hidden)'), 'a ready non-host was shown host progress controls'
         wait_for('document.querySelector("#online-finalize").disabled === false')
         assert page.locator('#online-finalize').is_visible() and page.locator('#online-ready').is_hidden()
         assert page.locator('#online-close-room').count() == 0, 'the room-end button remained in the waiting UI'
