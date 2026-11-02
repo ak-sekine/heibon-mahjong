@@ -9,7 +9,6 @@ roles = {
     '[data-panel-part="pass-call"]': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
     '#diagnostic-clear': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
     '#online-leave': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
-    '#online-close-room': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
     '#confirm-new-game': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
     '#cancel-new-game': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),
     '#diagnostic-close': ('rgb(248, 220, 145)', 'rgb(21, 78, 60)'),

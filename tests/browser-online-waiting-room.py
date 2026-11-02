@@ -750,12 +750,17 @@ with sync_playwright() as p:
         };
         const {left, right, top, bottom, width, height} = actions.getBoundingClientRect();
         const parent = {left, right, top, bottom, width, height};
-        const leave = rect('#online-leave'), ready = rect('#online-ready'), reconnect = rect('#online-reconnect');
+        const progressButtons = ['#online-ready', '#online-finalize', '#online-start-game'];
+        const activeProgress = progressButtons.find(selector => !document.querySelector(selector).hidden);
+        const progress = activeProgress ? rect(activeProgress) : null;
+        const leave = rect('#online-leave'), reconnect = rect('#online-reconnect');
         return {
           leaveVisible: !document.querySelector('#online-leave').hidden,
-          readyVisible: !document.querySelector('#online-ready').hidden,
+          progressVisible: Boolean(activeProgress),
+          activeProgress,
+          simultaneousProgressButtons: progressButtons.filter(selector => !document.querySelector(selector).hidden),
           reconnectVisible: !document.querySelector('#online-reconnect').hidden,
-          leave, ready, reconnect, parent,
+          leave, progress, reconnect, parent,
           viewportWidth: innerWidth,
           documentWidth: document.documentElement.scrollWidth,
           dialogWidth: document.querySelector('#online-dialog').scrollWidth,
@@ -766,15 +771,16 @@ with sync_playwright() as p:
           }),
         };
       }''')
-      assert layout['leaveVisible'] and layout['readyVisible'], f'primary waiting actions were not visible at {width}px: {layout}'
-      assert layout['leave']['left'] < layout['ready']['left'] and layout['leave']['right'] <= layout['ready']['left'], \
-        f'leave and ready actions were not left/right at {width}px: {layout}'
-      assert abs(layout['leave']['top'] - layout['ready']['top']) <= 1, \
-        f'leave and ready actions did not share the upper row at {width}px: {layout}'
+      assert layout['leaveVisible'] and layout['progressVisible'], f'primary waiting actions were not visible at {width}px: {layout}'
+      assert len(layout['simultaneousProgressButtons']) == 1, f'multiple progress actions were visible at {width}px: {layout}'
+      assert layout['leave']['left'] < layout['progress']['left'] and layout['leave']['right'] <= layout['progress']['left'], \
+        f'leave and progress actions were not left/right at {width}px: {layout}'
+      assert abs(layout['leave']['top'] - layout['progress']['top']) <= 1, \
+        f'leave and progress actions did not share the upper row at {width}px: {layout}'
       primary_position = tuple(layout[button][coordinate] - layout['parent'][origin]
                                for button, coordinate, origin in (
-                                 ('leave', 'left', 'left'), ('ready', 'left', 'left'),
-                                 ('leave', 'top', 'top'), ('ready', 'top', 'top')))
+                                 ('leave', 'left', 'left'), ('progress', 'left', 'left'),
+                                 ('leave', 'top', 'top'), ('progress', 'top', 'top')))
       if reconnect_visible:
         baseline = waiting_action_position_baselines.get(width)
         assert baseline is not None and all(abs(actual - expected) <= 1 for actual, expected in zip(primary_position, baseline)), \
@@ -783,7 +789,7 @@ with sync_playwright() as p:
         waiting_action_position_baselines[width] = primary_position
       assert layout['reconnectVisible'] is reconnect_visible, f'reconnect visibility did not match the connection state at {width}px: {layout}'
       if reconnect_visible:
-        assert layout['reconnect']['top'] >= max(layout['leave']['bottom'], layout['ready']['bottom']), \
+        assert layout['reconnect']['top'] >= max(layout['leave']['bottom'], layout['progress']['bottom']), \
           f'reconnect was not below the primary actions at {width}px: {layout}'
         assert abs(layout['reconnect']['left'] - layout['parent']['left']) <= 1 and \
           abs(layout['reconnect']['right'] - layout['parent']['right']) <= 1, \
@@ -818,6 +824,10 @@ with sync_playwright() as p:
         page.locator('#online-create-name').fill('テストホスト')
         page.locator('#online-create').click()
         wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234'")
+        assert page.locator('#online-ready').is_visible()
+        assert page.locator('#online-ready').inner_text() == '準備完了'
+        assert page.locator('#online-finalize, #online-start-game, #online-close-room').evaluate_all('buttons => buttons.every(button => button.hidden)')
+        leave_before_ready = page.locator('#online-leave').evaluate('element => { const box = element.getBoundingClientRect(); return {left: box.left, top: box.top}; }')
         page.evaluate('window.onlineMock.addGuest()')
 
         open_menu_item(guest_page, '#online-join-open')
@@ -827,11 +837,22 @@ with sync_playwright() as p:
         wait_guest("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234' && document.querySelector('#online-seats').innerText.includes('テストホスト')")
         wait_for("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
 
+        assert guest_page.locator('#online-ready').is_visible()
+        assert guest_page.locator('#online-finalize, #online-start-game').evaluate_all('buttons => buttons.every(button => button.hidden)'), 'a non-host was shown host progress controls'
         page.locator('#online-ready').click()
+        wait_for("document.querySelector('#online-ready').hidden && !document.querySelector('#online-finalize').hidden")
+        assert page.locator('#online-finalize').inner_text() == '席を確定'
+        assert guest_page.locator('#online-ready').is_hidden(), 'a ready non-host still had a readiness control'
+        assert guest_page.locator('#online-finalize, #online-start-game').evaluate_all('buttons => buttons.every(button => button.hidden)'), 'a non-host was shown host progress controls'
+        leave_after_ready = guest_page.locator('#online-leave').evaluate('element => { const box = element.getBoundingClientRect(); return {left: box.left, top: box.top}; }')
+        assert all(abs(leave_before_ready[key] - leave_after_ready[key]) <= 1 for key in ('left', 'top')), (leave_before_ready, leave_after_ready)
         guest_page.locator('#online-ready').click()
         wait_for('document.querySelector("#online-finalize").disabled === false')
+        assert page.locator('#online-finalize').is_visible() and page.locator('#online-ready').is_hidden()
+        assert page.locator('#online-close-room').count() == 0, 'the room-end button remained in the waiting UI'
         page.locator('#online-finalize').click()
         wait_for("document.querySelector('#online-finalized-message').hidden === false")
+        assert page.locator('#online-start-game').inner_text() == '対局開始'
         guest_page.wait_for_function("document.querySelector('#online-finalized-message').hidden === false")
         state_before = page.evaluate('window.onlineMock.snapshot()')
         assert state_before['room']['roomCode'] == guest_page.evaluate('window.onlineMock.snapshot().room.roomCode')
@@ -1755,7 +1776,7 @@ with sync_playwright() as p:
     assert host_row.locator('.online-seat-status').inner_text() == '接続中・未準備', 'the connection and ready state were not displayed in the seat list'
     assert 'テスト参加者' in seat_text and all(wind not in seat_text for wind in ('東', '南', '西', '北')), 'waiting list exposed a seat wind before finalization'
     assert page.locator('#online-my-seat, #online-host').count() == 0, 'self and host are still shown in separate fields'
-    assert page.locator('#online-finalize').is_visible() and not page.locator('#online-finalize').is_enabled(), 'host finalize was enabled before both players were ready'
+    assert page.locator('#online-ready').is_visible() and page.locator('#online-finalize').is_hidden(), 'host progress control did not begin at ready'
     assert '人間' not in seat_text and '空席' in seat_text, 'seat rows still contain redundant participant types or omit empty seats'
     page.evaluate('window.onlineMock.setAdditionalGuests()')
     wait_for("document.querySelector('#online-seats').innerText.includes('もう一人の長い参加者表示名テスト')")
@@ -1809,8 +1830,13 @@ with sync_playwright() as p:
     wait_for('window.onlineMock.ticketRequests >= 2')
     wait_for("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
 
+    ready_position = page.locator('#online-ready').evaluate('element => { const box = element.getBoundingClientRect(); return {left: box.left, top: box.top}; }')
     page.locator('#online-ready').click()
-    wait_for("document.querySelector('#online-ready').textContent === '準備を解除'")
+    wait_for("!document.querySelector('#online-finalize').hidden")
+    assert page.locator('#online-ready').is_hidden(), 'ready host was offered readiness cancellation'
+    assert page.locator('#online-finalize').is_disabled(), 'host seat finalization was enabled before all humans were ready'
+    finalize_position = page.locator('#online-finalize').evaluate('element => { const box = element.getBoundingClientRect(); return {left: box.left, top: box.top}; }')
+    assert all(abs(ready_position[key] - finalize_position[key]) <= 1 for key in ('left', 'top')), (ready_position, finalize_position)
     page.evaluate('window.onlineMock.setGuestReady(true)')
     wait_for('document.querySelector("#online-finalize").disabled === false')
 
@@ -1830,11 +1856,17 @@ with sync_playwright() as p:
     wait_for("document.querySelector('#online-connection').textContent === '接続中'", timeout=10000)
     wait_for("document.querySelector('#online-reconnect').hidden === true", timeout=10000)
     wait_for("document.querySelector('#online-seats').innerText.includes('接続中')")
-    wait_for("document.querySelector('#online-ready').textContent === '準備完了'", timeout=10000)
+    wait_for("!document.querySelector('#online-ready').hidden", timeout=10000)
     page.locator('#online-ready').click()
     wait_for('document.querySelector("#online-finalize").disabled === false')
+    assert page.locator('#online-ready').is_hidden(), 'ready host was offered readiness cancellation after reconnect'
+    assert page.locator('#online-finalize').is_visible() and page.locator('#online-start-game').is_hidden()
+    assert page.locator('#online-close-room').count() == 0
     page.locator('#online-finalize').click()
     wait_for("document.querySelector('#online-finalized-message').hidden === false")
+    assert page.locator('#online-finalize').is_hidden() and page.locator('#online-start-game').is_visible()
+    start_position = page.locator('#online-start-game').evaluate('element => { const box = element.getBoundingClientRect(); return {left: box.left, top: box.top}; }')
+    assert all(abs(finalize_position[key] - start_position[key]) <= 1 for key in ('left', 'top')), (finalize_position, start_position)
     assert page.locator('#online-finalized-message').inner_text() == '座席が確定しました。ホストはオンライン対局を開始できます。'
     seat_text = page.locator('#online-seats').inner_text()
     assert 'CPU1' in seat_text and 'CPU2' in seat_text, seat_text
@@ -2420,9 +2452,10 @@ with sync_playwright() as p:
     assert [seat['name'] for seat in prepared['room']['seats'] if seat['kind'] == 'human'] == ['テストホスト', 'テスト参加者']
     assert all(not seat['ready'] and seat['gameSeat'] is None for seat in prepared['room']['seats']), prepared['room']
     assert prepared['gameStatus'] == 'match-ended' and prepared['roundNumber'] == before_rematch['roundNumber'], 'result viewing or preparation changed the completed result'
-    assert page.locator('#online-ready').is_visible() and page.locator('#online-start-game').is_visible()
+    assert page.locator('#online-ready').is_visible() and page.locator('#online-start-game').is_hidden()
     assert page.locator('#online-start-game').is_disabled(), 'the host could start before all humans are ready'
     page.locator('#online-ready').click()
+    assert page.locator('#online-ready').is_hidden() and page.locator('#online-start-game').is_visible()
     page.evaluate('window.onlineMock.setGuestReady(true)')
     wait_for("document.querySelector('#online-start-game').disabled === false")
     assert page.evaluate("window.onlineMock.snapshot().gameStatus") == 'match-ended', 'all-ready state auto-started the rematch'

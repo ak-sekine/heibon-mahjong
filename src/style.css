@@ -285,11 +285,11 @@ header > div { min-width:0; }
 #online-connection { margin:2px 0 5px; padding:6px 8px; border-radius:6px; background:#123f32; font-size:.84rem; line-height:1.35; overflow-wrap:anywhere; }
 #online-finalized-message { margin:4px 0; padding:7px 8px; border:1px solid #ffda7d; border-radius:8px; background:#123f32; font-size:.9rem; font-weight:700; line-height:1.35; }
 #online-error { margin:4px 0; padding:7px 8px; border:1px solid #ffb4a2; border-radius:6px; color:#fff0eb; background:#632f26; font-size:.88rem; line-height:1.35; overflow-wrap:anywhere; }
-#online-actions { display:grid; flex:none; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-areas:"leave ready" "reconnect reconnect"; gap:6px; margin-top:4px; padding-top:5px; border-top:1px solid #63947a; background:#185640; }
+#online-actions { display:grid; flex:none; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-areas:"leave progress" "reconnect reconnect"; gap:6px; margin-top:4px; padding-top:5px; border-top:1px solid #63947a; background:#185640; }
 #online-actions button { min-width:0; white-space:normal; }
 #online-actions button:disabled { cursor:wait; }
 #online-leave { grid-area:leave; }
-#online-ready { grid-area:ready; }
+#online-ready,#online-finalize,#online-start-game { grid-area:progress; }
 #online-reconnect { grid-area:reconnect; width:100%; }
 @media (max-width:360px) { .online-seat-content { flex-wrap:wrap; gap:2px 6px; } .online-seat-status { margin-left:auto; } }
 [hidden] { display:none !important; }

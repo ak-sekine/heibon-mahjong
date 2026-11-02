@@ -124,7 +124,6 @@ export class OnlineWaitingRoom {
   private readonly readyButton = document.querySelector<HTMLButtonElement>('#online-ready')!;
   private readonly finalizeButton = document.querySelector<HTMLButtonElement>('#online-finalize')!;
   private readonly leaveButton = document.querySelector<HTMLButtonElement>('#online-leave')!;
-  private readonly closeRoomButton = document.querySelector<HTMLButtonElement>('#online-close-room')!;
   private readonly startGameButton = document.querySelector<HTMLButtonElement>('#online-start-game')!;
   private readonly confirmRulesButton = document.querySelector<HTMLButtonElement>('#online-confirm-rules')!;
   private readonly roomMenuItem = document.querySelector<HTMLButtonElement>('#menu-room')!;
@@ -202,7 +201,7 @@ export class OnlineWaitingRoom {
       this.reconnectAttempt = 0;
       void this.connect();
     });
-    this.readyButton.addEventListener('click', () => this.toggleReady());
+    this.readyButton.addEventListener('click', () => this.markReady());
     this.finalizeButton.addEventListener('click', () => this.sendAction({ type: 'finalize-seats' }));
     this.startGameButton.addEventListener('click', () => this.sendGameAction({ type: 'start-game' }, this.state?.gameRevision ?? 0));
     this.confirmRulesButton.addEventListener('click', () => {
@@ -210,7 +209,6 @@ export class OnlineWaitingRoom {
         this.state.rules ?? rulesForFormat(this.state.format));
     });
     this.leaveButton.addEventListener('click', () => this.leaveRoom());
-    this.closeRoomButton.addEventListener('click', () => this.closeRoom());
     document.querySelector<HTMLButtonElement>('#online-copy-code')!.addEventListener('click', () => {
       void this.copyRoomCode();
     });
@@ -775,25 +773,23 @@ export class OnlineWaitingRoom {
     const pending = this.pendingAction !== null || this.pendingGameAction !== null;
     const socketConnected = this.isSocketOpen();
     const readyPhase = state?.status === 'waiting' || state?.rematchWaiting === true;
-    this.readyButton.hidden = !self || !readyPhase;
-    this.readyButton.textContent = self?.ready ? '準備を解除' : '準備完了';
+    const rematchNeedsHostReady = state?.rematchWaiting === true && self?.isHost === true && !self.ready;
+    this.readyButton.hidden = !self || !readyPhase || self.ready;
+    this.readyButton.textContent = '準備完了';
     this.readyButton.disabled = pending || !self?.connected || !socketConnected;
-    this.readyButton.setAttribute('aria-pressed', String(self?.ready === true));
+    this.readyButton.setAttribute('aria-pressed', 'false');
     this.setBusy(this.readyButton, this.pendingAction?.payload.type === 'set-ready');
-    this.finalizeButton.hidden = !self?.isHost || state?.status !== 'waiting';
+    this.finalizeButton.hidden = !self?.isHost || state?.status !== 'waiting' || !self || !self.ready;
     this.finalizeButton.disabled = pending || !socketConnected || !allReady;
     this.setBusy(this.finalizeButton, this.pendingAction?.payload.type === 'finalize-seats');
     const allHumansConnected = humans.length > 0 && humans.every(seat => seat.connected);
     const startable = !this.gameActive && (state?.rematchWaiting === true || (state?.gameRevision ?? 0) === 0);
-    this.startGameButton.hidden = !self?.isHost || state?.status !== 'finalized' || !startable;
+    this.startGameButton.hidden = !self?.isHost || state?.status !== 'finalized' || !startable || rematchNeedsHostReady;
     this.startGameButton.disabled = pending || !socketConnected || !allReady || !allHumansConnected;
     this.setBusy(this.startGameButton, this.pendingGameAction?.payload.type === 'start-game');
     this.leaveButton.hidden = !session || state?.status === 'closed';
     this.leaveButton.disabled = pending || !socketConnected;
     this.setBusy(this.leaveButton, this.pendingAction?.payload.type === 'leave-room');
-    this.closeRoomButton.hidden = !self?.isHost || state?.status === 'closed' || (this.gameActive && !this.gameTerminated);
-    this.closeRoomButton.disabled = pending || !socketConnected;
-    this.setBusy(this.closeRoomButton, this.pendingAction?.payload.type === 'close-room');
     if (this.socket?.readyState === WebSocket.OPEN) this.reconnectButton.hidden = true;
   }
 
@@ -802,10 +798,10 @@ export class OnlineWaitingRoom {
     else button.removeAttribute('aria-busy');
   }
 
-  private toggleReady(): void {
+  private markReady(): void {
     const self = this.state?.seats.find(seat => seat.seat === this.session?.playerSeat && seat.kind === 'human');
-    if (!self) return;
-    this.sendAction({ type: 'set-ready', ready: !self.ready });
+    if (!self || self.ready) return;
+    this.sendAction({ type: 'set-ready', ready: true });
   }
 
   private sendAction(payload: RoomActionPayload): void {
@@ -978,11 +974,6 @@ export class OnlineWaitingRoom {
     const impact = this.gameActive ? '対局中の席はCPUに引き継がれ、対局は続行します。' : '';
     if (!this.session || !window.confirm(`このルームから退出しますか？退出するとこの参加トークンは使えなくなります。${impact}`)) return;
     this.sendAction({ type: 'leave-room' });
-  }
-
-  private closeRoom(): void {
-    if (!this.session || !window.confirm('ルームを終了しますか？参加者全員が待機ルームから切断されます。')) return;
-    this.sendAction({ type: 'close-room' });
   }
 
   private finishSession(message: string, preserveGame = false): void {

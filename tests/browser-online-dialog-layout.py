@@ -57,7 +57,7 @@ with sync_playwright() as playwright:
                     row.append(windLabel, content);
                     seats.append(row);
                   }
-                  dialog.querySelector('#online-ready').hidden = false;
+                  dialog.querySelector('#online-ready').hidden = true;
                   dialog.querySelector('#online-finalize').hidden = false;
                   dialog.querySelector('#online-finalize').disabled = true;
                   dialog.querySelector('#online-room-expiry').textContent = '2026/10/27 14:00';

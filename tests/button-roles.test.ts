@@ -9,7 +9,7 @@ const roleById: Record<string, string> = {
   'diagnostic-copy': 'b', 'diagnostic-clear': 'd1', 'online-join-close': 'b', 'online-join': 'a',
   'online-close': 'b', 'online-copy-code': 'b', 'online-confirm-rules': 'b', 'online-ready': 'a',
   'online-finalize': 'a', 'online-start-game': 'a', 'online-reconnect': 'a', 'online-leave': 'd1',
-  'online-close-room': 'd2', 'view-table': 'b', 'match-result-new-game': 'a', 'match-result-close': 'b',
+  'view-table': 'b', 'match-result-new-game': 'a', 'match-result-close': 'b',
   'cancel-new-game': 'b', 'confirm-new-game': 'a', 'online-rules-close': 'b', 'load-scenario': 'a',
   'start-cpu-kan': 'a', 'repeat-scenario': 'a', 'start-river-test': 'a',
 };
@@ -26,7 +26,7 @@ test('every static operation button on product and verification pages has exactl
   for (const file of files) {
     const html = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     const nodes = buttons(html);
-    assert.equal(nodes.length, file === 'index.html' ? 43 : file === 'kan-test.html' ? 20 : 21);
+    assert.equal(nodes.length, file === 'index.html' ? 42 : file === 'kan-test.html' ? 20 : 21);
     for (const button of nodes) {
       const classes = button.match(/\bclass="([^"]*)"/u)?.[1]?.split(/\s+/u) ?? [];
       if (classes.includes('main-menu-item') || classes.includes('main-menu-toggle')) {
@@ -80,11 +80,12 @@ test('local and online hand tile renderers use the same selectable A role', () =
 
 test('diagnostic and room destructive controls retain semantic classes without role colors', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  for (const [id, role] of [['diagnostic-clear', 'd1'], ['online-leave', 'd1'], ['online-close-room', 'd2']]) {
+  for (const [id, role] of [['diagnostic-clear', 'd1'], ['online-leave', 'd1']]) {
     const button = buttons(html).find(node => node.includes(`id="${id}"`));
     assert.ok(button, `missing #${id}`);
     assert.match(button, new RegExp(`ui-button--${role}(?:\\s|\")`, 'u'));
   }
+  assert.ok(!buttons(html).some(node => node.includes('id="online-close-room"')));
 });
 
 test('shared CSS defines one normal color, pressed and disabled states, and busy priority', () => {
