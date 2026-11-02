@@ -449,7 +449,7 @@ with sync_playwright() as p:
                     expected_heading = f'{seat_names[result["winnerId"]]} {method}・{score}・{result["totalPoints"]:,}点'
                     assert winner_summary.locator('.round-summary-winner').inner_text() == expected_heading, (width, scenario, expected_heading)
                     yaku_lines = section.locator('ul').first.locator('li').all_inner_texts()
-                    detail_yaku = [re.sub(r'\s+\d+(?:翻|役満)$', '', line) for line in yaku_lines]
+                    detail_yaku = [re.sub(r'\s+(?:\d+翻|役満|ダブル役満|トリプル役満|\d+倍役満)$', '', line) for line in yaku_lines]
                     assert detail_yaku == [DETAIL_YAKU_NAMES[yaku_id] for yaku_id in result['yaku']], (width, scenario, detail_yaku, result['yaku'])
                     summary_yaku = winner_summary.locator('.round-summary-yaku').inner_text()
                     expected_summary_parts = [
