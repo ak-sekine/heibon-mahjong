@@ -5,8 +5,10 @@
 - Issue #37 は実装開始時にOpenと確認。iPhone Safariの実機確認結果を受け取るまでOpenのままにする。
 - 実装開始時：ブランチ`work`、HEAD `d2e25ca0692dc7954fb24d260cb91c6d46f72ca6`、作業ツリーclean。fetch後の`origin/main`は`c09d3f6ddfbaa027d56d033fd9122fbbba2bc269`で、開始時のHEADから4 commit behind／ahead 0。fast-forwardして実装を開始。
 - 仕様の正本：[`Issue #19確定仕様`](issue19-unimplemented-rules-2026-11-02.md)「2026-11-02 仕様確定・Issue #19 closeout」。
-- 実装SHA：Actions結果とあわせて記入予定。
-- Worker／GitHub Pages公開とActions run：push後に結果を追記する。
+- 実装コミット：`8beb174a989849f9b27295fa82eb77cbf43b777d`。Browser UI回帰の安定化修正を含む最終公開SHA：`4b2c1bf4adb8150fcabbcd001a76f76ca9b946f4`。
+- GitHub Actions run [#41414647412](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41414647412)（run #526、2026-11-02、push event）：全必須ジョブsuccess。verify、Browser UI Chromium／WebKit、matrix audit、release freshness、Worker deploy、production-test、Pages build／deployが成功した。
+- Workerは`https://heibon-mahjong-online.ak-sekine.workers.dev`へ公開し、Pagesは`https://ak-sekine.github.io/heibon-mahjong/`へ同じSHAで公開。Workerのproduction-testはHTTPS、ルーム、WebSocket、再接続、認証・プライバシーと5種類のオンライン進行シナリオを通過。Pages deploy actionはGitHub Pages側でdeployment successを報告した。Pagesトップと固定局面URLへのCodex Cloudからの独立HTTP GETは、接続proxyのCONNECT 403で取得できなかった。
+- 文書反映後のdocs-only Actions runは、この記録の追記後に確認する。
 - iPhone Safari：未確認。ユーザー本人の報告待ち。
 
 ## 実装内容
@@ -25,15 +27,16 @@
 
 ## 自動検証
 
-- `npm test`：76テストファイルすべて成功、失敗0。
+- `npm test`：76テストファイルすべて成功、失敗0。GitHub Actions `verify`では個別テスト1,355件成功。
 - `npm run build`：成功。
 - `npm run typecheck:worker`：成功。
 - `git diff --check`：成功。
 - 追加テストは物理牌136枚の固定局面整合性、4形のON/OFF、近接する非対象形、和了前13枚と完成後14枚の対照、四暗刻のロン／ツモ条件、同役の重複防止、別役満の2+1加算、親子×ロン／ツモ×1/2/3/5役満の支払い、本場・供託、CPU和了、Worker側の和了・点数確定、オンライン公開倍率、v1〜v4移行、v5保存復元・Worker room保存を確認する。
 - 初回全体実行では既存`table.test.ts`の役満概要期待値が倍率表記を含まず失敗。仕様に合わせて期待値を更新し、再実行した全体テストは76/76成功。
-- オフライン・オンラインのルール設定、ルーム待機表示、結果表示、iPhone向け固定局面は既存GitHub Actions Browser UIのChromium/WebKit両方へ追加した。
+- オフライン・オンラインのルール設定、ルーム待機表示、結果表示、iPhone向け固定局面は既存GitHub Actions Browser UIでChromium／WebKit両方を実行。run #41414647412では各エンジンの6 viewport suitesが成功し、Issue #37固定局面ページの11シナリオ、OFF/ON結果詳細、320/375/390/430px、通常ページからの隔離も両方でpassした。
 - Codex Cloud内のChromiumはリポジトリの既知Crashpad/seccomp制約（`SO_PASSCRED`で`EPERM`、起動時`SIGTRAP`）によりローカルBrowser UI未実施。既存の手順に従い、Chromium／WebKit UI結果はGitHub Actionsで確認する。
-- GitHub Actions（verify、Browser UI、Deploy gate、Worker production test、Worker／Pages publish）：push後にcommit SHAとrun URL、job結果を追記する。ゲートを迂回した公開は行わない。
+- Actionsの途中runでは、#41406338539のv5設定assertion、#41406856160の旧役満概要期待値、#41407683377のfixture操作順、#41409337230・#41411625972・#41412958830のBrowser UI結果ダイアログ待ちが失敗した。期待値・fixture選択・描画完了待ちを修正して再実行した。#41408970652は並行してmainが進んだためrelease-freshnessが公開を拒否し、そのSHAでは公開されていない。最終run #41414647412ではverify、両Browser UI engine、matrix audit、freshness、Worker／Pages公開とproduction-testがすべてsuccess。
+- Worker・Pages deployment gateを迂回した公開は行っていない。最終Pages deployment actionのSHAは`4b2c1bf4adb8150fcabbcd001a76f76ca9b946f4`。
 
 ## iPhone Safari実機確認チェックリスト
 
