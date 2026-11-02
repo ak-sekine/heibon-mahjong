@@ -43,16 +43,25 @@
 
 ## 自動検証
 
-ローカルの結果はこの節に記録します。GitHub ActionsのChromium／WebKit、Deploy gate、Worker公開、GitHub Pages公開は、対象コミットSHAを照合した結果を後から追記します。
+ローカルとGitHub Actionsの結果を記録します。GitHub Actionsの対象SHAは実装・公開コミット`bd7cc8e35335b3652684077718a77a13be2b3ebf`です。
 
 - `npm test`: 成功。75 test files、pass 75、fail 0、skip 0。Issue #18用 `tests/issue18-rules.test.ts` は22件すべて成功。
 - `npm run build`: 成功（TypeScript compileとVite production build）。
 - `npm run typecheck:worker`: 成功。
-- Browser UI Python script syntax: `python -m py_compile tests/browser-online-waiting-room.py tests/browser-app-idle.py` 成功。
+- Browser UI Python script syntax: `python -m py_compile tests/browser-offline-rules.py tests/browser-online-waiting-room.py tests/browser-app-idle.py` 成功。
 - `git diff --check`: 成功。
-- Chromium Browser UI: Codex Cloud内はプロジェクト指示に記録されたChromium起動制限があるため未実施です。既存GitHub Actionsで実行し、結果を追記します。
-- WebKit Browser UI: Codex Cloudでは未実施です。既存GitHub Actionsで実行し、結果を追記します。
+- Codex Cloudでの直接Chromium／WebKit起動: プロジェクト指示に記録された実行環境制限のため未実施です。下記のGitHub Actions Browser UIで両エンジンを実行しました。
 - 特殊局面: 親テンパイ連荘・通常流局精算、4種類の途中流局、東4局／南4局のやめ条件、同点・2位以下、精算後供託、流し満貫、旧schema、オンライン作成・復元・再戦を自動テストで確認しました。
+
+### GitHub Actions、Deploy gate、公開結果
+
+- 最終対象SHA `bd7cc8e35335b3652684077718a77a13be2b3ebf` のDeploy run [`41382073027`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41382073027) はsuccessしました。
+- `docs-check`、`detect-changes`、`verify`、`browser-ui-matrix-audit`、`release-freshness`がすべてsuccessしました。Deploy gateを迂回していません。
+- Browser UIはChromium 37シナリオ、WebKit 25シナリオがすべてsuccessしました。新規対局の7項目初期値と、対局中の読み取り専用一覧18行も両エンジンで通過しました。
+- `deploy-worker`: success。Cloudflare Worker `https://heibon-mahjong-online.ak-sekine.workers.dev`をSHA `bd7cc8e35335b3652684077718a77a13be2b3ebf`から公開しました。
+- `production-test`: success。HTTPS、room、WebSocket、認証、プライバシーに加え、`two-human-game-host-cpu-handoff-reconnect`、`disconnect-reconnect`、`host-handoff-one-human-three-cpu`、`four-humans-zero-cpu`、`three-humans-one-cpu`の本番シナリオを確認しました。
+- `pages-build`／`pages-deploy`: success。GitHub Pages `https://ak-sekine.github.io/heibon-mahjong/`を同じSHAから公開し、ActionsのPages deployment IDも`bd7cc8e35335b3652684077718a77a13be2b3ebf`です。
+- Codex CloudからPages URLへの直接HTTP取得は確認できませんでした。`curl`はサイト応答を受け取る前に接続プロキシ（Envoy）から`CONNECT tunnel failed, response 403`を返され、HTTP statusは`000`でした。Web取得ツールもURLにアクセスできませんでした。この環境からの直接到達性だけが未確認で、Pagesの公開成否はActionsの`pages-deploy` successで確認しています。
 
 ### 初回GitHub Actions確認と修正
 
@@ -64,11 +73,11 @@
 
 - 初回実装コミットSHA: `20b11cb6773325d16c377992eb65d51b19889ad7`（直接push済み）。
 - 保存version期待値修正版SHA: `4ea0047523913e3d04a3fec71a4031dc0ce4f14d`（直接push済み）。
-- 読み取り専用項目・既定値のBrowser UI期待値修正SHA: 追記予定。
-- GitHub Actions Deploy run: 追記予定。verify、Browser UI Chromium／WebKit、Deploy gate、Worker公開、production test、Pages build/deployを対象SHAで確認します。
-- Worker公開SHAと結果: 追記予定。
-- GitHub Pages公開SHAと結果: 追記予定。Pagesの独立HTTP応答を確認したかも区別して記録します。
-- 最終検証記録コミットSHA: 追記予定。
+- 読み取り専用項目・既定値のBrowser UI期待値修正SHA: `bd7cc8e35335b3652684077718a77a13be2b3ebf`（直接push済み）。
+- 最終GitHub Actions Deploy run: [`41382073027`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41382073027)、success。
+- Worker公開SHAと結果: `bd7cc8e35335b3652684077718a77a13be2b3ebf`、success。本番シナリオもsuccess。
+- GitHub Pages公開SHAと結果: `bd7cc8e35335b3652684077718a77a13be2b3ebf`、success。Codex Cloudからの直接HTTP応答はネットワークプロキシに拒否され未確認です。
+- Issue #18はOpenのままです。ユーザー本人のiPhone Safari確認後に状態を判断します。
 
 ## iPhone Safari実機確認チェックリスト
 
@@ -76,19 +85,20 @@
 
 | # | 操作と確認内容 | 実機結果 |
 | --- | --- | --- |
-| 1 | オフライン新規対局で7項目すべて表示され、親テンパイ連荘・九種九牌・四風連打・四家立直・四開槓がON、アガリやめ・テンパイやめがOFFである。 | 未確認 |
-| 2 | 1項目ずつON/OFFを切り替えられ、設定を確定した次の新規対局で値が復元される。 | 未確認 |
-| 3 | 対局中の読み取り専用ルール確認に7項目と現在値が表示される。 | 未確認 |
-| 4 | オンラインルーム作成時に設定でき、待機画面・対局中の確認にホスト確定値が表示される。 | 未確認 |
-| 5 | オンライン再接続後および再戦時に7項目が維持される。 | 未確認 |
-| 6 | CPUを含む対局で、ルール確認・局結果・次局への通常操作が支障なく進む。特殊な途中流局局面は自動テストで確認する。 | 未確認 |
-| 7 | アガリやめ・テンパイやめ後に対局結果画面を開き、4人の最終順位・持ち点を確認できる。 | 未確認 |
+| 1 | [公開URL](https://ak-sekine.github.io/heibon-mahjong/)をiPhone Safariで開き、新規対局画面が表示される。 | 未確認 |
+| 2 | オフライン新規対局で7項目すべて表示され、親テンパイ連荘・九種九牌・四風連打・四家立直・四開槓がON、アガリやめ・テンパイやめがOFFである。 | 未確認 |
+| 3 | 1項目ずつON/OFFを切り替えられ、設定を確定した次の新規対局で値が復元される。 | 未確認 |
+| 4 | オフライン対局中の読み取り専用ルール確認に7項目と現在値が表示される。 | 未確認 |
+| 5 | オンラインルーム作成時に設定でき、待機画面・対局中の確認にホスト確定値が表示される。 | 未確認 |
+| 6 | オンライン再接続後および再戦時に7項目が維持される。 | 未確認 |
+| 7 | CPUを含む対局で、ルール確認・局結果・次局への通常操作が支障なく進む。特殊な途中流局局面は自動テストで確認する。 | 未確認 |
+| 8 | アガリやめ・テンパイやめ後に対局結果画面を開き、4人の最終順位・持ち点を確認できる。 | 未確認 |
 
 機種、iOSバージョン、確認日時、各項目のOK／NG／未確認をユーザーの報告後に記録します。実機確認が完了するまでIssue #18はOpenです。
 
 ## 未確認事項
 
 - 実機公開後のiPhone Safari確認は未実施です。
-- Codex Cloud上での直接Chromium／WebKit起動は行わず、GitHub Actionsの結果で確認します。
-- Actions、Worker・Pages公開、公開後のURL応答は実行後に対象SHAと結果を記録します。
+- Pages URLへのCodex Cloudからの直接HTTP応答は接続プロキシの403により取得できませんでした。GitHub ActionsのPages deploymentはsuccessしました。ユーザー端末での公開URL確認はSafariチェックリストに含めます。
+- ユーザーが実機確認を報告するまでIssue #18はOpenのままです。
 - 最終diffの対象はIssue #18のルールモデル、共通UI、局進行・途中流局処理、該当テスト、指定された3文書とこの検証記録だけです。
