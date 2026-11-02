@@ -692,6 +692,7 @@ with sync_playwright() as p:
           points:[...window.roundEndTest.controller.match.points],round:window.roundEndTest.controller.match.roundNumber,
           nextHidden:document.querySelector('#next-round').hidden})''') == before_match_result
         page.locator('#show-match-result').click()
+        page.wait_for_function("document.querySelector('#match-result-dialog').open")
         assert page.locator('#match-result-dialog').is_visible()
         assert page.locator('#match-result-body').evaluate('(body) => body.scrollTop === 0')
         page.locator('#match-result-close').click()
