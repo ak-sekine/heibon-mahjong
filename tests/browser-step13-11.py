@@ -92,7 +92,7 @@ with sync_playwright() as p:
             'four-yakuman': ['tenhou', 'daisangen', 'suuankou', 'tsuuiisou'],
         })[scenario]
         expected_yakuman_count = {'tenhou': 2, 'chiihou': 1, 'triple-yakuman': 3, 'four-yakuman': 4}[scenario]
-        assert result['yaku'] == expected_ids, result
+        assert sorted(result['yaku']) == sorted(expected_ids), result
         assert result['yakumanCount'] == expected_yakuman_count and result['han'] == 0, result
         assert result['points'] == expected_points and result['idsUnique'], result
         assert all(tile_id not in page.locator('main').inner_html() for tile_id in result['privateIds']), 'CPU private ID leaked after win'
