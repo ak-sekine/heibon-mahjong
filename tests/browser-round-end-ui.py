@@ -697,6 +697,7 @@ with sync_playwright() as p:
         assert page.locator('#match-result-dialog').is_visible()
         assert page.locator('#match-result-body').evaluate('(body) => body.scrollTop === 0')
         page.locator('#match-result-close').click()
+        page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
         page.set_viewport_size({'width': width, 'height': height})
         page.locator('#show-result').click()
         assert page.locator('#result-title').inner_text() == '東風戦終了'
