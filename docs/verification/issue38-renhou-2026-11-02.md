@@ -29,13 +29,12 @@
 
 ## GitHub Actionsと公開
 
-- GitHub Actions Chromium／WebKit Browser UI verification: 未確認
-- Deploy gate: 未確認
-- Pages公開: 未確認
-- Worker公開: 未確認
-- 公開成功SHA: 未確認
-
-Actions run URL、各ジョブ結果、Worker／Pages Deploymentと公開SHAを確認後に追記します。Codex Cloud内ブラウザーはプロジェクト作業指示の既知制限により起動せず、GitHub ActionsのChromium／WebKit結果を別欄で記録します。
+- Actions run [#563](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41546258846) はsuccess。runの`head_sha`は実装コミット`6c7a84ac0f38e791c7847270f04d455f659ed125`。
+- `verify`（`npm test`、Worker typecheck、Pages build）、Chromium Browser UI、WebKit Browser UI、Browser UI matrix audit、release-freshnessがすべてsuccess。
+- `deploy-worker`とproduction testがsuccess。Workerの成功デプロイSHA記録ステップもsuccess。
+- `pages-build`と`pages-deploy`がsuccess。Pagesの成功デプロイSHA記録ステップもsuccess。
+- Worker・Pages両方の成功公開SHAは`6c7a84ac0f38e791c7847270f04d455f659ed125`で、Actions runの実装SHAと一致。
+- Pages／Workerの公開ジョブ成功とSHA記録は確認済み。公開先への独立したHTTP応答検査は未実施。Codex Cloud内でChromium／WebKitは起動せず、Browser UI結果はGitHub Actionsで確認。
 
 ## iPhone Safari実機確認
 
