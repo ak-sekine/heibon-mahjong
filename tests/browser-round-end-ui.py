@@ -691,6 +691,7 @@ with sync_playwright() as p:
         assert page.evaluate('''() => ({status:window.roundEndTest.controller.match.status,
           points:[...window.roundEndTest.controller.match.points],round:window.roundEndTest.controller.match.roundNumber,
           nextHidden:document.querySelector('#next-round').hidden})''') == before_match_result
+        page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
         page.locator('#show-match-result').click()
         page.wait_for_function("document.querySelector('#match-result-dialog').open")
         assert page.locator('#match-result-dialog').is_visible()
