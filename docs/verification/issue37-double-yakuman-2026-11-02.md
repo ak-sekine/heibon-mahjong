@@ -50,6 +50,14 @@
 7. [固定局面検証ページ](https://ak-sekine.github.io/heibon-mahjong/test.html?debug=issue37)で四暗刻単騎、国士十三面／単騎、純正／通常九蓮、大四喜／小四喜を再現し、和了結果の役名・個別倍率・合計倍率・点数を確認する。
 8. 同ページで設定OFFにした対象4形が各1役満となり、ONでは対象形だけ2役満となる。近接する国士単騎・通常九蓮・小四喜はONでも1役満。
 
+## 役満倍率の表示名称更新 — 2026-11-02
+
+- 共通表示関数 [`yakuman-display-name.ts`](../../src/rendering/yakuman-display-name.ts) を追加し、和了概要・詳細、オフライン／オンライン結果、CPU和了、`test.html`の役満表示で使用します。個別役の倍率と複合役満の合計倍率は別の表示欄を保ち、同じ名称規則を使います。
+- 表示名は1倍「役満」、2倍「ダブル役満」、3倍「トリプル役満」、4倍「4倍役満」、5倍以上「N倍役満」です。個別役2倍＋別の個別役1倍の合計3倍も「トリプル役満」として自動テストに追加しました。
+- `npm test`: 76/76成功。`npm run typecheck:worker`成功。`npm run build`（アプリTypeScript型チェックとVite build）成功。Browser検証スクリプトのPython構文と`git diff --check`も成功しました。
+- Actions run [#41429120006](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41429120006)（SHA `5b2224303457a2e64259a55b4032f0fde97d604c`）はverify、Chromium／WebKit Browser UI、matrix audit、release freshness、Worker deploy、production-test、Pages build／deployがすべてsuccessしました。Workerは `https://heibon-mahjong-online.ak-sekine.workers.dev`、Pagesは `https://ak-sekine.github.io/heibon-mahjong/` へ公開されています。
+- 役判定・点数計算・精算・Workerのソースは変更していません。iPhone Safari実機確認は未実施です。Issue #37はOpenのままです。
+
 未報告の項目は未確認として残し、NodeテストやActionsの成功から実機確認済みとは判断しない。確認結果が揃った後に受け入れ条件と照合し、Issue #37のClose可否を判断する。
 
 ## 後続Issueへの影響
