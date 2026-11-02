@@ -750,7 +750,7 @@ export class OnlineWaitingRoom {
     this.codeOutput.textContent = state.roomCode;
     this.expiryOutput.textContent = new Date(state.expiresAt).toLocaleString();
     this.formatOutput.textContent = `対局形式：${state.format === 'tonnan' ? '半荘戦' : '東風戦'}`;
-    this.finalizedMessage.hidden = state.status !== 'finalized' || (this.gameActive && !state.rematchWaiting);
+    this.finalizedMessage.hidden = state.status !== 'finalized' || !state.rematchWaiting;
     this.finalizedMessage.textContent = state.rematchWaiting
       ? '次の対局の準備中です。全員の準備後、ホストが開始します。'
       : '座席が確定しました。ホストはオンライン対局を開始できます。';

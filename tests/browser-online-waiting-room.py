@@ -619,6 +619,10 @@ MOCK = r"""
         hands: JSON.parse(JSON.stringify(hands)), drawnTiles: JSON.parse(JSON.stringify(drawnTiles)) };
     },
     forceDisconnect() { sockets.filter(socket => socket.readyState === MockWebSocket.OPEN).at(-1)?.forceDisconnect(); },
+    sendSocketError(code = 'players_not_ready') {
+      const socket = sockets.find(value => value.readyState === MockWebSocket.OPEN);
+      if (socket) send(socket, { type: 'error', code });
+    },
     dropNextGameResult() { dropNextGameResult = true; },
     get ticketRequests() { return tickets; },
     get gameActions() { return [...gameActions]; },
@@ -854,9 +858,16 @@ with sync_playwright() as p:
         assert page.locator('#online-finalize').is_visible() and page.locator('#online-ready').is_hidden()
         assert page.locator('#online-close-room').count() == 0, 'the room-end button remained in the waiting UI'
         page.locator('#online-finalize').click()
-        wait_for("document.querySelector('#online-finalized-message').hidden === false")
+        wait_for("document.querySelector('#online-status').textContent === '座席が確定しました。ホストはオンライン対局を開始できます。'")
+        assert page.locator('#online-status').is_visible(), 'the upper seat-finalized status was hidden'
+        assert page.locator('#online-finalized-message').is_hidden(), 'the seat-finalized message was duplicated below the player list'
+        assert page.locator('#online-error').get_attribute('role') == 'alert', 'the independent error notification region was removed'
+        page.evaluate("window.onlineMock.sendSocketError('players_not_ready')")
+        assert page.locator('#online-error').is_visible() and page.locator('#online-error').inner_text() == 'すべての人間プレイヤーが準備完了していません。', 'server errors stopped appearing in the dedicated alert region'
+        assert page.locator('#online-finalized-message').is_hidden(), 'showing an error restored the duplicate seat-finalized message'
         assert page.locator('#online-start-game').inner_text() == '対局開始'
-        guest_page.wait_for_function("document.querySelector('#online-finalized-message').hidden === false")
+        guest_page.wait_for_function("document.querySelector('#online-status').textContent === '座席が確定しました。ホストはオンライン対局を開始できます。'")
+        assert guest_page.locator('#online-finalized-message').is_hidden(), 'the guest saw a duplicate seat-finalized message below the player list'
         state_before = page.evaluate('window.onlineMock.snapshot()')
         assert state_before['room']['roomCode'] == guest_page.evaluate('window.onlineMock.snapshot().room.roomCode')
         assert [seat['name'] for seat in state_before['room']['seats'] if seat['kind'] == 'human'] == ['テストホスト', 'テスト参加者']
@@ -929,8 +940,8 @@ with sync_playwright() as p:
         assert page.locator('#match-result-dialog').is_hidden() and guest_page.locator('#match-result-dialog').is_hidden()
         assert page.locator('#match-result-body').inner_text() == '' and guest_page.locator('#match-result-body').inner_text() == ''
         assert page.locator('#match-result-new-game').is_hidden() and guest_page.locator('#match-result-new-game').is_hidden()
-        assert '準備中' in page.locator('#online-finalized-message').inner_text()
-        assert '準備中' in guest_page.locator('#online-finalized-message').inner_text()
+        assert page.locator('#online-finalized-message').is_visible() and '準備中' in page.locator('#online-finalized-message').inner_text()
+        assert guest_page.locator('#online-finalized-message').is_visible() and '準備中' in guest_page.locator('#online-finalized-message').inner_text()
         assert page.locator('#online-ready').is_visible() and page.locator('#online-start-game').is_hidden()
         assert guest_page.locator('#online-ready').is_visible() and guest_page.locator('#online-start-game').is_hidden()
 
@@ -1288,7 +1299,8 @@ with sync_playwright() as p:
       page.locator('#online-ready').click()
       wait_for('document.querySelector("#online-finalize").disabled === false')
       page.locator('#online-finalize').click()
-      wait_for("document.querySelector('#online-finalized-message').hidden === false")
+      wait_for("document.querySelector('#online-status').textContent === '座席が確定しました。ホストはオンライン対局を開始できます。'")
+      assert page.locator('#online-finalized-message').is_hidden(), 'seat-finalized message was duplicated below the player list'
       page.locator('#online-start-game').click()
       wait_for("document.querySelector('#online-match').hidden === false")
       page.evaluate("window.onlineMock.setResultScenario('self-tsumo', 0)")
@@ -1311,7 +1323,8 @@ with sync_playwright() as p:
       page.locator('#online-ready').click()
       wait_for('document.querySelector("#online-finalize").disabled === false')
       page.locator('#online-finalize').click()
-      wait_for("document.querySelector('#online-finalized-message').hidden === false")
+      wait_for("document.querySelector('#online-status').textContent === '座席が確定しました。ホストはオンライン対局を開始できます。'")
+      assert page.locator('#online-finalized-message').is_hidden(), 'seat-finalized message was duplicated below the player list'
       page.locator('#online-start-game').click()
       wait_for("document.querySelector('#online-match').hidden === false")
       for width in (320, 375, 390, 430):
@@ -1866,11 +1879,12 @@ with sync_playwright() as p:
     assert page.locator('#online-finalize').is_visible() and page.locator('#online-start-game').is_hidden()
     assert page.locator('#online-close-room').count() == 0
     page.locator('#online-finalize').click()
-    wait_for("document.querySelector('#online-finalized-message').hidden === false")
+    wait_for("document.querySelector('#online-status').textContent === '座席が確定しました。ホストはオンライン対局を開始できます。'")
+    assert page.locator('#online-finalized-message').is_hidden(), 'seat-finalized message was duplicated below the player list'
     assert page.locator('#online-finalize').is_hidden() and page.locator('#online-start-game').is_visible()
     start_position = page.locator('#online-start-game').evaluate('element => { const box = element.getBoundingClientRect(), actions = document.querySelector("#online-actions").getBoundingClientRect(); return {left: box.left - actions.left, top: box.top - actions.top}; }')
     assert all(abs(finalize_position[key] - start_position[key]) <= 1 for key in ('left', 'top')), (finalize_position, start_position)
-    assert page.locator('#online-finalized-message').inner_text() == '座席が確定しました。ホストはオンライン対局を開始できます。'
+    assert page.locator('#online-status').inner_text() == '座席が確定しました。ホストはオンライン対局を開始できます。'
     seat_text = page.locator('#online-seats').inner_text()
     assert 'CPU1' in seat_text and 'CPU2' in seat_text, seat_text
     assert [wind.inner_text() for wind in page.locator('#online-seats .online-seat-wind').all()] == ['東', '南', '西', '北'], 'the finalized list did not show all actual game seats in order'
