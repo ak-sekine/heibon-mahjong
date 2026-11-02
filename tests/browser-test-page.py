@@ -119,7 +119,9 @@ with sync_playwright() as playwright:
             expected_multiplier = enabled_multiplier if enabled else 1
             multiplier_label = {1: '役満', 2: 'ダブル役満', 3: 'トリプル役満', 4: '4倍役満'}.get(
                 expected_multiplier, f'{expected_multiplier}倍役満')
-            total_multiplier = expected_multiplier + (1 if scenario == 'issue37-daisuushii' else 0)
+            # This closed daisuushii hand is also suuankou tanki, so both
+            # special yakuman receive the selected multiplier.
+            total_multiplier = expected_multiplier * (2 if scenario == 'issue37-daisuushii' else 1)
             total_label = {1: '役満', 2: 'ダブル役満', 3: 'トリプル役満', 4: '4倍役満'}.get(
                 total_multiplier, f'{total_multiplier}倍役満')
             page.locator('#issue37-double-yakuman').select_option('on' if enabled else 'off')
