@@ -15,6 +15,7 @@ import type { RoundSettlement } from '../model/match.ts';
 import { renderSeatLabel, renderWallCount } from './shared-table-components.ts';
 import { renderRoundWinSummary } from './round-win-summary.ts';
 import { yakuDisplayName } from './yaku-names.ts';
+import { yakumanMultiplierName } from './yakuman-display-name.ts';
 import { pendingDiscardTarget } from './pending-discard.ts';
 import { riichiRiverReference } from './riichi-river-reference.ts';
 export { yakuDisplayName } from './yaku-names.ts';
@@ -335,10 +336,10 @@ function renderWinResult(game: GameState, settlement: RoundSettlement | null, se
     section.append(text('p', '今回対応している役の判定結果'));
     const list = document.createElement('ul');
     for (const yaku of result.candidate.yaku) list.append(text('li',
-      `${yakuDisplayName(yaku.id)} ${yaku.yakuman > 0 ? `${yaku.yakuman}役満` : `${yaku.han}翻`}`));
+      `${yakuDisplayName(yaku.id)} ${yaku.yakuman > 0 ? yakumanMultiplierName(yaku.yakuman) : `${yaku.han}翻`}`));
     section.append(list);
     if (result.yakumanCount > 0) {
-      section.append(text('p', `役満：${result.yakumanCount}役満`));
+      section.append(text('p', `役満：${yakumanMultiplierName(result.yakumanCount)}`));
     } else {
       section.append(text('p', `役合計：${result.yakuHan}翻`));
       const bonuses = document.createElement('div');

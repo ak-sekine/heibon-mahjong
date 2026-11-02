@@ -9,8 +9,8 @@ BASE_URL = os.environ.get('HEIBON_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 OUT.mkdir(parents=True, exist_ok=True)
 SCENARIOS = [
-    ('tenhou', ['天和', '国士無双'], '2役満', 96000, '親連荘'),
-    ('chiihou', ['地和'], '1役満', 32000, '親交代'),
+    ('tenhou', ['天和', '国士無双'], 'ダブル役満', 96000, '親連荘'),
+    ('chiihou', ['地和'], '役満', 32000, '親交代'),
 ]
 
 with sync_playwright() as p:
@@ -92,7 +92,7 @@ with sync_playwright() as p:
         assert page.locator('#result-dialog').is_visible(), 'detail did not open'
         section = page.locator('.winner-result').first
         details = section.inner_text()
-        assert all(f'{name} 1役満' in details for name in expected_names), details
+        assert all(f'{name} 役満' in details and f'{name} 1役満' not in details for name in expected_names), details
         assert f'役満：{expected_count}' in details, details
         assert f'{expected_points}点' in section.locator('.win-score').inner_text(), details
         assert dealer_status in details, details

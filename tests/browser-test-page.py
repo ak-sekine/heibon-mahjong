@@ -117,15 +117,19 @@ with sync_playwright() as playwright:
         assert page.locator('#issue37-double-yakuman').is_visible(), scenario + ': special double-yakuman setting did not appear after selecting the fixture'
         for enabled in [False, True]:
             expected_multiplier = enabled_multiplier if enabled else 1
+            multiplier_label = {1: '役満', 2: 'ダブル役満', 3: 'トリプル役満', 4: '4倍役満'}.get(
+                expected_multiplier, f'{expected_multiplier}倍役満')
             page.locator('#issue37-double-yakuman').select_option('on' if enabled else 'off')
             page.locator('#load-scenario').click()
             page.wait_for_function('''() => !document.querySelector('#round-result-summary').hidden &&
               document.querySelector('#round-result-summary').innerText.includes('役満')''')
-            assert page.locator('#round-result-summary .round-win-summary').inner_text().find(f'{expected_multiplier}役満') >= 0, (scenario, enabled)
+            summary_text = page.locator('#round-result-summary .round-win-summary').inner_text()
+            assert multiplier_label in summary_text and '1役満' not in summary_text, (scenario, enabled, summary_text)
             assert f'設定：特殊形ダブル役満{"ON" if enabled else "OFF"}' in page.locator('#test-status').inner_text()
             page.locator('#show-result').click()
             details = page.locator('#win-result .winner-result').inner_text()
-            assert f'{yaku_name} {expected_multiplier}役満' in details, (scenario, enabled, details)
+            assert f'{yaku_name} {multiplier_label}' in details and '1役満' not in details, (scenario, enabled, details)
+            assert f'役満：{multiplier_label}' in details, (scenario, enabled, details)
             assert f'獲得点数：役満' in details, details
             assert page.locator('#win-result .winning-hand li').count() == 14, scenario
             page.locator('#view-table').click()

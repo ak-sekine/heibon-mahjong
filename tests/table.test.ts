@@ -6,6 +6,8 @@ import { tsumoGame } from './tsumo-fixture.ts';
 import { declareTsumo } from '../src/game/tsumo.ts';
 import { startGame } from '../src/game/start.ts';
 import { renderTable, renderSelection, yakuDisplayName } from '../src/rendering/table.ts';
+import { yakumanMultiplierName } from '../src/rendering/yakuman-display-name.ts';
+import { renderRoundWinSummary } from '../src/rendering/round-win-summary.ts';
 import type { YakuId } from '../src/analysis/yaku.ts';
 import { renderMatch } from '../src/rendering/match.ts';
 import { createLocalActionPanelState } from '../src/rendering/local-action-panel-state.ts';
@@ -72,6 +74,34 @@ test('the shared yaku name table uses official Japanese names', () => {
   ] as const satisfies readonly { id: YakuId; name: string }[];
 
   for (const { id, name } of cases) assert.equal(yakuDisplayName(id), name, id);
+});
+
+test('yakuman multiplier labels are shared by individual yaku and total summaries', () => {
+  const labels = ['役満', 'ダブル役満', 'トリプル役満', '4倍役満', '5倍役満', '6倍役満'];
+  class SummaryNode extends ElementStub {
+    constructor(tagName: string) { super(tagName); }
+  }
+  const original = globalThis.document;
+  globalThis.document = { createElement: (tag: string) => new SummaryNode(tag) } as unknown as Document;
+  try {
+    for (let multiplier = 1; multiplier <= labels.length; multiplier++) {
+      const label = labels[multiplier - 1]!;
+      assert.equal(yakumanMultiplierName(multiplier), label);
+      const summary = new SummaryNode('div');
+      renderRoundWinSummary(summary as unknown as HTMLElement, [{
+        winnerName: '自分', method: 'tsumo', han: 0, fu: null, yakumanCount: multiplier,
+        points: 32000 * multiplier,
+        yaku: [{ id: 'daisangen', yakuman: multiplier === 3 ? 2 : 1 },
+          ...(multiplier === 3 ? [{ id: 'tsuuiisou' as const, yakuman: 1 }] : [])],
+        doraCounts: { normal: 0, ura: 0, red: 0 },
+      }]);
+      const resultLine = summary.children[0]!.children[0]!;
+      assert.equal(resultLine.children[1]!.textContent, label);
+      const yakuLine = summary.children[0]!.children[1]!;
+      assert.ok(yakuLine.textContent.includes(multiplier === 3 ? '大三元 ダブル役満・字一色 役満' : '大三元 役満'));
+      assert.ok(!yakuLine.textContent.includes('1役満'));
+    }
+  } finally { globalThis.document = original; }
 });
 
 for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'red-only', 'normal-multiple', 'ura', 'yakuman'] as const) test(`result separates yaku and bonuses: ${count}`, () => {
@@ -146,10 +176,10 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'red-only', 'normal-m
     const win = won.winResult!;
     assert.deepEqual(won.winResult, scoringSnapshot, 'summary rendering must not mutate calculated scoring');
     const yaku = win.candidate.yaku.map(entry =>
-      `${yakuDisplayName(entry.id)}${entry.yakuman > 0 ? ` ${entry.yakuman}役満` : ''}`);
+      `${yakuDisplayName(entry.id)}${entry.yakuman > 0 ? ` ${yakumanMultiplierName(entry.yakuman)}` : ''}`);
     const summarySection = summary.children[0];
     const summaryLine = summarySection.children.find(child => child.className === 'round-summary-winner')!;
-    const summaryValue = win.yakumanCount > 0 ? `${win.yakumanCount}役満`
+    const summaryValue = win.yakumanCount > 0 ? yakumanMultiplierName(win.yakumanCount)
       : `${win.totalHanIncludingDora}翻${win.fu === null ? '' : ` ${win.fu}符`}`;
     const settlement = startMatch(won).lastSettlement!;
     const settledPayments = settlement.payments.filter(payment => payment.recipientId === win.winnerId);
@@ -166,8 +196,9 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'red-only', 'normal-m
     assert.equal(summarySection.children.length, 2);
     assert.ok(!summarySection.children.some(child => /支払|供託|親連荘|親交代|本場/.test(child.textContent)));
     if (count === 'yakuman') {
-      assert.ok(output.includes('国士無双 1役満'));
-      assert.ok(output.includes('役満：1役満'));
+      assert.ok(output.includes('国士無双 役満'));
+      assert.ok(output.includes('役満：役満'));
+      assert.ok(!output.some(s => s.includes('1役満')));
       assert.ok(!output.some(s => s.includes('翻') || s.includes('合計：') || s.includes('赤ドラ')));
       assert.equal(summarySection.children.find(child => child.className === 'round-summary-yaku')!.textContent,
         `${yaku.join('・')}${totalDoraCount > 0 ? `・ドラ${totalDoraCount}` : ''}`);

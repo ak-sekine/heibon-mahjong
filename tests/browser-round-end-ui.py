@@ -443,7 +443,9 @@ with sync_playwright() as p:
                     section = page.locator(f'.winner-result[data-winner-id="{result["winnerId"]}"]')
                     winner_summary = page.locator(f'.round-win-summary').nth(meta['winners'].index(result))
                     method = 'ツモ' if result['winMethod'] == 'tsumo' else 'ロン'
-                    score = f'{result["yakumanCount"]}役満' if result['yakumanCount'] else f'{result["totalHanIncludingDora"]}翻 {result["fu"]}符'
+                    score = ({1: '役満', 2: 'ダブル役満', 3: 'トリプル役満', 4: '4倍役満'}.get(
+                        result['yakumanCount'], f'{result["yakumanCount"]}倍役満') if result['yakumanCount'] else
+                        f'{result["totalHanIncludingDora"]}翻 {result["fu"]}符')
                     expected_heading = f'{seat_names[result["winnerId"]]} {method}・{score}・{result["totalPoints"]:,}点'
                     assert winner_summary.locator('.round-summary-winner').inner_text() == expected_heading, (width, scenario, expected_heading)
                     yaku_lines = section.locator('ul').first.locator('li').all_inner_texts()
@@ -451,7 +453,8 @@ with sync_playwright() as p:
                     assert detail_yaku == [DETAIL_YAKU_NAMES[yaku_id] for yaku_id in result['yaku']], (width, scenario, detail_yaku, result['yaku'])
                     summary_yaku = winner_summary.locator('.round-summary-yaku').inner_text()
                     expected_summary_parts = [
-                        SUMMARY_YAKU_NAMES[yaku['id']] + (f' {yaku["yakuman"]}役満' if yaku['yakuman'] else '')
+                        SUMMARY_YAKU_NAMES[yaku['id']] + ({1: ' 役満', 2: ' ダブル役満', 3: ' トリプル役満', 4: ' 4倍役満'}.get(
+                            yaku['yakuman'], f' {yaku["yakuman"]}倍役満') if yaku['yakuman'] else '')
                         for yaku in result['yakuDetails']
                     ]
                     dora_total = sum(result['doraCounts'].values())
@@ -463,7 +466,9 @@ with sync_playwright() as p:
                     assert winner_summary.locator('.round-summary-yaku').evaluate('element => element.scrollWidth <= element.clientWidth'), (width, scenario, 'yaku line overflows horizontally')
                     total = winner_summary.locator('.round-summary-value').inner_text()
                     if result['yakumanCount']:
-                        assert total == f'{result["yakumanCount"]}役満' and '翻' not in total, (width, scenario, total)
+                        expected_multiplier = {1: '役満', 2: 'ダブル役満', 3: 'トリプル役満', 4: '4倍役満'}.get(
+                            result['yakumanCount'], f'{result["yakumanCount"]}倍役満')
+                        assert total == expected_multiplier and '翻' not in total and '1役満' not in total, (width, scenario, total)
                     else:
                         assert total == f'{result["totalHanIncludingDora"]}翻 {result["fu"]}符', (width, scenario, total)
                         assert f'合計：{result["totalHanIncludingDora"]}翻' in section.inner_text(), (width, scenario)

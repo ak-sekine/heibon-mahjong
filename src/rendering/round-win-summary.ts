@@ -1,5 +1,6 @@
 import type { YakuId } from '../analysis/yaku.ts';
 import { yakuDisplayName } from './yaku-names.ts';
+import { yakumanMultiplierName } from './yakuman-display-name.ts';
 
 export type RoundWinSummary = Readonly<{
   winnerName: string;
@@ -26,7 +27,7 @@ export function renderRoundWinSummary(container: HTMLElement, winners: readonly 
     section.className = 'round-win-summary';
 
     const scoreLabel = winner.yakumanCount > 0
-      ? `${winner.yakumanCount}役満`
+      ? yakumanMultiplierName(winner.yakumanCount)
       : `${winner.han}翻${winner.fu === null ? '' : ` ${winner.fu}符`}`;
     const resultLine = text('p', '', 'round-summary-winner');
     resultLine.append(
@@ -39,7 +40,7 @@ export function renderRoundWinSummary(container: HTMLElement, winners: readonly 
     const yaku = winner.yaku.map(entry => {
       if (typeof entry === 'string') return yakuDisplayName(entry);
       const name = yakuDisplayName(entry.id);
-      return entry.yakuman > 0 ? `${name} ${entry.yakuman}役満` : name;
+      return entry.yakuman > 0 ? `${name} ${yakumanMultiplierName(entry.yakuman)}` : name;
     }).join('・');
     const doraCount = winner.doraCounts.normal + winner.doraCounts.ura + winner.doraCounts.red;
     const yakuAndDora = doraCount > 0 ? `${yaku}${yaku ? '・' : ''}ドラ${doraCount}` : yaku;

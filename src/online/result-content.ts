@@ -5,6 +5,7 @@ import type { PublicMeld, PlayerGameView, PublicWinSummary } from './game-view.t
 import { createResultDoraRow } from '../rendering/dora.ts';
 import { createTileElement, tileLabel } from '../rendering/tile-svg.ts';
 import { yakuDisplayName } from '../rendering/yaku-names.ts';
+import { yakumanMultiplierName } from '../rendering/yakuman-display-name.ts';
 import { renderRoundWinSummary } from '../rendering/round-win-summary.ts';
 import { onlinePlayerName } from './player-name.ts';
 
@@ -145,11 +146,11 @@ function renderWin(container: HTMLElement, view: PlayerGameView, winner: PublicW
   const yakuList = document.createElement('ul');
   for (const yaku of winner.yaku) {
     const name = yakuDisplayName(yaku.id as YakuId) || yaku.id;
-    yakuList.append(text('li', `${name} ${yaku.yakuman > 0 ? `${yaku.yakuman}役満` : `${yaku.han}翻`}`));
+    yakuList.append(text('li', `${name} ${yaku.yakuman > 0 ? yakumanMultiplierName(yaku.yakuman) : `${yaku.han}翻`}`));
   }
   section.append(yakuList);
   if (winner.yakumanCount > 0) {
-    section.append(text('p', `役満：${winner.yakumanCount}役満`));
+    section.append(text('p', `役満：${yakumanMultiplierName(winner.yakumanCount)}`));
   } else {
     section.append(text('p', `役合計：${winner.yakuHan}翻`));
     const bonuses = document.createElement('div');

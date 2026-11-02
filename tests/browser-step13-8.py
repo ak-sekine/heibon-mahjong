@@ -9,8 +9,8 @@ BASE_URL = os.environ.get('HEIBON_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 OUT.mkdir(parents=True, exist_ok=True)
 SCENARIOS = [
-    ('step13-8-single-yakuman', ['daisangen'], '大三元', '1役満', 48000),
-    ('step13-8-multiple-yakuman', ['ryuuiisou', 'suuankou'], '緑一色', '2役満', 64000),
+    ('step13-8-single-yakuman', ['daisangen'], '大三元', '役満', 48000),
+    ('step13-8-multiple-yakuman', ['ryuuiisou', 'suuankou'], '緑一色', 'ダブル役満', 64000),
 ]
 
 with sync_playwright() as p:
@@ -86,7 +86,7 @@ with sync_playwright() as p:
         section = page.locator('.winner-result').first
         detail_yaku = section.locator('ul').first.locator('li').all_inner_texts()
         for role_id, japanese in zip(expected_ids, ['大三元'] if len(expected_ids) == 1 else ['緑一色', '四暗刻']):
-            assert any(f'{japanese} 1役満' in item for item in detail_yaku), detail_yaku
+            assert any(f'{japanese} 役満' in item and '1役満' not in item for item in detail_yaku), detail_yaku
         detail_text = section.inner_text()
         assert f'役満：{count_label}' in detail_text, detail_text
         assert f'{expected_points}点' in section.locator('.win-score').inner_text(), result
