@@ -114,6 +114,7 @@ with sync_playwright() as playwright:
     ]
     for scenario, yaku_name, enabled_multiplier in issue37_cases:
         page.locator('#scenario').select_option(scenario)
+        page.locator('#load-scenario').click()
         for enabled in [False, True]:
             expected_multiplier = enabled_multiplier if enabled else 1
             page.locator('#issue37-double-yakuman').select_option('on' if enabled else 'off')
