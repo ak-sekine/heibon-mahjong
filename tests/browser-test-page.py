@@ -135,7 +135,8 @@ with sync_playwright() as playwright:
             page.locator('#show-result').click()
             details = page.locator('#win-result .winner-result').inner_text()
             assert f'{yaku_name} {multiplier_label}' in details and '1役満' not in details, (scenario, enabled, details)
-            assert f'役満：{total_label}' in details, (scenario, enabled, details)
+            assert f'合計：{total_label}' in details, (scenario, enabled, details)
+            assert '役満：' not in details and '役合計：' not in details, (scenario, enabled, details)
             assert f'獲得点数：役満' in details, details
             assert page.locator('#win-result .winning-hand li').count() == 14, scenario
             page.locator('#view-table').click()

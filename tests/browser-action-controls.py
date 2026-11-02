@@ -101,7 +101,7 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
   page.evaluate("riichiFixture('ron')");select_draw();page.locator('#riichi').click();page.evaluate('window.savedRiichi=riichiCheck();riichiRestore(savedRiichi);riichiDiscard()')
   assert page.locator('#ron').is_enabled();assert page.locator('#pass-ron').is_enabled();assert page.locator('#riichi').is_hidden();shot('ron-pending');page.locator('#ron').click()
   assert page.locator('#show-result').is_visible();page.locator('#show-result').click();assert page.locator('#result-dialog').is_visible()
-  text=page.locator('#win-result').inner_text();assert 'ダブル立直 2翻' in text;assert '役合計：3翻' in text
+  text=page.locator('#win-result').inner_text();assert 'ダブル立直 2翻' in text;assert '合計：3翻' in text;assert '役合計：' not in text
   assert page.evaluate('riichiCheck().lastSettlement.deposits.points')==1000;conservation();shot('ron-result')
   page.evaluate("riichiFixture('declared-ron')");select_draw();page.locator('#riichi').click()
   assert page.locator('#show-result').is_visible();page.locator('#show-result').click();assert page.locator('#result-dialog').is_visible()

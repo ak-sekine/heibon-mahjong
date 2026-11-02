@@ -66,8 +66,9 @@ with sync_playwright() as p:
             assert page.locator('#result-dialog').is_visible()
             result = panel.inner_text()
             for text in [f'CPU{winner}（{["", "南", "西", "北"][winner]}）', '門前清自摸和 1翻', '平和 1翻',
-                         '役合計：2翻', '通常ドラ：1枚（1翻）', '赤ドラ：2枚（2翻）', '合計：5翻', '獲得点数：']:
+                         '通常ドラ：1枚（1翻）', '赤ドラ：2枚（2翻）', '合計：5翻', '獲得点数：']:
                 assert text in result, result
+            assert '役合計：' not in result
             hand = page.locator('.winning-hand li')
             assert hand.count() == 14
             ids = hand.evaluate_all('els => els.map(el => el.dataset.tileId)')

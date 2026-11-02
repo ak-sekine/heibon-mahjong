@@ -2208,6 +2208,14 @@ with sync_playwright() as p:
       assert page.locator('#result-dialog').evaluate('element => element.open'), f'{scenario}: actual online result button click did not open the shared dialog'
       result_text = page.locator('#online-result-content').inner_text()
       assert all(label in result_text for label in expected), f'{scenario}: expected result detail was missing: {expected}; got {result_text}'
+      online_totals = page.evaluate('''() => window.onlineUiTest.onlineGameController.view.result.winners.map(winner => ({
+        yakumanCount: winner.yakumanCount, han: winner.han,
+      }))''')
+      for total in online_totals:
+        label = ({1: '役満', 2: 'ダブル役満', 3: 'トリプル役満', 4: '4倍役満'}.get(
+          total['yakumanCount'], f'{total["yakumanCount"]}倍役満') if total['yakumanCount'] else f'{total["han"]}翻')
+        assert f'合計：{label}' in result_text, f'{scenario}: missing total label {label}: {result_text}'
+      assert '役合計：' not in result_text and '役満：' not in result_text, f'{scenario}: legacy total label remains: {result_text}'
       assert page.locator('#online-result-content .result-dora').count() == (0 if scenario in ('draw', 'kyuushu') else 2), f'{scenario}: public dora rows did not match the result'
       assert page.locator('#result-new-game').count() == 0, f'{scenario}: an offline new-game action remained in the round result dialog'
       assert page.evaluate('''() => {

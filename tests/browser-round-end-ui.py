@@ -451,6 +451,12 @@ with sync_playwright() as p:
                     yaku_lines = section.locator('ul').first.locator('li').all_inner_texts()
                     detail_yaku = [re.sub(r'\s+(?:\d+翻|役満|ダブル役満|トリプル役満|\d+倍役満)$', '', line) for line in yaku_lines]
                     assert detail_yaku == [DETAIL_YAKU_NAMES[yaku_id] for yaku_id in result['yaku']], (width, scenario, detail_yaku, result['yaku'])
+                    result_total = ({1: '役満', 2: 'ダブル役満', 3: 'トリプル役満', 4: '4倍役満'}.get(
+                        result['yakumanCount'], f'{result["yakumanCount"]}倍役満') if result['yakumanCount'] else
+                        f'{result["totalHanIncludingDora"]}翻')
+                    detail_text = section.inner_text()
+                    assert f'合計：{result_total}' in detail_text, (width, scenario, detail_text)
+                    assert '役合計：' not in detail_text and '役満：' not in detail_text, (width, scenario, detail_text)
                     summary_yaku = winner_summary.locator('.round-summary-yaku').inner_text()
                     expected_summary_parts = [
                         SUMMARY_YAKU_NAMES[yaku['id']] + ({1: ' 役満', 2: ' ダブル役満', 3: ' トリプル役満', 4: ' 4倍役満'}.get(
@@ -471,7 +477,6 @@ with sync_playwright() as p:
                         assert total == expected_multiplier and '翻' not in total and '1役満' not in total, (width, scenario, total)
                     else:
                         assert total == f'{result["totalHanIncludingDora"]}翻 {result["fu"]}符', (width, scenario, total)
-                        assert f'合計：{result["totalHanIncludingDora"]}翻' in section.inner_text(), (width, scenario)
                     points = f'{result["totalPoints"]:,}点'
                     points_node = winner_summary.locator('.round-summary-points')
                     assert points_node.inner_text() == points, (width, scenario, result, points_node.inner_text())

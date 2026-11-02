@@ -75,7 +75,7 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
   page.locator('#next-round').click();assert page.evaluate('riichiCheck().game.players.every(p=>p.riichi===null)');conservation()
   page.evaluate("riichiFixture('ron')");select_draw();page.locator('#riichi').click();page.evaluate('window.savedRiichi=riichiCheck();riichiRestore(savedRiichi);riichiDiscard()')
   assert page.locator('#ron').is_enabled();assert page.locator('#riichi').is_hidden();page.locator('#ron').click()
-  assert page.locator('#result-dialog').is_visible();text=page.locator('#win-result').inner_text();assert '立直 1翻' in text;assert '役合計：1翻' in text
+  assert page.locator('#result-dialog').is_visible();text=page.locator('#win-result').inner_text();assert '立直 1翻' in text;assert '合計：1翻' in text;assert '役合計：' not in text
   assert page.evaluate('riichiCheck().lastSettlement.deposits.points')==1000;conservation();shot('ron-result')
   page.evaluate("riichiFixture('declared-ron')");select_draw();page.locator('#riichi').click()
   assert page.locator('#result-dialog').is_visible();assert page.evaluate('riichiCheck().depositSticks')==0;assert page.evaluate('riichiCheck().game.players[0].riichi') is None

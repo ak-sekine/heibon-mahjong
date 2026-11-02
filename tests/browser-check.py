@@ -423,7 +423,8 @@ function fixtureStart() {
             page.evaluate('document.querySelector("#tsumo").click()')
             assert page.locator('#win-result').is_visible()
             result=page.locator('#win-result').inner_text()
-            assert all(text in result for text in ['ツモ和了！','自分（東）','門前清自摸和 1翻','平和 1翻','役合計：2翻','通常ドラ：1枚（1翻）','赤ドラ：2枚（2翻）','合計：5翻','今回対応している役','獲得点数：'])
+            assert all(text in result for text in ['ツモ和了！','自分（東）','門前清自摸和 1翻','平和 1翻','通常ドラ：1枚（1翻）','赤ドラ：2枚（2翻）','合計：5翻','今回対応している役','獲得点数：'])
+            assert '役合計：' not in result
             assert dora_snapshot(page) == initial_indicator
             assert '通常ドラ' not in page.locator('#win-result ul').first.inner_text()
             assert '赤ドラ' not in page.locator('#win-result ul').first.inner_text()

@@ -88,7 +88,8 @@ with sync_playwright() as p:
         for role_id, japanese in zip(expected_ids, ['大三元'] if len(expected_ids) == 1 else ['緑一色', '四暗刻']):
             assert any(f'{japanese} 役満' in item and '1役満' not in item for item in detail_yaku), detail_yaku
         detail_text = section.inner_text()
-        assert f'役満：{count_label}' in detail_text, detail_text
+        assert f'合計：{count_label}' in detail_text, detail_text
+        assert '役満：' not in detail_text and '役合計：' not in detail_text, detail_text
         assert f'{expected_points}点' in section.locator('.win-score').inner_text(), result
         assert '（子） →' in detail_text, detail_text
         if scenario == 'step13-8-multiple-yakuman':

@@ -5,7 +5,7 @@ import type { PublicMeld, PlayerGameView, PublicWinSummary } from './game-view.t
 import { createResultDoraRow } from '../rendering/dora.ts';
 import { createTileElement, tileLabel } from '../rendering/tile-svg.ts';
 import { yakuDisplayName } from '../rendering/yaku-names.ts';
-import { yakumanMultiplierName } from '../rendering/yakuman-display-name.ts';
+import { yakumanMultiplierName, winTotalLabel } from '../rendering/yakuman-display-name.ts';
 import { renderRoundWinSummary } from '../rendering/round-win-summary.ts';
 import { onlinePlayerName } from './player-name.ts';
 
@@ -150,15 +150,14 @@ function renderWin(container: HTMLElement, view: PlayerGameView, winner: PublicW
   }
   section.append(yakuList);
   if (winner.yakumanCount > 0) {
-    section.append(text('p', `役満：${yakumanMultiplierName(winner.yakumanCount)}`));
+    section.append(text('p', winTotalLabel(winner.yakumanCount, winner.han)));
   } else {
-    section.append(text('p', `役合計：${winner.yakuHan}翻`));
     const bonuses = document.createElement('div');
     bonuses.className = 'win-bonuses';
     bonuses.append(text('p', `通常ドラ：${winner.doraCounts.normal}枚（${winner.dora.normal}翻）`));
     bonuses.append(text('p', `裏ドラ：${winner.doraCounts.ura}枚（${winner.dora.ura}翻）`));
     bonuses.append(text('p', `赤ドラ：${winner.doraCounts.red}枚（${winner.dora.red}翻）`));
-    section.append(bonuses, text('p', `合計：${winner.han}翻`));
+    section.append(bonuses, text('p', winTotalLabel(winner.yakumanCount, winner.han)));
   }
   section.append(createResultDoraRow(view.doraIndicators, false));
   if (view.rules.uraDora && seat.riichi && view.uraDoraIndicators) section.append(createResultDoraRow(view.uraDoraIndicators, true));

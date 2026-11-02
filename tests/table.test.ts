@@ -6,7 +6,7 @@ import { tsumoGame } from './tsumo-fixture.ts';
 import { declareTsumo } from '../src/game/tsumo.ts';
 import { startGame } from '../src/game/start.ts';
 import { renderTable, renderSelection, yakuDisplayName } from '../src/rendering/table.ts';
-import { yakumanMultiplierName } from '../src/rendering/yakuman-display-name.ts';
+import { yakumanMultiplierName, winTotalLabel } from '../src/rendering/yakuman-display-name.ts';
 import { renderRoundWinSummary } from '../src/rendering/round-win-summary.ts';
 import type { YakuId } from '../src/analysis/yaku.ts';
 import { renderMatch } from '../src/rendering/match.ts';
@@ -87,6 +87,7 @@ test('yakuman multiplier labels are shared by individual yaku and total summarie
     for (let multiplier = 1; multiplier <= labels.length; multiplier++) {
       const label = labels[multiplier - 1]!;
       assert.equal(yakumanMultiplierName(multiplier), label);
+      assert.equal(winTotalLabel(multiplier, 0), `合計：${label}`);
       const summary = new SummaryNode('div');
       renderRoundWinSummary(summary as unknown as HTMLElement, [{
         winnerName: '自分', method: 'tsumo', han: 0, fu: null, yakumanCount: multiplier,
@@ -197,16 +198,17 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'red-only', 'normal-m
     assert.ok(!summarySection.children.some(child => /支払|供託|親連荘|親交代|本場/.test(child.textContent)));
     if (count === 'yakuman') {
       assert.ok(output.includes('国士無双 役満'));
-      assert.ok(output.includes('役満：役満'));
+      assert.ok(output.includes('合計：役満'));
+      assert.ok(!output.some(s => s.startsWith('役満：')));
       assert.ok(!output.some(s => s.includes('1役満')));
-      assert.ok(!output.some(s => s.includes('翻') || s.includes('合計：') || s.includes('赤ドラ')));
+      assert.ok(!output.some(s => s.includes('翻') || s.includes('赤ドラ')));
       assert.equal(summarySection.children.find(child => child.className === 'round-summary-yaku')!.textContent,
         `${yaku.join('・')}${totalDoraCount > 0 ? `・ドラ${totalDoraCount}` : ''}`);
     } else {
       const expectedYaku = count === 'normal-multiple' || count === 'ura' ? list.children.map(c => c.textContent).sort()
         : ['三色同順 2翻', '平和 1翻', '門前清自摸和 1翻'];
       assert.deepEqual(list.children.map(c => c.textContent).sort(), expectedYaku);
-      assert.ok(output.includes(`役合計：${win.yakuHan}翻`));
+      assert.ok(!output.some(s => s.startsWith('役合計：')));
       const normal = count === 'zero-normal' || count === 'no-dora' || count === 'red-only' ? 0 : win.doraCount;
       const red = count === 'zero-normal' ? 2 : count === 'normal-multiple' || count === 'ura' || count === 'red-only'
         ? win.redDoraCount : count;
@@ -225,6 +227,7 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'red-only', 'normal-m
       }
       if (count !== 'ura') assert.equal(win.uraDoraCount, 0, 'ura dora is excluded without riichi');
       assert.ok(output.includes(`通常ドラ：${normal}枚（${normal}翻）`));
+      assert.ok(output.includes(`裏ドラ：${win.uraDoraCount}枚（${win.uraDoraHan}翻）`));
       if (count === 'no-dora') assert.ok(output.includes('赤ドラ：0枚（0翻）'));
       else assert.ok(output.includes(`赤ドラ：${red}枚（${red}翻）`));
       assert.ok(output.includes(`合計：${win.totalHanIncludingDora}翻`));
@@ -387,7 +390,8 @@ test('four seats render from player state, concealed CPU hands and fresh tiles',
     assert.equal(nodes.get('#player-hand')!.children.length, 14);
     assert.equal(nodes.get('#win-result')!.hidden, false);
     assert.ok(nodes.get('#win-result')!.children[0].children.some(c => c.textContent === 'ツモ和了！'));
-    assert.ok(nodes.get('#win-result')!.children[0].children.some(c => c.textContent === '役合計：2翻'));
+    assert.ok(nodes.get('#win-result')!.children[0].children.some(c =>
+      c.textContent === winTotalLabel(won.winResult!.yakumanCount, won.winResult!.totalHanIncludingDora)));
     assert.equal(nodes.get('#label-0')!.dataset.active, 'false');
     renderTable(startGame());
     assert.equal(nodes.get('#win-result')!.hidden, true);

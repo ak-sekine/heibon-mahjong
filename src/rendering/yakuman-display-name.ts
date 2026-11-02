@@ -8,3 +8,10 @@ export function yakumanMultiplierName(multiplier: number): string {
     default: return `${multiplier}倍役満`;
   }
 }
+
+/** Return the final total line shared by offline, CPU, and online result details. */
+export function winTotalLabel(yakumanCount: number, totalHanIncludingDora: number): string {
+  return yakumanCount > 0
+    ? `合計：${yakumanMultiplierName(yakumanCount)}`
+    : `合計：${totalHanIncludingDora}翻`;
+}

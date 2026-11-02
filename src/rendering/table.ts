@@ -15,7 +15,7 @@ import type { RoundSettlement } from '../model/match.ts';
 import { renderSeatLabel, renderWallCount } from './shared-table-components.ts';
 import { renderRoundWinSummary } from './round-win-summary.ts';
 import { yakuDisplayName } from './yaku-names.ts';
-import { yakumanMultiplierName } from './yakuman-display-name.ts';
+import { yakumanMultiplierName, winTotalLabel } from './yakuman-display-name.ts';
 import { pendingDiscardTarget } from './pending-discard.ts';
 import { riichiRiverReference } from './riichi-river-reference.ts';
 export { yakuDisplayName } from './yaku-names.ts';
@@ -339,16 +339,15 @@ function renderWinResult(game: GameState, settlement: RoundSettlement | null, se
       `${yakuDisplayName(yaku.id)} ${yaku.yakuman > 0 ? yakumanMultiplierName(yaku.yakuman) : `${yaku.han}翻`}`));
     section.append(list);
     if (result.yakumanCount > 0) {
-      section.append(text('p', `役満：${yakumanMultiplierName(result.yakumanCount)}`));
+      section.append(text('p', winTotalLabel(result.yakumanCount, result.totalHanIncludingDora)));
     } else {
-      section.append(text('p', `役合計：${result.yakuHan}翻`));
       const bonuses = document.createElement('div');
       bonuses.className = 'win-bonuses';
       bonuses.append(text('p', `通常ドラ：${result.doraCount}枚（${result.doraHan}翻）`));
       bonuses.append(text('p', `裏ドラ：${result.uraDoraCount}枚（${result.uraDoraHan}翻）`));
       bonuses.append(text('p', `赤ドラ：${result.redDoraCount}枚（${result.redDoraHan}翻）`));
       section.append(bonuses);
-      section.append(text('p', `合計：${result.totalHanIncludingDora}翻`));
+      section.append(text('p', winTotalLabel(result.yakumanCount, result.totalHanIncludingDora)));
     }
     section.append(createResultDoraRow(exposedDoraIndicators(game, game.rules), false));
     // Read hidden indicators only for a confirmed winner with established riichi.

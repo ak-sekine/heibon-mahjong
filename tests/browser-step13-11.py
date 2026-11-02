@@ -11,6 +11,8 @@ OUT.mkdir(parents=True, exist_ok=True)
 SCENARIOS = [
     ('tenhou', ['天和', '国士無双'], 'ダブル役満', 96000, '親連荘'),
     ('chiihou', ['地和'], '役満', 32000, '親交代'),
+    ('triple-yakuman', ['大三元', '四暗刻', '字一色'], 'トリプル役満', 144000, '親連荘'),
+    ('four-yakuman', ['天和', '大三元', '四暗刻', '字一色'], '4倍役満', 192000, '親連荘'),
 ]
 
 with sync_playwright() as p:
@@ -38,7 +40,9 @@ with sync_playwright() as p:
           ]);
           window.step1311Test.controller.newGame();
           const game = scenario === 'tenhou' ? fixtures.tenhouGame(0, fixtures.FIRST_TURN_HANDS.kokushi)
-            : fixtures.chiihouGame(0, fixtures.FIRST_TURN_HANDS.standard, 1311, 1);
+            : scenario === 'triple-yakuman' ? fixtures.dealerSecondTurnGame(fixtures.FIRST_TURN_HANDS.honorsDaisangen, 1311)
+              : scenario === 'four-yakuman' ? fixtures.tenhouGame(0, fixtures.FIRST_TURN_HANDS.honorsDaisangen, 1312)
+                : fixtures.chiihouGame(0, fixtures.FIRST_TURN_HANDS.standard, 1311, 1);
           window.step1311Test.controller.match = matchModule.startMatch(game);
           window.step1311Test.controller.selectedTileId = null;
           window.step1311Test.render();
@@ -81,8 +85,13 @@ with sync_playwright() as p:
             privateIds: game.players.slice(1).flatMap(player => [...player.hand,
               ...(player.drawnTile ? [player.drawnTile] : [])]).map(tile => tile.id) };
         }''')
-        expected_ids = ['tenhou', 'kokushi-musou'] if scenario == 'tenhou' else ['chiihou']
-        expected_yakuman_count = 2 if scenario == 'tenhou' else 1
+        expected_ids = ({
+            'tenhou': ['tenhou', 'kokushi-musou'],
+            'chiihou': ['chiihou'],
+            'triple-yakuman': ['daisangen', 'suuankou', 'tsuuiisou'],
+            'four-yakuman': ['tenhou', 'daisangen', 'suuankou', 'tsuuiisou'],
+        })[scenario]
+        expected_yakuman_count = {'tenhou': 2, 'chiihou': 1, 'triple-yakuman': 3, 'four-yakuman': 4}[scenario]
         assert result['yaku'] == expected_ids, result
         assert result['yakumanCount'] == expected_yakuman_count and result['han'] == 0, result
         assert result['points'] == expected_points and result['idsUnique'], result
@@ -93,7 +102,8 @@ with sync_playwright() as p:
         section = page.locator('.winner-result').first
         details = section.inner_text()
         assert all(f'{name} 役満' in details and f'{name} 1役満' not in details for name in expected_names), details
-        assert f'役満：{expected_count}' in details, details
+        assert f'合計：{expected_count}' in details, details
+        assert '役満：' not in details and '役合計：' not in details, details
         assert f'{expected_points}点' in section.locator('.win-score').inner_text(), details
         assert dealer_status in details, details
         if scenario == 'chiihou':
