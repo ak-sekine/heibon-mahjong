@@ -18,8 +18,8 @@
 - `npm run build`：成功（TypeScript検査、Vite production build）
 - `python -m py_compile tests/browser-online-waiting-room.py`：成功
 - `python tests/test_browser_regressions_selection.py`：成功（5件）
-- Chromium／WebKit Browser UI：GitHub Actions実行後に記録
-- Issue #41追加修正の本番公開：GitHub Actions Deploy gate結果を確認後に記録
+- 最初のコミット`9dc494b341566ad4933f4caea62e4c8e4e4f04ac`のrun [#41473236060](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41473236060)：`verify`成功後、Chromium／WebKitが追加したエラー通知チェックで失敗。テストmockが実際の`action-result`拒否を通さずにraw WebSocket errorを送っていたため、テストfixture側の誤りと特定。matrix auditも失敗しDeploy gateは不成立、Worker／Pagesは公開されなかった。
+- テストmockを実際のaction-result拒否経由に直したコミット`5d9121fa6e5b2f00c441c9c51c85878ea22a0a5f`をmainへpush。最終run [#41474025754](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41474025754) は`docs-check`、`verify`（回帰テスト・Worker型検査・Pages build）、Chromium、WebKit、`browser-ui-matrix-audit`、`release-freshness`、`deploy-worker`、`production-test`、`pages-build`、`pages-deploy`がすべてsuccess。mainと`origin/main`のSHAは同じ。
 - 修正後iPhone Safari：未確認。自動テストやChromium／WebKitの結果で代替しない
 
 ## 修正後のiPhone Safari確認項目
