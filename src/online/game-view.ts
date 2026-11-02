@@ -47,7 +47,7 @@ export type PublicWinSummary = Readonly<{
   rawFu: number | null;
   scoreTier: ScoreTier;
   yakumanCount: number;
-  yaku: readonly Readonly<{ id: string; han: number; yakuman: boolean }>[];
+  yaku: readonly Readonly<{ id: string; han: number; yakuman: number }>[];
   dora: Readonly<{ normal: number; ura: number; red: number }>;
   doraCounts: Readonly<{ normal: number; ura: number; red: number }>;
   fuEntries: readonly FuEntry[];
@@ -220,7 +220,7 @@ function publicWin(
     rawFu: result.rawFu,
     scoreTier: result.scoreTier,
     yakumanCount: result.yakumanCount,
-    yaku: result.candidate.yaku.map(entry => ({ id: entry.id, han: entry.han, yakuman: entry.yakuman > 0 })),
+    yaku: result.candidate.yaku.map(entry => ({ id: entry.id, han: entry.han, yakuman: entry.yakuman })),
     dora: { normal: result.doraHan, ura: result.uraDoraHan, red: result.redDoraHan },
     doraCounts: { normal: result.doraCount, ura: result.uraDoraCount, red: result.redDoraCount },
     fuEntries: result.fuBreakdown,

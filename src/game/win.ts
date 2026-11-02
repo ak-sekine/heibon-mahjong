@@ -45,7 +45,7 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
       houtei,
       seatWind: player.wind, roundWind: game.roundWind ?? ROUND_WIND, riichi: player.riichi !== null,
       ippatsuEligible: rules.ippatsu && player.riichi?.ippatsuEligible, doubleRiichi: player.riichi?.doubleRiichi,
-      kuitan: rules.kuitan });
+      kuitan: rules.kuitan, doubleYakuman: rules.doubleYakuman });
     if (!analysis.isWinningShape || !analysis.hasSupportedYaku) return null;
     const doraCount = countDora(allFaces, exposedDoraIndicators(game, rules).map(t => t.tile));
     const uraDoraCount = rules.uraDora && player.riichi ? countDora(allFaces, uraDoraIndicators(game, rules).map(t => t.tile)) : 0;

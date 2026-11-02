@@ -15,21 +15,23 @@ import { nagashiGame } from './step13-10-fixture.ts';
 import { startOnlineGame, startNextOnlineRound, hydrateOnlineGame } from '../src/online/game-engine.ts';
 import type { OnlineGameSession } from '../src/online/game-view.ts';
 
-test('GameRules v3 and v1/v2 data normalize to the seven confirmed defaults; v4 persists every independent option', () => {
+test('GameRules v1-v4 data normalize to v5 defaults and all five v5 options persist independently', () => {
   const v3 = { schemaVersion: 3, matchFormat: 'tonnan', redDora: false, kuitan: false, uraDora: true, ippatsu: false, kanDora: false };
-  assert.deepEqual(normalizeGameRules(v3), { ...DEFAULT_GAME_RULES, ...v3, schemaVersion: 4,
+  assert.deepEqual(normalizeGameRules(v3), { ...DEFAULT_GAME_RULES, ...v3, schemaVersion: 5,
     dealerTenpaiRenchan: true, kyuushuKyuuhai: true, fourWinds: true, fourRiichi: true, fourKans: true,
     agariYame: false, tenpaiYame: false });
   const selected = { ...DEFAULT_GAME_RULES, dealerTenpaiRenchan: false, kyuushuKyuuhai: false,
-    fourWinds: false, fourRiichi: false, fourKans: false, agariYame: true, tenpaiYame: true };
+    fourWinds: false, fourRiichi: false, fourKans: false, agariYame: true, tenpaiYame: true,
+    renhou: 'mangan' as const, pao: true, doubleYakuman: true, multipleRon: false, tripleRonAbortiveDraw: true };
   const values = new Map<string, string>();
   const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value) };
   assert.equal(saveLastGameRules(selected, storage), true);
-  assert.equal(JSON.parse(values.get(GAME_RULES_STORAGE_KEY)!).version, 4);
+  assert.equal(JSON.parse(values.get(GAME_RULES_STORAGE_KEY)!).version, 5);
   assert.deepEqual(loadLastGameRules(storage), selected);
   for (const [key, value] of [
     ['dealerTenpaiRenchan', false], ['kyuushuKyuuhai', false], ['fourWinds', false], ['fourRiichi', false],
-    ['fourKans', false], ['agariYame', true], ['tenpaiYame', true],
+    ['fourKans', false], ['agariYame', true], ['tenpaiYame', true], ['renhou', 'mangan'], ['pao', true],
+    ['doubleYakuman', true], ['multipleRon', false], ['tripleRonAbortiveDraw', true],
   ] as const) {
     const one = { ...DEFAULT_GAME_RULES, [key]: value };
     saveLastGameRules(one, storage);
@@ -55,9 +57,10 @@ test('dealer-tenpai rule does not change child or dealer win renchan', () => {
   }
 });
 
-test('the same v4 rules survive online creation, persisted reconnect state and a rematch round', () => {
+test('the same v5 rules survive online creation, persisted reconnect state and a rematch round', () => {
   const rules = { ...DEFAULT_GAME_RULES, dealerTenpaiRenchan: false, kyuushuKyuuhai: false,
-    fourWinds: false, fourRiichi: false, fourKans: false, agariYame: true, tenpaiYame: true };
+    fourWinds: false, fourRiichi: false, fourKans: false, agariYame: true, tenpaiYame: true,
+    renhou: 'mangan' as const, pao: true, doubleYakuman: true, multipleRon: false, tripleRonAbortiveDraw: true };
   const identities = [0, 1, 2, 3].map(seat => ({ seat: seat as 0 | 1 | 2 | 3, name: `Player ${seat}`, control: 'human' as const, connected: true })) as OnlineGameSession['identities'];
   const created = startOnlineGame(identities, 0, () => 0.5, rules);
   assert.deepEqual(created.match.rules, rules);

@@ -2,13 +2,15 @@ import { deal } from '../game/deal.ts';
 import { reserveDeadWall, createWall } from '../game/wall.ts';
 import type { GameState, PhysicalTile, PlayerId } from '../model/game.ts';
 import { tileKindKey } from '../model/tile.ts';
+import { createIssue37WinningState, ISSUE37_TEST_HANDS } from './issue37-fixtures.ts';
 
 export interface TestScenario {
   readonly id: string;
   readonly displayName: string;
   readonly description: string;
   readonly targetPlayerId: PlayerId;
-  readonly generateInitialGameState: () => GameState;
+  readonly generateInitialGameState: (targetPlayerId?: PlayerId) => GameState;
+  readonly immediateTsumo?: boolean;
 }
 
 const initialKinds = [
@@ -40,7 +42,7 @@ function createKyuushuGame(dealerId: PlayerId): GameState {
 
 const targetNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
 
-export const testScenarios: readonly TestScenario[] = targetNames.map((name, targetPlayerId) => ({
+const kyuushuScenarios: readonly TestScenario[] = targetNames.map((name, targetPlayerId) => ({
   id: `kyuushu-${targetPlayerId === 0 ? 'self' : `cpu${targetPlayerId}`}`,
   displayName: `九種九牌（${name}）`,
   description: targetPlayerId === 0
@@ -49,6 +51,26 @@ export const testScenarios: readonly TestScenario[] = targetNames.map((name, tar
   targetPlayerId: targetPlayerId as PlayerId,
   generateInitialGameState: () => createKyuushuGame(targetPlayerId as PlayerId),
 }));
+
+const issue37Scenarios: readonly TestScenario[] = ([
+  ['issue37-suuankou-tanki', '四暗刻単騎', ISSUE37_TEST_HANDS.suuankouTanki],
+  ['issue37-kokushi-thirteen', '国士無双十三面待ち', ISSUE37_TEST_HANDS.kokushiThirteen],
+  ['issue37-kokushi-single', '国士無双単騎（対照）', ISSUE37_TEST_HANDS.kokushiSingle],
+  ['issue37-chuuren-pure', '純正九蓮宝燈', ISSUE37_TEST_HANDS.chuurenPure],
+  ['issue37-chuuren-normal', '九蓮宝燈（対照）', ISSUE37_TEST_HANDS.chuurenNormal],
+  ['issue37-daisuushii', '大四喜', ISSUE37_TEST_HANDS.daisuushii],
+  ['issue37-shousuushii', '小四喜（対照）', ISSUE37_TEST_HANDS.shousuushii],
+] as const).map(([id, displayName, fixture]) => ({
+  id,
+  displayName,
+  description: '役・設定・倍率・支払いを確認するための固定ツモ局面です。',
+  targetPlayerId: 0 as PlayerId,
+  immediateTsumo: true,
+  generateInitialGameState: (targetPlayerId = 0 as PlayerId) =>
+    createIssue37WinningState(fixture.groups, fixture.winning, targetPlayerId),
+}));
+
+export const testScenarios: readonly TestScenario[] = [...kyuushuScenarios, ...issue37Scenarios];
 
 export function getTestScenario(id: string): TestScenario {
   const scenario = testScenarios.find(item => item.id === id);

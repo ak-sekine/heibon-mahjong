@@ -103,6 +103,33 @@ with sync_playwright() as playwright:
         page.wait_for_function("document.querySelector('#round-result-summary').hidden")
         assert page.locator('.revealed-tile').count() == 0, scenario
 
+    issue37_cases = [
+        ('issue37-suuankou-tanki', '四暗刻', 2),
+        ('issue37-kokushi-thirteen', '国士無双', 2),
+        ('issue37-kokushi-single', '国士無双', 1),
+        ('issue37-chuuren-pure', '九蓮宝燈', 2),
+        ('issue37-chuuren-normal', '九蓮宝燈', 1),
+        ('issue37-daisuushii', '大四喜', 2),
+        ('issue37-shousuushii', '小四喜', 1),
+    ]
+    for scenario, yaku_name, enabled_multiplier in issue37_cases:
+        page.locator('#scenario').select_option(scenario)
+        for enabled in [False, True]:
+            expected_multiplier = enabled_multiplier if enabled else 1
+            page.locator('#issue37-double-yakuman').select_option('on' if enabled else 'off')
+            page.locator('#load-scenario').click()
+            page.wait_for_function('''() => !document.querySelector('#round-result-summary').hidden &&
+              document.querySelector('#round-result-summary').innerText.includes('役満')''')
+            assert page.locator('#round-result-summary .round-win-summary').inner_text().find(f'{expected_multiplier}役満') >= 0, (scenario, enabled)
+            assert f'設定：特殊形ダブル役満{"ON" if enabled else "OFF"}' in page.locator('#test-status').inner_text()
+            page.locator('#show-result').click()
+            details = page.locator('#win-result .winner-result').inner_text()
+            assert f'{yaku_name} {expected_multiplier}役満' in details, (scenario, enabled, details)
+            assert f'獲得点数：役満' in details, details
+            assert page.locator('#win-result .winning-hand li').count() == 14, scenario
+            page.locator('#view-table').click()
+            assert not page.locator('#result-dialog').evaluate('dialog => dialog.open')
+
     page.goto(base)
     assert page.locator('.test-lab, #scenario, .test-badge').count() == 0, 'test controls leaked to regular entry'
     assert page.locator('#tile-gallery, .catalog').count() == 0, 'development tile catalog is present on regular entry'
@@ -113,7 +140,9 @@ with sync_playwright() as playwright:
     assert page.locator('#scenario option').count() == 7, 'kan verification page changed'
     assert page.locator('#tile-gallery, .catalog').count() == 0, 'development tile catalog is present on kan verification page'
     assert not errors, errors
-    print(json.dumps({'testPage': 'pass', 'scenarios': ['kyuushu-self', *[case[0] for case in cases]],
+    print(json.dumps({'testPage': 'pass', 'scenarios': ['kyuushu-self', *[case[0] for case in cases],
+                      *[case[0] for case in issue37_cases]],
+                      'doubleYakuman': 'OFF/ON and result details pass',
                       'widths': [320, 375, 390, 430], 'regularPageIsolation': 'pass',
                       'kanPage': 'pass'}, ensure_ascii=False))
     browser.close()

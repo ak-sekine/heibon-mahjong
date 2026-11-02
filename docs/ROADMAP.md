@@ -20,6 +20,7 @@
 | 赤ドラ・裏ドラ・一発・カンドラの個別設定 — Issue #16 | 完了（実機確認済み、completed／Closed） | `GameRules` v2に4真偽値を追加し、初期値はすべてONです。牌生成、得点、役判定、CPUのリーチ候補評価、ルーム保存、ゲームsnapshot、再接続・次局・再戦へ適用します。OFF時は赤牌を通常牌へ置換し、槓自体は維持したうえで追加表・裏ドラを止めます。2026-11-01のユーザー本人によるiPhone Safari確認は7件OK、NG 0件、未確認1件（一発OFF）です。一発OFFの役判定とリーチ役維持は決定的な自動テストで成功しました。Actions run #499は1,319 tests、Chromium／WebKit、Worker production test、Worker／Pages deployがsuccessしました。検証記録：[Issue #16](verification/issue16-local-rules-2026-11-01.md)。 |
 | 喰いタン切替 — Issue #17 | 完了・iPhone Safari実機確認（4項目OK、2項目未確認） | `GameRules` v3の喰いタン値を共通ルール編集・保存・Worker同期に追加しました。初期値ONを維持し、OFFでは副露断么九だけの和了を拒否して門前断么九と別役を含む副露手を維持します。2026-11-02のユーザー本人のiPhone Safari確認はOK 4件、NG 0件、未確認2件。CPU判断の自動テストと役なし拒否・フリテン維持の根拠を確認し、片和了の専用複数待ちケースは自動テスト未確認として記録しました。後付けありは固定、後付け禁止・片和了禁止は採用しません。Issue #17はcompletedとしてClose。詳細：[Issue #17検証記録](verification/issue17-local-rules-2026-11-01.md)。 |
 | 連荘・途中流局・オーラス終了条件 — Issue #18 | iPhone Safari指定6項目を実機確認済み（OK 6、NG 0、未確認 0）・completed／Closed | `GameRules` schema v4の独立した7項目を実装しました。初期値は親テンパイ連荘・九種九牌・四風連打・四家立直・四開槓がON、アガリやめ・テンパイやめがOFFです。精算、本場・供託、親進行、精算後の単独トップ判定を統合し、CPU・Worker・再接続・次局・再戦へ同じ設定を使います。2026-11-02、ユーザー本人がiPhone Safariで新規対局画面と初期値、設定保存、オフライン確認、オンライン作成・待機、再接続・再戦、CPU対局の次局進行を確認し、指定6項目すべてOKと報告しました。特殊な途中流局・精算やめ条件は実機OKとせず、自動テスト結果と区別しています。Actions run `41382073027`ではChromium 37件／WebKit 25件、Deploy gate、Worker・Pages公開がsuccessしました。Pages直接HTTP応答はCodex Cloudの接続プロキシ制限で未取得です。[検証記録](verification/issue18-local-rules-2026-11-02.md)。 |
+| 特殊形ダブル役満・共通ルール基盤 — Issue #37 | 実装・自動検証済み／iPhone Safari実機確認待ち・Open | GameRules/localStorage schema v5を導入し、四暗刻単騎・国士十三面・純正九蓮・大四喜の一括OFF/ONを追加。各役の倍率を候補に保持し、点数・CPU・Worker公開結果で共有します。人和・パオ・複数ロン・三家和の初期値・正規化・保存・同期型も追加しましたが、変更UIとゲーム動作は後続Issueの対象です。自動検証・Actions・公開・iPhone Safariの結果は[Issue #37検証記録](verification/issue37-double-yakuman-2026-11-02.md)に追記します。Issueは実機確認の報告を受けるまでOpenのままです。 |
 | 和了概要のドラ合計 — Issue #11 | 実機確認済み（指定4件OK、NG 0件、未確認4件）・完了／completedでClose | 共有の和了概要に計算済みの通常ドラ・裏ドラ・赤ドラ枚数の合計を表示し、0枚は省略します。Actions run 41196608100は実装SHAと一致し、verify、Browser UI、production-test、Worker/Pages deployが成功しました。長い役名の非重複、3種ドラの実機合算、オンラインのホスト・参加者間一致、再接続後の結果復元は未確認で、自動検証済み項目と区別しています。[検証記録](verification/issue11-dora-summary-2026-10-31.md)を参照してください。 |
 | 診断ログの閉じるボタン折り返し — Issue #10 | 実機確認済み・完了／Close | `#diagnostic-close`のflex縮小を止めてラベルを1行に固定し、長いビルド情報・ログ本文はダイアログ内で折り返します。Actions run 41191873055で1,301件のテスト、Worker型検査、Chromium/WebKitの320/375/390/414px Browser UI、本番Worker test、Worker/Pages deployがすべてsuccessしました。2026-10-31にユーザー本人がiPhone Safariで「閉じる」の1行表示・閉じる操作、コピー、クリア、ログ本文スクロール、他ダイアログの閉じる操作を確認し、5項目すべてOK（NG 0件）と報告しました。ログ件数別の実機確認、長いビルドID・長文ログの実機再現、機種・iOSバージョン・確認時刻は未報告です。[検証記録](verification/diagnostic-close-issue10-2026-10-31.md) |
 | 全ボタン共通配色・右上メニュー — Issue #24 | 完了・Close（実機確認範囲を限定） | 通常操作ボタンの通常 `#F8DC91 / #154E3C`、押下 `#E9C66A / #154E3C`、無効 `#9DA27C / #20352C` を共通化しました。メニュー項目とハンバーガートグルは専用UIに分離済みです。Deploy run 41171398665 はsuccessし、Actionsログで `npm test` 1,292件成功・失敗0件、Chromium 35件・WebKit 21件成功、Worker型検査、build、Worker／Pages deploy成功を確認しました。2026-10-31にユーザー本人がiPhone Safariでメニュー表示と開閉・項目選択・外側タップ・連続タップ・4項目・通常ボタン操作を確認し、正常と報告しました。Android Chrome実機は端末がないため未確認ですが、今回の必須条件から除外しました。PC Firefox実機、PWAインストール状態、公開配信CSSのcomputed style、全ボタン種別・状態の網羅実機確認も未確認で、Close条件ではありません。Android実機検証用のIssueは作成しません。[ハンバーガーメニュー記録](verification/main-menu-toggle-style-2026-10-31.md) · [ドロップダウン記録](verification/menu-dropdown-style-2026-10-31.md) · [全ボタン配色記録](verification/button-role-colors-issue24-2026-10-30.md) · [Issue #24](https://github.com/ak-sekine/heibon-mahjong/issues/24) |
@@ -54,7 +55,7 @@
 | チー・ポン・喰い替え制限 | 完了 | CPUの基本的な鳴き判断を含みます。 |
 | 暗カン・大明カン・加カン — Issue #25 | 実機確認済み・完了（通常対局は未確認） | 親の配牌直後・子の第一通常ツモ後の暗カンを含みます。複数候補の選択、嶺上開花・槍槓・カンドラ・四開槓を実装しています。2026-10-31、ユーザー本人がiPhone Safariでカン検証ページを操作し、ページ全体に問題なしと報告しました。通常オフライン／オンライン対局の親の初手暗カンは対象局面を実機で再現していないため未確認です。候補判定・合法性は通常対局、検証ページ、オンラインサーバーで共通の処理を使用します。従来のカン実機確認は[記録](verification/kan-safari-2026-10-18.md)、Issue #25の自動・実機確認と未確認範囲は[記録](verification/issue25-opening-ankan-2026-10-31.md)を参照してください。 |
 | CPUの手牌判断 | 一部実装 | 向聴数・有効牌・見えている牌を使う打牌と、限定的な鳴き・カン・立直判断があります。長期探索や強い戦略はありません。 |
-| 対局ルール拡張 — Issue #19 | 設計完了・実装Issueへ分割 | 人和・パオ・特殊形ダブル役満・複数ロン／三家和の確定仕様、既存コードとの差分、受入テスト計画、連盟公式資料の確認範囲と独自仕様の差を記録。実装は未着手。実装順は[#37](https://github.com/ak-sekine/heibon-mahjong/issues/37)特殊形ダブル役満 → [#38](https://github.com/ak-sekine/heibon-mahjong/issues/38)人和 → [#39](https://github.com/ak-sekine/heibon-mahjong/issues/39)パオ → [#40](https://github.com/ak-sekine/heibon-mahjong/issues/40)複数ロン・三家和。#6の設定保存、#18の途中流局精算を再利用します。[Issue #19設計記録](verification/issue19-unimplemented-rules-2026-11-02.md)。 |
+| 対局ルール拡張 — Issue #19 | 設計完了・実装Issueへ分割（#37実装済み・実機確認待ち） | 人和・パオ・特殊形ダブル役満・複数ロン／三家和の確定仕様、既存コードとの差分、受入テスト計画、連盟公式資料の確認範囲と独自仕様の差を記録。#37で特殊形ダブル役満とGameRules v5共通基盤を実装し、Safari実機確認待ちです。残りの実装順は[#38](https://github.com/ak-sekine/heibon-mahjong/issues/38)人和 → [#39](https://github.com/ak-sekine/heibon-mahjong/issues/39)パオ → [#40](https://github.com/ak-sekine/heibon-mahjong/issues/40)複数ロン・三家和。#6の設定保存、#18の途中流局精算を再利用します。[Issue #19設計記録](verification/issue19-unimplemented-rules-2026-11-02.md)。 |
 
 ## Step 13.6・13.7 完了範囲
 
@@ -90,7 +91,7 @@ Step 13.6と13.7で以下の11種類を実装・検証しました。
 | 大四喜 | 完了 | 風牌4種類が刻子・カン |
 | 九蓮宝燈 | 完了 | 門前の1色、1112345678999と同色牌1枚。暗カンを含む手は除外 |
 
-Step 13.8までの役満10種類に、Step 13.11で天和・地和を加え、計12種類に対応しています。異なる役満は同じ和了候補内で合算し、同じ種類は1回だけ数えます。四暗刻単騎、純正九蓮宝燈、大四喜、国士無双十三面待ち、天和、地和はいずれも1役満で、ダブル役満はありません。
+Step 13.8までの役満10種類に、Step 13.11で天和・地和を加え、計12種類に対応しています。異なる役満は同じ和了候補内で個別倍率を合算し、同じ種類は1回だけ数えます。特殊形ダブル役満ON時は四暗刻単騎・純正九蓮宝燈・大四喜・国士無双十三面待ちが2役満、OFF時と他の役満は1役満です。天和・地和は倍付けしません。
 
 人和と責任払い（パオ）は未実装です。Issue #19では人和・パオ・特殊形ダブル役満・複数ロン・三家和の仕様を確定し、実装設計を記録しています。四開槓による途中流局と、1人が4回カンしたときに続行するルールを実装しています。[Issue #19設計記録](verification/issue19-unimplemented-rules-2026-11-02.md)。
 
@@ -142,7 +143,7 @@ Step 13.8までの役満10種類に、Step 13.11で天和・地和を加え、�
 
 ## Step 13.11 完了範囲
 
-天和・地和を各1役満として追加しました。親の配牌14枚によるツモ和了を有効にし、子の第一ツモはそれ以前に通常打牌があっても成立しますが、鳴き・カン後やロンでは成立しません。通常形・七対子・国士無双の候補に追加し、候補内の既存役満と合算します。詳細は[SPEC.md](SPEC.md)を参照してください。人和、責任払い、ダブル役満は未実装です。
+天和・地和を各1役満として追加しました。親の配牌14枚によるツモ和了を有効にし、子の第一ツモはそれ以前に通常打牌があっても成立しますが、鳴き・カン後やロンでは成立しません。通常形・七対子・国士無双の候補に追加し、候補内の既存役満と合算します。詳細は[SPEC.md](SPEC.md)を参照してください。特殊形ダブル役満はIssue #37で実装し、人和・責任払いは未実装です。
 
 ### その他
 

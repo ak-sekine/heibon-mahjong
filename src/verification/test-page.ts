@@ -3,6 +3,7 @@ import { startMatch } from '../game/match.ts';
 import { AutomaticTurnRunner, waitForTurn } from '../game/automatic-turns.ts';
 import { getTestScenario } from './test-scenarios.ts';
 import { createRiverTestState } from './river-test-fixture.ts';
+import { DEFAULT_GAME_RULES } from '../model/rules.ts';
 import { useFixedTestSeating } from './fixed-test-seating.ts';
 import './style.css';
 
@@ -21,6 +22,8 @@ let activeScenarioId = select.value;
 const riverControls = document.querySelector<HTMLElement>('#river-test-controls')!;
 const riverCountSelect = document.querySelector<HTMLSelectElement>('#river-count')!;
 const riverBadge = document.querySelector<HTMLElement>('#river-test-badge')!;
+const issue37Controls = document.querySelector<HTMLElement>('#issue37-controls')!;
+const issue37DoubleSelect = document.querySelector<HTMLSelectElement>('#issue37-double-yakuman')!;
 
 function startRiverScenario(selection: string): void {
   scenarioCpuRunner.cancel();
@@ -62,11 +65,27 @@ function startScenario(id: string): void {
   riverControls.hidden = id !== 'river-test';
   riverBadge.hidden = id !== 'river-test';
   if (id === 'river-test') {
+    issue37Controls.hidden = true;
     activeScenarioId = id;
     startRiverScenario(riverCountSelect.value);
     return;
   }
   const scenario = getTestScenario(id);
+  issue37Controls.hidden = !scenario.immediateTsumo;
+  if (scenario.immediateTsumo) {
+    scenarioCpuRunner.cancel();
+    controller.newGame();
+    const rules = { ...DEFAULT_GAME_RULES, doubleYakuman: issue37DoubleSelect.value === 'on' };
+    controller.match = startMatch(scenario.generateInitialGameState(controller.playerSeat), rules);
+    resetLocalActionChoices();
+    activeScenarioId = scenario.id;
+    document.querySelector('#scenario-help')!.textContent = scenario.description;
+    controller.declareTsumo();
+    document.querySelector('#test-status')!.textContent =
+      '固定局面のツモ結果を表示しました。設定：特殊形ダブル役満' + (rules.doubleYakuman ? 'ON' : 'OFF') + '。';
+    render();
+    return;
+  }
   scenarioCpuRunner.cancel();
   controller.newGame(); // cancel any scheduled CPU turn before replacing the match
   controller.selectedTileId = null;
@@ -99,5 +118,6 @@ document.querySelector('#repeat-scenario')!.addEventListener('click', () => {
 });
 const requestedDebug = new URLSearchParams(window.location.search).get('debug');
 if (requestedDebug === 'river') select.value = 'river-test';
+if (requestedDebug === 'issue37') select.value = 'issue37-suuankou-tanki';
 activeScenarioId = select.value;
 startScenario(activeScenarioId);

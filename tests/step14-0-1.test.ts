@@ -401,6 +401,14 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.equal(invalidCreate.status, 400, 'malformed rule types are rejected before creating a room');
   });
 
+  await t.test('persists and restores the Issue #37 v5 double-yakuman setting from Worker-owned room state', async () => {
+    const selectedRules = { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' as const, doubleYakuman: true };
+    const fixture = await makeRoom('v5 rules host', token('f'), selectedRules);
+    assert.deepEqual((await readState(fixture)).rules, selectedRules);
+    fixture.room = new RoomDurableObject(fixture.ctx as unknown as DurableObjectState, {} as Env);
+    assert.deepEqual((await readState(fixture)).rules, selectedRules, 'v5 host settings survive Worker reconstruction');
+  });
+
   await t.test('supports two humans, Ready, conflict responses, CPU fill and idempotent finalization', async () => {
     const fixture = await makeRoom();
     const guestInfo = await joinRoom(fixture, 'Guest', token('b'));

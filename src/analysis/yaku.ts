@@ -27,6 +27,8 @@ export interface WinningContext {
   readonly doubleRiichi?: boolean;
   /** Allow open tanyao (kuitan). Omitted contexts retain the historical default. */
   readonly kuitan?: boolean;
+  /** Apply the Issue #37 special double-yakuman rule. */
+  readonly doubleYakuman?: boolean;
 }
 export type YakuId = 'rinshan' | 'chankan' | 'sankantsu' | 'suukantsu' | 'ippatsu' | 'double-riichi' | 'riichi' | 'menzen-tsumo' | 'tanyao' | 'yakuhai-white' | 'yakuhai-green' |
   'yakuhai-red' | 'yakuhai-seat-wind' | 'yakuhai-round-wind' | 'pinfu' |
@@ -40,7 +42,7 @@ type NormalYakuId = Exclude<YakuId, YakumanYakuId>;
 type NormalYakuHan = 1 | 2 | 3 | 5 | 6;
 export type RecognizedYaku =
   | Readonly<{ id: NormalYakuId; han: NormalYakuHan; yakuman: 0 }>
-  | Readonly<{ id: YakumanYakuId; han: 0; yakuman: 1 }>;
+  | Readonly<{ id: YakumanYakuId; han: 0; yakuman: 1 | 2 }>;
 export type WaitType = 'ryanmen' | 'kanchan' | 'penchan' | 'tanki' | 'shanpon';
 export type WinningTileAssignment =
   | Readonly<{ type: 'pair' }>
@@ -73,6 +75,7 @@ function validateContext(context: WinningContext, tiles: readonly Tile[]): void 
         .some(key => context[key] !== undefined && typeof context[key] !== 'boolean') ||
       (context.riichi !== undefined && typeof context.riichi !== 'boolean') ||
       (context.kuitan !== undefined && typeof context.kuitan !== 'boolean') ||
+      (context.doubleYakuman !== undefined && typeof context.doubleYakuman !== 'boolean') ||
       (context.isClosed !== undefined && context.isClosed !== true && !(context.isClosed === false && context.openMelds?.length))) {
     throw new RangeError('Invalid winning context; only closed hands are supported');
   }
@@ -113,8 +116,36 @@ function totals(yaku: readonly RecognizedYaku[]) {
   return { yaku, totalHan: yaku.reduce((n, y) => n + y.han, 0),
     yakumanCount: yaku.reduce((n, y) => n + y.yakuman, 0) };
 }
-function yakumanYaku(id: YakumanYakuId): RecognizedYaku {
-  return { id, han: 0, yakuman: 1 };
+function yakumanYaku(id: YakumanYakuId, yakuman: 1 | 2 = 1): RecognizedYaku {
+  return { id, han: 0, yakuman };
+}
+/** Tile kinds are sufficient here: identical copies have identical wait semantics. */
+function beforeWinningTile(tiles: readonly Tile[], context: WinningContext): TileKind[] {
+  const index = tiles.findIndex(tile => same(tile, context.winningTile));
+  return index < 0 ? [] : tiles.filter((_, tileIndex) => tileIndex !== index).map(tile => tile);
+}
+function isKokushiThirteenSidedWait(tiles: readonly Tile[], fixed: readonly WinningMeld[], context: WinningContext): boolean {
+  if (fixed.length !== 0) return false;
+  const before = beforeWinningTile(tiles, context);
+  if (before.length !== 13) return false;
+  const counts = new Map(before.map(tile => [tileKindKey(tile), 0]));
+  for (const tile of before) counts.set(tileKindKey(tile), (counts.get(tileKindKey(tile)) ?? 0) + 1);
+  const orphans = TILE_KINDS.filter(tile => tile.category === 'honor' || tile.rank === 1 || tile.rank === 9);
+  return before.length === orphans.length && orphans.every(tile => counts.get(tileKindKey(tile)) === 1);
+}
+function isPureChuurenWait(tiles: readonly Tile[], fixed: readonly WinningMeld[], context: WinningContext): boolean {
+  if (fixed.length !== 0) return false;
+  const before = beforeWinningTile(tiles, context);
+  if (before.length !== 13 || before.some(tile => tile.category !== 'suited')) return false;
+  const suit = before[0]?.category === 'suited' ? before[0].suit : null;
+  if (suit === null || before.some(tile => tile.category !== 'suited' || tile.suit !== suit)) return false;
+  const counts = Array<number>(10).fill(0);
+  for (const tile of before) if (tile.category === 'suited') counts[tile.rank]++;
+  const base = [0, 3, 1, 1, 1, 1, 1, 1, 1, 3];
+  return counts.every((count, rank) => count === base[rank]);
+}
+function yakumanValue(context: WinningContext, doubleEligible: boolean): 1 | 2 {
+  return context.doubleYakuman && doubleEligible ? 2 : 1;
 }
 function isGreenTile(tile: TileKind): boolean {
   return tile.category === 'honor' ? tile.honor === 'green'
@@ -246,13 +277,17 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
       if (dragonSets.size === 3) yakuman.push(yakumanYaku('daisangen'));
       const windSets = new Set(melds.flatMap(meld => meld.type === 'triplet' && meld.tile.category === 'honor' &&
         winds.includes(meld.tile.honor as SeatWind) ? [meld.tile.honor] : []));
-      if (windSets.size === 4) yakuman.push(yakumanYaku('daisuushii'));
+      if (windSets.size === 4) yakuman.push(yakumanYaku('daisuushii', yakumanValue(context, true)));
       else if (windSets.size === 3 && pair.category === 'honor' && winds.includes(pair.honor as SeatWind) &&
           !windSets.has(pair.honor)) yakuman.push(yakumanYaku('shousuushii'));
       if (kans === 4) yakuman.push(yakumanYaku('suukantsu'));
       if (melds.every((meld, meldIndex) => meld.type === 'triplet' &&
-          isConcealedTriplet(meld, meldIndex, assignment, wait, context))) yakuman.push(yakumanYaku('suuankou'));
-      if (isChuurenPoutou(tiles, fixed)) yakuman.push(yakumanYaku('chuuren-poutou'));
+          isConcealedTriplet(meld, meldIndex, assignment, wait, context))) {
+        yakuman.push(yakumanYaku('suuankou', yakumanValue(context, wait === 'tanki')));
+      }
+      if (isChuurenPoutou(tiles, fixed)) {
+        yakuman.push(yakumanYaku('chuuren-poutou', yakumanValue(context, isPureChuurenWait(tiles, fixed, context))));
+      }
 
       const yaku: RecognizedYaku[] = [...base];
       if (closed && melds.every(m => m.type === 'sequence') && !valuePair(pair, context) && wait === 'ryanmen') add(yaku, 'pinfu');
@@ -299,7 +334,7 @@ export function analyzeYaku(tiles: readonly Tile[], context: WinningContext): Ya
     const yakuman: RecognizedYaku[] = [];
     if (context.tenhou) yakuman.push(yakumanYaku('tenhou'));
     if (context.chiihou) yakuman.push(yakumanYaku('chiihou'));
-    yakuman.push(yakumanYaku('kokushi-musou'));
+    yakuman.push(yakumanYaku('kokushi-musou', yakumanValue(context, isKokushiThirteenSidedWait(tiles, fixed, context))));
     candidates.push({ shape: 'thirteen-orphans', id: 'thirteen-orphans',
       duplicate: shapes.thirteenOrphans.duplicate, assignment: null, wait: null, ...totals(yakuman) });
   }

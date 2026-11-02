@@ -6,9 +6,11 @@ import { canDeclareKyuushuKyuuhai, declareKyuushuKyuuhai } from '../src/game/spe
 import { nextRound, startMatch, updateMatchGame } from '../src/game/match.ts';
 import { tileKindKey } from '../src/model/tile.ts';
 import { getTestScenario, testScenarios } from '../src/verification/test-scenarios.ts';
+import { evaluateWin } from '../src/game/win.ts';
+import { DEFAULT_GAME_RULES } from '../src/model/rules.ts';
 
 test('all four deterministic nine terminals scenarios preserve the complete physical wall', () => {
-  for (const scenario of testScenarios) {
+  for (const scenario of testScenarios.filter(scenario => !scenario.immediateTsumo)) {
     const game = scenario.generateInitialGameState();
     const allTiles = [
       ...game.players.flatMap(player => [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]),
@@ -51,7 +53,7 @@ test('human declares through the rule function and the next round clears public 
 });
 
 test('CPU scenarios use the normal automatic CPU declaration path', async () => {
-  for (const scenario of testScenarios.slice(1)) {
+  for (const scenario of testScenarios.filter(scenario => !scenario.immediateTsumo && scenario.targetPlayerId !== 0)) {
     const controller = new GameController(() => scenario.generateInitialGameState());
     const cpuRunner = new AutomaticTurnRunner({ wait: async () => {} });
     await cpuRunner.runMatch(() => controller.match, match => { controller.match = match; });
@@ -59,5 +61,36 @@ test('CPU scenarios use the normal automatic CPU declaration path', async () => 
     assert.equal(controller.game.abortiveDrawPlayerId, scenario.targetPlayerId, scenario.id);
     assert.equal(controller.game.phase, 'wall-exhausted', scenario.id);
     controller.newGame();
+  }
+});
+
+test('Issue #37 fixed winning scenarios use a complete physical wall and evaluate through normal win scoring', () => {
+  const expectedYaku: Readonly<Record<string, string>> = {
+    'issue37-suuankou-tanki': 'suuankou',
+    'issue37-kokushi-thirteen': 'kokushi-musou',
+    'issue37-kokushi-single': 'kokushi-musou',
+    'issue37-chuuren-pure': 'chuuren-poutou',
+    'issue37-chuuren-normal': 'chuuren-poutou',
+    'issue37-daisuushii': 'daisuushii',
+    'issue37-shousuushii': 'shousuushii',
+  };
+  for (const scenario of testScenarios.filter(item => item.immediateTsumo)) {
+    const game = scenario.generateInitialGameState(0);
+    const allTiles = [
+      ...game.players.flatMap(player => [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]),
+      ...game.liveWall,
+      ...game.deadWall,
+    ];
+    assert.equal(allTiles.length, 136, scenario.id);
+    assert.equal(new Set(allTiles.map(tile => tile.id)).size, 136, scenario.id);
+    for (const enabled of [false, true]) {
+      const configured = { ...game, rules: { ...DEFAULT_GAME_RULES, doubleYakuman: enabled } };
+      const win = evaluateWin(configured, 0, configured.players[0].drawnTile!, 'tsumo');
+      assert.ok(win, scenario.id);
+      const target = win.candidate.yaku.find(yaku => yaku.id === expectedYaku[scenario.id]);
+      assert.ok(target, scenario.id);
+      const expected = enabled && ['issue37-suuankou-tanki', 'issue37-kokushi-thirteen', 'issue37-chuuren-pure', 'issue37-daisuushii'].includes(scenario.id) ? 2 : 1;
+      assert.equal(target.yakuman, expected, `${scenario.id} doubleYakuman=${enabled}`);
+    }
   }
 });

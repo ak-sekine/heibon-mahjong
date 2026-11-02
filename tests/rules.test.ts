@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_GAME_RULES, GAME_RULES_STORAGE_KEY, describeConfirmedRules,
+  DEFAULT_GAME_RULES, GAME_RULES_STORAGE_KEY, describeConfirmedRules, isValidGameRules,
   loadLastGameRules, normalizeGameRules, saveLastGameRules, type RulesStorage,
   rulesForMatch,
 } from '../src/model/rules.ts';
@@ -22,6 +22,9 @@ class MemoryStorage implements RulesStorage {
 
 test('rules default to East-only and safely normalize invalid and unknown values', () => {
   assert.deepEqual(loadLastGameRules(new MemoryStorage()), DEFAULT_GAME_RULES);
+  assert.equal(DEFAULT_GAME_RULES.schemaVersion, 5);
+  assert.deepEqual([DEFAULT_GAME_RULES.renhou, DEFAULT_GAME_RULES.pao, DEFAULT_GAME_RULES.doubleYakuman,
+    DEFAULT_GAME_RULES.multipleRon, DEFAULT_GAME_RULES.tripleRonAbortiveDraw], ['off', false, false, true, false]);
   assert.deepEqual(normalizeGameRules({ schemaVersion: 1, matchFormat: 'tonnan' }), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' });
   for (const value of [null, 'tonnan', { schemaVersion: 2, matchFormat: 'tonnan' },
     { schemaVersion: 1, matchFormat: 'unknown' }, { schemaVersion: 1, matchFormat: 'tonpu', futureRule: true }]) {
@@ -33,7 +36,7 @@ test('last started rules persist in a versioned format and restore on the next m
   const storage = new MemoryStorage();
   assert.equal(saveLastGameRules({ schemaVersion: 1, matchFormat: 'tonnan' }, storage), true);
   assert.deepEqual(JSON.parse(storage.values.get(GAME_RULES_STORAGE_KEY)!), {
-    version: 4, rules: { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' },
+    version: 5, rules: { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' },
   });
   assert.deepEqual(loadLastGameRules(storage), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' });
   storage.values.set(GAME_RULES_STORAGE_KEY, JSON.stringify({ version: 1, rules: { schemaVersion: 1, matchFormat: 'tonnan' } }));
@@ -42,6 +45,20 @@ test('last started rules persist in a versioned format and restore on the next m
   assert.deepEqual(loadLastGameRules(storage), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan', redDora: false, ippatsu: false, kanDora: false }, 'v2 settings receive the historical kuitan-on default');
   storage.values.set(GAME_RULES_STORAGE_KEY, JSON.stringify({ version: 3, rules: { schemaVersion: 3, matchFormat: 'tonnan', redDora: false, kuitan: false, uraDora: true, ippatsu: false, kanDora: false } }));
   assert.deepEqual(loadLastGameRules(storage), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan', redDora: false, kuitan: false, ippatsu: false, kanDora: false }, 'v3 rules receive the seven new defaults');
+  const v4Rules = { schemaVersion: 4, matchFormat: 'tonnan', redDora: true, kuitan: true,
+    uraDora: true, ippatsu: true, kanDora: true, dealerTenpaiRenchan: true,
+    kyuushuKyuuhai: true, fourWinds: true, fourRiichi: true, fourKans: true,
+    agariYame: false, tenpaiYame: false };
+  storage.values.set(GAME_RULES_STORAGE_KEY, JSON.stringify({ version: 4, rules: v4Rules }));
+  assert.deepEqual(loadLastGameRules(storage), { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' }, 'v4 rules receive the five Issue #37 defaults');
+  const customV5 = { ...DEFAULT_GAME_RULES, matchFormat: 'tonnan' as const, renhou: 'mangan' as const,
+    pao: true, doubleYakuman: true, multipleRon: false, tripleRonAbortiveDraw: true };
+  assert.deepEqual(normalizeGameRules(customV5), customV5);
+  assert.equal(isValidGameRules(customV5), true);
+  assert.equal(isValidGameRules({ ...customV5, doubleYakuman: 'true' }), false);
+  assert.equal(isValidGameRules({ ...customV5, unknownSetting: false }), false);
+  assert.equal(saveLastGameRules(customV5, storage), true);
+  assert.deepEqual(loadLastGameRules(storage), customV5, 'v5 persists all five settings');
 });
 
 test('corrupt data, old versions, and unknown setting values fall back without throwing', () => {
@@ -75,6 +92,9 @@ test('confirmed rule descriptions expose the complete current rule set as read-o
   assert.equal(rules.find(rule => rule.label === '裏ドラ')?.value, 'リーチ和了時にあり');
   assert.equal(rules.find(rule => rule.label === '一発')?.value, 'あり');
   assert.equal(rules.find(rule => rule.label === 'カンドラ')?.value, 'カン成立ごとに追加');
+  assert.equal(rules.find(rule => rule.label === '特殊形ダブル役満')?.value, 'なし');
+  assert.equal(describeConfirmedRules({ ...DEFAULT_GAME_RULES, doubleYakuman: true })
+    .find(rule => rule.label === '特殊形ダブル役満')?.value, 'あり（四暗刻単騎・国士十三面・純正九蓮・大四喜）');
   assert.equal(rules.find(rule => rule.label === '喰いタン')?.value, 'あり');
   assert.equal(describeConfirmedRules({ ...DEFAULT_GAME_RULES, kuitan: false }).find(rule => rule.label === '喰いタン')?.value, 'なし（門前の断么九は有効）');
   assert.match(rules.find(rule => rule.label === '対局終了')!.value, /南4局/);
@@ -84,7 +104,7 @@ test('active rules are a frozen start snapshot, independent of later edits and s
   for (const format of ['tonpu', 'tonnan'] as const) {
     const storage = new MemoryStorage();
     const preferences = new RulePreferences(storage);
-    const selection = { ...DEFAULT_GAME_RULES, matchFormat: format };
+    const selection = { ...DEFAULT_GAME_RULES, matchFormat: format, doubleYakuman: format === 'tonnan' };
     const controller = new GameController(() => startGame(), { startImmediately: false });
     controller.newGame(selection);
     preferences.acceptedStart(selection);
@@ -92,6 +112,7 @@ test('active rules are a frozen start snapshot, independent of later edits and s
     const before = structuredClone(match);
     const confirmed = rulesForMatch(match);
     assert.equal(confirmed.matchFormat, format);
+    assert.equal(confirmed.doubleYakuman, format === 'tonnan');
     assert.equal(match.format, format);
     assert.notEqual(match.rules, selection);
     assert.ok(Object.isFrozen(match.rules));
@@ -110,7 +131,7 @@ test('active rules are a frozen start snapshot, independent of later edits and s
 
 test('the same confirmed rules survive settlement and the next round in both match formats', () => {
   for (const format of ['tonpu', 'tonnan'] as const) {
-    const match = startMatch(startGame(), { ...DEFAULT_GAME_RULES, matchFormat: format });
+    const match = startMatch(startGame(), { ...DEFAULT_GAME_RULES, matchFormat: format, doubleYakuman: true });
     const snapshot = match.rules;
     const ended = updateMatchGame(match, fixedRound(0, []));
     assert.equal(ended.status, 'round-ended');
@@ -120,6 +141,7 @@ test('the same confirmed rules survive settlement and the next round in both mat
     assert.equal(next.roundNumber, 2);
     assert.equal(next.rules, snapshot);
     assert.equal(rulesForMatch(next).matchFormat, format);
+    assert.equal(rulesForMatch(next).doubleYakuman, true);
   }
 });
 

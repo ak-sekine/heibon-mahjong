@@ -198,7 +198,7 @@ function renderRoundSummary(game: GameState, settlement: RoundSettlement | null,
         fu: result.fu,
         yakumanCount: result.yakumanCount,
         points: receivedPoints,
-        yaku: result.candidate.yaku.map(entry => entry.id),
+        yaku: result.candidate.yaku.map(entry => ({ id: entry.id, yakuman: entry.yakuman })),
         doraCounts: { normal: result.doraCount, ura: result.uraDoraCount, red: result.redDoraCount },
       }]);
     }

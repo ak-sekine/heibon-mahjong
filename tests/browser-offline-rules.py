@@ -64,7 +64,8 @@ with sync_playwright() as playwright:
         assert page.locator('#online-rules-list dt').all_text_contents() == [
             '対局形式', '赤ドラ', '喰いタン', '和了条件', '後付け', 'リーチ', '一発',
             '裏ドラ', 'カンドラ', '通常流局', '親テンパイ連荘', '九種九牌', '四風連打',
-            '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ', '対局終了',
+            '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ', '特殊形ダブル役満',
+            '対局終了',
         ]
         default_rule_rows = dict(zip(
             page.locator('#online-rules-list dt').all_text_contents(),
@@ -73,6 +74,8 @@ with sync_playwright() as playwright:
         assert default_rule_rows['親テンパイ連荘'] == 'あり'
         assert all(default_rule_rows[key] == 'あり（途中流局）' for key in ['九種九牌', '四風連打', '四家立直', '四開槓'])
         assert default_rule_rows['アガリやめ'] == 'なし' and default_rule_rows['テンパイやめ'] == 'なし'
+        assert default_rule_rows['特殊形ダブル役満'] == ('あり（四暗刻単騎・国士十三面・純正九蓮・大四喜）'
+          if page.evaluate("window.rulesModel.rulesForMatch(window.rulesApp.controller.match).doubleYakuman") else 'なし')
         assert page.evaluate('''() => {
           const expected = window.rulesModel.describeConfirmedRules(window.rulesModel.rulesForMatch(window.rulesApp.controller.match));
           return [...document.querySelectorAll('#online-rules-list .confirmed-rule-row')].every((row, i) =>
@@ -103,10 +106,13 @@ with sync_playwright() as playwright:
             'fourKans': True,
             'agariYame': False,
             'tenpaiYame': False,
+            'doubleYakuman': False,
         }
         for key, enabled in default_rule_values.items():
             control = page.locator(f'#new-game-rules-editor input[data-rule-key="{key}"]')
             assert control.is_checked() is enabled, f'{key} default was not {enabled}'
+        if fmt == 'tonnan':
+            page.locator('#new-game-rules-editor input[data-rule-key="doubleYakuman"]').check()
         page.locator(f'input[name="new-game-rules-editor-match-format"][value="{fmt}"]').check()
         page.locator('#confirm-new-game').click()
         # Use the real selection UI; opening rules must not clear the selected tile.

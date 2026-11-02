@@ -20,6 +20,13 @@
       <option value="kyuushu-cpu2">九種九牌（CPU2）</option>
       <option value="kyuushu-cpu3">九種九牌（CPU3）</option>
       <option value="river-test">河テスト（合法局面）</option>
+      <option value="issue37-suuankou-tanki">四暗刻単騎（#37）</option>
+      <option value="issue37-kokushi-thirteen">国士無双十三面待ち（#37）</option>
+      <option value="issue37-kokushi-single">国士無双単騎（対照）</option>
+      <option value="issue37-chuuren-pure">純正九蓮宝燈（#37）</option>
+      <option value="issue37-chuuren-normal">九蓮宝燈（対照）</option>
+      <option value="issue37-daisuushii">大四喜（#37）</option>
+      <option value="issue37-shousuushii">小四喜（対照）</option>
     </select>
     <div class="test-actions">
       <button id="load-scenario" type="button" class="ui-button ui-button--a">テスト開始</button>
@@ -28,6 +35,11 @@
     </div>
     <p id="scenario-help" role="status"></p>
     <p id="test-status" role="status" aria-live="polite"></p>
+    <section id="issue37-controls" class="verification-rule-controls" aria-label="Issue #37固定局面設定" hidden>
+      <label for="issue37-double-yakuman">特殊形ダブル役満</label>
+      <select id="issue37-double-yakuman"><option value="off" selected>OFF（各1役満）</option><option value="on">ON（対象形は2役満）</option></select>
+      <p>公開検証ページ専用の固定ツモ局面です。通常の対局画面にはこの操作を表示しません。</p>
+    </section>
     <section id="river-test-controls" aria-label="河テストの設定" hidden>
       <label for="river-count">テスト対象・開始時の河</label>
       <select id="river-count">

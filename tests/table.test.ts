@@ -145,7 +145,8 @@ for (const count of [0, 1, 2, 3, 'zero-normal', 'no-dora', 'red-only', 'normal-m
     const summary = nodes.get('#round-result-summary')!;
     const win = won.winResult!;
     assert.deepEqual(won.winResult, scoringSnapshot, 'summary rendering must not mutate calculated scoring');
-    const yaku = win.candidate.yaku.map(entry => yakuDisplayName(entry.id));
+    const yaku = win.candidate.yaku.map(entry =>
+      `${yakuDisplayName(entry.id)}${entry.yakuman > 0 ? ` ${entry.yakuman}役満` : ''}`);
     const summarySection = summary.children[0];
     const summaryLine = summarySection.children.find(child => child.className === 'round-summary-winner')!;
     const summaryValue = win.yakumanCount > 0 ? `${win.yakumanCount}役満`

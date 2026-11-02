@@ -14,4 +14,8 @@
 .test-actions button, .test-actions a { box-sizing: border-box; min-height: 44px; max-width: 100%; padding: 8px; font: inherit; font-size: 15px; white-space: normal; touch-action: manipulation; }
 .test-actions a { grid-column: 1 / -1; display: flex; align-items: center; color: inherit; }
 .test-lab p { margin: 8px 0; }
+.verification-rule-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:8px; padding:8px; border:1px solid #63947a; border-radius:8px; background:#123f32; }
+.verification-rule-controls label,.verification-rule-controls p { font-size:13px; }
+.verification-rule-controls select { min-height:44px; }
+.verification-rule-controls p { flex:1 1 100%; margin:0; color:#d4e5db; font-size:12px; }
 @media (max-width: 360px) { .test-actions { grid-template-columns: 1fr; } .test-actions a { grid-column: auto; } }

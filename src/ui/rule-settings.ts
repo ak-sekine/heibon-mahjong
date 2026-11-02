@@ -87,6 +87,7 @@ export class RuleEditor {
       ['fourKans', '四開槓', '複数人の合計4回のカンで途中流局します'],
       ['agariYame', 'アガリやめ', '最終局で親が和了し、精算後に単独トップなら終了します'],
       ['tenpaiYame', 'テンパイやめ', '最終局で親テンパイ連荘となり、精算後に単独トップなら終了します'],
+      ['doubleYakuman', '特殊形ダブル役満', '四暗刻単騎・国士無双十三面待ち・純正九蓮宝燈・大四喜を2倍役満にします'],
     ] as const;
     for (const [key, title, hint] of options) {
       const label = document.createElement('label');
@@ -121,7 +122,7 @@ export class RuleEditor {
     });
     this.optionalRules.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(input => {
       const key = input.dataset.ruleKey as keyof GameRules | undefined;
-      if (key && key !== 'schemaVersion' && key !== 'matchFormat') input.checked = normalized[key];
+      if (key && key !== 'schemaVersion' && key !== 'matchFormat') input.checked = Boolean(normalized[key]);
     });
     this.renderFixedRules(normalized);
   }
@@ -131,7 +132,7 @@ export class RuleEditor {
   }
   private renderFixedRules(rules: GameRules): void {
     if (!this.fixedRules) return;
-    const rows = describeConfirmedRules(rules).filter(entry => !['対局形式', '赤ドラ', '喰いタン', '裏ドラ', '一発', 'カンドラ', '親テンパイ連荘', '九種九牌', '四風連打', '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ'].includes(entry.label));
+    const rows = describeConfirmedRules(rules).filter(entry => !['対局形式', '赤ドラ', '喰いタン', '裏ドラ', '一発', 'カンドラ', '親テンパイ連荘', '九種九牌', '四風連打', '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ', '特殊形ダブル役満'].includes(entry.label));
     const list = document.createElement('dl');
     list.className = 'confirmed-rules-list';
     for (const entry of rows) {

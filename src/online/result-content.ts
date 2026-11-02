@@ -50,7 +50,7 @@ export function renderOnlineWinSummary(container: HTMLElement, view: PlayerGameV
     fu: winner.fu,
     yakumanCount: winner.yakumanCount,
     points: winner.totalPoints,
-    yaku: winner.yaku.map(yaku => yaku.id as YakuId),
+    yaku: winner.yaku.map(yaku => ({ id: yaku.id as YakuId, yakuman: yaku.yakuman })),
     doraCounts: winner.doraCounts,
   })));
   return true;
@@ -145,7 +145,7 @@ function renderWin(container: HTMLElement, view: PlayerGameView, winner: PublicW
   const yakuList = document.createElement('ul');
   for (const yaku of winner.yaku) {
     const name = yakuDisplayName(yaku.id as YakuId) || yaku.id;
-    yakuList.append(text('li', `${name} ${yaku.yakuman ? '役満' : `${yaku.han}翻`}`));
+    yakuList.append(text('li', `${name} ${yaku.yakuman > 0 ? `${yaku.yakuman}役満` : `${yaku.han}翻`}`));
   }
   section.append(yakuList);
   if (winner.yakumanCount > 0) {

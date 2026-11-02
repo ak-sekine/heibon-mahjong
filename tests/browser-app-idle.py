@@ -53,9 +53,10 @@ with sync_playwright() as playwright:
     assert '半荘戦' not in page.locator('#local-table .center-info').inner_text()
     assert page.locator('#player-hand li').count() in (13, 14)
     saved = page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules'))")
-    assert saved['version'] == 4 and saved['rules']['matchFormat'] == 'tonnan', saved
+    assert saved['version'] == 5 and saved['rules']['matchFormat'] == 'tonnan', saved
     assert all(saved['rules'][key] is True for key in ['redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora', 'dealerTenpaiRenchan', 'kyuushuKyuuhai', 'fourWinds', 'fourRiichi', 'fourKans']), saved
     assert all(saved['rules'][key] is False for key in ['agariYame', 'tenpaiYame']), saved
+    assert saved['rules']['doubleYakuman'] is False, saved
     page.locator('#main-menu-toggle').click()
     page.locator('#menu-offline-rules').click()
     assert page.locator('#online-rules-list dd').first.inner_text() == '半荘戦（東南戦）'
