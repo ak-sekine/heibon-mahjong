@@ -26,7 +26,9 @@
 
 ## GitHub Actions・公開
 
-初回のmain Deploy run [#41443519982](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41443519982) は実装SHA `2d60be6a4950e541070b39c461ae856e693a53b2` を対象に実行。`docs-check`、`detect-changes`、`verify` はsuccess。WebKitの待機画面テストは、切断時の幅430pxに対する通常時の比較基準をテストの初期幅一覧へ追加し忘れたためfailureしました。これは比較基準の準備漏れで、表示位置のアサーションを実行する前に落ちたケースです。430pxを両状態で検証するようテストを修正し、修正版をmainへpushしてDeploy gateを再実行します。初回runの他job結果と修正版run、Worker／Pages公開結果は確認後追記する。
+初回のmain Deploy run [#41443519982](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41443519982) は実装SHA `2d60be6a4950e541070b39c461ae856e693a53b2` を対象に実行。`docs-check`、`detect-changes`、`verify` はsuccess。Chromium／WebKit両方の待機画面テストは、切断時の幅430pxに対する通常時の比較基準を初期幅一覧へ追加し忘れたためfailureしました。これは比較基準の準備漏れで、幅430pxの上段比較前に落ちたケースです。matrix auditもfailureとなり、Worker／Pages公開工程はskipされました。
+
+修正版run [#41444838765](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41444838765) はSHA `9db1af62844baaa350daf95a76783772f82bfa4c` を対象に実行。`docs-check`、`detect-changes`、`verify`、WebKit Browser UIはsuccess。Chromiumは待機画面の配置・接続遷移アサーションを通過した後、後続のオンライン対局診断テストで `game_action_response_timeout` が記録されずfailureしました。原因は、手動再接続中の表示確認用にテストmockへ追加した100ms遅延が、以降のゲーム再接続にも残ったことです。遅延を手動再接続1回で消費するようmockを修正し、再度Deploy gateを実行する。run2ではmatrix auditがfailure、Worker／Pages公開工程はskip。修正版runと公開結果は確定後追記する。
 
 ## iPhone Safari実機確認
 

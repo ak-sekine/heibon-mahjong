@@ -151,6 +151,8 @@ MOCK = r"""
       this.seat = remoteGuest ? 1 : nextSocketSeat;
       nextSocketSeat = 0;
       sockets.push(this);
+      const connectDelay = window.__onlineMockConnectDelay ?? 5;
+      window.__onlineMockConnectDelay = undefined;
       setTimeout(() => {
         if (this.readyState !== MockWebSocket.CONNECTING) return;
         this.readyState = MockWebSocket.OPEN;
@@ -164,7 +166,7 @@ MOCK = r"""
         this.dispatchEvent(new Event('open'));
         send(this, { type: 'room-state', ...JSON.parse(JSON.stringify(state)) });
         if (gameStarted) send(this, { type: 'game-state', view: makeView(this.seat) });
-      }, window.__onlineMockConnectDelay ?? 5);
+      }, connectDelay);
     }
     send(raw) {
       const message = JSON.parse(raw);
