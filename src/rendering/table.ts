@@ -336,11 +336,12 @@ function renderWinResult(game: GameState, settlement: RoundSettlement | null, se
     }
     section.append(text('p', '今回対応している役の判定結果'));
     const list = document.createElement('ul');
-    for (const yaku of result.candidate.yaku) list.append(text('li',
+    for (const yaku of result.candidate.yaku) list.append(text('li', yaku.id === 'renhou' ? '人和（固定満貫）' :
       `${yakuDisplayName(yaku.id)} ${yaku.yakuman > 0 ? yakumanMultiplierName(yaku.yakuman) : `${yaku.han}翻`}`));
     section.append(list);
     if (result.yakumanCount > 0) {
-      section.append(text('p', winTotalLabel(result.yakumanCount, result.totalHanIncludingDora)));
+      section.append(text('p', winTotalLabel(result.yakumanCount, result.totalHanIncludingDora,
+        result.candidate.yaku.some(yaku => yaku.id === 'renhou'))));
     } else {
       const bonuses = document.createElement('div');
       bonuses.className = 'win-bonuses';

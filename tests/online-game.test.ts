@@ -5,7 +5,7 @@ import { discardTileForOnline } from '../src/game/discard.ts';
 import { getKanOptions } from '../src/game/kan.ts';
 import { getRiichiDiscardOptions } from '../src/game/riichi.ts';
 import { canDeclareTsumo, declareTsumo } from '../src/game/tsumo.ts';
-import { declareRon, markRonPassed } from '../src/game/ron.ts';
+import { declareRon, getRonCandidates, markRonPassed } from '../src/game/ron.ts';
 import { startMatch, settleRound } from '../src/game/match.ts';
 import { fixedRon, fixedRound } from './match-fixture.ts';
 import { tileKindKey } from '../src/model/tile.ts';
@@ -80,7 +80,7 @@ function sessionForGame(
     control: seats[seat as PlayerId].control,
   })) as [PlayerState, PlayerState, PlayerState, PlayerState];
   const game = { ...source, players };
-  const match = startMatch(game);
+  const match = startMatch(game, game.rules ?? 'tonpu');
   return {
     schemaVersion: 1,
     gameRevision,
@@ -637,6 +637,71 @@ test('all ron candidates are collected, multiple ron resolves together, and only
   assert.deepEqual(oneRon.declarations.map(event => [event.seat, event.kind]), [[2, 'ron']]);
   assert.equal(oneRon.match.game.players[0].temporaryFuriten, true);
   assert.equal(oneRon.match.game.players[2].temporaryFuriten, false);
+});
+
+test('Issue #38: Worker recomputes Renhou and fixed mangan from its confirmed room rules', () => {
+  const rules = { ...DEFAULT_GAME_RULES, renhou: 'mangan' as const };
+  const start = { ...ronStart(1, [0], [['123m', '456m', '789p', '456s', '2p']], 'pin-2', false, 'pin-1'), rules };
+  const game = discardTileForOnline(start, 1, start.players[1].drawnTile!.id);
+  const decision = ronDecision([0], 1);
+  const waiting = sessionForGame(game, [0], 1, decision);
+  const forged = { type: 'declare-ron', requestId: 'issue38-renhou', expectedGameRevision: 1,
+    windowId: decision.windowId, yakuHan: 99, totalPoints: 999_999 } as unknown as Parameters<typeof applyOnlineGameAction>[2];
+  const ended = applyOnlineGameAction(waiting, 0, forged, new Set<PlayerId>([0]), 2000);
+  assert.equal(ended.status, 'round-ended');
+  assert.equal(ended.match.lastSettlement?.reason, 'ron');
+  const view = createPlayerGameView(ended, 0, 'ABC234', new Set([0]));
+  const winner = view.result!.winners[0];
+  assert.equal(winner.totalPoints, 8000);
+  assert.equal(winner.scoreTier, 'mangan');
+  assert.equal(winner.han, 0);
+  assert.deepEqual(winner.yaku.map(yaku => [yaku.id, yaku.han]), [['renhou', 0]]);
+  assert.deepEqual(view.rules, rules);
+});
+
+test('Issue #38: mixed human/CPU Renhou candidates survive pass and timeout decisions', () => {
+  const rules = { ...DEFAULT_GAME_RULES, renhou: 'mangan' as const };
+  const hands = [
+    ['123m', '456m', '789p', '456s', '2p'],
+    ['123m', '456m', '789s', '34p', '22s'],
+  ];
+  const start = { ...ronStart(1, [0, 2], hands, 'pin-2', false, 'pin-7'), rules };
+  const game = discardTileForOnline(start, 1, start.players[1].drawnTile!.id);
+  assert.deepEqual(getRonCandidates(game).map(candidate => [candidate.winnerId, candidate.candidate.yaku[0].id]), [[2, 'renhou'], [0, 'renhou']]);
+
+  const opened = ronDecision([0], 21);
+  const waiting = sessionForGame(game, [0], 21, opened);
+  const passed = applyOnlineGameAction(waiting, 0, {
+    type: 'pass-ron', requestId: 'issue38-pass-human', expectedGameRevision: 21, windowId: opened.windowId,
+  }, new Set<PlayerId>([0]), 2000);
+  assert.equal(passed.status, 'round-ended');
+  assert.deepEqual(passed.match.game.winResult?.winMethod === 'ron'
+    ? passed.match.game.winResult.winners.map(winner => winner.winnerId) : [], [2]);
+  assert.equal(passed.match.game.players[0].temporaryFuriten, true);
+  assert.deepEqual(passed.match.game.winResult?.winMethod === 'ron'
+    ? passed.match.game.winResult.winners[0].candidate.yaku.map(yaku => yaku.id) : [], ['renhou']);
+
+  const timeoutWindow = ronDecision([0], 22);
+  const timed = timeoutOnlineDecision(sessionForGame(game, [0], 22, timeoutWindow), timeoutWindow.expiresAt);
+  assert.equal(timed.status, 'round-ended');
+  assert.deepEqual(timed.match.game.winResult?.winMethod === 'ron'
+    ? timed.match.game.winResult.winners.map(winner => winner.winnerId) : [], [2]);
+
+  const humanWindow = ronDecision([0, 2], 23);
+  const twoHumans = sessionForGame(game, [0, 2], 23, humanWindow);
+  const first = applyOnlineGameAction(twoHumans, 0, {
+    type: 'declare-ron', requestId: 'issue38-reconnect-first', expectedGameRevision: 23, windowId: humanWindow.windowId,
+  }, new Set<PlayerId>([0, 2]), 3000);
+  const restored = hydrateOnlineGame(JSON.stringify(first));
+  assert.ok(restored);
+  assert.equal(restored.match.game.rules?.renhou, 'mangan');
+  const both = applyOnlineGameAction(restored, 2, {
+    type: 'declare-ron', requestId: 'issue38-reconnect-second', expectedGameRevision: 23, windowId: humanWindow.windowId,
+  }, new Set<PlayerId>([0, 2]), 3001);
+  assert.deepEqual(both.match.game.winResult?.winMethod === 'ron'
+    ? both.match.game.winResult.winners.map(winner => winner.winnerId).sort() : [], [0, 2]);
+  assert.ok(both.match.game.winResult?.winMethod === 'ron' && both.match.game.winResult.winners.every(winner =>
+    winner.candidate.yaku.some(yaku => yaku.id === 'renhou') && winner.totalPoints === 8000));
 });
 
 test('JSON recovery preserves pending answers and settled multi-ron scoring', () => {

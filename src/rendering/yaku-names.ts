@@ -12,7 +12,7 @@ const yakuNames: Record<YakuId, string> = {
   'sanshoku-doujun': '三色同順', ittsu: '一気通貫', honitsu: '混一色', chinitsu: '清一色',
   'kokushi-musou': '国士無双', suuankou: '四暗刻', daisangen: '大三元', tsuuiisou: '字一色',
   ryuuiisou: '緑一色', chinroutou: '清老頭', shousuushii: '小四喜', daisuushii: '大四喜',
-  'chuuren-poutou': '九蓮宝燈', tenhou: '天和', chiihou: '地和',
+  'chuuren-poutou': '九蓮宝燈', tenhou: '天和', chiihou: '地和', renhou: '人和',
 };
 
 export function yakuDisplayName(id: YakuId): string {

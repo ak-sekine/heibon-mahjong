@@ -42,10 +42,20 @@ export function calculateBasePoints(han: number, fu: number | null, yakumanCount
 }
 /** Four-player payments; balances are never mutated. */
 export function calculateScore(context: ScoreContext): ScoreResult {
+  const base = calculateBasePoints(context.totalHanIncludingDora, context.fu, context.yakumanCount);
+  return calculateScoreFromBasePoints(base, context);
+}
+
+/** Fixed mangan settlement for special rules that award a score tier without han. */
+export function calculateFixedManganRonScore(context: Pick<ScoreContext, 'winnerId' | 'dealerId' | 'discarderId'>): ScoreResult {
+  return calculateScoreFromBasePoints({ scoreTier: 'mangan', basePoints: 2000 }, { ...context, winMethod: 'ron' });
+}
+
+function calculateScoreFromBasePoints(base: Pick<ScoreResult, 'scoreTier' | 'basePoints'>,
+  context: Pick<ScoreContext, 'winnerId' | 'dealerId' | 'discarderId' | 'winMethod'>): ScoreResult {
   const { winnerId, dealerId, winMethod, discarderId } = context;
   const ids: readonly PlayerId[] = [0, 1, 2, 3];
   if (!ids.includes(winnerId) || !ids.includes(dealerId) || !['ron', 'tsumo'].includes(winMethod)) throw new RangeError('Invalid scoring context');
-  const base = calculateBasePoints(context.totalHanIncludingDora, context.fu, context.yakumanCount);
   const round = (multiplier: number) => Math.ceil(base.basePoints * multiplier / 100) * 100;
   let payments: Payment[];
   if (winMethod === 'ron') {

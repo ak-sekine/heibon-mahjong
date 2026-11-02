@@ -2,7 +2,7 @@ import type { TileKind } from '../model/tile.ts';
 import { isConcealedTriplet } from './yaku.ts';
 import type { WinningContext, YakuCandidate, WaitType } from './yaku.ts';
 
-export type FuMode = 'standard' | 'pinfu-tsumo' | 'seven-pairs' | 'yakuman';
+export type FuMode = 'standard' | 'pinfu-tsumo' | 'seven-pairs' | 'yakuman' | 'fixed-mangan';
 export type FuEntry =
   | Readonly<{ type: 'base' | 'menzen-ron' | 'tsumo' | 'pinfu-tsumo' | 'seven-pairs' | 'open-ron-minimum'; fu: number }>
   | Readonly<{ type: 'triplet' | 'kan'; fu: number; tile: TileKind; meldIndex: number; concealed: boolean; terminalOrHonor: boolean }>

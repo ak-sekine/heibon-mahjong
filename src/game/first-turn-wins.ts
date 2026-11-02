@@ -39,6 +39,26 @@ function hasNoCallsOrPendingWin(game: GameState): boolean {
     game.players.every(player => (player.melds?.length ?? 0) === 0 && player.callDiscard === null);
 }
 
+/** A ron window before this child has taken or discarded their first draw.
+ * discardHistory is retained when a call removes a tile from the visible river,
+ * so this does not mistake a shortened river for an untouched first turn. */
+export function isRenhouState(game: GameState, playerId: PlayerId, winningTileId?: string): boolean {
+  const player = game.players[playerId];
+  const window = game.ronWindow;
+  const discarder = window && playerIds.includes(window.discarderId) ? game.players[window.discarderId] : null;
+  if (!playerIds.includes(playerId) || !player || player.id !== playerId || playerId === game.dealerId ||
+      game.phase !== 'awaiting-ron' || !window || window.kan ||
+      (window.kind !== undefined && window.kind !== 'discard') ||
+      !discarder || discarder.id !== window.discarderId || window.discarderId === playerId ||
+      discarder.river.at(-1)?.id !== window.tileId || (winningTileId !== undefined && winningTileId !== window.tileId) ||
+      game.turnPlayerId !== window.discarderId || player.drawnTile !== null || player.drawnTileSource !== null ||
+      player.river.length !== 0 || !Array.isArray(player.discardHistory) || player.discardHistory.length !== 0 ||
+      game.callsMade !== false || game.kanCount !== 0 || game.winResult !== null ||
+      game.abortiveDraw !== undefined || game.players.some(other =>
+        (other.melds?.length ?? 0) !== 0 || other.callDiscard !== null) || !hasValidPhysicalTiles(game)) return false;
+  return true;
+}
+
 /** The only state in which the dealer's dealt fourteenth tile is a valid draw. */
 export function isTenhouState(game: GameState, playerId: PlayerId): boolean {
   if (!playerIds.includes(playerId) || playerId !== game.dealerId ||

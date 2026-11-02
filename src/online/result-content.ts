@@ -142,7 +142,8 @@ function renderWin(container: HTMLElement, view: PlayerGameView, winner: PublicW
   const yakuList = document.createElement('ul');
   for (const yaku of winner.yaku) {
     const name = yakuDisplayName(yaku.id as YakuId) || yaku.id;
-    yakuList.append(text('li', `${name} ${yaku.yakuman > 0 ? yakumanMultiplierName(yaku.yakuman) : `${yaku.han}翻`}`));
+    yakuList.append(text('li', yaku.id === 'renhou' ? '人和（固定満貫）' :
+      `${name} ${yaku.yakuman > 0 ? yakumanMultiplierName(yaku.yakuman) : `${yaku.han}翻`}`));
   }
   section.append(yakuList);
   if (winner.yakumanCount > 0) {
@@ -153,7 +154,8 @@ function renderWin(container: HTMLElement, view: PlayerGameView, winner: PublicW
     bonuses.append(text('p', `通常ドラ：${winner.doraCounts.normal}枚（${winner.dora.normal}翻）`));
     bonuses.append(text('p', `裏ドラ：${winner.doraCounts.ura}枚（${winner.dora.ura}翻）`));
     bonuses.append(text('p', `赤ドラ：${winner.doraCounts.red}枚（${winner.dora.red}翻）`));
-    section.append(bonuses, text('p', winTotalLabel(winner.yakumanCount, winner.han)));
+    section.append(bonuses, text('p', winTotalLabel(winner.yakumanCount, winner.han,
+      winner.yaku.some(yaku => yaku.id === 'renhou'))));
   }
   section.append(createResultDoraRow(view.doraIndicators, false));
   if (view.rules.uraDora && seat.riichi && view.uraDoraIndicators) section.append(createResultDoraRow(view.uraDoraIndicators, true));

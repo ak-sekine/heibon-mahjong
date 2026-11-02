@@ -29,7 +29,8 @@ export function renderRoundWinSummary(container: HTMLElement, winners: readonly 
     section.className = 'round-win-summary';
 
     const tierName = scoreTierDisplayName(winner.scoreTier, winner.yakumanCount);
-    const scoreLabel = winner.yakumanCount > 0 || winner.scoreTier === 'kazoe-yakuman'
+    const isRenhou = winner.yaku.some(entry => typeof entry !== 'string' && entry.id === 'renhou');
+    const scoreLabel = isRenhou ? '満貫' : winner.yakumanCount > 0 || winner.scoreTier === 'kazoe-yakuman'
       ? tierName
       : winner.scoreTier === 'normal'
         ? `${winner.han}翻${winner.fu === null ? '' : ` ${winner.fu}符`}`
@@ -47,7 +48,7 @@ export function renderRoundWinSummary(container: HTMLElement, winners: readonly 
       const name = yakuDisplayName(entry.id);
       return entry.yakuman > 0 ? `${name} ${yakumanMultiplierName(entry.yakuman)}` : name;
     }).join('・');
-    const doraCount = winner.doraCounts.normal + winner.doraCounts.ura + winner.doraCounts.red;
+    const doraCount = isRenhou ? 0 : winner.doraCounts.normal + winner.doraCounts.ura + winner.doraCounts.red;
     const yakuAndDora = doraCount > 0 ? `${yaku}${yaku ? '・' : ''}ドラ${doraCount}` : yaku;
     section.append(text('p', yakuAndDora, 'round-summary-yaku'));
     container.append(section);

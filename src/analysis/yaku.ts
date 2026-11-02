@@ -35,13 +35,14 @@ export type YakuId = 'rinshan' | 'chankan' | 'sankantsu' | 'suukantsu' | 'ippats
   'iipeikou' | 'ryanpeikou' | 'sanankou' | 'chiitoitsu' | 'toitoi' | 'shousangen' | 'honroutou' |
   'chanta' | 'junchan' | 'sanshoku-doukou' | 'sanshoku-doujun' | 'ittsu' | 'honitsu' | 'chinitsu' |
   'kokushi-musou' | 'suuankou' | 'daisangen' | 'tsuuiisou' | 'ryuuiisou' | 'chinroutou' | 'haitei' | 'houtei' |
-  'shousuushii' | 'daisuushii' | 'chuuren-poutou' | 'tenhou' | 'chiihou';
+  'shousuushii' | 'daisuushii' | 'chuuren-poutou' | 'tenhou' | 'chiihou' | 'renhou';
 type YakumanYakuId = Extract<YakuId, 'kokushi-musou' | 'suukantsu' | 'suuankou' | 'daisangen' |
   'tsuuiisou' | 'ryuuiisou' | 'chinroutou' | 'shousuushii' | 'daisuushii' | 'chuuren-poutou' | 'tenhou' | 'chiihou'>;
-type NormalYakuId = Exclude<YakuId, YakumanYakuId>;
+type NormalYakuId = Exclude<YakuId, YakumanYakuId | 'renhou'>;
 type NormalYakuHan = 1 | 2 | 3 | 5 | 6;
 export type RecognizedYaku =
   | Readonly<{ id: NormalYakuId; han: NormalYakuHan; yakuman: 0 }>
+  | Readonly<{ id: 'renhou'; han: 0; yakuman: 0 }>
   | Readonly<{ id: YakumanYakuId; han: 0; yakuman: 1 | 2 }>;
 export type WaitType = 'ryanmen' | 'kanchan' | 'penchan' | 'tanki' | 'shanpon';
 export type WinningTileAssignment =

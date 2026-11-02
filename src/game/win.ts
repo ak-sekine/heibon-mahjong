@@ -1,12 +1,12 @@
 import { tileKindKey } from '../model/tile.ts';
 import { concealedSize, winningMelds, isClosedHand, kanMeldCount } from './melds.ts';
 import { calculateFu } from '../analysis/fu.ts';
-import { calculateScore } from '../analysis/score.ts';
+import { calculateFixedManganRonScore, calculateScore } from '../analysis/score.ts';
 import type { GameState, PhysicalTile, PlayerId, SeatWind, WinDetails } from '../model/game.ts';
 import { analyzeYaku, type YakuAnalysis, type YakuCandidate } from '../analysis/yaku.ts';
 import { countDora, countRedDora } from '../analysis/dora.ts';
 import { exposedDoraIndicators, uraDoraIndicators } from './dora.ts';
-import { isChiihouState, isTenhouState } from './first-turn-wins.ts';
+import { isChiihouState, isRenhouState, isTenhouState } from './first-turn-wins.ts';
 import { rulesForGame } from '../model/rules.ts';
 
 /** Default round wind for legacy game states without an explicit wind. */
@@ -46,7 +46,9 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
       seatWind: player.wind, roundWind: game.roundWind ?? ROUND_WIND, riichi: player.riichi !== null,
       ippatsuEligible: rules.ippatsu && player.riichi?.ippatsuEligible, doubleRiichi: player.riichi?.doubleRiichi,
       kuitan: rules.kuitan, doubleYakuman: rules.doubleYakuman });
-    if (!analysis.isWinningShape || !analysis.hasSupportedYaku) return null;
+    if (!analysis.isWinningShape) return null;
+    const renhouEligible = winMethod === 'ron' && rules.renhou === 'mangan' && isRenhouState(game, playerId, winningTile.id);
+    if (!analysis.hasSupportedYaku && !renhouEligible) return null;
     const doraCount = countDora(allFaces, exposedDoraIndicators(game, rules).map(t => t.tile));
     const uraDoraCount = rules.uraDora && player.riichi ? countDora(allFaces, uraDoraIndicators(game, rules).map(t => t.tile)) : 0;
     const redDoraCount = rules.redDora ? countRedDora(allFaces) : 0;
@@ -63,7 +65,21 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
         totalHan: candidate.totalHan, yakuHan: candidate.totalHan, yakumanCount: candidate.yakumanCount,
         doraCount, doraHan, uraDoraCount, uraDoraHan, redDoraCount, redDoraHan, totalHanIncludingDora, ...fu, ...score };
     });
-    return selectScoredWinCandidate(evaluated);
+    const ordinary = selectScoredWinCandidate(evaluated);
+    if (!renhouEligible) return ordinary;
+    const shape = [...analysis.candidates].sort((a, b) => a.id.localeCompare(b.id))[0];
+    if (!shape) return ordinary;
+    const renhouYaku = { id: 'renhou' as const, han: 0 as const, yakuman: 0 as const };
+    const renhouCandidate: YakuCandidate = { ...shape, yaku: [renhouYaku], totalHan: 0, yakumanCount: 0 };
+    const renhouAnalysis: YakuAnalysis = { ...analysis, hasSupportedYaku: true, candidates: [renhouCandidate] };
+    const score = calculateFixedManganRonScore({ winnerId: playerId, dealerId: game.dealerId,
+      discarderId: game.ronWindow?.discarderId });
+    const renhou: WinDetails = { winnerId: playerId, winningTileId: winningTile.id,
+      analysis: renhouAnalysis, candidate: renhouCandidate, totalHan: 0, yakuHan: 0,
+      uraDoraCount, uraDoraHan: 0, doraCount, doraHan: 0,
+      redDoraCount, redDoraHan: 0, totalHanIncludingDora: 0, yakumanCount: 0,
+      rawFu: null, fu: null, fuBreakdown: [], fuMode: 'fixed-mangan', ...score };
+    return !ordinary || ordinary.totalPoints <= renhou.totalPoints ? renhou : ordinary;
   } catch (error) {
     if (error instanceof RangeError) return null;
     throw error;

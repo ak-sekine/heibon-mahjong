@@ -30,7 +30,15 @@ with sync_playwright() as playwright:
       window.rulesModel = await import('/heibon-mahjong/src/model/rules.ts');
       window.rulesMatches = await import('/heibon-mahjong/src/game/match.ts');
       window.rulesFixtures = await import('/heibon-mahjong/tests/match-fixture.ts');
+      window.rulesSummary = await import('/heibon-mahjong/src/rendering/round-win-summary.ts');
+      const summary = document.createElement('div');
+      window.rulesSummary.renderRoundWinSummary(summary, [{ winnerName: '子', method: 'ron', han: 0, fu: null,
+        scoreTier: 'mangan', yakumanCount: 0, points: 8000, yaku: [{ id: 'renhou', yakuman: 0 }],
+        doraCounts: { normal: 2, ura: 0, red: 0 } }]);
+      window.renhouSummaryText = summary.textContent;
     }''')
+    assert '満貫' in page.evaluate('window.renhouSummaryText') and '人和' in page.evaluate('window.renhouSummaryText')
+    assert 'ドラ' not in page.evaluate('window.renhouSummaryText') and '0翻' not in page.evaluate('window.renhouSummaryText')
     assert page.locator('#menu-offline-rules').is_hidden(), 'rules offered without an active match'
 
     def capture_state():
@@ -64,7 +72,7 @@ with sync_playwright() as playwright:
         assert page.locator('#online-rules-list dt').all_text_contents() == [
             '対局形式', '赤ドラ', '喰いタン', '和了条件', '後付け', 'リーチ', '一発',
             '裏ドラ', 'カンドラ', '通常流局', '親テンパイ連荘', '九種九牌', '四風連打',
-            '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ', '特殊形ダブル役満',
+            '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ', '特殊形ダブル役満', '人和',
             '対局終了',
         ]
         default_rule_rows = dict(zip(
@@ -76,6 +84,8 @@ with sync_playwright() as playwright:
         assert default_rule_rows['アガリやめ'] == 'なし' and default_rule_rows['テンパイやめ'] == 'なし'
         assert default_rule_rows['特殊形ダブル役満'] == ('あり（四暗刻単騎・国士十三面・純正九蓮・大四喜）'
           if page.evaluate("window.rulesModel.rulesForMatch(window.rulesApp.controller.match).doubleYakuman") else 'なし')
+        assert default_rule_rows['人和'] == ('あり（子の第一自摸前・鳴きなしの有効ロン、固定満貫）'
+          if page.evaluate("window.rulesModel.rulesForMatch(window.rulesApp.controller.match).renhou === 'mangan'") else 'なし')
         assert page.evaluate('''() => {
           const expected = window.rulesModel.describeConfirmedRules(window.rulesModel.rulesForMatch(window.rulesApp.controller.match));
           return [...document.querySelectorAll('#online-rules-list .confirmed-rule-row')].every((row, i) =>
@@ -107,12 +117,14 @@ with sync_playwright() as playwright:
             'agariYame': False,
             'tenpaiYame': False,
             'doubleYakuman': False,
+            'renhou': False,
         }
         for key, enabled in default_rule_values.items():
             control = page.locator(f'#new-game-rules-editor input[data-rule-key="{key}"]')
             assert control.is_checked() is enabled, f'{key} default was not {enabled}'
         if fmt == 'tonnan':
             page.locator('#new-game-rules-editor input[data-rule-key="doubleYakuman"]').check()
+            page.locator('#new-game-rules-editor input[data-rule-key="renhou"]').check()
         page.locator(f'input[name="new-game-rules-editor-match-format"][value="{fmt}"]').check()
         page.locator('#confirm-new-game').click()
         # Use the real selection UI; opening rules must not clear the selected tile.

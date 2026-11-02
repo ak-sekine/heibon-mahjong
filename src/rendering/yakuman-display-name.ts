@@ -26,8 +26,8 @@ export function scoreTierDisplayName(scoreTier: ScoreTier, yakumanCount: number)
 }
 
 /** Return the final total line shared by offline, CPU, and online result details. */
-export function winTotalLabel(yakumanCount: number, totalHanIncludingDora: number): string {
-  return yakumanCount > 0
+export function winTotalLabel(yakumanCount: number, totalHanIncludingDora: number, fixedMangan = false): string {
+  return fixedMangan ? '合計：満貫' : yakumanCount > 0
     ? `合計：${yakumanMultiplierName(yakumanCount)}`
     : `合計：${totalHanIncludingDora}翻`;
 }

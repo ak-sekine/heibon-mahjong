@@ -93,6 +93,11 @@ test('confirmed rule descriptions expose the complete current rule set as read-o
   assert.equal(rules.find(rule => rule.label === '一発')?.value, 'あり');
   assert.equal(rules.find(rule => rule.label === 'カンドラ')?.value, 'カン成立ごとに追加');
   assert.equal(rules.find(rule => rule.label === '特殊形ダブル役満')?.value, 'なし');
+  assert.equal(rules.find(rule => rule.label === '人和')?.value, 'なし');
+  assert.equal(describeConfirmedRules({ ...DEFAULT_GAME_RULES, renhou: 'mangan' })
+    .find(rule => rule.label === '人和')?.value, 'あり（子の第一自摸前・鳴きなしの有効ロン、固定満貫）');
+  assert.match(describeConfirmedRules({ ...DEFAULT_GAME_RULES, renhou: 'mangan' })
+    .find(rule => rule.label === '和了条件')!.value, /人和成立時は固定満貫/);
   assert.equal(describeConfirmedRules({ ...DEFAULT_GAME_RULES, doubleYakuman: true })
     .find(rule => rule.label === '特殊形ダブル役満')?.value, 'あり（四暗刻単騎・国士十三面・純正九蓮・大四喜）');
   assert.equal(rules.find(rule => rule.label === '喰いタン')?.value, 'あり');

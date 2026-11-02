@@ -16,7 +16,7 @@ export type GameRules = Readonly<{
   fourKans: boolean;
   agariYame: boolean;
   tenpaiYame: boolean;
-  /** Reserved for Issue #38; only `off` is user-selectable for now. */
+  /** Fixed mangan for an eligible child ron when enabled. */
   renhou: 'off' | 'mangan';
   /** Reserved for Issue #39. */
   pao: boolean;
@@ -169,7 +169,7 @@ export function describeConfirmedRules(rulesValue: unknown): readonly Readonly<{
     { label: '対局形式', value: rules.matchFormat === 'tonnan' ? '半荘戦（東南戦）' : '東風戦' },
     { label: '赤ドラ', value: rules.redDora ? 'あり（各色の五に1枚）' : 'なし（赤牌を使わない）' },
     { label: '喰いタン', value: rules.kuitan ? 'あり' : 'なし（門前の断么九は有効）' },
-    { label: '和了条件', value: '役が必要（ドラのみでは和了不可）' },
+    { label: '和了条件', value: rules.renhou === 'mangan' ? '通常は役が必要（人和成立時は固定満貫で和了可）' : '役が必要（ドラのみでは和了不可）' },
     { label: '後付け', value: '完成した手牌に役があれば和了可' },
     { label: 'リーチ', value: 'あり（ダブル立直を含む）' },
     { label: '一発', value: rules.ippatsu ? 'あり' : 'なし' },
@@ -184,6 +184,7 @@ export function describeConfirmedRules(rulesValue: unknown): readonly Readonly<{
     { label: 'アガリやめ', value: rules.agariYame ? '最終局に親が単独トップなら終了' : 'なし' },
     { label: 'テンパイやめ', value: rules.tenpaiYame ? '最終局、親テンパイ連荘時に単独トップなら終了' : 'なし' },
     { label: '特殊形ダブル役満', value: rules.doubleYakuman ? 'あり（四暗刻単騎・国士十三面・純正九蓮・大四喜）' : 'なし' },
+    { label: '人和', value: rules.renhou === 'mangan' ? 'あり（子の第一自摸前・鳴きなしの有効ロン、固定満貫）' : 'なし' },
     { label: '対局終了', value: rules.matchFormat === 'tonnan' ? '南4局後、終了条件を満たしたとき' : '東4局後、終了条件を満たしたとき' },
   ];
 }
