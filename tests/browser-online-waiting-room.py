@@ -931,12 +931,12 @@ with sync_playwright() as p:
         assert page.locator('#match-result-new-game').is_hidden() and guest_page.locator('#match-result-new-game').is_hidden()
         assert '準備中' in page.locator('#online-finalized-message').inner_text()
         assert '準備中' in guest_page.locator('#online-finalized-message').inner_text()
-        assert page.locator('#online-start-game').is_visible() and guest_page.locator('#online-start-game').is_hidden()
-        assert page.locator('#online-start-game').is_disabled(), 'host could start before the new readiness round'
+        assert page.locator('#online-ready').is_visible() and page.locator('#online-start-game').is_hidden()
+        assert guest_page.locator('#online-ready').is_visible() and guest_page.locator('#online-start-game').is_hidden()
 
         guest_page.locator('#online-ready').click()
         wait_for("window.onlineMock.snapshot().room.seats[1].ready === true")
-        assert page.locator('#online-start-game').is_disabled(), 'host could start before every human was ready'
+        assert page.locator('#online-ready').is_visible() and page.locator('#online-start-game').is_hidden(), 'the unready host did not retain the readiness action'
         page.locator('#online-ready').click()
         wait_for("document.querySelector('#online-start-game').disabled === false")
         wait_guest("document.querySelector('#online-start-game').hidden === true")
