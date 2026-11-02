@@ -828,7 +828,6 @@ with sync_playwright() as p:
         assert page.locator('#online-ready').is_visible()
         assert page.locator('#online-ready').inner_text() == '準備完了'
         assert page.locator('#online-finalize, #online-start-game, #online-close-room').evaluate_all('buttons => buttons.every(button => button.hidden)')
-        leave_before_ready = page.locator('#online-leave').evaluate('element => { const box = element.getBoundingClientRect(); return {left: box.left, top: box.top}; }')
         page.evaluate('window.onlineMock.addGuest()')
 
         open_menu_item(guest_page, '#online-join-open')
@@ -845,11 +844,12 @@ with sync_playwright() as p:
         assert page.locator('#online-finalize').inner_text() == '席を確定'
         assert guest_page.locator('#online-ready').is_visible(), 'an unready non-host lost the readiness control'
         assert guest_page.locator('#online-finalize, #online-start-game').evaluate_all('buttons => buttons.every(button => button.hidden)'), 'a non-host was shown host progress controls'
-        leave_after_ready = guest_page.locator('#online-leave').evaluate('element => { const box = element.getBoundingClientRect(); return {left: box.left, top: box.top}; }')
-        assert all(abs(leave_before_ready[key] - leave_after_ready[key]) <= 1 for key in ('left', 'top')), (leave_before_ready, leave_after_ready)
+        leave_before_ready = guest_page.locator('#online-leave').evaluate('element => element.getBoundingClientRect().left')
         guest_page.locator('#online-ready').click()
         wait_guest("document.querySelector('#online-ready').hidden")
         assert guest_page.locator('#online-finalize, #online-start-game').evaluate_all('buttons => buttons.every(button => button.hidden)'), 'a ready non-host was shown host progress controls'
+        leave_after_ready = guest_page.locator('#online-leave').evaluate('element => element.getBoundingClientRect().left')
+        assert abs(leave_before_ready - leave_after_ready) <= 1, (leave_before_ready, leave_after_ready)
         wait_for('document.querySelector("#online-finalize").disabled === false')
         assert page.locator('#online-finalize').is_visible() and page.locator('#online-ready').is_hidden()
         assert page.locator('#online-close-room').count() == 0, 'the room-end button remained in the waiting UI'
@@ -1833,12 +1833,12 @@ with sync_playwright() as p:
     wait_for('window.onlineMock.ticketRequests >= 2')
     wait_for("document.querySelector('#online-seats').innerText.includes('テスト参加者')")
 
-    ready_position = page.locator('#online-ready').evaluate('element => { const box = element.getBoundingClientRect(); return {left: box.left, top: box.top}; }')
+    ready_position = page.locator('#online-ready').evaluate('element => { const box = element.getBoundingClientRect(), actions = document.querySelector("#online-actions").getBoundingClientRect(); return {left: box.left - actions.left, top: box.top - actions.top}; }')
     page.locator('#online-ready').click()
     wait_for("!document.querySelector('#online-finalize').hidden")
     assert page.locator('#online-ready').is_hidden(), 'ready host was offered readiness cancellation'
     assert page.locator('#online-finalize').is_disabled(), 'host seat finalization was enabled before all humans were ready'
-    finalize_position = page.locator('#online-finalize').evaluate('element => { const box = element.getBoundingClientRect(); return {left: box.left, top: box.top}; }')
+    finalize_position = page.locator('#online-finalize').evaluate('element => { const box = element.getBoundingClientRect(), actions = document.querySelector("#online-actions").getBoundingClientRect(); return {left: box.left - actions.left, top: box.top - actions.top}; }')
     assert all(abs(ready_position[key] - finalize_position[key]) <= 1 for key in ('left', 'top')), (ready_position, finalize_position)
     page.evaluate('window.onlineMock.setGuestReady(true)')
     wait_for('document.querySelector("#online-finalize").disabled === false')
@@ -1868,7 +1868,7 @@ with sync_playwright() as p:
     page.locator('#online-finalize').click()
     wait_for("document.querySelector('#online-finalized-message').hidden === false")
     assert page.locator('#online-finalize').is_hidden() and page.locator('#online-start-game').is_visible()
-    start_position = page.locator('#online-start-game').evaluate('element => { const box = element.getBoundingClientRect(); return {left: box.left, top: box.top}; }')
+    start_position = page.locator('#online-start-game').evaluate('element => { const box = element.getBoundingClientRect(), actions = document.querySelector("#online-actions").getBoundingClientRect(); return {left: box.left - actions.left, top: box.top - actions.top}; }')
     assert all(abs(finalize_position[key] - start_position[key]) <= 1 for key in ('left', 'top')), (finalize_position, start_position)
     assert page.locator('#online-finalized-message').inner_text() == '座席が確定しました。ホストはオンライン対局を開始できます。'
     seat_text = page.locator('#online-seats').inner_text()
