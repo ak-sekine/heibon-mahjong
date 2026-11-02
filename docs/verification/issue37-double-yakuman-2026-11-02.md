@@ -49,6 +49,7 @@
 6. オンライン再接続、ホスト移行、再戦後もWorkerが確定した設定が維持される。
 7. [固定局面検証ページ](https://ak-sekine.github.io/heibon-mahjong/test.html?debug=issue37)で四暗刻単騎、国士十三面／単騎、純正／通常九蓮、大四喜／小四喜を再現し、和了結果の役名・個別倍率・合計倍率・点数を確認する。
 8. 同ページで設定OFFにした対象4形が各1役満となり、ONでは対象形だけ2役満となる。近接する国士単騎・通常九蓮・小四喜はONでも1役満。
+9. 和了結果詳細で通常役の「合計：N翻」と通常ドラ・裏ドラ・赤ドラ内訳を確認し、「役合計：」がないことを確認する。役満では個別役名・個別倍率と「合計：〇〇役満」が分かれ、「役満：」合計ラベルがないことを確認する。
 
 ## 役満倍率の表示名称更新 — 2026-11-02
 
@@ -57,6 +58,16 @@
 - `npm test`: 76/76成功。`npm run typecheck:worker`成功。`npm run build`（アプリTypeScript型チェックとVite build）成功。Browser検証スクリプトのPython構文と`git diff --check`も成功しました。
 - Actions run [#41429120006](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41429120006)（SHA `5b2224303457a2e64259a55b4032f0fde97d604c`）はverify、Chromium／WebKit Browser UI、matrix audit、release freshness、Worker deploy、production-test、Pages build／deployがすべてsuccessしました。Workerは `https://heibon-mahjong-online.ak-sekine.workers.dev`、Pagesは `https://ak-sekine.github.io/heibon-mahjong/` へ公開されています。
 - 役判定・点数計算・精算・Workerのソースは変更していません。iPhone Safari実機確認は未実施です。Issue #37はOpenのままです。
+
+## 和了結果詳細の合計ラベル統一 — 2026-11-02
+
+- 最新`origin/main` `a3bdce2fe912d883820599565441cff7a3ee6ebd`へfast-forwardして作業を開始しました。表示実装コミットは`b8dfdc3ea61a498f28df1b4291cafaf505b33755`、Browser UIの役順序比較を順不同に直した最終公開SHAは`87d5bf0c8d45904f64c96868a143132127bbf85c`です。どちらもPRを作成せず`main`へpushしました。
+- [`table.ts`](../../src/rendering/table.ts)（オフライン・CPU）と[`result-content.ts`](../../src/online/result-content.ts)（オンライン）の和了詳細で、通常役の「役合計：」行を削除し、役満の旧「役満：」行を「合計：役満倍率」に変更しました。共通の[`yakuman-display-name.ts`](../../src/rendering/yakuman-display-name.ts)に最終行ラベル関数を加え、通常役は既存のドラ込み合計翻数、役満は既存倍率名称を使用します。役名・個別倍率とドラ内訳は維持します。
+- `npm test`: 76/76成功。`npm run build`、`npm run typecheck:worker`、`git diff --check`も成功しました。追加Browser UI期待値は通常役・役満の旧ラベル不在、役満1〜6倍の表示名、通常ドラ・裏ドラ・赤ドラ内訳、3倍・4倍複合役満と個別役倍率、オンライン／オフライン／CPU詳細を確認します。
+- Actions run [#41437604604](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41437604604)は、Chromium `browser-step13-11.py`で役配列の順序を固定して比較していた新規テストが失敗し、gateにより公開されませんでした。表示値は3倍・144,000点で一致していました。比較を順不同に修正しました。
+- Actions run [#41439154842](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41439154842)（run #535、push event、最終SHA `87d5bf0c8d45904f64c96868a143132127bbf85c`）は`verify`、Chromium／WebKit Browser UI、matrix audit、release freshness、Worker deploy、production-test、Pages build／deployがすべてsuccessしました。Workerは`https://heibon-mahjong-online.ak-sekine.workers.dev`へ公開しproduction-testが成功。Pages deploymentはSHA `87d5bf0c8d45904f64c96868a143132127bbf85c`でGitHub Pagesのsuccessを報告し、公開先は`https://ak-sekine.github.io/heibon-mahjong/`です。公開URLへのCodex環境からの独立HTTP GETはproxyのCONNECT 403で未確認です。
+- 変更差分は3つの表示ソースと表示テスト／Browser UI期待値に限られ、役判定、翻数・ドラ・倍率・点数・精算・Workerゲームロジックのソースには触れていません。既存計算結果をラベル関数へ渡すだけであることと、全テスト成功で確認しました。
+- iPhone Safari実機確認は未実施です。和了結果詳細で通常役のドラ込み合計と3種の内訳、単独・複合役満の個別倍率と「合計：倍率」、旧ラベル不在を確認する必要があります。Issue #37はOpenのまま維持します。
 
 未報告の項目は未確認として残し、NodeテストやActionsの成功から実機確認済みとは判断しない。確認結果が揃った後に受け入れ条件と照合し、Issue #37のClose可否を判断する。
 
