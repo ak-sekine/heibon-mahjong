@@ -1714,7 +1714,7 @@ with sync_playwright() as p:
       browser.close()
       raise SystemExit(0)
     layout_results = []
-    for width, height in [(320, 700), (375, 667), (375, 812), (390, 844), (414, 896), (1280, 900)]:
+    for width, height in [(320, 700), (375, 667), (375, 812), (390, 844), (414, 896), (430, 932), (1280, 900)]:
       page.set_viewport_size({'width': width, 'height': height})
       assert_waiting_action_layout(width, height, False)
       assert_online_dialog_header('#online-dialog', '#online-close', width)
