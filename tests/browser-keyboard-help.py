@@ -128,28 +128,18 @@ with sync_playwright() as playwright:
             displays.push(getComputedStyle(root.querySelector('.keyboard-help')).display);
             root.remove();
           }
-          const disabledRules = [];
-          const visit = (rules, conditions = []) => {
-            for (const rule of rules) {
-              if (rule.cssRules) visit(rule.cssRules, [...conditions, rule.conditionText || rule.name || '']);
-              else if (rule.selectorText?.includes('.keyboard-help') && rule.style?.display === 'none') {
-                disabledRules.push({conditions, selector: rule.selectorText});
-              }
-            }
-          };
-          for (const sheet of document.styleSheets) {
-            try { visit(sheet.cssRules); } catch { /* Cross-origin sheets are not needed for this assertion. */ }
-          }
-          return {displays, disabledRules};
+          const response = await fetch('/heibon-mahjong/src/style.css');
+          if (!response.ok) throw new Error(`keyboard help CSS HTTP ${response.status}`);
+          const cssSource = await response.text();
+          return {displays, cssSource};
         }""")
         assert standalone_panel_results['displays'] == [standard_display, standard_display], \
             standalone_panel_results
         assert standalone_panel_results['displays'] == ['none', 'none'], standalone_panel_results
-        assert any('hover: none' in ' '.join(rule['conditions']) and
-                   'pointer: coarse' in ' '.join(rule['conditions']) for rule in standalone_panel_results['disabledRules']), \
-            standalone_panel_results
-        assert all('display-mode' not in ' '.join(rule['conditions'])
-                   for rule in standalone_panel_results['disabledRules']), standalone_panel_results
+        assert '@media (hover: none) and (pointer: coarse)' in standalone_panel_results['cssSource'], \
+            'touch help rule does not use the required hover/pointer media features'
+        assert 'display-mode' not in standalone_panel_results['cssSource'], \
+            'touch help CSS must not depend on display-mode'
         standalone_context.close()
 
     # Touch must continue to select/discard a tile and choose an actual pon.
