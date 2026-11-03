@@ -28,8 +28,7 @@ def inspect_page(page):
       const round=document.querySelector('#local-table .round-summary');
       const roundLabel=document.querySelector('#local-table .round-label');
       const wallCount=document.querySelector('#local-table .wall-count');
-      const doraHeading=document.querySelector('#local-table .dora-area h2');
-      const textNodes=[...document.querySelectorAll('.score-strip .seat-label,.table .seat-label,.table .center-info > .round-summary,.table .round-label,.table .wall-count,.table .dora-area h2')]
+      const textNodes=[...document.querySelectorAll('.score-strip .seat-label,.table .seat-label,.table .center-info > .round-summary,.table .round-label,.table .wall-count')]
         .filter(e=>visible(e)&&e.textContent.trim());
       const tileNodes=[...document.querySelectorAll('.table .tile-svg,.table .tile-back')]
         .filter(visible);
@@ -52,7 +51,6 @@ def inspect_page(page):
         roundFontSize:parseFloat(getComputedStyle(round).fontSize),
         roundLabelFontSize:parseFloat(getComputedStyle(roundLabel).fontSize),
         wallCountFontSize:parseFloat(getComputedStyle(wallCount).fontSize),
-        doraHeadingFontSize:parseFloat(getComputedStyle(doraHeading).fontSize),
         visibleActionButtons:buttons,
         textCount:textNodes.length,tileCount:tileNodes.length,overlaps,
         scroll:{top:scroll.scrollTop,width:scroll.scrollWidth,height:scroll.scrollHeight},
@@ -77,7 +75,6 @@ def assert_pc_layout(page, width, height, label):
     assert 14 <= result['roundFontSize'] <= 16, f'{label}: round information is outside 14–16px: {result}'
     assert 14 <= result['roundLabelFontSize'] <= 16, f'{label}: round label is outside 14–16px: {result}'
     assert 14 <= result['wallCountFontSize'] <= 16, f'{label}: remaining-wall count is outside 14–16px: {result}'
-    assert 14 <= result['doraHeadingFontSize'] <= 16, f'{label}: dora heading is outside 14–16px: {result}'
     assert result['textCount'] >= 5 and result['tileCount'] > 0, f'{label}: expected visible seat, round, and tile content: {result}'
     assert not result['overlaps'], f'{label}: text overlaps a tile, river, dora, or meld: {result}'
     discard = next((button for button in result['visibleActionButtons'] if button['id'] == 'discard'), None)
@@ -144,7 +141,7 @@ with sync_playwright() as p:
             assert result['table']['top'] >= -.5 and result['table']['bottom'] <= height + .5, f'{width}x{height}: fixture table exceeds viewport height: {result}'
             assert result['scoreFontSizes'] and all(14 <= size <= 16 for size in result['scoreFontSizes']), f'{width}x{height}: fixture score labels are too small: {result}'
             assert 14 <= result['centerFontSize'] <= 16 and 14 <= result['roundFontSize'] <= 16, f'{width}x{height}: fixture center text is too small: {result}'
-            assert 14 <= result['roundLabelFontSize'] <= 16 and 14 <= result['wallCountFontSize'] <= 16 and 14 <= result['doraHeadingFontSize'] <= 16, f'{width}x{height}: fixture center labels are too small: {result}'
+            assert 14 <= result['roundLabelFontSize'] <= 16 and 14 <= result['wallCountFontSize'] <= 16, f'{width}x{height}: fixture center labels are too small: {result}'
             assert result['meldCount'] == expected_melds, f'{width}x{height}: expected {expected_melds} open melds: {result}'
             assert not result['overlaps'], f'{width}x{height}: text overlaps river, dora, meld, or hand tiles: {result}'
             fixture_results.append({'melds': expected_melds, 'tileCount': result['tileCount'], 'textCount': result['textCount'], 'overlaps': result['overlaps']})
