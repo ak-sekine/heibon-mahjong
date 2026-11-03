@@ -1,6 +1,6 @@
 # Issue #32 レスポンシブレイアウト — 2026-11-03
 
-[Issue #32](https://github.com/ak-sekine/heibon-mahjong/issues/32) のスマートフォン・タブレット・PC向けレイアウトと、操作可能性の回帰検証を記録します。Issue は iPhone Safari のユーザー実機確認後に完了判断するため、実装・公開後も Open のまま維持します。
+[Issue #32](https://github.com/ak-sekine/heibon-mahjong/issues/32) のスマートフォン・タブレット・PC向けレイアウトと、操作可能性の回帰検証を記録します。iPhone Safari／PWAの追加修正はユーザー報告でOKですが、PCブラウザーのユーザー本人による実機確認を必須条件に追加し、その報告後にIssue全体のClose可否を判断します。
 
 ## Git作業基準
 
@@ -55,14 +55,14 @@
 - Cloudflare Worker `https://heibon-mahjong-online.ak-sekine.workers.dev` のdeployとHTTPS／ルーム／WebSocket／再接続／認証・プライバシーproduction testがsuccessしました。結果ログには5つの本番シナリオ成功が記録されています。
 - GitHub Pages `https://ak-sekine.github.io/heibon-mahjong/` のbuildとdeployがsuccessしました。既存のGitHub Deployment SHA追跡に記録された値はWorker・Pages双方 `2d89d476ddbf85ffc08af350b6ec169d7c05b64f` です。
 - Codex実行環境からの公開URLへの直接HTTP取得はネットワークproxyの403で実施できませんでした。公開確認は、ActionsのWorker production test・Pages deploy成功・双方のDeployment SHA記録を根拠にしています。
-- Issue #32はOpenです。ユーザー本人のiPhone Safari実機確認後にClose可否を判断します。
+- Issue #32はOpenです。PCブラウザーのユーザー本人による実機確認結果が報告された後に、他の受け入れ条件と合わせてClose可否を再判断します。
 
 | 検証 | 結果 |
 | --- | --- |
 | `npm test` | 80ファイル／テストグループ成功、合計80 pass、fail 0、skip 0（Issue #32変更後） |
 | `npm run build` | 成功。TypeScript、Vite、PWA shell生成を含む |
 | `npm run typecheck:worker` | 成功 |
-| Browser UI matrix selection | 6項目成功。Chromium 38、WebKit 28、合計66 scenarioの選択を検証 |
+| Browser UI matrix selection（初回レスポンシブ変更） | 6項目成功。Chromium 38、WebKit 28、合計66 scenarioの選択を検証 |
 | Python Browser UI構文確認 | 成功 |
 | `git diff --check` | 成功（ローカルの現行差分） |
 | Chromium／Playwright Browser UI | Deploy run [#41633626802](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41633626802)で38 scenario success。PWA・対局操作・10代表viewportを含む |
@@ -74,10 +74,40 @@ Browser UIをCodex Cloud内で実行した結果としては扱いません。�
 
 ## 実機確認と残る範囲
 
-- iPhone Safari実機確認：ユーザー本人による実施待ち。以下のチェックリストを使い、結果が届くまでIssue #32をOpenに保ちます。
-- Android実機確認：未実施。PlaywrightのChromium結果と区別します。
-- タブレット実機確認：未実施。代表viewportのブラウザー検証と区別します。
+| 対象 | ユーザー実機報告 | 補足 |
+| --- | --- | --- |
+| iPhone Safari／ホーム画面PWAの追加修正 | OK 3件、NG 0件 | ユーザー本人の報告。個別内訳は報告に含まれていないため、操作内容や端末情報は補っていません |
+
+- 以前からのiPhoneチェックリストは網羅記録として残します。
+- PCブラウザーの実機確認：未実施。スマートフォン・タブレット・PC対応というIssueの目的に合わせ、ユーザー本人が実際のPCブラウザーでチェックリストを確認し、結果を報告することをClose判断の必須条件に追加しました。
+- Android実機確認：未実施。必須条件ではありません。PlaywrightのChromium結果と区別します。
+- タブレット実機確認：未実施。必須条件ではありません。代表viewportのブラウザー検証と区別します。
 - Browser UIのviewport検証は機種実機のブラウザUI、ソフトウェアキーボード、端末固有のsafe areaを完全に再現するものではありません。
+
+### 受け入れ条件と既存のChromium／WebKit自動検証の照合
+
+| 受け入れ条件 | 既存の自動検証・記録 | 判定と残る確認 |
+| --- | --- | --- |
+| スマートフォン・タブレット・PCの代表viewportで主要画面を操作できる | Deploy run [#41649796576](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41649796576) のChromium 39／WebKit 29 scenario。レスポンシブ回帰では320×568〜1440×900の10代表viewport、縦横変更相当を確認。キーボード案内修正のBrowser UIもPC幅のキーボード操作を含む | エミュレーション上の代表幅・高さは自動確認済み。実際のPCブラウザー操作は未確認で、ユーザー本人のPC実機確認をClose必須条件とする |
+| 牌・ボタン・文字の重なり、意図しない横スクロール、操作不能な領域がない | 10代表viewportで卓・手牌・河・副露の寸法、横overflow、選択・打牌ボタン領域を確認。ダイアログ本文スクロール、固定フッター、オンライン座席と操作ボタンもChromium／WebKitで確認 | 自動検証範囲は成功。実PCブラウザー上の目視・マウス・キーボード操作は未確認 |
+| チー複数候補、ロン、カン、結果ダイアログなどを回帰検証する | WebKit 29 scenarioで複数チー候補・見送り・スクロール・結果dialog再オープン等を確認。Chromium／WebKitの既存Browser UI matrixで対局操作・ダイアログ回帰を確認 | 自動回帰検証済み。全局面や全端末を網羅するものではない |
+| iPhone Safariでユーザー本人が実機確認する | 今回報告されたiPhone Safari／PWAの追加修正3件はすべてOKとして記録 | 追加修正3件はOK。既存の広範なiPhone確認項目はチェックリスト上で個別に記録する |
+| Android・タブレットの実機未確認は明記し、エミュレーションと区別する | 本記録に未実施と記載 | 明記済み。いずれも必須条件ではない |
+| 設計方針・検証結果を記録する | 本記録、検証目次、ロードマップに記載 | 記録済み |
+| 追加条件：ユーザー本人がPCブラウザーで実機確認する | Chromium／WebKitのPlaywright viewport emulationとPC向けキーボード自動テストはある | 実機確認は未実施。下記PCチェックリストの報告を受けてClose可否を再判断する |
+
+### PCブラウザー実機確認チェックリスト
+
+PCの実ブラウザーで各項目を確認し、**OK／NG／未確認** を記録してください。少なくともOS、ブラウザー名・バージョン、画面解像度、ウィンドウサイズを併記してください。NGの場合は再現操作と画面状態も記録してください。
+
+| 結果 | 確認項目・操作 | 期待結果 |
+| --- | --- | --- |
+| 未実施 | 卓表示：広いウィンドウでオフライン対局を開始し、卓・4席・河・副露・手牌・卓中央情報を確認する | 卓が見やすい大きさで表示され、席・河・副露・情報が重ならず、ブラウザー幅に応じた横スクロールが発生しない |
+| 未実施 | ウィンドウサイズ変更：対局中にウィンドウの幅と高さを広い／狭いサイズへ何度か変更し、短い横長サイズも確認する | 卓と牌が再配置・縮小し、河領域や操作欄が潰れない。意図しない横overflow、重なり、画面外に残る操作部品がない |
+| 未実施 | マウス操作：手牌をクリックで選択し、打牌、チー候補、ポン、ロン／カン等の表示された操作をクリックする | ポインター位置どおりの牌・ボタンが選択され、操作が1回ずつ反映される。選択状態やカーソル位置で誤操作しない |
+| 未実施 | キーボード操作：Tabでフォーカスを進め、Enter／Spaceで牌・ボタンを選択・確定する。フォーカスを見失わないか確認する | フォーカス位置が見え、案内に記載されたキー操作が機能する。マウス操作と併用しても入力が詰まらない |
+| 未実施 | ダイアログ：新規対局／ルール設定、オンライン作成・参加、結果・順位などのダイアログを開閉し、本文末尾までスクロールする | タイトル・本文・閉じる操作が読める。固定フッターやボタンが本文を隠さず、開閉後に卓の操作へ戻れる |
+| 未実施 | オンライン対局：PCブラウザーでルームを作成または参加し、待機室の座席・準備・退出を操作して対局を進める | 座席・接続状態・操作ボタンが読みやすく、マウスまたはキーボードで操作できる。対局中も卓・手牌・操作欄に重なりやoverflowがない |
 
 ### iPhone Safari実機確認チェックリスト
 
@@ -141,7 +171,7 @@ Browser UIをCodex Cloud内で実行した結果としては扱いません。�
 | Worker | `heibon-production-worker` deployment status success、production test success、同SHA |
 | GitHub Issue | [#32](https://github.com/ak-sekine/heibon-mahjong/issues/32) はOpenを維持 |
 
-Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emulationをiPhone実機確認と扱いません。Issue #32はOpenのままです。公開後にユーザー本人がSafariとPWAの双方で案内非表示を再確認するまで完了判断を保留します。
+Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emulationを実機確認と扱いません。iPhone Safari／PWAの追加修正3件はユーザー報告でOKです。PCブラウザーの実機確認は未実施でClose必須条件のため、Issue #32はOpenのままです。
 
 ### 初回Deploy gateのテスト修正記録
 
