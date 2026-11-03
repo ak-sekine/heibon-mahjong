@@ -110,7 +110,7 @@ export interface GameState extends WallState {
   readonly rules?: GameRules;
   /** Missing in legacy game states means east. */
   readonly roundWind?: RoundWind;
-  readonly abortiveDraw?: 'four-kans' | 'kyuushu-kyuuhai' | 'four-winds' | 'four-riichi';
+  readonly abortiveDraw?: 'four-kans' | 'kyuushu-kyuuhai' | 'four-winds' | 'four-riichi' | 'triple-ron';
   /** Set only when 九種九牌 is confirmed; identifies the hand made public. */
   readonly abortiveDrawPlayerId?: PlayerId;
   readonly callsMade?: boolean;

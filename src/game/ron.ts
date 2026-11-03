@@ -5,6 +5,7 @@ import type { GameState, PhysicalTile, PlayerId, PlayerState, RonCandidate } fro
 import { TILE_KINDS, ordinaryTile, tileKindKey, type Tile, type TileKind } from '../model/tile.ts';
 import { isWinningShape } from '../analysis/winning-shape.ts';
 import { evaluateWin } from './win.ts';
+import { rulesForGame } from '../model/rules.ts';
 
 /** Shape waits deliberately ignore yaku; an impossible fifth copy is excluded. */
 export function getWaitingTileKinds(hand: readonly Tile[], fixed: readonly import('../analysis/winning-shape.ts').WinningMeld[] = []): readonly TileKind[] {
@@ -97,6 +98,11 @@ export function resolveRonDeclarations(game: GameState, winnerIds: readonly Play
 function resolve(game: GameState, winners: readonly RonCandidate[]): GameState {
   if (!getRonTile(game)) throw new RangeError('No current ron window');
   const { discarderId, tileId } = game.ronWindow!;
+  if (winners.length === 3 && rulesForGame(game).tripleRonAbortiveDraw) {
+    return { ...game, phase: 'wall-exhausted', abortiveDraw: 'triple-ron', ronWindow: null,
+      pendingRiichi: null, winResult: null };
+  }
+  if (winners.length > 1 && !rulesForGame(game).multipleRon) winners = [winners[0]];
   if (winners.length) return { ...game, phase: 'won', ronWindow: null, pendingRiichi: null,
     winResult: { winMethod: 'ron', winningTile:getRonTile(game)!, discarderId, winningTileId: tileId, winners } };
   return game.ronWindow?.kan ? completeKan(game,game.ronWindow.kan) : resolveDiscardCalls(game);

@@ -15,6 +15,7 @@ const abortiveNames = {
   'kyuushu-kyuuhai': '九種九牌',
   'four-winds': '四風連打',
   'four-riichi': '四家立直',
+  'triple-ron': '三家和',
 } as const;
 function text(tag: string, content: string, className?: string): HTMLElement {
   const node = document.createElement(tag);
@@ -279,7 +280,7 @@ export function renderOnlineResultContent(container: HTMLElement, view: PlayerGa
     settlement.append(payments);
   }
   if (result.deposits) settlement.append(text('p', `供託：${playerName(view, result.deposits.recipientId)} ＋${result.deposits.points.toLocaleString('ja-JP')}点`));
-  else if (['four-kans', 'kyuushu-kyuuhai', 'four-winds', 'four-riichi', 'draw'].includes(result.reason)) {
+  else if (['four-kans', 'kyuushu-kyuuhai', 'four-winds', 'four-riichi', 'triple-ron', 'draw'].includes(result.reason)) {
     settlement.append(text('p', `供託：${view.round.depositSticks}本を次局へ持ち越し`));
   }
 

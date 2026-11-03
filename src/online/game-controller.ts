@@ -530,6 +530,7 @@ export class OnlineGameController {
       'kyuushu-kyuuhai': '九種九牌',
       'four-winds': '四風連打',
       'four-riichi': '四家立直',
+      'triple-ron': '三家和',
     } as const;
     if (result.reason in abortiveNames) {
       section.append(text('h2', `途中流局（${abortiveNames[result.reason as keyof typeof abortiveNames]}）`, 'round-summary-winner'));

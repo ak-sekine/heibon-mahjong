@@ -6,8 +6,9 @@ import { fixedRound, fixedRon } from './match-fixture.ts';
 import { tsumoGame } from './tsumo-fixture.ts';
 import { cpuTsumoGame } from './cpu-tsumo-fixture.ts';
 import { declareTsumo } from '../src/game/tsumo.ts';
+import type { GameState } from '../src/model/game.ts';
 
-for (const scenario of ['human-ron','human-tsumo','cpu-ron','cpu-tsumo','draw','end','double','triple']) test(`result dialog lifecycle: ${scenario}`, () => {
+for (const scenario of ['human-ron','human-tsumo','cpu-ron','cpu-tsumo','draw','end','double','triple','triple-abortive']) test(`result dialog lifecycle: ${scenario}`, () => {
   class Node {
     open = false; hidden = false; textContent = ''; scrollTop = 100; focused = false; opens = 0;
     listeners: Record<string, (event: { preventDefault(): void }) => void> = {};
@@ -29,10 +30,13 @@ for (const scenario of ['human-ron','human-tsumo','cpu-ron','cpu-tsumo','draw','
       : scenario === 'cpu-tsumo' ? declareTsumo(cpuTsumoGame(1),1)
       : scenario === 'draw' ? fixedRound(0,[0,2])
       : scenario === 'end' ? fixedRon(3,[0],2)
-      : fixedRon(0, scenario === 'cpu-ron' ? [1] : scenario === 'double' ? [0,2] : scenario === 'triple' ? [0,1,2] : [0]);
+      : scenario === 'triple-abortive' ? { ...fixedRon(0, [0]), phase: 'wall-exhausted', abortiveDraw: 'triple-ron',
+        ronWindow: null, winResult: null } as GameState
+        : fixedRon(0, scenario === 'cpu-ron' ? [1] : scenario === 'double' ? [0,2] : scenario === 'triple' ? [0,1,2] : [0]);
     const match = settleRound({...initial,game, ...(scenario === 'end' ? {roundNumber:4,dealerId:3 as const} : {})});
     const snapshot = structuredClone(match);
     ui.update(match);
+    if (scenario === 'triple-abortive') assert.match(nodes.get('#result-title')!.textContent, /三家和/u);
     assert.equal(nodes.get('#result-dialog')!.open,false);
     assert.equal(nodes.get('#result-body')!.scrollTop,0);
     for (let i=0;i<10;i++) {

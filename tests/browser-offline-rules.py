@@ -73,7 +73,7 @@ with sync_playwright() as playwright:
             '対局形式', '赤ドラ', '喰いタン', '和了条件', '後付け', 'リーチ', '一発',
             '裏ドラ', 'カンドラ', '通常流局', '親テンパイ連荘', '九種九牌', '四風連打',
             '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ', '特殊形ダブル役満', '人和',
-            'パオ',
+            'パオ', '複数ロン', '三家和流局',
             '対局終了',
         ]
         default_rule_rows = dict(zip(
@@ -89,6 +89,10 @@ with sync_playwright() as playwright:
           if page.evaluate("window.rulesModel.rulesForMatch(window.rulesApp.controller.match).renhou === 'mangan'") else 'なし')
         assert default_rule_rows['パオ'] == ('あり（大三元・大四喜・四槓子）'
           if page.evaluate('window.rulesModel.rulesForMatch(window.rulesApp.controller.match).pao') else 'なし')
+        assert default_rule_rows['複数ロン'] == ('あり（宣言者全員が和了）'
+          if page.evaluate('window.rulesModel.rulesForMatch(window.rulesApp.controller.match).multipleRon') else 'なし（頭ハネ）')
+        assert default_rule_rows['三家和流局'] == ('あり（3人全員の有効ロン宣言時）'
+          if page.evaluate('window.rulesModel.rulesForMatch(window.rulesApp.controller.match).tripleRonAbortiveDraw') else 'なし')
         assert page.evaluate('''() => {
           const expected = window.rulesModel.describeConfirmedRules(window.rulesModel.rulesForMatch(window.rulesApp.controller.match));
           return [...document.querySelectorAll('#online-rules-list .confirmed-rule-row')].every((row, i) =>
@@ -122,6 +126,8 @@ with sync_playwright() as playwright:
             'doubleYakuman': False,
             'renhou': False,
             'pao': False,
+            'multipleRon': True,
+            'tripleRonAbortiveDraw': False,
         }
         for key, enabled in default_rule_values.items():
             control = page.locator(f'#new-game-rules-editor input[data-rule-key="{key}"]')

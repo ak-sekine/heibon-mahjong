@@ -11,6 +11,7 @@ const abortiveNames = {
   'kyuushu-kyuuhai': '九種九牌',
   'four-winds': '四風連打',
   'four-riichi': '四家立直',
+  'triple-ron': '三家和',
 } as const;
 function tileOrder(tile: Tile): number {
   return tile.category === 'suited' ? SUITS.indexOf(tile.suit) * 9 + tile.rank - 1 : 27 + HONORS.indexOf(tile.honor);
@@ -68,7 +69,7 @@ export function renderMatch(match: MatchState, names: readonly string[] = defaul
   }
   for (const payment of result.payments) panel.append(text('p',`${names[payment.payerId]} → ${names[payment.recipientId]} ${payment.points.toLocaleString('ja-JP')}点（${result.reason === 'nagashi-mangan' ? '満貫相当' : '基本'}${payment.basePoints}点・本場${payment.honbaPoints}点${payment.notenPoints ? `・ノーテン罰符${payment.notenPoints}点` : ''}）`));
   if (result.deposits) panel.append(text('p',`供託：${names[result.deposits.recipientId]} ＋${result.deposits.points}点`));
-  else if (['four-kans','kyuushu-kyuuhai','four-winds','four-riichi','draw'].includes(result.reason)) {
+  else if (['four-kans','kyuushu-kyuuhai','four-winds','four-riichi','triple-ron','draw'].includes(result.reason)) {
     panel.append(text('p',`供託：${match.depositSticks}本を次局へ持ち越し`));
   }
   panel.append(text('h3','局終了後の持ち点'));

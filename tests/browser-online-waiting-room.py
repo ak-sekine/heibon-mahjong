@@ -1431,10 +1431,12 @@ with sync_playwright() as p:
     assert page.locator('#rule-settings-dialog').count() == 0, 'standalone rules dialog remains in the document'
     assert page.locator('#new-game-dialog #new-game-rules').count() == 0, 'offline rules still require a separate navigation button'
     assert page.locator('input[name="new-game-rules-editor-match-format"][value="tonpu"]').is_checked(), 'offline match format did not default to tonpu'
-    assert page.locator('#new-game-rules-editor .optional-rule-option input:checked').count() == 10, 'the ten ON local rules should default to ON'
+    assert page.locator('#new-game-rules-editor .optional-rule-option input:checked').count() == 11, 'the eleven ON local rules should default to ON'
     assert not page.locator('#new-game-rules-editor input[data-rule-key="doubleYakuman"]').is_checked(), 'special double yakuman must default OFF'
     assert not page.locator('#new-game-rules-editor input[data-rule-key="renhou"]').is_checked(), 'Renhou must default OFF'
     assert not page.locator('#new-game-rules-editor input[data-rule-key="pao"]').is_checked(), 'Pao must default OFF'
+    assert page.locator('#new-game-rules-editor input[data-rule-key="multipleRon"]').is_checked(), 'multiple ron must default ON'
+    assert not page.locator('#new-game-rules-editor input[data-rule-key="tripleRonAbortiveDraw"]').is_checked(), 'triple ron abortive draw must default OFF'
     assert all(page.locator(f'#new-game-rules-editor input[data-rule-key="{key}"]').is_checked() for key in ['dealerTenpaiRenchan', 'kyuushuKyuuhai', 'fourWinds', 'fourRiichi', 'fourKans']), 'the five new ON settings did not default to ON'
     assert all(not page.locator(f'#new-game-rules-editor input[data-rule-key="{key}"]').is_checked() for key in ['agariYame', 'tenpaiYame']), 'the two yame settings did not default to OFF'
     assert page.locator('#new-game-rules-editor .confirmed-rule-row dt').all_text_contents() == [
@@ -1490,6 +1492,8 @@ with sync_playwright() as p:
     for key in ['dealerTenpaiRenchan', 'kyuushuKyuuhai', 'fourWinds', 'fourRiichi', 'fourKans']:
       page.locator(f'#new-game-rules-editor input[data-rule-key="{key}"]').uncheck()
     page.locator('#new-game-rules-editor input[data-rule-key="renhou"]').check()
+    page.locator('#new-game-rules-editor input[data-rule-key="multipleRon"]').uncheck()
+    page.locator('#new-game-rules-editor input[data-rule-key="tripleRonAbortiveDraw"]').check()
     page.locator('#confirm-new-game').click()
     assert page.evaluate('window.onlineUiTest.controller.match.format') == 'tonnan', 'offline selection was not stored in match state'
     assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'"), 'accepted offline start did not save the last rules'
@@ -1498,7 +1502,7 @@ with sync_playwright() as p:
       return ['redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora', 'dealerTenpaiRenchan', 'kyuushuKyuuhai', 'fourWinds', 'fourRiichi', 'fourKans']
         .every(key => rules[key] === false) && rules.agariYame === false && rules.tenpaiYame === false &&
         rules.renhou === 'mangan' && rules.pao === false && rules.doubleYakuman === false &&
-        rules.multipleRon === true && rules.tripleRonAbortiveDraw === false;
+        rules.multipleRon === false && rules.tripleRonAbortiveDraw === true;
     }'''), 'accepted offline start did not persist all selected OFF values and schema v5 defaults'
     select_menu_item('#menu-offline-rules')
     assert '現在の対局開始時に確定' in page.locator('#online-rules-readonly-label').inner_text()
@@ -1506,6 +1510,7 @@ with sync_playwright() as p:
     rule_rows = dict(zip(page.locator('#online-rules-list dt').all_text_contents(), page.locator('#online-rules-list dd').all_text_contents()))
     assert rule_rows['赤ドラ'] == 'なし（赤牌を使わない）' and rule_rows['喰いタン'] == 'なし（門前の断么九は有効）' and rule_rows['裏ドラ'] == 'なし' and rule_rows['一発'] == 'なし' and rule_rows['カンドラ'] == 'なし（槓裏も追加しない）'
     assert rule_rows['親テンパイ連荘'] == 'なし（通常流局では親交代）'
+    assert rule_rows['複数ロン'] == 'なし（頭ハネ）' and rule_rows['三家和流局'] == 'あり（3人全員の有効ロン宣言時）'
     assert all(rule_rows[key] == 'なし（通常進行）' for key in ['九種九牌', '四風連打', '四家立直', '四開槓'])
     assert rule_rows['アガリやめ'] == 'なし' and rule_rows['テンパイやめ'] == 'なし'
     page.locator('#online-rules-close').click()
@@ -1691,7 +1696,7 @@ with sync_playwright() as p:
     assert not page.locator('#online-join-dialog').evaluate('element => element.open'), 'join form opened after room creation'
     assert page.locator('#online-dialog #online-create-form, #online-dialog #online-join-form').count() == 0, 'input forms were mixed into the room management screen'
     host_rules = page.evaluate('window.onlineMock.requests[0].body.rules')
-    assert host_rules == {'schemaVersion': 5, 'matchFormat': 'tonnan', 'redDora': False, 'kuitan': False, 'uraDora': False, 'ippatsu': False, 'kanDora': False, 'dealerTenpaiRenchan': False, 'kyuushuKyuuhai': False, 'fourWinds': True, 'fourRiichi': False, 'fourKans': False, 'agariYame': True, 'tenpaiYame': True, 'renhou': 'mangan', 'pao': True, 'doubleYakuman': True, 'multipleRon': True, 'tripleRonAbortiveDraw': False}, host_rules
+    assert host_rules == {'schemaVersion': 5, 'matchFormat': 'tonnan', 'redDora': False, 'kuitan': False, 'uraDora': False, 'ippatsu': False, 'kanDora': False, 'dealerTenpaiRenchan': False, 'kyuushuKyuuhai': False, 'fourWinds': True, 'fourRiichi': False, 'fourKans': False, 'agariYame': True, 'tenpaiYame': True, 'renhou': 'mangan', 'pao': True, 'doubleYakuman': True, 'multipleRon': False, 'tripleRonAbortiveDraw': True}, host_rules
     assert page.evaluate('window.onlineMock.snapshot().room.rules') == host_rules, 'Worker mock did not keep the accepted host rules as room state'
     assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan' && JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.pao === true"), 'successful Worker room creation did not persist its confirmed rules'
     assert page.locator('#online-room-format').inner_text() == '対局形式：半荘戦', 'selected format was not shown in the waiting room'
@@ -1714,6 +1719,7 @@ with sync_playwright() as p:
     assert online_rule_rows['特殊形ダブル役満'] == 'あり（四暗刻単騎・国士十三面・純正九蓮・大四喜）', online_rule_rows
     assert online_rule_rows['人和'] == 'あり（子の第一自摸前・鳴きなしの有効ロン、固定満貫）', online_rule_rows
     assert online_rule_rows['パオ'] == 'あり（大三元・大四喜・四槓子）', online_rule_rows
+    assert online_rule_rows['複数ロン'] == 'なし（頭ハネ）' and online_rule_rows['三家和流局'] == 'あり（3人全員の有効ロン宣言時）', online_rule_rows
     assert page.locator('#online-rules-dialog input, #online-rules-dialog select, #online-rules-dialog button:not(#online-rules-close)').count() == 0, 'read-only rule confirmation exposed editing controls'
     page.set_viewport_size({'width': 320, 'height': 600})
     readonly_layout = page.locator('#online-rules-dialog').evaluate('''dialog => {

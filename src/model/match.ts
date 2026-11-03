@@ -21,7 +21,7 @@ export interface SettlementPayment {
 }
 export interface RoundSettlement extends RoundInfo {
   readonly format: MatchFormat;
-  readonly reason: 'tsumo' | 'ron' | 'draw' | 'nagashi-mangan' | 'four-kans' | 'kyuushu-kyuuhai' | 'four-winds' | 'four-riichi';
+  readonly reason: 'tsumo' | 'ron' | 'draw' | 'nagashi-mangan' | 'four-kans' | 'kyuushu-kyuuhai' | 'four-winds' | 'four-riichi' | 'triple-ron';
   readonly before: Points;
   readonly payments: readonly SettlementPayment[];
   readonly deposits: Readonly<{ recipientId: PlayerId; points: number }> | null;

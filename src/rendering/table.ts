@@ -230,6 +230,7 @@ function renderRoundSummary(game: GameState, settlement: RoundSettlement | null,
     'kyuushu-kyuuhai': '途中流局（九種九牌）',
     'four-winds': '途中流局（四風連打）',
     'four-riichi': '途中流局（四家立直）',
+    'triple-ron': '途中流局（三家和）',
   } as const;
   if (settlement && settlement.reason in abortiveLabels) {
     summary.hidden = false;

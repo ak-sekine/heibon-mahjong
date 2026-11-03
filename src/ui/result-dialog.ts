@@ -40,6 +40,7 @@ export class ResultDialog {
       'kyuushu-kyuuhai': '九種九牌',
       'four-winds': '四風連打',
       'four-riichi': '四家立直',
+      'triple-ron': '三家和',
     } as const;
     this.title.textContent = match.status === 'match-ended' ? `${match.format === 'tonnan' ? '半荘戦' : '東風戦'}終了`
       : result.reason === 'nagashi-mangan' ? '流し満貫'
