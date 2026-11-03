@@ -4,7 +4,7 @@
 
 ## Issue調査
 
-- [PWAインストール・更新管理 — Issue #31、2026-11-03](issue31-pwa-2026-11-03.md) — 前回実装のmain反映とWorker／Pages公開SHAの照合、HTML HTTP cacheを避ける更新修正、Chromium／WebKitでのオフラインCPU対局・複数タブ・旧キャッシュ更新試験、直接HTTP取得制限、実機未確認事項を記録。
+- [PWAインストール・更新管理 — Issue #31、2026-11-03](issue31-pwa-2026-11-03.md) — HTML HTTP cacheを避ける更新修正、Chromium／WebKitでのオフラインCPU対局・複数タブ・旧キャッシュ更新試験、run `41607845715`の成功、Worker／Pages双方の公開SHA `96b3350…`、直接HTTP取得制限、実機未確認事項を記録。
 
 - [和了結果の点数区分 — Issue #36、2026-11-02〜11-03](issue36-win-score-tier-2026-11-02.md) — 計算済みscoreTierによる共通表示、run #558のverify・Chromium／WebKit・matrix audit・Worker／Pages公開成功、2026-11-03のiPhone Safari実機OK 6件・NG 0件・未確認1件（数え役満／通常・複合役満）、個別満貫境界の実機未報告を自動検証と区別して記録。完了条件を満たしIssue #36はcompletedでClose。
 - [オンライン待機画面の進行ボタン — Issue #41、2026-11-02〜11-03](issue41-online-waiting-room-progress-buttons-2026-11-02.md) — ホストの準備・座席確定・対局開始の同位置切替と回帰、最終Deploy run `41474025754`の検証・Chromium／WebKit・Worker／Pages成功、追加修正後のiPhone Safari報告、実機未確認項目、completed／Close判定を記録します。
