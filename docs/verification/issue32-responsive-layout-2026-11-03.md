@@ -6,7 +6,7 @@
 
 - 作業開始時のcleanな `work` branch HEADは `716fcf567abc690eaa8ceb2c7073faefd24fe14b` でした。
 - `git fetch origin` は最初プロキシ接続不可でした。承認済みネットワーク実行で再取得し、最新 `origin/main` は `ef4fcc202515437ee638cb3494d72c6cadd23101` と確認しました。開始HEADはmainより16 commit behind・0 aheadだったため、fast-forwardで最新mainを基準にしました。
-- Issue #32実装コミット `19880bb17afcd915b8a6849f4363920257963fed` はfast-forwardでmainへ直接pushしました。Actions、公開SHA、後続の検証記録コミットは完了時に追記します。
+- 初回実装 `19880bb17afcd915b8a6849f4363920257963fed`、横画面の牌サイズと回転後の操作検証を調整した `649040561df3431fb0984c78a78cda11f190b9b2`、診断ログを追加した `2d89d476ddbf85ffc08af350b6ec169d7c05b64f` を順にmainへfast-forward pushしました。最終Deploy run [#41633626802](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41633626802) はSHA `2d89d476ddbf85ffc08af350b6ec169d7c05b64f` を検証・公開し、Pages／Workerの追跡記録も同じSHAです。
 
 ## 調査で確認した実装と問題
 
@@ -32,6 +32,7 @@
 - `tests/browser-mobile-table-layout.py` — Chromium／WebKitの10代表viewport、卓・牌・河・副露の寸法、横overflow、実際の手牌選択と打牌操作を検査。
 - `tests/browser-create-dialog-layout.py` — 新規対局・オンライン作成ダイアログの代表viewportを拡張。本文スクロール、黄色インジケーター、固定フッター、最終項目到達を検査。
 - `tests/browser-online-dialog-layout.py` — WebKitのオンライン待機室を含むダイアログ表示・操作ボタンを10代表viewportへ拡張。
+- `tests/browser-round-end-ui.py` — 結果dialogを閉じた後に順位dialogを再度開くWebKit検証に、失敗時のdialog・ボタン状態と入力イベントの診断を追加。
 - `tests/run-browser-regressions.py` と `tests/test_browser_regressions_selection.py` — WebKitの卓レイアウト検証をmatrixへ登録し、ブラウザー選択件数を更新。
 - `docs/verification/README.md`、`docs/ROADMAP.md` — 検証記録への導線とIssue状態を更新。
 
@@ -42,6 +43,20 @@
 - Deploy run [#41630015368](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41630015368)、実装SHA `19880bb17afcd915b8a6849f4363920257963fed` はverify成功でした。`docs-check` は記録ファイル末尾の余分な空行を検出したため、その空行を削除しました。
 - Chromium／WebKitの両Browser UI jobは、打牌後にCPU手番へ移った画面を使ってviewportを回転し、操作ボタンが0件であることを失敗と判定しました。これは手番外で操作ボタンが隠れる既存動作を見たテスト手順の問題でした。回転後に新しい局を開始し、手牌を選択してから、打牌ボタンの表示領域・44px以上の大きさ・クリック先を検査するよう修正しました。このrunのBrowser UI失敗は成功扱いせず、再実行結果を下表へ追記します。
 
+### WebKitの結果dialog再オープン再検証
+
+- Deploy run [#41631621731](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41631621731)、SHA `649040561df3431fb0984c78a78cda11f190b9b2` はverifyとChromiumがsuccessでした。WebKitは局の結果dialogを閉じてから順位dialogを再度開く既存シナリオでタイムアウトし、matrix auditにより公開されませんでした。
+- 入力イベントと全dialogの状態を失敗時に記録する診断を追加しました。最終run [#41633626802](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41633626802) ではWebKitの同じ再オープンシナリオを含むmatrix全体がsuccessとなり、診断出力を要する失敗は発生しませんでした。前回のタイムアウト原因が再現したとは扱いません。
+
+### 最終検証・公開
+
+- Deploy run [#41633626802](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41633626802) は実装・テストSHA `2d89d476ddbf85ffc08af350b6ec169d7c05b64f` でverify、Chromium、WebKit、matrix audit、release freshness、Worker deploy、Worker production test、Pages build／deployがすべてsuccessでした。Browser UI manifestのChromium 38、WebKit 28、合計66 scenarioが完了しました。
+- 10代表viewportの卓・手牌・河・副露と実打牌、縦横の回転相当、新規対局設定の本文末尾・固定フッター・黄色インジケーター、オンライン作成／参加／待機室のボタンと座席、結果dialog、既存PWA、複数チー候補とスクロールをChromium／WebKitの既存回帰matrixで検証しました。Playwrightのviewport emulation結果であり、実機結果ではありません。
+- Cloudflare Worker `https://heibon-mahjong-online.ak-sekine.workers.dev` のdeployとHTTPS／ルーム／WebSocket／再接続／認証・プライバシーproduction testがsuccessしました。結果ログには5つの本番シナリオ成功が記録されています。
+- GitHub Pages `https://ak-sekine.github.io/heibon-mahjong/` のbuildとdeployがsuccessしました。既存のGitHub Deployment SHA追跡に記録された値はWorker・Pages双方 `2d89d476ddbf85ffc08af350b6ec169d7c05b64f` です。
+- Codex実行環境からの公開URLへの直接HTTP取得はネットワークproxyの403で実施できませんでした。公開確認は、ActionsのWorker production test・Pages deploy成功・双方のDeployment SHA記録を根拠にしています。
+- Issue #32はOpenです。ユーザー本人のiPhone Safari実機確認後にClose可否を判断します。
+
 | 検証 | 結果 |
 | --- | --- |
 | `npm test` | 80ファイル／テストグループ成功、合計80 pass、fail 0、skip 0（Issue #32変更後） |
@@ -50,12 +65,12 @@
 | Browser UI matrix selection | 6項目成功。Chromium 38、WebKit 28、合計66 scenarioの選択を検証 |
 | Python Browser UI構文確認 | 成功 |
 | `git diff --check` | 成功（ローカルの現行差分） |
-| Chromium／Playwright Browser UI | GitHub Actions実行後に記録予定 |
-| WebKit／Playwright Browser UI | GitHub Actions実行後に記録予定 |
-| Actions run ID・実装SHA | push後に記録予定 |
-| GitHub Pages・Cloudflare Worker公開SHA | Deploy gate完了後に記録予定 |
+| Chromium／Playwright Browser UI | Deploy run [#41633626802](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41633626802)で38 scenario success。PWA・対局操作・10代表viewportを含む |
+| WebKit／Playwright Browser UI | 同runで28 scenario success。PWA・オンラインdialog／待機室・チー候補・結果dialog再オープン・10代表viewportを含む |
+| GitHub Actions・実装SHA | run `41633626802`、検証・デプロイSHA `2d89d476ddbf85ffc08af350b6ec169d7c05b64f`。verify、matrix audit、release freshnessを含む全ジョブsuccess |
+| GitHub Pages・Cloudflare Worker公開SHA | Pages build/deploy、Worker deploy/production-test success。Deployment SHA追跡はいずれも `2d89d476ddbf85ffc08af350b6ec169d7c05b64f` |
 
-Browser UIをCodex Cloud内で実行した結果としては扱いません。プロジェクト規約に従い、ブラウザー検証は既存GitHub ActionsのChromium／WebKit matrixとDeploy gateで確認します。Actionsが完了するまでブラウザー検証・公開は未確認です。
+Browser UIをCodex Cloud内で実行した結果としては扱いません。プロジェクト規約に従い、ブラウザー検証は既存GitHub ActionsのChromium／WebKit matrixとDeploy gateで確認しました。Codexから直接取得できなかった公開URLは、Action deploymentのsuccessとSHA追跡を根拠に確認しています。
 
 ## 実機確認と残る範囲
 
