@@ -39,10 +39,10 @@ with sync_playwright() as p:
                 }''', {'seat': seat, 'position': position})
                 metrics = page.evaluate('''({seat,position})=>{
                   const rect=e=>e.getBoundingClientRect(), q=s=>document.querySelector(s);
-                  const river=q(`main > .table .river[data-player-id="${seat}"]`), items=[...river.children];
+                  const river=q(`#local-table .river[data-player-id="${seat}"]`), items=[...river.children];
                   const dec=river.querySelector('[data-riichi-declaration="true"]'), decSvg=dec?.querySelector('svg');
                   const normalSvg=items.find(e=>e!==dec).querySelector('svg');
-                  const n=rect(normalSvg), d=decSvg?rect(decSvg):n, table=rect(q('main > .table'));
+                  const n=rect(normalSvg), d=decSvg?rect(decSvg):n, table=rect(q('#local-table'));
                   const close=(a,b)=>Math.abs(a-b)<.35;
                   const overlaps=(a,b)=>a.left<b.right-.1&&b.left<a.right-.1&&a.top<b.bottom-.1&&b.top<a.bottom-.1;
                   const side=river.classList.contains('river-left')||river.classList.contains('river-right');
@@ -89,7 +89,7 @@ with sync_playwright() as p:
                   const publicIds=new Set([...document.querySelectorAll('[data-tile-id]')].map(e=>e.dataset.tileId));
                   const visibleIds=new Set([...shown.players.flatMap(p=>p.river),...shown.players.flatMap(p=>p.melds.flatMap(m=>m.tiles)),...dora.exposedDoraIndicators(shown)].map(t=>t.id));
                   const privateTiles=[...shown.players.slice(1).flatMap(p=>[...p.hand,...(p.drawnTile?[p.drawnTile]:[])]),...shown.liveWall,...shown.deadWall].filter(t=>!visibleIds.has(t.id));
-                  const allRiverSvgs=[...document.querySelectorAll('main > .table .river svg')].map(rect);
+                  const allRiverSvgs=[...document.querySelectorAll('#local-table .river svg')].map(rect);
                   const ratio=Math.max(n.width,n.height)/Math.min(n.width,n.height);
                   const rotatedRatio=decSvg?Math.max(d.width,d.height)/Math.min(d.width,d.height):ratio;
                   const outsideViewport=[...document.querySelectorAll('body *')].map(e=>({e,r:rect(e)}))

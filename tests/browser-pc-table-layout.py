@@ -29,9 +29,9 @@ def inspect_page(page):
       const roundLabel=document.querySelector('#local-table .round-label');
       const wallCount=document.querySelector('#local-table .wall-count');
       const doraHeading=document.querySelector('#local-table .dora-area h2');
-      const textNodes=[...document.querySelectorAll('.score-strip .seat-label,.table .seat-label,.table .round-label,.table .wall-count,.table .dora-area h2')]
+      const textNodes=[...document.querySelectorAll('.score-strip .seat-label,.table .seat-label,.table .center-info > .round-summary,.table .round-label,.table .wall-count,.table .dora-area h2')]
         .filter(e=>visible(e)&&e.textContent.trim());
-      const tileNodes=[...document.querySelectorAll('.table .river-tile-face .tile-svg,.table .tile-back,.table .open-meld .tile-svg,.table .revealed-tile .tile-svg')]
+      const tileNodes=[...document.querySelectorAll('.table .river-tile-face .tile-svg,.table .tile-back,.table .dora-area .tile-svg,.table .open-meld .tile-svg,.table .revealed-tile .tile-svg')]
         .filter(visible);
       const overlaps=[];
       for(const text of textNodes){
