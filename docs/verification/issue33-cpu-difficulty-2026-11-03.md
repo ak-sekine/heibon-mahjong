@@ -70,7 +70,10 @@
 - `npm run build`: 成功。
 - `npm run typecheck:worker`: 成功。
 - `git diff --check`: 成功。Browser UI Pythonシナリオの構文解析も成功。
-- GitHub ActionsのChromium／WebKit UI、オンライン本番統合テスト、Deploy gate、Worker／Pages公開はコミットをpush後に実行・確認します。未確認のSafari実機は確認済みと扱いません。
+- GitHub Actions [run #41735065139](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41735065139)（SHA `f07baba77058b266a04598a18a9940b34735b79e`）は全ジョブsuccess。`verify`、Deploy gate、release freshness、Browser UI matrix audit、Worker・Pages公開を確認しました。
+- Browser UIはChromium 40シナリオ、WebKit 30シナリオが全成功しました。初回run #41733707177は保存形式v5を固定した既存assertion、2回目run #41734445190は読み取り専用一覧に難易度行を含めない既存assertionで停止しました。各テストの期待値をv6・CPU難易度行に更新し、最終runで両エンジンが成功しました。
+- オンライン本番統合テスト（HTTPS、ルーム作成、WebSocket、再接続、認証、非公開情報）success。Workerは `https://heibon-mahjong-online.ak-sekine.workers.dev`、Pagesは `https://ak-sekine.github.io/heibon-mahjong/` へSHA `f07baba77058b266a04598a18a9940b34735b79e`を公開しました。Worker URLをPages bundleへ含むbuild検証とPages deployもsuccessです。
+- iPhone Safari実機はCodexでは確認していません。ユーザー実機確認が残るため、Issue #33はOpenを維持します。
 
 ## iPhone Safari実機確認チェックリスト
 
