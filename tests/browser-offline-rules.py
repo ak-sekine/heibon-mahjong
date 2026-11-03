@@ -70,7 +70,7 @@ with sync_playwright() as playwright:
         assert page.locator('#online-rules-readonly-label').inner_text() == '読み取り専用：現在の対局開始時に確定したルール'
         assert page.locator('#online-rules-dialog input, #online-rules-dialog select, #online-rules-dialog textarea, #online-rules-dialog [contenteditable], #online-rules-dialog button:not(#online-rules-close)').count() == 0
         assert page.locator('#online-rules-list dt').all_text_contents() == [
-            '対局形式', '赤ドラ', '喰いタン', '和了条件', '後付け', 'リーチ', '一発',
+            '対局形式', 'CPUの強さ', '赤ドラ', '喰いタン', '和了条件', '後付け', 'リーチ', '一発',
             '裏ドラ', 'カンドラ', '通常流局', '親テンパイ連荘', '九種九牌', '四風連打',
             '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ', '特殊形ダブル役満', '人和',
             'パオ', '複数ロン', '三家和流局',
@@ -80,6 +80,7 @@ with sync_playwright() as playwright:
             page.locator('#online-rules-list dt').all_text_contents(),
             page.locator('#online-rules-list dd').all_text_contents(),
         ))
+        assert default_rule_rows['CPUの強さ'] == '標準'
         assert default_rule_rows['親テンパイ連荘'] == 'あり'
         assert all(default_rule_rows[key] == 'あり（途中流局）' for key in ['九種九牌', '四風連打', '四家立直', '四開槓'])
         assert default_rule_rows['アガリやめ'] == 'なし' and default_rule_rows['テンパイやめ'] == 'なし'
