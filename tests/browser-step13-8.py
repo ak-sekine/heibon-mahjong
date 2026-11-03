@@ -107,7 +107,8 @@ with sync_playwright() as p:
             assert pao_details.count() == 1
             pao_details.locator('summary').click()
             assert '責任者 CPU3' in pao_details.inner_text(), detail_text
-            assert '責任払い' in pao_details.inner_text() and 'CPU3 → 自分 48000点' in pao_details.inner_text(), detail_text
+            pao_text = pao_details.inner_text()
+            assert '責任払い' in pao_text and 'CPU3 → 自分 48,000点' in pao_text, pao_text
             page.set_viewport_size({'width': 320, 'height': 844})
             layout = pao_details.evaluate('element => ({width: element.clientWidth, scroll: element.scrollWidth, height: element.getBoundingClientRect().height})')
             assert layout['scroll'] <= layout['width'] and layout['height'] > 0, layout
