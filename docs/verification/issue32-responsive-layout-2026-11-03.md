@@ -86,6 +86,8 @@ Browser UIをCodex Cloud内で実行した結果としては扱いません。�
 | 結果 | 操作 | 期待結果 |
 | --- | --- | --- |
 |  | Safari縦画面でオフライン対局を開始し、14枚の手牌から牌を1枚選び「打牌」を押す | 牌が選択状態になり、44px以上の打牌ボタンが押せて局が進む。牌・ボタンが横にはみ出さない |
+|  | Safariブラウザーで対局を始め、共通操作欄の案内を確認する | 「Tabで牌とボタンへ移動、Enter／Spaceで選択・確定」が表示されず、余分な空白がない。手牌選択・打牌・チー／ポン選択はタッチで操作できる |
+|  | 対局を終えてからオンラインに接続し、PWAに更新案内があれば「更新する」を押して再読み込み後、ホーム画面からPWAを起動し同じ操作欄を確認する | Safariと同じく案内が表示されず、余分な空白がない。手牌選択・打牌・チー／ポン選択がタッチで動作し、Safariとの表示条件が一致する |
 |  | 対局中に上下へスクロールし、チー候補が複数ある局面で各チー候補と「見送る」を順に操作 | 候補すべてを選択でき、「見送る」で判断が進む。指を離した後にページ位置が勝手に戻らない |
 |  | 鳴き候補を表示したままSafariのアドレスバーを表示／収納する | 表示領域が変わっても候補と操作ボタンへスクロールで到達でき、横はみ出しや重なりがない |
 |  | 端末を横向きにし、手牌選択と打牌を行う | 卓が縮小され、河・副露が卓内に収まる。操作領域へスクロールしてボタンを押せる |
@@ -130,10 +132,14 @@ Browser UIをCodex Cloud内で実行した結果としては扱いません。�
 | Browser UI selection | 6件成功。Chromium 39、WebKit 29、合計68 scenarioを選択 |
 | Browser UI Python構文確認 | 成功 |
 | `git diff --check` | 成功 |
-| Chromium Browser UI / Deploy gate | push後のrun ID・結果を追記予定 |
-| WebKit Browser UI / Deploy gate | push後のrun ID・結果を追記予定 |
-| 修正コミットSHA | commit後に追記予定 |
-| Pages / Worker公開SHA | Deploy gate後に追記予定 |
+| Chromium Browser UI | run [#41649796576](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41649796576) で39 scenario success。新規案内検証は2.580秒でsuccess |
+| WebKit Browser UI | 同runで29 scenario success。新規案内検証は2.763秒でsuccess |
+| Deploy gate | run [#41649796576](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41649796576) がSHA `653decf9cf06ff0e73772b4c0db765345c9330e7` でsuccess。verify、Browser UI matrix audit、release freshness、Worker deploy／production test、Pages build／deployを含む |
+| 主なCSS修正コミット | `569df38a5ef3970eeec0c6c660f48ea91f471280` |
+| 検証・公開SHA | Worker、GitHub Pagesとも `653decf9cf06ff0e73772b4c0db765345c9330e7` |
+| GitHub Pages公開先 | [https://ak-sekine.github.io/heibon-mahjong/](https://ak-sekine.github.io/heibon-mahjong/) — deployment status success、同SHA |
+| Worker | `heibon-production-worker` deployment status success、production test success、同SHA |
+| GitHub Issue | [#32](https://github.com/ak-sekine/heibon-mahjong/issues/32) はOpenを維持 |
 
 Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emulationをiPhone実機確認と扱いません。Issue #32はOpenのままです。公開後にユーザー本人がSafariとPWAの双方で案内非表示を再確認するまで完了判断を保留します。
 
@@ -143,6 +149,7 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - 次のrun [#41645699473](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41645699473) でも同じ待機箇所が失敗しました。GitHub check annotationで、タッチ表示確認時の `wait_for_selector()` が非表示を期待する `.keyboard-help` を既定の `visible` 状態で待っていたことを確認しました。PWA Browser UIの前後既存シナリオは両runで成功しました。
 - 要素を `attached` 状態で待ってから計算済み `display:none` と0高さを調べるよう直しました。2回の失敗はテストの待機条件によるもので、製品CSSの表示差異検証結果としては扱いません。実装SHA `569df38a5ef3970eeec0c6c660f48ea91f471280` のrunは失敗し、Deploy／Pages公開はありません。再検証する最終runの結果と公開SHAは成功後に下表を更新します。
 - Deploy run [#41646364720](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41646364720) では二つの検証ハーネス問題が見つかりました。ChromiumのCDP `Emulation.setEmulatedMedia` はこのrunの環境で `display-mode:standalone` を有効にせず、WebKit側はテンプレート比較用の複製パネルをホスト要素と取り違えて残し、同じ `#discard` IDを重複させていました。いずれも製品CSSの失敗ではありません。
-- 次のDeploy run [#41647193250](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41647193250) では、headless Chromeの `--app` 起動も `display-mode:standalone` を示さないことを確認しました。実ブラウザー画面のPWA modeはこのheadless環境から操作できないため、Chromiumではテスト専用のstandalone media-query hintを使い、同時に `.keyboard-help` を隠すCSSルールが `hover`／`pointer` のみに依存しdisplay-mode条件を持たないことをCSSOMで確認する形に変更しました。実インストールPWAの表示確認は実機チェック待ちです。
+- 次のDeploy run [#41647193250](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41647193250) では、headless Chromeの `--app` 起動も `display-mode:standalone` を示さないことを確認しました。Chromiumではテスト専用のstandalone media-query hintを使い、Viteから取得したCSSソースにdisplay-mode条件がないことを確認する方式に変更しました。これは実インストールPWAの描画modeを再現するものではなく、実機確認は引き続き待ちです。
 - 同runのWebKit Browser UI matrixは成功しました。Chromiumだけがstandalone判定で失敗したため、matrix auditがDeployを止め、Pages更新はありません。
-- Deploy run [#41647893037](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41647893037) はverify/buildとWebKit前半を進めています。Chromiumでは通常・standalone query hintの双方で計算済み表示が `none` になりましたが、開発時に注入されたCSSをCSSOMから列挙するテスト部分が空結果となり失敗しました。CSSOM依存をやめ、Viteから実際の `src/style.css` を取得してpointer条件とdisplay-mode非依存を確認するよう直しました。このrunのWebKit結果は完了後に追記します。Deployはchromium matrix failureにより未実行です。
+- Deploy run [#41647893037](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41647893037) はverify/buildに成功し、WebKit matrixもsuccessしました。Chromiumでは通常・standalone query hint双方の計算済み表示は `none` でしたが、CSSOM列挙が空結果となるテストハーネス問題で失敗しました。Viteから `src/style.css` の実ソースを取得してpointer条件とdisplay-mode非依存を確認するよう直し、次runでChromiumも通過しました。Deployはchromium matrix failureにより未実行でした。
+- 最終Deploy run [#41649796576](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41649796576) はhead SHA `653decf9cf06ff0e73772b4c0db765345c9330e7` でsuccessしました。Chromium 39 scenario／WebKit 29 scenario、matrix audit、Worker deployとproduction test、Pages buildとdeployがすべてsuccessし、Worker／Pages deployment SHAは同じ `653decf9cf06ff0e73772b4c0db765345c9330e7` です。
