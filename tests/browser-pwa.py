@@ -109,7 +109,8 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         cache_names = page.evaluate('caches.keys()')
         app_caches = [name for name in cache_names if name.startswith('heibon-mahjong-shell-')]
         assert len(app_caches) == 1, cache_names
-        cached_urls = page.evaluate("""async name => (await (await caches.open(name)).keys()).map(request => new URL(request.url).pathname)""", app_caches[0])
+        old_cache_name = app_caches[0]
+        cached_urls = page.evaluate("""async name => (await (await caches.open(name)).keys()).map(request => new URL(request.url).pathname)""", old_cache_name)
         assert all(path == BASE_PATH or path.startswith(BASE_PATH) for path in cached_urls), cached_urls
 
         # First install must leave the ordinary browser entry usable.
@@ -128,6 +129,10 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         context.set_offline(False)
         page.reload(wait_until='networkidle')
         page.locator('#app-idle').wait_for(state='visible')
+        page.locator('#main-menu-toggle').click()
+        page.locator('#new-game').click()
+        page.locator('#confirm-new-game').click()
+        page.locator('#local-table').wait_for(state='visible')
 
         # Change the served build while its previous HTML is fresh in HTTP cache.
         index_path = PagesHandler.root / 'index.html'
@@ -155,8 +160,12 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         page.wait_for_function("async () => { const registration = await navigator.serviceWorker.getRegistration(); return !registration.installing && !registration.waiting; }")
         assert page.evaluate('navigator.serviceWorker.controller.scriptURL') == f'{base_url}sw.js'
         assert page.locator('#app-idle').is_visible()
+        assert old_cache_name in page.evaluate('caches.keys()'), 'failed update removed the active version cache'
         PagesHandler.failure_path = None
         worker = sw_path.read_text(encoding='utf-8').replace('-v2";', '-v2-retry";')
+        retry_cache = re.search(r'const CACHE = "([^"]+)";', worker)
+        assert retry_cache, 'retry cache declaration missing'
+        new_cache_name = retry_cache.group(1)
         sw_path.write_text(worker, encoding='utf-8')
 
         page.evaluate('async () => { const registration = await navigator.serviceWorker.getRegistration(); await registration.update(); }')
@@ -167,7 +176,9 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         }""")
         assert waiting_state == {'waiting': True, 'state': 'installed'}, waiting_state
         cache_names = page.evaluate('caches.keys()')
-        assert len([name for name in cache_names if name.startswith('heibon-mahjong-shell-')]) == 2, cache_names
+        assert old_cache_name in cache_names, f'active cache was removed before user approval: {cache_names}'
+        assert new_cache_name in cache_names, f'new waiting cache is missing: {cache_names}'
+        assert page.locator('#local-table').is_visible(), 'update detection reloaded the in-progress CPU game'
 
         # A regular browser tab and an installed-app-like tab share the same
         # Service Worker scope. A second client must block an approved update.
@@ -178,12 +189,13 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         page.locator('#pwa-update-notice button').click()
         page.get_by_text('別のタブでも開かれています。ほかのタブを閉じてから更新してください。').wait_for(timeout=10000)
         assert page.evaluate("document.querySelector('main').dataset.pwaVersion || 'v1'") == 'v1'
+        assert page.locator('#local-table').is_visible(), 'blocked update interrupted the in-progress CPU game'
         second_page.close()
 
         page.locator('#pwa-update-notice button').click()
         page.wait_for_function("document.querySelector('main')?.dataset.pwaVersion === 'v2'", timeout=20000)
         page.wait_for_function("navigator.serviceWorker.controller?.scriptURL.endsWith('/heibon-mahjong/sw.js')")
-        page.wait_for_function("caches.keys().then(keys => keys.filter(key => key.startsWith('heibon-mahjong-shell-')).length === 1)")
+        page.wait_for_function("name => caches.keys().then(keys => keys.filter(key => key.startsWith('heibon-mahjong-shell-')).length === 1 && keys.includes(name))", arg=new_cache_name)
         assert page.locator('#app-idle').is_visible()
         assert page.evaluate('navigator.onLine') is True
 
