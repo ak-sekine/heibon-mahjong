@@ -136,3 +136,9 @@ Browser UIをCodex Cloud内で実行した結果としては扱いません。�
 | Pages / Worker公開SHA | Deploy gate後に追記予定 |
 
 Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emulationをiPhone実機確認と扱いません。Issue #32はOpenのままです。公開後にユーザー本人がSafariとPWAの双方で案内非表示を再確認するまで完了判断を保留します。
+
+### 初回Deploy gateのテスト修正記録
+
+- Deploy run [#41644817445](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41644817445) はunit/integration、Worker型チェック、buildに成功しましたが、ChromiumとWebKitの新規テストがタイムアウトし、matrix auditで公開を停止しました。
+- 次のrun [#41645699473](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41645699473) でも同じ待機箇所が失敗しました。GitHub check annotationで、タッチ表示確認時の `wait_for_selector()` が非表示を期待する `.keyboard-help` を既定の `visible` 状態で待っていたことを確認しました。PWA Browser UIの前後既存シナリオは両runで成功しました。
+- 要素を `attached` 状態で待ってから計算済み `display:none` と0高さを調べるよう直しました。2回の失敗はテストの待機条件によるもので、製品CSSの表示差異検証結果としては扱いません。実装SHA `569df38a5ef3970eeec0c6c660f48ea91f471280` のrunは失敗し、Deploy／Pages公開はありません。再検証する最終runの結果と公開SHAは成功後に下表を更新します。

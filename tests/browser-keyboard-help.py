@@ -73,7 +73,7 @@ with sync_playwright() as playwright:
     assert touch_page.evaluate("matchMedia('(hover: none) and (pointer: coarse)').matches"), \
         'touch context did not expose coarse primary pointer media features'
     touch_page.evaluate('keyboardHelpRiichi()')
-    touch_page.wait_for_selector('#local-game-controls .keyboard-help')
+    touch_page.wait_for_selector('#local-game-controls .keyboard-help', state='attached')
 
     panel_results = touch_page.evaluate("""async () => {
       const { mountActionPanel } = await import('/heibon-mahjong/src/ui/action-panel.ts');
