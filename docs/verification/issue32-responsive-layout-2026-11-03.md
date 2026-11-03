@@ -116,7 +116,7 @@ Browser UIをCodex Cloud内で実行した結果としては扱いません。�
 ### 変更ファイル
 
 - `src/style.css` — タッチ主入力時の `.keyboard-help` 非表示条件。
-- `tests/browser-keyboard-help.py` — Chromium／WebKitでタッチCSSメディア機能、通常表示とChromium standalone emulationの一致、共通のoffline/onlineパネル、手牌選択・打牌・ポン、PCのTab／Enter／Space操作を検査。
+- `tests/browser-keyboard-help.py` — Chromium／WebKitでタッチCSSメディア機能、通常表示とstandaloneクエリhintを置いた表示の一致、非表示CSSルールにdisplay-mode依存がないこと、共通のoffline/onlineパネル、手牌選択・打牌・ポン、PCのTab／Enter／Space操作を検査。standalone hintはHeadless Browser内のJS状態シミュレーションで、実インストールPWA表示とは区別します。
 - `tests/run-browser-regressions.py` と `tests/test_browser_regressions_selection.py` — Chromium／WebKit双方のBrowser UI matrixに新しい検証を登録。
 - 本検証記録 — 今回の追加修正結果を追記。先行するIssue #32の記録・チェックリストは保持。
 
@@ -143,4 +143,5 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - 次のrun [#41645699473](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41645699473) でも同じ待機箇所が失敗しました。GitHub check annotationで、タッチ表示確認時の `wait_for_selector()` が非表示を期待する `.keyboard-help` を既定の `visible` 状態で待っていたことを確認しました。PWA Browser UIの前後既存シナリオは両runで成功しました。
 - 要素を `attached` 状態で待ってから計算済み `display:none` と0高さを調べるよう直しました。2回の失敗はテストの待機条件によるもので、製品CSSの表示差異検証結果としては扱いません。実装SHA `569df38a5ef3970eeec0c6c660f48ea91f471280` のrunは失敗し、Deploy／Pages公開はありません。再検証する最終runの結果と公開SHAは成功後に下表を更新します。
 - Deploy run [#41646364720](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41646364720) では二つの検証ハーネス問題が見つかりました。ChromiumのCDP `Emulation.setEmulatedMedia` はこのrunの環境で `display-mode:standalone` を有効にせず、WebKit側はテンプレート比較用の複製パネルをホスト要素と取り違えて残し、同じ `#discard` IDを重複させていました。いずれも製品CSSの失敗ではありません。
-- standalone比較をChromeの `--app` ウィンドウで確認し、比較用パネルは複製したroot自体を取り除くよう直しました。run `41646364720` もBrowser UIの失敗でmatrix auditが止まり、公開はありません。最終再検証runの結果を後述の公開記録へ追記します。
+- 次のDeploy run [#41647193250](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41647193250) では、headless Chromeの `--app` 起動も `display-mode:standalone` を示さないことを確認しました。実ブラウザー画面のPWA modeはこのheadless環境から操作できないため、Chromiumではテスト専用のstandalone media-query hintを使い、同時に `.keyboard-help` を隠すCSSルールが `hover`／`pointer` のみに依存しdisplay-mode条件を持たないことをCSSOMで確認する形に変更しました。実インストールPWAの表示確認は実機チェック待ちです。
+- 同runのWebKit失敗は前runで見つかった重複IDのテストfixture cleanup漏れで、root要素を削除する修正後に解消する想定です。run `41647193250` もmatrix auditで公開を停止し、Pages更新はありません。最終再検証runの結果は次に追記します。

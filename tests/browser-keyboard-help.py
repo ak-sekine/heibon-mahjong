@@ -2,7 +2,6 @@
 import os
 import shutil
 import sys
-import tempfile
 import traceback
 from playwright.sync_api import sync_playwright
 from browser_main_fixtures import fixed_seat_fixture
@@ -97,30 +96,61 @@ with sync_playwright() as playwright:
 
     standard_display = panel_results['local']
     if ENGINE == 'chromium':
-        with tempfile.TemporaryDirectory(prefix='heibon-keyboard-app-') as app_profile:
-            app_context = playwright.chromium.launch_persistent_context(
-                app_profile,
-                executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'),
-                args=[f'--app={BASE_URL}'],
-                viewport={'width': 390, 'height': 844}, has_touch=True, is_mobile=True,
-            )
-            app_page = app_context.pages[0] if app_context.pages else app_context.new_page()
-            app_page.wait_for_load_state('domcontentloaded')
-            assert app_page.evaluate("matchMedia('(display-mode: standalone)').matches"), \
-                'Chromium --app window did not expose standalone display mode'
-            standalone_display = app_page.evaluate("""async () => {
-              const { mountActionPanel } = await import('/heibon-mahjong/src/ui/action-panel.ts');
-              const host = document.createElement('div');
-              document.body.append(host);
-              const root = mountActionPanel(host, 'local');
-              const display = getComputedStyle(root.querySelector('.keyboard-help')).display;
-              root.remove();
-              return display;
-            }""")
-            assert standalone_display == standard_display == 'none', {
-                'standard': standard_display, 'standalone': standalone_display,
+        standalone_context = browser.new_context(
+            viewport={'width': 390, 'height': 844}, has_touch=True, is_mobile=True,
+        )
+        standalone_context.add_init_script("""(() => {
+          const nativeMatchMedia = window.matchMedia.bind(window);
+          window.matchMedia = query => {
+            const result = nativeMatchMedia(query);
+            if (!query.includes('(display-mode: standalone)')) return result;
+            return new Proxy(result, {get(target, property) {
+              if (property === 'matches') return true;
+              const value = Reflect.get(target, property, target);
+              return typeof value === 'function' ? value.bind(target) : value;
+            }});
+          };
+        })();""")
+        standalone_page = standalone_context.new_page()
+        standalone_page.set_default_timeout(8000)
+        standalone_page.set_default_navigation_timeout(12000)
+        standalone_page.goto(BASE_URL)
+        assert standalone_page.evaluate("matchMedia('(hover: none) and (pointer: coarse)').matches")
+        assert standalone_page.evaluate("matchMedia('(display-mode: standalone)').matches"), \
+            'standalone display-mode hint was not applied in the test context'
+        standalone_panel_results = standalone_page.evaluate("""async () => {
+          const { mountActionPanel } = await import('/heibon-mahjong/src/ui/action-panel.ts');
+          const displays = [];
+          for (const mode of ['local', 'online']) {
+            const host = document.createElement('div');
+            document.body.append(host);
+            const root = mountActionPanel(host, mode);
+            displays.push(getComputedStyle(root.querySelector('.keyboard-help')).display);
+            root.remove();
+          }
+          const disabledRules = [];
+          const visit = (rules, conditions = []) => {
+            for (const rule of rules) {
+              if (rule.cssRules) visit(rule.cssRules, [...conditions, rule.conditionText || rule.name || '']);
+              else if (rule.selectorText?.includes('.keyboard-help') && rule.style?.display === 'none') {
+                disabledRules.push({conditions, selector: rule.selectorText});
+              }
             }
-            app_context.close()
+          };
+          for (const sheet of document.styleSheets) {
+            try { visit(sheet.cssRules); } catch { /* Cross-origin sheets are not needed for this assertion. */ }
+          }
+          return {displays, disabledRules};
+        }""")
+        assert standalone_panel_results['displays'] == [standard_display, standard_display], \
+            standalone_panel_results
+        assert standalone_panel_results['displays'] == ['none', 'none'], standalone_panel_results
+        assert any('hover: none' in ' '.join(rule['conditions']) and
+                   'pointer: coarse' in ' '.join(rule['conditions']) for rule in standalone_panel_results['disabledRules']), \
+            standalone_panel_results
+        assert all('display-mode' not in ' '.join(rule['conditions'])
+                   for rule in standalone_panel_results['disabledRules']), standalone_panel_results
+        standalone_context.close()
 
     # Touch must continue to select/discard a tile and choose an actual pon.
     selected = touch_page.locator('#player-hand button').first
@@ -165,7 +195,7 @@ with sync_playwright() as playwright:
         'n => keyboardHelpState().game.players[0].river.length > n', arg=before_river,
     )
 
-    print(f'{ENGINE}: coarse touch hides local/online help in normal and standalone modes; '
+    print(f'{ENGINE}: coarse touch hides local/online help in normal and standalone-query contexts; '
           'touch discard/pon and desktop Tab/Enter/Space passed')
     desktop_context.close()
     touch_context.close()
