@@ -32,14 +32,21 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
   baseline = []
   measurements = []
   def geometry():
-   # The enlarged table intentionally scrolls; exercise normal panel scrolling.
-   page.locator('#local-game-controls').scroll_into_view_if_needed()
+   # Mobile keeps the controls below the table; the PC layout gives them a
+   # separate column and should not require a scroll to reach the active turn.
+   if width < 960:
+    page.locator('#local-game-controls').scroll_into_view_if_needed()
    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
    boxes=page.locator('#player-hand li').evaluate_all('els=>els.map(e=>{let r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}})')
    assert len(set(round(b['y'],1) for b in boxes))==1
    assert all(b['x']>=0 and b['x']+b['w']<=width for b in boxes)
    controls=page.locator('#local-game-controls').bounding_box()
-   assert all(b['y']+b['h']<=controls['y'] for b in boxes),(width,height,boxes[-1],controls)
+   if width >= 960:
+    table=page.locator('#local-table').bounding_box()
+    assert all(b['x']>=table['x'] and b['x']+b['w']<=table['x']+table['width'] for b in boxes),(width,height,boxes[-1],table)
+    assert table['x']+table['width']<=controls['x'] or controls['x']+controls['width']<=table['x'],(width,height,table,controls)
+   else:
+    assert all(b['y']+b['h']<=controls['y'] for b in boxes),(width,height,boxes[-1],controls)
    assert page.locator('.dora-slot').count()==5
    assert page.locator('#dora-indicators').evaluate('e=>getComputedStyle(e).gridTemplateColumns.split(" ").length')==5
    for selector in ['#discard','#tsumo','#riichi']:
