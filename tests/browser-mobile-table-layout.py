@@ -86,8 +86,8 @@ with sync_playwright() as p:
             assert metrics['noHorizontalScroll'], f'horizontal scroll at {width}px: {metrics}'
             assert metrics['tableInsideViewport'], f'table exceeds the visible page width at {width}x{height}: {metrics}'
             if width >= 600 and height <= 500:
-                assert metrics['tableWidth'] <= height - 101, f'compact landscape table did not follow the dynamic viewport height at {width}x{height}: {metrics}'
-                assert metrics['tileWidth'] >= 15, f'compact landscape tiles became too small at {width}x{height}: {metrics}'
+                assert metrics['tableWidth'] <= height - 31, f'compact landscape table did not follow the dynamic viewport height at {width}x{height}: {metrics}'
+                assert metrics['tileWidth'] >= 18, f'compact landscape tiles became too small at {width}x{height}: {metrics}'
         assert all(r['count']==18 and ((r['rows'],r['cols']) in [(3,6),(8,3)]) for r in river_metrics['rivers']), f'rivers must remain 6x3 for self/opposite and 8x3 for side seats at {width}px: {river_metrics}'
         assert all(min(r['gaps'])>=.8 and r['rowAlignment']<.35 for r in river_metrics['rivers']), f'river tracks overlap or drift at {width}px: {river_metrics}'
         assert river_metrics['riichiTileWidth']>0, f'riichi tile should retain a cell at {width}px: {river_metrics}'
@@ -148,10 +148,18 @@ with sync_playwright() as p:
         if (width, height) in [(667, 375), (844, 390), (768, 1024), (1024, 768)]:
             rotated = {'width': height, 'height': width}
             page.set_viewport_size(rotated)
-            rotated_metrics = page.evaluate('''()=>{const r=document.querySelector('.table').getBoundingClientRect();return {width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,table:{left:r.left,right:r.right,width:r.width},handButtons:[...document.querySelectorAll('#player-hand button')].length,actionButtons:[...document.querySelectorAll('#local-game-controls button:not([hidden])')].length}}''')
+            page.evaluate('''()=>{responsiveApp.controller.random=()=>.999999;responsiveApp.controller.newGame()}''')
+            page.locator('#player-hand button:enabled').first.click()
+            rotated_action = page.locator('#discard')
+            rotated_action.wait_for(state='visible')
+            rotated_action.scroll_into_view_if_needed()
+            rotated_metrics = page.evaluate('''()=>{const r=document.querySelector('.table').getBoundingClientRect(),button=document.querySelector('#discard'),b=button.getBoundingClientRect(),hit=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);return {width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,table:{left:r.left,right:r.right,width:r.width},handButtons:[...document.querySelectorAll('#player-hand button')].length,actionButton:{left:b.left,right:b.right,top:b.top,bottom:b.bottom,width:b.width,height:b.height,enabled:!button.disabled,receivesPointer:hit===button||button.contains(hit)}}}''')
             assert rotated_metrics['scrollWidth'] <= rotated_metrics['width'], f'rotation caused horizontal overflow: {rotated_metrics}'
             assert rotated_metrics['table']['left'] >= -.5 and rotated_metrics['table']['right'] <= rotated_metrics['width'] + .5, f'rotation moved the table outside the viewport: {rotated_metrics}'
-            assert rotated_metrics['handButtons'] in (13, 14) and rotated_metrics['actionButtons'] > 0, f'rotation hid the hand or operation controls: {rotated_metrics}'
+            assert rotated_metrics['handButtons'] in (13, 14), f'rotation hid the hand: {rotated_metrics}'
+            assert rotated_metrics['actionButton']['enabled'] and rotated_metrics['actionButton']['receivesPointer'], f'rotated discard action is not operable: {rotated_metrics}'
+            assert rotated_metrics['actionButton']['top'] >= 0 and rotated_metrics['actionButton']['bottom'] <= rotated_metrics['height'], f'rotated discard action did not scroll into view: {rotated_metrics}'
+            assert rotated_metrics['actionButton']['width'] >= 44 and rotated_metrics['actionButton']['height'] >= 44, f'rotated discard action target is undersized: {rotated_metrics}'
         reports.append({'viewport': f'{width}x{height}', 'tableWidth': metrics['tableWidth'], 'tileWidth': metrics['tileWidth'], 'riverMetrics': river_metrics})
         print(f'{ENGINE} {width}x{height} responsive table passed: rivers={river_metrics}')
         page.close()
