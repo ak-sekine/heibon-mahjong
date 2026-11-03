@@ -9,7 +9,9 @@ BROWSER_NAME = 'webkit'
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 OUT.mkdir(parents=True, exist_ok=True)
 
-VIEWPORTS = [(320, 700), (375, 812), (390, 844), (414, 896)]
+VIEWPORTS = [(320, 568), (375, 667), (390, 844), (430, 932),
+             (667, 375), (844, 390), (768, 1024), (1024, 768),
+             (1280, 800), (1440, 900)]
 DIALOGS = [
     ('create', '#online-create-dialog', '#online-create-close', '#online-create-open'),
     ('join', '#online-join-dialog', '#online-join-close', '#online-join-open'),

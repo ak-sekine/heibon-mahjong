@@ -8,7 +8,9 @@ BASE_URL = os.environ.get('HEIBON_BASE_URL', 'http://127.0.0.1:4173/heibon-mahjo
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 OUT = Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui')) / 'create-dialog-layout'
 OUT.mkdir(parents=True, exist_ok=True)
-VIEWPORTS = [[320, 568], [320, 320], [375, 667], [812, 375], [390, 844]]
+VIEWPORTS = [[320, 568], [320, 320], [375, 667], [390, 844], [430, 932],
+             [667, 375], [844, 390], [768, 1024], [1024, 768],
+             [1280, 800], [1440, 900], [812, 375]]
 
 with sync_playwright() as playwright:
     browser = getattr(playwright, ENGINE).launch()

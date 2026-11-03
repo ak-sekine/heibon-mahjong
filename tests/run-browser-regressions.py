@@ -59,6 +59,7 @@ SUITE = [
     run('tests/browser-center-round-display.py', 'webkit'),
     run('tests/browser-dora-rows.py', 'webkit'),
     run('tests/browser-mobile-table-layout.py'),
+    run('tests/browser-mobile-table-layout.py', 'webkit'),
     run('tests/browser-seat-kan-overlap.py'),
     run('tests/browser-step13-5-5.py'),
     run('tests/browser-step13-5-5-kan.py'),
