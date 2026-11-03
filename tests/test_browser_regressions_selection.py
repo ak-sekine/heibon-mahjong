@@ -27,9 +27,9 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
         webkit = select_scenarios(browser='webkit')
         all_engines = select_scenarios(browser='both')
 
-        self.assertEqual(len(SUITE), 68)
-        self.assertEqual(len(chromium), 39)
-        self.assertEqual(len(webkit), 29)
+        self.assertEqual(len(SUITE), 70)
+        self.assertEqual(len(chromium), 40)
+        self.assertEqual(len(webkit), 30)
         self.assertEqual(set(chromium).intersection(webkit), set())
         self.assertEqual(set(chromium).union(webkit), set(all_engines))
         self.assertEqual(all_engines, list(range(len(SUITE))))
@@ -47,7 +47,7 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
             def poll(self):
                 return None
 
-        for engine, expected_count in [('chromium', 39), ('webkit', 29)]:
+        for engine, expected_count in [('chromium', 40), ('webkit', 30)]:
             with self.subTest(engine=engine), tempfile.TemporaryDirectory() as directory:
                 report = Path(directory) / 'timings.csv'
                 argv = [str(RUNNER), '--browser', engine, '--timings-file', str(report)]
@@ -77,6 +77,11 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
 
     def test_responsive_table_layout_runs_in_both_engines(self):
         both = select_scenarios(['browser-mobile-table-layout.py'], 'both')
+        self.assertEqual(len(both), 2)
+        self.assertEqual({SUITE[index]['browser'] for index in both}, {'chromium', 'webkit'})
+
+    def test_pc_table_layout_runs_in_both_engines(self):
+        both = select_scenarios(['browser-pc-table-layout.py'], 'both')
         self.assertEqual(len(both), 2)
         self.assertEqual({SUITE[index]['browser'] for index in both}, {'chromium', 'webkit'})
 
