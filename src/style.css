@@ -677,7 +677,7 @@ header > div { min-width:0; }
    justify-self:center;
    width:min(100%,860px,calc(100dvh - 80px));
    margin:0;
-   --table-tile-width:min(52px,round(down,calc((100cqw - 18px) / 15.8),.1px));
+   --table-tile-width:min(52px,round(down,calc((100cqw - 18px) / 16.2),.1px));
  }
  #local-game-layout > #round-result-summary { grid-column:2; grid-row:2; align-self:center; }
  #local-game-layout > #local-game-controls { grid-column:2; grid-row:3; align-self:end; width:100%; }
@@ -699,14 +699,17 @@ header > div { min-width:0; }
    justify-self:center;
    width:min(100%,860px,calc(100dvh - 80px));
    margin:0;
-   --table-tile-width:min(52px,round(down,calc((100cqw - 18px) / 15.8),.1px));
+   --table-tile-width:min(52px,round(down,calc((100cqw - 18px) / 16.2),.1px));
  }
  #online-match > #online-round-result { grid-column:2; grid-row:2; align-self:center; }
  #online-match > #online-game-controls { grid-column:2; grid-row:3; align-self:end; width:100%; }
 
  .table .seat-label,.score-strip .seat-label { font-size:14px; line-height:1.2; }
- .table .seat,.table .rivers { --table-tile-width:min(52px,round(down,calc((100cqw - 22px) / 15.8),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); --river-tile-width:calc(var(--table-tile-width)*.76); --river-tile-height:calc(var(--table-tile-height)*.76); --cell:calc(var(--table-tile-height) + 1px); }
+ .table .seat,.table .rivers { --table-tile-width:min(52px,round(down,calc((100cqw - 22px) / 16.2),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); --river-tile-width:calc(var(--table-tile-width)*.76); --river-tile-height:calc(var(--table-tile-height)*.76); --cell:calc(var(--table-tile-height) + 1px); }
  .table .seat { --meld-headroom:calc(var(--table-tile-width) + 2px); }
+ /* Preserve the corner clearance needed by four side melds and the bottom hand. */
+ .table .seat-right .open-melds { transform:translate(calc(var(--river-tile-width)*.75 + 4.5px),calc(var(--river-tile-width)*.1)); }
+ .table .seat-left .open-melds { transform:translate(calc(0px - var(--river-tile-width)*.75 + 9px),calc(var(--river-tile-width)*.1)); }
  .table .center-info { font-size:14px; }
  .table .round-summary { font-size:16px; letter-spacing:normal; }
  .table .round-label { font-size:16px; }
