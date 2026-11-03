@@ -4,7 +4,7 @@ import os
 import pathlib
 import re
 import shutil
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 from browser_score_labels import score_summary_label
 
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-round-end-ui'))
@@ -705,8 +705,32 @@ with sync_playwright() as p:
           points:[...window.roundEndTest.controller.match.points],round:window.roundEndTest.controller.match.roundNumber,
           nextHidden:document.querySelector('#next-round').hidden})''') == before_match_result
         page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+        page.evaluate('''() => {
+          window.matchResultReopenDebug={targetClicks:0,rootClicks:0};
+          document.querySelector('#show-match-result').addEventListener('click',()=>window.matchResultReopenDebug.targetClicks++,true);
+          document.querySelector('#local-game-controls').addEventListener('click',event=>{
+            if(event.target.closest('#show-match-result'))window.matchResultReopenDebug.rootClicks++;
+          },true);
+        }''')
         page.locator('#show-match-result').click()
-        page.wait_for_function("document.querySelector('#match-result-dialog').open")
+        try:
+            page.wait_for_function("document.querySelector('#match-result-dialog').open", timeout=5000)
+        except PlaywrightTimeoutError as error:
+            debug = page.evaluate('''() => {
+              const dialog=document.querySelector('#match-result-dialog');
+              const button=document.querySelector('#show-match-result');
+              const rect=button.getBoundingClientRect();
+              const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
+              return {viewport:[innerWidth,innerHeight],dialogOpen:dialog.open,newGameDialogOpen:document.querySelector('#new-game-dialog').open,
+                resultOpenClass:document.documentElement.classList.contains('result-open'),activeElement:document.activeElement?.id,
+                button:{hidden:button.hidden,disabled:button.disabled,text:button.textContent,rect:{left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom},
+                  hit:hit?.id||hit?.tagName,hitClass:typeof hit?.className==='string'?hit.className:''},
+                dialogList:[...document.querySelectorAll('dialog')].filter(item=>item.open).map(item=>item.id),
+                bodyScrollTop:document.querySelector('#match-result-body').scrollTop,scrollY,
+                clickEvents:window.matchResultReopenDebug};
+            }''')
+            page.screenshot(path=str(OUT / f'{ENGINE}-{width}x{height}-match-result-reopen-failure.png'), full_page=True)
+            raise AssertionError(f'match result did not reopen after a real button click at {width}x{height}: {debug}') from error
         assert page.locator('#match-result-dialog').is_visible()
         assert page.locator('#match-result-body').evaluate('(body) => body.scrollTop === 0')
         page.locator('#match-result-close').click()
