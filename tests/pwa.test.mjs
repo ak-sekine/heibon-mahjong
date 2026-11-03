@@ -12,6 +12,27 @@ test('manifest is scoped to GitHub Pages and has all Android icon purposes', () 
   assert.equal(manifest.scope, PWA_BASE);
   assert.equal(manifest.display, 'standalone');
   assert.deepEqual(new Set(manifest.icons.map(icon => icon.purpose)), new Set(['any', 'maskable']));
+  assert.deepEqual(manifest.icons.map(({ src, sizes, purpose }) => [src, sizes, purpose]), [
+    ['icons/icon-192.png', '192x192', 'any'],
+    ['icons/icon-512.png', '512x512', 'any'],
+    ['icons/icon-maskable-512.png', '512x512', 'maskable'],
+  ]);
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /rel="apple-touch-icon" sizes="180x180" href="\/heibon-mahjong\/icons\/icon-180\.png"/);
+});
+
+test('provided PWA icon PNGs have the requested dimensions', () => {
+  for (const [name, size] of [
+    ['icon-180.png', 180],
+    ['icon-192.png', 192],
+    ['icon-512.png', 512],
+    ['icon-maskable-512.png', 512],
+  ]) {
+    const icon = readFileSync(new URL(`../public/icons/${name}`, import.meta.url));
+    assert.equal(icon.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', `${name} PNG signature`);
+    assert.equal(icon.readUInt32BE(16), size, `${name} width`);
+    assert.equal(icon.readUInt32BE(20), size, `${name} height`);
+  }
 });
 
 test('generated icons are valid RGBA PNGs with correct dimensions', () => {
@@ -55,6 +76,40 @@ test('offline shell uses a content-versioned cache and never caches Worker traff
     writeFileSync(path.join(tmp, 'assets', 'app-abc.js'), 'console.log(2)');
     const third = buildPwa(tmp);
     assert.notEqual(first.cacheName, third.cacheName, 'a new bundle must yield a new cache key');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('PWA build preserves the supplied icons and precaches each icon URL', () => {
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'heibon-pwa-icons-'));
+  const iconNames = ['icon-180.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
+  try {
+    mkdirSync(path.join(tmp, 'assets'));
+    mkdirSync(path.join(tmp, 'icons'));
+    writeFileSync(path.join(tmp, 'index.html'), '<!doctype html><title>app</title>');
+    writeFileSync(path.join(tmp, 'manifest.webmanifest'), readFileSync(new URL('../public/manifest.webmanifest', import.meta.url)));
+    writeFileSync(path.join(tmp, 'assets', 'app-abc.js'), 'console.log(1)');
+    writeFileSync(path.join(tmp, 'assets', 'app-def.css'), 'body{}');
+    for (const name of iconNames) {
+      writeFileSync(
+        path.join(tmp, 'icons', name),
+        readFileSync(new URL(`../public/icons/${name}`, import.meta.url)),
+      );
+    }
+
+    const result = buildPwa(tmp);
+    const worker = readFileSync(path.join(tmp, 'sw.js'), 'utf8');
+    for (const name of iconNames) {
+      const url = PWA_BASE + 'icons/' + name;
+      assert(result.urls.includes(url), `${url} is in the precache URL list`);
+      assert(worker.includes(JSON.stringify(url)), `${url} is embedded in the Service Worker`);
+      assert.deepEqual(
+        readFileSync(path.join(tmp, 'icons', name)),
+        readFileSync(new URL(`../public/icons/${name}`, import.meta.url)),
+        `${name} is preserved byte for byte`,
+      );
+    }
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

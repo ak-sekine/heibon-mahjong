@@ -160,7 +160,12 @@ export function buildPwa(distDir) {
     ['icon-192.png', 192, false],
     ['icon-512.png', 512, false],
     ['icon-maskable-512.png', 512, true],
-  ]) writeFileSync(path.join(iconDir, name), makeIcon(size, maskable));
+  ]) {
+    const iconPath = path.join(iconDir, name);
+    // Vite copies public/ into dist/ before this script runs. Keep those
+    // supplied assets intact; generate a fallback only for a missing icon.
+    if (!existsSync(iconPath)) writeFileSync(iconPath, makeIcon(size, maskable));
+  }
 
   const iconPaths = ['icon-180.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'].map(name => 'icons/' + name);
   const paths = ['index.html', 'manifest.webmanifest', ...iconPaths, ...assets];
