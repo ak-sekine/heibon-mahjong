@@ -662,3 +662,23 @@ button.ui-button.ui-button[aria-pressed="true"]:not(.tile-choice):not(:disabled)
 button.tile-choice.ui-button.ui-button:disabled { background-color:transparent; color:inherit; border-color:transparent; box-shadow:none; }
 button.tile-choice.ui-button[aria-pressed="true"] { background-color:transparent; outline:2px solid var(--button-focus-inner); outline-offset:0; box-shadow:inset 0 0 0 2px var(--button-focus-inner); }
 button.tile-choice.ui-button[aria-pressed="true"]:disabled { transform:none; }
+
+/* Issue #31: an opt-in update notice, never an automatic mid-game reload. */
+.pwa-update-notice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  background: #124532;
+  border: 1px solid #F8DC91;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.pwa-update-notice p {
+  flex: 1 1 195px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.pwa-update-notice button { flex: 0 0 auto; font-size: 14px; }

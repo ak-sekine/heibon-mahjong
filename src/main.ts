@@ -1,5 +1,6 @@
 import { installCallViewport, scrollPageToTop } from './ui/call-viewport.ts';
 import './style.css';
+import './pwa/register.ts';
 import { renderTable, renderSelection } from './rendering/table.ts';
 import { renderMatch } from './rendering/match.ts';
 import { ResultDialog } from './ui/result-dialog.ts';
