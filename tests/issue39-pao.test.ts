@@ -26,15 +26,30 @@ function discardWindow(game: GameState, discarderId: PlayerId): GameState {
     ronWindow: { kind: 'discard', discarderId, tileId: tile.id } };
 }
 
-function callFixture(melds: MeldSpec, hand: readonly string[], discard: string): GameState {
-  const game = kanGame({ hands: { 0: hand }, melds: { 0: melds }, draw: discard, turn: 3 });
-  return discardWindow(game, 3);
+function callFixture(melds: MeldSpec, hand: readonly string[], discard: string, discarderId: PlayerId = 3,
+  rinshan?: readonly string[]): GameState {
+  const game = kanGame({ hands: { 0: hand }, melds: { 0: melds }, draw: discard, turn: discarderId,
+    ...(rinshan ? { rinshan } : {}) });
+  return discardWindow(game, discarderId);
 }
 
 function call(game: GameState, caller: PlayerId, type: string): GameState {
   const option = getCallOptions(game, caller).find(candidate => candidate.type === type);
   assert.ok(option, `expected legal ${type} call`);
   return declareCall(game, caller, option.id);
+}
+
+function multiPaoTsumoAfterCompletedCalls(): { readonly thirdDragonCall: GameState; readonly fourthKan: GameState; readonly win: GameState } {
+  const thirdDragonCall = call(callFixture([
+    { type: 'daiminkan', group: '5555z', from: 1 }, { type: 'daiminkan', group: '6666z', from: 2 },
+  ], ['777z', '22z', '1m', '1p'], 'red'), 0, 'daiminkan');
+  const fourthKanWindow = callFixture([
+    { type: 'daiminkan', group: '5555z', from: 1 }, { type: 'daiminkan', group: '6666z', from: 2 },
+    { type: 'daiminkan', group: '7777z', from: 3 },
+  ], ['111m', '2m'], 'man-1', 2, ['man-7', 'man-8', 'man-9', 'man-2']);
+  const fourthKan = call({ ...fourthKanWindow, paoResponsibilities: thirdDragonCall.paoResponsibilities,
+    paoResponsibilityOrder: thirdDragonCall.paoResponsibilityOrder }, 0, 'daiminkan');
+  return { thirdDragonCall, fourthKan, win: declareTsumo(fourthKan, 0) };
 }
 
 test('legacy GameRules v1-v4 safely normalize pao to OFF and v5 persists it', () => {
@@ -60,6 +75,72 @@ test('大三元責任者は最後の三元牌ポンを許した打ち手で、�
   assert.equal(finalPon.paoResponsibilities?.daisangen, 3);
   assert.equal(finalPon.players[3].river.length, 0);
   assert.equal(finalPon.players[0].melds?.at(-1)?.fromPlayerId, 3);
+});
+
+test('大三元の判定では手牌の白暗刻・發暗刻を数えず、最後の中ポンだけではパオにならない', () => {
+  const called = call(callFixture([], ['555z', '666z', '77z', '123m', '45p'], 'red'), 0, 'pon');
+  assert.equal(called.players[0].melds?.at(-1)?.type, 'pon');
+  assert.equal(called.paoResponsibilities?.daisangen, undefined);
+});
+
+test('白暗槓と發ポンが成立済み面子なら最後の中ポンで大三元責任者を記録する', () => {
+  const prior: NonNullable<MeldSpec> = [
+    { type: 'ankan', group: '5555z' }, { type: 'pon', group: '666z', from: 1 },
+  ];
+  const called = call(callFixture(prior, ['77z', '22z', '12m', '3p'], 'red'), 0, 'pon');
+  assert.equal(called.paoResponsibilities?.daisangen, 3);
+  assert.deepEqual(called.paoResponsibilityOrder, ['daisangen']);
+});
+
+test('先行する加槓も大三元の成立済み面子に含め、最後の必要なポンで責任者を記録する', () => {
+  const prior: NonNullable<MeldSpec> = [
+    { type: 'kakan', group: '5555z', from: 1 }, { type: 'pon', group: '666z', from: 2 },
+  ];
+  const called = call(callFixture(prior, ['77z', '22z', '12m', '3p'], 'red'), 0, 'pon');
+  assert.equal(called.paoResponsibilities?.daisangen, 3);
+  assert.equal(called.players[0].melds?.[0].type, 'kakan');
+});
+
+test('手牌の風牌暗刻だけでは大四喜パオにならず、成立済み暗槓は面子として数える', () => {
+  const concealedTriplets = call(callFixture([], ['111z', '222z', '333z', '44z', '12m'], 'north'), 0, 'pon');
+  assert.equal(concealedTriplets.paoResponsibilities?.daisuushii, undefined);
+
+  const prior: NonNullable<MeldSpec> = [
+    { type: 'ankan', group: '1111z' }, { type: 'pon', group: '222z', from: 1 }, { type: 'pon', group: '333z', from: 2 },
+  ];
+  const called = call(callFixture(prior, ['44z', '22m'], 'north'), 0, 'pon');
+  assert.equal(called.paoResponsibilities?.daisuushii, 3);
+});
+
+test('白暗槓・發ポンのあと最後の中大明槓が大三元責任者を確定する', () => {
+  const prior: NonNullable<MeldSpec> = [
+    { type: 'ankan', group: '5555z' }, { type: 'pon', group: '666z', from: 1 },
+  ];
+  const called = call(callFixture(prior, ['777z', '22z', '1m', '1p'], 'red'), 0, 'daiminkan');
+  assert.equal(called.paoResponsibilities?.daisangen, 3);
+  assert.equal(called.players[0].melds?.at(-1)?.type, 'daiminkan');
+});
+
+test('暗槓で大三元面子が揃っても責任者を新規作成せず、加槓は既存責任者を保持する', () => {
+  const ankanCandidate = kanGame({ hands: { 0: ['777z', '123m', '4p'] }, melds: { 0: [
+    { type: 'ankan', group: '5555z' }, { type: 'pon', group: '666z', from: 1 },
+  ] }, draw: 'red', turn: 0, rinshan: ['south'] });
+  const ankanOption = getKanOptions({ ...ankanCandidate, rules: paoRules }, 0).find(option => option.meld.type === 'ankan');
+  assert.ok(ankanOption);
+  const afterAnkan = declareKan({ ...ankanCandidate, rules: paoRules }, 0, ankanOption.id);
+  assert.equal(afterAnkan.paoResponsibilities?.daisangen, undefined);
+
+  const kakan = kanGame({ hands: { 0: ['4z'] }, melds: { 0: [
+    { type: 'daiminkan', group: '1111z' }, { type: 'daiminkan', group: '2222z' },
+    { type: 'daiminkan', group: '3333z' }, { type: 'pon', group: '444z', from: 1 },
+  ] }, draw: 'man-5', turn: 0 });
+  const withPao = { ...kakan, rules: paoRules, paoResponsibilities: { daisangen: 2 as PlayerId },
+    paoResponsibilityOrder: ['daisangen'] as const };
+  const kakanOption = getKanOptions(withPao, 0).find(option => option.meld.type === 'kakan');
+  assert.ok(kakanOption);
+  const afterKakan = declareKan(withPao, 0, kakanOption.id);
+  assert.equal(afterKakan.paoResponsibilities?.daisangen, 2);
+  assert.deepEqual(afterKakan.paoResponsibilityOrder, ['daisangen']);
 });
 
 test('CPUのポンも正式成立時に同じ責任者ロジックを使う', () => {
@@ -224,13 +305,73 @@ test('大四喜のダブル役満2倍分を全て責任払いし、対象役満�
   assertPointConservation(settled);
 });
 
-test('複数の責任対象役満は役ごとに責任者へ割り当て、同じ責任者の金額を集約する', () => {
+test('複数責任者の本場は成立順で1回だけ負担し、役満別基本点は役ごとに配賦する', () => {
+  const { thirdDragonCall, fourthKan, win } = multiPaoTsumoAfterCompletedCalls();
+  assert.deepEqual(thirdDragonCall.paoResponsibilityOrder, ['daisangen']);
+  assert.equal(thirdDragonCall.paoResponsibilities?.daisangen, 3);
+  assert.deepEqual(fourthKan.paoResponsibilityOrder, ['daisangen', 'suukantsu']);
+  assert.equal(fourthKan.paoResponsibilities?.suukantsu, 2);
+  assert.ok(win.winResult?.candidate.yaku.some(item => item.id === 'daisangen'));
+  assert.ok(win.winResult?.candidate.yaku.some(item => item.id === 'suukantsu'));
+
+  const match = updateMatchGame({ ...startMatch(fourthKan, paoRules), honba: 2 }, win);
+  assert.equal(match.lastSettlement?.payments.find(item => item.payerId === 3)?.honbaPoints, 600);
+  assert.equal(match.lastSettlement?.payments.find(item => item.payerId === 2)?.honbaPoints, 0);
+  assertPointConservation(match);
+
+  // Reverse the object insertion order: the saved formal order still controls honba.
+  const reverseKeyOrder: Partial<Record<'daisangen' | 'suukantsu', PlayerId>> = {};
+  reverseKeyOrder.suukantsu = 2;
+  reverseKeyOrder.daisangen = 3;
+  const orderedGame = { ...fourthKan, paoResponsibilities: reverseKeyOrder,
+    paoResponsibilityOrder: ['daisangen', 'suukantsu'] as const };
+  const orderedWin = declareTsumo(orderedGame, 0);
+  const orderedSettlement = updateMatchGame({ ...startMatch(orderedGame, paoRules), honba: 1 }, orderedWin);
+  assert.equal(orderedSettlement.lastSettlement?.payments.find(item => item.payerId === 3)?.honbaPoints, 300);
+  assert.equal(orderedSettlement.lastSettlement?.payments.find(item => item.payerId === 2)?.honbaPoints, 0);
+  assertPointConservation(orderedSettlement);
+
+  const reverseEstablishedOrder = { ...fourthKan, paoResponsibilities: { daisangen: 3 as PlayerId, suukantsu: 2 as PlayerId },
+    paoResponsibilityOrder: ['suukantsu', 'daisangen'] as const };
+  const reverseOrderWin = declareTsumo(reverseEstablishedOrder, 0);
+  const reverseOrderSettlement = updateMatchGame({ ...startMatch(reverseEstablishedOrder, paoRules), honba: 1 }, reverseOrderWin);
+  assert.equal(reverseOrderSettlement.lastSettlement?.payments.find(item => item.payerId === 2)?.honbaPoints, 300);
+  assert.equal(reverseOrderSettlement.lastSettlement?.payments.find(item => item.payerId === 3)?.honbaPoints, 0);
+  assertPointConservation(reverseOrderSettlement);
+
+  const missingOrder = { ...fourthKan, paoResponsibilities: reverseKeyOrder, paoResponsibilityOrder: undefined };
+  const missingOrderWin = declareTsumo(missingOrder, 0);
+  assert.throws(() => updateMatchGame({ ...startMatch(missingOrder, paoRules), honba: 1 }, missingOrderWin),
+    /Missing pao responsibility establishment order/);
+
+  const samePayer = { ...fourthKan, paoResponsibilities: { suukantsu: 2 as PlayerId, daisangen: 2 as PlayerId },
+    paoResponsibilityOrder: ['daisangen', 'suukantsu'] as const };
+  const samePayerWin = declareTsumo(samePayer, 0);
+  const samePayerSettlement = updateMatchGame({ ...startMatch(samePayer, paoRules), honba: 1 }, samePayerWin);
+  const samePayerPayments = samePayerSettlement.lastSettlement!.payments.filter(item => item.payerId === 2);
+  assert.equal(samePayerPayments.length, 1, 'same-seat role payments and honba should be aggregated');
+  assert.equal(samePayerPayments[0].honbaPoints, 300, 'the honba must be charged once, not once per role');
+  assertPointConservation(samePayerSettlement);
+
+  const identities = [0, 1, 2, 3].map(seat => ({ seat: seat as PlayerId, name: `P${seat}`, control: 'human' as const, connected: true })) as OnlineGameSession['identities'];
+  const started = startOnlineGame(identities, 0, () => 0.5, paoRules);
+  const session: OnlineGameSession = { ...started, gameRevision: 4, match };
+  const restored = hydrateOnlineGame(JSON.stringify(session));
+  assert.ok(restored);
+  assert.deepEqual(restored.match.game.paoResponsibilityOrder, ['daisangen', 'suukantsu']);
+  assert.deepEqual(restored.match.lastSettlement, match.lastSettlement);
+  const snapshot = createPlayerGameView(restored, 0, 'ABC234', new Set<PlayerId>([0, 1, 2, 3]));
+  assert.deepEqual(snapshot.paoResponsibilityOrder, ['daisangen', 'suukantsu']);
+});
+
+test('複数の責任対象役満は役ごとの基本点を責任者別に合算する', () => {
   const game = kanGame({ hands: { 0: ['2z'] }, melds: { 0: [
     { type: 'daiminkan', group: '5555z', from: 1 }, { type: 'daiminkan', group: '6666z', from: 2 },
     { type: 'daiminkan', group: '7777z', from: 3 }, { type: 'daiminkan', group: '1111z', from: 1 },
   ] }, draw: 'south', turn: 0 });
   const responsibilities = { daisangen: 1 as PlayerId, suukantsu: 1 as PlayerId };
-  const won = declareTsumo({ ...game, rules: paoRules, paoResponsibilities: responsibilities }, 0);
+  const won = declareTsumo({ ...game, rules: paoRules, paoResponsibilities: responsibilities,
+    paoResponsibilityOrder: ['daisangen', 'suukantsu'] }, 0);
   assert.ok(won.winResult?.candidate.yaku.some(item => item.id === 'daisangen'));
   assert.ok(won.winResult?.candidate.yaku.some(item => item.id === 'suukantsu'));
   const settled = updateMatchGame(startMatch(game, paoRules), won);
@@ -238,7 +379,7 @@ test('複数の責任対象役満は役ごとに責任者へ割り当て、同�
   assertPointConservation(settled);
 
   const separate = declareTsumo({ ...game, rules: paoRules,
-    paoResponsibilities: { daisangen: 1, suukantsu: 2 } }, 0);
+    paoResponsibilities: { daisangen: 1, suukantsu: 2 }, paoResponsibilityOrder: ['daisangen', 'suukantsu'] }, 0);
   const separateResult = updateMatchGame(startMatch(game, paoRules), separate);
   assert.deepEqual(separateResult.lastSettlement?.payments.map(item => [item.payerId, item.basePoints]),
     [[1, 64000], [2, 64000], [3, 16000]]);

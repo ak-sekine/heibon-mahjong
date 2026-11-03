@@ -1,5 +1,5 @@
 import { winningMelds } from './melds.ts';
-import type { GameState, PaoYakuId, PlayerId } from '../model/game.ts';
+import type { GameState, PlayerId, YakumanPaymentBreakdown } from '../model/game.ts';
 import type { MatchState, MatchFormat, Points, RoundSettlement, SettlementPayment, RoundWind } from '../model/match.ts';
 import { hasNonDefaultGameRules, normalizeGameRules, rulesForFormat, rulesForMatch, type GameRules } from '../model/rules.ts';
 import { ordinaryTile } from '../model/tile.ts';
@@ -34,6 +34,27 @@ export function assertPointConservation(match: MatchState): void {
     throw new RangeError('Invalid point balance');
   }
 }
+
+function firstPaoTsumoHonbaPayer(game: GameState, breakdown: readonly YakumanPaymentBreakdown[] | undefined,
+  honba: number): PlayerId | undefined {
+  const applicable = (breakdown ?? []).filter(entry => entry.responsiblePlayerId !== undefined);
+  if (!applicable.length) return undefined;
+  const ordered = (game.paoResponsibilityOrder ?? [])
+    .map(yakuId => applicable.find(entry => entry.yakuId === yakuId))
+    .filter((entry): entry is YakumanPaymentBreakdown => entry !== undefined);
+  if (new Set(ordered.map(entry => entry.yakuId)).size === new Set(applicable.map(entry => entry.yakuId)).size) {
+    return ordered[0]?.responsiblePlayerId;
+  }
+
+  // A single applicable payer (or several roles assigned to the same seat) is
+  // unambiguous without an order. Distinct payers require the formally stored
+  // call/kan order; never infer it from object property enumeration.
+  const payerIds = new Set(applicable.map(entry => entry.responsiblePlayerId));
+  if (payerIds.size === 1) return applicable[0].responsiblePlayerId;
+  if (honba > 0) throw new RangeError('Missing pao responsibility establishment order');
+  return undefined;
+}
+
 /** Pure, idempotent settlement; scoring remains exclusively in ScoreResult. */
 export function settleRound(match: MatchState): MatchState {
   if (match.status !== 'playing' || !['won','wall-exhausted'].includes(match.game.phase)) return match;
@@ -58,6 +79,9 @@ export function settleRound(match: MatchState): MatchState {
     if (!winners.length || new Set(winners.map(w=>w.winnerId)).size !== winners.length) throw new RangeError('Invalid winners');
     for (const winner of winners) {
       const payers = new Set<PlayerId>();
+      const paoTsumoResponsible = win.winMethod === 'tsumo'
+        ? firstPaoTsumoHonbaPayer(match.game, winner.yakumanBreakdown, match.honba)
+        : undefined;
       for (const payment of winner.payments) {
         const paoPayers = new Set((winner.yakumanBreakdown ?? []).flatMap(entry =>
           entry.responsiblePlayerId === undefined ? [] : [entry.responsiblePlayerId]));
@@ -66,13 +90,7 @@ export function settleRound(match: MatchState): MatchState {
           throw new RangeError('Duplicate or invalid payer');
         }
         payers.add(payment.playerId);
-        // One honba is charged once. With distinct responsible parties, use the
-        // first established Pao role that applies to this win.
-        const paoTsumoResponsible = win.winMethod === 'tsumo'
-          ? (match.game.paoResponsibilityOrder ?? Object.keys(match.game.paoResponsibilities ?? {}) as PaoYakuId[])
-            .map(yakuId => winner.yakumanBreakdown?.find(entry => entry.yakuId === yakuId && entry.responsiblePlayerId !== undefined)?.responsiblePlayerId)
-            .find(playerId => playerId !== undefined)
-          : undefined;
+        // One honba is charged once to the earliest applicable pao responsibility.
         const honba = win.winMethod === 'ron'
           ? payment.playerId === win.discarderId ? match.honba * 300 : 0
           : paoTsumoResponsible === undefined ? match.honba * 100

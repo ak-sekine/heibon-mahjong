@@ -6,14 +6,16 @@ const windNames = ['east', 'south', 'west', 'north'] as const;
 
 function setKinds(game: GameState, playerId: PlayerId): Set<string> {
   const player = game.players[playerId];
-  const counts = new Map<string, number>();
-  const tiles = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : []),
-    ...(player.melds ?? []).flatMap(meld => meld.tiles)];
-  for (const physical of tiles) {
-    const key = tileKindKey(physical.tile);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+  const kinds = new Set<string>();
+  // Only completed melds participate in pao establishment. Concealed hand
+  // triplets are not public sets; ankan/kakan are already represented as melds.
+  for (const meld of player.melds ?? []) {
+    if (meld.type === 'chi') continue;
+    const keys = meld.tiles.map(tile => tileKindKey(tile.tile));
+    if (keys.length < 3 || keys.some(key => key !== keys[0])) continue;
+    kinds.add(keys[0]);
   }
-  return new Set([...counts].filter(([, count]) => count >= 3).map(([key]) => key));
+  return kinds;
 }
 
 function honorKey(honor: Honor): string {
@@ -28,7 +30,7 @@ export function recordSetPao(game: GameState, after: GameState, meld: OpenMeld):
   const sets = setKinds(after, playerId);
   const callKey = tileKindKey(meld.tiles[0].tile);
   const responsibilities = { ...after.paoResponsibilities };
-  const order = [...(after.paoResponsibilityOrder ?? Object.keys(after.paoResponsibilities ?? {}) as PaoYakuId[])];
+  const order = [...(after.paoResponsibilityOrder ?? [])];
   let changed = false;
   const dragonsComplete = dragonNames.every(honor => sets.has(honorKey(honor)));
   const exposesPreviouslyCompleteSet = meld.type === 'daiminkan' || !priorSets.has(callKey);
@@ -54,7 +56,7 @@ export function recordFourKanPao(game: GameState, option: { playerId: PlayerId; 
   const priorOwnKanCount = (game.players[option.playerId].melds ?? []).filter(meld => meld.tiles.length === 4).length;
   if (game.rules?.pao !== true || option.meld.type !== 'daiminkan' || option.playerId === option.fromPlayerId ||
       priorOwnKanCount !== 3 || after.paoResponsibilities?.suukantsu !== undefined) return after;
-  const order = [...(after.paoResponsibilityOrder ?? Object.keys(after.paoResponsibilities ?? {}) as PaoYakuId[])];
+  const order = [...(after.paoResponsibilityOrder ?? [])];
   order.push('suukantsu');
   return { ...after, paoResponsibilities: { ...after.paoResponsibilities, suukantsu: option.fromPlayerId },
     paoResponsibilityOrder: order };

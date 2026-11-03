@@ -339,7 +339,7 @@ export function createPlayerGameView(
     gameRevision: session.gameRevision,
     ...(rules.pao && game.paoResponsibilities ? {
       paoResponsibilities: { ...game.paoResponsibilities },
-      paoResponsibilityOrder: game.paoResponsibilityOrder ?? Object.keys(game.paoResponsibilities) as PaoYakuId[],
+      ...(game.paoResponsibilityOrder ? { paoResponsibilityOrder: [...game.paoResponsibilityOrder] } : {}),
     } : {}),
     declarations: session.declarations ?? [],
     viewerSeat,
