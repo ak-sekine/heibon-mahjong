@@ -31,7 +31,7 @@ def inspect_page(page):
       const doraHeading=document.querySelector('#local-table .dora-area h2');
       const textNodes=[...document.querySelectorAll('.score-strip .seat-label,.table .seat-label,.table .center-info > .round-summary,.table .round-label,.table .wall-count,.table .dora-area h2')]
         .filter(e=>visible(e)&&e.textContent.trim());
-      const tileNodes=[...document.querySelectorAll('.table .river-tile-face .tile-svg,.table .tile-back,.table .dora-area .tile-svg,.table .open-meld .tile-svg,.table .revealed-tile .tile-svg')]
+      const tileNodes=[...document.querySelectorAll('.table .tile-svg,.table .tile-back')]
         .filter(visible);
       const overlaps=[];
       for(const text of textNodes){
