@@ -2,6 +2,7 @@
 import os
 import shutil
 import sys
+import tempfile
 import traceback
 from playwright.sync_api import sync_playwright
 from browser_main_fixtures import fixed_seat_fixture
@@ -83,7 +84,7 @@ with sync_playwright() as playwright:
         document.body.append(host);
         const root = mountActionPanel(host, mode);
         panels.push({mode, display: getComputedStyle(root.querySelector('.keyboard-help')).display});
-        host.remove();
+        root.remove();
       }
       const live = document.querySelector('#local-game-controls .keyboard-help');
       return {panels, local: getComputedStyle(live).display,
@@ -96,19 +97,30 @@ with sync_playwright() as playwright:
 
     standard_display = panel_results['local']
     if ENGINE == 'chromium':
-        cdp = touch_context.new_cdp_session(touch_page)
-        cdp.send('Emulation.setEmulatedMedia', {
-            'features': [{'name': 'display-mode', 'value': 'standalone'}],
-        })
-        assert touch_page.evaluate("matchMedia('(display-mode: standalone)').matches"), \
-            'Chromium did not enter emulated standalone display mode'
-        standalone_display = touch_page.locator('#local-game-controls .keyboard-help').evaluate(
-            'element => getComputedStyle(element).display'
-        )
-        assert standalone_display == standard_display == 'none', {
-            'standard': standard_display, 'standalone': standalone_display,
-        }
-        cdp.detach()
+        with tempfile.TemporaryDirectory(prefix='heibon-keyboard-app-') as app_profile:
+            app_context = playwright.chromium.launch_persistent_context(
+                app_profile,
+                executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'),
+                args=[f'--app={BASE_URL}'],
+                viewport={'width': 390, 'height': 844}, has_touch=True, is_mobile=True,
+            )
+            app_page = app_context.pages[0] if app_context.pages else app_context.new_page()
+            app_page.wait_for_load_state('domcontentloaded')
+            assert app_page.evaluate("matchMedia('(display-mode: standalone)').matches"), \
+                'Chromium --app window did not expose standalone display mode'
+            standalone_display = app_page.evaluate("""async () => {
+              const { mountActionPanel } = await import('/heibon-mahjong/src/ui/action-panel.ts');
+              const host = document.createElement('div');
+              document.body.append(host);
+              const root = mountActionPanel(host, 'local');
+              const display = getComputedStyle(root.querySelector('.keyboard-help')).display;
+              root.remove();
+              return display;
+            }""")
+            assert standalone_display == standard_display == 'none', {
+                'standard': standard_display, 'standalone': standalone_display,
+            }
+            app_context.close()
 
     # Touch must continue to select/discard a tile and choose an actual pon.
     selected = touch_page.locator('#player-hand button').first
