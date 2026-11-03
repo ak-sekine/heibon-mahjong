@@ -27,9 +27,9 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
         webkit = select_scenarios(browser='webkit')
         all_engines = select_scenarios(browser='both')
 
-        self.assertEqual(len(SUITE), 66)
-        self.assertEqual(len(chromium), 38)
-        self.assertEqual(len(webkit), 28)
+        self.assertEqual(len(SUITE), 68)
+        self.assertEqual(len(chromium), 39)
+        self.assertEqual(len(webkit), 29)
         self.assertEqual(set(chromium).intersection(webkit), set())
         self.assertEqual(set(chromium).union(webkit), set(all_engines))
         self.assertEqual(all_engines, list(range(len(SUITE))))
@@ -47,7 +47,7 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
             def poll(self):
                 return None
 
-        for engine, expected_count in [('chromium', 38), ('webkit', 28)]:
+        for engine, expected_count in [('chromium', 39), ('webkit', 29)]:
             with self.subTest(engine=engine), tempfile.TemporaryDirectory() as directory:
                 report = Path(directory) / 'timings.csv'
                 argv = [str(RUNNER), '--browser', engine, '--timings-file', str(report)]

@@ -57,6 +57,9 @@ ul { list-style:none; padding:0; margin:0; }
 .round-result-actions { display:flex; align-items:stretch; justify-content:center; flex:1 1 100%; gap:6px; }
 .round-result-actions button { flex:1 1 0; min-width:72px; min-height:44px; padding:8px 6px; }
 .keyboard-help { width:100%; margin:0; font-size:11px; color:#d4e5db; }
+@media (hover: none) and (pointer: coarse) {
+  .keyboard-help { display:none; }
+}
 .tile-svg { display:block; width:100%; height:auto; aspect-ratio:60/84; }
 .test-heading { flex-wrap:wrap; }
 .river-test-badge { margin-left:auto; padding:2px 7px; border:1px solid #ffda7d; border-radius:999px; color:#ffda7d; font-size:11px; }

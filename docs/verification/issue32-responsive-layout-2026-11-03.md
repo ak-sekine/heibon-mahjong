@@ -95,3 +95,44 @@ Browser UIをCodex Cloud内で実行した結果としては扱いません。�
 |  | ホーム画面に追加したPWAのstandalone表示で縦横を切り替える | セーフエリア内に表示され、横スクロールなしで対局とメニューを操作でき、オフライン起動できる |
 |  | iPhoneの文字拡大またはSafariページ拡大を有効にし、操作ボタンとダイアログを操作する | 重要な操作が隠れず、ダイアログ本文はスクロールでき、ボタンが画面外に固定されない |
 |  | ルーム作成／参加のプレイヤー名入力欄でソフトウェアキーボードを開き、閉じる | 入力欄と確定・閉じる操作へ到達でき、キーボードの表示・非表示後に横overflowや固定フッターの重なりがない |
+
+## 追加修正: タッチ端末のキーボード案内 — 2026-11-03
+
+### 報告と調査
+
+- Issue #32 の追加報告では、iPhoneのホーム画面から開いたPWAでは対局操作欄の下に「Tabで牌とボタンへ移動、Enter／Spaceで選択・確定」が見え、同じアプリをSafariで開くと見えないとのことです。提供された実機スクリーンショットではPWA側の案内表示を確認したという報告です。この環境ではiPhone実機、Safari/PWAの実画面、SafariのCSS viewport値を直接測定していません。
+- `index.html` の案内は `#game-controls-template` の `.keyboard-help` に1つあります。`src/ui/action-panel.ts` の `mountActionPanel()` はこのテンプレートを複製し、オフラインでは `#local-game-controls`、オンラインでは `#online-game-controls` として使います。モード別に案内を表示する分岐はありません。
+- 現行CSSの案内非表示条件は、幅350px以下、高さ650px以下、ロン判断待ちの `.ron-pending > .keyboard-help` です。幅・高さ条件はタッチ種別を見ません。`index.html` は `width=device-width, initial-scale=1, viewport-fit=cover` を指定し、manifestはstandalone表示を宣言します。`.keyboard-help` に対する `display-mode`、User-Agent、機種判定はありません。
+- Safariとホーム画面PWAで表示が違った直接原因は、このコードと報告だけからは特定できません。画面高650px以下の既存メディアクエリが表示差を作った可能性はありますが、実際のSafari/PWA viewport値や局面が不明なので推測として扱います。PWA固有の不具合とは断定しません。
+
+### 修正と設計判断
+
+- `.keyboard-help` の基本スタイル直後に `@media (hover: none) and (pointer: coarse)` を追加し、主入力がタッチである環境では案内を `display:none` にします。画面モード、幅、高さを条件にしません。`display:none` のため操作欄内に余白は残りません。
+- 既存の幅350px以下・高さ650px以下・ロン判断待ち条件はそのまま残します。タッチ向け条件も非表示だけを指定するため、既存の狭幅・低高表示や操作パネルの余白ルールは変わりません。新しい条件は既存条件を上書きせず、タッチ主入力時に画面サイズを問わず非表示を追加します。
+- メディア機能はCSSが報告する主入力の性質で判定します。display-mode standalone、User-Agent、特定端末名を使いません。タッチ対応PCでも主入力がマウスなら案内は表示されます。タッチ主入力端末でTab／Enter／Spaceを使う機能はDOMのボタンとキーボード処理として残し、削除・変更していません。
+- オフライン／オンラインは同一テンプレートを複製するため、同じCSS条件が適用されます。他の操作パネル・ダイアログのCSSは変更していません。
+- PWAのCSSはビルド時にハッシュ付きアセットとなり、Service Workerはアプリシェルと同じ版のアセットを版付きCache Storageへ保存します。更新版のService Workerは新しいシェルを準備してから更新通知を出し、ユーザーが「更新する」を選んだ時に再読み込みします。したがって既存PWAを開いたままの場合は更新通知から更新してください。更新通知が出ない場合は、オンラインに接続してPWAを閉じて再起動し、更新を再確認してください。旧CSSと新CSSの混在はPWA Browser UIテストの更新・キャッシュ回帰でも確認します。
+
+### 変更ファイル
+
+- `src/style.css` — タッチ主入力時の `.keyboard-help` 非表示条件。
+- `tests/browser-keyboard-help.py` — Chromium／WebKitでタッチCSSメディア機能、通常表示とChromium standalone emulationの一致、共通のoffline/onlineパネル、手牌選択・打牌・ポン、PCのTab／Enter／Space操作を検査。
+- `tests/run-browser-regressions.py` と `tests/test_browser_regressions_selection.py` — Chromium／WebKit双方のBrowser UI matrixに新しい検証を登録。
+- 本検証記録 — 今回の追加修正結果を追記。先行するIssue #32の記録・チェックリストは保持。
+
+### 今回の自動検証と公開記録
+
+| 検証 | 結果 |
+| --- | --- |
+| `npm test` | 80テストファイル成功、80 pass、fail 0、skip 0 |
+| `npm run build` | 成功。TypeScript、Vite、版付きPWA shell生成を含む |
+| `npm run typecheck:worker` | 成功 |
+| Browser UI selection | 6件成功。Chromium 39、WebKit 29、合計68 scenarioを選択 |
+| Browser UI Python構文確認 | 成功 |
+| `git diff --check` | 成功 |
+| Chromium Browser UI / Deploy gate | push後のrun ID・結果を追記予定 |
+| WebKit Browser UI / Deploy gate | push後のrun ID・結果を追記予定 |
+| 修正コミットSHA | commit後に追記予定 |
+| Pages / Worker公開SHA | Deploy gate後に追記予定 |
+
+Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emulationをiPhone実機確認と扱いません。Issue #32はOpenのままです。公開後にユーザー本人がSafariとPWAの双方で案内非表示を再確認するまで完了判断を保留します。

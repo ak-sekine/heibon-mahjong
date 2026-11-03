@@ -22,6 +22,8 @@ SUITE = [
     run('tests/browser-online-dialog-layout.py', 'webkit', HEIBON_PRODUCTION_URL='http://127.0.0.1:4174/heibon-mahjong/'),
     run('tests/browser-pwa.py'),
     run('tests/browser-pwa.py', 'webkit'),
+    run('tests/browser-keyboard-help.py'),
+    run('tests/browser-keyboard-help.py', 'webkit'),
     run('tests/browser-app-idle.py'),
     run('tests/browser-app-idle.py', 'webkit'),
     run('tests/browser-offline-rules.py'),
