@@ -63,10 +63,20 @@ class PagesHandler(SimpleHTTPRequestHandler):
             # Model a fresh, cached GitHub Pages HTML response. SW navigation and
             # update installation must bypass this response after a new build.
             self.send_header('Cache-Control', 'public, max-age=600')
+        if self.path.split('?', 1)[0] == BASE_PATH + 'sw.js':
+            self.send_header('Cache-Control', 'no-store')
         super().end_headers()
 
     def log_message(self, _format, *_args):
         pass
+
+
+def write_worker_version(path, source):
+    path.write_text(source, encoding='utf-8')
+    # SimpleHTTPRequestHandler validators have one-second precision. Give
+    # every simulated release a distinct Last-Modified value when updating twice.
+    modified = max(time.time(), path.stat().st_mtime) + 2
+    os.utime(path, (modified, modified))
 
 
 with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
@@ -147,7 +157,7 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         assert precache_match, 'precache URL list missing'
         precache = json.loads(precache_match.group(1))
         failed_asset = next(url for url in precache if url.endswith('.js'))
-        sw_path.write_text(worker, encoding='utf-8')
+        write_worker_version(sw_path, worker)
 
         # A failed precache install must leave the old active worker and app
         # usable. After delivery recovers, a changed worker script can retry.
@@ -166,7 +176,7 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         retry_cache = re.search(r'const CACHE = "([^"]+)";', worker)
         assert retry_cache, 'retry cache declaration missing'
         new_cache_name = retry_cache.group(1)
-        sw_path.write_text(worker, encoding='utf-8')
+        write_worker_version(sw_path, worker)
 
         page.evaluate('async () => { const registration = await navigator.serviceWorker.getRegistration(); await registration.update(); }')
         page.locator('#pwa-update-notice').wait_for(state='visible', timeout=20000)
@@ -177,7 +187,7 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         assert waiting_state == {'waiting': True, 'state': 'installed'}, waiting_state
         cache_names = page.evaluate('caches.keys()')
         assert old_cache_name in cache_names, f'active cache was removed before user approval: {cache_names}'
-        assert new_cache_name in cache_names, f'new waiting cache is missing: {cache_names}'
+        assert new_cache_name in cache_names, f'new waiting cache {new_cache_name} is missing: {cache_names}'
         assert page.locator('#local-table').is_visible(), 'update detection reloaded the in-progress CPU game'
 
         # A regular browser tab and an installed-app-like tab share the same
