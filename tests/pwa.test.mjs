@@ -40,7 +40,9 @@ test('offline shell uses a content-versioned cache and never caches Worker traff
     assert(first.urls.includes(PWA_BASE + 'assets/app-abc.js'));
     assert(first.urls.includes(PWA_BASE + 'icons/icon-192.png'));
     assert.match(worker, /request\.mode === 'navigate'/);
-    assert.match(worker, /await fetch\(request\)/);
+    assert.match(worker, /new Request\(url, \{ cache: 'reload' \}\)/);
+    assert.match(worker, /new Request\(request, \{ cache: 'no-store' \}\)/);
+    assert.match(worker, /await fetch\(new Request\(request, \{ cache: 'no-store' \}\)\)/);
     assert.match(worker, /url\.origin !== self\.location\.origin/);
     assert.match(worker, /ACTIVATE_UPDATE/);
     assert.match(worker, /scoped\.length > 1/);

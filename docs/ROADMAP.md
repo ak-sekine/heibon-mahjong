@@ -13,7 +13,7 @@
 
 | 機能 | 状態 | 現在の内容 |
 | --- | --- | --- |
-| PWAインストール・更新管理 — Issue #31 | 一部実装（検証・実機確認待ち） | GitHub Pagesスコープのmanifest・アイコン生成・Service Workerと更新通知を追加。静的シェルは事前保存し、オンライン通信はキャッシュ対象外。iOS Safari／Android実機のインストール確認は未実施。自動検証結果は[検証記録](verification/issue31-pwa-2026-11-03.md)へ追記する。
+| PWAインストール・更新管理 — Issue #31 | 実装済み（更新修正の公開・端末実機確認待ち） | manifest・各OS用アイコン・Service Worker・オフラインCPU対局を実装。前回SHA `79b939e…`はActions run `41600214270`でWorker／Pages双方の公開successを確認。HTTP cacheの旧HTMLを避ける修正と追加ブラウザーテストを実施中。公開SHA、直接HTTP取得制限、端末実機の未確認範囲は[検証記録](verification/issue31-pwa-2026-11-03.md)へ記録。IssueはiPhone Safari実機確認までOpen。
 | オンライン待機画面の進行ボタン — Issue #41 | 完了（実機確認済み範囲と未確認範囲を記録、completed／Closed） | ホスト右側の同じ位置で「準備完了」→「席を確定」→「対局開始」を切り替え、非ホストは準備後に操作を表示しません。追加修正SHA `5d9121fa6e5b2f00c441c9c51c85878ea22a0a5f`のDeploy run [#41474025754](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41474025754)はverify、Chromium／WebKit、matrix audit、release freshness、Worker／Pages公開がsuccess。2026-11-03、ユーザー本人がiPhone Safariで座席確定メッセージの上部1か所表示とプレイヤー一覧下の重複なしをOKと報告。追加修正前のボタン操作は「動作は問題ありません」と総括報告あり。エラー通知、再接続、CPU補充、非ホスト操作など個別に報告されていない実機条件は未確認で、自動検証と区別しています。文書更新run [#41476660809](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41476660809)はdocs-check success、検証・公開ジョブは文書のみの変更分類により正常skip。[進行ボタン検証記録](verification/issue41-online-waiting-room-progress-buttons-2026-11-02.md)／[重複表示の追加修正記録](verification/issue41-seat-finalized-message-duplicate-2026-11-02.md)。 |
 | オンライン待機画面の操作ボタン配置 — Issue #34 | 実機確認済み（OK 5、NG 0、未確認0）・completed／Close | 退出を左、準備完了を右の上段に固定し、再接続をその下段の全幅に配置します。接続状態で再接続が表示・非表示になっても上段は固定します。Deploy run [#41446809663](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41446809663) はChromium／WebKit、Worker／Pages公開までsuccess（SHA `6214f8cc73cf509acfe189cc5852a6deba855d97`）。ユーザー本人が2026-11-02にiPhone Safariで指定5項目すべてOKと報告しました（NG 0、未確認0）。[検証記録](verification/issue34-online-waiting-room-buttons-2026-11-02.md)に自動検証と分けて記録し、IssueはcompletedでCloseします。 |
 | 対局終了時の最終順位・持ち点 — Issue #12 | 実機確認済み（指定4件OK、NG 0件）・完了／Close | `match-ended`確定後に「対局結果」画面を開き、東風戦／半荘戦、既存順位規則による4人の順位と確定持ち点を表示します。通常局終了時のボタンは「局の結果」「次の局へ」、対局確定終了時は「局の結果」「順位確認」です。2026-11-01にユーザー本人がiPhone Safariでフォント統一・ボタン配置・動作の4項目すべてOKと報告しました。その他の個別実機条件は未確認として区別します。自動検証と実機確認の記録は[検証記録](verification/issue12-match-result-2026-10-31.md)を参照してください。 |
@@ -160,7 +160,7 @@ Step 13.8までの役満10種類に、Step 13.11で天和・地和を加え、�
 | 対局の中断・再開 | 未実装 |
 | 対局履歴・牌譜 | 未実装 |
 | 効果音 | 未実装 |
-| PWA対応 | 未実装 |
+| PWA対応 | 実装済み（Issue #31、公開・iPhone Safari／Android Chrome実機確認待ち。詳細は[検証記録](verification/issue31-pwa-2026-11-03.md)） |
 | Step 14.0：Cloudflareオンライン待機基盤 | 完了 | ルーム作成・参加、WebSocket認証、24時間TTL、本番デプロイ・通信テストを実装しました。[検証記録](verification/step14.0/README.md) |
 | Step 14.0.1：オンライン待機ルーム完成 | 完了 | Ready、ホスト権限と引き継ぎ、CPU席補充、座席確定、退出、自動再接続、revision・重複要求防止、レート制限を実装しました。[設計・実装記録](development/step-14.0.1.md) · [検証記録](verification/step14.0.1/README.md) |
 | Step 14.1：オンライン対局の進行共有 | 完了 | サーバー権威型のゲーム状態・座席別ビュー、打牌・判断窓・CPU進行・局精算・再接続、オンライン卓を実装しました。ローカル検証、GitHub ActionsのBrowser UI、Cloudflare本番通信、Pages build / deployが成功しました。[開発・設計記録](development/step-14.1.md) · [検証記録](verification/step14.1/README.md) |
