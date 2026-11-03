@@ -4,8 +4,10 @@ import json
 from pathlib import Path
 import re
 import shutil
+import sys
 import tempfile
 import time
+import traceback
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from urllib.parse import unquote, urlsplit
@@ -14,6 +16,18 @@ from playwright.sync_api import sync_playwright
 
 BASE_PATH = '/heibon-mahjong/'
 DIST = Path('dist').resolve()
+
+
+def report_browser_failure(exception_type, exception, trace):
+    """Put the failing test line in the GitHub check API, not only its log blob."""
+    frames = traceback.extract_tb(trace)
+    line = frames[-1].lineno if frames else 1
+    message = f'{exception_type.__name__}: {exception}'.replace('\n', ' ')
+    print(f'::error file=tests/browser-pwa.py,line={line},title=PWA browser failure::{message}', flush=True)
+    sys.__excepthook__(exception_type, exception, trace)
+
+
+sys.excepthook = report_browser_failure
 
 
 class PagesHandler(SimpleHTTPRequestHandler):
