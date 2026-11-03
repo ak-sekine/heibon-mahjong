@@ -13,6 +13,7 @@ import { AutomaticTurnRunner } from '../src/game/automatic-turns.ts';
 import { GameController } from '../src/ui/controller.ts';
 import { cpuRiichiStart } from './cpu-riichi-fixture.ts';
 import { cpuTsumoGame } from './cpu-tsumo-fixture.ts';
+import { DEFAULT_GAME_RULES } from '../src/model/rules.ts';
 import { fixedRound } from './match-fixture.ts';
 import { inventory, freeze } from './helpers.ts';
 import { tileKindKey } from '../src/model/tile.ts';
@@ -40,6 +41,23 @@ test('CPU expected riichi value includes the configured ippatsu han',()=>{
   const on={...source,players,rules:{schemaVersion:3 as const,matchFormat:'tonpu' as const,redDora:true,kuitan:true,uraDora:true,ippatsu:true,kanDora:true}};
   const off={...on,rules:{...on.rules,ippatsu:false}};
   assert.ok(estimateCpuRiichiOptionHan(on,1,option)>estimateCpuRiichiOptionHan(off,1,option));
+});
+
+test('beginner riichi policy skips legal but narrow two-kind waits; standard preserves the existing choice',()=>{
+  const game=cpuRiichiStart(1,[],'north',['123m','123p','123s','22z','45m']);
+  assert.equal(chooseCpuRiichiDiscard(game,1,25000),'north-3');
+  assert.equal(chooseCpuRiichiDiscard({...game,rules:{...DEFAULT_GAME_RULES,cpuDifficulty:'beginner'}},1,25000),null);
+});
+
+test('CPU riichi choice is invariant to hidden opponent hands and wall order',()=>{
+  const game=cpuRiichiStart(1,[],'north',['123m','123p','123s','22z','45m']);
+  const deadWall=[...game.deadWall];[deadWall[5],deadWall[7]]=[deadWall[7],deadWall[5]];
+  const hidden={...game,players:game.players.map(player=>player.id===0?{...player,hand:[...player.hand].reverse()}:player),
+    liveWall:[...game.liveWall].reverse(),deadWall} as typeof game;
+  assert.equal(chooseCpuRiichiDiscard(hidden,1,25000),chooseCpuRiichiDiscard(game,1,25000));
+  const option=getRiichiDiscardOptions(game,1,25000)[0];assert.ok(option);
+  assert.equal(estimateCpuRiichiOptionHan(hidden,1,option),estimateCpuRiichiOptionHan(game,1,option),
+    'riichi candidate value excludes hidden ura-dora indicators');
 });
 for(const reason of ['points','wall','already','turn','ron','ended'] as const) test(`CPU riichi rejection: ${reason}`,()=>{
   let g=cpuRiichiStart();let points=25000;

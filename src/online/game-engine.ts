@@ -1,4 +1,4 @@
-import { chooseCpuRiichiDiscard, chooseShantenDiscardAsync } from '../game/cpu.ts';
+import { chooseCpuFallbackDiscard, chooseCpuRiichiDiscard, chooseShantenDiscardAsync } from '../game/cpu.ts';
 import { getCallOptions, resolveCallResponses, type CallOption } from '../game/calls.ts';
 import { drawOrStop } from '../game/draw.ts';
 import { discardTileForOnline, canDiscard } from '../game/discard.ts';
@@ -11,7 +11,6 @@ import { canDeclareTsumo, declareTsumo } from '../game/tsumo.ts';
 import { completeKan } from '../game/kan.ts';
 import { startGame } from '../game/start.ts';
 import type { RandomSource } from '../game/shuffle.ts';
-import { tileKindKey } from '../model/tile.ts';
 import { drawSeatAssignment } from '../game/seating.ts';
 import type { GameState, PlayerId, PlayerState } from '../model/game.ts';
 import type { MatchState, MatchFormat } from '../model/match.ts';
@@ -505,6 +504,8 @@ export function startNextOnlineRound(
 export async function advanceOnlineCpu(
   session: OnlineGameSession,
   now = Date.now(),
+  // Production uses the short Worker default; the capped override keeps full-policy tests deterministic.
+  riichiEvaluationBudgetMs = 2.5,
 ): Promise<OnlineGameSession> {
   if (session.status !== 'playing' || session.decision) return session;
   if (session.match.game.pendingRiichi) {
@@ -524,7 +525,9 @@ export async function advanceOnlineCpu(
   const strategyGame = cpuStrategyView(game, playerId);
   const kan = chooseCpuKan(strategyGame, playerId);
   if (kan) return commitMatch(session, { ...match, game: declareKanForOnline(game, playerId, kan.id) }, now);
-  const riichiDiscard = chooseCpuRiichiDiscard(strategyGame, playerId, match.points[playerId], 2.5);
+  const riichiBudget = Number.isFinite(riichiEvaluationBudgetMs)
+    ? Math.max(0.5, Math.min(20, riichiEvaluationBudgetMs)) : 2.5;
+  const riichiDiscard = chooseCpuRiichiDiscard(strategyGame, playerId, match.points[playerId], riichiBudget);
   if (riichiDiscard) {
     const player = game.players[playerId];
     const doubleRiichi = !game.callsMade && !game.players.some((candidate: PlayerState) => candidate.melds?.length) &&
@@ -550,16 +553,13 @@ export async function advanceOnlineCpu(
   const budget = setTimeout(() => abort.abort(), 3);
   let tileId: string | null = null;
   try {
-    tileId = await chooseShantenDiscardAsync(strategyGame, playerId, abort.signal, 2);
+    tileId = await chooseShantenDiscardAsync(strategyGame, playerId, abort.signal, 2, secureRandomSource);
   } finally {
     clearTimeout(budget);
   }
   if (!tileId || !canDiscard(game, playerId) ||
       ![...game.players[playerId].hand, game.players[playerId].drawnTile].some(tile => tile?.id === tileId)) {
-    const player = game.players[playerId];
-    tileId = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
-      .filter(tile => !player.callDiscard?.forbiddenKinds.includes(tileKindKey(tile.tile)))
-      .sort((a, b) => a.id.localeCompare(b.id))[0]?.id ?? null;
+    tileId = chooseCpuFallbackDiscard(strategyGame, playerId, secureRandomSource);
   }
   if (!tileId) throw new OnlineGameRuleError('cpu_turn_failed');
   return commitMatch(session, { ...match, game: discardTileForOnline(game, playerId, tileId) }, now);

@@ -39,13 +39,14 @@ export function renderRulesList(root: HTMLElement, rules: unknown, label = '現�
 export class RuleEditor {
   private readonly root: HTMLElement | null;
   private readonly formatOptions: HTMLFieldSetElement | null;
+  private readonly difficultyOptions: HTMLFieldSetElement | null;
   private readonly optionalRules: HTMLFieldSetElement | null;
   private readonly fixedRules: HTMLElement | null;
   private readonly preferences: RulePreferences;
   constructor(rootSelector: string, preferences: RulePreferences) {
     this.root = document.querySelector<HTMLElement>(rootSelector);
     this.preferences = preferences;
-    if (!this.root) { this.formatOptions = null; this.optionalRules = null; this.fixedRules = null; return; }
+    if (!this.root) { this.formatOptions = null; this.difficultyOptions = null; this.optionalRules = null; this.fixedRules = null; return; }
     this.formatOptions = document.createElement('fieldset');
     this.formatOptions.className = 'match-format-options';
     const legend = document.createElement('legend');
@@ -68,6 +69,27 @@ export class RuleEditor {
       });
       label.append(input, document.createTextNode(` ${text}`));
       this.formatOptions.append(label);
+    }
+    this.difficultyOptions = document.createElement('fieldset');
+    this.difficultyOptions.className = 'cpu-difficulty-options';
+    const difficultyLegend = document.createElement('legend');
+    difficultyLegend.textContent = 'CPUの強さ（全CPU共通）';
+    this.difficultyOptions.append(difficultyLegend);
+    for (const [value, title, hint] of [
+      ['beginner', '初級', 'シャンテン中心の簡単な打牌と控えめな鳴きを行います'],
+      ['standard', '標準', '現在のCPU判断を使います'],
+      ['advanced', '上級', '同等の手進行を保ちながら、リーチ者への安全牌を優先します'],
+    ] as const) {
+      const label = document.createElement('label');
+      const input = document.createElement('input');
+      input.type = 'radio'; input.name = `${this.root.id}-cpu-difficulty`; input.value = value;
+      input.addEventListener('change', () => {
+        if (input.checked) this.preferences.commit({ ...this.preferences.current, cpuDifficulty: value });
+      });
+      const content = document.createElement('span');
+      const name = document.createElement('strong'); name.textContent = title;
+      const description = document.createElement('small'); description.textContent = hint;
+      content.append(name, description); label.append(input, content); this.difficultyOptions.append(label);
     }
     this.optionalRules = document.createElement('fieldset');
     this.optionalRules.className = 'optional-rule-options';
@@ -116,7 +138,7 @@ export class RuleEditor {
     this.fixedRules = document.createElement('div');
     this.fixedRules.className = 'rule-settings-fixed-list';
     fixedSection.append(heading, this.fixedRules);
-    this.root.replaceChildren(this.formatOptions, this.optionalRules, fixedSection);
+    this.root.replaceChildren(this.formatOptions, this.difficultyOptions, this.optionalRules, fixedSection);
     this.update(preferences.current);
   }
   update(rules: unknown = this.preferences.current): void {
@@ -124,6 +146,9 @@ export class RuleEditor {
     const normalized = normalizeGameRules(rules);
     this.formatOptions.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach(input => {
       input.checked = input.value === normalized.matchFormat;
+    });
+    this.difficultyOptions?.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach(input => {
+      input.checked = input.value === normalized.cpuDifficulty;
     });
     this.optionalRules.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(input => {
       const key = input.dataset.ruleKey as keyof GameRules | undefined;
@@ -134,11 +159,12 @@ export class RuleEditor {
   }
   setDisabled(disabled: boolean): void {
     if (this.formatOptions) this.formatOptions.disabled = disabled;
+    if (this.difficultyOptions) this.difficultyOptions.disabled = disabled;
     if (this.optionalRules) this.optionalRules.disabled = disabled;
   }
   private renderFixedRules(rules: GameRules): void {
     if (!this.fixedRules) return;
-    const rows = describeConfirmedRules(rules).filter(entry => !['対局形式', '赤ドラ', '喰いタン', '裏ドラ', '一発', 'カンドラ', '親テンパイ連荘', '九種九牌', '四風連打', '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ', '特殊形ダブル役満', '人和', 'パオ', '複数ロン', '三家和流局'].includes(entry.label));
+    const rows = describeConfirmedRules(rules).filter(entry => !['対局形式', 'CPUの強さ', '赤ドラ', '喰いタン', '裏ドラ', '一発', 'カンドラ', '親テンパイ連荘', '九種九牌', '四風連打', '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ', '特殊形ダブル役満', '人和', 'パオ', '複数ロン', '三家和流局'].includes(entry.label));
     const list = document.createElement('dl');
     list.className = 'confirmed-rules-list';
     for (const entry of rows) {

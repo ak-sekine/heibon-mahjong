@@ -6,6 +6,7 @@ import { cancelAllIppatsu } from './ippatsu.ts';
 import { calculateShanten } from '../analysis/shanten.ts';
 import { isFourWindsDraw } from './special-draws.ts';
 import { rulesForGame } from '../model/rules.ts';
+import type { CpuDifficulty } from '../model/rules.ts';
 import { diagnosticLog, markDiagnosticError, safeErrorInfo } from '../online/diagnostics.ts';
 import { recordSetPao } from './pao.ts';
 
@@ -68,7 +69,7 @@ export function getCallOptions(game: GameState, playerId: PlayerId): readonly Ca
   return options;
 }
 /** Own hand/melds and the public discard only; no wall/opponent hand access. */
-export function chooseCpuCall(player: PlayerState, options: readonly CallOption[], kuitan = true): CallOption | null {
+export function chooseCpuCall(player: PlayerState, options: readonly CallOption[], kuitan = true, difficulty: CpuDifficulty = 'standard'): CallOption | null {
   if(!options.length || player.control!=='cpu' || player.riichi) return null;
   const before=calculateShanten(player.hand.map(t=>t.tile),player.melds?.length ?? 0).minimum;
   const evaluated=options.flatMap(option=>{
@@ -79,7 +80,7 @@ export function chooseCpuCall(player: PlayerState, options: readonly CallOption[
     const all=[...remaining,...melds.flatMap(m=>m.tiles)];
     const tanyao=kuitan && all.every(t=>t.tile.category==='suited' && t.tile.rank>=2 && t.tile.rank<=8);
     const toitoi=melds.every(m=>m.type!=='chi') && new Set(remaining.map(t=>tileKindKey(t.tile))).size<=5;
-    if(!value && !tanyao && !toitoi) return [];
+    if(difficulty === 'beginner' ? !value : !value && !tanyao && !toitoi) return [];
     const best=option.type==='daiminkan' ? calculateShanten(remaining.map(t=>t.tile),melds.length).minimum : Math.min(...remaining.filter(t=>!option.forbiddenKinds.includes(tileKindKey(t.tile))).map(t=>
       calculateShanten(remaining.filter(x=>x.id!==t.id).map(x=>x.tile),melds.length).minimum));
     return best<before || (best===before && (value || tanyao)) ? [{option,best}] : [];
@@ -95,8 +96,8 @@ function cpuOptions(game:GameState):CallOption[] {
   const context={operation,phase:game.phase,seat:game.turnPlayerId,remainingTiles:game.liveWall.length};
   diagnosticLog.record('INFO','local_cpu_call_judgment_started',context);
   try {
-    const kuitan=rulesForGame(game).kuitan;
-    const result=game.players.flatMap(p=>{const c=chooseCpuCall(p,getCallOptions(game,p.id),kuitan);return c?[c]:[];});
+    const rules=rulesForGame(game);
+    const result=game.players.flatMap(p=>{const c=chooseCpuCall(p,getCallOptions(game,p.id),rules.kuitan,rules.cpuDifficulty);return c?[c]:[];});
     diagnosticLog.record('INFO','local_cpu_call_judgment_completed',{...context,elapsedMs:Date.now()-startedAt,outcome:result.length?'selected':'none',selectedSeats:result.map(option=>option.playerId).join(',')});
     return result;
   } catch(error) {

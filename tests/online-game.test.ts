@@ -600,6 +600,20 @@ test('online CPU riichi settles before the next draw and advances the revision',
   assert.ok(nextCpuTurn.gameRevision > settled.gameRevision);
 });
 
+test('online Worker applies the configured beginner policy while standard retains legal narrow-wait riichi', async () => {
+  const makeSession = (cpuDifficulty: 'beginner' | 'standard') => {
+    const source = cpuRiichiStart(1, [], 'north', ['123m', '123p', '123s', '22z', '45m']);
+    const game = { ...source, rules: { ...DEFAULT_GAME_RULES, cpuDifficulty } };
+    return sessionForGame(game, [0]);
+  };
+  const standard = await advanceOnlineCpu(makeSession('standard'), 7100, 20);
+  const beginner = await advanceOnlineCpu(makeSession('beginner'), 7200, 20);
+  assert.equal(standard.match.game.players[1].riichi?.declarationTileId, 'north-3');
+  assert.equal(beginner.match.game.pendingRiichi, null);
+  assert.equal(beginner.match.game.players[1].discardHistory?.length, 1);
+  assert.ok(beginner.match.game.players[1].river.some(tile => tile.id === beginner.match.game.players[1].discardHistory![0].id));
+});
+
 test('all ron candidates are collected, multiple ron resolves together, and only a passer becomes furiten', () => {
   const game = ronGame(1, [0, 2]);
   const connected = new Set<PlayerId>([0, 2]);

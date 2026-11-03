@@ -2,7 +2,8 @@ import type { MatchFormat, MatchState } from './match.ts';
 
 /** Immutable local rules selected for one match. */
 export type GameRules = Readonly<{
-  schemaVersion: 5;
+  schemaVersion: 6;
+  cpuDifficulty: CpuDifficulty;
   matchFormat: MatchFormat;
   redDora: boolean;
   kuitan: boolean;
@@ -28,14 +29,16 @@ export type GameRules = Readonly<{
   tripleRonAbortiveDraw: boolean;
 }>;
 
+export type CpuDifficulty = 'beginner' | 'standard' | 'advanced';
+
 export const DEFAULT_GAME_RULES: GameRules = Object.freeze({
-  schemaVersion: 5, matchFormat: 'tonpu', redDora: true, kuitan: true, uraDora: true, ippatsu: true, kanDora: true,
+  schemaVersion: 6, cpuDifficulty: 'standard', matchFormat: 'tonpu', redDora: true, kuitan: true, uraDora: true, ippatsu: true, kanDora: true,
   dealerTenpaiRenchan: true, kyuushuKyuuhai: true, fourWinds: true, fourRiichi: true, fourKans: true,
   agariYame: false, tenpaiYame: false, renhou: 'off', pao: false, doubleYakuman: false,
   multipleRon: true, tripleRonAbortiveDraw: false,
 });
 export const GAME_RULES_STORAGE_KEY = 'heibon-mahjong-last-rules';
-const STORAGE_VERSION = 5;
+const STORAGE_VERSION = 6;
 
 export function rulesForFormat(format: MatchFormat): GameRules {
   return Object.freeze({ ...DEFAULT_GAME_RULES, matchFormat: format });
@@ -43,7 +46,7 @@ export function rulesForFormat(format: MatchFormat): GameRules {
 
 /** Game-level snapshots are only needed when behavior differs from the legacy defaults. */
 export function hasNonDefaultGameRules(rules: GameRules): boolean {
-  return !rules.redDora || !rules.kuitan || !rules.uraDora || !rules.ippatsu || !rules.kanDora ||
+  return rules.cpuDifficulty !== 'standard' || !rules.redDora || !rules.kuitan || !rules.uraDora || !rules.ippatsu || !rules.kanDora ||
     !rules.dealerTenpaiRenchan || !rules.kyuushuKyuuhai || !rules.fourWinds || !rules.fourRiichi || !rules.fourKans ||
     rules.agariYame || rules.tenpaiYame || rules.renhou !== 'off' || rules.pao || rules.doubleYakuman ||
     !rules.multipleRon || rules.tripleRonAbortiveDraw;
@@ -53,15 +56,16 @@ export function hasNonDefaultGameRules(rules: GameRules): boolean {
 export function normalizeGameRules(value: unknown): GameRules {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return DEFAULT_GAME_RULES;
   const candidate = value as Record<string, unknown>;
-  if (![1, 2, 3, 4, 5].includes(candidate.schemaVersion as number) ||
+  if (![1, 2, 3, 4, 5, 6].includes(candidate.schemaVersion as number) ||
       (candidate.matchFormat !== 'tonpu' && candidate.matchFormat !== 'tonnan')) return DEFAULT_GAME_RULES;
-  const version = candidate.schemaVersion as 1 | 2 | 3 | 4 | 5;
+  const version = candidate.schemaVersion as 1 | 2 | 3 | 4 | 5 | 6;
   const legacy = version === 1;
   const allowed = new Set(version === 1 ? ['schemaVersion', 'matchFormat'] : version === 2 ?
     ['schemaVersion', 'matchFormat', 'redDora', 'uraDora', 'ippatsu', 'kanDora'] :
     version === 3 ? ['schemaVersion', 'matchFormat', 'redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora'] :
     ['schemaVersion', 'matchFormat', 'redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora', 'dealerTenpaiRenchan', 'kyuushuKyuuhai', 'fourWinds', 'fourRiichi', 'fourKans', 'agariYame', 'tenpaiYame',
-      ...(version === 5 ? ['renhou', 'pao', 'doubleYakuman', 'multipleRon', 'tripleRonAbortiveDraw'] : [])]);
+      ...(version >= 5 ? ['renhou', 'pao', 'doubleYakuman', 'multipleRon', 'tripleRonAbortiveDraw'] : []),
+      ...(version === 6 ? ['cpuDifficulty'] : [])]);
   if (Object.keys(candidate).some(key => !allowed.has(key))) return DEFAULT_GAME_RULES;
   const keys = version >= 3 ? ['redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora'] as const :
     ['redDora', 'uraDora', 'ippatsu', 'kanDora'] as const;
@@ -69,9 +73,10 @@ export function normalizeGameRules(value: unknown): GameRules {
   if (!legacy && keys.some(key => typeof candidate[key] !== 'boolean')) return DEFAULT_GAME_RULES;
   if (version >= 4 && added.some(key => typeof candidate[key] !== 'boolean')) return DEFAULT_GAME_RULES;
   const newKeys = ['pao', 'doubleYakuman', 'multipleRon', 'tripleRonAbortiveDraw'] as const;
-  if (version === 5 && (newKeys.some(key => typeof candidate[key] !== 'boolean') ||
+  if (version >= 5 && (newKeys.some(key => typeof candidate[key] !== 'boolean') ||
       !['off', 'mangan'].includes(candidate.renhou as string))) return DEFAULT_GAME_RULES;
-  return Object.freeze({ schemaVersion: 5, matchFormat: candidate.matchFormat,
+  if (version === 6 && !['beginner', 'standard', 'advanced'].includes(candidate.cpuDifficulty as string)) return DEFAULT_GAME_RULES;
+  return Object.freeze({ schemaVersion: 6, cpuDifficulty: version === 6 ? candidate.cpuDifficulty as CpuDifficulty : 'standard', matchFormat: candidate.matchFormat,
     redDora: legacy ? true : candidate.redDora as boolean,
     kuitan: version < 3 ? true : candidate.kuitan as boolean,
     uraDora: legacy ? true : candidate.uraDora as boolean,
@@ -100,13 +105,13 @@ export function isValidGameRules(value: unknown): boolean {
     Object.keys(candidate).every(key => candidate.schemaVersion === 1 ? key === 'schemaVersion' || key === 'matchFormat' :
       ['schemaVersion', 'matchFormat', 'redDora', 'uraDora', 'ippatsu', 'kanDora'].includes(key)) &&
     (candidate.schemaVersion === 1 || ['redDora', 'uraDora', 'ippatsu', 'kanDora'].every(key => typeof candidate[key] === 'boolean'));
-  if (![3, 4, 5].includes(candidate.schemaVersion as number) ||
+  if (![3, 4, 5, 6].includes(candidate.schemaVersion as number) ||
       (candidate.matchFormat !== 'tonpu' && candidate.matchFormat !== 'tonnan')) return false;
-  const schemaVersion = candidate.schemaVersion as 3 | 4 | 5;
+  const schemaVersion = candidate.schemaVersion as 3 | 4 | 5 | 6;
   const oldKeys = ['redDora', 'kuitan', 'uraDora', 'ippatsu', 'kanDora'];
   const added = ['dealerTenpaiRenchan', 'kyuushuKyuuhai', 'fourWinds', 'fourRiichi', 'fourKans', 'agariYame', 'tenpaiYame'];
   const v5 = ['renhou', 'pao', 'doubleYakuman', 'multipleRon', 'tripleRonAbortiveDraw'];
-  const versionKeys = [...oldKeys, ...(schemaVersion >= 4 ? added : []), ...(schemaVersion === 5 ? v5 : [])];
+  const versionKeys = [...oldKeys, ...(schemaVersion >= 4 ? added : []), ...(schemaVersion >= 5 ? v5 : []), ...(schemaVersion === 6 ? ['cpuDifficulty'] : [])];
   const expected = ['schemaVersion', 'matchFormat', ...versionKeys];
   return oldKeys.every(key => typeof candidate[key] === 'boolean') &&
     (schemaVersion < 4 || added.every(key => typeof candidate[key] === 'boolean')) &&
@@ -115,6 +120,7 @@ export function isValidGameRules(value: unknown): boolean {
       candidate.multipleRon !== undefined && typeof candidate.multipleRon === 'boolean' &&
       candidate.tripleRonAbortiveDraw !== undefined && typeof candidate.tripleRonAbortiveDraw === 'boolean' &&
       (candidate.renhou === 'off' || candidate.renhou === 'mangan'))) &&
+    (schemaVersion < 6 || ['beginner', 'standard', 'advanced'].includes(candidate.cpuDifficulty as string)) &&
     Object.keys(candidate).every(key => expected.includes(key));
 }
 
@@ -147,7 +153,7 @@ export function loadLastGameRules(storage: RulesStorage | null = browserStorage(
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return DEFAULT_GAME_RULES;
     const record = parsed as Record<string, unknown>;
-    if (![1, 2, 3, 4, STORAGE_VERSION].includes(record.version as number)) return DEFAULT_GAME_RULES;
+    if (![1, 2, 3, 4, 5, STORAGE_VERSION].includes(record.version as number)) return DEFAULT_GAME_RULES;
     return normalizeGameRules(record.rules);
   } catch { return DEFAULT_GAME_RULES; }
 }
@@ -167,6 +173,7 @@ export function describeConfirmedRules(rulesValue: unknown): readonly Readonly<{
   const rules = normalizeGameRules(rulesValue);
   return [
     { label: '対局形式', value: rules.matchFormat === 'tonnan' ? '半荘戦（東南戦）' : '東風戦' },
+    { label: 'CPUの強さ', value: rules.cpuDifficulty === 'beginner' ? '初級' : rules.cpuDifficulty === 'advanced' ? '上級' : '標準' },
     { label: '赤ドラ', value: rules.redDora ? 'あり（各色の五に1枚）' : 'なし（赤牌を使わない）' },
     { label: '喰いタン', value: rules.kuitan ? 'あり' : 'なし（門前の断么九は有効）' },
     { label: '和了条件', value: rules.renhou === 'mangan' ? '通常は役が必要（人和成立時は固定満貫で和了可）' : '役が必要（ドラのみでは和了不可）' },

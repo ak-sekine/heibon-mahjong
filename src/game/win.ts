@@ -54,7 +54,13 @@ export function selectWinCandidate(analysis: YakuAnalysis): YakuCandidate | null
 }
 
 /** Both methods use the same supported yaku, candidate selection and bonuses. */
-export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: PhysicalTile, winMethod: 'tsumo' | 'ron'): WinDetails | null {
+export function evaluateWin(
+  game: GameState,
+  playerId: PlayerId,
+  winningTile: PhysicalTile,
+  winMethod: 'tsumo' | 'ron',
+  options: Readonly<{ includeUraDora?: boolean }> = {},
+): WinDetails | null {
   const player = game.players[playerId];
   const tiles = [...player.hand, winningTile];
   const allPhysical = [...tiles, ...(player.melds ?? []).flatMap(m=>m.tiles)];
@@ -84,7 +90,8 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
     const renhouEligible = winMethod === 'ron' && rules.renhou === 'mangan' && isRenhouState(game, playerId, winningTile.id);
     if (!analysis.hasSupportedYaku && !renhouEligible) return null;
     const doraCount = countDora(allFaces, exposedDoraIndicators(game, rules).map(t => t.tile));
-    const uraDoraCount = rules.uraDora && player.riichi ? countDora(allFaces, uraDoraIndicators(game, rules).map(t => t.tile)) : 0;
+    const uraDoraCount = options.includeUraDora !== false && rules.uraDora && player.riichi
+      ? countDora(allFaces, uraDoraIndicators(game, rules).map(t => t.tile)) : 0;
     const redDoraCount = rules.redDora ? countRedDora(allFaces) : 0;
     const evaluated = analysis.candidates.filter(c => c.yaku.length > 0).map(candidate => {
       const doraHan = candidate.yakumanCount > 0 ? 0 : doraCount;

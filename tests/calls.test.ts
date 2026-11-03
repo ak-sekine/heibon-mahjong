@@ -169,5 +169,6 @@ test('CPU call policy suppresses an otherwise pointless open-tanyao pon when kui
  const g={...initial,phase:'awaiting-call',players:initial.players.map(p=>p.id===3?{...p,drawnTile:null,drawnTileSource:null,river:[called]}:p),ronWindow:{discarderId:3,tileId:called.id}} as GameState;
  const option=getCallOptions(g,1).find(candidate=>candidate.type==='pon');assert.ok(option);
  assert.equal(chooseCpuCall(g.players[1],[option],true)?.id,option.id);
+ assert.equal(chooseCpuCall(g.players[1],[option],true,'beginner'),null,'beginner skips an open tanyao call without an obvious value honor');
  assert.equal(chooseCpuCall(g.players[1],[option],false),null);
 });

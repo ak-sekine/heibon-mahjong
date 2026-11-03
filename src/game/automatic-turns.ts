@@ -188,7 +188,7 @@ export class AutomaticTurnRunner {
             ? this.stageSync(turn,'discard_selection',game,matchAccess?.read(),()=>currentPlayer.drawnTile!.id)
             : this.options.chooseDiscard
               ? this.stageSync(turn,'discard_selection',game,matchAccess?.read(),()=>this.options.chooseDiscard!(currentPlayer, this.options.random ?? Math.random))
-              : await this.stageAsync(turn,'discard_selection',game,matchAccess?.read(),()=>chooseShantenDiscardAsync(game, player.id, abort.signal));
+              : await this.stageAsync(turn,'discard_selection',game,matchAccess?.read(),()=>chooseShantenDiscardAsync(game, player.id, abort.signal, 6, this.options.random ?? Math.random));
           if (id === null || !current() || read() !== game || (matchAccess && matchAccess.read().status !== 'playing')) {
             this.completeCpuTurn(turn, 'state-changed', read().phase); return;
           }

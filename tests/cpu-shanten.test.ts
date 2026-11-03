@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chooseShantenDiscard, chooseShantenDiscardFromPublic, evaluateShantenDiscards, compareDiscardEvaluations, chooseShantenDiscardAsync, chooseRandomDiscard } from '../src/game/cpu.ts';
+import { chooseShantenDiscard, chooseAdvancedShantenDiscard, chooseCpuFallbackDiscard, publicRiichiDefenseInput, riichiDanger, chooseShantenDiscardFromPublic, evaluateShantenDiscards, compareDiscardEvaluations, chooseShantenDiscardAsync, chooseRandomDiscard } from '../src/game/cpu.ts';
 import { calculateShanten } from '../src/analysis/shanten.ts';
+import { exposedDoraIndicators } from '../src/game/dora.ts';
 import { ordinaryTile, TILE_KINDS, redFive, tileKindKey } from '../src/model/tile.ts';
+import { DEFAULT_GAME_RULES } from '../src/model/rules.ts';
 import { startGame } from '../src/game/start.ts';
 import { cpuRiichiStart } from './cpu-riichi-fixture.ts';
 import { seeded, freeze, inventory, allTiles } from './helpers.ts';
@@ -97,6 +99,49 @@ test('actual same-weight tie selects more effective kinds (seed 25)',()=>{
  assert.equal(best.tileId,'man-6-1');assert.equal(best.effectiveTileCount,14);assert.equal(best.effectiveKindCount,5);
  const other=values.find(v=>v.tileId==='pin-6-3')!;assert.equal(other.shanten,best.shanten);assert.equal(other.effectiveTileCount,14);assert.equal(other.effectiveKindCount,4);
  assert.equal(chooseShantenDiscard(g,1),best.tileId);
+});
+
+test('beginner uses shanten-only randomized ties with injectable reproducible randomness',()=>{
+ const g=startGame(seeded(25),1),p=g.players[1];
+ const data={tiles:[...p.hand,p.drawnTile!],visibleTiles:[g.deadWall[4]]};
+ const normal=chooseShantenDiscardFromPublic(data,'standard');
+ assert.equal(normal,'man-6-1');
+ assert.equal(chooseShantenDiscardFromPublic(data,'beginner',()=>0),'pin-6-3');
+ assert.equal(chooseShantenDiscardFromPublic(data,'beginner',()=>0),'pin-6-3');
+ assert.equal(chooseShantenDiscardFromPublic(data,'beginner',()=>0.999),'pin-6-0');
+ const result=evaluateShantenDiscards(data);
+ assert.equal(result.find(x=>x.tileId==='pin-6-3')!.shanten,result.find(x=>x.tileId===normal)!.shanten);
+ assert.ok(result.find(x=>x.tileId==='pin-6-3')!.effectiveKindCount < result.find(x=>x.tileId===normal)!.effectiveKindCount);
+ assert.throws(()=>chooseShantenDiscardFromPublic(data,'beginner',()=>1),RangeError);
+});
+
+test('advanced uses only public genbutsu to break otherwise equal efficiency ties',()=>{
+ const start=startGame(seeded(40),1),safe=start.liveWall[0];
+ const players=start.players.map(player=>player.id===2?{...player,riichi:{declarationTileId:safe.id},river:[safe]}:player) as unknown as typeof start.players;
+ const game={...start,players,liveWall:start.liveWall.slice(1)};
+ const before=structuredClone(game);
+ const standard=chooseShantenDiscard(game,1),advanced=chooseAdvancedShantenDiscard(game,1);
+ assert.equal(standard,'east-2');assert.equal(advanced,'green-1');
+ const defense=publicRiichiDefenseInput(game,1);
+ assert.equal(riichiDanger(defense,standard),1);assert.equal(riichiDanger(defense,advanced),0);
+ assert.deepEqual(Object.keys(defense).sort(),['opponents','ownTiles']);
+ assert.deepEqual(Object.keys(defense.opponents[0]).sort(),['declarationTileId','river']);
+ const input={tiles:[...game.players[1].hand,game.players[1].drawnTile!],visibleTiles:[...game.players.flatMap(p=>[...p.river,...(p.melds??[]).flatMap(m=>m.tiles)]),...exposedDoraIndicators(game,game.rules)]};
+ const values=evaluateShantenDiscards(input),a=values.find(x=>x.tileId===advanced)!,s=values.find(x=>x.tileId===standard)!;
+ assert.deepEqual([a.shanten,a.effectiveTileCount,a.effectiveKindCount],[s.shanten,s.effectiveTileCount,s.effectiveKindCount]);
+ const hidden={...game,players:game.players.map(p=>p.id===0?{...p,hand:[...p.hand].reverse()}:p),liveWall:[...game.liveWall].reverse(),deadWall:[...game.deadWall].reverse()} as typeof game;
+ assert.equal(chooseAdvancedShantenDiscard(hidden,1),advanced);
+ assert.deepEqual(game,before);
+});
+
+test('online timeout fallback stays legal and preserves each tier policy',()=>{
+ const g=startGame(seeded(25),1),p=g.players[1];
+ const standard=chooseCpuFallbackDiscard(g,1)!;
+ const beginner={...g,rules:{...DEFAULT_GAME_RULES,cpuDifficulty:'beginner' as const}};
+ const beginnerChoice=chooseCpuFallbackDiscard(beginner,1,()=>0)!;
+ assert.notEqual(beginnerChoice,standard);
+ for(const id of [standard,beginnerChoice]) assert.ok([...p.hand,p.drawnTile!].some(tile=>tile.id===id));
+ assert.equal(chooseCpuFallbackDiscard(beginner,1,()=>0),beginnerChoice);
 });
 
 test('theoretical zero shanten does not fabricate an available winning fifth tile',()=>{
