@@ -40,7 +40,7 @@
 
 ## 自動・ブラウザー検証
 
-- [人和・固定満貫 — Issue #38、2026-11-02](issue38-renhou-2026-11-02.md) — 実装コミット`6c7a84a`、固定局面テスト、Actions run [#563](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41546258846)のverify・Chromium／WebKit・Deploy gate・Worker／Pages公開successを記録。公開SHAは実装SHAと一致。iPhone Safari実機確認は未実施で、Issue #38はOpenのまま。
+- [人和・固定満貫 — Issue #38、2026-11-02〜11-03](issue38-renhou-2026-11-02.md) — 実装SHA `6c7a84ac0f38e791c7847270f04d455f659ed125`、固定局面テストとActions run `41546258846`のverify・Chromium／WebKit・Worker／Pages公開成功を照合。公開SHAは実装SHAと一致。2026-11-03のiPhone Safari実機確認はOK 5件、NG 0件、未確認3件。人和成立局面・高点法・不成立条件の実機再現は未確認で、自動検証と区別して記録。自動検証で受け入れ条件を確認できたためIssue #38はcompletedでClose。
 - [特殊形ダブル役満・GameRules v5 — Issue #37、2026-11-02](issue37-double-yakuman-2026-11-02.md) — 4形の判定・倍率、v1〜v4移行とv5保存、オフライン／オンライン／Worker同期、iPhone Safari実機OK 7件（表示・点数）、その他の実機未報告項目は自動検証と区別して記録。completedでClose。結果詳細の合計ラベル統一を含む公開SHA `87d5bf0`、Actions run [#41439154842](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41439154842)はverify・Chromium／WebKit・Worker／Pages gate成功。
 - [喰いタンON/OFF — Issue #17](issue17-local-rules-2026-11-01.md) — `GameRules` v3、ON/OFFの役・翻数・点数、CPU鳴き、保存・オンライン同期、自動テスト・GitHub Actions結果を記録します。2026-11-02のユーザー本人によるiPhone Safari実機確認はOK 4件、NG 0件、未確認2件。CPU判断は自動テスト根拠あり。片和了の一方のみ役成立する専用ケースは自動テスト未確認で、その範囲を記録してIssue #17をcompletedとしてClose。
 

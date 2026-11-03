@@ -24,7 +24,7 @@
 | 連荘・途中流局・オーラス終了条件 — Issue #18 | iPhone Safari指定6項目を実機確認済み（OK 6、NG 0、未確認 0）・completed／Closed | `GameRules` schema v4の独立した7項目を実装しました。初期値は親テンパイ連荘・九種九牌・四風連打・四家立直・四開槓がON、アガリやめ・テンパイやめがOFFです。精算、本場・供託、親進行、精算後の単独トップ判定を統合し、CPU・Worker・再接続・次局・再戦へ同じ設定を使います。2026-11-02、ユーザー本人がiPhone Safariで新規対局画面と初期値、設定保存、オフライン確認、オンライン作成・待機、再接続・再戦、CPU対局の次局進行を確認し、指定6項目すべてOKと報告しました。特殊な途中流局・精算やめ条件は実機OKとせず、自動テスト結果と区別しています。Actions run `41382073027`ではChromium 37件／WebKit 25件、Deploy gate、Worker・Pages公開がsuccessしました。Pages直接HTTP応答はCodex Cloudの接続プロキシ制限で未取得です。[検証記録](verification/issue18-local-rules-2026-11-02.md)。 |
 | 和了結果概要の点数区分 — Issue #36 | 完了・completed／Close（iPhone Safari実機OK 6件・NG 0件・未確認1件） | 計算済みの`scoreTier`を使い満貫未満は翻数・符数、満貫〜三倍満は翻数・区分、数え役満・役満系は区分のみを表示します。オフライン・オンライン共通表示で、既存の点数計算・支払い・ドラ合計・「局の結果」の符内訳は維持しました。Actions [run #558](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41483482522)でverify、Chromium／WebKit、matrix audit、Worker／Pages公開がsuccess。2026-11-03のユーザー本人によるiPhone Safari確認は7項目中6件OK、役満系の表示1件は実機未確認。3翻70符・4翻30符／40符の個別実機再現も未報告であり、自動テストとは区別しています。[検証記録](verification/issue36-win-score-tier-2026-11-02.md)。 |
 | 特殊形ダブル役満・共通ルール基盤 — Issue #37 | completed・Close／自動検証・公開成功／iPhone Safari実機OK 7件（表示・点数） | GameRules/localStorage schema v5を導入し、四暗刻単騎・国士十三面・純正九蓮・大四喜の一括OFF/ONを追加。各役の倍率を候補に保持し、点数・CPU・Worker公開結果で共有します。表示は1倍「役満」、2倍「ダブル役満」、3倍「トリプル役満」、4倍「4倍役満」、5倍以上「N倍役満」に統一します。和了結果詳細の通常役・役満の合計ラベルも「合計：」に統一しました。人和・パオ・複数ロン・三家和の初期値・正規化・保存・同期型も追加しましたが、変更UIとゲーム動作は後続Issueの対象です。初回実装はActions run [#41414647412](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41414647412)、表示名称更新は[#41429120006](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41429120006)、合計ラベル統一は[#41439154842](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41439154842)でverify、Chromium／WebKit、Deploy gate、production-test、Worker／Pages publishがsuccessしました。最新公開SHAは`87d5bf0`。iPhone Safariで表示・点数の7項目がOK（NG 0、未確認 0）。その他の個別実機未報告項目は自動検証と区別して記録し、IssueをcompletedでCloseしました。[Issue #37検証記録](verification/issue37-double-yakuman-2026-11-02.md)。 |
-| 人和・固定満貫 — Issue #38 | 自動検証・Actions・Worker／Pages公開成功／iPhone Safari実機確認待ち・Issue Open | GameRules v5の人和ON/OFFを利用し、子の第一自摸前・局内の鳴き／槓なしの有効ロンだけを独立した固定満貫候補として扱います。通常役候補は役・ドラ込みの和了点（本場・供託を除く）で比較し、8,000点を超える場合だけ通常得点を採用します。Actions [run #563](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41546258846)でverify、Chromium／WebKit、matrix audit、release-freshness、Worker／production-test、Pages build／deployがsuccessし、Worker／Pages成功SHAは実装SHA`6c7a84a`と一致しました。ユーザーのiPhone Safari実機確認は未実施のためIssue #38はOpenです。[検証記録](verification/issue38-renhou-2026-11-02.md)。 |
+| 人和・固定満貫 — Issue #38 | completed・Close／自動検証・公開成功／iPhone Safari実機OK 5件、NG 0件、未確認3件 | GameRules v5の人和ON/OFFを利用し、子の第一自摸前・局内の鳴き／槓なしの有効ロンだけを独立した固定満貫候補として扱います。通常役候補は役・ドラ込みの和了点（本場・供託を除く）で比較し、8,000点を超える場合だけ通常得点を採用します。Actions run [41546258846](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41546258846)のverify、Chromium／WebKit、matrix audit、release-freshness、Worker／production-test、Pages build／deployがsuccessし、Worker／Pages成功SHAは実装SHA `6c7a84ac0f38e791c7847270f04d455f659ed125`と一致しました。2026-11-03のユーザー本人によるiPhone Safari確認はOK 5件、NG 0件、未確認3件。人和成立局面・高点法・不成立条件の実機確認は未確認のまま、自動テストと区別して記録しました。[検証記録](verification/issue38-renhou-2026-11-02.md)。 |
 | 和了概要のドラ合計 — Issue #11 | 実機確認済み（指定4件OK、NG 0件、未確認4件）・完了／completedでClose | 共有の和了概要に計算済みの通常ドラ・裏ドラ・赤ドラ枚数の合計を表示し、0枚は省略します。Actions run 41196608100は実装SHAと一致し、verify、Browser UI、production-test、Worker/Pages deployが成功しました。長い役名の非重複、3種ドラの実機合算、オンラインのホスト・参加者間一致、再接続後の結果復元は未確認で、自動検証済み項目と区別しています。[検証記録](verification/issue11-dora-summary-2026-10-31.md)を参照してください。 |
 | 診断ログの閉じるボタン折り返し — Issue #10 | 実機確認済み・完了／Close | `#diagnostic-close`のflex縮小を止めてラベルを1行に固定し、長いビルド情報・ログ本文はダイアログ内で折り返します。Actions run 41191873055で1,301件のテスト、Worker型検査、Chromium/WebKitの320/375/390/414px Browser UI、本番Worker test、Worker/Pages deployがすべてsuccessしました。2026-10-31にユーザー本人がiPhone Safariで「閉じる」の1行表示・閉じる操作、コピー、クリア、ログ本文スクロール、他ダイアログの閉じる操作を確認し、5項目すべてOK（NG 0件）と報告しました。ログ件数別の実機確認、長いビルドID・長文ログの実機再現、機種・iOSバージョン・確認時刻は未報告です。[検証記録](verification/diagnostic-close-issue10-2026-10-31.md) |
 | 全ボタン共通配色・右上メニュー — Issue #24 | 完了・Close（実機確認範囲を限定） | 通常操作ボタンの通常 `#F8DC91 / #154E3C`、押下 `#E9C66A / #154E3C`、無効 `#9DA27C / #20352C` を共通化しました。メニュー項目とハンバーガートグルは専用UIに分離済みです。Deploy run 41171398665 はsuccessし、Actionsログで `npm test` 1,292件成功・失敗0件、Chromium 35件・WebKit 21件成功、Worker型検査、build、Worker／Pages deploy成功を確認しました。2026-10-31にユーザー本人がiPhone Safariでメニュー表示と開閉・項目選択・外側タップ・連続タップ・4項目・通常ボタン操作を確認し、正常と報告しました。Android Chrome実機は端末がないため未確認ですが、今回の必須条件から除外しました。PC Firefox実機、PWAインストール状態、公開配信CSSのcomputed style、全ボタン種別・状態の網羅実機確認も未確認で、Close条件ではありません。Android実機検証用のIssueは作成しません。[ハンバーガーメニュー記録](verification/main-menu-toggle-style-2026-10-31.md) · [ドロップダウン記録](verification/menu-dropdown-style-2026-10-31.md) · [全ボタン配色記録](verification/button-role-colors-issue24-2026-10-30.md) · [Issue #24](https://github.com/ak-sekine/heibon-mahjong/issues/24) |
@@ -59,7 +59,7 @@
 | チー・ポン・喰い替え制限 | 完了 | CPUの基本的な鳴き判断を含みます。 |
 | 暗カン・大明カン・加カン — Issue #25 | 実機確認済み・完了（通常対局は未確認） | 親の配牌直後・子の第一通常ツモ後の暗カンを含みます。複数候補の選択、嶺上開花・槍槓・カンドラ・四開槓を実装しています。2026-10-31、ユーザー本人がiPhone Safariでカン検証ページを操作し、ページ全体に問題なしと報告しました。通常オフライン／オンライン対局の親の初手暗カンは対象局面を実機で再現していないため未確認です。候補判定・合法性は通常対局、検証ページ、オンラインサーバーで共通の処理を使用します。従来のカン実機確認は[記録](verification/kan-safari-2026-10-18.md)、Issue #25の自動・実機確認と未確認範囲は[記録](verification/issue25-opening-ankan-2026-10-31.md)を参照してください。 |
 | CPUの手牌判断 | 一部実装 | 向聴数・有効牌・見えている牌を使う打牌と、限定的な鳴き・カン・立直判断があります。長期探索や強い戦略はありません。 |
-| 対局ルール拡張 — Issue #19 | 設計完了・実装Issueへ分割（#37 completed） | 人和・パオ・特殊形ダブル役満・複数ロン／三家和の確定仕様、既存コードとの差分、受入テスト計画、連盟公式資料の確認範囲と独自仕様の差を記録。#37で特殊形ダブル役満とGameRules v5共通基盤を実装し、Safari実機の表示・点数7項目OKを記録してcompletedでCloseしました。Issue #38の人和は実装・公開済みでiPhone Safari実機確認待ちです。残りの実装順は[#39](https://github.com/ak-sekine/heibon-mahjong/issues/39)パオ → [#40](https://github.com/ak-sekine/heibon-mahjong/issues/40)複数ロン・三家和。#6の設定保存、#18の途中流局精算を再利用します。[Issue #19設計記録](verification/issue19-unimplemented-rules-2026-11-02.md)。 |
+| 対局ルール拡張 — Issue #19 | 設計完了・実装Issueへ分割（#37 completed） | 人和・パオ・特殊形ダブル役満・複数ロン／三家和の確定仕様、既存コードとの差分、受入テスト計画、連盟公式資料の確認範囲と独自仕様の差を記録。#37で特殊形ダブル役満とGameRules v5共通基盤を実装し、Safari実機の表示・点数7項目OKを記録してcompletedでCloseしました。Issue #38の人和は実装・自動検証・公開済みでcompletedとしてCloseしました。iPhone Safari実機確認は5件OK、3件未確認で、未確認局面は自動テストの結果と区別しています。残りの実装順は[#39](https://github.com/ak-sekine/heibon-mahjong/issues/39)パオ → [#40](https://github.com/ak-sekine/heibon-mahjong/issues/40)複数ロン・三家和。#6の設定保存、#18の途中流局精算を再利用します。[Issue #19設計記録](verification/issue19-unimplemented-rules-2026-11-02.md)。 |
 
 ## Step 13.6・13.7 完了範囲
 
@@ -97,7 +97,7 @@ Step 13.6と13.7で以下の11種類を実装・検証しました。
 
 Step 13.8までの役満10種類に、Step 13.11で天和・地和を加え、計12種類に対応しています。異なる役満は同じ和了候補内で個別倍率を合算し、同じ種類は1回だけ数えます。特殊形ダブル役満ON時は四暗刻単騎・純正九蓮宝燈・大四喜・国士無双十三面待ちが2役満、OFF時と他の役満は1役満です。天和・地和は倍付けしません。
 
-人和はIssue #38で固定満貫として実装済みですが、iPhone Safari実機確認待ちのためIssueはOpenです。責任払い（パオ）は未実装です。Issue #19では人和・パオ・特殊形ダブル役満・複数ロン・三家和の仕様を確定し、実装設計を記録しています。四開槓による途中流局と、1人が4回カンしたときに続行するルールを実装しています。[Issue #19設計記録](verification/issue19-unimplemented-rules-2026-11-02.md)。
+人和はIssue #38で固定満貫として実装・自動検証・公開済みで、completedとしてCloseしました。2026-11-03のiPhone Safari実機確認は5件OK、NG 0件、3件未確認です。責任払い（パオ）は未実装です。Issue #19では人和・パオ・特殊形ダブル役満・複数ロン・三家和の仕様を確定し、実装設計を記録しています。四開槓による途中流局と、1人が4回カンしたときに続行するルールを実装しています。[Issue #19設計記録](verification/issue19-unimplemented-rules-2026-11-02.md)。
 
 ## Step 13.9 完了範囲
 
@@ -136,7 +136,7 @@ Step 13.8までの役満10種類に、Step 13.11で天和・地和を加え、�
 | 四風連打 | 完了。4人の第一打が同じ風牌なら、4枚目へのロン解決後に成立 |
 | 四家立直 | 完了。4人目の宣言牌へのロン解決と供託後に成立 |
 | 天和・地和 | 完了。天和は正当な親の配牌時ツモ、地和は鳴き・カンのない子の第一ツモ。いずれも既存役満と複合し、1役満 |
-| 人和 — Issue #38 | 実装済み・Actions／Worker／Pages公開成功、iPhone Safari実機確認待ち／Issue Open |
+| 人和 — Issue #38 | 完了・completed／Actions・Worker／Pages公開成功、iPhone Safari実機OK 5件・NG 0件・未確認3件 |
 | その他必要な流局ルール | 検討中 |
 
 四開槓を含む途中流局は親を維持し、本場を1つ増やし、供託を持ち越し、ノーテン罰符を行いません。途中流局だけを理由に東風戦を終了しません。通常の荒牌流局とは区別して精算します。
@@ -147,7 +147,7 @@ Step 13.8までの役満10種類に、Step 13.11で天和・地和を加え、�
 
 ## Step 13.11 完了範囲
 
-天和・地和を各1役満として追加しました。親の配牌14枚によるツモ和了を有効にし、子の第一ツモはそれ以前に通常打牌があっても成立しますが、鳴き・カン後やロンでは成立しません。通常形・七対子・国士無双の候補に追加し、候補内の既存役満と合算します。詳細は[SPEC.md](SPEC.md)を参照してください。特殊形ダブル役満はIssue #37、人和はIssue #38で実装し、人和はiPhone Safari実機確認待ちです。責任払いは未実装です。
+天和・地和を各1役満として追加しました。親の配牌14枚によるツモ和了を有効にし、子の第一ツモはそれ以前に通常打牌があっても成立しますが、鳴き・カン後やロンでは成立しません。通常形・七対子・国士無双の候補に追加し、候補内の既存役満と合算します。詳細は[SPEC.md](SPEC.md)を参照してください。特殊形ダブル役満はIssue #37、人和はIssue #38で実装し、人和は実機確認8項目中5件OK、3件未確認でIssue #38をcompletedとしてCloseしました。未確認局面は自動検証と区別しています。責任払いは未実装です。
 
 ### その他
 
