@@ -36,7 +36,7 @@ export type YakuId = 'rinshan' | 'chankan' | 'sankantsu' | 'suukantsu' | 'ippats
   'chanta' | 'junchan' | 'sanshoku-doukou' | 'sanshoku-doujun' | 'ittsu' | 'honitsu' | 'chinitsu' |
   'kokushi-musou' | 'suuankou' | 'daisangen' | 'tsuuiisou' | 'ryuuiisou' | 'chinroutou' | 'haitei' | 'houtei' |
   'shousuushii' | 'daisuushii' | 'chuuren-poutou' | 'tenhou' | 'chiihou' | 'renhou';
-type YakumanYakuId = Extract<YakuId, 'kokushi-musou' | 'suukantsu' | 'suuankou' | 'daisangen' |
+export type YakumanYakuId = Extract<YakuId, 'kokushi-musou' | 'suukantsu' | 'suuankou' | 'daisangen' |
   'tsuuiisou' | 'ryuuiisou' | 'chinroutou' | 'shousuushii' | 'daisuushii' | 'chuuren-poutou' | 'tenhou' | 'chiihou'>;
 type NormalYakuId = Exclude<YakuId, YakumanYakuId | 'renhou'>;
 type NormalYakuHan = 1 | 2 | 3 | 5 | 6;

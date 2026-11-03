@@ -1,5 +1,5 @@
 import { winningMelds } from './melds.ts';
-import type { GameState, PlayerId } from '../model/game.ts';
+import type { GameState, PaoYakuId, PlayerId } from '../model/game.ts';
 import type { MatchState, MatchFormat, Points, RoundSettlement, SettlementPayment, RoundWind } from '../model/match.ts';
 import { hasNonDefaultGameRules, normalizeGameRules, rulesForFormat, rulesForMatch, type GameRules } from '../model/rules.ts';
 import { ordinaryTile } from '../model/tile.ts';
@@ -59,11 +59,28 @@ export function settleRound(match: MatchState): MatchState {
     for (const winner of winners) {
       const payers = new Set<PlayerId>();
       for (const payment of winner.payments) {
-        if (payers.has(payment.playerId) || (win.winMethod === 'ron' && payment.playerId !== win.discarderId)) throw new RangeError('Duplicate or invalid payer');
+        const paoPayers = new Set((winner.yakumanBreakdown ?? []).flatMap(entry =>
+          entry.responsiblePlayerId === undefined ? [] : [entry.responsiblePlayerId]));
+        if (payers.has(payment.playerId) || payment.playerId === winner.winnerId ||
+            (win.winMethod === 'ron' && payment.playerId !== win.discarderId && !paoPayers.has(payment.playerId))) {
+          throw new RangeError('Duplicate or invalid payer');
+        }
         payers.add(payment.playerId);
-        transfer(payment.playerId,winner.winnerId,payment.points,match.honba*(win.winMethod === 'ron' ? 300 : 100));
+        // One honba is charged once. With distinct responsible parties, use the
+        // first established Pao role that applies to this win.
+        const paoTsumoResponsible = win.winMethod === 'tsumo'
+          ? (match.game.paoResponsibilityOrder ?? Object.keys(match.game.paoResponsibilities ?? {}) as PaoYakuId[])
+            .map(yakuId => winner.yakumanBreakdown?.find(entry => entry.yakuId === yakuId && entry.responsiblePlayerId !== undefined)?.responsiblePlayerId)
+            .find(playerId => playerId !== undefined)
+          : undefined;
+        const honba = win.winMethod === 'ron'
+          ? payment.playerId === win.discarderId ? match.honba * 300 : 0
+          : paoTsumoResponsible === undefined ? match.honba * 100
+            : payment.playerId === paoTsumoResponsible ? match.honba * 300 : 0;
+        transfer(payment.playerId,winner.winnerId,payment.points,honba);
       }
-      if (payers.size !== (win.winMethod === 'ron' ? 1 : 3) || winner.payments.reduce((sum,p)=>sum+p.points,0) !== winner.totalPoints) throw new RangeError('Incomplete payments');
+      if ((!winner.payments.length || win.winMethod === 'tsumo' && !winner.yakumanBreakdown && payers.size !== 3) ||
+          winner.payments.reduce((sum,p)=>sum+p.points,0) !== winner.totalPoints) throw new RangeError('Incomplete payments');
     }
   } else if (nagashiWinners.length) {
     for (const winnerId of nagashiWinners) {

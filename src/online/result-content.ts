@@ -146,6 +146,23 @@ function renderWin(container: HTMLElement, view: PlayerGameView, winner: PublicW
       `${name} ${yaku.yakuman > 0 ? yakumanMultiplierName(yaku.yakuman) : `${yaku.han}翻`}`));
   }
   section.append(yakuList);
+  const paoBreakdown = winner.yakumanBreakdown?.filter(entry => entry.responsiblePlayerId !== undefined);
+  if (paoBreakdown?.length) {
+    const details = document.createElement('details');
+    details.className = 'pao-details';
+    details.append(text('summary', 'パオ・役満別の支払い内訳'));
+    const breakdown = document.createElement('ul');
+    for (const entry of winner.yakumanBreakdown!) {
+      const name = yakuDisplayName(entry.yakuId as YakuId) || entry.yakuId;
+      const responsible = entry.responsiblePlayerId === undefined
+        ? '通常精算' : `責任者 ${playerName(view, entry.responsiblePlayerId)}`;
+      breakdown.append(text('li', `${name}：${responsible}（${yakumanMultiplierName(entry.yakuman)}）`));
+      for (const share of entry.payerShares) breakdown.append(text('li',
+        `　${playerName(view, share.playerId)} → ${playerName(view, winner.winnerId)} ${share.points.toLocaleString('ja-JP')}点（${share.pao ? '責任払い' : '通常払い'}）`));
+    }
+    details.append(breakdown);
+    section.append(details);
+  }
   if (winner.yakumanCount > 0) {
     section.append(text('p', winTotalLabel(winner.yakumanCount, winner.han)));
   } else {

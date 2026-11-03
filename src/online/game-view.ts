@@ -1,6 +1,6 @@
 import type { FuEntry } from '../analysis/fu.ts';
 import type { ScoreTier } from '../analysis/score.ts';
-import type { GameState, OpenMeld, PhysicalTile, PlayerId, PlayerState, WinDetails } from '../model/game.ts';
+import type { GameState, OpenMeld, PaoYakuId, PhysicalTile, PlayerId, PlayerState, WinDetails, YakumanPaymentBreakdown } from '../model/game.ts';
 import type { MatchState, MatchFormat, RoundSettlement, RoundWind } from '../model/match.ts';
 import type { Tile } from '../model/tile.ts';
 import type { PublicDeclarationEvent } from '../model/declaration.ts';
@@ -47,6 +47,7 @@ export type PublicWinSummary = Readonly<{
   rawFu: number | null;
   scoreTier: ScoreTier;
   yakumanCount: number;
+  yakumanBreakdown?: readonly YakumanPaymentBreakdown[];
   yaku: readonly Readonly<{ id: string; han: number; yakuman: number }>[];
   dora: Readonly<{ normal: number; ura: number; red: number }>;
   doraCounts: Readonly<{ normal: number; ura: number; red: number }>;
@@ -80,6 +81,10 @@ export type PlayerGameView = Readonly<{
   format: MatchFormat;
   roomCode: string;
   gameRevision: number;
+  /** Worker-confirmed, public responsibility created by a completed call or kan. */
+  paoResponsibilities?: Partial<Readonly<Record<PaoYakuId, PlayerId>>>;
+  /** Establishment order is public and lets clients verify identical round state. */
+  paoResponsibilityOrder?: readonly PaoYakuId[];
   /** Public declarations are retained so clients can catch up between snapshots. */
   declarations: readonly PublicDeclarationEvent[];
   viewerSeat: PlayerId;
@@ -220,6 +225,7 @@ function publicWin(
     rawFu: result.rawFu,
     scoreTier: result.scoreTier,
     yakumanCount: result.yakumanCount,
+    ...(result.yakumanBreakdown ? { yakumanBreakdown: result.yakumanBreakdown } : {}),
     yaku: result.candidate.yaku.map(entry => ({ id: entry.id, han: entry.han, yakuman: entry.yakuman })),
     dora: { normal: result.doraHan, ura: result.uraDoraHan, red: result.redDoraHan },
     doraCounts: { normal: result.doraCount, ura: result.uraDoraCount, red: result.redDoraCount },
@@ -331,6 +337,10 @@ export function createPlayerGameView(
     format: match.format ?? 'tonpu',
     roomCode,
     gameRevision: session.gameRevision,
+    ...(rules.pao && game.paoResponsibilities ? {
+      paoResponsibilities: { ...game.paoResponsibilities },
+      paoResponsibilityOrder: game.paoResponsibilityOrder ?? Object.keys(game.paoResponsibilities) as PaoYakuId[],
+    } : {}),
     declarations: session.declarations ?? [],
     viewerSeat,
     status: session.status,

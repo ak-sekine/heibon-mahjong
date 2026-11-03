@@ -4,17 +4,22 @@ import os
 import pathlib
 import shutil
 from playwright.sync_api import sync_playwright
+ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 
 BASE_URL = os.environ.get('HEIBON_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 OUT.mkdir(parents=True, exist_ok=True)
 SCENARIOS = [
-    ('step13-8-single-yakuman', ['daisangen'], '大三元', '役満', 48000),
-    ('step13-8-multiple-yakuman', ['ryuuiisou', 'suuankou'], '緑一色', 'ダブル役満', 64000),
+    ('step13-8-single-yakuman', 'step13-8-single-yakuman', ['daisangen'], '大三元', '役満', 48000, False),
+    ('step13-8-multiple-yakuman', 'step13-8-multiple-yakuman', ['ryuuiisou', 'suuankou'], '緑一色', 'ダブル役満', 64000, False),
+    ('issue39-pao-daisangen-result', 'step13-8-single-yakuman', ['daisangen'], '大三元', '役満', 48000, True),
 ]
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'), args=['--no-sandbox'])
+    browser_type = getattr(p, ENGINE)
+    browser = browser_type.launch(
+        **({'executable_path': os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'), 'args': ['--no-sandbox']}
+           if ENGINE == 'chromium' else {}))
     page = browser.new_page(viewport={'width': 390, 'height': 844})
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
@@ -30,24 +35,27 @@ with sync_playwright() as p:
     page.wait_for_function('typeof window.step138Test === "object"')
     results = []
 
-    for scenario, expected_ids, expected_name, count_label, expected_points in SCENARIOS:
+    for scenario, fixture_scenario, expected_ids, expected_name, count_label, expected_points, pao in SCENARIOS:
         setup = page.evaluate('''async scenario => {
-          const [fixtures, match] = await Promise.all([
+          const [fixtures, match, rules] = await Promise.all([
             import('/heibon-mahjong/tests/scoring-fixture.ts'),
             import('/heibon-mahjong/src/game/match.ts'),
+            import('/heibon-mahjong/src/model/rules.ts'),
           ]);
           window.step138Test.controller.newGame();
-          const game = fixtures.scoringGame(scenario);
-          window.step138Test.controller.match = match.startMatch(game);
+          const game = fixtures.scoringGame(scenario.fixture);
+          const prepared = scenario.pao ? { ...game, rules: { ...rules.DEFAULT_GAME_RULES, pao: true },
+            paoResponsibilities: { daisangen: 3 } } : game;
+          window.step138Test.controller.match = match.startMatch(prepared, prepared.rules ?? 'tonpu');
           window.step138Test.render();
-          const physical = [...game.liveWall, ...game.deadWall, ...game.players.flatMap(player => [
+          const physical = [...prepared.liveWall, ...prepared.deadWall, ...prepared.players.flatMap(player => [
             ...player.hand, ...(player.drawnTile ? [player.drawnTile] : []), ...player.river,
             ...(player.melds ?? []).flatMap(meld => meld.tiles),
           ])];
-          return { phase: game.phase, idsUnique: physical.length === 136 && new Set(physical.map(tile => tile.id)).size === 136,
-            privateIds: game.players.slice(1).flatMap(player => [...player.hand,
+          return { phase: prepared.phase, idsUnique: physical.length === 136 && new Set(physical.map(tile => tile.id)).size === 136,
+            privateIds: prepared.players.slice(1).flatMap(player => [...player.hand,
               ...(player.drawnTile ? [player.drawnTile] : [])]).map(tile => tile.id) };
-        }''', scenario)
+        }''', {'fixture': fixture_scenario, 'pao': pao})
         assert setup['phase'] == 'awaiting-discard' and setup['idsUnique'], setup
         assert page.locator('#tsumo').is_visible() and page.locator('#tsumo').is_enabled(), 'tsumo action unavailable'
         page.locator('#tsumo').click()
@@ -94,6 +102,16 @@ with sync_playwright() as p:
         assert '（子） →' in detail_text, detail_text
         if scenario == 'step13-8-multiple-yakuman':
             assert '（親） →' in detail_text, detail_text
+        if pao:
+            pao_details = section.locator('.pao-details')
+            assert pao_details.count() == 1
+            pao_details.locator('summary').click()
+            assert '責任者 CPU3' in pao_details.inner_text(), detail_text
+            assert '責任払い' in pao_details.inner_text() and 'CPU3 → 自分 48000点' in pao_details.inner_text(), detail_text
+            page.set_viewport_size({'width': 320, 'height': 844})
+            layout = pao_details.evaluate('element => ({width: element.clientWidth, scroll: element.scrollWidth, height: element.getBoundingClientRect().height})')
+            assert layout['scroll'] <= layout['width'] and layout['height'] > 0, layout
+            page.set_viewport_size({'width': 390, 'height': 844})
         page.locator('#view-table').click()
         assert not page.locator('#result-dialog').is_visible(), 'table button failed to close details'
         page.locator('#next-round').click()
@@ -107,7 +125,7 @@ with sync_playwright() as p:
             'totalPoints': expected_points, 'viewport': [390, 844], 'result': 'pass'})
 
     assert not errors, errors
-    report = {'step': '13.8', 'scenarios': results, 'result': 'pass'}
+    report = {'step': '13.8 / Issue 39', 'browser': ENGINE, 'scenarios': results, 'result': 'pass'}
     print(json.dumps(report, ensure_ascii=False), flush=True)
     (OUT / 'step13-8-browser.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     page.close()

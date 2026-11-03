@@ -2,12 +2,46 @@ import { tileKindKey } from '../model/tile.ts';
 import { concealedSize, winningMelds, isClosedHand, kanMeldCount } from './melds.ts';
 import { calculateFu } from '../analysis/fu.ts';
 import { calculateFixedManganRonScore, calculateScore } from '../analysis/score.ts';
-import type { GameState, PhysicalTile, PlayerId, SeatWind, WinDetails } from '../model/game.ts';
-import { analyzeYaku, type YakuAnalysis, type YakuCandidate } from '../analysis/yaku.ts';
+import type { GameState, PhysicalTile, PlayerId, SeatWind, WinDetails, YakumanPaymentBreakdown } from '../model/game.ts';
+import { analyzeYaku, type YakuAnalysis, type YakuCandidate, type YakumanYakuId } from '../analysis/yaku.ts';
 import { countDora, countRedDora } from '../analysis/dora.ts';
 import { exposedDoraIndicators, uraDoraIndicators } from './dora.ts';
 import { isChiihouState, isRenhouState, isTenhouState } from './first-turn-wins.ts';
 import { rulesForGame } from '../model/rules.ts';
+import { paoResponsiblePlayer } from './pao.ts';
+
+const paoYaku = new Set<YakumanYakuId>(['daisangen', 'daisuushii', 'suukantsu']);
+
+function allocateYakumanPao(game: GameState, candidate: YakuCandidate, winnerId: PlayerId, dealerId: PlayerId,
+  winMethod: 'tsumo' | 'ron', discarderId?: PlayerId): Pick<WinDetails, 'payments' | 'totalPoints' | 'yakumanBreakdown'> | null {
+  const components = candidate.yaku.filter(yaku => yaku.yakuman > 0);
+  const responsibilities = components.map(yaku => ({ yaku, responsiblePlayerId:
+    paoYaku.has(yaku.id as YakumanYakuId) ? paoResponsiblePlayer(game, yaku.id as 'daisangen' | 'daisuushii' | 'suukantsu') : undefined }));
+  if (!responsibilities.some(item => item.responsiblePlayerId !== undefined)) return null;
+  const byPayer = new Map<PlayerId, number>();
+  const breakdown: YakumanPaymentBreakdown[] = [];
+  for (const { yaku, responsiblePlayerId } of responsibilities) {
+    const component = calculateScore({ totalHanIncludingDora: 0, fu: null, yakumanCount: yaku.yakuman,
+      winnerId, dealerId, winMethod, ...(discarderId === undefined ? {} : { discarderId }) });
+    const shares = new Map<PlayerId, { points: number; pao: boolean }>();
+    if (responsiblePlayerId === undefined) {
+      for (const payment of component.payments) shares.set(payment.playerId, { points: payment.points, pao: false });
+    } else if (winMethod === 'tsumo') {
+      shares.set(responsiblePlayerId, { points: component.totalPoints, pao: true });
+    } else if (discarderId === responsiblePlayerId) {
+      shares.set(responsiblePlayerId, { points: component.totalPoints, pao: true });
+    } else {
+      const half = Math.floor(component.totalPoints / 200) * 100;
+      shares.set(responsiblePlayerId, { points: half, pao: true });
+      shares.set(discarderId!, { points: component.totalPoints - half, pao: true });
+    }
+    for (const [playerId, share] of shares) byPayer.set(playerId, (byPayer.get(playerId) ?? 0) + share.points);
+    breakdown.push({ yakuId: yaku.id as YakumanYakuId, yakuman: yaku.yakuman, responsiblePlayerId,
+      payerShares: [...shares].map(([playerId, share]) => ({ playerId, ...share })) });
+  }
+  const payments = [...byPayer].sort(([a], [b]) => a - b).map(([playerId, points]) => ({ playerId, points }));
+  return { payments, totalPoints: payments.reduce((sum, payment) => sum + payment.points, 0), yakumanBreakdown: breakdown };
+}
 
 /** Default round wind for legacy game states without an explicit wind. */
 export const ROUND_WIND: SeatWind = 'east';
@@ -61,9 +95,14 @@ export function evaluateWin(game: GameState, playerId: PlayerId, winningTile: Ph
       const score = calculateScore({ totalHanIncludingDora, fu: fu.fu, yakumanCount: candidate.yakumanCount,
         winnerId: playerId, dealerId: game.dealerId, winMethod,
         discarderId: winMethod === 'ron' ? game.ronWindow?.discarderId : undefined });
+      const paoAllocation = candidate.yakumanCount > 0
+        ? allocateYakumanPao(game, candidate, playerId, game.dealerId, winMethod,
+          winMethod === 'ron' ? game.ronWindow?.discarderId : undefined) : null;
       return { winnerId: playerId, winningTileId: winningTile.id, analysis, candidate,
         totalHan: candidate.totalHan, yakuHan: candidate.totalHan, yakumanCount: candidate.yakumanCount,
-        doraCount, doraHan, uraDoraCount, uraDoraHan, redDoraCount, redDoraHan, totalHanIncludingDora, ...fu, ...score };
+        doraCount, doraHan, uraDoraCount, uraDoraHan, redDoraCount, redDoraHan, totalHanIncludingDora, ...fu, ...score,
+        ...(paoAllocation ? { payments: paoAllocation.payments, totalPoints: paoAllocation.totalPoints,
+          yakumanBreakdown: paoAllocation.yakumanBreakdown } : {}) };
     });
     const ordinary = selectScoredWinCandidate(evaluated);
     if (!renhouEligible) return ordinary;

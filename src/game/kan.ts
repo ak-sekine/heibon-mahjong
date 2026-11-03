@@ -7,6 +7,7 @@ import { analyzeWinningShapes } from '../analysis/winning-shape.ts';
 import { calculateShanten } from '../analysis/shanten.ts';
 import { isTenhouState } from './first-turn-wins.ts';
 import { rulesForGame } from '../model/rules.ts';
+import { recordFourKanPao, recordSetPao } from './pao.ts';
 
 export interface KanOption {
   readonly id: string;
@@ -71,7 +72,9 @@ export function completeKan(game: GameState, option: Omit<KanOption,'id'>): Game
   const distributed=count===3 && rulesForGame(game).fourKans && players.filter(p=>(p.melds ?? []).some(m=>m.tiles.length===4)).length>1;
   // Four distributed kans end immediately on confirmation, before any win/discard.
   // The reserved fourth rinshan is still transferred to keep all 136 IDs unique.
-  return cancelAllIppatsu({...game,turnPlayerId:p.id,players,deadWall,liveWall:game.liveWall.slice(0,-1),kanCount:count+1,callsMade:true,ronWindow:null,phase:distributed?'wall-exhausted':'awaiting-discard',...(distributed?{abortiveDraw:'four-kans' as const}:{})});
+  const completed = cancelAllIppatsu({...game,turnPlayerId:p.id,players,deadWall,liveWall:game.liveWall.slice(0,-1),kanCount:count+1,callsMade:true,ronWindow:null,phase:distributed?'wall-exhausted':'awaiting-discard',...(distributed?{abortiveDraw:'four-kans' as const}:{})});
+  const fourKan = recordFourKanPao(game, { playerId: p.id, meld: option.meld, fromPlayerId: option.meld.fromPlayerId }, completed);
+  return recordSetPao(game, fourKan, option.meld);
 }
 export function declareKan(game: GameState, playerId: PlayerId, optionId: string): GameState {
   return resolveDiscardRon(declareKanForOnline(game, playerId, optionId));

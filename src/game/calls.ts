@@ -7,6 +7,7 @@ import { calculateShanten } from '../analysis/shanten.ts';
 import { isFourWindsDraw } from './special-draws.ts';
 import { rulesForGame } from '../model/rules.ts';
 import { diagnosticLog, markDiagnosticError, safeErrorInfo } from '../online/diagnostics.ts';
+import { recordSetPao } from './pao.ts';
 
 let nextCpuCallDiagnosticId = 0;
 
@@ -117,7 +118,8 @@ function apply(game:GameState,option:CallOption):GameState {
   players[p.id]={...p,hand:p.hand.filter(t=>!option.handTileIds.includes(t.id)),
     melds:[...(p.melds ?? []),meld],
     callDiscard:{forbiddenKinds:option.forbiddenKinds}};
-  return cancelAllIppatsu({...game,players,callsMade:true,phase:'awaiting-discard',turnPlayerId:p.id,ronWindow:null});
+  const called = cancelAllIppatsu({...game,players,callsMade:true,phase:'awaiting-discard',turnPlayerId:p.id,ronWindow:null});
+  return recordSetPao(game, called, meld);
 }
 function finish(game:GameState,selected:readonly CallOption[]):GameState {
   const startedAt=Date.now(), context={phase:game.phase,seat:game.turnPlayerId,remainingTiles:game.liveWall.length};

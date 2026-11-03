@@ -98,6 +98,10 @@ ul { list-style:none; padding:0; margin:0; }
 .fu-details summary { min-height:44px; padding:10px 0; cursor:pointer; }
 .fu-details summary:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
 .fu-details ul { padding-left:20px; }
+.pao-details { margin:12px 0; overflow-wrap:anywhere; }
+.pao-details summary { min-height:44px; padding:10px 0; cursor:pointer; }
+.pao-details summary:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
+.pao-details ul { padding-left:20px; }
 header h1 { margin:0; }
 header > div { min-width:0; }
 #match-result { padding:12px; border:1px solid #ffda7d; border-radius:8px; overflow-wrap:anywhere; }

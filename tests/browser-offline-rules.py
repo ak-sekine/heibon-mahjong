@@ -73,6 +73,7 @@ with sync_playwright() as playwright:
             '対局形式', '赤ドラ', '喰いタン', '和了条件', '後付け', 'リーチ', '一発',
             '裏ドラ', 'カンドラ', '通常流局', '親テンパイ連荘', '九種九牌', '四風連打',
             '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ', '特殊形ダブル役満', '人和',
+            'パオ',
             '対局終了',
         ]
         default_rule_rows = dict(zip(
@@ -86,6 +87,8 @@ with sync_playwright() as playwright:
           if page.evaluate("window.rulesModel.rulesForMatch(window.rulesApp.controller.match).doubleYakuman") else 'なし')
         assert default_rule_rows['人和'] == ('あり（子の第一自摸前・鳴きなしの有効ロン、固定満貫）'
           if page.evaluate("window.rulesModel.rulesForMatch(window.rulesApp.controller.match).renhou === 'mangan'") else 'なし')
+        assert default_rule_rows['パオ'] == ('あり（大三元・大四喜・四槓子）'
+          if page.evaluate('window.rulesModel.rulesForMatch(window.rulesApp.controller.match).pao') else 'なし')
         assert page.evaluate('''() => {
           const expected = window.rulesModel.describeConfirmedRules(window.rulesModel.rulesForMatch(window.rulesApp.controller.match));
           return [...document.querySelectorAll('#online-rules-list .confirmed-rule-row')].every((row, i) =>
@@ -118,6 +121,7 @@ with sync_playwright() as playwright:
             'tenpaiYame': False,
             'doubleYakuman': False,
             'renhou': False,
+            'pao': False,
         }
         for key, enabled in default_rule_values.items():
             control = page.locator(f'#new-game-rules-editor input[data-rule-key="{key}"]')
@@ -125,8 +129,12 @@ with sync_playwright() as playwright:
         if fmt == 'tonnan':
             page.locator('#new-game-rules-editor input[data-rule-key="doubleYakuman"]').check()
             page.locator('#new-game-rules-editor input[data-rule-key="renhou"]').check()
+            page.locator('#new-game-rules-editor input[data-rule-key="pao"]').check()
         page.locator(f'input[name="new-game-rules-editor-match-format"][value="{fmt}"]').check()
         page.locator('#confirm-new-game').click()
+        saved_pao = fmt == 'tonnan'
+        assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.pao") is saved_pao
+        assert page.evaluate('window.rulesModel.rulesForMatch(window.rulesApp.controller.match).pao') is saved_pao
         # Use the real selection UI; opening rules must not clear the selected tile.
         page.locator('#player-hand button').first.click()
         capture_state()
@@ -142,7 +150,10 @@ with sync_playwright() as playwright:
         assert page.locator(f'input[name="new-game-rules-editor-match-format"][value="{fmt}"]').is_checked()
         page.locator(f'input[name="new-game-rules-editor-match-format"][value="{other}"]').check()
         page.locator('#cancel-new-game').click()
-        assert page.evaluate('''fmt => JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === fmt''', fmt)
+        assert page.evaluate('''expected => {
+          const saved = JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules;
+          return saved.matchFormat === expected.format && saved.pao === expected.pao;
+        }''', {'format': fmt, 'pao': fmt == 'tonnan'})
         assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element')
         capture_state()
         open_rules(label)

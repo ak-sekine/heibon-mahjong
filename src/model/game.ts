@@ -1,12 +1,19 @@
 import type { FuResult } from '../analysis/fu.ts';
 import type { ScoreResult } from '../analysis/score.ts';
-import type { YakuAnalysis, YakuCandidate } from '../analysis/yaku.ts';
+import type { YakumanYakuId, YakuAnalysis, YakuCandidate } from '../analysis/yaku.ts';
 import type { Tile } from './tile.ts';
 import type { GameRules } from './rules.ts';
 
 /** Identity is unique within one game; tile describes its face only. */
 export type PhysicalTile = Readonly<{ id: string; tile: Tile }>;
 export type PlayerId = 0 | 1 | 2 | 3;
+export type PaoYakuId = Extract<YakumanYakuId, 'daisangen' | 'daisuushii' | 'suukantsu'>;
+export interface YakumanPaymentBreakdown {
+  readonly yakuId: YakumanYakuId;
+  readonly yakuman: number;
+  readonly responsiblePlayerId?: PlayerId;
+  readonly payerShares: readonly Readonly<{ playerId: PlayerId; points: number; pao: boolean }>[];
+}
 export type SeatWind = 'east' | 'south' | 'west' | 'north';
 export type RoundWind = 'east' | 'south';
 export interface RiichiState {
@@ -67,6 +74,8 @@ export interface WinDetails extends FuResult, ScoreResult {
   readonly redDoraHan: number;
   readonly totalHanIncludingDora: number;
   readonly yakumanCount: number;
+  /** Role-specific allocation, including the pao payer when applicable. */
+  readonly yakumanBreakdown?: readonly YakumanPaymentBreakdown[];
 }
 export interface TsumoResult extends WinDetails {
   readonly winMethod: 'tsumo';
@@ -105,6 +114,10 @@ export interface GameState extends WallState {
   /** Set only when 九種九牌 is confirmed; identifies the hand made public. */
   readonly abortiveDrawPlayerId?: PlayerId;
   readonly callsMade?: boolean;
+  /** Worker-owned, role-specific pao responsibility established by a completed call/kan. */
+  readonly paoResponsibilities?: Partial<Readonly<Record<PaoYakuId, PlayerId>>>;
+  /** Order in which role-specific pao responsibilities were established. */
+  readonly paoResponsibilityOrder?: readonly PaoYakuId[];
   readonly pendingRiichi: PendingRiichi | null;
   readonly ronWindow: RonWindow | null;
   readonly winResult: TsumoResult | RonResult | null;

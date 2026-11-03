@@ -185,6 +185,7 @@ export function describeConfirmedRules(rulesValue: unknown): readonly Readonly<{
     { label: 'テンパイやめ', value: rules.tenpaiYame ? '最終局、親テンパイ連荘時に単独トップなら終了' : 'なし' },
     { label: '特殊形ダブル役満', value: rules.doubleYakuman ? 'あり（四暗刻単騎・国士十三面・純正九蓮・大四喜）' : 'なし' },
     { label: '人和', value: rules.renhou === 'mangan' ? 'あり（子の第一自摸前・鳴きなしの有効ロン、固定満貫）' : 'なし' },
+    { label: 'パオ', value: rules.pao ? 'あり（大三元・大四喜・四槓子）' : 'なし' },
     { label: '対局終了', value: rules.matchFormat === 'tonnan' ? '南4局後、終了条件を満たしたとき' : '東4局後、終了条件を満たしたとき' },
   ];
 }

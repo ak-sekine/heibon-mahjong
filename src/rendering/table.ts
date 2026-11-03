@@ -339,6 +339,24 @@ function renderWinResult(game: GameState, settlement: RoundSettlement | null, se
     for (const yaku of result.candidate.yaku) list.append(text('li', yaku.id === 'renhou' ? '人和（固定満貫）' :
       `${yakuDisplayName(yaku.id)} ${yaku.yakuman > 0 ? yakumanMultiplierName(yaku.yakuman) : `${yaku.han}翻`}`));
     section.append(list);
+    const paoBreakdown = result.yakumanBreakdown?.filter(entry => entry.responsiblePlayerId !== undefined);
+    if (paoBreakdown?.length) {
+      const details = document.createElement('details');
+      details.className = 'pao-details';
+      details.append(text('summary', 'パオ・役満別の支払い内訳'));
+      const breakdown = document.createElement('ul');
+      for (const entry of result.yakumanBreakdown!) {
+        const name = yakuDisplayName(entry.yakuId);
+        const role = entry.responsiblePlayerId === undefined
+          ? `${name}：通常精算`
+          : `${name}：責任者 ${seatNames[entry.responsiblePlayerId]}`;
+        breakdown.append(text('li', `${role}（${yakumanMultiplierName(entry.yakuman)}）`));
+        for (const share of entry.payerShares) breakdown.append(text('li',
+          `　${seatNames[share.playerId]} → ${seatNames[result.winnerId]} ${share.points.toLocaleString('ja-JP')}点（${share.pao ? '責任払い' : '通常払い'}）`));
+      }
+      details.append(breakdown);
+      section.append(details);
+    }
     if (result.yakumanCount > 0) {
       section.append(text('p', winTotalLabel(result.yakumanCount, result.totalHanIncludingDora,
         result.candidate.yaku.some(yaku => yaku.id === 'renhou'))));

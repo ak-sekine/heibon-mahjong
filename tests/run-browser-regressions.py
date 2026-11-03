@@ -63,6 +63,7 @@ SUITE = [
     run('tests/browser-step13-6.py'),
     run('tests/browser-step13-7.py'),
     run('tests/browser-step13-8.py'),
+    run('tests/browser-step13-8.py', 'webkit'),
     run('tests/browser-step13-9.py'),
     run('tests/browser-step13-10.py'),
     run('tests/browser-step13-10.py', 'webkit'),

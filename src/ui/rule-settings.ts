@@ -89,6 +89,7 @@ export class RuleEditor {
       ['tenpaiYame', 'テンパイやめ', '最終局で親テンパイ連荘となり、精算後に単独トップなら終了します'],
       ['doubleYakuman', '特殊形ダブル役満', '四暗刻単騎・国士無双十三面待ち・純正九蓮宝燈・大四喜を2倍役満にします'],
       ['renhou', '人和', '子の第一自摸前、局内に鳴きがない有効ロンを固定満貫にします'],
+      ['pao', 'パオ', '大三元・大四喜・四槓子の責任払いを適用します'],
     ] as const;
     for (const [key, title, hint] of options) {
       const label = document.createElement('label');
@@ -135,7 +136,7 @@ export class RuleEditor {
   }
   private renderFixedRules(rules: GameRules): void {
     if (!this.fixedRules) return;
-    const rows = describeConfirmedRules(rules).filter(entry => !['対局形式', '赤ドラ', '喰いタン', '裏ドラ', '一発', 'カンドラ', '親テンパイ連荘', '九種九牌', '四風連打', '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ', '特殊形ダブル役満', '人和'].includes(entry.label));
+    const rows = describeConfirmedRules(rules).filter(entry => !['対局形式', '赤ドラ', '喰いタン', '裏ドラ', '一発', 'カンドラ', '親テンパイ連荘', '九種九牌', '四風連打', '四家立直', '四開槓', 'アガリやめ', 'テンパイやめ', '特殊形ダブル役満', '人和', 'パオ'].includes(entry.label));
     const list = document.createElement('dl');
     list.className = 'confirmed-rules-list';
     for (const entry of rows) {
