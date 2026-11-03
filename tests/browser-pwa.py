@@ -159,7 +159,7 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         assert PagesHandler.failed_requests > 0, 'the simulated install asset failure was not requested'
         page.wait_for_function("async () => { const registration = await navigator.serviceWorker.getRegistration(); return !registration.installing && !registration.waiting; }")
         assert page.evaluate('navigator.serviceWorker.controller.scriptURL') == f'{base_url}sw.js'
-        assert page.locator('#app-idle').is_visible()
+        assert page.locator('#local-table').is_visible(), 'failed update interrupted the in-progress CPU game'
         assert old_cache_name in page.evaluate('caches.keys()'), 'failed update removed the active version cache'
         PagesHandler.failure_path = None
         worker = sw_path.read_text(encoding='utf-8').replace('-v2";', '-v2-retry";')
