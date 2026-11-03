@@ -1,12 +1,25 @@
 """Keyboard-help visibility and action input across mouse and touch contexts."""
 import os
 import shutil
+import sys
+import traceback
 from playwright.sync_api import sync_playwright
 from browser_main_fixtures import fixed_seat_fixture
 
 
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 BASE_URL = 'http://127.0.0.1:4173/heibon-mahjong/'
+
+
+def report_browser_failure(exception_type, exception, trace):
+    frames = traceback.extract_tb(trace)
+    line = frames[-1].lineno if frames else 1
+    message = f'{exception_type.__name__}: {exception}'.replace('\n', ' ')
+    print(f'::error file=tests/browser-keyboard-help.py,line={line},title=Keyboard help browser failure::{message}', flush=True)
+    sys.__excepthook__(exception_type, exception, trace)
+
+
+sys.excepthook = report_browser_failure
 
 
 def install_fixtures(page):
@@ -25,7 +38,7 @@ window.keyboardHelpRiichi = () => {
 };
 window.keyboardHelpCall = () => {
   controller.newGame();
-  const game = callStart(3, {0:['555m','234p','678s','19p','12z']}, 'man-5');
+  const game = callStart(3, {0:['555m','234p','678s','19p','12z']}, 'red:man-5');
   controller.match = startMatch(discardTile(game, 3, game.players[3].drawnTile.id));
   render();
 };
@@ -54,6 +67,8 @@ with sync_playwright() as playwright:
         viewport={'width': 390, 'height': 844}, has_touch=True, is_mobile=True,
     )
     touch_page = touch_context.new_page()
+    touch_page.set_default_timeout(8000)
+    touch_page.set_default_navigation_timeout(12000)
     install_fixtures(touch_page)
     assert touch_page.evaluate("matchMedia('(hover: none) and (pointer: coarse)').matches"), \
         'touch context did not expose coarse primary pointer media features'
@@ -113,6 +128,8 @@ with sync_playwright() as playwright:
     # Enter, and Space continue to select and discard tiles.
     desktop_context = browser.new_context(viewport={'width': 1280, 'height': 800})
     desktop_page = desktop_context.new_page()
+    desktop_page.set_default_timeout(8000)
+    desktop_page.set_default_navigation_timeout(12000)
     install_fixtures(desktop_page)
     assert not desktop_page.evaluate("matchMedia('(hover: none) and (pointer: coarse)').matches")
     desktop_page.evaluate('keyboardHelpRiichi()')
