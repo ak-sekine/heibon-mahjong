@@ -147,7 +147,7 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 
 - Deploy run [#41644817445](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41644817445) はunit/integration、Worker型チェック、buildに成功しましたが、ChromiumとWebKitの新規テストがタイムアウトし、matrix auditで公開を停止しました。
 - 次のrun [#41645699473](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41645699473) でも同じ待機箇所が失敗しました。GitHub check annotationで、タッチ表示確認時の `wait_for_selector()` が非表示を期待する `.keyboard-help` を既定の `visible` 状態で待っていたことを確認しました。PWA Browser UIの前後既存シナリオは両runで成功しました。
-- 要素を `attached` 状態で待ってから計算済み `display:none` と0高さを調べるよう直しました。2回の失敗はテストの待機条件によるもので、製品CSSの表示差異検証結果としては扱いません。実装SHA `569df38a5ef3970eeec0c6c660f48ea91f471280` のrunは失敗し、Deploy／Pages公開はありません。再検証する最終runの結果と公開SHAは成功後に下表を更新します。
+- 要素を `attached` 状態で待ってから計算済み `display:none` と0高さを調べるよう直しました。2回の失敗はテストの待機条件によるもので、製品CSSの表示差異検証結果としては扱いません。実装SHA `569df38a5ef3970eeec0c6c660f48ea91f471280` のrunは失敗し、Deploy／Pages公開はありません。後続の修正後、最終Deploy run `41649796576` で検証・公開が成功しました（結果は上表を参照）。
 - Deploy run [#41646364720](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41646364720) では二つの検証ハーネス問題が見つかりました。ChromiumのCDP `Emulation.setEmulatedMedia` はこのrunの環境で `display-mode:standalone` を有効にせず、WebKit側はテンプレート比較用の複製パネルをホスト要素と取り違えて残し、同じ `#discard` IDを重複させていました。いずれも製品CSSの失敗ではありません。
 - 次のDeploy run [#41647193250](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41647193250) では、headless Chromeの `--app` 起動も `display-mode:standalone` を示さないことを確認しました。Chromiumではテスト専用のstandalone media-query hintを使い、Viteから取得したCSSソースにdisplay-mode条件がないことを確認する方式に変更しました。これは実インストールPWAの描画modeを再現するものではなく、実機確認は引き続き待ちです。
 - 同runのWebKit Browser UI matrixは成功しました。Chromiumだけがstandalone判定で失敗したため、matrix auditがDeployを止め、Pages更新はありません。
