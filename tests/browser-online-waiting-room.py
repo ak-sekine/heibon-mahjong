@@ -807,9 +807,16 @@ with sync_playwright() as p:
           window.onlineUiTest.onlineGameController.gameConnectionReady === true &&
           document.querySelector('#online-player-hand button[data-tile-id]:not([disabled])') !== null""", timeout=timeout)
 
+    def wait_for_synced_game_state(timeout=10000):
+        wait_for("""window.onlineUiTest.onlineGameController.view?.gameRevision === window.onlineMock.snapshot().gameRevision &&
+          window.onlineUiTest.onlineGameController.actionPending === false &&
+          window.onlineUiTest.onlineGameController.gameConnectionReady === true &&
+          document.querySelector('#online-match').hidden === false""", timeout=timeout)
+
     def wait_for_synced_own_turn(timeout=10000):
         wait_for("""window.onlineUiTest.onlineGameController.view?.gameRevision === window.onlineMock.snapshot().gameRevision &&
           window.onlineUiTest.onlineGameController.view?.turnPlayerId === 0 &&
+          window.onlineUiTest.onlineGameController.actionPending === false &&
           window.onlineUiTest.onlineGameController.gameConnectionReady === true &&
           document.querySelector('#online-player-hand button[data-tile-id]:not([disabled])') !== null""", timeout=timeout)
 
@@ -1289,13 +1296,16 @@ with sync_playwright() as p:
         wait_for("document.querySelector('#online-connection').textContent.includes('切れました') || document.querySelector('#online-connection').textContent.includes('再接続')")
         assert page.evaluate('window.onlineMock.gameActionRequests.length') == sent_before_exception, 'a thrown WebSocket send reached the server'
         assert page.locator('#online-discard').is_disabled(), 'send failure left an offline action enabled'
-        wait_for_synced_own_turn()
+        wait_for_synced_game_state()
         assert page.locator('#online-error').inner_text() == '', 'replayed send exception left a stale wait error visible'
         replayed_request_ids = page.evaluate('window.onlineMock.gameActionRequests.filter(item => item.type === "discard").map(item => item.requestId)')
         assert replayed_request_ids[-1] == ambiguous_request_id, f'send failure recovery changed the requestId: {replayed_request_ids} {ambiguous_request_id}'
         assert page.evaluate('window.onlineMock.snapshot().rivers[0].length') == 5, 'send exception recovery applied the action more than once'
+        assert page.locator('#online-game-action-status').inner_text().startswith('テスト参加者の手番'), 'send exception recovery did not render the accepted discard state'
 
         # Disconnect before a click: controls remain safely disabled and become usable after the fresh state arrives.
+        page.evaluate('window.onlineMock.advanceCpu()')
+        wait_for_own_turn()
         page.evaluate('window.onlineMock.forceDisconnect()')
         wait_for("document.querySelector('#online-connection').textContent.includes('切れました')")
         assert page.locator('#online-discard').is_disabled(), 'disconnect did not disable game actions'
