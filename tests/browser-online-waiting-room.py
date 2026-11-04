@@ -802,6 +802,17 @@ with sync_playwright() as p:
         except PlaywrightTimeoutError as error:
             raise AssertionError(f'online browser UI wait timed out: {expression}: {error}') from error
 
+    def wait_for_own_turn(timeout=30000):
+        wait_for("""window.onlineUiTest.onlineGameController.view?.turnPlayerId === 0 &&
+          window.onlineUiTest.onlineGameController.gameConnectionReady === true &&
+          document.querySelector('#online-player-hand button[data-tile-id]:not([disabled])') !== null""", timeout=timeout)
+
+    def wait_for_synced_own_turn(timeout=10000):
+        wait_for("""window.onlineUiTest.onlineGameController.view?.gameRevision === window.onlineMock.snapshot().gameRevision &&
+          window.onlineUiTest.onlineGameController.view?.turnPlayerId === 0 &&
+          window.onlineUiTest.onlineGameController.gameConnectionReady === true &&
+          document.querySelector('#online-player-hand button[data-tile-id]:not([disabled])') !== null""", timeout=timeout)
+
     waiting_action_position_baselines = {}
 
     def assert_waiting_action_layout(width, height, reconnect_visible):
@@ -1199,7 +1210,8 @@ with sync_playwright() as p:
         page.locator('#online-finalize').click()
         wait_for("!document.querySelector('#online-start-game').hidden")
         page.locator('#online-start-game').click()
-        wait_for("document.querySelector('#online-match').hidden === false && document.querySelector('#online-discard').disabled === false")
+        wait_for("document.querySelector('#online-match').hidden === false")
+        wait_for_own_turn()
 
         # State may precede the acknowledgement. The display stays waiting until its matching result arrives.
         page.evaluate('window.onlineMock.sendGameStateBeforeNextResult()')
@@ -1219,7 +1231,7 @@ with sync_playwright() as p:
 
         # A stale sync response reconnects once, then the fresh connection supplies the current state.
         page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.staleNextGameSync()')
-        wait_for("window.onlineUiTest.onlineGameController.view.turnPlayerId === 0 && document.querySelector('#online-discard').disabled === false")
+        wait_for_own_turn()
         syncs_before_stale_sync = page.evaluate('window.onlineMock.gameStateSyncRequests')
         page.locator('#online-player-hand button[data-tile-id]').first.click()
         page.locator('#online-discard').click()
@@ -1228,7 +1240,7 @@ with sync_playwright() as p:
 
         # A correlated rate limit rejects the mutation and unlocks its controls.
         page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.rateLimitNextGameAction()')
-        wait_for("window.onlineUiTest.onlineGameController.view.turnPlayerId === 0 && document.querySelector('#online-discard').disabled === false")
+        wait_for_own_turn()
         page.locator('#online-player-hand button[data-tile-id]').first.click()
         page.locator('#online-discard').click()
         wait_for("window.onlineUiTest.onlineGameController.actionPending === false && document.querySelector('#online-error').textContent.includes('短時間')")
@@ -1236,7 +1248,7 @@ with sync_playwright() as p:
 
         # Older workers omit requestId on rate-limit errors; without a sync in flight this rejection remains identifiable.
         page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.rateLimitNextGameActionLegacy()')
-        wait_for("window.onlineUiTest.onlineGameController.view.turnPlayerId === 0 && document.querySelector('#online-discard').disabled === false")
+        wait_for_own_turn()
         page.locator('#online-player-hand button[data-tile-id]').first.click()
         page.locator('#online-discard').click()
         wait_for("window.onlineUiTest.onlineGameController.actionPending === false && document.querySelector('#online-error').textContent.includes('短時間')")
@@ -1244,7 +1256,7 @@ with sync_playwright() as p:
 
         # Lost acknowledgement is recovered by state sync and replay with the same id.
         page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.dropNextGameResult(); window.__shortNextActionTimeout = true')
-        wait_for("window.onlineUiTest.onlineGameController.view.turnPlayerId === 0 && document.querySelector('#online-discard').disabled === false")
+        wait_for_own_turn()
         page.locator('#online-player-hand button[data-tile-id]').first.click()
         page.locator('#online-discard').click()
         wait_for("window.onlineUiTest.onlineGameController.actionPending === false", timeout=5000)
@@ -1258,7 +1270,7 @@ with sync_playwright() as p:
 
         # A rate-limited state sync does not clear the unrelated uncertain operation; reconnect resolves it.
         page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.dropNextGameResult(); window.onlineMock.suppressNextGameBroadcast(); window.onlineMock.rateLimitNextGameSync(); window.__shortNextActionTimeout = true; window.__shortNextGameSyncTimeout = true')
-        wait_for("window.onlineUiTest.onlineGameController.view.turnPlayerId === 0 && document.querySelector('#online-discard').disabled === false")
+        wait_for_own_turn()
         page.locator('#online-player-hand button[data-tile-id]').first.click()
         page.locator('#online-discard').click()
         wait_for("window.onlineUiTest.onlineGameController.actionPending === true && document.querySelector('#online-error').textContent.includes('短時間')", timeout=5000)
@@ -1269,7 +1281,7 @@ with sync_playwright() as p:
 
         # A send exception is ambiguous; the same request ID is replayed after reconnect.
         page.evaluate('window.onlineMock.advanceCpu(); window.__throwNextSocketSend = true')
-        wait_for("window.onlineUiTest.onlineGameController.view.turnPlayerId === 0 && document.querySelector('#online-discard').disabled === false")
+        wait_for_own_turn()
         sent_before_exception = page.evaluate('window.onlineMock.gameActionRequests.length')
         page.locator('#online-player-hand button[data-tile-id]').first.click()
         page.locator('#online-discard').click()
@@ -1277,7 +1289,7 @@ with sync_playwright() as p:
         wait_for("document.querySelector('#online-connection').textContent.includes('切れました') || document.querySelector('#online-connection').textContent.includes('再接続')")
         assert page.evaluate('window.onlineMock.gameActionRequests.length') == sent_before_exception, 'a thrown WebSocket send reached the server'
         assert page.locator('#online-discard').is_disabled(), 'send failure left an offline action enabled'
-        wait_for("window.onlineUiTest.onlineGameController.view.gameRevision === window.onlineMock.snapshot().gameRevision && document.querySelector('#online-discard').disabled === false", timeout=10000)
+        wait_for_synced_own_turn()
         assert page.locator('#online-error').inner_text() == '', 'replayed send exception left a stale wait error visible'
         replayed_request_ids = page.evaluate('window.onlineMock.gameActionRequests.filter(item => item.type === "discard").map(item => item.requestId)')
         assert replayed_request_ids[-1] == ambiguous_request_id, f'send failure recovery changed the requestId: {replayed_request_ids} {ambiguous_request_id}'
@@ -1290,7 +1302,7 @@ with sync_playwright() as p:
         sent_before_offline_click = page.evaluate('window.onlineMock.gameActionRequests.length')
         page.locator('#online-discard').click(force=True)
         assert page.evaluate('window.onlineMock.gameActionRequests.length') == sent_before_offline_click, 'a disconnected click reached the server'
-        wait_for("window.onlineUiTest.onlineGameController.view.gameRevision === window.onlineMock.snapshot().gameRevision && document.querySelector('#online-discard').disabled === false", timeout=10000)
+        wait_for_synced_own_turn()
 
         assert not errors and not console_errors, f'{ENGINE} action synchronization errors: {errors} {console_errors}'
         browser.close()
