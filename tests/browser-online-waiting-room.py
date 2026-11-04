@@ -1280,7 +1280,13 @@ with sync_playwright() as p:
         page.locator('#online-discard').click()
         wait_for("window.onlineUiTest.onlineGameController.actionPending === false && document.querySelector('#online-error').textContent.includes('通信が集中したため')")
         assert page.locator('#online-discard').is_enabled(), 'a confirmed rate-limited rejection left the action disabled'
-        page.evaluate('''() => { const now = Date.now; Date.now = () => now() + 2000; window.__restoreDateNow = () => { Date.now = now; }; }''')
+        page.evaluate('''() => {
+          const now = Date.now;
+          let offsetMs = 2000;
+          Date.now = () => now() + offsetMs;
+          window.__setTestDateOffset = value => { offsetMs = value; };
+          window.__restoreDateNow = () => { Date.now = now; };
+        }''')
 
         # Older workers omit requestId on rate-limit errors; without a sync in flight this rejection remains identifiable.
         page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.rateLimitNextGameActionLegacy()')
@@ -1292,6 +1298,9 @@ with sync_playwright() as p:
 
         # Lost acknowledgement is recovered by state sync and replay with the same id.
         page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.dropNextGameResult(); window.__shortNextActionTimeout = true')
+        # The legacy rejection above set a one-second cooldown in the test clock.
+        # Advance past it before sending this action, then restore the real clock.
+        page.evaluate('window.__setTestDateOffset(6000)')
         wait_for_own_turn()
         page.locator('#online-player-hand button[data-tile-id]').first.click()
         page.locator('#online-discard').click()
