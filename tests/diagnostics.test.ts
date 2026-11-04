@@ -75,6 +75,29 @@ test('important local action traces survive viewport event noise at the bounded 
   assert.equal(log.all().at(-1)?.details.elapsedMs,799);
 });
 
+test('online operation and recovery events displace offline CPU noise but remain bounded', () => {
+  const storage = new MemoryStorage();
+  const log = new DiagnosticLog(storage);
+  for (let index = 0; index < 500; index++) {
+    log.record('INFO', 'local_cpu_turn_completed', { turnId: `offline-${index}`, seat: index % 4 });
+  }
+  const priorityEvents = [
+    'game_action_rejected', 'server_game_action_result_received', 'server_rejected_operation',
+    'operation_wait_released', 'websocket_disconnected', 'websocket_connect_failed',
+    'game_state_sync_failed', 'game_state_sync_timeout',
+  ];
+  for (const event of priorityEvents) log.record('WARN', event, { errorCode: 'rate_limited', retryAfterMs: 1200 });
+  assert.equal(log.all().length, 500);
+  for (const event of priorityEvents) assert.ok(log.all().some(entry => entry.event === event), event);
+  const restored = new DiagnosticLog(storage);
+  for (const event of priorityEvents) assert.ok(restored.all().some(entry => entry.event === event), `${event} survives reload`);
+  assert.equal(log.all()[0]?.details.turnId, 'offline-8');
+  for (let index = 0; index < 600; index++) log.record('WARN', 'websocket_error', { connectionGeneration: index });
+  assert.equal(log.all().length, 500);
+  assert.equal(log.all().at(-1)?.event, 'websocket_error');
+  assert.equal(log.all().some(entry => entry.event === 'game_action_rejected'), false, 'old priority events must eventually expire');
+});
+
 test('exception text is scrubbed before it enters diagnostic entries',()=>{
   const log=new DiagnosticLog(null);
   const info=safeErrorInfo(new Error('failed tile-man-5 token=secret123 at https://private.example/path'));

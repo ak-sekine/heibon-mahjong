@@ -2,6 +2,26 @@
 
 実施日：2026-11-04。Issue #29はOpenのまま維持します。2026-11-01に起きた実際の対局停止原因は特定されておらず、この修正で原因を特定したとは扱いません。
 
+## 2026-11-05 iPhone Safari実機NGと追補
+
+2026-11-05 0:14 JST頃、通常のオンライン対局で「打牌する」を押すと「操作が受け付けられませんでした。最新状態を確認してください。」と表示されました。iPhone Safari診断ログに同時刻の打牌クリックがあり、Cloudflare Workerは次の各要求を`rate_limited`で拒否しています。
+
+| UTC | Workerイベント | エラー |
+| --- | --- | --- |
+| 2026-11-04 15:14:48.290 | `operation_rejected` | `rate_limited` |
+| 2026-11-04 15:14:49.962 | `operation_rejected` | `rate_limited` |
+| 2026-11-04 15:14:53.363 | `operation_rejected` | `rate_limited` |
+
+同じ時間帯に`state_sync_requested`が繰り返されていました。席単位30要求/60秒の枠は操作と`request-game-state`で共有されています。これは今回の打牌拒否の確認済みの原因です。2026-11-01の約1分間の停止原因は引き続き未特定であり、この拒否と同一原因とは扱いません。
+
+調査では、クライアントが成功結果を受信した時点で結果revisionの状態通知が未着だと即時に`request-game-state`を送る一方、Workerは成功結果の直後に状態を配信することを確認しました。通常操作の結果と状態通知の到着順により不要な同期が発生し、操作要求数を増やしていました。
+
+追補修正では成功結果後に250msだけ対応状態通知を待ち、届かなければ同期要求を送ります。同じ未確定操作に対する同期要求は最大2回です。250msはWorkerが結果送信と同じ処理内で続けて状態を配信する通常経路を通す猶予で、既存の操作応答タイムアウト15秒や同期タイムアウト8秒より十分短く、異常時の復旧を遅らせません。同期要求のレート制限拒否では操作待機を解除せず、`retryAfterMs`後に再接続して同じ操作IDを保持します。明示的な操作レート制限拒否は状態同期拒否と別に記録・表示し、指定された待機中の再送をクライアント側で抑止します。
+
+通常成功時のWebSocket要求は1操作あたり、修正前の「ゲーム操作1件＋不要な状態同期1件」の2件から、修正後はゲーム操作1件になります。WebSocketの席単位30要求/60秒は変更していません。通常のCPU対局ではCPU手番はWorker内部で進み、クライアント要求は人間が行う操作だけです。回帰ではCPU自動進行と通常結果先行経路を含め、レート制限を引き上げず要求数を確認します。
+
+この文書冒頭の2026-11-04検証記録は最初の修正時点の履歴として残し、以下に今回の再修正後の結果を追記します。
+
 ## 確認されたコード上の不整合
 
 - `OnlineGameController` は受信した任意の `game-state` で `actionPending` を解除していました。対応する `game-action-result` より先に状態通知が来ると、画面の操作ボタンが先に有効になり、`OnlineWaitingRoom.pendingGameAction` が残ることがありました。
@@ -59,3 +79,15 @@ Actions実行中にブラウザー検査の期待条件を2点修正しました
 - iPhone Safari実機での接続切断、操作ボタンの無効化、再接続、最新状態への復帰は未確認です。ユーザーによる実機確認後もIssue #29はその指示なくCloseしません。
 - 自動テストは決定的なWorker・ブラウザーmockで対象遷移を確認します。Cloudflare本番障害やすべての通信順序を網羅するものではありません。
 - 2026-11-01の実際の停止原因は未特定です。今回の修正がその停止を再現・説明したとは主張しません。
+
+## 追補修正の自動検証
+
+- `tests/diagnostics.test.ts`、`tests/online-game-revision.test.ts`、`tests/step14-0-1.test.ts`：3ファイル成功、失敗0。診断イベント優先保持と永続化、revision管理、既存のWorkerレート制限・同一requestId重複防止を確認。
+- `npm test`：81テストファイル成功、失敗・skip 0。
+- `npm run build`：成功（TypeScript検査、Vite build、PWA shell生成）。
+- `npm run typecheck:worker`：成功。
+- `tests/browser-online-waiting-room.py`：Python構文検査成功。結果先行の通常打牌で余分な同期がないこと、欠落状態からの1回の同期、同期レート制限後の再接続、利用者向けエラー表示、同一requestId維持のシナリオをChromium／WebKit双方に追加。
+- Browser UIはCodex Cloud内の既知のChromium Crashpad起動制限によりローカル実行していません。Chromium／WebKitの実行結果はこのコミットに対するGitHub Actionsを確認後に追記します。
+- `git diff --check`：成功。レート制限を誘発する本番要求試験は実施していません。
+
+コミットSHA、Actions、Deploy gate、Worker／Pages公開状態はmain反映後にここへ追記します。Issue #29はiPhone Safari実機再確認までOpenのままです。

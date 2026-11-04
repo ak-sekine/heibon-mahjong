@@ -39,11 +39,15 @@ type PendingGameAction = {
   sentAt: number | null;
   resultReceived: boolean;
   resultGameRevision: number | null;
+  syncAttempts: number;
 };
 type SocketActionResult = RoomActionResult;
 type SocketError = RoomSocketError;
 
 const SESSION_KEY = 'heibon-mahjong-online-session';
+// Worker sends the action result immediately before its game-state broadcast.
+// Allow the following WebSocket frame to arrive before asking for a snapshot.
+const GAME_STATE_CONFIRMATION_GRACE_MS = 250;
 const ROOM_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/u;
 const SEAT_NAMES = ['東', '南', '西', '北'] as const;
 const roomErrorMessages: Record<string, string> = {
@@ -55,13 +59,13 @@ const roomErrorMessages: Record<string, string> = {
   room_finalized: '座席確定後は新しい参加者を受け付けていません。',
   room_full: 'このルームは満席です。',
   unauthorized: '認証に失敗しました。セッションを確認してください。',
-  rate_limited: '操作が短時間に集中しています。少し待ってから再試行してください。',
+  rate_limited: '通信が集中したため、操作を受け付けられませんでした。しばらくしてから再試行してください。',
 };
 const socketErrorMessages: Record<string, string> = {
   invalid_message: 'サーバーが操作内容を確認できませんでした。',
   invalid_json: '送信内容を読み取れませんでした。',
   message_too_large: '送信内容が大きすぎます。',
-  rate_limited: '操作が短時間に集中しています。少し待ってから再試行してください。',
+  rate_limited: '通信が集中したため、操作を受け付けられませんでした。しばらくしてから再試行してください。',
   request_id_reused: '操作IDが重複しました。状態を更新してから操作してください。',
   revision_conflict: 'ルーム状態が更新されました。最新状態を確認して、もう一度操作してください。',
   not_host: 'この操作はホストだけが行えます。',
@@ -146,6 +150,8 @@ export class OnlineWaitingRoom {
   private stateSyncPending = false;
   private gameStateSyncTimer: number | null = null;
   private gameStateSyncPending = false;
+  private gameActionStateTimer: number | null = null;
+  private gameActionRetryAt = 0;
   private reconnectAttempt = 0;
   private automaticReconnectAllowed = true;
   private dialogWasClosedByUser = false;
@@ -205,6 +211,8 @@ export class OnlineWaitingRoom {
       this.automaticReconnectAllowed = true;
       this.dialogWasClosedByUser = false;
       this.reconnectAttempt = 0;
+      if (this.pendingGameAction) this.pendingGameAction.syncAttempts = 0;
+      if (this.socket && this.socket.readyState < WebSocket.CLOSING) this.closeSocket();
       void this.connect();
     });
     this.readyButton.addEventListener('click', () => this.markReady());
@@ -469,7 +477,9 @@ export class OnlineWaitingRoom {
     this.state = null;
     this.gameRevisions.clear();
     this.gameRevisions.enterRoom(result.roomCode);
+    this.gameActionRetryAt = 0;
     this.clearPendingGameActionTimer();
+    this.clearGameActionStateTimer();
     this.pendingGameAction = null;
     this.clearGameStateSyncTimer();
     this.gameStateSyncPending = false;
@@ -524,6 +534,7 @@ export class OnlineWaitingRoom {
     this.clearStableConnectionTimer();
     this.clearStateSyncTimer();
     this.clearGameStateSyncTimer();
+    this.clearGameActionStateTimer();
     const session = this.session;
     if (!session) return;
     if (session.expiresAt <= Date.now()) {
@@ -566,7 +577,9 @@ export class OnlineWaitingRoom {
         this.reconnectButton.hidden = true;
         this.setConnection('接続しました。ルーム状態を同期しています…');
         this.onGameMessage({ type: 'game-connection-state', ready: false, message: '対局状態を同期しています。' });
-        if (this.pendingGameAction && this.pendingGameActionTimer === null) this.armPendingGameActionTimer();
+        if (this.pendingGameAction?.resultReceived) {
+          if (this.pendingGameAction.syncAttempts < 2) this.armPendingGameStateConfirmation(this.pendingGameAction, 'reconnected_action_confirmation');
+        } else if (this.pendingGameAction && this.pendingGameActionTimer === null) this.armPendingGameActionTimer();
       });
       socket.addEventListener('message', event => {
         if (!this.isCurrentSocket(socket, generation) || typeof event.data !== 'string') return;
@@ -577,6 +590,7 @@ export class OnlineWaitingRoom {
         this.clearStableConnectionTimer();
         this.clearStateSyncTimer();
         this.clearGameStateSyncTimer();
+        this.clearGameActionStateTimer();
         this.gameStateSyncPending = false;
         this.socket = null;
         this.onGameMessage({ type: 'game-connection-state', ready: false, message: '対局サーバーとの接続が切れました。再接続しています…' });
@@ -684,7 +698,6 @@ export class OnlineWaitingRoom {
       if (message.type === 'game-state' && !stateRevisionAccepted) {
         diagnosticLog.record('WARN', 'stale_game_state_ignored', { gameRevision, latestGameRevision: this.gameRevisions.latest });
         if (syncWasPending) this.reconnectAfterStaleGameState();
-        else if (this.pendingGameAction?.resultReceived) this.requestGameState('stale_game_state');
         return;
       }
       this.onGameMessage(message);
@@ -693,19 +706,21 @@ export class OnlineWaitingRoom {
         const pending = this.pendingGameAction;
         if (pending.resultReceived) {
           if (pending.resultGameRevision === null && syncWasPending) {
+            this.clearGameActionStateTimer();
             this.pendingGameAction = null;
             this.clearPendingGameActionTimer();
+            diagnosticLog.record('INFO', 'operation_wait_released', { actionType: pending.payload.type, requestId: pending.requestId });
             this.setError();
             this.onGameMessage({ type: 'game-action-state-confirmed', requestId: pending.requestId });
           } else if (pending.resultGameRevision !== null && this.gameRevisions.latest >= pending.resultGameRevision) {
+            this.clearGameActionStateTimer();
             this.pendingGameAction = null;
             this.clearPendingGameActionTimer();
+            diagnosticLog.record('INFO', 'operation_wait_released', { actionType: pending.payload.type, requestId: pending.requestId, gameRevision: pending.resultGameRevision });
             this.setError();
             this.renderControls();
           } else if (syncWasPending) {
             this.reconnectAfterStaleGameState();
-          } else {
-            this.requestGameState('action_result_state_behind');
           }
         } else {
           this.sendPendingGameAction(socket, generation);
@@ -856,7 +871,8 @@ export class OnlineWaitingRoom {
     this.leaveButton.hidden = !session || state?.status === 'closed';
     this.leaveButton.disabled = pending || !socketConnected;
     this.setBusy(this.leaveButton, this.pendingAction?.payload.type === 'leave-room');
-    if (this.socket?.readyState === WebSocket.OPEN) this.reconnectButton.hidden = true;
+    if (this.socket?.readyState === WebSocket.OPEN &&
+        !(this.pendingGameAction && this.pendingGameAction.syncAttempts >= 2)) this.reconnectButton.hidden = true;
   }
 
   private setBusy(button: HTMLButtonElement, busy: boolean): void {
@@ -898,6 +914,10 @@ export class OnlineWaitingRoom {
       if (this.session && this.automaticReconnectAllowed) this.scheduleReconnect();
       return false;
     }
+    if (Date.now() < this.gameActionRetryAt) {
+      this.setError(this.rateLimitMessage(this.gameActionRetryAt - Date.now()));
+      return false;
+    }
     if (this.pendingAction || this.pendingGameAction) return false;
     this.setError();
     const pending: PendingGameAction = {
@@ -908,6 +928,7 @@ export class OnlineWaitingRoom {
       startedAt: Date.now(), sentAt: null,
       resultReceived: false,
       resultGameRevision: null,
+      syncAttempts: 0,
     };
     this.pendingGameAction = pending;
     diagnosticLog.record('INFO', 'game_action_accepted', { actionType: payload.type, requestId: pending.requestId, gameRevision: expectedGameRevision });
@@ -980,6 +1001,23 @@ export class OnlineWaitingRoom {
     }, 15_000);
   }
 
+  private armPendingGameStateConfirmation(pending: PendingGameAction, source: string): void {
+    this.clearGameActionStateTimer();
+    this.gameActionStateTimer = window.setTimeout(() => {
+      this.gameActionStateTimer = null;
+      if (this.pendingGameAction !== pending || !pending.resultReceived) return;
+      if (pending.resultGameRevision !== null && this.gameRevisions.latest >= pending.resultGameRevision) {
+        this.pendingGameAction = null;
+        this.clearPendingGameActionTimer();
+        diagnosticLog.record('INFO', 'operation_wait_released', { actionType: pending.payload.type, requestId: pending.requestId, gameRevision: pending.resultGameRevision });
+        this.setError();
+        this.renderControls();
+        return;
+      }
+      this.requestGameState(source);
+    }, GAME_STATE_CONFIRMATION_GRACE_MS);
+  }
+
   private requestGameState(source: string): void {
     if (this.gameStateSyncPending) {
       diagnosticLog.record('INFO', 'game_state_sync_already_pending', { source });
@@ -987,6 +1025,13 @@ export class OnlineWaitingRoom {
     }
     const socket = this.socket;
     const generation = this.connectGeneration;
+    const pending = this.pendingGameAction;
+    if (pending && pending.syncAttempts >= 2) {
+      diagnosticLog.record('WARN', 'game_state_sync_failed', { requestId: pending.requestId, source, errorCode: 'retry_exhausted' });
+      this.setError('操作結果を状態で確認できません。再接続ボタンから最新状態を確認してください。');
+      this.reconnectButton.hidden = false;
+      return;
+    }
     this.onGameMessage({ type: 'game-connection-state', ready: false, message: '対局状態を同期しています。操作結果を確認するまでお待ちください。' });
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       this.onGameMessage({ type: 'game-connection-state', ready: false, message: '対局状態を取得できません。再接続しています…' });
@@ -995,6 +1040,7 @@ export class OnlineWaitingRoom {
       this.scheduleReconnect();
       return;
     }
+    if (pending) pending.syncAttempts++;
     this.gameStateSyncPending = true;
     this.clearGameStateSyncTimer();
     this.gameStateSyncTimer = window.setTimeout(() => {
@@ -1008,6 +1054,7 @@ export class OnlineWaitingRoom {
       this.renderControls();
       this.scheduleReconnect();
     }, 8_000);
+    diagnosticLog.record('INFO', 'game_state_sync_requested', { source });
     try { socket.send(JSON.stringify({ type: 'request-game-state' })); }
     catch {
       this.gameStateSyncPending = false;
@@ -1060,16 +1107,16 @@ export class OnlineWaitingRoom {
       this.clearPendingGameActionTimer();
       this.onGameMessage(message);
       const source = resultGameRevision === null ? 'action_result_revision_missing' : 'action_result_before_state';
-      diagnosticLog.record('WARN', 'game_state_sync_requested', { requestId: completed.requestId, source });
       this.setError(resultGameRevision === null
         ? '操作結果を確認しました。対局状態を同期しています。'
-        : '操作結果を受け取りました。最新状態を同期しています。');
-      this.requestGameState(source);
+        : '操作結果を受け取りました。対局状態を確認しています。');
+      this.armPendingGameStateConfirmation(completed, source);
       this.renderControls();
       return;
     }
     diagnosticLog.record('INFO', 'operation_wait_released', { actionType: completed.payload.type, requestId: completed.requestId, gameRevision: resultGameRevision ?? undefined });
     this.pendingGameAction = null;
+    this.clearGameActionStateTimer();
     this.clearPendingGameActionTimer();
     this.onGameMessage(message);
     this.renderControls();
@@ -1087,6 +1134,16 @@ export class OnlineWaitingRoom {
 
   private receiveSocketError(error: SocketError): void {
     const code = error.code ?? 'invalid_message';
+    if (code === 'rate_limited' && this.gameStateSyncPending && !error.requestId) {
+      this.clearGameStateSyncTimer();
+      this.gameStateSyncPending = false;
+      diagnosticLog.record('WARN', 'game_state_sync_failed', { source: 'server_rate_limit', errorCode: code, retryAfterMs: error.retryAfterMs });
+      this.onGameMessage({ type: 'game-connection-state', ready: false, message: '通信が集中しています。操作結果を確認中のため、そのままお待ちください。' });
+      this.setError('通信が集中しています。操作結果を確認するため、制限解除後に再接続します。新しい操作は送信しないでください。');
+      this.scheduleReconnect(error.retryAfterMs);
+      diagnosticLog.record('WARN', 'server_rejected_operation', { errorCode: code, retryAfterMs: error.retryAfterMs });
+      return;
+    }
     const legacyRateLimitRejectedRoomAction = code === 'rate_limited' && !error.requestId &&
       !this.stateSyncPending && this.pendingAction !== null;
     if ((error.requestId && this.pendingAction?.requestId === error.requestId) || legacyRateLimitRejectedRoomAction) {
@@ -1102,16 +1159,25 @@ export class OnlineWaitingRoom {
       const pending = pendingGameAction;
       diagnosticLog.record('WARN', 'operation_wait_released', { actionType: pending.payload.type, requestId: pending.requestId, errorCode: code, result: 'rejected' });
       this.pendingGameAction = null;
+      this.clearGameActionStateTimer();
       this.clearPendingGameActionTimer();
+      if (code === 'rate_limited') this.gameActionRetryAt = Date.now() + Math.max(1_000, error.retryAfterMs ?? 1_000);
       this.onGameMessage({ type: 'game-action-result', requestId: pending.requestId, ok: false, code,
         gameRevision: this.state?.gameRevision ?? pending.expectedGameRevision });
       this.renderControls();
     }
-    this.setError(socketErrorMessages[code] ?? 'サーバーが操作を受け付けませんでした。');
+    this.setError(code === 'rate_limited' ? this.rateLimitMessage(error.retryAfterMs) : socketErrorMessages[code] ?? 'サーバーが操作を受け付けませんでした。');
     if (code === 'unauthorized' || code === 'room_closed') {
       this.finishSession(socketErrorMessages[code]);
     }
-    diagnosticLog.record('WARN', 'server_rejected_operation', { errorCode: code, requestId: error.requestId });
+    diagnosticLog.record('WARN', 'server_rejected_operation', { errorCode: code, requestId: error.requestId, retryAfterMs: error.retryAfterMs });
+  }
+
+  private rateLimitMessage(retryAfterMs?: number): string {
+    const remainingMs = retryAfterMs ?? (this.gameActionRetryAt > Date.now() ? this.gameActionRetryAt - Date.now() : undefined);
+    return typeof remainingMs === 'number' && Number.isFinite(remainingMs) && remainingMs > 0
+      ? `通信が集中したため、操作を受け付けられませんでした。約${Math.ceil(remainingMs / 1_000)}秒後に再試行できます。`
+      : socketErrorMessages.rate_limited;
   }
 
   private async copyRoomCode(): Promise<void> {
@@ -1137,12 +1203,14 @@ export class OnlineWaitingRoom {
     this.syncRoomMenu();
     this.state = null;
     this.gameRevisions.clear();
+    this.gameActionRetryAt = 0;
     this.pendingAction = null;
     this.pendingGameAction = null;
     this.gameActive = false;
     this.gameTerminated = false;
     this.clearPendingActionTimer();
     this.clearPendingGameActionTimer();
+    this.clearGameActionStateTimer();
     sessionStorage.removeItem(SESSION_KEY);
     this.roomPanel.hidden = true;
     this.setError();
@@ -1197,6 +1265,7 @@ export class OnlineWaitingRoom {
     this.clearStableConnectionTimer();
     this.clearStateSyncTimer();
     this.clearGameStateSyncTimer();
+    this.clearGameActionStateTimer();
     this.gameStateSyncPending = false;
     this.clearPendingActionTimer();
     this.clearPendingGameActionTimer();
@@ -1213,6 +1282,7 @@ export class OnlineWaitingRoom {
     this.clearStableConnectionTimer();
     this.clearStateSyncTimer();
     this.clearGameStateSyncTimer();
+    this.clearGameActionStateTimer();
     this.gameStateSyncPending = false;
     const socket = this.socket;
     this.socket = null;
@@ -1232,10 +1302,11 @@ export class OnlineWaitingRoom {
     this.reconnectButton.hidden = false;
     this.renderControls();
     if (document.visibilityState === 'hidden' || !navigator.onLine) return;
-    const base = retryAfterMs !== undefined
-      ? Math.min(30_000, Math.max(1_000, retryAfterMs))
+    const base = typeof retryAfterMs === 'number' && Number.isFinite(retryAfterMs) && retryAfterMs > 0
+      ? Math.max(1_000, retryAfterMs)
       : Math.min(30_000, 1_000 * (2 ** this.reconnectAttempt++));
-    const delay = retryAfterMs !== undefined ? base : Math.round(base * (0.8 + Math.random() * 0.4));
+    const delay = typeof retryAfterMs === 'number' && Number.isFinite(retryAfterMs) && retryAfterMs > 0
+      ? base : Math.round(base * (0.8 + Math.random() * 0.4));
     diagnosticLog.record('WARN', 'reconnect_scheduled', { attempt: this.reconnectAttempt, durationMs: delay });
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
@@ -1293,6 +1364,11 @@ export class OnlineWaitingRoom {
   private clearGameStateSyncTimer(): void {
     if (this.gameStateSyncTimer !== null) window.clearTimeout(this.gameStateSyncTimer);
     this.gameStateSyncTimer = null;
+  }
+
+  private clearGameActionStateTimer(): void {
+    if (this.gameActionStateTimer !== null) window.clearTimeout(this.gameActionStateTimer);
+    this.gameActionStateTimer = null;
   }
 
   private clearPendingActionTimer(): void {

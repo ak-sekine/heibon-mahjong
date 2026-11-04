@@ -192,7 +192,7 @@ MOCK = r"""
         gameActionRequests.push({ type: message.type, requestId: message.requestId });
         if (rateLimitNextAction) {
           rateLimitNextAction = false;
-          const response = { type: 'error', code: 'rate_limited' };
+          const response = { type: 'error', code: 'rate_limited', retryAfterMs: 1000 };
           if (!omitNextActionRateLimitRequestId) response.requestId = message.requestId;
           omitNextActionRateLimitRequestId = false;
           send(this, response);
@@ -207,7 +207,7 @@ MOCK = r"""
       }
       if (message.type === 'request-game-state') {
         gameStateSyncRequests++;
-        if (rateLimitNextSync) { rateLimitNextSync = false; send(this, { type: 'error', code: 'rate_limited' }); return; }
+        if (rateLimitNextSync) { rateLimitNextSync = false; send(this, { type: 'error', code: 'rate_limited', retryAfterMs: 1000 }); return; }
         if (gameStarted) {
           const view = makeView(this.seat);
           if (staleNextGameSync) {
@@ -753,10 +753,12 @@ MOCK = r"""
   const nativeSetTimeout = window.setTimeout.bind(window);
   window.__shortNextActionTimeout = false;
   window.__shortNextGameSyncTimeout = false;
+  window.__shortNextStateConfirm = false;
   window.__shortExitNoticeTimeout = false;
   window.setTimeout = (callback, delay, ...args) => {
     if (window.__shortNextActionTimeout && delay === 15000) { window.__shortNextActionTimeout = false; delay = 20; }
     if (window.__shortNextGameSyncTimeout && delay === 8000) { window.__shortNextGameSyncTimeout = false; delay = 20; }
+    if (window.__shortNextStateConfirm && delay === 250) { window.__shortNextStateConfirm = false; delay = 0; }
     if (window.__shortExitNoticeTimeout && delay === 8000) { window.__shortExitNoticeTimeout = false; delay = 5000; }
     return nativeSetTimeout(callback, delay, ...args);
   };
@@ -1237,7 +1239,7 @@ with sync_playwright() as p:
         assert page.evaluate('window.onlineMock.gameStateSyncRequests') == syncs_before_stale_burst, 'unsolicited old states caused synchronization traffic'
 
         # A stale sync response reconnects once, then the fresh connection supplies the current state.
-        page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.staleNextGameSync()')
+        page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.staleNextGameSync(); window.onlineMock.suppressNextGameBroadcast(); window.__shortNextStateConfirm = true')
         wait_for_own_turn()
         syncs_before_stale_sync = page.evaluate('window.onlineMock.gameStateSyncRequests')
         page.locator('#online-player-hand button[data-tile-id]').first.click()
@@ -1245,20 +1247,31 @@ with sync_playwright() as p:
         wait_for("window.onlineUiTest.onlineGameController.actionPending === false && window.onlineUiTest.onlineGameController.view.gameRevision === window.onlineMock.snapshot().gameRevision", timeout=10000)
         assert page.evaluate('(before) => window.onlineMock.gameStateSyncRequests - before', syncs_before_stale_sync) == 1, 'a stale sync response caused multiple sync requests before reconnect'
 
+        # In the normal result-first order, the paired state frame arrives within the brief confirmation grace.
+        syncs_before_normal_action = page.evaluate('window.onlineMock.gameStateSyncRequests')
+        page.evaluate('window.onlineMock.advanceCpu()')
+        wait_for_own_turn()
+        page.locator('#online-player-hand button[data-tile-id]').first.click()
+        page.locator('#online-discard').click()
+        wait_for("window.onlineUiTest.onlineGameController.actionPending === false")
+        assert page.evaluate('window.onlineMock.gameStateSyncRequests') == syncs_before_normal_action, 'a normal result-first operation triggered a redundant state sync'
+
         # A correlated rate limit rejects the mutation and unlocks its controls.
         page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.rateLimitNextGameAction()')
         wait_for_own_turn()
         page.locator('#online-player-hand button[data-tile-id]').first.click()
         page.locator('#online-discard').click()
-        wait_for("window.onlineUiTest.onlineGameController.actionPending === false && document.querySelector('#online-error').textContent.includes('短時間')")
+        wait_for("window.onlineUiTest.onlineGameController.actionPending === false && document.querySelector('#online-error').textContent.includes('通信が集中したため')")
         assert page.locator('#online-discard').is_enabled(), 'a confirmed rate-limited rejection left the action disabled'
+        page.evaluate('''() => { const now = Date.now; Date.now = () => now() + 2000; window.__restoreDateNow = () => { Date.now = now; }; }''')
 
         # Older workers omit requestId on rate-limit errors; without a sync in flight this rejection remains identifiable.
         page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.rateLimitNextGameActionLegacy()')
         wait_for_own_turn()
         page.locator('#online-player-hand button[data-tile-id]').first.click()
         page.locator('#online-discard').click()
-        wait_for("window.onlineUiTest.onlineGameController.actionPending === false && document.querySelector('#online-error').textContent.includes('短時間')")
+        wait_for("window.onlineUiTest.onlineGameController.actionPending === false && document.querySelector('#online-error').textContent.includes('通信が集中したため')")
+        page.evaluate('window.__restoreDateNow()')
         assert page.locator('#online-discard').is_enabled(), 'a legacy rate-limit rejection left the action disabled'
 
         # Lost acknowledgement is recovered by state sync and replay with the same id.
@@ -1278,13 +1291,15 @@ with sync_playwright() as p:
         # A rate-limited state sync does not clear the unrelated uncertain operation; reconnect resolves it.
         page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.dropNextGameResult(); window.onlineMock.suppressNextGameBroadcast(); window.onlineMock.rateLimitNextGameSync(); window.__shortNextActionTimeout = true; window.__shortNextGameSyncTimeout = true')
         wait_for_own_turn()
+        syncs_before_rate_limited_recovery = page.evaluate('window.onlineMock.gameStateSyncRequests')
         page.locator('#online-player-hand button[data-tile-id]').first.click()
         page.locator('#online-discard').click()
-        wait_for("window.onlineUiTest.onlineGameController.actionPending === true && document.querySelector('#online-error').textContent.includes('短時間')", timeout=5000)
+        wait_for("window.onlineUiTest.onlineGameController.actionPending === true && document.querySelector('#online-error').textContent.includes('通信が集中しています')", timeout=5000)
         assert page.locator('#online-discard').is_disabled(), 'rate-limited synchronization released an unresolved game operation'
         wait_for("window.onlineUiTest.onlineGameController.actionPending === false && document.querySelector('#online-connection').textContent === '接続中'", timeout=10000)
         assert page.locator('#online-error').inner_text() == '', 'successful reconnect left a stale synchronization error visible'
         assert page.evaluate('window.onlineMock.snapshot().rivers[0].length') == 4, 'reconnect replay applied the uncertain operation more than once'
+        assert page.evaluate('(before) => window.onlineMock.gameStateSyncRequests - before', syncs_before_rate_limited_recovery) == 1, 'a rate-limited sync was repeated instead of waiting for reconnect state'
 
         # A send exception is ambiguous; the same request ID is replayed after reconnect.
         page.evaluate('window.onlineMock.advanceCpu(); window.__throwNextSocketSend = true')
