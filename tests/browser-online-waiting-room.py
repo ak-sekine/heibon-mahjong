@@ -1299,14 +1299,11 @@ with sync_playwright() as p:
         # Lost acknowledgement is recovered by state sync and replay with the same id.
         page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.dropNextGameResult(); window.__shortNextActionTimeout = true')
         # The legacy rejection above set a one-second cooldown in the test clock.
-        # Advance past it before sending this action, then restore the real clock.
+        # Keep the clock past that cooldown through the remaining recovery cases.
         page.evaluate('window.__setTestDateOffset(6000)')
         wait_for_own_turn()
         page.locator('#online-player-hand button[data-tile-id]').first.click()
         page.locator('#online-discard').click()
-        # Keep the test clock advanced until this click has been accepted. Restoring it
-        # before the click leaves the preceding rate-limit cooldown in the future.
-        page.evaluate('window.__restoreDateNow()')
         wait_for("window.onlineUiTest.onlineGameController.actionPending === true", timeout=5000)
         wait_for("window.onlineUiTest.onlineGameController.actionPending === false", timeout=5000)
         recovery_error = page.locator('#online-error').inner_text()
@@ -1358,6 +1355,7 @@ with sync_playwright() as p:
         page.locator('#online-discard').click(force=True)
         assert page.evaluate('window.onlineMock.gameActionRequests.length') == sent_before_offline_click, 'a disconnected click reached the server'
         wait_for_synced_own_turn()
+        page.evaluate('window.__restoreDateNow()')
 
         assert not errors and not console_errors, f'{ENGINE} action synchronization errors: {errors} {console_errors}'
         browser.close()
