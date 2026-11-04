@@ -183,7 +183,12 @@ test('Browser UI engine matrix keeps scenarios independent and avoids duplicate 
   assert.match(browserJob, /max-parallel: 2/);
   assert.match(browserJob, /browser: \[chromium, webkit\]/);
   assert.match(browserJob, /run-browser-regressions\.py --browser/);
-  assert.match(browserJob, /playwright install --with-deps "\$\{\{ matrix\.browser \}\}"/);
+  assert.match(browserJob, /Install OS dependencies \(\$\{\{ matrix\.browser \}\}\)/);
+  assert.match(browserJob, /timed-playwright-install\.py install-deps "\$\{\{ matrix\.browser \}\}"/);
+  assert.match(browserJob, /Install browser \(\$\{\{ matrix\.browser \}\}\)/);
+  assert.match(browserJob, /timed-playwright-install\.py install "\$\{\{ matrix\.browser \}\}"/);
+  assert.doesNotMatch(browserJob, /playwright install --with-deps/);
+  assert.match(browserJob, /playwright-install-environment/);
   assert.match(browserJob, /if-no-files-found: error/);
   assert.doesNotMatch(browserJob, /run: npm test|run: npm run build/);
   assert.match(buildJob, /run: npm test/);

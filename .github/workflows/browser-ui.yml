@@ -138,7 +138,59 @@ jobs:
           name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
           path: dist
       - run: python -m pip install playwright
-      - run: python -m playwright install --with-deps "${{ matrix.browser }}"
+      - name: Record Playwright install environment
+        env:
+          BROWSER: ${{ matrix.browser }}
+        run: |
+          python - <<'PY'
+          import importlib.metadata
+          import json
+          import os
+          import platform
+          from pathlib import Path
+          import playwright
+
+          try:
+              os_release = platform.freedesktop_os_release()
+              operating_system = {
+                  "name": os_release.get("NAME"),
+                  "version": os_release.get("VERSION_ID"),
+              }
+          except (AttributeError, OSError):
+              operating_system = {"name": None, "version": None}
+
+          image = {
+              key: os.environ.get(key)
+              for key in ("ImageOS", "ImageVersion")
+          }
+          browsers_file = Path(playwright.__file__).parent / "driver/package/browsers.json"
+          revision = None
+          try:
+              browser_registry = json.loads(browsers_file.read_text(encoding="utf-8"))
+              revision = next(
+                  (item.get("revision") for item in browser_registry.get("browsers", [])
+                   if item.get("name") == os.environ["BROWSER"]),
+                  None,
+              )
+          except (OSError, ValueError, KeyError):
+              pass
+
+          print("[playwright-install-environment] " + json.dumps({
+              "runner_os": os.environ.get("RUNNER_OS"),
+              "os": operating_system,
+              "runner_image": image,
+              "python": platform.python_version(),
+              "playwright": importlib.metadata.version("playwright"),
+              "browser": os.environ["BROWSER"],
+              "browser_revision": revision,
+          }, separators=(",", ":")))
+          PY
+      - name: Install OS dependencies (${{ matrix.browser }})
+        shell: bash
+        run: python .github/scripts/timed-playwright-install.py install-deps "${{ matrix.browser }}"
+      - name: Install browser (${{ matrix.browser }})
+        shell: bash
+        run: python .github/scripts/timed-playwright-install.py install "${{ matrix.browser }}"
       - name: Run Vite and browser regressions
         shell: bash
         env:
