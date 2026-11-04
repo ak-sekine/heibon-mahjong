@@ -121,12 +121,19 @@ MOCK = r"""
   let suppressNextGameBroadcast = false;
   let gameStateSyncRequests = 0;
   let stateBeforeNextGameResult = false;
+  let holdNextGameResult = false;
+  let heldGameResult = null;
   const cachedGameResults = new Map();
   const gameResult = (socket, message, ok, codeName) => {
     const response = { type: 'game-action-result', requestId: message.requestId, ok, gameRevision,
       ...(codeName ? { code: codeName } : {}) };
     cachedGameResults.set(message.requestId, response);
     if (dropNextGameResult) { dropNextGameResult = false; return; }
+    if (holdNextGameResult) {
+      holdNextGameResult = false;
+      heldGameResult = { socket, response };
+      return;
+    }
     send(socket, response);
   };
   const sockets = [];
@@ -261,7 +268,10 @@ MOCK = r"""
         const stateBeforeResult = stateBeforeNextGameResult;
         stateBeforeNextGameResult = false;
         if (stateBeforeResult) broadcastGame('game-state');
-        if (stateBeforeResult) setTimeout(() => gameResult(this, message, true), 30);
+        if (stateBeforeResult) {
+          holdNextGameResult = true;
+          gameResult(this, message, true);
+        }
         else gameResult(this, message, true);
         if (!stateBeforeResult && !suppressNextGameBroadcast) broadcastGame('game-state');
         suppressNextGameBroadcast = false;
@@ -665,6 +675,12 @@ MOCK = r"""
     forceDisconnect() { sockets.filter(socket => socket.readyState === MockWebSocket.OPEN).at(-1)?.forceDisconnect(); },
     rejectNextFinalize() { rejectNextFinalize = true; },
     dropNextGameResult() { dropNextGameResult = true; },
+    releaseHeldGameResult() {
+      if (!heldGameResult) throw new Error('no held game result is waiting');
+      const { socket, response } = heldGameResult;
+      heldGameResult = null;
+      send(socket, response);
+    },
     rateLimitNextGameAction() { rateLimitNextAction = true; },
     rateLimitNextGameActionLegacy() { rateLimitNextAction = true; omitNextActionRateLimitRequestId = true; },
     rateLimitNextGameSync() { rateLimitNextSync = true; },
@@ -1228,6 +1244,7 @@ with sync_playwright() as p:
         page.locator('#online-discard').click()
         wait_for("window.onlineUiTest.onlineGameController.actionPending === true")
         assert page.locator('#online-discard').is_disabled(), 'game-state released the UI wait before the matching action result'
+        page.evaluate('window.onlineMock.releaseHeldGameResult()')
         wait_for("window.onlineUiTest.onlineGameController.actionPending === false")
         assert page.locator('#online-game-action-status').inner_text().startswith('テスト参加者の手番'), 'successful operation did not release the wait and render the new turn'
 
@@ -1271,7 +1288,6 @@ with sync_playwright() as p:
         page.locator('#online-player-hand button[data-tile-id]').first.click()
         page.locator('#online-discard').click()
         wait_for("window.onlineUiTest.onlineGameController.actionPending === false && document.querySelector('#online-error').textContent.includes('通信が集中したため')")
-        page.evaluate('window.__restoreDateNow()')
         assert page.locator('#online-discard').is_enabled(), 'a legacy rate-limit rejection left the action disabled'
 
         # Lost acknowledgement is recovered by state sync and replay with the same id.
@@ -1279,8 +1295,13 @@ with sync_playwright() as p:
         wait_for_own_turn()
         page.locator('#online-player-hand button[data-tile-id]').first.click()
         page.locator('#online-discard').click()
+        # Keep the test clock advanced until this click has been accepted. Restoring it
+        # before the click leaves the preceding rate-limit cooldown in the future.
+        page.evaluate('window.__restoreDateNow()')
+        wait_for("window.onlineUiTest.onlineGameController.actionPending === true", timeout=5000)
         wait_for("window.onlineUiTest.onlineGameController.actionPending === false", timeout=5000)
-        assert page.locator('#online-error').inner_text() == '', 'resolved lost acknowledgement left a stale wait error visible'
+        recovery_error = page.locator('#online-error').inner_text()
+        assert recovery_error == '', f'resolved lost acknowledgement left an error visible: {recovery_error!r}'
         assert page.evaluate("window.onlineMock.snapshot().rivers[0].length") == 3, 'replaying a lost response applied the discard twice'
         duplicate_ids = page.evaluate('''() => {
           const requests = window.onlineMock.gameActionRequests.filter(item => item.type === 'discard');
