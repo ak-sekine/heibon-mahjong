@@ -195,8 +195,6 @@ header > div { min-width:0; }
 .match-format-options,.cpu-difficulty-options { display:grid; gap:6px; margin:0 0 16px; padding:10px; border:1px solid #63947a; border-radius:8px; }
 .match-format-options legend,.cpu-difficulty-options legend { padding:0 4px; font-weight:700; }
 .match-format-options label,.cpu-difficulty-options label { display:flex; align-items:center; gap:10px; min-height:44px; font-weight:600; touch-action:manipulation; }
-.cpu-difficulty-options label span { display:grid; gap:2px; min-width:0; }
-.cpu-difficulty-options small { color:#e3eee7; font-size:.77rem; line-height:1.3; font-weight:400; }
 .match-format-options input[type="radio"],.cpu-difficulty-options input[type="radio"],.online-entry-form .match-format-options input[type="radio"] { flex:none; width:22px; min-width:22px; min-height:22px; height:22px; margin:0; padding:0; accent-color:#ffda7d; }
 .online-entry-form .match-format-options { margin:0; }
 .optional-rule-options { display:grid; gap:4px; margin:0 0 12px; padding:10px; border:1px solid #63947a; border-radius:8px; }

@@ -23,6 +23,21 @@ with sync_playwright() as playwright:
         page.locator('#main-menu-toggle').click()
         page.locator(selector).click()
 
+    def verify_cpu_difficulty_options(dialog_selector, name):
+        options = page.locator(f'{dialog_selector} .cpu-difficulty-options')
+        labels = options.locator('label')
+        assert labels.count() == 3, f'{name} should show exactly three CPU difficulty options'
+        assert [label.strip() for label in labels.all_text_contents()] == ['初級', '標準', '上級'], f'{name} difficulty labels changed'
+        assert options.locator('small').count() == 0, f'{name} difficulty descriptions remain in the DOM'
+        assert options.locator('input[type="radio"]').evaluate_all("inputs => inputs.map(input => input.value)") == ['beginner', 'standard', 'advanced']
+        standard = options.locator('input[value="standard"]')
+        assert standard.is_checked(), f'{name} CPU difficulty did not default to standard'
+        assert all(label.evaluate('element => element.getBoundingClientRect().height >= 44') for label in labels.all()), f'{name} difficulty options are smaller than 44px'
+        options.locator('input[value="advanced"]').check()
+        assert options.locator('input[value="advanced"]').is_checked(), f'{name} advanced radio could not be selected'
+        standard.check()
+        assert standard.is_checked(), f'{name} standard radio could not be restored'
+
     def verify_dialog(dialog_selector, content_selector, footer_selector, action_selector, name):
         snapshots = []
         for width, height in VIEWPORTS:
@@ -100,12 +115,14 @@ with sync_playwright() as playwright:
         return snapshots
 
     open_menu_item('#new-game')
+    verify_cpu_difficulty_options('#new-game-dialog', 'offline')
     offline = verify_dialog('#new-game-dialog', '#new-game-content', '.new-game-actions', '#confirm-new-game', 'offline')
     page.locator('#cancel-new-game').click()
     assert not page.locator('#new-game-dialog').evaluate('dialog => dialog.open'), 'offline cancel was blocked by scrolling'
 
     open_menu_item('#online-create-open')
     page.locator('#online-create-name').fill('テストホスト')
+    verify_cpu_difficulty_options('#online-create-dialog', 'online')
     online = verify_dialog('#online-create-dialog', '#online-create-content', '#online-create-actions', '#online-create', 'online')
     page.locator('#online-create-cancel').click()
     assert not page.locator('#online-create-dialog').evaluate('dialog => dialog.open'), 'online cancel was blocked by scrolling'

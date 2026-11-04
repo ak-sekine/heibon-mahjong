@@ -75,10 +75,10 @@ export class RuleEditor {
     const difficultyLegend = document.createElement('legend');
     difficultyLegend.textContent = 'CPUの強さ（全CPU共通）';
     this.difficultyOptions.append(difficultyLegend);
-    for (const [value, title, hint] of [
-      ['beginner', '初級', 'シャンテン中心の簡単な打牌と控えめな鳴きを行います'],
-      ['standard', '標準', '現在のCPU判断を使います'],
-      ['advanced', '上級', '同等の手進行を保ちながら、リーチ者への安全牌を優先します'],
+    for (const [value, title] of [
+      ['beginner', '初級'],
+      ['standard', '標準'],
+      ['advanced', '上級'],
     ] as const) {
       const label = document.createElement('label');
       const input = document.createElement('input');
@@ -86,10 +86,8 @@ export class RuleEditor {
       input.addEventListener('change', () => {
         if (input.checked) this.preferences.commit({ ...this.preferences.current, cpuDifficulty: value });
       });
-      const content = document.createElement('span');
-      const name = document.createElement('strong'); name.textContent = title;
-      const description = document.createElement('small'); description.textContent = hint;
-      content.append(name, description); label.append(input, content); this.difficultyOptions.append(label);
+      label.append(input, document.createTextNode(` ${title}`));
+      this.difficultyOptions.append(label);
     }
     this.optionalRules = document.createElement('fieldset');
     this.optionalRules.className = 'optional-rule-options';
