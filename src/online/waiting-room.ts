@@ -1140,6 +1140,7 @@ export class OnlineWaitingRoom {
       diagnosticLog.record('WARN', 'game_state_sync_failed', { source: 'server_rate_limit', errorCode: code, retryAfterMs: error.retryAfterMs });
       this.onGameMessage({ type: 'game-connection-state', ready: false, message: '通信が集中しています。操作結果を確認中のため、そのままお待ちください。' });
       this.setError('通信が集中しています。操作結果を確認するため、制限解除後に再接続します。新しい操作は送信しないでください。');
+      this.closeSocket();
       this.scheduleReconnect(error.retryAfterMs);
       diagnosticLog.record('WARN', 'server_rejected_operation', { errorCode: code, retryAfterMs: error.retryAfterMs });
       return;
