@@ -1,6 +1,6 @@
 # オンライン対局の操作待機・復旧 — Issue #29
 
-実施日：2026-11-04。Issue #29はOpenのまま維持します。2026-11-01に起きた実際の対局停止原因は特定されておらず、この修正で原因を特定したとは扱いません。
+実施日：2026-11-04〜2026-11-05。2026-11-05のiPhone Safari最終確認はOK 6件、NG 0件、未確認 0件。修正後の対象SHA `cf367a613cc15ae6ee40598d4e6c795fd75f15ce` とGitHub Actions run [#41926545076](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41926545076)（success）を照合し、Issue #29をcompletedとしてCloseします。2026-11-01の約1分間の停止原因は未特定のままです。
 
 ## 2026-11-05 iPhone Safari実機NGと追補
 
@@ -90,4 +90,30 @@ Actions実行中にブラウザー検査の期待条件を2点修正しました
 - Browser UIはCodex Cloud内の既知のChromium Crashpad起動制限によりローカル実行していません。Chromium／WebKitの実行結果はこのコミットに対するGitHub Actionsを確認後に追記します。
 - `git diff --check`：成功。レート制限を誘発する本番要求試験は実施していません。
 
-コミットSHA、Actions、Deploy gate、Worker／Pages公開状態はmain反映後にここへ追記します。Issue #29はiPhone Safari実機再確認までOpenのままです。
+## 最終検証・完了（2026-11-05）
+
+### GitHub Actionsと対象SHA
+
+- 対象SHA：`cf367a613cc15ae6ee40598d4e6c795fd75f15ce`（main）
+- GitHub Actions run [#41926545076](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41926545076)：`completed`／`success`。Actions上のhead SHAは対象SHAと一致します。
+- `docs-check`、`verify`、Chromium／WebKit Browser UI、Browser UI matrix audit、release freshness、Worker deploy、本番Worker検証、Pages build／deployはいずれもsuccess。
+- 修正過程の先行CI失敗は履歴として保持します。run [#41862333884](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41862333884)、[#41923664027](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41923664027)、[#41924488381](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41924488381)、[#41925146668](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41925146668)、[#41925744080](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41925744080)は失敗で、Browser UIのChromium／WebKit回帰ジョブとmatrix auditが失敗しました。その後の修正を含む最終run #41926545076は成功しています。
+
+### iPhone Safari実機確認
+
+2026-11-05、ユーザー本人によるiPhone Safariの実機確認結果です。
+
+1. **OK**：通常の打牌で操作拒否が発生せず、正常に進行する。
+2. **OK**：CPUを含むオンライン対局を連続して進めても、`rate_limited`が発生しない。
+3. **OK**：ポン・チー・カン・リーチなどの操作後も正常に進行する。
+4. **OK**：対局中にSafariをバックグラウンドへ移し、復帰後も操作できる。
+5. **OK**：通信切断から再接続した後、操作ボタンが正常に使える。
+6. **OK**：操作ボタンの連続タップで、二重操作が発生しない。
+
+**集計：OK 6件、NG 0件、未確認 0件。**
+
+2026-11-05に先に確認された打牌拒否は、Workerが操作を`rate_limited`で拒否したものでした。同時間帯に不要な`state_sync`要求が繰り返され、操作と状態同期で共有する席単位の要求枠を消費していました。成功結果後に状態通知を待つ修正などを適用した後、上記6項目はすべて実機OKでした。以前の実機NGはこの最終結果と分けて履歴に残します。
+
+2026-11-01の約1分間の停止については、原因を特定できていません。2026-11-05の`rate_limited`による打牌拒否と同一原因とは断定しません。
+
+自動検証runの成功は実機確認の代替ではなく、ここでは別々の結果として記録しています。最終実機結果とActions確認をもって本Issueの対応を完了とし、completed理由でCloseします。
