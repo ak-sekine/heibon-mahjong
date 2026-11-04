@@ -107,3 +107,21 @@
 ### Close可否
 
 **Issue #33はcompletedでClose可能と判定します。** 難易度の選択・判断差・標準互換・オフライン／オンライン同期・合法性・処理時間と限定的な対局比較は既存の実装／自動検証で確認され、ユーザー本人のiPhone Safari報告もOK 5件／NG 0件です。再接続・次局・再戦後の難易度維持は実機未確認1件のまま記録し、関連自動テスト結果と区別します。将来実機で不具合が判明した場合は、新規Issueまたは必要に応じた再Openで対応します。
+
+## 2026-11-04 CPU難易度UI簡素化後のiPhone Safari実機確認
+
+既存実装コミット [`60de19ca`](https://github.com/ak-sekine/heibon-mahjong/commit/60de19cae1999ec58f68f9a2e8009a9d49789344) でCPU難易度の選択UIから説明文を削除した後、ユーザー本人がiPhone Safariで確認しました。これは上記「2026-11-04 iPhone Safari実機確認とClose判定」のIssue #33本体の実機結果（OK 5件・NG 0件・未確認1件）とは別の確認結果です。
+
+**今回のUI簡素化後の結果：OK 3件、NG 0件、未確認 0件。**
+
+| # | 実機結果 | ユーザー報告の確認項目 |
+| --- | --- | --- |
+| 1 | OK | 初級・標準・上級の名前だけが表示され、説明文がない |
+| 2 | OK | 3段階をタップで選択でき、開始後のルール表示も正しい |
+| 3 | OK | ダイアログを最後までスクロールでき、キャンセル・対局開始ボタンを正常に操作できる |
+
+### 実装コミットとActionsの照合
+
+- GitHub Actions [run #41768442066](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41768442066) は、UI簡素化コミット `60de19cae1999ec58f68f9a2e8009a9d49789344` に対する実行です。`verify`、Chromium、WebKit、Browser UI matrix audit はsuccessでした。
+- workflow全体の結論はfailureです。`release-freshness` が、実行中に `main` が後続コミット `8106baabed80c857166ffe65324b27113528550d` へ進んだことを検出し、古いSHAの公開を拒否しました。Worker・Pagesのdeployジョブはskipです。したがってUI／verifyジョブの成功と公開結果を分けて記録します。
+- このActionsの結果はブラウザー自動検証であり、上記のiPhone Safari実機結果とは別です。CPU判断の統計的な強さの評価、および再接続・次局・再戦の実機未確認状態は従来の記録のままです。Issue #33はcompleted／Closedのままです。
