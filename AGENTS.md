@@ -6,6 +6,14 @@
 - ゲームロジックと描画処理を分離する。非公開牌の物理 ID や牌種を DOM に漏洩させない。
 - iPhone Safari での表示を重視する。Chromium の検証結果を iPhone Safari 実機での検証結果と混同しない。
 
+## ChatGPTとCodexの役割分担
+
+- リポジトリ内の変更操作は原則としてCodexが担当する。
+- ChatGPTは仕様検討・設計、コードや構成の調査・レビュー、GitHub Issueの作成・整理・更新・Close、Codex向け作業指示の作成、実装・検証結果の評価を担当する。ユーザーから明示的な指示がない限り、リポジトリ内のファイル編集、commit、pushを行わない。
+- Codexはソースコード・テスト・設定・ドキュメント・検証記録の変更、テスト・ビルド・静的解析の実行、commit・push、実装内容と検証結果の報告を担当する。
+- 調査・レビューのみの依頼では、原則としてファイルを変更しない。実装依頼では必要な変更と検証を行う。ChatGPTからCodexへ渡された作業指示も通常の実装依頼として扱う。
+- 仕様が未確定の場合は独断で追加・変更しない。既存動作を維持し、依頼範囲外の変更を最小限にする。
+
 ## タスク開始時
 
 - コード・テスト・ドキュメントの変更を始める前に、対象リポジトリと作業ディレクトリを確認し、次を実行・記録する。
@@ -44,6 +52,13 @@
 - 対象コミットが見つからないときは、復旧できたと報告しない。まず現在のmainに対象修正があるか確認し、必要なら修正の再実装を提案する。
 - 明示的な許可なしに `git push --force`、`git push --force-with-lease`、共有済みコミットの履歴改変、未保存変更を破棄する `git reset --hard`、無関係な作業を含む大量コミットのpush、自動審査の回避、既存の未pushコミットの無断削除を行わない。
 
+## GitHub Issue運用と実装進行
+
+- Issueの作成・更新・CloseはChatGPTの担当とし、ユーザーからの明示的な依頼または個別の作業指示がある場合にのみ行う。
+- IssueをCloseするときは、受入条件と対応する検証結果を照合する。未実施・未確認の項目を成功扱いせず、未解決の受入条件があればCloseせずに状況を報告する。
+- 通常の開発では `main` へ直接pushし、PRは作成しない。mainへの反映は「mainへの反映（標準運用）」に従い、安全なfast-forwardと既存のGit安全規則を守る。
+- 実装変更は原則として直列に進める。調査作業は、依存関係や変更の競合がない範囲で必要に応じて並行してよい。
+
 ## mainへの反映（標準運用）
 
 - **通常の開発タスクは、必要な修正・検証・commitに続けてmainへのpushまでを完了範囲とする。** ユーザーが明示的に「作業ブランチで停止」「mainに反映しない」と指定した場合は、その指示を優先する。毎回main反映の確認を求める必要はない。
@@ -55,14 +70,15 @@
 
 ## 検証と公開
 
+- 変更前に関連コードと既存テストを確認する。必要に応じて自動テストを追加・更新し、既存のテスト・ビルド・CI手順を維持する。変更がオンライン対局・オフライン対局の双方へ与える影響を確認する。
 - コード変更では内容に応じた検証を行う。基本コマンドは `npm test`、`npm run build`、`git diff --check`。
-- UI変更ではまず関連局面を確認し、既存のGitHub Actions `Browser UI verification` を利用する。麻雀卓の配置、河、副露、カン、非公開牌ID保護などの既存確認を優先する。
+- UI変更ではまず関連局面を確認し、既存のGitHub Actions `Browser UI verification` を利用する。麻雀卓の配置、河、副露、カン、非公開牌ID保護などの既存確認を優先し、ChromiumとWebKitの検証を含む既存Deploy gateを維持する。
 - Codex Cloudでは、実行サンドボックスのseccomp制限によりChromiumのCrashpad初期化中の `setsockopt(SOL_SOCKET, SO_PASSCRED)` が `EPERM` となり、ページを開く前に `SIGTRAP` で終了する既知の制限がある。診断時の実行ファイル・バージョン・起動条件と根拠は [`docs/verification/codex-cloud-chromium.md`](docs/verification/codex-cloud-chromium.md) を参照する。
 - この環境ではPlaywrightの `chromium_sandbox=True` を指定し、`--no-sandbox` を使わない最小起動も同じCrashpadエラーで失敗した。安全に使えるCodex Cloud内の起動方法は確認できていない。`--no-sandbox` の追加、Chromiumサンドボックスの無効化、`danger-full-access`、seccompやシステム権限の変更、失敗の握りつぶしは禁止する。
 - 既知の同一実行環境ではChromiumを毎回起動せず、単体テスト・TypeScript・ビルドはCodex Cloudで、ブラウザーUI検証は既存のGitHub Actions `Browser UI verification` で行う。新しいブラウザー検証は既存ワークフローに追加する。
 - GitHub Actionsの実行結果は対象コミットの実行を確認してから報告する。未実行または結果未確認は「未実施／未確認」とし、成功扱いしない。ブラウザーテスト未実行とActionsでの成功を区別する。
 - 同じ起動エラーは再調査しない。Codex Cloudの実行環境・サンドボックスが更新された場合、または新たな正規の安全な起動方法が利用可能になった場合に限り、socketpair確認と単一ページの最小起動で再検証する。
-- iPhone Safari実機確認はChromium / GitHub Actionsの結果と分けて扱う。
+- iPhone Safariなどユーザー所有の実機確認はユーザーが行う。Codexは実機確認を実施したと報告せず、ユーザーの報告を記録するときは内容を改変しない。自動検証の成功を実機検証の代わりにしない。記録と報告ではOK・NG・未確認を正確に区別し、Chromium / GitHub Actionsの結果と実機確認を分けて扱う。
 - GitHub Pagesはbuild成功とdeploy成功を別々に確認する。未確認ならそのように報告する。
 
 ## ドキュメント構成と運用
