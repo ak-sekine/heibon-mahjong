@@ -19,7 +19,7 @@ import { riichiRiverReference } from '../rendering/riichi-river-reference.ts';
 import { diagnosticLog, recordGameRenderFailure } from './diagnostics.ts';
 import { isValidGameRules, normalizeGameRules } from '../model/rules.ts';
 
-type ActionSender = (action: GameActionPayload, expectedGameRevision: number) => void;
+type ActionSender = (action: GameActionPayload, expectedGameRevision: number, requestId: string) => boolean;
 type DecisionAction = { type: 'declare-ron' } | { type: 'pass-ron' } | { type: 'declare-call'; optionId: string } | { type: 'pass-call' };
 function face(tile: PublicTile): SVGSVGElement {
   const svg = createTileElement(tile.tile);
@@ -68,6 +68,10 @@ export class OnlineGameController {
   private declarationCursor: number | null = null;
   private selectedTileId: string | null = null;
   private actionPending = false;
+  private actionRequestId: string | null = null;
+  private actionResultRevision: number | null = null;
+  private gameConnectionReady = false;
+  private connectionNotice = '対局サーバーの状態を確認しています。';
   private decisionPending = false;
   private actionNotice = '';
   private roomNotice = '';
@@ -162,6 +166,10 @@ export class OnlineGameController {
       this.declarationCursor = null;
       this.finalRanks = null;
       this.actionPending = false;
+      this.actionRequestId = null;
+      this.actionResultRevision = null;
+      this.gameConnectionReady = false;
+      this.connectionNotice = '対局サーバーの状態を確認しています。';
       this.decisionPending = false;
       this.actionNotice = '';
       this.root.hidden = true;
@@ -181,6 +189,10 @@ export class OnlineGameController {
       this.declarationCursor = null;
       this.finalRanks = null;
       this.actionPending = false;
+      this.actionRequestId = null;
+      this.actionResultRevision = null;
+      this.gameConnectionReady = false;
+      this.connectionNotice = '対局サーバーの状態を確認しています。';
       this.decisionPending = false;
       this.actionNotice = '';
       this.kanChoicesOpen = false;
@@ -209,16 +221,48 @@ export class OnlineGameController {
       }
       return;
     }
-    if (message.type === 'game-action-result') {
+    if (message.type === 'game-connection-state') {
+      this.gameConnectionReady = message.ready === true;
+      this.connectionNotice = typeof message.message === 'string' ? message.message : '';
+      if (this.view) this.renderActions(this.view);
+      return;
+    }
+    if (message.type === 'game-action-state-confirmed') {
+      if (!this.actionRequestId || message.requestId !== this.actionRequestId) return;
       this.actionPending = false;
+      this.actionRequestId = null;
+      this.actionResultRevision = null;
       this.decisionPending = false;
-      this.actionNotice = message.ok === false ? '操作が受け付けられませんでした。最新状態を確認してください。' : '';
+      this.actionNotice = '';
+      this.render();
+      return;
+    }
+    if (message.type === 'game-action-result') {
+      if (!this.actionRequestId || message.requestId !== this.actionRequestId || typeof message.ok !== 'boolean') return;
+      this.decisionPending = false;
+      if (message.ok === false) {
+        this.actionPending = false;
+        this.actionRequestId = null;
+        this.actionResultRevision = null;
+        this.actionNotice = '操作が受け付けられませんでした。最新状態を確認してください。';
+      } else {
+        const revision = Number.isSafeInteger(message.gameRevision) ? message.gameRevision as number : null;
+        this.actionResultRevision = revision;
+        if (revision !== null && this.view && this.view.gameRevision >= revision) {
+          this.actionPending = false;
+          this.actionRequestId = null;
+          this.actionResultRevision = null;
+        }
+        this.actionNotice = revision === null ? '操作結果を受け取りました。対局状態を同期しています。' : '';
+      }
       this.render();
       return;
     }
     if (message.type === 'game-aborted') {
       this.stopDecisionCountdown();
       this.actionPending = false;
+      this.actionRequestId = null;
+      this.actionResultRevision = null;
       this.decisionPending = false;
       this.actionNotice = '';
       this.view = this.view ? {
@@ -255,8 +299,14 @@ export class OnlineGameController {
       this.kanChoicesOpen = false;
     }
     this.view = next;
-    this.actionPending = false;
-    this.decisionPending = false;
+    this.gameConnectionReady = true;
+    this.connectionNotice = '';
+    if (this.actionResultRevision !== null && next.gameRevision >= this.actionResultRevision) {
+      this.actionPending = false;
+      this.actionRequestId = null;
+      this.actionResultRevision = null;
+      this.decisionPending = false;
+    }
     this.actionNotice = '';
     this.setTableClasses(true);
     this.root.hidden = false;
@@ -270,24 +320,43 @@ export class OnlineGameController {
 
   private send(action: GameActionPayload): void {
     const view = this.view;
-    if (!view || !this.sender || this.actionPending ||
+    if (!view || !this.sender || !this.gameConnectionReady || this.actionPending ||
         (view.status !== 'playing' && !(action.type === 'next-round' && view.status === 'round-ended'))) return;
     this.actionPending = true;
     this.decisionPending = false;
     this.actionNotice = '';
     this.render();
-    this.sender(action, view.gameRevision);
+    this.dispatch(action, view.gameRevision);
   }
 
   private sendDecision(action: DecisionAction): void {
     const view = this.view;
     const decision = view?.self.decision;
-    if (!view || !decision || decision.answered || !this.sender || this.actionPending) return;
+    if (!view || !decision || decision.answered || !this.sender || !this.gameConnectionReady || this.actionPending) return;
     this.actionPending = true;
     this.decisionPending = true;
     this.actionNotice = '';
     this.render();
-    this.sender({ ...action, windowId: decision.windowId } as GameActionPayload, decision.expectedGameRevision);
+    this.dispatch({ ...action, windowId: decision.windowId } as GameActionPayload, decision.expectedGameRevision);
+  }
+
+  private dispatch(action: GameActionPayload, expectedGameRevision: number): void {
+    if (!this.sender) return;
+    const requestId = crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    this.actionRequestId = requestId;
+    this.actionResultRevision = null;
+    this.actionPending = true;
+    this.actionNotice = '';
+    this.render();
+    let sent = false;
+    try { sent = this.sender(action, expectedGameRevision, requestId); } catch { sent = false; }
+    if (!sent && this.actionRequestId === requestId) {
+      this.actionPending = false;
+      this.actionRequestId = null;
+      this.decisionPending = false;
+      this.actionNotice = '接続がありません。再接続してから操作してください。';
+      this.render();
+    }
   }
 
   private discardTileId(): string | null {
@@ -554,11 +623,11 @@ export class OnlineGameController {
     this.actionPanel.update(createOnlineActionPanelState(
       view,
       this.selectedTileId,
-      this.actionPending,
+      this.actionPending || !this.gameConnectionReady,
       this.decisionPending,
       this.kanChoicesOpen,
       this.decisionSeconds(view.self.decision),
-      this.roomNotice || this.actionNotice,
+      this.roomNotice || this.connectionNotice || this.actionNotice,
     ));
     this.syncDecisionCountdown(view.self.decision);
   }

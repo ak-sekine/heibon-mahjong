@@ -141,12 +141,14 @@ window.declarationGameplayTest = { controller, render, onlineGameController };
       };
       const onlineView = () => views.createPlayerGameView(session, 0, 'ABC234', connected);
       app.onlineGameController.receive({type:'game-started', view:onlineView()});
-      app.onlineGameController.setActionSender((action, expectedGameRevision) => {
+      app.onlineGameController.setActionSender((action, expectedGameRevision, requestId) => {
         session = engine.applyOnlineGameAction(session, 0, {
-          ...action, requestId:'browser-gameplay-riichi', expectedGameRevision,
+          ...action, requestId, expectedGameRevision,
         }, connected, Date.now());
         window.declarationGameplaySession = session;
+        app.onlineGameController.receive({type:'game-action-result', requestId, ok:true, gameRevision:session.gameRevision});
         app.onlineGameController.receive({type:'game-state', view:onlineView()});
+        return true;
       });
       window.declarationGameplaySession = session;
       const tileId = onlineView().self.riichiTileIds[0];

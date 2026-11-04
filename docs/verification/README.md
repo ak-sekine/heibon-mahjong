@@ -4,6 +4,7 @@
 
 ## Issue調査
 
+- [オンライン対局の操作待機・復旧 — Issue #29、2026-11-04](issue29-online-action-pending-2026-11-04.md) — 確認された待機状態とrevisionの不整合、同一requestIdによる復旧、同期要求のレート制限、回帰テスト、Actions・iPhone Safariの確認範囲を記録。2026-11-01の実停止原因は未特定として維持します。
 - [CPU難易度 — Issue #33、2026-11-03〜11-04](issue33-cpu-difficulty-2026-11-03.md) — 初級／標準／上級の仕様、合法性と非公開情報境界、固定局面差、処理時間、限定的な対局比較、オンライン保存・再接続・再戦の自動検証を記録。Issue #33本体の2026-11-04 iPhone Safari実機結果はOK 5件・NG 0件・未確認1件（再接続・次局・再戦後の難易度維持）。別記録として、コミット `60de19ca` によるUI簡素化後の実機確認はOK 3件・NG 0件・未確認0件。Actionsの自動検証結果とは区別し、Issue #33はcompleted／Closed。強さの統計的優劣は未立証。
 - [PWAインストール・更新管理 — Issue #31、2026-11-03](issue31-pwa-2026-11-03.md) — iPhone Safari実機OK 7件・NG 0件、Chromium／WebKitでの更新・複数タブ・旧キャッシュ・復旧試験、run `41607845715`の成功、Worker／Pages双方の公開SHA `96b3350…`、Android実機と直接HTTP取得の未確認事項、completed／Close判定を記録。
 - [PWAアイコン変更 — 2026-11-03](pwa-icons-2026-11-03.md) — コミット `83804ced` の実機結果はOK 3件・NG 0件・未確認2件。アイコン受入は完了、オフラインCPU対局とオンライン復帰後の対局は未確認。Actions run `41621533105` の自動検証／公開結果と実機確認を分けて記録。

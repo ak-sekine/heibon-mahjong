@@ -306,7 +306,7 @@ if (document.querySelector('#online-create-open')) {
   });
   const waitingRoom = new OnlineWaitingRoom(import.meta.env.VITE_ONLINE_API_URL, message => onlineGameController?.receive(message), rulePreferences);
   matchResultDialog.setOnlineRematchHandler(() => waitingRoom.prepareRematch());
-  onlineGameController.setActionSender((action, expectedGameRevision) => waitingRoom.sendGameAction(action, expectedGameRevision));
+  onlineGameController.setActionSender((action, expectedGameRevision, requestId) => waitingRoom.sendGameAction(action, expectedGameRevision, requestId));
 }
 mountDialogScrollIndicators();
 document.querySelector('#player-hand')!.addEventListener('click', event => {

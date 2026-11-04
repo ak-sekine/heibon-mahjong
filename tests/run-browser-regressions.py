@@ -37,6 +37,8 @@ SUITE = [
     run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_EXIT_NOTICE_ONLY='1'),
     run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_EXIT_NOTICE_ONLY='1'),
     run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_RULES_ONLY='1'),
+    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_ACTION_SYNC_ONLY='1'),
+    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_ACTION_SYNC_ONLY='1'),
     run('tests/browser-riichi-discard-layout.py'),
     run('tests/browser-action-controls.py'),
     run('tests/browser-action-panel.py'),

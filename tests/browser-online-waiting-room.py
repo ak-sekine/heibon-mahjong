@@ -17,6 +17,7 @@ RULES_ONLY = os.environ.get('HEIBON_ONLINE_RULES_ONLY') == '1'
 NEXT_ROUND_ONLY = os.environ.get('HEIBON_ONLINE_NEXT_ROUND_ONLY') == '1'
 RESULT_BUTTON_FONTS_ONLY = os.environ.get('HEIBON_ONLINE_RESULT_BUTTON_FONTS_ONLY') == '1'
 REMATCH_MULTI_CLIENT_ONLY = os.environ.get('HEIBON_ONLINE_REMATCH_MULTI_CLIENT_ONLY') == '1'
+ACTION_SYNC_ONLY = os.environ.get('HEIBON_ONLINE_ACTION_SYNC_ONLY') == '1'
 OUT.mkdir(parents=True, exist_ok=True)
 
 def assert_common_button_colors(page, selector):
@@ -113,13 +114,24 @@ MOCK = r"""
     publishToGuest({ type, view: makeView(1) });
   });
   let dropNextGameResult = false;
+  let rateLimitNextAction = false;
+  let omitNextActionRateLimitRequestId = false;
+  let rateLimitNextSync = false;
+  let staleNextGameSync = false;
+  let suppressNextGameBroadcast = false;
+  let gameStateSyncRequests = 0;
+  let stateBeforeNextGameResult = false;
+  const cachedGameResults = new Map();
   const gameResult = (socket, message, ok, codeName) => {
+    const response = { type: 'game-action-result', requestId: message.requestId, ok, gameRevision,
+      ...(codeName ? { code: codeName } : {}) };
+    cachedGameResults.set(message.requestId, response);
     if (dropNextGameResult) { dropNextGameResult = false; return; }
-    send(socket, { type: 'game-action-result', requestId: message.requestId, ok, gameRevision,
-      ...(codeName ? { code: codeName } : {}) });
+    send(socket, response);
   };
   const sockets = [];
   const gameActions = [];
+  const gameActionRequests = [];
   let rejectNextFinalize = false;
   let tickets = 0;
   let nextSocketSeat = 0;
@@ -171,17 +183,39 @@ MOCK = r"""
     }
     send(raw) {
       const message = JSON.parse(raw);
+      if (window.__throwNextSocketSend) { window.__throwNextSocketSend = false; throw new Error('mock send failed'); }
       if (remoteGuest) {
         roomChannel.postMessage({ kind: 'guest-message', message });
         return;
       }
-      if (['discard', 'declare-riichi', 'declare-tsumo', 'declare-kyuushu-kyuuhai', 'declare-kan', 'declare-ron', 'pass-ron', 'declare-call', 'pass-call', 'next-round'].includes(message.type)) gameActions.push(message.type);
+      if (['start-game', 'discard', 'declare-riichi', 'declare-tsumo', 'declare-kyuushu-kyuuhai', 'declare-kan', 'declare-ron', 'pass-ron', 'declare-call', 'pass-call', 'next-round'].includes(message.type)) {
+        gameActionRequests.push({ type: message.type, requestId: message.requestId });
+        if (rateLimitNextAction) {
+          rateLimitNextAction = false;
+          const response = { type: 'error', code: 'rate_limited' };
+          if (!omitNextActionRateLimitRequestId) response.requestId = message.requestId;
+          omitNextActionRateLimitRequestId = false;
+          send(this, response);
+          return;
+        }
+        if (cachedGameResults.has(message.requestId)) { send(this, cachedGameResults.get(message.requestId)); return; }
+        if (message.type !== 'start-game') gameActions.push(message.type);
+      }
       if (message.type === 'request-state') {
         send(this, { type: 'room-state', ...JSON.parse(JSON.stringify(state)) });
         return;
       }
       if (message.type === 'request-game-state') {
-        if (gameStarted) send(this, { type: 'game-state', view: makeView(this.seat) });
+        gameStateSyncRequests++;
+        if (rateLimitNextSync) { rateLimitNextSync = false; send(this, { type: 'error', code: 'rate_limited' }); return; }
+        if (gameStarted) {
+          const view = makeView(this.seat);
+          if (staleNextGameSync) {
+            staleNextGameSync = false;
+            view.gameRevision = Math.max(0, gameRevision - 2);
+          }
+          send(this, { type: 'game-state', view });
+        }
         return;
       }
       if (message.type === 'start-game') {
@@ -224,8 +258,13 @@ MOCK = r"""
         phase = 'awaiting-draw';
         turnPlayerId = (this.seat + 1) % 4;
         gameRevision++;
-        gameResult(this, message, true);
-        broadcastGame('game-state');
+        const stateBeforeResult = stateBeforeNextGameResult;
+        stateBeforeNextGameResult = false;
+        if (stateBeforeResult) broadcastGame('game-state');
+        if (stateBeforeResult) setTimeout(() => gameResult(this, message, true), 30);
+        else gameResult(this, message, true);
+        if (!stateBeforeResult && !suppressNextGameBroadcast) broadcastGame('game-state');
+        suppressNextGameBroadcast = false;
         return;
       }
       if (message.type === 'pass-ron' || message.type === 'pass-call' || message.type === 'declare-ron' || message.type === 'declare-call') {
@@ -626,6 +665,23 @@ MOCK = r"""
     forceDisconnect() { sockets.filter(socket => socket.readyState === MockWebSocket.OPEN).at(-1)?.forceDisconnect(); },
     rejectNextFinalize() { rejectNextFinalize = true; },
     dropNextGameResult() { dropNextGameResult = true; },
+    rateLimitNextGameAction() { rateLimitNextAction = true; },
+    rateLimitNextGameActionLegacy() { rateLimitNextAction = true; omitNextActionRateLimitRequestId = true; },
+    rateLimitNextGameSync() { rateLimitNextSync = true; },
+    staleNextGameSync() { staleNextGameSync = true; },
+    suppressNextGameBroadcast() { suppressNextGameBroadcast = true; },
+    sendStaleGameStates(count) {
+      sockets.filter(socket => socket.readyState === MockWebSocket.OPEN).forEach(socket => {
+        for (let index = 0; index < count; index++) {
+          const view = makeView(socket.seat);
+          view.gameRevision = Math.max(0, gameRevision - 2);
+          send(socket, { type: 'game-state', view });
+        }
+      });
+    },
+    sendGameStateBeforeNextResult() { stateBeforeNextGameResult = true; },
+    get gameActionRequests() { return [...gameActionRequests]; },
+    get gameStateSyncRequests() { return gameStateSyncRequests; },
     get ticketRequests() { return tickets; },
     get gameActions() { return [...gameActions]; },
     get requests() { return requests; },
@@ -696,9 +752,11 @@ MOCK = r"""
   });
   const nativeSetTimeout = window.setTimeout.bind(window);
   window.__shortNextActionTimeout = false;
+  window.__shortNextGameSyncTimeout = false;
   window.__shortExitNoticeTimeout = false;
   window.setTimeout = (callback, delay, ...args) => {
     if (window.__shortNextActionTimeout && delay === 15000) { window.__shortNextActionTimeout = false; delay = 20; }
+    if (window.__shortNextGameSyncTimeout && delay === 8000) { window.__shortNextGameSyncTimeout = false; delay = 20; }
     if (window.__shortExitNoticeTimeout && delay === 8000) { window.__shortExitNoticeTimeout = false; delay = 5000; }
     return nativeSetTimeout(callback, delay, ...args);
   };
@@ -1129,6 +1187,115 @@ with sync_playwright() as p:
         if page.locator('#main-menu-items').is_hidden():
             page.locator('#main-menu-toggle').click()
         page.locator(selector).click()
+
+    if ACTION_SYNC_ONLY:
+        select_menu_item('#online-create-open')
+        page.locator('#online-create-name').fill('待機テスト')
+        page.locator('#online-create').click()
+        wait_for("!document.querySelector('#online-ready').hidden")
+        page.evaluate('window.onlineMock.addGuest(); window.onlineMock.setGuestReady(true)')
+        page.locator('#online-ready').click()
+        wait_for("!document.querySelector('#online-finalize').disabled")
+        page.locator('#online-finalize').click()
+        wait_for("!document.querySelector('#online-start-game').hidden")
+        page.locator('#online-start-game').click()
+        wait_for("document.querySelector('#online-match').hidden === false && document.querySelector('#online-discard').disabled === false")
+
+        # State may precede the acknowledgement. The display stays waiting until its matching result arrives.
+        page.evaluate('window.onlineMock.sendGameStateBeforeNextResult()')
+        page.locator('#online-player-hand button[data-tile-id]').first.click()
+        page.locator('#online-discard').click()
+        wait_for("window.onlineUiTest.onlineGameController.actionPending === true")
+        assert page.locator('#online-discard').is_disabled(), 'game-state released the UI wait before the matching action result'
+        wait_for("window.onlineUiTest.onlineGameController.actionPending === false")
+        assert page.locator('#online-game-action-status').inner_text().startswith('テスト参加者の手番'), 'successful operation did not release the wait and render the new turn'
+
+        # Delayed old states neither roll back the panel nor create sync traffic.
+        syncs_before_stale_burst = page.evaluate('window.onlineMock.gameStateSyncRequests')
+        view_revision_before_stale_burst = page.evaluate('window.onlineUiTest.onlineGameController.view.gameRevision')
+        page.evaluate('window.onlineMock.sendStaleGameStates(5)')
+        assert page.evaluate('window.onlineUiTest.onlineGameController.view.gameRevision') == view_revision_before_stale_burst, 'an old game-state replaced the current displayed state'
+        assert page.evaluate('window.onlineMock.gameStateSyncRequests') == syncs_before_stale_burst, 'unsolicited old states caused synchronization traffic'
+
+        # A stale sync response reconnects once, then the fresh connection supplies the current state.
+        page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.staleNextGameSync()')
+        wait_for("window.onlineUiTest.onlineGameController.view.turnPlayerId === 0 && document.querySelector('#online-discard').disabled === false")
+        syncs_before_stale_sync = page.evaluate('window.onlineMock.gameStateSyncRequests')
+        page.locator('#online-player-hand button[data-tile-id]').first.click()
+        page.locator('#online-discard').click()
+        wait_for("window.onlineUiTest.onlineGameController.actionPending === false && window.onlineUiTest.onlineGameController.view.gameRevision === window.onlineMock.snapshot().gameRevision", timeout=10000)
+        assert page.evaluate('(before) => window.onlineMock.gameStateSyncRequests - before', syncs_before_stale_sync) == 1, 'a stale sync response caused multiple sync requests before reconnect'
+
+        # A correlated rate limit rejects the mutation and unlocks its controls.
+        page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.rateLimitNextGameAction()')
+        wait_for("window.onlineUiTest.onlineGameController.view.turnPlayerId === 0 && document.querySelector('#online-discard').disabled === false")
+        page.locator('#online-player-hand button[data-tile-id]').first.click()
+        page.locator('#online-discard').click()
+        wait_for("window.onlineUiTest.onlineGameController.actionPending === false && document.querySelector('#online-error').textContent.includes('短時間')")
+        assert page.locator('#online-discard').is_enabled(), 'a confirmed rate-limited rejection left the action disabled'
+
+        # Older workers omit requestId on rate-limit errors; without a sync in flight this rejection remains identifiable.
+        page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.rateLimitNextGameActionLegacy()')
+        wait_for("window.onlineUiTest.onlineGameController.view.turnPlayerId === 0 && document.querySelector('#online-discard').disabled === false")
+        page.locator('#online-player-hand button[data-tile-id]').first.click()
+        page.locator('#online-discard').click()
+        wait_for("window.onlineUiTest.onlineGameController.actionPending === false && document.querySelector('#online-error').textContent.includes('短時間')")
+        assert page.locator('#online-discard').is_enabled(), 'a legacy rate-limit rejection left the action disabled'
+
+        # Lost acknowledgement is recovered by state sync and replay with the same id.
+        page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.dropNextGameResult(); window.__shortNextActionTimeout = true')
+        wait_for("window.onlineUiTest.onlineGameController.view.turnPlayerId === 0 && document.querySelector('#online-discard').disabled === false")
+        page.locator('#online-player-hand button[data-tile-id]').first.click()
+        page.locator('#online-discard').click()
+        wait_for("window.onlineUiTest.onlineGameController.actionPending === false", timeout=5000)
+        assert page.locator('#online-error').inner_text() == '', 'resolved lost acknowledgement left a stale wait error visible'
+        assert page.evaluate("window.onlineMock.snapshot().rivers[0].length") == 3, 'replaying a lost response applied the discard twice'
+        duplicate_ids = page.evaluate('''() => {
+          const requests = window.onlineMock.gameActionRequests.filter(item => item.type === 'discard');
+          return requests.map(item => item.requestId);
+        }''')
+        assert len(duplicate_ids) >= 5 and duplicate_ids[-1] == duplicate_ids[-2], f'uncertain operation was not replayed with its original requestId: {duplicate_ids}'
+
+        # A rate-limited state sync does not clear the unrelated uncertain operation; reconnect resolves it.
+        page.evaluate('window.onlineMock.advanceCpu(); window.onlineMock.dropNextGameResult(); window.onlineMock.suppressNextGameBroadcast(); window.onlineMock.rateLimitNextGameSync(); window.__shortNextActionTimeout = true; window.__shortNextGameSyncTimeout = true')
+        wait_for("window.onlineUiTest.onlineGameController.view.turnPlayerId === 0 && document.querySelector('#online-discard').disabled === false")
+        page.locator('#online-player-hand button[data-tile-id]').first.click()
+        page.locator('#online-discard').click()
+        wait_for("window.onlineUiTest.onlineGameController.actionPending === true && document.querySelector('#online-error').textContent.includes('短時間')", timeout=5000)
+        assert page.locator('#online-discard').is_disabled(), 'rate-limited synchronization released an unresolved game operation'
+        wait_for("window.onlineUiTest.onlineGameController.actionPending === false && document.querySelector('#online-connection').textContent === '接続中'", timeout=10000)
+        assert page.locator('#online-error').inner_text() == '', 'successful reconnect left a stale synchronization error visible'
+        assert page.evaluate('window.onlineMock.snapshot().rivers[0].length') == 4, 'reconnect replay applied the uncertain operation more than once'
+
+        # A send exception is ambiguous; the same request ID is replayed after reconnect.
+        page.evaluate('window.onlineMock.advanceCpu(); window.__throwNextSocketSend = true')
+        wait_for("window.onlineUiTest.onlineGameController.view.turnPlayerId === 0 && document.querySelector('#online-discard').disabled === false")
+        sent_before_exception = page.evaluate('window.onlineMock.gameActionRequests.length')
+        page.locator('#online-player-hand button[data-tile-id]').first.click()
+        page.locator('#online-discard').click()
+        ambiguous_request_id = page.evaluate('window.onlineUiTest.onlineGameController.actionRequestId')
+        wait_for("document.querySelector('#online-connection').textContent.includes('切れました') || document.querySelector('#online-connection').textContent.includes('再接続')")
+        assert page.evaluate('window.onlineMock.gameActionRequests.length') == sent_before_exception, 'a thrown WebSocket send reached the server'
+        assert page.locator('#online-discard').is_disabled(), 'send failure left an offline action enabled'
+        wait_for("window.onlineUiTest.onlineGameController.view.gameRevision === window.onlineMock.snapshot().gameRevision && document.querySelector('#online-discard').disabled === false", timeout=10000)
+        assert page.locator('#online-error').inner_text() == '', 'replayed send exception left a stale wait error visible'
+        replayed_request_ids = page.evaluate('window.onlineMock.gameActionRequests.filter(item => item.type === "discard").map(item => item.requestId)')
+        assert replayed_request_ids[-1] == ambiguous_request_id, f'send failure recovery changed the requestId: {replayed_request_ids} {ambiguous_request_id}'
+        assert page.evaluate('window.onlineMock.snapshot().rivers[0].length') == 5, 'send exception recovery applied the action more than once'
+
+        # Disconnect before a click: controls remain safely disabled and become usable after the fresh state arrives.
+        page.evaluate('window.onlineMock.forceDisconnect()')
+        wait_for("document.querySelector('#online-connection').textContent.includes('切れました')")
+        assert page.locator('#online-discard').is_disabled(), 'disconnect did not disable game actions'
+        sent_before_offline_click = page.evaluate('window.onlineMock.gameActionRequests.length')
+        page.locator('#online-discard').click(force=True)
+        assert page.evaluate('window.onlineMock.gameActionRequests.length') == sent_before_offline_click, 'a disconnected click reached the server'
+        wait_for("window.onlineUiTest.onlineGameController.view.gameRevision === window.onlineMock.snapshot().gameRevision && document.querySelector('#online-discard').disabled === false", timeout=10000)
+
+        assert not errors and not console_errors, f'{ENGINE} action synchronization errors: {errors} {console_errors}'
+        browser.close()
+        print(json.dumps({'browser': ENGINE, 'scenario': 'online action wait, rejection, replay, sync failure and reconnect', 'result': 'pass'}, ensure_ascii=False))
+        raise SystemExit(0)
 
     def assert_online_dialog_header(dialog_selector, close_selector, width):
         layout = page.evaluate('''({dialogSelector, closeSelector}) => {

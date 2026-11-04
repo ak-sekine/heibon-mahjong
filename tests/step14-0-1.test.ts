@@ -683,6 +683,24 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
       secondFixture.room.webSocketMessage(rateClient.server as unknown as WebSocket, JSON.stringify({ type: 'request-state' }));
     }
     assert.ok(rateClient.client.sent.some(message => JSON.parse(message).code === 'rate_limited'));
+    secondFixture.room.webSocketMessage(rateClient.server as unknown as WebSocket,
+      JSON.stringify({ type: 'discard', requestId: 'rate-rejected-game-action', expectedGameRevision: 0, tileId: 'tile-1' }));
+    const correlatedRateError = JSON.parse(rateClient.client.sent.at(-1)!);
+    assert.equal(correlatedRateError.code, 'rate_limited');
+    assert.equal(correlatedRateError.requestId, 'rate-rejected-game-action', 'a rejected mutation must identify its request ID');
+    secondFixture.room.webSocketMessage(rateClient.server as unknown as WebSocket, JSON.stringify({ type: 'request-game-state' }));
+    const syncRateError = JSON.parse(rateClient.client.sent.at(-1)!);
+    assert.equal(syncRateError.code, 'rate_limited');
+    assert.equal(syncRateError.requestId, undefined, 'a sync rejection must not be mistaken for a pending mutation result');
+    secondFixture.room.webSocketMessage(rateClient.server as unknown as WebSocket,
+      JSON.stringify({ type: 'request-game-state', requestId: 'rate-rejected-game-action' }));
+    const malformedSyncRateError = JSON.parse(rateClient.client.sent.at(-1)!);
+    assert.equal(malformedSyncRateError.code, 'rate_limited');
+    assert.equal(malformedSyncRateError.requestId, undefined, 'a sync request cannot correlate itself to a game operation');
+    secondFixture.room.webSocketMessage(rateClient.server as unknown as WebSocket, new ArrayBuffer(4097));
+    const oversizedRateError = JSON.parse(rateClient.client.sent.at(-1)!);
+    assert.equal(oversizedRateError.code, 'rate_limited');
+    assert.equal(oversizedRateError.requestId, undefined, 'oversized input must not be decoded to find a request ID');
   });
 
   await t.test('starts, persists, isolates, resumes and advances a two-human online game', { timeout: 30_000 }, async t => {

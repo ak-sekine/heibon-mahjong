@@ -468,6 +468,20 @@ export class RoomDurableObject {
     try { socket.send(JSON.stringify(error)); } catch { /* A closing connection is ignored. */ }
   }
 
+  private requestIdForRateLimit(message: string | ArrayBuffer): string | undefined {
+    try {
+      if (typeof message === 'string' && message.length > MAX_MESSAGE_BYTES) return undefined;
+      if (message instanceof ArrayBuffer && message.byteLength > MAX_MESSAGE_BYTES) return undefined;
+      const text = typeof message === 'string' ? message : new TextDecoder().decode(message);
+      if (new TextEncoder().encode(text).byteLength > MAX_MESSAGE_BYTES) return undefined;
+      const value: unknown = JSON.parse(text);
+      const action = this.parseSocketAction(value);
+      return action && typeof action !== 'string' ? action.requestId : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   private closeSockets(code: number, reason: string, seat?: number): void {
     const sockets = seat === undefined ? this.ctx.getWebSockets() : this.ctx.getWebSockets(`seat-${seat}`);
     for (const socket of sockets) {
@@ -1136,7 +1150,7 @@ export class RoomDurableObject {
     const rate = this.consumeSocketRateLimit(attachment.seat);
     if (!rate.allowed) {
       logWorker({ event: 'operation_rejected', level: 'WARN', errorCode: 'rate_limited' });
-      this.sendError(socket, 'rate_limited', undefined, rate.retryAfterMs);
+      this.sendError(socket, 'rate_limited', this.requestIdForRateLimit(message), rate.retryAfterMs);
       return;
     }
     let text: string;
