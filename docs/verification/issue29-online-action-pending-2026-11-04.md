@@ -45,7 +45,14 @@
 - Browser UI Pythonシナリオ3ファイルのPython AST構文検査：成功。
 - `git diff --check`：成功。
 
-Chromium／WebKit Browser UIとmain Deploy gateはpush後のGitHub Actionsで確認します。未確認の間は成功扱いしません。
+GitHub Actions run [#41843992570](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41843992570)（検証コードSHA `0658dfb35b430e0debf624f2cc2abbec281adcb2`）はsuccessしました。
+
+- `verify`：`npm test`、Worker型チェック、Pages buildが成功。
+- Browser UI：Chromium 41シナリオ、WebKit 31シナリオが成功。Browser UI matrix auditも成功し、両engineでaction syncシナリオが成功。
+- Deploy gate：release freshness、Worker deploy、本番Worker通信検証、Pages build／deployが成功。
+- WorkerおよびPagesの公開記録SHAはともに検証コードSHA `0658dfb35b430e0debf624f2cc2abbec281adcb2` と一致。
+
+Actions実行中にブラウザー検査の期待条件を2点修正しました。選択前の打牌ボタンは仕様どおり無効なため、テストは選択可能な合法手牌を確認します。再送操作の成功後は相手手番になるため、最新状態の一致と自分の手番での復帰を個別に確認します。
 
 ## 未確認範囲と残るリスク
 
