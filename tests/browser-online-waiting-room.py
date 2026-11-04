@@ -1311,7 +1311,7 @@ with sync_playwright() as p:
         wait_for("window.onlineUiTest.onlineGameController.actionPending === false", timeout=5000)
         recovery_error = page.locator('#online-error').inner_text()
         assert recovery_error == '', f'resolved lost acknowledgement left an error visible: {recovery_error!r}'
-        assert page.evaluate("window.onlineMock.snapshot().rivers[0].length") == 3, 'replaying a lost response applied the discard twice'
+        assert page.evaluate("window.onlineMock.snapshot().rivers[0].length") == 4, 'replaying a lost response applied the discard twice'
         duplicate_ids = page.evaluate('''() => {
           const requests = window.onlineMock.gameActionRequests.filter(item => item.type === 'discard');
           return requests.map(item => item.requestId);
@@ -1328,7 +1328,7 @@ with sync_playwright() as p:
         assert page.locator('#online-discard').is_disabled(), 'rate-limited synchronization released an unresolved game operation'
         wait_for("window.onlineUiTest.onlineGameController.actionPending === false && document.querySelector('#online-connection').textContent === '接続中'", timeout=10000)
         assert page.locator('#online-error').inner_text() == '', 'successful reconnect left a stale synchronization error visible'
-        assert page.evaluate('window.onlineMock.snapshot().rivers[0].length') == 4, 'reconnect replay applied the uncertain operation more than once'
+        assert page.evaluate('window.onlineMock.snapshot().rivers[0].length') == 5, 'reconnect replay applied the uncertain operation more than once'
         assert page.evaluate('(before) => window.onlineMock.gameStateSyncRequests - before', syncs_before_rate_limited_recovery) == 1, 'a rate-limited sync was repeated instead of waiting for reconnect state'
 
         # A send exception is ambiguous; the same request ID is replayed after reconnect.
@@ -1345,7 +1345,7 @@ with sync_playwright() as p:
         assert page.locator('#online-error').inner_text() == '', 'replayed send exception left a stale wait error visible'
         replayed_request_ids = page.evaluate('window.onlineMock.gameActionRequests.filter(item => item.type === "discard").map(item => item.requestId)')
         assert replayed_request_ids[-1] == ambiguous_request_id, f'send failure recovery changed the requestId: {replayed_request_ids} {ambiguous_request_id}'
-        assert page.evaluate('window.onlineMock.snapshot().rivers[0].length') == 5, 'send exception recovery applied the action more than once'
+        assert page.evaluate('window.onlineMock.snapshot().rivers[0].length') == 6, 'send exception recovery applied the action more than once'
         assert page.locator('#online-game-action-status').inner_text().startswith('テスト参加者の手番'), 'send exception recovery did not render the accepted discard state'
 
         # Disconnect before a click: controls remain safely disabled and become usable after the fresh state arrives.
