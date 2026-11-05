@@ -40,16 +40,27 @@ Issue #44のスクリーンショット報告では、iPhone Safariで日本語�
 - Worker URLは[https://heibon-mahjong-online.ak-sekine.workers.dev](https://heibon-mahjong-online.ak-sekine.workers.dev)。Worker deployment記録SHAとPages deployment記録SHAはともに`4264a24e87f98331f95533a80f719c8e85c32b3b`でActions対象SHAと一致し、Pagesは[https://ak-sekine.github.io/heibon-mahjong/](https://ak-sekine.github.io/heibon-mahjong/)で公開成功しました。
 - 初回runのWebKit失敗は355×320での既存`tests/browser-round-end-ui.py`のタイムアウトでした。ログでは「順位確認」ボタンの`clickEvents`が0件のまま結果dialogが再表示されず、原因は未特定です。同scenarioは直近成功run [#41940009814](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41940009814)（SHA `c57d35cd65adc5cb28c977383c379127f734e305`）と今回の最終runではsuccessしました。初回失敗が一時的かは確定できず、今回のCSS変更とはセレクター範囲・失敗画面の双方が異なります。
 - `4264a24e87f98331f95533a80f719c8e85c32b3b`は初回実装commit `e1d583ac32d6fe8e29f9f789bbe330c6b716d54f`に余白計算コメントとCI失敗記録を加えたcommitです。公開コードは同じで、Worker／Pages公開SHAと成功Actions対象SHAは`4264a24…`です。
-- iPhone Safari実機確認は自動検証と分け、ユーザー確認待ちです。
+- 最終runの検証・公開結果は上記のとおり成功しています。以下の実機報告は自動検証とは分けて記録します。
 
-## iPhone Safari実機確認待ち
+## iPhone Safari実機確認（2026-11-05）
 
-公開後、Safariとホーム画面PWAの両方で次を確認してください。
+- 確認者：ユーザー本人
+- 確認環境：iPhone Safari
+- 今回報告された6項目：OK 6件、NG 0件、未確認 0件。
 
-1. ルーム作成を開き、プレイヤー名欄をタップする。日本語キーボード表示中と非表示時に、水色枠の四辺が欠けず、文字入力できること。
-2. ルール一覧を上下にスクロールし、インジケーターがスクロール位置に合わせて動くこと。入力欄とルール設定の幅、下部の「キャンセル」「ルーム作成」ボタン配置が変わっていないこと。
-3. 「キャンセル」と「閉じる」でダイアログを閉じられ、入力後に「ルーム作成」を実行できること。
-4. ルーム参加画面でプレイヤー名とルームコードを順にフォーカスし、両方の枠が四辺とも見え、入力できること。
-5. 可能なら横幅320px相当の狭い画面で横方向のはみ出しがないこと。
+1. OK：「新しくルームを作る」でプレイヤー名をタップすると、水色のフォーカス枠が四辺とも欠けずに表示される。
+2. OK：日本語キーボードの表示中・非表示時に、入力とダイアログ表示に問題がない。
+3. OK：ルール一覧を上下にスクロールでき、スクロールインジケーターが正常に動く。
+4. OK：下部の「キャンセル」「ルーム作成」ボタンが正しく表示・操作できる。
+5. OK：「ルームに参加する」のプレイヤー名・ルームコード欄でもフォーカス枠と入力に問題がない。
+6. OK：画面の横はみ出しや、入力欄・ルール・ボタンの重なりがない。
 
-Issue #44はOpenのまま維持し、実装・自動検証と実機確認を区別します。
+今回報告されていないホーム画面PWA、320px相当幅の実機表示、ダイアログの「閉じる」操作は、上記の実機OKに含めません。端末機種、iOSバージョン、確認時刻も報告がないため記載しません。修正前の実機での直接再現も未確認です。
+
+## 受入条件と完了判断
+
+主要受入条件は、ユーザー本人によるiPhone Safari実機確認で満たされました。作成画面のフォーカス枠、キーボード表示前後、ルール一覧とスクロールインジケーター、操作ボタン、参加画面の入力欄、および横はみ出し・要素重なりの有無が報告範囲でOKです。自動検証では指定Actions runのChromium 42 scenarioとWebKit 31 scenario、フォーカス枠回帰テスト、matrix audit、regression tests／build、Worker本番検証、Worker／Pages deployが成功し、公開SHA `4264a24e87f98331f95533a80f719c8e85c32b3b` はActions対象SHAと一致しています。
+
+以上からIssue #44はcompletedでClose可能と判断します。今回の作業ではIssue本体を変更せず、Openのまま維持します。Close操作は別途ChatGPT側で実施します。
+
+初回Actionsの別画面WebKit timeoutと、再実行時のartifact名不一致は原因未特定の履歴として保持します。最終runが成功したことをもって、それら過去の失敗原因が解明されたとは判断しません。
