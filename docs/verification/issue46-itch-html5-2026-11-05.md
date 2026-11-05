@@ -243,7 +243,42 @@ Origin拒否の診断ログは既存のHTTP/WebSocket区別と15秒抑制を維�
 
 `tests/worker-origin.test.ts`でPagesとitch.ioの完全一致CORS応答、itch.io OPTIONS 204、正常なルーム作成、`Vary: Origin`、未許可・Origin欠落・`null`・HTTP版・類似Originの403、未対応CORSヘッダー403、ticketなし401、成功Handshake診断レコードを確認します。production通信テストは二方向のクロスOriginでルーム作成・参加、ticketとsubprotocolによるWebSocket接続、準備、座席確定、ゲーム開始、打牌同期、切断・再接続後の状態一致を実施し、未許可OriginのREST参加403とWebSocket handshake 403、発行されていないticketの401も確認します。Deploy workflowに両Originを明示し、release gateを変更せず、production testの後にPages build/deployします。
 
-実行結果、run URL、SHA、デプロイされたWorker/PagesのSHA、各jobの状態は本作業完了時にこの節へ追記します。ローカルのChromium/WebKit実機ブラウザーは既知のCodex Cloud sandbox制約により起動しません。GitHub Actions Browser UIでChromium／WebKitおよびPages PWA回帰を確認します。
+### 自動検証・本番反映の結果
+
+| 検証 | 最終結果 |
+| --- | --- |
+| `npm test` | 成功、85/85 tests、失敗0 |
+| `npm run typecheck:worker` | 成功 |
+| `npm run build` | 成功。Pages PWA buildを維持 |
+| `node --check tests/online-production.mjs`、`git diff --check` | 成功 |
+| Worker Origin / CORSテスト | Pages・itch正確Origin、itch OPTIONS 204、正常なルーム作成、正確なCORS Origin、`Vary: Origin`、非対応CORSヘッダー403、欠落・`null`・HTTP・類似Origin拒否を確認 |
+| GitHub Actions verify | success |
+| Browser UI Chromium / WebKit | success。itch package smoke test、Pages UI/PWA回帰を含むBrowser UI workflowが通過 |
+| Browser UI matrix audit / release freshness | success |
+| Worker deploy | success、`https://heibon-mahjong-online.ak-sekine.workers.dev` |
+| Production online test | success。7 scenarios（通常対局、再接続、席引継ぎ、4人/3人、Pages→itch、itch→Pages） |
+| production testの拒否系 | 未許可Origin REST join 403、WebSocket 403、未発行ticket 401 |
+| Pages build / deploy | success。Pages deployment reported success |
+
+最終成功runは [Deploy #42081081997](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42081081997)、attempt 1、対象SHA `4924682d58feefaee16b3f7026c359ef6be5e179`です。verify、Chromium、WebKit、matrix audit、release-freshness、Worker deploy、production-test、Pages build/deployがすべてsuccessでした。Worker deploy記録とPages deploymentの`pages_build_version`は同じSHA `4924682d58feefaee16b3f7026c359ef6be5e179`です。Worker URLは既存の `https://heibon-mahjong-online.ak-sekine.workers.dev` のままです。
+
+production testログには以下の両方向シナリオがsuccessとして記録されました。
+
+- `pages-to-secondary-origin-room-and-game-sync`
+- `secondary-to-pages-origin-room-and-game-sync`
+
+それぞれでルーム作成・参加、短命ticketと `heibon-mahjong.v1` subprotocolを用いたWebSocket接続、準備完了、座席確定、対局開始、打牌後のrevision同期、切断・再接続後のゲーム状態一致を確認しました。また未許可OriginでのREST join 403／WebSocket handshake 403、発行されていないticketの401も同じ本番Worker上で確認しました。これらはテスト実行時に明示指定したOrigin値による自動通信結果です。実際のiPhone Safari Handshake Originや実機対戦の報告には置き換えません。
+
+**途中の失敗と修正履歴:**
+
+| run / commit | 結果と原因 | 後続対応 |
+| --- | --- | --- |
+| [#42073068650](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42073068650) attempt 1、`e2a6d9b` | WebKitの既存`browser-round-end-ui.py`が430×932でclick eventを受けずtimeout。Chromiumはsuccessし、ゲートによりdeployはskip。 | ログで対象が既存結果dialogシナリオと確認。同じWorkflow全体を再実行。 |
+| [#42073068650](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42073068650) attempt 2、`e2a6d9b` | Chromium／WebKit、matrix audit、Worker deployはsuccess。Production testは、再接続時に既存の古いhost snapshotを拾うテスト待機条件でfailure。 | `request-game-state`後に両socketの新しいmessageを待つよう更新。 |
+| [#42078495316](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42078495316) attempt 1、`4de92cc` | Chromium／WebKit、matrix audit、Worker deployはsuccess。両方向のreconnect state比較通過後、対局中に禁止される`close-room`を呼ぶcleanupが`game_in_progress`でfailure。 | テスト終了は対局中に許可されたホスト・最終参加者の通常`leave-room`操作で行うよう変更。 |
+| [#42081081997](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42081081997) attempt 1、`4924682` | 全workflow job success。 | 最終結果として採用。上の失敗runの結果は履歴として保持し、最終成功と混同しない。 |
+
+Browser UIはローカルの既知のCodex Cloud sandbox制限のため起動せず、GitHub ActionsのChromium／WebKit matrixで実行しました。初回WebKit失敗は最終runでは再発しませんでした。CIは一度も弱めていません。
 
 ### iPhone Safari 実機確認手順（本番Worker反映後）
 
@@ -277,5 +312,19 @@ itch.io Draftに現在アップロード済みのZIPをそのまま使えます�
 | Worker受信HTTP Origin | 同じOriginをCloudflareログで実測。OPTIONS拒否2件 |
 | 許可後のルーム作成 | この表の追記時点では未確認。許可前は失敗 |
 | Worker受信WebSocket Handshake Origin | 未確認。`origin_accepted`ログまたは拒否ログで本番観測待ち |
-| Pages↔itch.io実機相互対局・同期・再接続 | 未確認 |
+| Pages↔itch.io自動相互対局・同期・再接続 | 本番Workerで両方向success。iPhone実機では未確認 |
+| 許可後の本番ルーム作成・待機室 | iPhone実機では未確認 |
 | GitHub Issue #46 | Openのまま維持。実機の相互対戦、再接続、Draft公開準備を残す |
+
+### 本番結果後のiPhone実機確認項目
+
+1. itch.io Draftを現在アップロード済みのまま起動し、「新しくルームを作る」→名前・ルール入力→「ルーム作成」を行います。ルームコードとオンライン待機画面を確認します。
+2. 同時接続には別クライアントを用意してください。Pagesで作成してitchから参加、続けてitchで作成してPagesから参加します。片方はiPhone Safari、もう片方はPC/Mac Chromiumまたは別端末のブラウザーを推奨します。
+3. 両方向で準備完了、座席確定、対局開始、打牌とrevision/手番の同期を確認します。鳴きと和了結果は実際に該当局面になった場合だけ確認し、局面を作れなければ未確認にします。
+4. 片側を切断・再接続して、両画面の局・revision・手番が一致することを確認します。確認端末、iOS/Safariバージョン、各操作で見えた結果を記録してください。
+5. Cloudflare Observabilityでは同じ時間帯の`origin_accepted`または`origin_rejected`を見て、`communicationType: websocket`、Origin、resultを記録します。今回の自動test OriginをiPhone実測値として転記しません。
+6. iPhone1台で別クライアントを安定して維持できない操作、実際に発生しなかった鳴き・和了局面は未確認として残します。
+
+今回の変更はWorker設定・自動テスト・文書で、クライアントbundleに変更はありません。itch.io Draftの既存ZIPを使えます。今回のWorker Origin許可のためのZIP再アップロードは不要です。Deploy runが生成した[SHA `4924682`用itch ZIP artifact](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42081081997/artifacts/13442341911)も記録用に残します。GitHub Pages版は同じSHAで再build/deployされ、Pages deployment successを確認しました。
+
+**Issue #46はOpenのままです。** Production testは自動通信の成功であり、iPhone実機のルーム作成、WebSocket Handshake Origin、Pages↔itch実機対局、鳴き・和了同期、Safari再接続、Draft公開準備の最終確認はユーザー確認待ちです。
