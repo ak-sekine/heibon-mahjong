@@ -20,6 +20,7 @@
 - 全幅でコード`ABC234`の6文字と有効期限`2026/10/27 14:00`を表示し、ルーム情報・ダイアログ・ページに横方向のoverflowがないことを確認しました。低いviewportではオンラインダイアログ既存の縦スクロールを使用します。
 - 最初のrun [#41939006219](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41939006219)（`920ea2d`）は、待機ヘッダーを従来の`flex`と仮定した既存アサーションで失敗しました。待機画面のみ`grid`に変更した仕様に合わせてテスト期待値を直しました。次のrun [#41939406487](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41939406487)（`f93bb1b`）では320pxでコード行の実際のクリップを検出しました。操作列を88px、コードラベルとコードを狭幅用サイズへ調整し、期限テストはinlineの`time.clientWidth`ではなく親行の描画範囲で判定するよう修正しました。最終run #41940009814で両問題の解消を確認しています。
 - Worker deployとproduction testはsuccessです。GitHub Pagesのdeploy jobもsuccessし、Pages公開記録のSHAは`c57d35cd65adc5cb28c977383c379127f734e305`です。公開先は[https://ak-sekine.github.io/heibon-mahjong/](https://ak-sekine.github.io/heibon-mahjong/)です。
+- 別のproduction Worker diagnostics workflow [run #41941954653](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41941954653)は、同じ公開SHA `c57d35cd65adc5cb28c977383c379127f734e305`で失敗しました。`production-test`内のstate diagnosticsが、再接続後の`set-ready`に対する`action-result`を10秒待ってタイムアウトし、その直前にhost／guest双方のWebSocketがclose code `1006`を記録しています。直近のプロトコルメッセージは`room_state`でした。待機ダイアログのDeploy gateとは別の本番Worker診断で、原因は未特定です。WorkerコードはこのIssueでは変更していません。この診断失敗はUIの自動検証成功とは別の未解決事項として扱います。
 
 ## 実機確認と受入条件
 
