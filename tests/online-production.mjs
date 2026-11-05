@@ -824,14 +824,22 @@ async function main() {
           state => state.seats.some(seat => seat.seat === 1 && !seat.connected), disconnectIndex);
         crossOrigin.guest.socket.close(1000, 'mixed-Origin reconnect test');
         await observedDisconnect;
+        const reconnectMinimumRevision = Math.max(
+          currentGameRevision(crossOrigin.host), currentGameRevision(crossOrigin.guest),
+        );
         const reconnected = await connectParticipant(crossOrigin.roomCode, crossOrigin.guestToken,
           'mixed-origin-reconnected', guestOrigin);
         crossOrigin.sockets.push(reconnected);
         crossOrigin.guest = reconnected;
+        const snapshotIndexes = [crossOrigin.host.messages.length, crossOrigin.guest.messages.length];
+        crossOrigin.host.socket.send(JSON.stringify({ type: 'request-game-state' }));
+        crossOrigin.guest.socket.send(JSON.stringify({ type: 'request-game-state' }));
         const [hostSnapshot, guestSnapshot] = await Promise.all([crossOrigin.host, crossOrigin.guest].map(client =>
-          waitForGameState(client, view => view?.roomCode === crossOrigin.roomCode && view.status !== 'aborted')));
+          waitForGameState(client, view => view?.roomCode === crossOrigin.roomCode && view.status !== 'aborted' &&
+            Number(view.gameRevision) >= reconnectMinimumRevision,
+          snapshotIndexes[client === crossOrigin.host ? 0 : 1])));
         check(hostSnapshot.view.gameRevision === guestSnapshot.view.gameRevision,
-          'A reconnected mixed-Origin participant did not receive the current synchronized game state.');
+          `Mixed-Origin reconnect snapshots differed (host ${hostSnapshot.view.gameRevision}, guest ${guestSnapshot.view.gameRevision}).`);
         await closeRoom(crossOrigin, crossOrigin.host);
         roomSummaries.push({ scenario: `${direction}-room-and-game-sync`, roomCode: crossOrigin.roomCode, revision: currentRevision(crossOrigin.host) });
         activeHostForCleanup = null;
