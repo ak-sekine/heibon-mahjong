@@ -118,9 +118,9 @@ npm run build
 
 **Draftアップロード用:** Actions artifact [itch-html5-0dda2f7c7263e2f7246590a1c22ea1e556857c4c-3](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42042381292/artifacts/13426290667)には、runのWorker deploy後に同じ本番Worker URLで生成したゲームZIPが含まれます。artifactをダウンロードして外側を展開し、中の`heibon-mahjong.zip`をitch.ioへアップロードしてください。workspaceには同じソースSHA・本番Worker URLで作った直接アップロード可能な`artifacts/itch/heibon-mahjong.zip`もあります。
 
-## Draft実機チェックリスト（すべて未確認）
+## Draft実機チェックリスト（初版記録時点ですべて未確認）
 
-ユーザーが確認日・端末・OS／ブラウザバージョンとともにOK／NG／未確認を記録します。自動テストの成功で置き換えません。
+この表は2026-11-05の初版作成時点です。後日ユーザーから提示されたiPhone報告は本書末尾の追加記録に分けて記載します。確認日・端末・OS／ブラウザバージョンとともにOK／NG／未確認を記録し、自動テストの成功で置き換えません。
 
 | # | 確認項目 | 結果 |
 | --- | --- | --- |
@@ -175,12 +175,14 @@ Cloudflare Dashboardの Workers & Pages → `heibon-mahjong-online` → Observab
 | `npm test` | 成功。85テスト、失敗0。Origin表示／Opaque Origin、API URLからOriginのみ抽出、拒否イベントのHTTP／WebSocket区別、安全なOriginログ項目を追加検証 |
 | `npm run typecheck:worker` | 成功 |
 | `npm run build` | 成功。Pages PWA buildとService Worker生成を確認 |
-| `VITE_ONLINE_API_URL=https://heibon-mahjong-online.ak-sekine.workers.dev npm run build:itch` | 成功。3ファイル、展開後335,658 bytes、ZIP 88,122 bytes |
-| itch ZIP構造 | 成功。ZIP直下 `index.html`、相対参照。`test.html`、`kan-test.html`、manifest、Service Worker、PWAアイコンなし。bundle内に指定本番Worker URLとOrigin診断表示を確認。SHA-256 `bf7ed235113816cd0a306e3c17da5b6afbd90c94bd8929d115c8d5925a95c442` |
-| Chromium／WebKit Browser UI、診断の表示・コピー、Pages PWAブラウザー回帰 | GitHub Actionsで対象commitの実行待ち。Codex Cloud上でのブラウザー起動は既知の安全な起動制限があるため行っていない。Actions結果を実機結果と混同しない |
+| `VITE_ONLINE_API_URL=https://heibon-mahjong-online.ak-sekine.workers.dev npm run build:itch` | 成功。3ファイル、展開後335,658 bytes、ZIP 88,123 bytes |
+| itch ZIP構造 | 成功。ZIP直下 `index.html`、相対参照。`test.html`、`kan-test.html`、manifest、Service Worker、PWAアイコンなし。bundle内に指定本番Worker URLとOrigin診断表示を確認。commit `b78ff5d` のローカルZIP SHA-256 `8ae65e357077bd4140884d9dc7fc10a832c0ee0d2335929f9b116e2887da9628` |
+| Chromium／WebKit Browser UI、診断の表示・コピー、Pages PWAブラウザー回帰 | 最初のrun [#42060259136](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42060259136) では両engineとも診断iframeテストfixtureを画面外に置いたため失敗。Chromiumは要素がviewport外、WebKitは安定待ちtimeout。製品コードの失敗ではなく、診断UI／itch smoke test stepは未到達。fixtureを画面内へ移し、Pages production previewのOrigin表示も確認する追試を追加。追試のActions結果は次commitで確認する。 |
 | `git diff --check` | 成功 |
 
 Browser UIのlocalhost上のPages／itch相当Originは合成テスト値であり、itch.io Draftの実Origin計測ではない。
+
+最初のrunでは `verify`（npm test、Worker型検査、Pages／itch browser build）はsuccess、Browser UIのChromium／WebKitとmatrix auditはfailureとなり、本番DeployゲートによりWorker deploy、production-test、Pages build/deployはすべてskip。公開環境はこのrunから変更されていない。診断iframeをviewport外に配置したテストfixtureを直し、Pages本番preview上の配布モード表示も明示検証してから追試する。
 
 GitHub Actions Deployのitch artifactは、成功したWorker deploy出力の `worker_url` を使って `npm run build:itch` とZIPを生成する既存経路で配布する。既存のDeployゲートとChromium／WebKit Browser UIゲートは変更しない。使用URL `https://heibon-mahjong-online.ak-sekine.workers.dev` は、過去のProduction run [#42042381292](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42042381292) のWorker deploy後にPages buildとitch ZIPへ注入した本番Worker URLと一致する。今回の新しいrunのWorker deploy結果は完了後に別途記録する。
 

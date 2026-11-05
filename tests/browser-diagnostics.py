@@ -4,6 +4,7 @@ import os
 from playwright.sync_api import sync_playwright
 
 base = os.environ.get('HEIBON_BASE_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
+pages_base = os.environ.get('HEIBON_PAGES_BASE_URL', 'http://127.0.0.1:4174/heibon-mahjong/')
 seed = [{'timestamp': '2026-10-24T12:34:56.789Z', 'level': 'WARN', 'event': 'game_action_response_timeout',
          'details': {'actionType': 'discard', 'requestId': 'request-example', 'gameRevision': 42, 'durationMs': 15000}}]
 with sync_playwright() as playwright:
@@ -72,7 +73,7 @@ with sync_playwright() as playwright:
       const frame = document.createElement('iframe');
       frame.id = 'diagnostic-iframe-test';
       frame.src = url;
-      frame.style.cssText = 'position:fixed;left:-10000px;width:390px;height:844px';
+      frame.style.cssText = 'position:fixed;left:0;top:0;width:375px;height:812px;border:0;z-index:10000';
       document.body.append(frame);
     }""", base)
     frame = page.frame_locator('#diagnostic-iframe-test')
@@ -82,6 +83,18 @@ with sync_playwright() as playwright:
     assert frame.locator('#diagnostic-execution-origin').inner_text() == page.evaluate('location.origin')
     frame.locator('#diagnostic-close').click()
     page.locator('#diagnostic-iframe-test').evaluate('(el) => el.remove()')
+
+    # The production Pages build is served separately from Vite development.
+    pages_page = browser.new_page(viewport={'width': 375, 'height': 812}, is_mobile=True, has_touch=True)
+    pages_page.on('pageerror', lambda error: errors.append(str(error)))
+    pages_page.goto(pages_base)
+    pages_page.locator('#main-menu-toggle').click()
+    pages_page.locator('#menu-diagnostics').click()
+    pages_origin = pages_page.evaluate('location.origin')
+    assert pages_page.locator('#diagnostic-execution-origin').inner_text() == pages_origin
+    assert '配布モード: Pages' in pages_page.locator('#diagnostic-origin-info').inner_text()
+    assert 'HTTP Request Origin: 未確認' in pages_page.locator('#diagnostic-origin-info').inner_text()
+    pages_page.close()
 
     # Keep a neighboring dialog's close flow covered while exercising the
     # diagnostic header at the smallest supported widths.
