@@ -149,3 +149,65 @@ npm run build
 ローカルのブラウザーUI検証はこのCloud環境の既知のChromium sandbox起動制約のため実行していません。GitHub ActionsでChromium／WebKitからitch配布ビルドを開き、PWA登録がなく、CPU対局を開始して打牌できるsmoke testを実行し、対象SHAのattempt 3で成功しました。
 
 したがって、実装完了／自動検証完了／Draft実機確認完了／一般公開準備完了は別々に判定します。この記録を作っただけでIssueを完了・Closeしません。
+
+---
+
+## 2026-11-05 Origin診断追加記録
+
+既存の「診断ログ」ダイアログを拡張し、現在のブラウザーJavaScriptから取得した `location.origin` と `location.hostname`、iframe内か、Pages／itch／developmentの配布モード、`VITE_ONLINE_API_URL` のOrigin、ビルドSHA／buildIdを表示・コピーできるようにした。`location.origin` が文字列 `null` の場合はOpaque Originの可能性を併記する。ページURLのpath・query・fragmentは表示せず、API URLもOriginのみを使う。コピーにはHTTP Request OriginとWebSocket Request Originを別項目で「未確認」と含める。ブラウザーJavaScriptから送信後のOriginヘッダーを読み取れるとは扱わない。既存ログのコピーは維持し、機密情報らしい名前の項目をコピーから除外する。
+
+### Workerで拒否されたOriginを確認する
+
+既存Cloudflare Workers Logsの記録では `invocation_logs: false` であり、Workerの構造化ログにはOrigin拒否イベントがなかった。したがって、過去ログだけから拒否されたOriginを確認することはできない。
+
+今回 `worker/index.ts` は、未許可またはOrigin欠落で403を返す既存経路で、Originと通信種別だけの `origin_rejected` 構造化ログを記録する。WebSocket Upgrade要求は `communicationType: websocket`、その他は `http`。Originはcanonical HTTP(S) Originまたは `null`／`(missing)` のみ記録し、不正な値は省く。URL path・query・fragment、room code、Cookie、認証・参加者token、IP、リクエスト本文は記録しない。同じWorker isolateでは通信種別ごとに15秒間隔で抑制する。これはベストエフォートの過剰ログ抑制で、全isolate横断のrate limitではない。Cloudflareの自動Invocation Logs、公開API、CORS応答は変更しない。
+
+Cloudflare Dashboardの Workers & Pages → `heibon-mahjong-online` → Observability で、対象時間帯の `origin_rejected` を確認する。`communicationType` と `origin` がHTTPとWebSocketで別々に記録される。実際の拒否イベントが記録されるまで、ヘッダー値は未確認のまま扱う。現行画面のルーム作成がHTTP 403で止まった場合、WebSocket handshake自体が発生しないことがあり、その場合WebSocket Originも未確認のままである。画面に表示する `location.origin` はWorker受信ヘッダーの実測値の代わりにならない。
+
+許可Originのリスト、403、認証／認可、レート制限、Durable Objectの通信経路は変更していない。許可リスト変更は実Originを別途確認し、ユーザーが了承した後の別作業とする。
+
+### 自動検証と配布ZIP
+
+今回のローカル検証結果:
+
+| 検証 | 結果 |
+| --- | --- |
+| `npm test` | 成功。85テスト、失敗0。Origin表示／Opaque Origin、API URLからOriginのみ抽出、拒否イベントのHTTP／WebSocket区別、安全なOriginログ項目を追加検証 |
+| `npm run typecheck:worker` | 成功 |
+| `npm run build` | 成功。Pages PWA buildとService Worker生成を確認 |
+| `VITE_ONLINE_API_URL=https://heibon-mahjong-online.ak-sekine.workers.dev npm run build:itch` | 成功。3ファイル、展開後335,658 bytes、ZIP 88,122 bytes |
+| itch ZIP構造 | 成功。ZIP直下 `index.html`、相対参照。`test.html`、`kan-test.html`、manifest、Service Worker、PWAアイコンなし。bundle内に指定本番Worker URLとOrigin診断表示を確認。SHA-256 `bf7ed235113816cd0a306e3c17da5b6afbd90c94bd8929d115c8d5925a95c442` |
+| Chromium／WebKit Browser UI、診断の表示・コピー、Pages PWAブラウザー回帰 | GitHub Actionsで対象commitの実行待ち。Codex Cloud上でのブラウザー起動は既知の安全な起動制限があるため行っていない。Actions結果を実機結果と混同しない |
+| `git diff --check` | 成功 |
+
+Browser UIのlocalhost上のPages／itch相当Originは合成テスト値であり、itch.io Draftの実Origin計測ではない。
+
+GitHub Actions Deployのitch artifactは、成功したWorker deploy出力の `worker_url` を使って `npm run build:itch` とZIPを生成する既存経路で配布する。既存のDeployゲートとChromium／WebKit Browser UIゲートは変更しない。使用URL `https://heibon-mahjong-online.ak-sekine.workers.dev` は、過去のProduction run [#42042381292](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42042381292) のWorker deploy後にPages buildとitch ZIPへ注入した本番Worker URLと一致する。今回の新しいrunのWorker deploy結果は完了後に別途記録する。
+
+### iPhone Safariでの更新・確認手順
+
+1. GitHub Actionsの対象Deploy runを開き、完了したrunの `itch-html5-<SHA>-<attempt>` artifactをダウンロードする。
+2. iPhoneの「ファイル」アプリで外側のActions artifact ZIPを展開する。
+3. 展開先の内側にある `heibon-mahjong.zip` をitch.io DraftのHTML5 upload欄へアップロードする。内側ZIPをさらに展開してからアップロードしない。
+4. Draftのゲームを起動し、メニュー → 「診断ログ」を開く。
+5. 大きく表示された「実行Origin」を確認し、必要なら「コピー」を押す。
+6. HTTPのWorker拒否記録も必要な場合は「新しくルームを作る」を試す。Origin未許可なら403は現段階で想定内。
+7. コピーした診断情報、表示されたエラーと、確認した対局内容を報告する。Workers Logsの確認が必要なら、Cloudflare Observabilityにある `origin_rejected` の通信種別とOriginを別に記録する。
+
+PC／Macの開発者ツール接続はこの手順の前提にしない。WorkerのHTTP／WebSocket Originはアプリ画面のExecution Originと分けて報告し、Workerログに対応イベントがない通信種別は「未確認」とする。
+
+### ユーザーから提示された実機報告
+
+次の内容は、この依頼でユーザーから提示された報告として記録する。自動検証や本書の作成者による実機確認ではない。
+
+| 項目 | 2026-11-06時点として提示された報告 |
+| --- | --- |
+| iPhone Safariでitch.io Draftのゲーム起動 | OK |
+| 麻雀卓と手牌の表示 | スクリーンショットで確認 |
+| CPU対局 | ユーザー報告「問題なさそう」。全操作・全局面の完全確認とは扱わない |
+| ネットワーク切断状態でのCPU対局 | 未確認 |
+| PC実機 | 未確認 |
+| HTTP／WebSocketのWorker受信Origin | 未確認 |
+| Pages↔itch.io相互対戦 | 未確認 |
+
+したがって、今回の自動テスト成功をもって上記の未確認実機項目をOKへ変更しない。Issue #46はOpenのまま維持する。

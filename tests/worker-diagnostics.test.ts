@@ -56,3 +56,22 @@ test('Worker logger omits a token-shaped requestId', () => {
 
   assert.equal('requestId' in (records[0] as Record<string, unknown>), false);
 });
+
+test('Worker rejection logs keep only a canonical Origin and communication type', () => {
+  const records: unknown[] = [];
+  const originalLog = console.log;
+  console.log = (...values: unknown[]) => records.push(...values);
+  try {
+    logWorker({ event: 'origin_rejected', level: 'WARN', communicationType: 'websocket', origin: 'https://itch.example' });
+    logWorker({ event: 'origin_rejected', level: 'WARN', communicationType: 'http', origin: 'https://itch.example/room?token=secret' });
+  } finally { console.log = originalLog; }
+  assert.deepEqual(records.map(record => {
+    const value = record as Record<string, unknown>;
+    return { event: value.event, communicationType: value.communicationType, origin: value.origin };
+  }), [
+    { event: 'origin_rejected', communicationType: 'websocket', origin: 'https://itch.example' },
+    { event: 'origin_rejected', communicationType: 'http', origin: undefined },
+  ]);
+  assert.equal(JSON.stringify(records).includes('secret'), false);
+  assert.equal(JSON.stringify(records).includes('/room'), false);
+});

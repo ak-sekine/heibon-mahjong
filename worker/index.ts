@@ -11,6 +11,8 @@ const allowedOrigins = new Set([
 const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const ROOM_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/u;
 const PARTICIPANT_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
+const lastOriginRejectionLogAt: Record<'http' | 'websocket', number> = { http: 0, websocket: 0 };
+const ORIGIN_REJECTION_LOG_INTERVAL_MS = 15_000;
 
 const ratePolicies = {
   create: { limit: 10, windowMs: 10 * 60 * 1000 },
@@ -246,7 +248,18 @@ export default {
 
 async function handleFetch(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get('Origin');
-    if (!origin || !allowedOrigins.has(origin)) return new Response('Origin not allowed', { status: 403 });
+    if (!origin || !allowedOrigins.has(origin)) {
+      const communicationType = request.headers.get('Upgrade')?.toLowerCase() === 'websocket' ? 'websocket' : 'http';
+      const now = Date.now();
+      if (now - lastOriginRejectionLogAt[communicationType] >= ORIGIN_REJECTION_LOG_INTERVAL_MS) {
+        lastOriginRejectionLogAt[communicationType] = now;
+        logWorker({
+          event: 'origin_rejected', level: 'WARN', communicationType,
+          origin: origin ?? '(missing)',
+        });
+      }
+      return new Response('Origin not allowed', { status: 403 });
+    }
 
     if (request.method === 'OPTIONS') {
       const requestedHeaders = (request.headers.get('Access-Control-Request-Headers') ?? '')

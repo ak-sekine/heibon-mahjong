@@ -8,6 +8,8 @@ export type WorkerLog = {
   result?: string;
   errorCode?: string;
   durationMs?: number;
+  communicationType?: 'http' | 'websocket';
+  origin?: string;
 };
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/u;
@@ -15,6 +17,18 @@ const CREDENTIAL_PATTERN = /^[a-f0-9]{64}$/u;
 const ACTION_TYPE_PATTERN = /^[a-z-]{1,40}$/u;
 const RESULT_PATTERN = /^[a-z-]{1,40}$/u;
 const ERROR_CODE_PATTERN = /^[a-z0-9_-]{1,60}$/u;
+const COMMUNICATION_TYPE_PATTERN = /^(?:http|websocket)$/u;
+
+function safeOrigin(value: string): string | null {
+  if (value === 'null' || value === '(missing)') return value;
+  if (value.length > 300) return null;
+  try {
+    const parsed = new URL(value);
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password ||
+        parsed.pathname !== '/' || parsed.search || parsed.hash || parsed.origin !== value) return null;
+    return value;
+  } catch { return null; }
+}
 
 /** Emit an explicitly allowlisted structured record; do not pass request or exception objects. */
 export function logWorker(value: WorkerLog): void {
@@ -34,6 +48,11 @@ export function logWorker(value: WorkerLog): void {
     }
     if (value.result && RESULT_PATTERN.test(value.result)) safe.result = value.result;
     if (value.errorCode && ERROR_CODE_PATTERN.test(value.errorCode)) safe.errorCode = value.errorCode;
+    if (value.communicationType && COMMUNICATION_TYPE_PATTERN.test(value.communicationType)) safe.communicationType = value.communicationType;
+    if (value.origin) {
+      const origin = safeOrigin(value.origin);
+      if (origin) safe.origin = origin;
+    }
     console.log(safe);
   } catch { /* Logging is best effort. */ }
 }

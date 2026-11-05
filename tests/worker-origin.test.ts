@@ -52,18 +52,31 @@ test('preflight accepts allowed Origin and requested headers, and rejects unsupp
 });
 
 test('unknown and missing Origins are denied for REST and WebSocket upgrade requests', async () => {
-  for (const headers of [
-    { Origin: itchOriginCandidate },
-    {},
-  ]) {
-    for (const path of ['/health', '/api/rooms/ABCDEF/socket']) {
-      const response = await worker.fetch(new Request(`https://worker.invalid${path}`, {
-        headers: { ...headers, ...(path.endsWith('/socket') ? { Upgrade: 'websocket' } : {}) },
-      }), mockEnv().env);
-      assert.equal(response.status, 403, `${path} with Origin ${headers.Origin ?? '(missing)'}`);
-      assert.equal(response.headers.get('Access-Control-Allow-Origin'), null);
+  const records: unknown[] = [];
+  const originalLog = console.log;
+  console.log = (...values: unknown[]) => records.push(...values);
+  try {
+    for (const headers of [
+      { Origin: itchOriginCandidate },
+      {},
+    ]) {
+      for (const path of ['/health', '/api/rooms/ABCDEF/socket']) {
+        const response = await worker.fetch(new Request(`https://worker.invalid${path}`, {
+          headers: { ...headers, ...(path.endsWith('/socket') ? { Upgrade: 'websocket' } : {}) },
+        }), mockEnv().env);
+        assert.equal(response.status, 403, `${path} with Origin ${headers.Origin ?? '(missing)'}`);
+        assert.equal(response.headers.get('Access-Control-Allow-Origin'), null);
+      }
     }
-  }
+  } finally { console.log = originalLog; }
+  const originEvents = records as Array<Record<string, unknown>>;
+  assert.deepEqual(originEvents.map(record => [record.event, record.communicationType, record.origin]), [
+    ['origin_rejected', 'http', itchOriginCandidate],
+    ['origin_rejected', 'websocket', itchOriginCandidate],
+  ]);
+  assert.equal(JSON.stringify(originEvents).includes('ABCDEF'), false);
+  assert.equal(JSON.stringify(originEvents).includes('token'), false);
+  assert.equal(JSON.stringify(originEvents).includes('worker.invalid'), false);
 });
 
 test('allowed-Origin WebSocket request reaches the room with its Origin; ticket token auth stays enforced', async () => {

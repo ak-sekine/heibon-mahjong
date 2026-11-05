@@ -311,15 +311,126 @@ export function installGlobalErrorDiagnostics(log: DiagnosticLog = diagnosticLog
 
 declare global { interface Window { __heibonErrorDiagnosticsInstalled?: boolean } }
 
-export function mountDiagnosticDialog(log: DiagnosticLog = diagnosticLog, snapshot?: () => Record<string, unknown> | null): void {
+export type OriginDiagnosticInfo = {
+  executionOrigin: string;
+  executionHost: string;
+  insideIframe: string;
+  buildMode: string;
+  apiOrigin: string;
+  buildSha: string;
+  buildId: string;
+};
+
+/** Collect only public origin/build metadata. Never inspect the URL path, query, or fragment. */
+export function getOriginDiagnosticInfo(options: {
+  origin: string;
+  hostname: string;
+  insideIframe: string;
+  mode: string;
+  apiUrl?: string;
+  buildInfo?: AppBuildInfo;
+}): OriginDiagnosticInfo {
+  const buildInfo = options.buildInfo ?? getBuildInfo();
+  let apiOrigin = '未設定';
+  try {
+    if (options.apiUrl) {
+      const parsedApiUrl = new URL(options.apiUrl);
+      if (!['http:', 'https:'].includes(parsedApiUrl.protocol) || parsedApiUrl.origin === 'null') throw new TypeError('Unsupported API URL scheme');
+      apiOrigin = parsedApiUrl.origin;
+    }
+  } catch { apiOrigin = '取得できません'; }
+  const buildMode = options.mode === 'itch' ? 'itch' : options.mode === 'development' ? 'development' : 'Pages';
+  const executionOrigin = options.origin === 'null'
+    ? 'null（Opaque Originの可能性があります）'
+    : options.origin;
+  return {
+    executionOrigin,
+    executionHost: options.hostname || '（なし）',
+    insideIframe: options.insideIframe,
+    buildMode,
+    apiOrigin,
+    buildSha: buildInfo.gitSha,
+    buildId: buildInfo.buildId,
+  };
+}
+
+export function describeIframeContext(self: unknown, readTop: () => unknown): string {
+  try { return self !== readTop() ? 'はい' : 'いいえ'; }
+  catch { return '判定できません（SecurityError）'; }
+}
+
+function readInsideIframe(): string { return describeIframeContext(window.self, () => window.top); }
+
+function currentOriginDiagnosticInfo(runtime: { mode?: string; apiUrl?: string } = {}): OriginDiagnosticInfo {
+  try {
+    return getOriginDiagnosticInfo({
+      origin: String(window.location.origin),
+      hostname: String(window.location.hostname),
+      insideIframe: readInsideIframe(),
+      mode: runtime.mode ?? getBuildInfo().mode,
+      apiUrl: runtime.apiUrl,
+    });
+  } catch {
+    return getOriginDiagnosticInfo({
+      origin: '取得できません', hostname: '取得できません',
+      insideIframe: '判定できません', mode: runtime.mode ?? getBuildInfo().mode,
+      apiUrl: runtime.apiUrl,
+    });
+  }
+}
+
+export function formatOriginDiagnosticInfo(info: OriginDiagnosticInfo): string {
+  return [
+    'HEIBON MAHJONG Origin Diagnostics',
+    `Execution Origin: ${info.executionOrigin}`,
+    `Execution Host: ${info.executionHost}`,
+    `Inside iframe: ${info.insideIframe}`,
+    `Build Mode: ${info.buildMode}`,
+    `API Origin: ${info.apiOrigin}`,
+    `Build SHA: ${info.buildSha}`,
+    `Build ID: ${info.buildId}`,
+    'HTTP Request Origin: 未確認（ブラウザーJavaScriptから実際のヘッダーは読めません）',
+    'WebSocket Request Origin: 未確認（ブラウザーJavaScriptから実際のHandshakeヘッダーは読めません）',
+  ].join('\n');
+}
+
+export function mountDiagnosticDialog(
+  log: DiagnosticLog = diagnosticLog,
+  snapshot?: () => Record<string, unknown> | null,
+  runtime: { mode?: string; apiUrl?: string } = {},
+): void {
   const dialog = document.querySelector<HTMLDialogElement>('#diagnostic-dialog');
   const list = document.querySelector<HTMLElement>('#diagnostic-entries');
   const count = document.querySelector<HTMLElement>('#diagnostic-count');
   const status = document.querySelector<HTMLElement>('#diagnostic-status');
   const build = document.querySelector<HTMLElement>('#diagnostic-build-info');
+  const originInfo = document.querySelector<HTMLElement>('#diagnostic-origin-info');
   if (!dialog || !list || !count || !status) return;
   const buildInfo = getBuildInfo();
   if (build) build.textContent = `ビルド ${buildInfo.gitSha} · ${buildInfo.buildTimeUtc} · v${buildInfo.appVersion} · ${buildInfo.mode} · schema ${buildInfo.schemaVersion}`;
+  const originDiagnostics = currentOriginDiagnosticInfo(runtime);
+  try {
+    if (originInfo) {
+      originInfo.replaceChildren();
+      const title = document.createElement('h3');
+      title.textContent = '実行Origin（ブラウザーJavaScript）';
+      const executionOrigin = document.createElement('strong');
+      executionOrigin.id = 'diagnostic-execution-origin';
+      executionOrigin.textContent = originDiagnostics.executionOrigin;
+      const details = document.createElement('pre');
+      details.textContent = [
+        `実行ホスト: ${originDiagnostics.executionHost}`,
+        `iframe内実行: ${originDiagnostics.insideIframe}`,
+        `配布モード: ${originDiagnostics.buildMode}`,
+        `API Origin: ${originDiagnostics.apiOrigin}`,
+        `Build SHA: ${originDiagnostics.buildSha}`,
+        `Build ID: ${originDiagnostics.buildId}`,
+        'HTTP Request Origin: 未確認（実際のHTTPヘッダー）',
+        'WebSocket Request Origin: 未確認（実際のHandshakeヘッダー）',
+      ].join('\n');
+      originInfo.append(title, executionOrigin, details);
+    }
+  } catch { /* Origin diagnostics cannot prevent the game from mounting. */ }
   const render = () => {
     const entries = log.all();
     const wasAtBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
@@ -353,7 +464,13 @@ export function mountDiagnosticDialog(log: DiagnosticLog = diagnosticLog, snapsh
     if (window.confirm('保存されている診断ログをすべて消去しますか？')) { log.clear(); status.textContent = 'ログを消去しました。'; }
   });
   document.querySelector<HTMLButtonElement>('#diagnostic-copy')?.addEventListener('click', () => {
-    const text = log.all().map(entry => `${entry.timestamp} ${entry.level} ${entry.event} ${JSON.stringify(entry.details)}`).join('\n');
+    const safeEntries = log.all().map(entry => {
+      const details = Object.fromEntries(Object.entries(entry.details)
+        .filter(([key]) => !/(?:token|ticket|authorization|cookie|password|secret|room.?code|participant)/iu.test(key))
+        .map(([key, value]) => [key, typeof value === 'string' ? sanitizeDiagnosticMessage(value) : value]));
+      return `${entry.timestamp} ${entry.level} ${entry.event} ${JSON.stringify(details)}`;
+    }).join('\n');
+    const text = `${formatOriginDiagnosticInfo(originDiagnostics)}\n\n${safeEntries}`;
     void copyText(text).then(ok => { status.textContent = ok ? 'コピーしました。' : 'コピーできませんでした。'; });
   });
 }

@@ -68,7 +68,7 @@ mountDiagnosticDialog(diagnosticLog, () => ({
   lastSuccessfulRenderPhase: getLastSuccessfulRender()?.phase ?? null,
   lastSuccessfulRenderSeat: getLastSuccessfulRender()?.seat ?? null,
   lastSuccessfulRenderRunnerState: getLastSuccessfulRender()?.runnerState ?? null,
-}));
+}), { mode: import.meta.env.MODE, apiUrl: import.meta.env.VITE_ONLINE_API_URL });
 let activeLocalActionTrace: ActionPanelTrace | null = null;
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {

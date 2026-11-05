@@ -8,6 +8,14 @@ BROWSER_NAME = os.environ.get('HEIBON_BROWSER', 'chromium')
 with sync_playwright() as playwright:
     browser = getattr(playwright, BROWSER_NAME).launch()
     page = browser.new_page(viewport={'width': 390, 'height': 844}, device_scale_factor=1)
+    page.add_init_script("""(() => {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+      document.execCommand = command => {
+        if (command !== 'copy') return false;
+        window.__copiedDiagnosticText = document.querySelector('textarea')?.value ?? '';
+        return true;
+      };
+    })();""")
     failed_responses = []
     page_errors = []
     page.on('response', lambda response: failed_responses.append((response.status, response.url)) if response.status >= 400 else None)
@@ -22,6 +30,22 @@ with sync_playwright() as playwright:
       await new Promise(resolve => setTimeout(resolve, 100));
       return (await navigator.serviceWorker.getRegistrations()).length === 0;
     }'''), 'itch package registered a Service Worker'
+
+    page.locator('#main-menu-toggle').click()
+    page.locator('#menu-diagnostics').click()
+    assert page.locator('#diagnostic-execution-origin').inner_text() == page.evaluate('location.origin')
+    origin_info = page.locator('#diagnostic-origin-info').inner_text()
+    assert '配布モード: itch' in origin_info, origin_info
+    assert 'iframe内実行: いいえ' in origin_info, origin_info
+    assert 'HTTP Request Origin: 未確認' in origin_info
+    page.locator('#diagnostic-copy').click()
+    assert page.locator('#diagnostic-status').inner_text() == 'コピーしました。'
+    copied = page.evaluate('window.__copiedDiagnosticText')
+    assert 'Build Mode: itch' in copied
+    assert f'Execution Origin: {page.evaluate("location.origin")}' in copied
+    assert 'API Origin: https://online-mock.invalid' in copied
+    assert 'token=' not in copied and 'participantToken' not in copied
+    page.locator('#diagnostic-close').click()
 
     page.locator('#main-menu-toggle').click()
     page.locator('#new-game').click()

@@ -26,7 +26,7 @@ with sync_playwright() as playwright:
     })();""".replace('SEED_JSON', json.dumps(json.dumps(seed))))
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
-    page.goto(base)
+    page.goto(base + '?roomCode=room-secret&participantToken=participant-secret#private-fragment')
     page.reload()
     page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => { app.controller.random = () => .999999; app.controller.newGame(); })")
     page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
@@ -34,6 +34,12 @@ with sync_playwright() as playwright:
     page.locator('#main-menu-toggle').click()
     page.locator('#menu-diagnostics').click()
     assert page.locator('#diagnostic-dialog').is_visible()
+    execution_origin = page.locator('#diagnostic-execution-origin').inner_text()
+    assert execution_origin == page.evaluate('location.origin'), execution_origin
+    assert '実行ホスト:' in page.locator('#diagnostic-origin-info').inner_text()
+    assert 'iframe内実行: いいえ' in page.locator('#diagnostic-origin-info').inner_text()
+    assert 'HTTP Request Origin: 未確認' in page.locator('#diagnostic-origin-info').inner_text()
+    assert 'WebSocket Request Origin: 未確認' in page.locator('#diagnostic-origin-info').inner_text()
     build_info = page.locator('#diagnostic-build-info').inner_text()
     assert 'schema 2' in build_info and 'unknown' not in build_info, build_info
     assert page.locator('#diagnostic-count').inner_text().endswith('件')
@@ -48,11 +54,34 @@ with sync_playwright() as playwright:
     assert 'request-example' in page.evaluate('window.__copiedDiagnosticText')
     assert 'app_build_info' in page.evaluate('window.__copiedDiagnosticText')
     assert 'local_game_render_succeeded' in page.evaluate('window.__copiedDiagnosticText')
+    copied = page.evaluate('window.__copiedDiagnosticText')
+    assert f'Execution Origin: {execution_origin}' in copied
+    assert 'HTTP Request Origin: 未確認' in copied and 'WebSocket Request Origin: 未確認' in copied
+    assert 'token=secret' not in copied and 'participantToken' not in copied
+    assert 'room-secret' not in copied and 'participant-secret' not in copied and 'private-fragment' not in copied
+    assert 'room-secret' not in page.locator('#diagnostic-origin-info').inner_text()
+    assert 'request-example' in copied
     page.once('dialog', lambda dialog: dialog.accept())
     page.locator('#diagnostic-clear').click()
     assert page.locator('#diagnostic-count').inner_text() == '0件'
     page.locator('#diagnostic-close').click()
     assert not page.locator('#diagnostic-dialog').is_visible()
+
+    # The same runtime is also exercised inside an iframe, as itch.io embeds HTML5 games.
+    page.evaluate("""url => {
+      const frame = document.createElement('iframe');
+      frame.id = 'diagnostic-iframe-test';
+      frame.src = url;
+      frame.style.cssText = 'position:fixed;left:-10000px;width:390px;height:844px';
+      document.body.append(frame);
+    }""", base)
+    frame = page.frame_locator('#diagnostic-iframe-test')
+    frame.locator('#main-menu-toggle').click()
+    frame.locator('#menu-diagnostics').click()
+    assert 'iframe内実行: はい' in frame.locator('#diagnostic-origin-info').inner_text()
+    assert frame.locator('#diagnostic-execution-origin').inner_text() == page.evaluate('location.origin')
+    frame.locator('#diagnostic-close').click()
+    page.locator('#diagnostic-iframe-test').evaluate('(el) => el.remove()')
 
     # Keep a neighboring dialog's close flow covered while exercising the
     # diagnostic header at the smallest supported widths.
