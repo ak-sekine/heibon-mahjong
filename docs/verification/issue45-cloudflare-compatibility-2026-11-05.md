@@ -147,3 +147,9 @@ Deploy後の詳細検証 [Production Worker diagnostics run #42022175635](https:
 - Cloudflare Workers Logsで該当時間の`websocket_error`、`server_internal_error`、`websocket_disconnected`、`operation_received/succeeded/failed`をrequest/room IDで照合する必要があります。ログにsecretやparticipant tokenを追加してはいけません。
 - 更新前runではset-ready timeout後の再接続テストを完了していません。更新後の2回のproduction testは成功し、診断runではClose codeとgame reconnect stateも確認できました。さらに比較可能な更新後の複数回詳細診断、または同種の1006再現時のWorkers Logs照合で証拠を増やします。単回の詳細diagnostic successは根本原因解決とみなしません。
 - Node.js互換の既定変更を含む2026-08-04以降の日付は別調査で判断します。
+
+## 最終判定 — completed／Close可能
+
+2026-11-05時点で、Issue #45の受入条件を満たしました。互換性の調査と`2026-04-07`への更新、`webSocketClose()`のClose応答処理と回帰テスト、Durable Objectの保存形式・migration履歴の維持を確認し、Worker型検査、単体テスト、build、Chromium、WebKit、Deploy gate、本番通信、WebSocket接続・切断・再接続が成功しています。更新後の詳細診断で1006は観測されていません。
+
+この結果は1006の根本原因特定または解消を意味しません。Cloudflare Workers Logsは取得できず、サーバー側の終了理由も未確認です。再発した場合はWorkers Logs等を用いて別途調査します。したがってIssue #45は調査・更新・検証の受入条件を満たし、`completed`としてClose可能です。Issue本体はOpenのまま維持し、Close操作はChatGPT側で行います。
