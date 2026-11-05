@@ -184,6 +184,51 @@ test('ActionPanel applies visibility, availability, labels, groups, messages, an
   } finally { fixture.restore(); }
 });
 
+test('ActionPanel keeps one countdown in the decision group while it updates and clears', () => {
+  const fixture = panelFixture();
+  const remaining = '鳴き判断の残り';
+  const visibleCountdowns = () => ['call-status', 'ron-status', 'action-status']
+    .filter(part => fixture.parts.get(part)!.textContent.includes(remaining));
+  try {
+    const option: ActionChoiceOption = { id: 'chi-1', label: 'チー', tiles: [], enabled: true };
+    fixture.panel.update(state({
+      buttons: { ...state().buttons, 'pass-call': { visible: true, enabled: true, label: '見送る' } },
+      callGroup: { visible: true, status: '鳴き判断の残り 10 秒です。', options: [option] },
+      actionStatus: '鳴き判断を待っています。',
+    }));
+    assert.deepEqual(visibleCountdowns(), ['call-status']);
+    assert.equal(fixture.parts.get('call-status')!.textContent, '鳴き判断の残り 10 秒です。');
+    assert.equal(fixture.parts.get('pass-call')!.textContent, '見送る');
+
+    fixture.panel.update(state({
+      buttons: { ...state().buttons, 'pass-call': { visible: true, enabled: true, label: '見送る' } },
+      callGroup: { visible: true, status: '鳴き判断の残り 9 秒です。', options: [option] },
+      actionStatus: '鳴き判断を待っています。',
+    }));
+    assert.deepEqual(visibleCountdowns(), ['call-status']);
+    assert.equal(fixture.parts.get('call-status')!.textContent, '鳴き判断の残り 9 秒です。');
+
+    fixture.panel.update(state());
+    assert.deepEqual(visibleCountdowns(), []);
+    assert.equal(fixture.parts.get('call-status')!.textContent, '');
+    assert.equal(fixture.parts.get('call-controls')!.hidden, true);
+
+    fixture.panel.update(state({
+      ronGroup: { visible: true, status: 'ロン判断の残り 12 秒です。', target: null },
+      actionStatus: 'ロン判断を待っています。',
+    }));
+    assert.deepEqual(['ron-status', 'action-status'].filter(part => fixture.parts.get(part)!.textContent.includes('判断の残り')), ['ron-status']);
+
+    fixture.panel.update(state());
+    assert.equal(fixture.parts.get('ron-status')!.textContent, '');
+    fixture.panel.update(state({
+      callGroup: { visible: true, status: '鳴き判断の残り 15 秒です。', options: [option] },
+      actionStatus: '鳴き判断を待っています。',
+    }));
+    assert.deepEqual(visibleCountdowns(), ['call-status']);
+  } finally { fixture.restore(); }
+});
+
 test('ActionPanel delegates static and choice clicks through one mode callback and keeps choices disabled while pending', () => {
   const events: ActionPanelEvent[] = [];
   const fixture = panelFixture(event => events.push(event));

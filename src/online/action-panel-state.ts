@@ -59,7 +59,8 @@ export function createOnlineActionPanelState(
     : 'サーバーで操作を確認しています…';
   else if (notice) actionStatus = notice;
   else if (decision?.answered) actionStatus = '回答を受け付けました。他のプレイヤーの回答を待っています。';
-  else if (decision) actionStatus = decisionStatus;
+  else if (decision?.type === 'call') actionStatus = '鳴き判断を待っています。';
+  else if (decision?.type === 'ron') actionStatus = 'ロン判断を待っています。';
   else if (view.status === 'round-ended') actionStatus = view.self.nextRoundReady
     ? '他のプレイヤーを待っています' : '局が終了しました。結果を確認してください。';
   else if (view.status === 'match-ended') actionStatus = `${view.format === 'tonnan' ? '半荘戦' : '東風戦'}が終了しました。最終結果を確認できます。`;
@@ -98,7 +99,11 @@ export function createOnlineActionPanelState(
         view.status === 'match-ended' && Boolean(view.result?.matchEnded), '順位確認'),
     },
     actionStatus,
-    callGroup: { visible: decision?.type === 'call', status: decisionStatus, options: callChoices },
+    callGroup: {
+      visible: decision?.type === 'call',
+      status: decision?.type === 'call' ? decisionStatus : '',
+      options: callChoices,
+    },
     kanGroup: {
       visible: kanChoicesOpen && ownTurn && kanChoices.length > 0,
       status: 'カンする面子を選択してください。',
@@ -106,7 +111,7 @@ export function createOnlineActionPanelState(
     },
     ronGroup: {
       visible: decision?.type === 'ron',
-      status: decisionStatus,
+      status: decision?.type === 'ron' ? decisionStatus : '',
       target: ronAllowed && view.self.ronTile ? {
         tile: view.self.ronTile.tile,
         description: `${tileLabel(view.self.ronTile.tile)} · この牌でロンできます`,

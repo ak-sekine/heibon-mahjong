@@ -213,6 +213,26 @@ test('call choices and pass state match between a local call window and server l
     actionChoicesForDisplay('call', online.callGroup.options).map(option => [option.id, option.label]),
   );
   assert.equal(online.buttons['pass-call'].enabled, true);
+  assert.equal(local.callGroup.status, '');
+  assert.equal(local.actionStatus, '鳴き判断を待っています。');
+  assert.equal(online.callGroup.status, '鳴き判断の残り 10 秒です。');
+  assert.equal(online.ronGroup.status, '');
+  assert.equal(online.actionStatus, '鳴き判断を待っています。');
+
+  const ticking = createOnlineActionPanelState(onlineViewFor(game, { decision }), null, false, false, false, 9);
+  assert.equal(ticking.callGroup.status, '鳴き判断の残り 9 秒です。');
+  assert.equal(ticking.actionStatus, '鳴き判断を待っています。');
+
+  const expired = createOnlineActionPanelState(onlineViewFor(game, { decision }), null, false, false, false, 0);
+  assert.match(expired.callGroup.status, /判断期限が過ぎました/u);
+  assert.equal(expired.callGroup.status.includes('残り'), false);
+  assert.equal(expired.actionStatus, '鳴き判断を待っています。');
+  assert.equal(expired.buttons['pass-call'].enabled, false);
+
+  const resolved = createOnlineActionPanelState(onlineViewFor(game), null, false, false, false, null);
+  assert.equal(resolved.callGroup.visible, false);
+  assert.equal(resolved.callGroup.status, '');
+  assert.equal(resolved.actionStatus.includes('残り'), false);
 });
 
 test('ron judgement shows legal actions and focuses on server timeout or action pending state', () => {
@@ -229,6 +249,9 @@ test('ron judgement shows legal actions and focuses on server timeout or action 
   assert.equal(online.ronGroup.visible, true);
   assertSharedButtons(local, online, ['ron', 'pass-ron']);
   assert.equal(local.ronGroup.target?.tile !== undefined, true);
+  assert.equal(online.ronGroup.status, 'ロン判断の残り 10 秒です。');
+  assert.equal(online.callGroup.status, '');
+  assert.equal(online.actionStatus, 'ロン判断を待っています。');
 
   const pending = createOnlineActionPanelState(onlineView, null, true, true, false, 10);
   assert.equal(pending.buttons.ron.visible, true);

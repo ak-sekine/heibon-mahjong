@@ -9,7 +9,12 @@ out.mkdir(parents=True, exist_ok=True)
 reports = []
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(executable_path=os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'), args=['--no-sandbox'])
+    browser_name = os.environ.get('HEIBON_BROWSER', 'chromium')
+    browser_type = getattr(p, browser_name)
+    launch = {}
+    if browser_name == 'chromium':
+        launch = {'executable_path': os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium'), 'args': ['--no-sandbox']}
+    browser = browser_type.launch(**launch)
     for width in [320, 375, 390, 430]:
         page = browser.new_page(viewport={'width': width, 'height': 844})
         errors = []
@@ -154,20 +159,101 @@ with sync_playwright() as p:
         assert page.locator('[data-browser-action-panel] [data-panel-part="call-controls"]').nth(1).is_visible()
         assert page.locator('[data-browser-action-panel] [data-panel-part="pass-call"]').nth(1).is_enabled()
         assert_common_colors('[data-browser-action-panel] [data-panel-part="call-options"] button.ui-button')
+        assert page.evaluate("""() => {
+          const root = document.querySelector('[data-browser-action-panel]').children[1];
+          const status = root.querySelector('[data-panel-part="call-status"]');
+          const actionStatus = root.querySelector('[data-panel-part="action-status"]');
+          const options = root.querySelector('[data-panel-part="call-options"]');
+          const pass = root.querySelector('[data-panel-part="pass-call"]');
+          const box = element => element.getBoundingClientRect();
+          const text = root.innerText;
+          return status.innerText === '鳴き判断の残り 10 秒です。' &&
+            actionStatus.innerText === '鳴き判断を待っています。' &&
+            (text.match(/鳴き判断の残り/gu) || []).length === 1 &&
+            box(status).bottom <= box(options).top && box(options).top <= box(pass).top &&
+            box(status).bottom <= box(pass).top;
+        }""")
+        for seconds in [9, 8]:
+          page.evaluate("seconds => window.actionPanelBrowser.update(null, false, false, false, seconds)", seconds)
+          assert page.evaluate("""() => {
+            const root = document.querySelector('[data-browser-action-panel]').children[1];
+            return (root.innerText.match(/鳴き判断の残り/gu) || []).length === 1 &&
+              !root.querySelector('[data-panel-part="action-status"]').innerText.includes('残り');
+          }""")
+        for call_type, label in [('chi', 'チー'), ('pon', 'ポン'), ('daiminkan', '大明カン')]:
+          page.evaluate("""({callType}) => {
+            const test = window.actionPanelBrowser;
+            test.view.self.callOptions[0].type = callType;
+            test.update(null, false, false, false, 10);
+          }""", {'callType': call_type})
+          assert page.evaluate("""label => {
+            const root = document.querySelector('[data-browser-action-panel]').children[1];
+            return root.querySelector('[data-panel-part="call-options"] button').innerText === label &&
+              (root.innerText.match(/鳴き判断の残り/gu) || []).length === 1;
+          }""", label)
         online_panel.locator('[data-panel-part="call-options"] button').click()
         online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
         assert online_events[-1] == {'type': 'select-call', 'optionId': 'server-call-option'}, online_events
+        page.evaluate("""() => {
+          const test = window.actionPanelBrowser;
+          test.view.self.decision = null;
+          test.view.self.callOptions = [];
+          test.view.turnPlayerId = 0;
+          test.view.phase = 'awaiting-discard';
+          test.update();
+        }""")
+        assert page.evaluate("""() => {
+          const root = document.querySelector('[data-browser-action-panel]').children[1];
+          return root.querySelector('[data-panel-part="call-controls"]').hidden &&
+            !root.innerText.includes('鳴き判断の残り');
+        }""")
 
         page.evaluate("""() => {
           const test = window.actionPanelBrowser;
-          test.view.self.decision = { ...test.view.self.decision, type: 'ron' };
+          test.view.self.callOptions = [{ id: 'passable-call', type: 'chi', tiles: [test.tile], calledTileId: 'called', handTileIds: ['own-physical-tile'] }];
+          test.view.self.decision = { windowId: 'call-2', type: 'call', expiresAt: Date.now() + 10000, expectedGameRevision: 2, answered: false };
+          test.view.turnPlayerId = 3;
+          test.view.phase = 'awaiting-call';
+          test.update(null, false, false, false, 10);
+        }""")
+        online_panel.locator('[data-panel-part="pass-call"]').click()
+        online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
+        assert online_events[-1] == {'type': 'pass-call'}, online_events
+        page.evaluate("""() => {
+          const test = window.actionPanelBrowser;
+          test.view.self.decision = null;
+          test.view.self.callOptions = [];
+          test.view.turnPlayerId = 0;
+          test.view.phase = 'awaiting-discard';
+          test.update();
+        }""")
+        assert page.evaluate("""() => {
+          const root = document.querySelector('[data-browser-action-panel]').children[1];
+          return root.querySelector('[data-panel-part="call-controls"]').hidden &&
+            !root.innerText.includes('鳴き判断の残り');
+        }""")
+
+        page.evaluate("""() => {
+          const test = window.actionPanelBrowser;
+          test.view.self.decision = { windowId: 'ron-1', type: 'ron', expiresAt: Date.now() + 10000, expectedGameRevision: 3, answered: false };
           test.view.self.canRon = true;
           test.view.self.ronTile = test.tile;
+          test.update(null, false, false, false, 10);
+        }""")
+        assert page.evaluate("""() => {
+          const root = document.querySelector('[data-browser-action-panel]').children[1];
+          return (root.innerText.match(/ロン判断の残り/gu) || []).length === 1 &&
+            root.querySelector('[data-panel-part="action-status"]').innerText === 'ロン判断を待っています。';
+        }""")
+        page.evaluate("""() => {
+          const test = window.actionPanelBrowser;
           test.update(null, false, false, false, 0);
         }""")
         assert page.locator('[data-browser-action-panel] [data-panel-part="ron-controls"]').nth(1).is_visible()
         assert page.locator('[data-browser-action-panel] [data-panel-part="ron"]').nth(1).is_disabled()
         assert '判断期限が過ぎました' in page.locator('[data-browser-action-panel] [data-panel-part="ron-status"]').nth(1).inner_text()
+        assert '残り' not in page.locator('[data-browser-action-panel] [data-panel-part="ron-status"]').nth(1).inner_text()
+        assert '残り' not in page.locator('[data-browser-action-panel] [data-panel-part="action-status"]').nth(1).inner_text()
 
         page.evaluate("""() => {
           const test = window.actionPanelBrowser;
@@ -199,7 +285,7 @@ with sync_playwright() as p:
         assert all(button['left'] >= 0 and button['right'] <= width and button['width'] >= 44 and button['height'] >= 44
                    for panel in layout for button in panel['buttons']), (width, layout)
         assert not errors, errors
-        reports.append({'width': width, 'result': 'passed', 'checks': ['legal-only', 'shared-renderer', 'mode-handler-delegation', 'pending', 'call', 'ron-timeout', 'result-actions', 'mobile-layout', 'non-public-opponent-id-not-rendered']})
+        reports.append({'width': width, 'browser': browser_name, 'result': 'passed', 'checks': ['legal-only', 'shared-renderer', 'mode-handler-delegation', 'pending', 'call-single-countdown-and-position', 'countdown-update', 'ron-timeout-without-countdown', 'result-actions', 'mobile-layout', 'non-public-opponent-id-not-rendered']})
         print(f'{width}px: passed', flush=True)
         page.close()
     browser.close()
