@@ -18,6 +18,58 @@ DIALOGS = [
     ('waiting', '#online-dialog', '#online-close', None),
 ]
 
+
+def verify_focus_outline(page, selector, name, width):
+    page.locator(selector).focus()
+    focus = page.locator(selector).evaluate('''element => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      const content = element.closest('.dialog-scroll-content');
+      const contentStyle = content ? getComputedStyle(content) : null;
+      const outlineWidth = parseFloat(style.outlineWidth) || 0;
+      const outlineOffset = parseFloat(style.outlineOffset) || 0;
+      const extent = outlineWidth + outlineOffset;
+      const painted = {left: rect.left - extent, right: rect.right + extent, top: rect.top - extent, bottom: rect.bottom + extent};
+      const clippingAncestors = [];
+      for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        const ancestorStyle = getComputedStyle(ancestor);
+        const box = ancestor.getBoundingClientRect();
+        const borderLeft = parseFloat(ancestorStyle.borderLeftWidth) || 0;
+        const borderRight = parseFloat(ancestorStyle.borderRightWidth) || 0;
+        const borderTop = parseFloat(ancestorStyle.borderTopWidth) || 0;
+        const borderBottom = parseFloat(ancestorStyle.borderBottomWidth) || 0;
+        const clipsX = ['hidden', 'clip', 'auto', 'scroll'].includes(ancestorStyle.overflowX);
+        const clipsY = ['hidden', 'clip', 'auto', 'scroll'].includes(ancestorStyle.overflowY);
+        if (clipsX || clipsY) clippingAncestors.push({
+          id: ancestor.id || ancestor.className || ancestor.tagName,
+          clipsX, clipsY,
+          left: box.left + borderLeft, right: box.right - borderRight,
+          top: box.top + borderTop, bottom: box.bottom - borderBottom,
+          overflowX: ancestorStyle.overflowX, overflowY: ancestorStyle.overflowY,
+        });
+      }
+      return {
+        focusVisible: element.matches(':focus-visible'), outlineStyle: style.outlineStyle,
+        outlineColor: style.outlineColor, outlineWidth: style.outlineWidth, outlineOffset: style.outlineOffset,
+        input: {left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom},
+        contentWidth: content ? content.clientWidth : null,
+        contentPaddingLeft: contentStyle ? parseFloat(contentStyle.paddingLeft) : 0,
+        contentPaddingRight: contentStyle ? parseFloat(contentStyle.paddingRight) : 0,
+        painted, clippingAncestors,
+      };
+    }''')
+    assert focus['focusVisible'], f'{name} input did not receive keyboard-visible focus at {width}px: {focus}'
+    assert focus['outlineStyle'] != 'none' and focus['outlineColor'] == 'rgb(130, 220, 255)', f'{name} focus outline changed at {width}px: {focus}'
+    if focus['contentWidth'] is not None:
+        available_content_width = focus['contentWidth'] - focus['contentPaddingLeft'] - focus['contentPaddingRight']
+        assert abs((focus['input']['right'] - focus['input']['left']) - available_content_width) <= 1, f'{name} input did not use the full available scroll-content width at {width}px: {focus}'
+    for clip in focus['clippingAncestors']:
+        if clip['clipsX']:
+            assert focus['painted']['left'] >= clip['left'] - 0.5 and focus['painted']['right'] <= clip['right'] + 0.5, f'{name} focus outline exceeds horizontal clip area at {width}px: {focus}'
+        if clip['clipsY']:
+            assert focus['painted']['top'] >= clip['top'] - 0.5 and focus['painted']['bottom'] <= clip['bottom'] + 0.5, f'{name} focus outline exceeds vertical clip area at {width}px: {focus}'
+    page.screenshot(path=str(OUT / f'online-dialog-focus-{name}-{width}-{BROWSER_NAME}.png'))
+
 with sync_playwright() as playwright:
     browser = getattr(playwright, BROWSER_NAME).launch()
     page = browser.new_page(viewport={'width': 390, 'height': 844}, device_scale_factor=1)
@@ -35,6 +87,9 @@ with sync_playwright() as playwright:
                 if page.locator('#main-menu-items').is_hidden():
                     page.locator('#main-menu-toggle').click()
                 page.locator(open_selector).click()
+                input_selectors = {'create': ['#online-create-name'], 'join': ['#online-join-name', '#online-join-code']}[name]
+                for input_selector in input_selectors:
+                    verify_focus_outline(page, input_selector, input_selector.lstrip('#'), width)
             else:
                 page.locator(dialog_selector).evaluate('''dialog => {
                   dialog.querySelector('#online-status').hidden = true;

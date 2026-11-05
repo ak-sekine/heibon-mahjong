@@ -254,6 +254,7 @@ header > div { min-width:0; }
 .online-form-dialog { width:min(calc(100vw - 24px),420px); }
 .online-entry-form { display:grid; gap:10px; min-width:0; }
 .online-create-dialog #online-create-form { display:flex; flex:1 1 auto; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
+.online-create-dialog .dialog-scroll-content { margin-right:-6px; padding-left:6px; }
 .online-create-fields { display:grid; gap:10px; min-width:0; }
 .online-create-dialog #online-create-actions { flex:none; margin-top:8px; background:#185640; }
 .online-create-dialog #online-create-actions button { width:auto; white-space:normal; overflow-wrap:anywhere; }
