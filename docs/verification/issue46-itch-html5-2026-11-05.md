@@ -4,7 +4,8 @@
 
 対象: `ak-sekine/heibon-mahjong` Issue [#46](https://github.com/ak-sekine/heibon-mahjong/issues/46)
 
-実装基準: `origin/main` `73efa9daa1e5848e53d741c44dc8ab71cee7300f`、実装コミット `979dd466a06d2021b84a93391ead38121b022284`
+実装基準: `origin/main` `73efa9daa1e5848e53d741c44dc8ab71cee7300f`
+対象コードSHA: `0dda2f7c7263e2f7246590a1c22ea1e556857c4c`（機能実装 `979dd466a06d2021b84a93391ead38121b022284`、Browser UI smoke selector修正 `0dda2f7c7263e2f7246590a1c22ea1e556857c4c`）
 Issue状態: Open（PC／iPhone SafariのDraft確認とOrigin実測が終わるまで維持）
 
 ## 配布仕様と分離方針
@@ -97,19 +98,25 @@ npm run build
 
 ## 自動検証結果
 
-下表はローカル自動検証を記入します。Pages版のPWA自動テストとitch ZIPテスト、Worker Originテストを区別します。GitHub Actionsの実行結果はpush後の対象SHA runを確認して追記します。
+下表はローカルとGitHub Actionsの自動検証を記入します。Pages版のPWA自動テストとitch ZIPテスト、Worker Originテストを区別します。実機確認は別表のまま未確認です。
 
 | 検証 | 結果 |
 | --- | --- |
-| `npm test` | 成功。84/84テスト、失敗0 |
-| `npm run typecheck:worker` | 成功 |
-| Pages `npm run build` とPWA成果物 | 成功。`index.html`、`test.html`、`kan-test.html`、manifest、4アイコン、`sw.js`を生成 |
-| `VITE_ONLINE_API_URL=… npm run build:itch` | 成功。実URL `https://heibon-mahjong-online.ak-sekine.workers.dev`をバンドルに確認 |
-| ZIP root `index.html`、相対参照、大文字小文字、除外物、サイズ制限 | 成功。ZIPは3ファイル、展開後332,565 bytes、圧縮後87,076 bytes、最大単一ファイル258,598 bytes。ZIPのCRC展開検査成功 |
+| `npm test` | 成功。84/84テスト、失敗0（ローカルと対象SHAのActions） |
+| `npm run typecheck:worker` | 成功（ローカルとActions） |
+| Pages `npm run build` とPWA成果物 | 成功。`index.html`、`test.html`、`kan-test.html`、manifest、4アイコン、`sw.js`を生成。Pages deployも成功 |
+| `VITE_ONLINE_API_URL=… npm run build:itch` | 成功。実URL `https://heibon-mahjong-online.ak-sekine.workers.dev`をローカルとPages build jobの両方でバンドルに確認 |
+| ZIP root `index.html`、相対参照、大文字小文字、除外物、サイズ制限 | 成功。ローカル生成ZIPは3ファイル、展開後332,565 bytes、87,077 bytes、最大単一ファイル258,598 bytes、最大パス24文字。CRC展開検査成功。対象SHAのActions生成ZIPは87,076 bytesで、Actions artifactは外側の保存用ZIPを含め87,210 bytes |
 | Pages buildとの分離 | itch build前後のPages `dist/index.html`、`dist/sw.js`、`dist/manifest.webmanifest` SHA-256が一致 |
 | Pages Origin / 未許可 / Origin欠落 / OPTIONS / WebSocket / token | 自動テスト追加済み。全ケース成功。実測していないitch Originは未許可のまま |
-| GitHub Actions browser UI（Chromium / WebKit）、Worker / Pages deploy | push後の対象SHAで確認。未確認 |
-| Pages PWAの画面・更新・オフラインCPU対局 | 既存PWA testとBrowser UIを確認。今回の追加変更後は実機未確認 |
+| GitHub Actions Browser UI（Chromium / WebKit）とitch CPU／打牌smoke test | run [#42042381292](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42042381292) attempt 3、SHA `0dda2f7c7263e2f7246590a1c22ea1e556857c4c`で成功。matrix auditも成功 |
+| Worker deploy、production-test、Pages build/deploy | 同じrun attempt 3で全job success |
+| Production Worker diagnostics | run [#42048287656](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42048287656) success。2人対局、切断・再接続、ホスト交代・CPU引継ぎ等の5シナリオ |
+| Pages PWA回帰 | Browser UIのChromium／WebKit自動検証は成功。iPhone SafariでのPWA起動・更新・オフラインCPU対局は未確認 |
+
+**Actionsの再試行記録:** SHA `0dda2f7`のattempt 1では既存`browser-round-end-ui.py`がWebKit 320×480のダイアログ再クリックで失敗しました（同じシナリオは直近の成功runで通過）。失敗jobだけのattempt 2はattempt別dist artifactを取得できず、テストは実行されませんでした。全jobを再実行したattempt 3では同じWebKitシナリオを含む全行列が成功しました。最初のクリック失敗の原因は未特定で、成功した再試行を実機確認とは扱いません。
+
+**Draftアップロード用:** Actions artifact [itch-html5-0dda2f7c7263e2f7246590a1c22ea1e556857c4c-3](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42042381292/artifacts/13426290667)には、runのWorker deploy後に同じ本番Worker URLで生成したゲームZIPが含まれます。artifactをダウンロードして外側を展開し、中の`heibon-mahjong.zip`をitch.ioへアップロードしてください。workspaceには同じソースSHA・本番Worker URLで作った直接アップロード可能な`artifacts/itch/heibon-mahjong.zip`もあります。
 
 ## Draft実機チェックリスト（すべて未確認）
 
@@ -139,6 +146,6 @@ npm run build
 | 未確認動作を明示 | 本記録と上記リストで記録 |
 | 公開素材・Draft手順・一般公開判断材料 | 本記録を整備。権利最終確認とDraft実機確認は未完了 |
 
-ローカルのブラウザーUI検証はこのCloud環境の既知のChromium sandbox起動制約のため実行していません。GitHub ActionsにChromium／WebKitでitch配布ビルドから起動し、PWA登録がなく、CPU対局を開始・打牌できるsmoke testを追加しました。対象SHAのActions結果はpush後に確認します。
+ローカルのブラウザーUI検証はこのCloud環境の既知のChromium sandbox起動制約のため実行していません。GitHub ActionsでChromium／WebKitからitch配布ビルドを開き、PWA登録がなく、CPU対局を開始して打牌できるsmoke testを実行し、対象SHAのattempt 3で成功しました。
 
 したがって、実装完了／自動検証完了／Draft実機確認完了／一般公開準備完了は別々に判定します。この記録を作っただけでIssueを完了・Closeしません。
