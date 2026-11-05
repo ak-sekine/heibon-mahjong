@@ -9,7 +9,7 @@ Issue: [#45](https://github.com/ak-sekine/heibon-mahjong/issues/45)
 
 - `2025-03-01` はStep 14.0を追加した2026-10-19のcommit `0bace825ddcf28accea1bb27ee754fddc636598f` で導入されました。commit、[Step 14.0の開発記録](../development/step-14.0.md)、[初回本番検証](step14.0/README.md)に、選定理由の説明はありません。古い日付を維持する技術上の必要性は確認できませんでした。
 - 2026-04-07以降はWorkersが受信したWebSocket Closeフレームへ自動応答します。現行の`webSocketClose()`は切断状態を保存するだけでClose応答を送っておらず、旧互換日付でハンドシェイク不備になり得る実装でした。`socket.close(code, reason)`で明示応答し、互換日付更新後も旧日付へ戻した際に応答できるようにしました。
-- 1006はクライアントが記録した異常終了コードです。run #41941954653には、該当接続でWorkerがCloseフレームを受信した証拠、Worker例外、Cloudflare側の終了理由がありません。互換日付の古さは根本原因として確定していません。
+- 1006はクライアントが記録した異常終了コードです。run #41941954653には、該当接続でWorkerがCloseフレームを受信した証拠、Worker例外、Cloudflare側の終了理由がありません。更新後の本番テストは成功し、詳細診断runでは1006を観測しませんでしたが、更新前にCloseフレームが届いたか不明で、更新後の詳細診断も1回のみです。互換日付の古さは根本原因として確定していません。
 - 候補は段階的更新の`2026-04-07`を採用しました。2026-08-04以降のNode.js互換機能既定有効化を含む`2026-11-05`への一括更新は今回採用していません。Workersの古い互換日付は引き続きサポートされ、すべての新機能へ追従する必要はないとCloudflareは説明しています。
 
 ## 互換性変更の評価
@@ -87,6 +87,23 @@ timeout logの`recentTypes=room_state`は、`waitForClientMessage()`がset-ready
 - **通信環境または診断テスト実装**: 両socketのcloseがホスト・ゲストで少し異なるタイミングに発生した事実はありますが、理由の根拠になりません。1006のみから原因を選びません。
 - run #41941954653のログにはWorker側error logが含まれていません。`webSocketError()`や`server_internal_error`の実行有無、Durable Object invocationの例外は**未確認**です。Workers Logsのアカウント接続はこの調査環境で利用できませんでした。
 
+### 更新後の本番再検証
+
+Worker deploymentとPages deploymentの両方が成功したmain run [#42020017286](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42020017286)は、head SHA `cc9332af829f93e6011d464110e052d97a047b25`を検証・公開しました。`verify`、Chromium／WebKit、browser matrix audit、release freshness、Worker deploy、`production-test`、Pages build／deployがすべてsuccessです。Wranglerは`https://heibon-mahjong-online.ak-sekine.workers.dev`を公開し、Worker deployment記録とPages deploymentは同SHAでした。
+
+Deploy後の詳細検証 [Production Worker diagnostics run #42022175635](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42022175635)も同じSHAをcheckoutし、全5シナリオがsuccessしました。通常のdeploy workflow内の`production-test`と、その後の診断workflowの計2回でproduction testが通っています。
+
+| 検証日時 (UTC) | 観測 | 結果 |
+| --- | --- | --- |
+| 2026-11-05 11:50:40.985 / 11:50:41.377 | host / guest WebSocket open | 接続確立 |
+| 2026-11-05 11:50:42.654 | game中guestが明示close後、close code `1000` | その後の`guest-reconnected`が11:50:43.061にopenし、revision 12のgame stateを受信。seat takeover後もrevision 13を受信 |
+| 同runの`disconnect-reconnect`シナリオ | room stateからguestが切断し、同じparticipant tokenで再接続 | test assertionでseat connected、Ready解除、再接続後の`set-ready`成功を確認 |
+| 同runの全close event | code `1000` 2回、`1009` 1回、`4002` 10回、`4003` 3回 | client diagnostic logに`1006`なし。`1009`はテストのoversized message、`4002`はroom close/expiry、`4003`はparticipant exitで使用される。診断ログにはclose reason本文はない |
+| 同runのReady／room action検査 | stale revisionの拒否、`set-ready`、seat finalization等 | 5シナリオsuccess。`set-ready`は`action-result`の`ok`を検査するテストが通過。room actionごとの応答時刻は診断ログへ出力されない |
+| 同runの完了 | 2026-11-05 11:50:51 UTCごろ | timeoutまたはテスト例外なし。production scenarios passed |
+
+この結果は更新後のproduction testで1006を再現しなかった事実を示します。run #41941954653のClose frame detailやWorker側ログがない点は変わらないため、Close応答の修正で根本原因を解消したとは結論できません。特に`set-ready`成功はテストのassertionで確認できますが、個別の`action-result`本文や応答時間はログにありません。Cloudflare Workers Logs／Durable Object invocation errorは引き続き未確認です。
+
 ## 更新候補
 
 | 候補 | 利点 | リスク・変更範囲 | 判断 |
@@ -110,9 +127,15 @@ timeout logの`recentTypes=room_state`は、`waitForClientMessage()`がset-ready
 | 2026-11-05 | `npm run build`: 成功 |
 | 2026-11-05 | `npm run typecheck:worker`: 成功 |
 | 2026-11-05 | `npx wrangler deploy --dry-run --config wrangler.jsonc`: 成功、Worker bundle/bindingsを生成 |
-| 2026-11-05 | `git diff --check`: commit前に実行予定 |
+| 2026-11-05 | `git diff --check`: commit前に成功 |
 | 2026-11-05 | `wrangler dev --local`による本番通信テスト: 未実施。通常起動・`--ip 127.0.0.1`とも`uv_interface_addresses returned Unknown system error 1`でWorkerd起動前に終了。Actionsの既存デプロイ／本番検証ゲートで補う |
-| 公開後 | Worker deploy、Browser UI Chromium/WebKit、Deploy gate、HTTPS/API、複数回WebSocket、set-ready、再接続結果をActions終了後に追記する |
+
+### 更新後・公開後
+
+| 検証日時 (UTC) | 互換日付 | Worker対象SHA | Actions run | WebSocket close | 操作応答 | timeout／復元 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-05 11:34–11:50 | `2026-04-07` | `cc9332af829f93e6011d464110e052d97a047b25` | [Deploy #42020017286](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42020017286) | production test success。詳細診断runには16 close event、`1000`/`1009`/`4002`/`4003`のみで1006なし | Deploy内testと診断run双方がsuccess。set-readyを含む全room action assertion成功 | timeoutなし。game state revision 12復元、room seat／Ready復元後に再度Ready成功 |
+| 2026-11-05 11:50 | `2026-04-07` | `cc9332af829f93e6011d464110e052d97a047b25` | [Diagnostics #42022175635](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42022175635) | client logで1006なし。Cloudflare server-side close reasonは未取得 | Ready/seat finalizationを含む5シナリオ成功。room action responseの個別時刻は未記録 | timeoutなし。切断中game再join・waiting room reconnectの両方を確認 |
 
 ## 切り戻し
 
@@ -120,7 +143,7 @@ timeout logの`recentTypes=room_state`は、`waitForClientMessage()`がset-ready
 
 ## 残るリスクと次の調査
 
-- 1006と互換日付更新の因果関係は、再現・Worker Logs・同条件の複数回更新後テストがそろうまで未確認です。
+- 更新後はdeploy workflowと診断workflowの2回のproduction testが成功し、詳細診断1回のログでは1006を観測しませんでした。1006と互換日付更新の因果関係は、更新前のClose frame detailとWorker Logsがないため未確定です。今回の結果だけで根本原因解消とはしません。
 - Cloudflare Workers Logsで該当時間の`websocket_error`、`server_internal_error`、`websocket_disconnected`、`operation_received/succeeded/failed`をrequest/room IDで照合する必要があります。ログにsecretやparticipant tokenを追加してはいけません。
-- 更新前runでは再接続テストを最後まで完了していません。更新後は既存production testを同じSHAのActions runで複数回実行し、Close code、`set-ready`応答、timeout、再接続後stateを比較します。単回成功は根本原因解決とみなしません。
+- 更新前runではset-ready timeout後の再接続テストを完了していません。更新後の2回のproduction testは成功し、診断runではClose codeとgame reconnect stateも確認できました。さらに比較可能な更新後の複数回詳細診断、または同種の1006再現時のWorkers Logs照合で証拠を増やします。単回の詳細diagnostic successは根本原因解決とみなしません。
 - Node.js互換の既定変更を含む2026-08-04以降の日付は別調査で判断します。
