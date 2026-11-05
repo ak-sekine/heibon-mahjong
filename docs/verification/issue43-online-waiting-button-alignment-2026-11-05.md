@@ -7,7 +7,7 @@
 - ルームコードの省略表示をなくし、有効期限をコードの直下に保ちました。ルーム情報の後に既存配色の区切り線を追加しました。
 - 既存の`ui-button ui-button--b`、要素ID、イベントリスナー、`aria-label`を維持しています。`src/online/waiting-room.ts`、参加者一覧、下部操作、再接続、オンライン／オフラインのゲーム処理は変更していません。
 
-## 検証
+## 既存の自動検証・公開結果
 
 - 作業基準：`origin/main` / `92480dc523c05d343065203b12dbca64dedbccc7`。作業開始時の`work`は7コミット遅れており、fetch後にfast-forwardしました。作業開始時・fetch後とも作業ツリーはクリーンでした。
 - `npm test`：82件成功、失敗0件。
@@ -22,8 +22,29 @@
 - Worker deployとproduction testはsuccessです。GitHub Pagesのdeploy jobもsuccessし、Pages公開記録のSHAは`c57d35cd65adc5cb28c977383c379127f734e305`です。公開先は[https://ak-sekine.github.io/heibon-mahjong/](https://ak-sekine.github.io/heibon-mahjong/)です。
 - 別のproduction Worker diagnostics workflow [run #41941954653](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41941954653)は、同じ公開SHA `c57d35cd65adc5cb28c977383c379127f734e305`で失敗しました。`production-test`内のstate diagnosticsが、再接続後の`set-ready`に対する`action-result`を10秒待ってタイムアウトし、その直前にhost／guest双方のWebSocketがclose code `1006`を記録しています。直近のプロトコルメッセージは`room_state`でした。待機ダイアログのDeploy gateとは別の本番Worker診断で、原因は未特定です。WorkerコードはこのIssueでは変更していません。この診断失敗はUIの自動検証成功とは別の未解決事項として扱います。
 
-## 実機確認と受入条件
+## ユーザー本人による実機確認（2026-11-05）
 
-- 自動検証では右端揃え、共通寸法・書体、44pxタップ領域、折返し／クリッピングなし、コードと期限の表示、縦横・PC viewport、横overflowなしを確認しました。既存の待機室Browser UI回帰もDeploy gate内で成功しました。
-- iPhone Safari縦画面／横画面、ホーム画面PWAの実機確認は未実施です。ホスト／ゲストの各状態と実際の再接続を実機で測る項目も未確認です。Chromium／WebKitの自動結果で置き換えません。
-- Issue #43はOpenのままにし、実機確認結果とあわせてClose可否を別途判断します。
+確認環境はiPhone Safari／ホーム画面PWAです。ユーザー本人の報告を記録します。指定6項目の結果は **OK 6件、NG 0件、未確認 0件** です。
+
+| 項目 | 結果 | 確認内容 |
+| --- | --- | --- |
+| 1 | OK | iPhone Safari縦画面で「閉じる」「コピー」「ルール確認」の右端と寸法が揃っている |
+| 2 | OK | 3つのボタン、ルームコード、有効期限が欠けず、重なりや横はみ出しがない |
+| 3 | OK | 「閉じる」「コピー」「ルール確認」が従来どおり動作する |
+| 4 | OK | 「ルームを退出」「準備完了」「席を確定」「対局開始」の配置と動作に問題がない |
+| 5 | OK | ゲストの待機画面、準備完了前後、座席確定後の表示に問題がない |
+| 6 | OK | iPhone Safari横画面とホーム画面PWAでも表示が崩れない |
+
+実機での再接続操作は今回報告されていないため、未確認です。上記の「未確認 0件」は指定6項目の集計であり、再接続の確認を含みません。自動検証の成功を実機確認の代わりにはしません。
+
+## Issue #43の完了判断とGitHub上の状態
+
+既存の自動検証では右端揃え、共通寸法・書体、44pxタップ領域、折返し／クリッピングなし、コードと期限の表示、縦横・PC viewport、横overflowなしを確認し、既存の待機室Browser UI回帰もDeploy gate内で成功しました。今回の実機確認6項目もすべてOKのため、Issue #43の受入条件は充足し、完了・Close可能と判断します。
+
+今回の作業は検証文書の更新のみです。[Issue #43](https://github.com/ak-sekine/heibon-mahjong/issues/43)本体は変更せず、Openのまま維持します。Close操作は検証記録更新後にChatGPT側で行います。
+
+## 対象外の未解決事項・残る未確認事項
+
+- 別の本番Worker診断 [run #41941954653](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41941954653)のWebSocket切断（host／guestともclose code `1006`）と、再接続後の`set-ready`に対する`action-result`の10秒応答タイムアウトは未解決です。原因は未特定であり、Issue #43が原因とは断定しません。
+- この診断失敗はIssue #43の補助ボタン配置の完了判断とは分けて継続して扱います。今回の実機確認やClose可能の判断によって、解決済みにはしません。
+- 実機での再接続操作は未確認のままです。
