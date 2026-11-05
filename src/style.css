@@ -233,7 +233,6 @@ header > div { min-width:0; }
 .confirmed-rule-row dd { margin:0; overflow-wrap:anywhere; }
 #online-rules-list { min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
 #online-rules-list { max-height:min(68vh,620px); max-height:min(68dvh,620px); }
-#online-confirm-rules { box-sizing:border-box; flex:none; min-width:96px; min-height:44px; padding:6px 8px; white-space:nowrap; }
 .online-dialog { box-sizing:border-box; width:min(calc(100vw - 24px),520px); max-width:calc(100vw - 24px); max-height:calc(100svh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom))); overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; padding:clamp(12px,3.5vw,18px); border:2px solid #ffda7d; border-radius:12px; background:#185640; color:#fffdf7; }
 @supports (height:100dvh) { .online-dialog { max-height:calc(100dvh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom))); } }
 .online-dialog[open] { display:block; }
@@ -248,6 +247,10 @@ header > div { min-width:0; }
 .online-dialog input:focus-visible { outline:3px solid #82dcff; outline-offset:2px; }
 .online-dialog button:disabled { cursor:not-allowed; }
 .online-dialog .online-dialog-close { box-sizing:border-box; flex:none; width:max-content; min-width:44px; height:44px; padding:4px 8px; white-space:nowrap; font-size:.82rem; }
+#online-dialog { --online-operation-width:clamp(96px,28vw,112px); }
+#online-dialog .online-dialog-header { display:grid; grid-template-columns:minmax(0,1fr) var(--online-operation-width); gap:8px; }
+#online-dialog .online-dialog-close { width:100%; min-width:0; }
+#online-dialog .online-waiting-operation { box-sizing:border-box; flex:none; width:100%; min-width:0; height:44px; min-height:44px; padding:6px 8px; border-radius:8px; font-size:.82rem; font-weight:600; line-height:1.25; white-space:nowrap; }
 .online-form-dialog { width:min(calc(100vw - 24px),420px); }
 .online-entry-form { display:grid; gap:10px; min-width:0; }
 .online-create-dialog #online-create-form { display:flex; flex:1 1 auto; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
@@ -266,9 +269,11 @@ header > div { min-width:0; }
 .online-room-rule-row { display:flex; align-items:center; justify-content:space-between; gap:6px; min-width:0; }
 .online-room-rule-row p { min-width:0; overflow-wrap:anywhere; }
 .online-room-info p { margin:0; }
-.online-room-code-row { display:flex; align-items:center; gap:8px; min-width:0; }
+#online-dialog .online-room-info { gap:6px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #63947a; }
+#online-dialog .online-room-code-row { display:grid; grid-template-columns:max-content minmax(0,1fr) var(--online-operation-width); align-items:center; gap:8px; min-width:0; }
 .online-room-code-row > span { flex:none; font-size:.88rem; }
-.online-room-code-row strong { min-width:0; overflow:hidden; text-overflow:ellipsis; letter-spacing:.08em; font-size:1.05rem; }
+.online-room-code-row strong { min-width:max-content; letter-spacing:.08em; font-size:1.05rem; }
+#online-dialog .online-room-rule-row { display:grid; grid-template-columns:minmax(0,1fr) var(--online-operation-width); align-items:center; gap:8px; min-width:0; }
 .online-room-expiry-row { color:#d7e6dd; font-size:.72rem; line-height:1.25; white-space:nowrap; }
 #online-seats { display:grid; gap:4px; padding:0; margin:4px 0 6px; list-style:none; }
 #online-seats li { display:grid; grid-template-columns:minmax(0,1fr); align-items:center; gap:6px; min-width:0; min-height:34px; box-sizing:border-box; padding:4px 7px; border:1px solid #63947a; border-radius:6px; }
@@ -282,7 +287,6 @@ header > div { min-width:0; }
 .online-seat-content.is-empty { color:#d7e6dd; }
 #online-seats li[data-kind="cpu"] { background:#123f32; }
 #online-seats li[data-kind="empty"] { color:#d7e6dd; border-style:dashed; }
-#online-copy-code { flex:none; min-height:44px !important; padding:5px 10px !important; font-size:.84rem !important; }
 #online-connection { margin:2px 0 5px; padding:6px 8px; border-radius:6px; background:#123f32; font-size:.84rem; line-height:1.35; overflow-wrap:anywhere; }
 #online-finalized-message { margin:4px 0; padding:7px 8px; border:1px solid #ffda7d; border-radius:8px; background:#123f32; font-size:.9rem; font-weight:700; line-height:1.35; }
 #online-error { margin:4px 0; padding:7px 8px; border:1px solid #ffb4a2; border-radius:6px; color:#fff0eb; background:#632f26; font-size:.88rem; line-height:1.35; overflow-wrap:anywhere; }

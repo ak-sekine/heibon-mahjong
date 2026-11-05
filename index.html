@@ -65,14 +65,14 @@
     </form>
   </dialog>
   <dialog id="online-dialog" class="online-dialog" aria-labelledby="online-title">
-    <header class="online-dialog-header"><h2 id="online-title">オンライン待機</h2><button id="online-close" class="online-dialog-close ui-button ui-button--b" type="button" aria-label="オンライン待機を閉じる">閉じる</button></header>
+    <header class="online-dialog-header"><h2 id="online-title">オンライン待機</h2><button id="online-close" class="online-dialog-close online-waiting-operation ui-button ui-button--b" type="button" aria-label="オンライン待機を閉じる">閉じる</button></header>
     <p id="online-status" role="status" aria-live="polite" hidden></p>
     <section id="online-room" aria-label="ルームの参加者" hidden>
       <div id="online-room-content">
         <div class="online-room-info">
-          <p class="online-room-code-row"><span>ルームコード</span><strong id="online-room-code">—</strong><button id="online-copy-code" type="button" class="ui-button ui-button--b">コピー</button></p>
+          <p class="online-room-code-row"><span>ルームコード</span><strong id="online-room-code">—</strong><button id="online-copy-code" type="button" class="online-waiting-operation ui-button ui-button--b">コピー</button></p>
           <p class="online-room-expiry-row">有効期限：<time id="online-room-expiry">—</time></p>
-          <div class="online-room-rule-row"><p id="online-room-format" class="online-room-expiry-row"></p><button id="online-confirm-rules" type="button" class="ui-button ui-button--b">ルール確認</button></div>
+          <div class="online-room-rule-row"><p id="online-room-format" class="online-room-expiry-row"></p><button id="online-confirm-rules" type="button" class="online-waiting-operation ui-button ui-button--b">ルール確認</button></div>
         </div>
         <p id="online-connection" role="status" aria-live="polite" hidden>接続状態を確認しています。</p>
         <ol id="online-seats" aria-label="参加者とCPUの一覧"></ol>

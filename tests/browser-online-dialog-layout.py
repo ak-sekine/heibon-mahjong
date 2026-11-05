@@ -5,7 +5,7 @@ import pathlib
 from playwright.sync_api import sync_playwright
 
 BASE_URL = os.environ.get('HEIBON_PRODUCTION_URL', 'http://127.0.0.1:4174/heibon-mahjong/')
-BROWSER_NAME = 'webkit'
+BROWSER_NAME = os.environ.get('HEIBON_BROWSER', 'webkit')
 OUT = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -19,7 +19,7 @@ DIALOGS = [
 ]
 
 with sync_playwright() as playwright:
-    browser = playwright.webkit.launch()
+    browser = getattr(playwright, BROWSER_NAME).launch()
     page = browser.new_page(viewport={'width': 390, 'height': 844}, device_scale_factor=1)
     page.goto(BASE_URL, wait_until='networkidle')
     css_assets = page.evaluate("""() => performance.getEntriesByType('resource')
@@ -141,6 +141,57 @@ with sync_playwright() as playwright:
             assert layout['dialogInsideViewport'], f'{name} dialog exceeds the viewport at {width}px: {layout}'
             assert layout['noHorizontalOverflow'], f'{name} dialog overflows horizontally at {width}px: {layout}'
             assert layout['visibleButtonsFit'], f'{name} operation button does not fit at {width}px: {layout}'
+
+            if name == 'waiting':
+                waiting_layout = page.locator(dialog_selector).evaluate('''dialog => {
+                  const selectors = ['#online-close', '#online-copy-code', '#online-confirm-rules'];
+                  const buttons = selectors.map(selector => {
+                    const button = dialog.querySelector(selector);
+                    const box = button.getBoundingClientRect();
+                    const style = getComputedStyle(button);
+                    const range = document.createRange();
+                    range.selectNodeContents(button);
+                    const textBox = range.getBoundingClientRect();
+                    return {
+                      id: button.id, label: button.textContent.trim(),
+                      left: box.left, right: box.right, width: box.width, height: box.height,
+                      textWidth: textBox.width, textHeight: textBox.height,
+                      textLines: range.getClientRects().length,
+                      textFits: textBox.left >= box.left && textBox.right <= box.right && button.scrollWidth <= button.clientWidth,
+                      fontFamily: style.fontFamily, fontSize: style.fontSize, fontWeight: style.fontWeight,
+                      lineHeight: style.lineHeight, borderRadius: style.borderRadius,
+                      padding: style.padding, whiteSpace: style.whiteSpace,
+                    };
+                  });
+                  const code = dialog.querySelector('#online-room-code');
+                  const copy = dialog.querySelector('#online-copy-code');
+                  const expiry = dialog.querySelector('#online-room-expiry');
+                  const codeRange = document.createRange();
+                  codeRange.selectNodeContents(code);
+                  const expiryRange = document.createRange();
+                  expiryRange.selectNodeContents(expiry);
+                  const codeText = codeRange.getBoundingClientRect();
+                  const copyBox = copy.getBoundingClientRect();
+                  return {
+                    buttons,
+                    code: code.textContent.trim(), codeTextWidth: codeText.width,
+                    codeFits: codeRange.getClientRects().length === 1 && code.scrollWidth <= code.clientWidth && codeText.left >= code.getBoundingClientRect().left && codeText.right <= copyBox.left,
+                    expiry: expiry.textContent.trim(), expiryVisible: expiry.getClientRects().length === 1 && expiryRange.getBoundingClientRect().width <= expiry.clientWidth,
+                    dialogScrollWidth: dialog.scrollWidth, dialogClientWidth: dialog.clientWidth,
+                    documentScrollWidth: document.documentElement.scrollWidth,
+                    viewportWidth: innerWidth,
+                  };
+                }''')
+                buttons = waiting_layout['buttons']
+                assert max(button['right'] for button in buttons) - min(button['right'] for button in buttons) <= 0.5, f'waiting operation buttons do not share a right edge at {width}px: {waiting_layout}'
+                assert max(button['width'] for button in buttons) - min(button['width'] for button in buttons) <= 0.5, f'waiting operation button widths differ at {width}px: {waiting_layout}'
+                assert max(button['height'] for button in buttons) - min(button['height'] for button in buttons) <= 0.5 and min(button['height'] for button in buttons) >= 44, f'waiting operation button heights differ or are under 44px at {width}px: {waiting_layout}'
+                assert len({(button['fontFamily'], button['fontSize'], button['fontWeight'], button['lineHeight'], button['borderRadius'], button['padding']) for button in buttons}) == 1, f'waiting operation button typography or shape differs at {width}px: {waiting_layout}'
+                assert all(button['whiteSpace'] == 'nowrap' and button['textLines'] == 1 and button['textFits'] for button in buttons), f'waiting operation label wraps or clips at {width}px: {waiting_layout}'
+                assert waiting_layout['code'] == 'ABC234' and waiting_layout['codeFits'], f'six-character room code is clipped or missing at {width}px: {waiting_layout}'
+                assert waiting_layout['expiry'] and waiting_layout['expiryVisible'], f'room expiry is clipped or missing at {width}px: {waiting_layout}'
+                assert waiting_layout['dialogScrollWidth'] <= waiting_layout['dialogClientWidth'] and waiting_layout['documentScrollWidth'] <= waiting_layout['viewportWidth'], f'waiting dialog has horizontal overflow at {width}px: {waiting_layout}'
+                layout['waitingOperations'] = waiting_layout
 
             page.screenshot(path=str(OUT / f'online-dialog-{name}-{width}-{BROWSER_NAME}.png'))
             reports.append({'dialog': name, 'viewport': f'{width}x{height}', **layout})
