@@ -1273,7 +1273,10 @@ export class RoomDurableObject {
     if (session) this.broadcastGame(session);
   }
 
-  webSocketClose(socket: WebSocket): void {
+  webSocketClose(socket: WebSocket, code: number, reason: string): void {
+    // Before 2026-04-07, the runtime requires the application to answer a peer Close frame.
+    // On newer compatibility dates this is harmless because the runtime has already closed it.
+    try { socket.close(code, reason); } catch { /* Already closed or no close frame was received. */ }
     try { this.socketEnded(socket); }
     catch { logWorker({ event: 'server_internal_error', level: 'ERROR', errorCode: 'websocket_close_handler_failed' }); }
   }

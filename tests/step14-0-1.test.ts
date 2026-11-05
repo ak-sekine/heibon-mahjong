@@ -78,6 +78,7 @@ class TestSocket {
   tags: string[] = [];
   peer: TestSocket | null = null;
   sent: string[] = [];
+  closeCalls: Array<{ code: number; reason: string }> = [];
   private attachment: unknown = null;
 
   send(value: string): void {
@@ -85,7 +86,8 @@ class TestSocket {
     if (this.peer) this.peer.sent.push(value);
   }
 
-  close(_code = 1000, _reason = ''): void {
+  close(code = 1000, reason = ''): void {
+    this.closeCalls.push({ code, reason });
     this.readyState = 3;
     if (this.peer) this.peer.readyState = 3;
   }
@@ -630,6 +632,43 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     const state = await readState(fixture);
     assert.equal(publicSeats(state).filter(seat => seat.kind === 'human').length, 4);
     assert.equal(new Set(publicSeats(state).map(seat => seat.seat)).size, 4);
+  });
+
+  await t.test('replies to a peer Close frame and marks only the current connection offline', async () => {
+    const fixture = await makeRoom();
+    const host = await connectParticipant(fixture, fixture.hostToken);
+    host.server.readyState = 2;
+    fixture.room.webSocketClose(host.server as unknown as WebSocket, 1001, 'client going away');
+    assert.deepEqual(host.server.closeCalls.at(-1), { code: 1001, reason: 'client going away' });
+    const state = await readState(fixture);
+    assert.equal(publicSeats(state)[0].connected, false);
+    assert.equal(publicSeats(state)[0].ready, false);
+  });
+
+  await t.test('handles abnormal disconnects without clearing a replacement connection', async () => {
+    const fixture = await makeRoom();
+    const first = await connectParticipant(fixture, fixture.hostToken);
+    let state = await readState(fixture);
+    const firstReady = sendAction(fixture, first, {
+      type: 'set-ready', requestId: 'ready-before-replacement', expectedRevision: state.revision, ready: true,
+    });
+    assert.equal(firstReady.ok, true);
+
+    const replacement = await connectParticipant(fixture, fixture.hostToken);
+    fixture.room.webSocketError(first.server as unknown as WebSocket);
+    state = await readState(fixture);
+    assert.equal(publicSeats(state)[0].connected, true);
+    assert.equal(publicSeats(state)[0].ready, false);
+
+    const replacementReady = sendAction(fixture, replacement, {
+      type: 'set-ready', requestId: 'ready-before-abnormal-close', expectedRevision: state.revision, ready: true,
+    });
+    assert.equal(replacementReady.ok, true);
+    replacement.server.readyState = 3;
+    fixture.room.webSocketError(replacement.server as unknown as WebSocket);
+    state = await readState(fixture);
+    assert.equal(publicSeats(state)[0].connected, false);
+    assert.equal(publicSeats(state)[0].ready, false);
   });
 
   await t.test('reconnect resets Ready, survives hibernation and ignores an old close event', async () => {
