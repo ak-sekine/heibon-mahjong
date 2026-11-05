@@ -165,19 +165,22 @@ with sync_playwright() as playwright:
                     };
                   });
                   const code = dialog.querySelector('#online-room-code');
+                  const codeRow = dialog.querySelector('.online-room-code-row');
                   const copy = dialog.querySelector('#online-copy-code');
                   const expiry = dialog.querySelector('#online-room-expiry');
                   const codeRange = document.createRange();
                   codeRange.selectNodeContents(code);
                   const expiryRange = document.createRange();
                   expiryRange.selectNodeContents(expiry);
+                  const expiryRow = expiry.closest('.online-room-expiry-row');
+                  const expiryRowBox = expiryRow.getBoundingClientRect();
                   const codeText = codeRange.getBoundingClientRect();
                   const copyBox = copy.getBoundingClientRect();
                   return {
                     buttons,
                     code: code.textContent.trim(), codeTextWidth: codeText.width,
-                    codeFits: codeRange.getClientRects().length === 1 && code.scrollWidth <= code.clientWidth && codeText.left >= code.getBoundingClientRect().left && codeText.right <= copyBox.left,
-                    expiry: expiry.textContent.trim(), expiryVisible: expiry.getClientRects().length === 1 && expiryRange.getBoundingClientRect().width <= expiry.clientWidth,
+                    codeFits: codeRange.getClientRects().length === 1 && codeRow.scrollWidth <= codeRow.clientWidth && codeText.left >= codeRow.getBoundingClientRect().left && codeText.right <= copyBox.left,
+                    expiry: expiry.textContent.trim(), expiryVisible: expiry.getClientRects().length === 1 && expiryRange.getBoundingClientRect().right <= expiryRowBox.right,
                     dialogScrollWidth: dialog.scrollWidth, dialogClientWidth: dialog.clientWidth,
                     documentScrollWidth: document.documentElement.scrollWidth,
                     viewportWidth: innerWidth,
