@@ -42,6 +42,40 @@ Issue #48は、2026-11-05に提供されたiPhone画面で、対局中の鳴き�
 
 ## 実機確認とIssue状態
 
-iPhone Safari実機では未確認です。狭い画面でのブラウザー自動検証を実機確認とは扱いません。残り時間が鳴きボタン群の上だけにあること、ボタンとの重なりがないこと、選択・見送り・timeout後に不要表示が消えることを、iPhone Safariで確認する必要があります。
+### iPhone Safari実機確認（ユーザー本人の報告）
 
-この必須の実機確認が未完了のため、Issue #48はOpenのままにします。
+2026-11-05、ユーザー本人がiPhone Safariで次の4項目を確認し、すべてOKと報告しました。
+
+1. **OK** — オンライン対局で、鳴き判断の残り時間が選択ボタンの上側1箇所だけに表示される。
+2. **OK** — 残り秒数が更新されても、重複表示や古いメッセージが発生しない。
+3. **OK** — 鳴き選択または「見送る」の後に残り時間表示が消える。
+4. **OK** — ロン判断でも残り時間が1箇所だけに表示され、操作後に消える。
+
+**集計：OK 4件、NG 0件、報告された4項目について未確認0件。** この集計は報告された4項目だけを対象にします。端末機種、iOSバージョン、確認時刻、画面幅は報告されていないため記録していません。
+
+この報告でiPhone Safari実機確認が未実施だった状態を更新します。今回明示されていないタイムアウト時の動作、個々のチー・ポン・カン等の種別、特定の画面幅は、実機確認済みとして扱いません。
+
+### 受入条件の評価
+
+| Issue #48の受入条件 | 判定と根拠 |
+| --- | --- |
+| 残り時間が鳴き選択ボタン群の上側に1箇所だけ表示される。 | **充足。** ユーザー本人のiPhone Safari報告（上側1箇所）と、Chromium／WebKitのBrowser UI検証（選択肢群より上に1箇所）を根拠とします。 |
+| 秒更新時に重複や古い表示が残らない。 | **充足。** iPhone Safari実機報告と、Chromium／WebKitの秒更新・既存status要素更新の自動検証を根拠とします。 |
+| 選択・見送り・タイムアウト後に不要な表示が消える。 | **充足。** 実機報告は鳴き選択・見送りとロン操作後の消去を確認しています。タイムアウト後の消去はChromium／WebKitおよび状態テストで確認しており、タイムアウトは今回の実機確認範囲外です。 |
+| チー・ポン・カン・ロン等で重複表示がない。 | **充足。** Chromium／WebKitのBrowser UI自動検証でチー・ポン・大明カン・ロンの判断を確認しています。実機で個別に確認した種別は報告されていません。 |
+| オフライン・オンラインの影響範囲が調査され、回帰がない。 | **充足。** コード調査で、残り時間文言はオンライン判断状態変換から設定され、オフライン状態変換に判断タイマーがないことを確認しました。オフライン／オンラインの状態テストと、共通ActionPanelの描画回帰テストを根拠とします。ゲーム判断・タイマー進行ロジックは変更されていません。 |
+| iPhone Safariなどの狭い画面で表示位置・操作性に問題がない。 | **充足。** ユーザー本人のiPhone Safari報告で表示位置と選択・見送り操作後の消去を確認しています。Chromium／WebKit自動検証では320、375、390、430pxで位置と44px以上の操作領域を確認しています。実機の具体的な画面幅は未報告です。 |
+
+### 自動検証・公開記録との照合
+
+対象コードコミット`d4bfaa41ccad501f400fc26eca7fc5984f8e1add`は、GitHub Actions [Deploy run #42028711294](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42028711294)の全体successと一致します。runのverify、Chromium、WebKit、Browser UI matrix audit、release freshness、Worker deploy、本番production-test、Pages build／deployの各jobがsuccessでした。run詳細では、独立したbrowser-ui内のverify-build／docs-check／detect-changesは再利用済みbuildによりskipでした。
+
+既存記録にある`npm test`、`npm run build`、`npm run typecheck:worker`、Browser UI選択テスト7件の成功、Chromium 42 scenario／WebKit 32 scenarioの成功と照合しました。runのverify jobは回帰テスト・Worker型検査・Pages buildの成功を示しています。ブラウザーUI検証は自動検証であり、iPhone Safari実機確認とは別の根拠です。
+
+Worker／Pagesは対象コードSHA `d4bfaa41ccad501f400fc26eca7fc5984f8e1add`で公開成功と記録されています。ActionsのWorker deploy、production-test、Pages build／deploy各jobもsuccessです。
+
+文書更新コミット`107fe3c5b9498e91f61093ef3a511bfd70c3c17c`とActions [run #42031364488](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42031364488)も照合しました。docs-checkはsuccessし、変更分類・deploy gate・Worker／Pages build・deploy等のコード検証または公開jobは文書のみの変更としてskipでした。これはコード変更を含まない文書更新に対する正常なskipで、コード検証やデプロイが実行されたことを意味しません。
+
+### 判定
+
+Issue #48の6受入条件は、iPhone Safari実機報告、自動検証、コード調査を区別したうえで、いずれも根拠を確認できました。実機未確認の範囲（タイムアウト、個々の鳴き種別、具体的な画面幅）は残りますが、該当する表示・状態遷移・幅の条件は自動検証とコード調査で確認されています。したがって、**Issue #48はcompletedとしてClose可能**と判断します。Issue本体はこの作業では操作せず、Openのまま維持します。Close操作は完了報告を確認したあとに別途行います。
