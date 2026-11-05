@@ -272,6 +272,8 @@ jobs:
       - name: Verify HTTPS, rooms, WebSockets, reconnection, auth, and privacy
         env:
           ONLINE_API_URL: ${{ needs.deploy-worker.outputs.worker_url }}
+          ONLINE_TEST_ORIGIN: https://ak-sekine.github.io
+          ONLINE_SECONDARY_TEST_ORIGIN: https://html-classic.itch.zone
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: npm run test:online:production

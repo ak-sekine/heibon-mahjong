@@ -215,3 +215,67 @@ PC／Macの開発者ツール接続はこの手順の前提にしない。Worker
 | Pages↔itch.io相互対戦 | 未確認 |
 
 したがって、今回の自動テスト成功をもって上記の未確認実機項目をOKへ変更しない。Issue #46はOpenのまま維持する。
+
+## 2026-11-05 実測 Origin 許可と相互接続検証
+
+### ユーザー報告と、許可前の失敗
+
+ユーザーのiPhone Safariからの診断報告では、実行Originは `https://html-classic.itch.zone`、Execution Hostは `html-classic.itch.zone`、iframe内、Build Modeは `itch`、API Originは `https://heibon-mahjong-online.ak-sekine.workers.dev`、Build SHAは `3bea5b440a2d591e826e2603bd507e4d11bf3e6c` です。診断画面のExecution OriginだけではHTTP/WebSocketヘッダーの証明にしません。
+
+Cloudflare Observabilityで次のWorker受信ログをユーザーが確認しました。
+
+| 時刻 (UTC) | 通信 | Origin | Method / path | 結果 |
+| --- | --- | --- | --- | --- |
+| 2026-11-05 17:00:44.416 | HTTP | `https://html-classic.itch.zone` | `OPTIONS /api/rooms` | `origin_rejected` |
+| 2026-11-05 17:02:05.151 | HTTP | `https://html-classic.itch.zone` | `OPTIONS /api/rooms` | `origin_rejected` |
+
+許可前はブラウザーに「オンラインサーバーに接続できません」と表示され、ルーム作成は失敗しました。これは許可前の結果です。WebSocket Handshake Origin、ルーム作成成功、Pages↔itch.io相互対局、同期、再接続はこの報告時点で未確認です。
+
+### 実装とセキュリティ評価
+
+`worker/index.ts`の許可リストへ `https://html-classic.itch.zone` を完全一致で追加しました。既存の `https://ak-sekine.github.io`、`http://localhost:5173`、`http://127.0.0.1:5173` は維持します。ワイルドカード、Origin欠落、`null`、HTTP版、似た文字列は許可しません。CORSは要求された `Authorization` と `Content-Type` だけを認め、正確なOriginを返し、`Vary: Origin`を維持します。
+
+itch.ioの共有Originを許可すると、同じOrigin上で動く他のブラウザーコンテンツにもCORS経由でWorkerの公開HTTP機能（health、ルーム作成、コードを知るルームへの参加・公開待機状態取得）を呼べるようになります。Origin値はゲームや利用者を識別しないため認証にはなりません。これらの作成・参加機能は元々利用者向け公開機能であり、Workerは作成／参加／ticket／socketのレート制限を続けます。参加者tokenは作成・参加した当該クライアントへだけ返し、ticket発行には正しいBearer participant tokenを要求します。WebSocketは短命・一回使用のticketと `heibon-mahjong.v1` subprotocolを検証し、Durable Objectは参加者席・ルーム状態・ホスト権限・各操作権限を検査します。ルームコードを知らない第三者は既存ルームへの参加を指定できませんが、コード自体は秘密の認証要素ではなく、待機中の空席参加は意図した公開動作です。既存のレート制限、ゲーム状態の認可、チケット消費、拒否Origin 403は変更・緩和しません。
+
+Origin拒否の診断ログは既存のHTTP/WebSocket区別と15秒抑制を維持します。追加した `origin_accepted` はDurable Objectから101 Upgrade応答が返った場合だけ記録し、通信種別、Origin、`result: accepted`のみを含み、許可Originごとに15秒間抑制します。ticket、participant token、ルームコード、Cookie、IP、本文、URL pathは記録しません。実際のitch.io handshake値はこの本番ログが観測されるまで未確認です。自動テストで指定したOrigin値を実測扱いしません。
+
+### 追加した自動検証
+
+`tests/worker-origin.test.ts`でPagesとitch.ioの完全一致CORS応答、itch.io OPTIONS 204、正常なルーム作成、`Vary: Origin`、未許可・Origin欠落・`null`・HTTP版・類似Originの403、未対応CORSヘッダー403、ticketなし401、成功Handshake診断レコードを確認します。production通信テストは二方向のクロスOriginでルーム作成・参加、ticketとsubprotocolによるWebSocket接続、準備、座席確定、ゲーム開始、打牌同期、切断・再接続後の状態一致を実施し、未許可OriginのREST参加403とWebSocket handshake 403、発行されていないticketの401も確認します。Deploy workflowに両Originを明示し、release gateを変更せず、production testの後にPages build/deployします。
+
+実行結果、run URL、SHA、デプロイされたWorker/PagesのSHA、各jobの状態は本作業完了時にこの節へ追記します。ローカルのChromium/WebKit実機ブラウザーは既知のCodex Cloud sandbox制約により起動しません。GitHub Actions Browser UIでChromium／WebKitおよびPages PWA回帰を確認します。
+
+### iPhone Safari 実機確認手順（本番Worker反映後）
+
+itch.io Draftに現在アップロード済みのZIPをそのまま使えます。クライアント・バンドルは変更していないので、今回のWorker Origin許可のためのZIP再アップロードは不要です。
+
+**A. itch.io版単独**
+
+1. iPhone Safariでitch.io Draftを開き、現在のゲームを起動します。
+2. 「新しくルームを作る」を選び、プレイヤー名とルールを設定して「ルーム作成」を押します。
+3. ルームコード表示とオンライン待機画面を確認します。失敗した場合は時刻と表示文を記録します。
+4. メニューの診断ログでExecution OriginとBuild SHAを確認し、Cloudflare Observabilityで同時刻の `origin_accepted` / `origin_rejected`、`communicationType: websocket`、Origin、結果を別に確認します。診断画面の値をHandshake Originへ読み替えません。
+5. 待機画面が保たれ、Safariから戻って再表示できることを確認します。単独テストだけでは同期・相手参加を確認したことにしません。
+
+**B. Pages版との相互対戦**
+
+同時操作と通信を確認するには、iPhoneと別の参加クライアント（PC/MacのChromiumまたはiPhone/iPadの別ブラウザー・端末）が必要です。同じiPhoneのSafariタブ2枚だけではバックグラウンド停止やタブ切替の影響があるため安定した同時接続テストにしません。
+
+1. Pages版でルームを作成し、iPhoneのitch版から参加します。その後、itch版でルームを作成し、Pages版から参加する逆方向も行います。
+2. それぞれ準備完了、ホストの座席確定、対局開始を確認します。
+3. 人間の手番で打牌し、相手画面の状態・手番・ゲームrevisionが一致することを確認します。鳴き可能な局面と和了局面が出た場合は鳴き・和了結果も確認します。自然に局面が出なければ未確認のまま残します。
+4. 一方のSafariまたはブラウザーでネットワークを一時的に切る／ページを再読み込みし、復帰後に再接続して双方の局・revision・手番が一致するか確認します。対局中の回線切替と再読込は別々に行い、対象端末・OS・Safariバージョンを記録します。
+5. iPhone 1台だけで、相手クライアントを維持したまま安定した切断・再接続や双方同時の操作を確認できない場合、その項目は未確認とします。自動production testの成功で実機欄をOKにしません。
+
+### この作業後の結果
+
+| 確認項目 | 状態 |
+| --- | --- |
+| iPhone Safariでitch.io版を起動 | ユーザー報告 OK |
+| CPU対局 | ユーザー報告「問題なさそう」。全操作の確認ではない |
+| 実行Origin | `https://html-classic.itch.zone`（ユーザーの診断画面報告） |
+| Worker受信HTTP Origin | 同じOriginをCloudflareログで実測。OPTIONS拒否2件 |
+| 許可後のルーム作成 | この表の追記時点では未確認。許可前は失敗 |
+| Worker受信WebSocket Handshake Origin | 未確認。`origin_accepted`ログまたは拒否ログで本番観測待ち |
+| Pages↔itch.io実機相互対局・同期・再接続 | 未確認 |
+| GitHub Issue #46 | Openのまま維持。実機の相互対戦、再接続、Draft公開準備を残す |

@@ -3,7 +3,7 @@ import test from 'node:test';
 import worker from '../worker/index.ts';
 
 const pagesOrigin = 'https://ak-sekine.github.io';
-const itchOriginCandidate = 'https://example.invalid';
+const itchOrigin = 'https://html-classic.itch.zone';
 
 function mockEnv(onRoomRequest: (request: Request) => Response = () => new Response(null, { status: 418 })) {
   let roomRequest: Request | null = null;
@@ -33,6 +33,29 @@ test('Pages Origin is accepted with exact CORS headers and wildcard remains abse
   assert.notEqual(response.headers.get('Access-Control-Allow-Origin'), '*');
 });
 
+test('itch.io Origin is accepted exactly for preflight and normal API requests', async () => {
+  const preflight = await worker.fetch(new Request('https://worker.invalid/api/rooms', {
+    method: 'OPTIONS',
+    headers: { Origin: itchOrigin, 'Access-Control-Request-Headers': 'authorization,content-type' },
+  }), {} as Env);
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), itchOrigin);
+  assert.equal(preflight.headers.get('Vary'), 'Origin');
+
+  const { env } = mockEnv(() => new Response(JSON.stringify({
+    createdAt: 1, expiresAt: 2, seats: [], format: 'tonpu',
+  }), { status: 201, headers: { 'Content-Type': 'application/json' } }));
+  const created = await worker.fetch(new Request('https://worker.invalid/api/rooms', {
+    method: 'POST',
+    headers: { Origin: itchOrigin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ displayName: 'itch player' }),
+  }), env);
+  assert.equal(created.status, 201);
+  assert.equal(created.headers.get('Access-Control-Allow-Origin'), itchOrigin);
+  assert.equal(created.headers.get('Vary'), 'Origin');
+  assert.equal(created.headers.get('Access-Control-Allow-Origin'), itchOrigin);
+});
+
 test('preflight accepts allowed Origin and requested headers, and rejects unsupported headers', async () => {
   const allowed = await worker.fetch(new Request('https://worker.invalid/api/rooms', {
     method: 'OPTIONS',
@@ -43,23 +66,33 @@ test('preflight accepts allowed Origin and requested headers, and rejects unsupp
   assert.equal(allowed.headers.get('Access-Control-Allow-Methods'), 'GET, POST, OPTIONS');
   assert.equal(allowed.headers.get('Access-Control-Allow-Headers'), 'Authorization, Content-Type');
 
-  const unsupported = await worker.fetch(new Request('https://worker.invalid/api/rooms', {
-    method: 'OPTIONS',
-    headers: { Origin: pagesOrigin, 'Access-Control-Request-Headers': 'x-unexpected' },
-  }), {} as Env);
-  assert.equal(unsupported.status, 403);
-  assert.equal(unsupported.headers.get('Access-Control-Allow-Origin'), null);
+  for (const origin of [pagesOrigin, itchOrigin]) {
+    const unsupported = await worker.fetch(new Request('https://worker.invalid/api/rooms', {
+      method: 'OPTIONS',
+      headers: { Origin: origin, 'Access-Control-Request-Headers': 'x-unexpected' },
+    }), {} as Env);
+    assert.equal(unsupported.status, 403);
+    assert.equal(unsupported.headers.get('Access-Control-Allow-Origin'), null);
+  }
 });
 
-test('unknown and missing Origins are denied for REST and WebSocket upgrade requests', async () => {
+test('unapproved, missing, null, HTTP, and lookalike Origins are denied for REST and WebSocket', async () => {
   const records: unknown[] = [];
   const originalLog = console.log;
+  const originalNow = Date.now;
+  let now = originalNow();
+  Date.now = () => (now += 16_000);
   console.log = (...values: unknown[]) => records.push(...values);
   try {
-    for (const headers of [
-      { Origin: itchOriginCandidate },
-      {},
+    for (const origin of [
+      'https://example.invalid',
+      'http://html-classic.itch.zone',
+      'https://html-classic.itch.zone.evil.example',
+      'https://evil-html-classic.itch.zone',
+      'null',
+      undefined,
     ]) {
+      const headers = origin === undefined ? {} : { Origin: origin };
       for (const path of ['/health', '/api/rooms/ABCDEF/socket']) {
         const response = await worker.fetch(new Request(`https://worker.invalid${path}`, {
           headers: { ...headers, ...(path.endsWith('/socket') ? { Upgrade: 'websocket' } : {}) },
@@ -68,15 +101,34 @@ test('unknown and missing Origins are denied for REST and WebSocket upgrade requ
         assert.equal(response.headers.get('Access-Control-Allow-Origin'), null);
       }
     }
-  } finally { console.log = originalLog; }
+  } finally { console.log = originalLog; Date.now = originalNow; }
   const originEvents = records as Array<Record<string, unknown>>;
-  assert.deepEqual(originEvents.map(record => [record.event, record.communicationType, record.origin]), [
-    ['origin_rejected', 'http', itchOriginCandidate],
-    ['origin_rejected', 'websocket', itchOriginCandidate],
-  ]);
+  assert.deepEqual(originEvents.map(record => [record.event, record.communicationType, record.origin]),
+    ['https://example.invalid', 'http://html-classic.itch.zone', 'https://html-classic.itch.zone.evil.example',
+      'https://evil-html-classic.itch.zone', 'null', '(missing)']
+      .flatMap(origin => [['origin_rejected', 'http', origin], ['origin_rejected', 'websocket', origin]]));
   assert.equal(JSON.stringify(originEvents).includes('ABCDEF'), false);
   assert.equal(JSON.stringify(originEvents).includes('token'), false);
   assert.equal(JSON.stringify(originEvents).includes('worker.invalid'), false);
+});
+
+test('successful WebSocket upgrade records only the exact Origin and acceptance result', async () => {
+  const records: unknown[] = [];
+  const originalLog = console.log;
+  console.log = (...values: unknown[]) => records.push(...values);
+  try {
+    const { env } = mockEnv(() => ({ status: 101 } as Response));
+    const response = await worker.fetch(new Request('https://worker.invalid/api/rooms/ABCDEF/socket', {
+      headers: { Origin: itchOrigin, Upgrade: 'websocket' },
+    }), env);
+    assert.equal(response.status, 101);
+  } finally { console.log = originalLog; }
+  const record = records[0] as Record<string, unknown>;
+  assert.equal(record.event, 'origin_accepted');
+  assert.equal(record.communicationType, 'websocket');
+  assert.equal(record.origin, itchOrigin);
+  assert.equal(record.result, 'accepted');
+  assert.equal(Object.keys(record).some(key => ['token', 'roomCode', 'cookie', 'ipAddress'].includes(key)), false);
 });
 
 test('allowed-Origin WebSocket request reaches the room with its Origin; ticket token auth stays enforced', async () => {

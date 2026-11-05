@@ -2,6 +2,8 @@
 
 このディレクトリには過去の自動テスト、ビルド、Chromiumブラウザー確認などのログを保存しています。**iPhone Safari実機の確認結果は、確認者と報告範囲が分かる専用記録に分けます。** 各ログの数値や未完了事項は実施当時の結果です。
 
+- [Issue #46 itch.io Worker Origin許可・相互接続検証](issue46-itch-html5-2026-11-05.md#2026-11-05-実測-origin-許可と相互接続検証) — iPhone Safariで報告されたHTTP Origin `https://html-classic.itch.zone`を完全一致で許可し、REST/CORS、WebSocket認証、二方向本番通信、自動回帰、デプロイ結果を追記します。Handshake Originと実機相互対戦は自動テスト結果と分けて記録します。
+
 ## Issue調査
 
 - [Issue #46 Origin診断追加、2026-11-05](issue46-itch-html5-2026-11-05.md#2026-11-05-origin診断追加記録) — 既存診断ダイアログに実行Origin表示・コピーと、Workerで拒否されたHTTP／WebSocket Originの安全な構造化観測を追加。run [#42062625984](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42062625984)でChromium／WebKit、Worker deploy／本番通信検証、Pages deployが成功し、[itch artifact](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42062625984/artifacts/13433286148)を確認。Draftの実Origin、PC、オフラインCPU、Pages↔itch対戦は未確認。IssueはOpenを維持。

@@ -464,6 +464,17 @@ async function main() {
     const secondaryHealth = await request('/health', { origin: secondaryOrigin });
     check(secondaryHealth.response.status === 200 && secondaryHealth.response.headers.get('access-control-allow-origin') === secondaryOrigin,
       'The secondary Origin was not accepted with an exact CORS response.');
+    const preflight = await fetch(`${apiUrl}/api/rooms`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: secondaryOrigin,
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'authorization,content-type',
+      },
+    });
+    check(preflight.status === 204 && preflight.headers.get('access-control-allow-origin') === secondaryOrigin &&
+      preflight.headers.get('vary')?.toLowerCase().includes('origin'),
+    'The secondary Origin did not receive an exact CORS preflight response.');
   }
 
   const runId = process.env.GITHUB_RUN_ID ?? `local-${Date.now()}`;
@@ -763,6 +774,27 @@ async function main() {
       ]) {
         const crossOrigin = await createAndConnectCrossOriginTwo(`${label}-cross`, hostOrigin, guestOrigin);
         activeHostForCleanup = crossOrigin.host;
+        const deniedJoin = await request(`/api/rooms/${crossOrigin.roomCode}/join`, {
+          method: 'POST', origin: 'https://attacker.example', body: { displayName: 'BlockedGuest' },
+        });
+        check(deniedJoin.response.status === 403, 'An unapproved Origin joined the mixed-Origin room.');
+        const badTicket = await issueTicket(crossOrigin.roomCode, crossOrigin.hostToken, hostOrigin);
+        const badOriginSocket = connect(
+          `${apiUrl.replace(/^https:/u, 'wss:')}/api/rooms/${crossOrigin.roomCode}/socket`,
+          badTicket, privateValues, 'blocked-origin-probe', 'https://attacker.example',
+        );
+        let rejectedHandshake = false;
+        try { await badOriginSocket.opened; }
+        catch (error) { rejectedHandshake = error instanceof Error && error.message.includes('403'); }
+        check(rejectedHandshake, 'An unapproved Origin completed a WebSocket handshake.');
+        const invalidTicketSocket = connect(
+          `${apiUrl.replace(/^https:/u, 'wss:')}/api/rooms/${crossOrigin.roomCode}/socket`,
+          'f'.repeat(64), privateValues, 'invalid-ticket-probe', hostOrigin,
+        );
+        let rejectedTicket = false;
+        try { await invalidTicketSocket.opened; }
+        catch (error) { rejectedTicket = error instanceof Error && error.message.includes('401'); }
+        check(rejectedTicket, 'A WebSocket connection with an unissued ticket was accepted.');
         await ready(crossOrigin.host);
         await ready(crossOrigin.guest);
         const finalized = await sendAction(crossOrigin.host, { type: 'finalize-seats' }, 'cross-finalize');

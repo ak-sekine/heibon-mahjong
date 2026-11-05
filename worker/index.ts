@@ -5,6 +5,7 @@ import { isValidGameRules, normalizeGameRules, rulesForFormat, type GameRules } 
 
 const allowedOrigins = new Set([
   'https://ak-sekine.github.io',
+  'https://html-classic.itch.zone',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ]);
@@ -12,6 +13,7 @@ const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const ROOM_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/u;
 const PARTICIPANT_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 const lastOriginRejectionLogAt: Record<'http' | 'websocket', number> = { http: 0, websocket: 0 };
+const lastWebSocketOriginAcceptanceLogAt: Record<string, number> = {};
 const ORIGIN_REJECTION_LOG_INTERVAL_MS = 15_000;
 
 const ratePolicies = {
@@ -226,7 +228,17 @@ async function handleApi(request: Request, env: Env, origin: string): Promise<Re
   if (action === 'socket' && request.method === 'GET' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
     const limited = await consumeRateLimit(request, env, 'socket');
     if (!limited.allowed) return limited.response;
-    return stub.fetch(request);
+    const response = await stub.fetch(request);
+    if (response.status === 101) {
+      const now = Date.now();
+      if (now - (lastWebSocketOriginAcceptanceLogAt[origin] ?? 0) >= ORIGIN_REJECTION_LOG_INTERVAL_MS) {
+        lastWebSocketOriginAcceptanceLogAt[origin] = now;
+        logWorker({
+          event: 'origin_accepted', level: 'INFO', communicationType: 'websocket', origin, result: 'accepted',
+        });
+      }
+    }
+    return response;
   }
 
   return json({ error: 'not_found' }, 404, origin);
