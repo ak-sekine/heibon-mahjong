@@ -840,7 +840,10 @@ async function main() {
           snapshotIndexes[client === crossOrigin.host ? 0 : 1])));
         check(hostSnapshot.view.gameRevision === guestSnapshot.view.gameRevision,
           `Mixed-Origin reconnect snapshots differed (host ${hostSnapshot.view.gameRevision}, guest ${guestSnapshot.view.gameRevision}).`);
-        await closeRoom(crossOrigin, crossOrigin.host);
+        const hostExit = await sendAction(crossOrigin.host, { type: 'leave-room' }, 'cross-cleanup-host-exit');
+        check(hostExit.result.ok === true, `The ${direction} host could not leave during test cleanup.`);
+        const finalGuestExit = await sendAction(crossOrigin.guest, { type: 'leave-room' }, 'cross-cleanup-final-exit');
+        check(finalGuestExit.result.ok === true, `The last ${direction} participant could not end the test room.`);
         roomSummaries.push({ scenario: `${direction}-room-and-game-sync`, roomCode: crossOrigin.roomCode, revision: currentRevision(crossOrigin.host) });
         activeHostForCleanup = null;
       }
