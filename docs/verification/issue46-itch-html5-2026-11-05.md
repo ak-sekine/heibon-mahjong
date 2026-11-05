@@ -4,7 +4,7 @@
 
 対象: `ak-sekine/heibon-mahjong` Issue [#46](https://github.com/ak-sekine/heibon-mahjong/issues/46)
 
-実装基準: `origin/main` `73efa9daa1e5848e53d741c44dc8ab71cee7300f`
+実装基準: `origin/main` `73efa9daa1e5848e53d741c44dc8ab71cee7300f`、実装コミット `979dd466a06d2021b84a93391ead38121b022284`
 Issue状態: Open（PC／iPhone SafariのDraft確認とOrigin実測が終わるまで維持）
 
 ## 配布仕様と分離方針
@@ -101,11 +101,11 @@ npm run build
 
 | 検証 | 結果 |
 | --- | --- |
-| `npm test` | 成功。84/84テストファイル、失敗0 |
+| `npm test` | 成功。84/84テスト、失敗0 |
 | `npm run typecheck:worker` | 成功 |
 | Pages `npm run build` とPWA成果物 | 成功。`index.html`、`test.html`、`kan-test.html`、manifest、4アイコン、`sw.js`を生成 |
 | `VITE_ONLINE_API_URL=… npm run build:itch` | 成功。実URL `https://heibon-mahjong-online.ak-sekine.workers.dev`をバンドルに確認 |
-| ZIP root `index.html`、相対参照、大文字小文字、除外物、サイズ制限 | 成功。ZIPは3ファイル、展開後332,565 bytes、圧縮後87,075 bytes、最大単一ファイル258,598 bytes。ZIPのCRC展開検査成功 |
+| ZIP root `index.html`、相対参照、大文字小文字、除外物、サイズ制限 | 成功。ZIPは3ファイル、展開後332,565 bytes、圧縮後87,076 bytes、最大単一ファイル258,598 bytes。ZIPのCRC展開検査成功 |
 | Pages buildとの分離 | itch build前後のPages `dist/index.html`、`dist/sw.js`、`dist/manifest.webmanifest` SHA-256が一致 |
 | Pages Origin / 未許可 / Origin欠落 / OPTIONS / WebSocket / token | 自動テスト追加済み。全ケース成功。実測していないitch Originは未許可のまま |
 | GitHub Actions browser UI（Chromium / WebKit）、Worker / Pages deploy | push後の対象SHAで確認。未確認 |

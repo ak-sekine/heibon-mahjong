@@ -29,7 +29,7 @@ with sync_playwright() as playwright:
     page.wait_for_function("document.querySelectorAll('#player-hand li').length >= 13")
     page.wait_for_function("document.querySelectorAll('#player-hand button:enabled').length > 0", timeout=20000)
     page.locator('#player-hand button:enabled').first.click()
-    discard = page.locator('#local-action-panel-host [data-panel-part="discard"]')
+    discard = page.locator('#discard')
     assert discard.is_enabled(), 'discard control did not become available for the selected tile'
     discard.click()
     page.wait_for_function("document.querySelectorAll('.river-bottom svg').length > 0", timeout=10000)
