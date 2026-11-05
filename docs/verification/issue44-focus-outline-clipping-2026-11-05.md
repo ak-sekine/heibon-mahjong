@@ -34,10 +34,13 @@ Issue #44のスクリーンショット報告では、iPhone Safariで日本語�
 
 - commit / push：`e1d583ac32d6fe8e29f9f789bbe330c6b716d54f`を`main`へpushし、リモート`refs/heads/main`が同SHAであることを確認しました。push前fetchで`origin/main`は`60aff03b25bea07312b60e0095620a16978409f6`、未pushコミットは今回の1件のみでした。
 - Actions run [#41963501717](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41963501717)、対象SHA `e1d583ac32d6fe8e29f9f789bbe330c6b716d54f`：verify、npm regression、Worker型チェック、Pages build、Chromium Browser UIはsuccess。Browser UIのWebKitは別画面の既存`tests/browser-round-end-ui.py`が355×320で失敗しました。ログでは「順位確認」ボタンの`clickEvents`が0件のまま結果dialogが再表示されず、原因は未特定です。
-- 同じ初回runのWebKit `tests/browser-online-dialog-layout.py`（作成画面・参加画面のoutline、320pxを含む幅）はsuccessし、今回のフォーカス枠回帰テストは通過しました。matrix auditは両エンジン必須条件によりfailure、Worker deploy、production test、Pages build／deployはskipされ、公開されていません。
-- 失敗WebKit jobの単独再実行（run attempt 2）はverify/build successでしたが、Browser UIが`pages-dist-e1d583ac32d6fe8e29f9f789bbe330c6b716d54f-2` artifactを要求し、Deploy workflowが`...-1`として保存したため、ブラウザー起動前にfailureしました。これは再実行時のartifact名の不一致です。旧attemptの再実行では他jobが同attemptにbuild artifactを出さず、再検証にならないため、最新mainで新しい通常push runを行い、検証・公開ゲートを再実行します。
-- 比較資料：直近の成功run [#41940009814](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41940009814)（SHA `c57d35cd65adc5cb28c977383c379127f734e305`）でも同じ`browser-round-end-ui.py`のWebKit確認はsuccessでした。今回の失敗原因が一時的かどうかは確定できず、今回のCSS変更とはセレクター範囲・失敗画面の双方が異なります。
-- iPhone Safari実機確認は自動検証と分け、ユーザー確認待ちです。Pages公開SHAと最終Actionsの結果を公開後に追記します。
+- 同じ初回runのWebKit `tests/browser-online-dialog-layout.py`（作成画面・参加画面のoutline、320pxを含む幅）はsuccessし、今回のフォーカス枠回帰テストは通過しました。matrix auditは両エンジン必須条件によりfailure、Worker deploy、production test、Pages build／deployはskipされ、公開されませんでした。
+- 失敗WebKit jobの単独再実行（run attempt 2）はverify/build successでしたが、Browser UIが`pages-dist-e1d583ac32d6fe8e29f9f789bbe330c6b716d54f-2` artifactを要求し、Deploy workflowが`...-1`として保存したため、ブラウザー起動前にfailureしました。再実行時のartifact名不一致です。
+- 最終通常push run [#41965193092](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41965193092)、対象SHA `4264a24e87f98331f95533a80f719c8e85c32b3b`：verify、npm regression、Worker型チェック、Pages build、Chromium／WebKit Browser UI、matrix audit、release freshness、Worker deploy、本番Worker test、Pages build／deployがすべてsuccess。両Browser UI jobのSHAは対象SHAと一致し、Chromium 42 scenario、WebKit 31 scenarioを実行しました。今回追加した`browser-online-dialog-layout.py`も両エンジンでsuccessし、作成・参加画面のフォーカス枠、320px幅、既存の作成画面レイアウト確認が通過しました。
+- Worker URLは[https://heibon-mahjong-online.ak-sekine.workers.dev](https://heibon-mahjong-online.ak-sekine.workers.dev)。Worker deployment記録SHAとPages deployment記録SHAはともに`4264a24e87f98331f95533a80f719c8e85c32b3b`でActions対象SHAと一致し、Pagesは[https://ak-sekine.github.io/heibon-mahjong/](https://ak-sekine.github.io/heibon-mahjong/)で公開成功しました。
+- 初回runのWebKit失敗は355×320での既存`tests/browser-round-end-ui.py`のタイムアウトでした。ログでは「順位確認」ボタンの`clickEvents`が0件のまま結果dialogが再表示されず、原因は未特定です。同scenarioは直近成功run [#41940009814](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41940009814)（SHA `c57d35cd65adc5cb28c977383c379127f734e305`）と今回の最終runではsuccessしました。初回失敗が一時的かは確定できず、今回のCSS変更とはセレクター範囲・失敗画面の双方が異なります。
+- `4264a24e87f98331f95533a80f719c8e85c32b3b`は初回実装commit `e1d583ac32d6fe8e29f9f789bbe330c6b716d54f`に余白計算コメントとCI失敗記録を加えたcommitです。公開コードは同じで、Worker／Pages公開SHAと成功Actions対象SHAは`4264a24…`です。
+- iPhone Safari実機確認は自動検証と分け、ユーザー確認待ちです。
 
 ## iPhone Safari実機確認待ち
 
