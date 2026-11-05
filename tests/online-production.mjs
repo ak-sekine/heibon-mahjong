@@ -9,6 +9,7 @@ import {
 
 const apiUrl = (process.env.ONLINE_API_URL ?? '').replace(/\/+$/u, '');
 const pageOrigin = process.env.ONLINE_TEST_ORIGIN ?? 'https://ak-sekine.github.io';
+const secondaryOrigin = process.env.ONLINE_SECONDARY_TEST_ORIGIN ?? '';
 const protocolName = 'heibon-mahjong.v1';
 const privateSentinel = 'PRIVATE_TILE_DATA_MUST_NOT_LEAK';
 const privateValues = [privateSentinel];
@@ -249,9 +250,9 @@ function inspectGameView(client, expectedSeat, privateValues, expectedRoomCode, 
   return view;
 }
 
-function connect(url, ticket, privateValues, diagnosticLabel = 'participant') {
+function connect(url, ticket, privateValues, diagnosticLabel = 'participant', origin = pageOrigin) {
   const socket = new WebSocket(url, [protocolName, `ticket.${ticket}`], {
-    headers: { Origin: pageOrigin },
+    headers: { Origin: origin },
     handshakeTimeout: 10000,
   });
   const client = {
@@ -314,24 +315,25 @@ function connect(url, ticket, privateValues, diagnosticLabel = 'participant') {
   return client;
 }
 
-async function issueTicket(roomCode, token) {
-  const result = await request(`/api/rooms/${roomCode}/ticket`, { method: 'POST', token });
+async function issueTicket(roomCode, token, origin = pageOrigin) {
+  const result = await request(`/api/rooms/${roomCode}/ticket`, { method: 'POST', token, origin });
   check(result.response.status === 200 && typeof result.value.ticket === 'string', 'WebSocket ticket could not be issued.');
   privateValues.push(result.value.ticket);
   return result.value.ticket;
 }
 
-async function connectParticipant(roomCode, token, diagnosticLabel = 'participant') {
+async function connectParticipant(roomCode, token, diagnosticLabel = 'participant', origin = pageOrigin) {
   const wsUrl = `${apiUrl.replace(/^https:/u, 'wss:').replace(/^http:/u, 'ws:')}/api/rooms/${roomCode}/socket`;
-  const client = connect(wsUrl, await issueTicket(roomCode, token), privateValues, diagnosticLabel);
+  const client = connect(wsUrl, await issueTicket(roomCode, token, origin), privateValues, diagnosticLabel, origin);
   await client.opened;
   await waitForRoomState(client, state => state.roomCode === roomCode && Array.isArray(state.seats));
   return client;
 }
 
-async function createRoom(label) {
+async function createRoom(label, origin = pageOrigin) {
   const created = await request('/api/rooms', {
     method: 'POST',
+    origin,
     body: { displayName: testName(label, 'A'), privateTileData: privateSentinel },
   });
   check(created.response.status === 201, 'Room creation failed.');
@@ -353,9 +355,10 @@ async function createRoom(label) {
   return room;
 }
 
-async function joinRoom(room, name) {
+async function joinRoom(room, name, origin = pageOrigin) {
   const joined = await request(`/api/rooms/${room.roomCode}/join`, {
     method: 'POST',
+    origin,
     body: { displayName: [...name].slice(0, 24).join(''), privateTileData: privateSentinel },
   });
   check(joined.response.status === 201, 'Joining by room code failed.');
@@ -430,6 +433,16 @@ async function createAndConnectTwo(label) {
   return room;
 }
 
+async function createAndConnectCrossOriginTwo(label, hostOrigin, guestOrigin) {
+  const room = await createRoom(label, hostOrigin);
+  const guest = await joinRoom(room, testName(label, 'B'), guestOrigin);
+  room.guestToken = guest.token;
+  room.host = await connectParticipant(room.roomCode, room.hostToken, 'host', hostOrigin);
+  room.guest = await connectParticipant(room.roomCode, room.guestToken, 'guest', guestOrigin);
+  room.sockets.push(room.host, room.guest);
+  return room;
+}
+
 async function main() {
   let api;
   try { api = new URL(apiUrl); } catch { throw new Error('The deployed Worker URL is missing or invalid.'); }
@@ -440,6 +453,18 @@ async function main() {
   check(health.response.headers.get('access-control-allow-origin') === pageOrigin, 'GitHub Pages Origin was not allowed.');
   const blocked = await request('/health', { origin: 'https://not-the-pages-origin.example' });
   check(blocked.response.status === 403, 'An unapproved Origin was accepted.');
+  const missingOrigin = await fetch(`${apiUrl}/health`, { cache: 'no-store' });
+  check(missingOrigin.status === 403, 'A request without Origin was accepted.');
+  if (secondaryOrigin) {
+    let parsedSecondaryOrigin;
+    try { parsedSecondaryOrigin = new URL(secondaryOrigin); }
+    catch { throw new Error('ONLINE_SECONDARY_TEST_ORIGIN must be an exact Origin URL.'); }
+    check(parsedSecondaryOrigin.protocol === 'https:' && parsedSecondaryOrigin.origin === secondaryOrigin && secondaryOrigin !== pageOrigin,
+      'ONLINE_SECONDARY_TEST_ORIGIN must be a distinct HTTPS origin without a path.');
+    const secondaryHealth = await request('/health', { origin: secondaryOrigin });
+    check(secondaryHealth.response.status === 200 && secondaryHealth.response.headers.get('access-control-allow-origin') === secondaryOrigin,
+      'The secondary Origin was not accepted with an exact CORS response.');
+  }
 
   const runId = process.env.GITHUB_RUN_ID ?? `local-${Date.now()}`;
   const attempt = process.env.GITHUB_RUN_ATTEMPT ?? '1';
@@ -730,6 +755,56 @@ async function main() {
 
     check(![reconnect, handoff, concurrent, three].some(room => room.sockets.some(client => client.privacyLeak)),
       'A WebSocket update included a secret.');
+
+    if (secondaryOrigin) {
+      for (const [direction, hostOrigin, guestOrigin] of [
+        ['pages-to-secondary-origin', pageOrigin, secondaryOrigin],
+        ['secondary-to-pages-origin', secondaryOrigin, pageOrigin],
+      ]) {
+        const crossOrigin = await createAndConnectCrossOriginTwo(`${label}-cross`, hostOrigin, guestOrigin);
+        activeHostForCleanup = crossOrigin.host;
+        await ready(crossOrigin.host);
+        await ready(crossOrigin.guest);
+        const finalized = await sendAction(crossOrigin.host, { type: 'finalize-seats' }, 'cross-finalize');
+        check(finalized.result.ok === true, `The ${direction} host could not finalize a mixed-Origin room.`);
+        const [hostState, guestState] = await Promise.all([crossOrigin.host, crossOrigin.guest]
+          .map(client => waitForRoomState(client, state => state.status === 'finalized')));
+        check(hostState.seats.map(seat => seat.gameSeat).join(',') === guestState.seats.map(seat => seat.gameSeat).join(','),
+          'Mixed-Origin participants received different finalized seats.');
+        const started = await sendGameAction(crossOrigin.host, { type: 'start-game' }, 0, 'cross-start');
+        check(started.result.ok === true, `The ${direction} host could not start the mixed-Origin game.`);
+        const crossViews = await Promise.all([crossOrigin.host, crossOrigin.guest].map(client => waitForGameState(client,
+          view => view?.roomCode === crossOrigin.roomCode && Number(view.gameRevision) >= Number(started.result.gameRevision))));
+        check(crossViews[0].view.viewerSeat !== crossViews[1].view.viewerSeat,
+          'Mixed-Origin participants did not receive separate seat views.');
+        const turn = await waitForHumanTurn([crossOrigin.host, crossOrigin.guest], Number(started.result.gameRevision));
+        if (turn.status === 'playing') {
+          const active = turn.viewerSeat === crossViews[0].view.viewerSeat ? crossOrigin.host : crossOrigin.guest;
+          const discard = await sendGameAction(active, { type: 'discard', tileId: turn.self.discardableTileIds[0] }, turn.gameRevision, 'cross-discard');
+          check(discard.result.ok === true, 'A legal discard was rejected in the mixed-Origin game.');
+          const synchronized = await Promise.all([crossOrigin.host, crossOrigin.guest].map(client => waitForGameState(client,
+            view => view?.roomCode === crossOrigin.roomCode && Number(view.gameRevision) >= Number(discard.result.gameRevision))));
+          check(synchronized[0].view.gameRevision === synchronized[1].view.gameRevision,
+            'Mixed-Origin participants did not synchronize the game revision after a discard.');
+        }
+        const disconnectIndex = crossOrigin.host.messages.length;
+        const observedDisconnect = waitForRoomState(crossOrigin.host,
+          state => state.seats.some(seat => seat.seat === 1 && !seat.connected), disconnectIndex);
+        crossOrigin.guest.socket.close(1000, 'mixed-Origin reconnect test');
+        await observedDisconnect;
+        const reconnected = await connectParticipant(crossOrigin.roomCode, crossOrigin.guestToken,
+          'mixed-origin-reconnected', guestOrigin);
+        crossOrigin.sockets.push(reconnected);
+        crossOrigin.guest = reconnected;
+        const [hostSnapshot, guestSnapshot] = await Promise.all([crossOrigin.host, crossOrigin.guest].map(client =>
+          waitForGameState(client, view => view?.roomCode === crossOrigin.roomCode && view.status !== 'aborted')));
+        check(hostSnapshot.view.gameRevision === guestSnapshot.view.gameRevision,
+          'A reconnected mixed-Origin participant did not receive the current synchronized game state.');
+        await closeRoom(crossOrigin, crossOrigin.host);
+        roomSummaries.push({ scenario: `${direction}-room-and-game-sync`, roomCode: crossOrigin.roomCode, revision: currentRevision(crossOrigin.host) });
+        activeHostForCleanup = null;
+      }
+    }
   } finally {
     if (activeHostForCleanup) {
       const room = roomsForCleanup.find(candidate => candidate.host === activeHostForCleanup || candidate.sockets.includes(activeHostForCleanup));

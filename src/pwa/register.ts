@@ -3,6 +3,9 @@
  * application, not the test/kan pages or local development server.
  */
 export function registerPwa(): void {
+  // itch.io hosts the game below a CDN subpath inside an iframe. PWA scope and
+  // Service Worker update handling belong only to the GitHub Pages build.
+  if (import.meta.env.MODE === 'itch') return;
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
   const root = import.meta.env.BASE_URL;
   if (location.pathname !== root && location.pathname !== root + 'index.html') return;

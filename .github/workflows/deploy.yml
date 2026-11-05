@@ -151,11 +151,21 @@ jobs:
         run: npm run typecheck:worker
       - name: Build the Pages application
         run: npm run build
+      - name: Build itch.io package with an isolated mock Worker URL for browser UI tests
+        env:
+          VITE_ONLINE_API_URL: https://online-mock.invalid
+        run: npm run build:itch
       - name: Save the verified browser test build
         uses: actions/upload-artifact@v4
         with:
           name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
           path: dist
+          if-no-files-found: error
+      - name: Save the verified standalone itch browser build
+        uses: actions/upload-artifact@v4
+        with:
+          name: itch-dist-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist-itch
           if-no-files-found: error
 
   browser-ui:
@@ -299,9 +309,19 @@ jobs:
             echo "::error title=Worker URL missing from Pages bundle::The deployed Worker URL was not included in the GitHub Pages build."
             exit 1
           fi
+      - name: Build itch.io ZIP with the same deployed public Worker URL
+        env:
+          VITE_ONLINE_API_URL: ${{ needs.deploy-worker.outputs.worker_url }}
+        run: npm run build:itch
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+      - name: Save itch.io ZIP for Draft upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: itch-html5-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/itch/heibon-mahjong.zip
+          if-no-files-found: error
 
   pages-deploy:
     needs: pages-build

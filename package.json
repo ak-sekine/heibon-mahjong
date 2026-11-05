@@ -10,6 +10,7 @@
     "dev": "vite",
     "dev:worker": "wrangler dev --local --config wrangler.jsonc --port 8787",
     "build": "tsc --noEmit && vite build && node scripts/build-pwa.mjs",
+    "build:itch": "tsc --noEmit && vite build --mode itch --outDir dist-itch && node scripts/package-itch.mjs",
     "preview": "vite preview",
     "test": "node --test --test-concurrency=1 tests/*.test.ts tests/*.test.mjs",
     "test:file": "node --test --test-concurrency=1",

@@ -21,6 +21,11 @@ test('manifest is scoped to GitHub Pages and has all Android icon purposes', () 
   assert.match(html, /rel="apple-touch-icon" sizes="180x180" href="\/heibon-mahjong\/icons\/icon-180\.png"/);
 });
 
+test('PWA registration is explicitly disabled in the itch.io build mode', () => {
+  const registration = readFileSync(new URL('../src/pwa/register.ts', import.meta.url), 'utf8');
+  assert.match(registration, /import\.meta\.env\.MODE === 'itch'\) return/);
+});
+
 test('provided PWA icon PNGs have the requested dimensions', () => {
   for (const [name, size] of [
     ['icon-180.png', 180],

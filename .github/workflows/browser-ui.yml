@@ -79,11 +79,21 @@ jobs:
         run: npm test
       - name: Build the browser test site
         run: npm run build
+      - name: Build the standalone itch browser test site
+        env:
+          VITE_ONLINE_API_URL: https://online-mock.invalid
+        run: npm run build:itch
       - name: Save the verified browser test build
         uses: actions/upload-artifact@v4
         with:
           name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
           path: dist
+          if-no-files-found: error
+      - name: Save the verified itch browser build
+        uses: actions/upload-artifact@v4
+        with:
+          name: itch-dist-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist-itch
           if-no-files-found: error
 
   browser-ui:
@@ -137,6 +147,11 @@ jobs:
         with:
           name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
           path: dist
+      - name: Download verified itch build
+        uses: actions/download-artifact@v4
+        with:
+          name: itch-dist-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist-itch
       - run: python -m pip install playwright
       - name: Record Playwright install environment
         env:
@@ -215,6 +230,20 @@ jobs:
           export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
           set -o pipefail
           python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
+      - name: Run the standalone itch package browser smoke test
+        shell: bash
+        env:
+          BROWSER: ${{ matrix.browser }}
+        run: |
+          python -m http.server 4175 --bind 127.0.0.1 --directory dist-itch > /tmp/heibon-itch-preview.log 2>&1 &
+          itch_preview_pid=$!
+          trap 'kill "$itch_preview_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4175/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:4175/ > /dev/null
+          HEIBON_BROWSER="$BROWSER" python tests/browser-itch-package.py
       - name: Save browser results, script timings, and screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -227,6 +256,7 @@ jobs:
             /tmp/heibon-table-ui
             /tmp/heibon-vite.log
             /tmp/heibon-preview.log
+            /tmp/heibon-itch-preview.log
             docs/verification/step13.5.5
       - name: Save center round display screenshots and measurements
         if: always()
