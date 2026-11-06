@@ -41,7 +41,7 @@ window.loadCalls=(mode)=>{
 window.callState=()=>controller.game;
 window.loadTurn=()=>{
  controller.newGame();
- const game=callStart(0,{0:['55z','234m','456p','678s','19p']},'white');
+ const game=callStart(3,{0:['55z','234m','456p','678s','19p']},'white');
  controller.match=startMatch(game);render();
 };
 """
