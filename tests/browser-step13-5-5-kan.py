@@ -11,7 +11,11 @@ with sync_playwright() as p:
   page.goto('http://localhost:4173/heibon-mahjong/kan-test.html')
   page.wait_for_selector('#scenario-help:not(:empty)')
   page.evaluate('window.readGame=()=>window.testController.game')
-  page.select_option('#scenario','opening');page.locator('#load-scenario').click()
+  def load_scenario(mode):
+   if page.locator('#call-decision-dialog').evaluate('(node)=>node.open'):
+    page.locator('#call-decision-view-table').click()
+   page.select_option('#scenario',mode);page.locator('#load-scenario').click()
+  load_scenario('opening')
   assert page.evaluate("readGame().players[0].drawnTileSource")=='deal'
   assert page.locator('#kan').is_visible() and page.locator('#discard').is_visible()
   page.locator('#kan').click()
@@ -21,7 +25,7 @@ with sync_playwright() as p:
   page.locator('#discard').click()
   page.wait_for_function("readGame().players[0].river.length===1")
   assert page.evaluate('readGame().kanCount')==0
-  page.select_option('#scenario','opening');page.locator('#load-scenario').click()
+  load_scenario('opening')
   page.locator('#kan').click();page.locator('#kan-options button').nth(1).click()
   page.wait_for_function("readGame().kanCount===1 && readGame().players[0].drawnTileSource==='rinshan'")
   assert page.locator('.open-meld[data-meld-type="ankan"]').count()==1
@@ -29,7 +33,7 @@ with sync_playwright() as p:
   assert page.evaluate("readGame().players[0].hand.length===10")
   page.screenshot(path=str(out/f'{width}-opening-ankan.png'),full_page=True)
   for mode in ['ankan','daiminkan','kakan','rinshan','multiple']:
-   page.select_option('#scenario',mode);page.locator('#load-scenario').click()
+   load_scenario(mode)
    if mode=='daiminkan':page.locator('#call-options button').filter(has_text='大明カン').click()
    else:page.locator('#kan').click();page.locator('#kan-options button').first.click()
    page.wait_for_timeout(200)
@@ -62,7 +66,7 @@ with sync_playwright() as p:
     page.wait_for_selector('#win-result:visible')
     assert '嶺上開花 1翻' in page.locator('#win-result').inner_text()
     page.locator('#view-table').click()
-    page.select_option('#scenario','kakan');page.locator('#load-scenario').click()
+    load_scenario('kakan')
     page.locator('#kan').click();page.locator('#kan-options button').first.click()
     page.wait_for_timeout(200)
     assert page.locator('.dora-slot[data-tile-id]').count()==2
