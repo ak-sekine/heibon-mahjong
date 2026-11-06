@@ -70,15 +70,26 @@ run #421558の失敗は鳴き判断やブラウザー回帰スクリプト内で
 
 GitHub APIのrun metadataで、run [#42155800715](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42155800715) はSHA `3ed7faadad903b071ffb062364dff6a476edd05b`、全体failure、Chromium job success／WebKit job failureであり、WebKitの失敗stepはstandalone itch smokeだけと確認しました。ChromiumのBrowser UI回帰を含む各job stepはsuccessでした。run [#42153947821](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42153947821) は同SHAで、Chromiumのstandalone itch smoke stepがfailure、WebKit側はOS依存パッケージ導入stepがfailureとなり、その後の検査はskipでした。
 
-GitHub APIのrun metadataと現行ソースは再確認できましたが、Actions実ログZIPは `results-receiver.actions.githubusercontent.com` がForbiddenを返し取得できませんでした。そのため個々のタイムアウト直前のゲーム状態・DOM・コンソール内容は独立には確認できていません。既存記録にある「WebKitは新規対局後の有効手牌ボタン待ち」「Chromiumは打牌後の河SVG待ち」という観測を維持し、ゲーム本体の停止・描画不具合だったかは未特定とします。
+GitHub Actionsのジョブログを取得し、run #421558ではWebKitの `page.wait_for_function("document.querySelectorAll('#player-hand button:enabled').length > 0", timeout=20000)` が、新規対局開始後に20秒でtimeoutしたことを確認しました。run #421539ではChromiumの `page.wait_for_function("document.querySelectorAll('.river-bottom svg').length > 0", timeout=10000)` が打牌後に10秒でtimeoutしました。どちらの旧テストもtimeout時の状態JSON・画面・traceを保存しておらず、当時のゲーム状態、DOM、console／pageerrorまでは分かりません。したがって旧失敗の具体的なゲーム局面は未特定で、ゲーム本体の不具合だったと示す証拠もありません。
 
 ### smokeの判定
 
 - Smokeはitch用の実ビルドZIP内容を相対パスで配信して検査し、初期座席・配牌を本番仕様のまま使います。itch ZIP専用のテスト入口や固定乱数は追加していません。
 - 20秒の状態待機中は、有効手牌だけを無条件に待たず、鳴きダイアログを識別して正規の「見送る」、ロン候補は「見逃す」で進めます。CPUが局を終えた場合は結果を閉じ、利用可能な「次の局へ」で進めます。
 - 打牌は受理された `discard` 操作の状態遷移を確認し、選んだ物理牌IDが手牌から消え、同じIDが河または副露の「鳴かれた牌」のいずれかに一度だけ存在することを検証します。河だけへの残存は要求しません。
+- SHA `9712e4d` の手動Browser UI run [#42225017812](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42225017812) では、WebKit probeが選択牌の手牌内0件・河1件・打牌受理を記録する一方、操作ログのフェーズは `awaiting-discard`、`GameController.confirm` の遷移ログは `awaiting-discard → awaiting-draw` と示しました。操作ログは同期的に始まったCPU runnerの進行後に記録されるため、両フェーズの一致を求める以前のSmoke条件は誤判定でした。現在は受理ログ、正規の打牌遷移、物理牌の公開先を別々に確認します。これはテスト条件の不具合で、ゲーム本体の変更は不要でした。
 - 既存の鳴き判断ブラウザーテストを再利用します。関連するunit回帰では、見送った牌が河と履歴に残ること、およびCPUポンでは同じ物理牌が河から除かれて副露へ移ることを明示します。
 - Browser UI suiteの前後に、Chromium／WebKitごとにsmokeを各3回実行します。成功時は各反復と状態分岐をログに残します。失敗時は各stepの `/tmp/heibon-itch-smoke-{before}/<browser>-iteration-<n>.{json,png,zip}` または `/tmp/heibon-itch-smoke/<browser>-iteration-<n>.{json,png,zip}` をBrowser UI artifactに含めます。JSONは安全な診断キーだけ、URLはquery／fragment／credentialsを除いて保存します。Playwright traceは各反復開始から有効にし、失敗時だけ保存します。
 - Browser UI jobは後続stepで意図的なassertion失敗も実行し、診断snapshot、打牌遷移、PNG、trace ZIPが生成されたことを確認します。failure flagはPython smokeだけにあり、itch build／ZIPには含まれません。
 
-この追補に対するChromium／WebKitのActions結果とrun URLは、push後に追記します。自動検証とiPhone Safari／実際のitch.io実機検証は分けて記録し、Issue #46はOpenのままです。
+### 最終自動検証結果
+
+コード変更SHA `f258f855b06bd3c4e6b6bd229b10e6374a018a90`に対するBrowser UI run [#42225801512](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42225801512) は、verify-build、Chromium、WebKit、artifact保存まで全job successでした。Chromium／WebKitそれぞれでBrowser UI suiteの前後にSmokeを3回ずつ実行し、各6回成功、予期しない失敗0回です。各Smoke反復でitch packageの起動、手牌選択、打牌受理、物理牌の公開先、エラーなしを確認しました。このrunでは6回とも初期判断を必要としない局面でした。
+
+Browser UI suiteはChromiumで36種類のPythonスクリプトを42回、WebKitで25種類を32回実行して全てsuccessしました。`browser-random-seating.py`と`browser-call-decision-dialog.py`も両エンジンで成功し、ランダム座席と「卓を確認する／見送る」の回帰を別々に検証しました。
+
+意図的なassertion失敗の検査は期待どおり失敗を捕捉し、診断JSON・スクリーンショット・Playwright trace ZIPが作成されたことを確認しました。run [#42225801512 artifacts](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42225801512/artifacts)には、Chromiumの`browser-ui-chromium-f258f855b06bd3c4e6b6bd229b10e6374a018a90-1`とWebKitの`browser-ui-webkit-f258f855b06bd3c4e6b6bd229b10e6374a018a90-1`があり、両artifactにBrowser UI結果と制御失敗の診断資料が含まれます。SmokeはオフラインCPU対局だけを開き、診断JSONは許可リスト方式、保存URLはcredentials/query/fragmentを除去します。Playwright traceは各反復開始時から有効にし、失敗時だけ保存します。
+
+run #42225801512のverify-buildでは`npm test`が1461件成功、失敗0件、Pages／itchブラウザーbuildが成功しました。push起点のDeploy run [#42225719187](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42225719187)ではregression tests、Worker型検査、Pages／itch buildがsuccessしました。ローカルでも`npm run typecheck:worker`と`npm run build:itch`が成功し、ZIPには`index.html`、CSS、JavaScript bundleだけが含まれ、manifest、Service Worker、Smoke専用入口・フラグはありません。
+
+以上はGitHub Actionsとローカルbuildによる自動検証です。iPhone Safari実機、実際のitch.io iframeでの公開・相互対局・再接続は未確認です。Issue #46はOpenのままにします。
