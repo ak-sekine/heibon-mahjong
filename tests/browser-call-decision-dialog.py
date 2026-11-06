@@ -133,7 +133,7 @@ window.callState=()=>controller.game;
             page.locator('#call-options button').first.click()
             page.wait_for_function("callState().phase!=='awaiting-call'")
             assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
-            assert page.locator('[data-panel-part="return-call-decision"]').is_hidden()
+            assert page.locator('#local-game-controls [data-panel-part="return-call-decision"]').is_hidden()
             page.wait_for_function("document.activeElement===document.querySelector('#local-game-controls [data-panel-part=action-status]')")
         assert not errors, errors
     page.close()
