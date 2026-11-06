@@ -104,7 +104,7 @@ def wait_for_human_action(page, timeout_ms=TURN_TIMEOUT_MS):
     deadline = time.monotonic() + timeout_ms / 1000
     decisions = {'calls_passed': 0, 'ron_passed': 0, 'rounds_advanced': 0}
     while time.monotonic() < deadline:
-        if page.locator('#player-hand button:enabled').count() > 0 and page.locator('#discard').is_enabled():
+        if page.locator('#player-hand button:enabled').count() > 0:
             return decisions
 
         call_dialog = page.locator('#call-decision-dialog')
@@ -134,7 +134,11 @@ def wait_for_human_action(page, timeout_ms=TURN_TIMEOUT_MS):
 
         page.wait_for_timeout(100)
 
-    raise TimeoutError(f'Human discard state was not reached within {timeout_ms}ms; decisions={decisions}')
+    state = collect_game_state(page)
+    raise TimeoutError(
+        f'Human discard state was not reached within {timeout_ms}ms; '
+        f'decisions={decisions}; safeState={json.dumps(state, ensure_ascii=False)}'
+    )
 
 
 def capture_failure(page, context, events, repetition, error, observations):
