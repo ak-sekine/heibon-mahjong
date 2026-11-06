@@ -2359,7 +2359,7 @@ with sync_playwright() as p:
     page.locator('#online-pass-ron').click()
     wait_for("document.querySelector('#online-ron-controls').hidden === true")
     def online_call_layout():
-      return page.evaluate("""()=>Object.fromEntries(['.app-header','.score-strip','#online-table','#online-player-hand','.online-rivers','.center-info']
+      return page.evaluate("""()=>Object.fromEntries(['.app-header','.score-strip','#online-table','#online-player-hand','[data-online-rivers]','.center-info']
         .map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return [selector,[r.x,r.y,r.width,r.height]]}))""")
     layout_before_call = online_call_layout()
     page.evaluate('window.onlineMock.showCall()')
