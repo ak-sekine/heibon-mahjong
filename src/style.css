@@ -73,7 +73,6 @@ ul { list-style:none; padding:0; margin:0; }
 #call-decision-options-host .control-option-button { min-width:0; min-height:52px; flex:none; flex-direction:column; gap:2px; padding:4px 2px; font-size:13px; line-height:1.15; }
 #call-decision-options-host .action-option-tiles { display:flex; flex:none; align-items:center; justify-content:center; gap:2px; max-width:100%; }
 #call-decision-options-host .control-option-button .tile-svg { flex:none; width:22px; min-width:22px; height:31px; }
-#call-decision-options-host [data-panel-part="pass-call"] { flex:none; min-height:44px; margin:0 8px; }
 .call-decision-footer { flex:none; display:flex; padding:0 8px 8px; }
 .call-decision-footer button { width:100%; min-width:0; min-height:44px; padding:8px; border:1px solid currentColor; border-radius:8px; font:inherit; font-weight:600; touch-action:manipulation; cursor:pointer; }
 .call-decision-open #call-decision-dialog button:focus-visible { outline:3px solid var(--button-focus); outline-offset:2px; }

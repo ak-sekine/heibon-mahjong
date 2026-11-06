@@ -93,7 +93,8 @@ window.loadTurn=()=>{
         assert page.locator('#call-decision-options-host .tile-svg').count() > 0
         assert options.evaluate_all("nodes=>nodes.every(n=>{const r=n.getBoundingClientRect();return r.width>=44&&r.height>=44})")
         assert page.locator('#call-decision-options-host .tile-svg').evaluate_all("nodes=>nodes.every(n=>{const r=n.getBoundingClientRect();return r.width>=22&&r.height>=31})")
-        assert page.locator('#call-decision-options-host [data-panel-part="pass-call"]').is_visible()
+        assert page.locator('#call-decision-options-host [data-panel-part="pass-call"]').count() == 0
+        assert page.locator('#pass-calls').is_visible(), 'the normal pass button disappeared while choosing a candidate'
         assert page.locator('#call-decision-view-table').inner_text() == '卓に戻る'
         dialog_fit = page.evaluate("""()=>{
           const vv=visualViewport, top=vv?.offsetTop??0, bottom=top+(vv?.height??innerHeight);
@@ -109,6 +110,7 @@ window.loadTurn=()=>{
         }""")
         assert dialog_fit['fit'] and dialog_fit['scrollWidth'] <= dialog_fit['innerWidth'] and dialog_fit['scrollY'] == 0, dialog_fit
         assert layout_snapshot() == before, {'before':before,'after':layout_snapshot()}
+        print(f'{browser_name} call dialog at {page.viewport_size}: {dialog_fit["dialog"]}')
         return options
 
     for width, height in [(375, 634), (375, 667), (320, 568), (375, 568)]:
@@ -144,6 +146,7 @@ window.loadTurn=()=>{
             assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
             assert page.evaluate("callState().phase==='awaiting-call'")
             assert page.locator('#call-chi').is_visible(), 'returning to the table ended the call decision'
+            assert page.locator('#pass-calls').is_visible(), 'the normal pass button was not restored on the table'
             open_kind('chi', 5).first.click()
             page.wait_for_function("callState().phase!=='awaiting-call'")
             assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
@@ -169,6 +172,14 @@ window.loadTurn=()=>{
             page.locator('#call-decision-options-host button:has(path[d="M48 4h7v7Z"])').click()
             page.wait_for_function("callState().phase!=='awaiting-call'")
             assert page.evaluate("callState().players[0].melds[0].tiles.some(t=>t.tile.isRed)"), 'the red pon option lost its red physical tile'
+
+            page.evaluate("loadCalls('max')")
+            open_kind('chi', 5)
+            page.locator('#call-decision-view-table').click()
+            assert page.evaluate("callState().phase==='awaiting-call'")
+            page.locator('#pass-calls').click()
+            page.wait_for_function("callState().phase!=='awaiting-call'")
+            assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
 
         if not (width == 375 and height == 634):
             # Verify a maximum type specific list fits every requested viewport.
@@ -206,6 +217,8 @@ window.loadTurn=()=>{
     frame.locator('#call-chi').click()
     assert frame.locator('#call-decision-dialog').evaluate('(node)=>node.open')
     assert frame.locator('#call-decision-options-host button[data-action-choice="call"]').count() == 5
+    assert frame.locator('#call-decision-options-host [data-panel-part="pass-call"]').count() == 0
+    assert frame.locator('#pass-calls').is_visible()
     frame.locator('#call-decision-view-table').click()
     assert not frame.locator('#call-decision-dialog').evaluate('(node)=>node.open')
     print(f'{browser_name} itch-style iframe four-button and filtered-dialog fit: {iframe_metrics}')

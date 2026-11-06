@@ -180,7 +180,6 @@ export class ActionPanel {
   private readonly callTitle: HTMLElement | null;
   private readonly callStatusParent: HTMLElement | null;
   private readonly callOptionsParent: HTMLElement | null;
-  private readonly passCallParent: HTMLElement | null;
   private callType: 'pon' | 'daiminkan' | 'chi' | null = null;
   private activeCallOptions: readonly ActionChoiceOption[] = [];
   private currentCallStatus = '';
@@ -204,7 +203,6 @@ export class ActionPanel {
     }
     this.callStatusParent = this.part('call-status').parentElement;
     this.callOptionsParent = this.part('call-options').parentElement;
-    this.passCallParent = this.part('pass-call').parentElement;
     this.parts.set('root', root);
     this.part('action-status').tabIndex = -1;
     for (const part of [
@@ -301,7 +299,6 @@ export class ActionPanel {
         this.renderOptions('call-options', 'call', candidates, progressing || this.callSelectionPending);
         if (this.callStatus) this.callStatus.textContent = state.callGroup.status;
         this.updateCallTarget();
-        passCall.disabled = !state.buttons['pass-call'].enabled;
       }
     }
     passCall.disabled = this.callSelectionPending || !state.buttons['pass-call'].enabled;
@@ -466,7 +463,7 @@ export class ActionPanel {
     this.callStatus.textContent = this.currentCallStatus;
     this.updateCallTarget();
     this.renderOptions('call-options', 'call', candidates, this.callSelectionPending);
-    this.callOptionsHost.append(this.part('call-status'), this.part('call-options'), this.part('pass-call'));
+    this.callOptionsHost.append(this.part('call-status'), this.part('call-options'));
     this.callDialog.showModal();
     document.documentElement.classList.add('call-decision-open');
     this.firstCallChoice()?.focus({ preventScroll: true });
@@ -495,7 +492,6 @@ export class ActionPanel {
   private restoreCallControls(): void {
     if (this.callStatusParent) this.callStatusParent.append(this.part('call-status'));
     if (this.callOptionsParent) this.callOptionsParent.append(this.part('call-options'));
-    if (this.passCallParent) this.passCallParent.append(this.part('pass-call'));
     this.part('call-options').replaceChildren();
     this.choiceSignatures.delete('call-options');
   }

@@ -102,18 +102,20 @@ def collect_game_state(page):
 def wait_for_human_action(page, timeout_ms=TURN_TIMEOUT_MS):
     """Advance only through normal decision controls until the human can discard."""
     deadline = time.monotonic() + timeout_ms / 1000
-    decisions = {'calls_passed': 0, 'ron_passed': 0, 'rounds_advanced': 0}
+    decisions = {'call_dialogs_returned': 0, 'calls_passed': 0, 'ron_passed': 0, 'rounds_advanced': 0}
     while time.monotonic() < deadline:
         if page.locator('#player-hand button:enabled').count() > 0:
             return decisions
 
         call_dialog = page.locator('#call-decision-dialog')
         pass_call = page.locator('#pass-calls')
+        if call_dialog.evaluate('(dialog) => dialog.open'):
+            page.locator('#call-decision-view-table').click()
+            decisions['call_dialogs_returned'] += 1
+            continue
         if pass_call.is_visible() and pass_call.is_enabled():
             pass_call.click()
             decisions['calls_passed'] += 1
-            if call_dialog.evaluate('(dialog) => dialog.open'):
-                page.wait_for_function("!document.querySelector('#call-decision-dialog').open", timeout=3000)
             continue
 
         pass_ron = page.locator('#pass-ron')

@@ -150,6 +150,7 @@ function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPan
     panel,
     root,
     dialog: queried.get('#call-decision-dialog')!,
+    callOptionsHost: queried.get('#call-decision-options-host')!,
     parts,
     restore() {
       if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
@@ -348,6 +349,37 @@ test('a multi-option call opens the shared dialog for only the selected type and
     fixture.panel.update(state());
     fixture.restore();
   }
+});
+
+test('the call dialog omits pass and the table pass button remains delegated', () => {
+  const events: ActionPanelEvent[] = [];
+  const fixture = panelFixture(event => events.push(event), {}, true);
+  const face = (rank: 1 | 2) => ordinaryTile(TILE_KINDS.find(kind => kind.category === 'suited' && kind.suit === 'man' && kind.rank === rank)!);
+  const options: ActionChoiceOption[] = [
+    { id: 'chi-1', label: 'チー', tiles: [{ id: 'one', tile: face(1) }], enabled: true },
+    { id: 'chi-2', label: 'チー', tiles: [{ id: 'two', tile: face(2) }], enabled: true },
+  ];
+  try {
+    fixture.panel.update(state({
+      buttons: { ...state().buttons, 'pass-call': { visible: true, enabled: true, label: '見送る' } },
+      callGroup: { visible: true, status: '残り10秒', options },
+    }));
+    fixture.root.listeners.get('click')!({ target: fixture.parts.get('call-chi')! } as unknown as Event);
+
+    assert.equal(fixture.dialog.open, true);
+    assert.equal(fixture.parts.get('pass-call')!.parent, fixture.parts.get('call-controls'));
+    assert.equal(fixture.callOptionsHost.children.includes(fixture.parts.get('pass-call')), false);
+    assert.equal(fixture.parts.get('pass-call')!.hidden, false);
+    assert.equal(fixture.parts.get('pass-call')!.disabled, false);
+    assert.deepEqual(events, [], 'opening candidate selection does not answer the call window');
+
+    fixture.dialog.listeners.get('cancel')!({ preventDefault() {} } as unknown as Event);
+    assert.equal(fixture.dialog.open, false);
+    assert.equal(fixture.parts.get('call-chi')!.hidden, false);
+    assert.equal(fixture.parts.get('pass-call')!.parent, fixture.parts.get('call-controls'));
+    fixture.root.listeners.get('click')!({ target: fixture.parts.get('pass-call')! } as unknown as Event);
+    assert.deepEqual(events, [{ type: 'pass-call' }]);
+  } finally { fixture.restore(); }
 });
 
 test('ActionPanel marks pending static and dynamic actions busy, then clears the state on recovery', () => {

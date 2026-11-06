@@ -2392,6 +2392,8 @@ with sync_playwright() as p:
     dialog_options = page.locator('#online-call-options button[data-online-call]')
     assert dialog_options.count() == 2
     assert dialog_options.filter(has_text='チー').count() == 2
+    assert page.locator('#call-decision-options-host [data-panel-part="pass-call"]').count() == 0
+    assert page.locator('#online-pass-call').is_visible(), 'the normal online pass button disappeared during candidate selection'
     assert '残り' in page.locator('#call-decision-status').inner_text()
     assert page.locator('.call-decision-target .tile-svg').count() == 1
     assert online_call_layout() == layout_before_multi
@@ -2411,6 +2413,18 @@ with sync_playwright() as p:
     wait_for("document.querySelector('#online-call-controls').hidden === true")
     assert page.evaluate('window.onlineMock.gameActions.length') == multi_actions_before + 1
     assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
+
+    page.evaluate('window.onlineMock.showCallCandidates()')
+    page.locator('#online-call-chi').click()
+    assert page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
+    pass_actions_before = page.evaluate('window.onlineMock.gameActions.length')
+    page.locator('#call-decision-view-table').click()
+    assert page.evaluate('window.onlineMock.gameActions.length') == pass_actions_before, 'returning to the table answered the online call window'
+    assert page.locator('#online-pass-call').is_visible()
+    page.locator('#online-pass-call').click()
+    page.wait_for_function('expected => window.onlineMock.gameActions.length === expected + 1', arg=pass_actions_before)
+    assert page.evaluate('window.onlineMock.gameActions.at(-1)') == 'pass-call'
+    wait_for("document.querySelector('#online-call-controls').hidden === true")
 
     page.evaluate('window.onlineMock.showCall(3000)')
     wait_for("document.querySelector('#online-call-controls').hidden === false")
