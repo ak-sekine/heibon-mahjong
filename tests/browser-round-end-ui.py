@@ -706,13 +706,16 @@ with sync_playwright() as p:
           nextHidden:document.querySelector('#next-round').hidden})''') == before_match_result
         page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
         page.evaluate('''() => {
-          window.matchResultReopenDebug={targetClicks:0,rootClicks:0};
+          window.matchResultReopenDebug={targetClicks:0,rootClicks:0,enterKeys:0};
           document.querySelector('#show-match-result').addEventListener('click',()=>window.matchResultReopenDebug.targetClicks++,true);
+          document.querySelector('#show-match-result').addEventListener('keydown',event=>{
+            if(event.key==='Enter')window.matchResultReopenDebug.enterKeys++;
+          },true);
           document.querySelector('#local-game-controls').addEventListener('click',event=>{
             if(event.target.closest('#show-match-result'))window.matchResultReopenDebug.rootClicks++;
           },true);
         }''')
-        page.locator('#show-match-result').click()
+        page.keyboard.press('Enter')
         try:
             page.wait_for_function("document.querySelector('#match-result-dialog').open", timeout=5000)
         except PlaywrightTimeoutError as error:
@@ -730,7 +733,8 @@ with sync_playwright() as p:
                 clickEvents:window.matchResultReopenDebug};
             }''')
             page.screenshot(path=str(OUT / f'{ENGINE}-{width}x{height}-match-result-reopen-failure.png'), full_page=True)
-            raise AssertionError(f'match result did not reopen after a real button click at {width}x{height}: {debug}') from error
+            raise AssertionError(f'match result did not reopen after Enter activation at {width}x{height}: {debug}') from error
+        assert page.evaluate('window.matchResultReopenDebug') == {'targetClicks':1,'rootClicks':1,'enterKeys':1}, (width, page.evaluate('window.matchResultReopenDebug'))
         assert page.locator('#match-result-dialog').is_visible()
         assert page.locator('#match-result-body').evaluate('(body) => body.scrollTop === 0')
         page.locator('#match-result-close').click()
