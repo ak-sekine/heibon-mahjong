@@ -16,6 +16,7 @@ import {
 
 class FakeClassList {
   readonly values = new Set<string>();
+  add(...names: string[]): void { names.forEach(name => this.values.add(name)); }
   toggle(name: string, force?: boolean): void {
     if (force ?? !this.values.has(name)) this.values.add(name);
     else this.values.delete(name);
@@ -45,15 +46,21 @@ class FakeElement {
   scrolled = false;
 
   private readonly documentLike: { activeElement: FakeElement | null };
+  getClientRects(): readonly object[] { return [{}]; }
   constructor(documentLike: { activeElement: FakeElement | null }) {
     this.documentLike = documentLike;
     this.content = { firstElementChild: this };
   }
 
   querySelectorAll(selector: string): FakeElement[] {
-    if (selector !== '[data-panel-part]') return [];
     return this.children.flatMap(child => child instanceof FakeElement
-      ? [child, ...child.querySelectorAll(selector)] : []);
+      ? [...(child.matches(selector) ? [child] : []), ...child.querySelectorAll(selector)] : []);
+  }
+  querySelector(selector: string): FakeElement | null { return this.querySelectorAll(selector)[0] ?? null; }
+  matches(selector: string): boolean {
+    if (selector === '[data-panel-part]') return Boolean(this.dataset.panelPart);
+    if (selector === 'button[data-action-choice]:not(:disabled)') return Boolean(this.dataset.actionChoice) && !this.disabled;
+    return false;
   }
   addEventListener(name: string, callback: (event: Event) => void): void { this.listeners.set(name, callback); }
   showModal(): void { this.open = true; }
@@ -64,6 +71,13 @@ class FakeElement {
     for (const child of children) if (child instanceof FakeElement) child.parent = this;
   }
   append(...children: unknown[]): void {
+    for (const child of children) {
+      if (child instanceof FakeElement && child.parent) {
+        const siblings = child.parent.children;
+        const index = siblings.indexOf(child);
+        if (index >= 0) siblings.splice(index, 1);
+      }
+    }
     this.children.push(...children);
     for (const child of children) if (child instanceof FakeElement) child.parent = this;
   }
@@ -104,11 +118,17 @@ function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPan
     queried.set('#call-decision-status', new FakeElement(doc));
     queried.set('.call-decision-target', new FakeElement(doc));
     queried.set('#call-decision-view-table', new FakeElement(doc));
+    queried.set('#call-decision-title', new FakeElement(doc));
+    for (const selector of ['#call-decision-options-host', '#call-decision-status', '.call-decision-target', '#call-decision-view-table', '#call-decision-title']) {
+      const child = queried.get(selector)!;
+      child.parent = queried.get('#call-decision-dialog')!;
+      queried.get('#call-decision-dialog')!.children.push(child);
+    }
   }
   root.dataset.panelPart = 'root';
   const parts = new Map<string, FakeElement>();
   const parents: Record<string, string> = {
-    'call-status': 'call-controls', 'call-options': 'call-controls', 'pass-call': 'call-controls',
+    'call-status': 'call-controls', 'call-options': 'call-controls', 'call-pon': 'call-controls', 'call-kan': 'call-controls', 'call-chi': 'call-controls', 'pass-call': 'call-controls',
     'kan-status': 'kan-controls', 'kan-options': 'kan-controls', 'cancel-kan': 'kan-controls',
     'ron-status': 'ron-controls', 'ron-target': 'ron-controls', ron: 'ron-controls', 'pass-ron': 'ron-controls',
     'show-result': 'round-actions', 'next-round': 'round-actions',
@@ -129,6 +149,7 @@ function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPan
   return {
     panel,
     root,
+    dialog: queried.get('#call-decision-dialog')!,
     parts,
     restore() {
       if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
@@ -142,7 +163,7 @@ function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPan
 function state(overrides: Partial<ActionPanelState> = {}): ActionPanelState {
   const labels: Record<ActionPanelPart, string> = {
     discard: '打牌する', riichi: 'リーチ', tsumo: 'ツモ和了', kyuushu: '九種九牌', 'kan-toggle': 'カン',
-    'return-call-decision': '鳴き判断に戻る',
+    'call-pon': 'ポン', 'call-kan': 'カン', 'call-chi': 'チー',
     ron: 'ロン和了', 'pass-ron': '見逃す', 'pass-call': '見送る', 'cancel-kan': 'キャンセル',
     'next-round': '次の局へ', 'show-result': '局の結果', 'show-match-result': '順位確認',
   };
@@ -262,18 +283,15 @@ test('ActionPanel delegates static and choice clicks through one mode callback a
     const click = (target: FakeElement) => fixture.root.listeners.get('click')!({ target } as unknown as Event);
     click(fixture.parts.get('discard')!);
     click(fixture.parts.get('pass-call')!);
-    const deniedChoice = fixture.parts.get('call-options')!.children[0] as FakeElement;
-    click(deniedChoice);
+    click(fixture.parts.get('call-pon')!);
     assert.deepEqual(events, []);
 
     fixture.panel.update(state({
       buttons: { ...state().buttons, discard: { visible: true, enabled: true, label: '打牌する' } },
       callGroup: { visible: true, status: '', options: [{ ...option, enabled: true }] },
     }));
-    const callButton = fixture.parts.get('call-options')!.children[0] as FakeElement;
-    assert.equal(callButton.dataset.callId, 'call-1');
-    assert.equal(callButton.dataset.onlineCall, 'call-1');
-    assert.equal(callButton.className, 'control-option-button ui-button ui-button--a');
+    const callButton = fixture.parts.get('call-pon')!;
+    assert.equal(fixture.parts.get('call-options')!.children.length, 0, 'a single call option stays out of the dialog');
     click(fixture.parts.get('discard')!);
     click(callButton);
     assert.deepEqual(events, [{ type: 'discard' }, { type: 'select-call', optionId: 'call-1' }]);
@@ -296,6 +314,42 @@ test('closed call dialog does not block a legal kan choice', () => {
   } finally { fixture.restore(); }
 });
 
+test('a multi-option call opens the shared dialog for only the selected type and does not answer on Escape', () => {
+  const events: ActionPanelEvent[] = [];
+  const fixture = panelFixture(event => events.push(event), {}, true);
+  const face = (rank: 1 | 2) => ordinaryTile(TILE_KINDS.find(kind => kind.category === 'suited' && kind.suit === 'man' && kind.rank === rank)!);
+  const options: ActionChoiceOption[] = [
+    { id: 'pon-1', label: 'ポン', tiles: [{ id: 'face-a', tile: face(1) }], enabled: true },
+    { id: 'pon-2', label: 'ポン', tiles: [{ id: 'face-b', tile: face(2) }], enabled: true },
+    { id: 'chi-1', label: 'チー', tiles: [], enabled: true },
+  ];
+  try {
+    fixture.panel.update(state({ callGroup: { visible: true, status: '', options } }));
+    const clickRoot = (target: FakeElement) => fixture.root.listeners.get('click')!({ target } as unknown as Event);
+    clickRoot(fixture.parts.get('call-pon')!);
+    assert.equal(fixture.dialog.open, true);
+    let shown = fixture.parts.get('call-options')!.children as FakeElement[];
+    assert.equal(shown.length, 2);
+    assert.ok(shown.every(option => option.dataset.optionId.startsWith('pon-')));
+    assert.equal(fixture.parts.get('call-chi')!.hidden, false, 'a different available type remains available on the table');
+
+    fixture.dialog.listeners.get('cancel')!({ preventDefault() {} } as unknown as Event);
+    assert.equal(fixture.dialog.open, false);
+    assert.deepEqual(events, [], 'closing the dialog leaves the decision unanswered');
+    assert.equal(fixture.parts.get('call-pon')!.hidden, false);
+    clickRoot(fixture.parts.get('call-pon')!);
+    assert.equal(fixture.dialog.open, true, 'the same type can be chosen again after returning to the table');
+    shown = fixture.parts.get('call-options')!.children as FakeElement[];
+    const chosen = shown.find(button => button.dataset.optionId === 'pon-2')!;
+    fixture.dialog.listeners.get('click')!({ target: chosen, detail: 1 } as unknown as Event);
+    assert.deepEqual(events, [{ type: 'select-call', optionId: 'pon-2' }]);
+    assert.equal(fixture.dialog.open, false);
+  } finally {
+    fixture.panel.update(state());
+    fixture.restore();
+  }
+});
+
 test('ActionPanel marks pending static and dynamic actions busy, then clears the state on recovery', () => {
   let progressing = true;
   const fixture = panelFixture(() => {}, { getContext: () => ({ progressing }) });
@@ -306,12 +360,12 @@ test('ActionPanel marks pending static and dynamic actions busy, then clears the
       callGroup: { visible: true, status: '送信しています…', options: [option] },
     }));
     const discard = fixture.parts.get('discard')!;
-    const call = fixture.parts.get('call-options')!.children[0] as FakeElement;
+    const call = fixture.parts.get('call-pon')!;
     assert.equal(discard.disabled, true);
     assert.equal(discard.attributes.get('aria-busy'), 'true');
     assert.equal(call.disabled, true);
     assert.equal(call.attributes.get('aria-busy'), 'true');
-    assert.match(call.className, /ui-button--a/u);
+    assert.equal(call.hidden, false);
 
     progressing = false;
     fixture.panel.update(state({
@@ -319,7 +373,7 @@ test('ActionPanel marks pending static and dynamic actions busy, then clears the
       callGroup: { visible: true, status: '', options: [{ ...option, enabled: true }] },
     }));
     assert.equal(discard.attributes.has('aria-busy'), false);
-    const recoveredCall = fixture.parts.get('call-options')!.children[0] as FakeElement;
+    const recoveredCall = fixture.parts.get('call-pon')!;
     assert.equal(recoveredCall.disabled, false);
     assert.equal(recoveredCall.attributes.has('aria-busy'), false);
   } finally { fixture.restore(); }
@@ -335,10 +389,12 @@ test('every legal call and kan candidate receives the same primary role', () => 
       callGroup: { visible: true, status: '', options: choices('call', ['ポン', 'チー', '大明カン']) },
       kanGroup: { visible: true, status: '', options: choices('kan', ['暗カン', '加カン']) },
     }));
-    for (const part of ['call-options', 'kan-options']) {
+    for (const part of ['call-pon', 'call-kan', 'call-chi', 'kan-options']) {
       const options = fixture.parts.get(part)!.children as FakeElement[];
-      assert.equal(options.length, part === 'call-options' ? 3 : 2);
-      assert.ok(options.every(button => button.className === 'control-option-button ui-button ui-button--a'), part);
+      if (part === 'kan-options') {
+        assert.equal(options.length, 2);
+        assert.ok(options.every(button => button.className === 'control-option-button ui-button ui-button--a'), part);
+      } else assert.equal(fixture.parts.get(part)!.hidden, false, `${part} is a visible type button`);
     }
   } finally { fixture.restore(); }
 });
@@ -359,7 +415,7 @@ test('call panel diagnostics correlate displayed choices and clicks without reta
       buttons: { ...state().buttons, 'pass-call': { visible: true, enabled: true, label: '見送る' } },
       callGroup: { visible: true, status: '', options },
     }));
-    const button = fixture.parts.get('call-options')!.children[0] as FakeElement;
+    const button = fixture.parts.get('call-chi')!;
     fixture.root.listeners.get('pointerdown')!({ target: button } as unknown as Event);
     fixture.root.listeners.get('click')!({ target: button, detail: 1 } as unknown as Event);
 
@@ -415,12 +471,12 @@ test('ActionPanel clears stale operation state and can render the same choices a
       buttons: { ...state().buttons, discard: { visible: true, enabled: true, label: '打牌する' } },
       callGroup: { visible: true, status: '鳴き判断です。', options },
     }));
-    assert.equal(fixture.parts.get('call-options')!.children.length, 1);
+    assert.equal(fixture.parts.get('call-pon')!.hidden, false);
     fixture.panel.clear();
     assert.equal(fixture.parts.get('discard')!.hidden, true);
     assert.equal(fixture.parts.get('call-controls')!.hidden, true);
     assert.equal(fixture.parts.get('call-options')!.children.length, 0);
     fixture.panel.update(state({ callGroup: { visible: true, status: '', options } }));
-    assert.equal(fixture.parts.get('call-options')!.children.length, 1);
+    assert.equal(fixture.parts.get('call-pon')!.hidden, false);
   } finally { fixture.restore(); }
 });

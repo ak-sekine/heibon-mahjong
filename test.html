@@ -91,10 +91,15 @@
   </template>
   <template id="game-controls-template">
     <section class="discard-controls" data-panel-part="root">
-      <div class="action-choice-group" data-panel-part="call-controls" role="group" aria-label="ポン・チーの選択" hidden>
+      <div class="action-choice-group call-controls" data-panel-part="call-controls" role="group" aria-label="鳴き判断" hidden>
         <p class="action-group-status" data-panel-part="call-status"></p>
         <div class="action-option-list" data-panel-part="call-options"></div>
-        <button class="control-action-button ui-button ui-button--c" data-panel-part="pass-call" type="button">見送る</button>
+        <div class="call-type-buttons">
+          <button class="control-action-button ui-button ui-button--a" data-panel-part="call-pon" type="button" hidden>ポン</button>
+          <button class="control-action-button ui-button ui-button--a" data-panel-part="call-kan" type="button" hidden>カン</button>
+          <button class="control-action-button ui-button ui-button--a" data-panel-part="call-chi" type="button" hidden>チー</button>
+          <button class="control-action-button ui-button ui-button--c" data-panel-part="pass-call" type="button">見送る</button>
+        </div>
       </div>
       <div class="action-choice-group" data-panel-part="kan-controls" role="group" aria-label="暗カン・加カンの選択" hidden>
         <p class="action-group-status" data-panel-part="kan-status">カンする面子を選択</p>
@@ -109,7 +114,6 @@
       </div>
       <p class="action-status" data-panel-part="action-status" role="status" aria-live="polite"></p>
       <div class="action-buttons">
-        <button class="control-action-button ui-button ui-button--c" data-panel-part="return-call-decision" type="button" hidden>鳴き判断に戻る</button>
         <button class="control-action-button ui-button ui-button--a" data-panel-part="discard" type="button" disabled>打牌する</button>
         <button class="control-action-button ui-button ui-button--a" data-panel-part="riichi" type="button" disabled>リーチ</button>
         <button class="control-action-button ui-button ui-button--a" data-panel-part="kan-toggle" type="button" hidden>カン</button>
@@ -125,11 +129,11 @@
     </section>
   </template>
   <dialog id="call-decision-dialog" aria-labelledby="call-decision-title" aria-describedby="call-decision-status">
-    <header class="call-decision-header"><h2 id="call-decision-title">鳴き判断</h2><p id="call-decision-status" aria-live="polite"></p></header>
+    <header class="call-decision-header"><h2 id="call-decision-title">鳴きの選択</h2><p id="call-decision-status" aria-live="polite"></p></header>
     <div class="call-decision-target" role="img" aria-label="鳴き対象の捨て牌"></div>
     <div id="call-decision-options-host"></div>
     <footer class="call-decision-footer">
-      <button id="call-decision-view-table" type="button" class="ui-button ui-button--b">卓を確認する</button>
+      <button id="call-decision-view-table" type="button" class="ui-button ui-button--b">卓に戻る</button>
     </footer>
   </dialog>
   <dialog id="result-dialog" aria-labelledby="result-title">

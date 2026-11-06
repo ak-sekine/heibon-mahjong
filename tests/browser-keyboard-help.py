@@ -150,7 +150,7 @@ with sync_playwright() as playwright:
     assert touch_page.evaluate("keyboardHelpState().game.players[0].river.length") >= 1
 
     touch_page.evaluate('keyboardHelpCall()')
-    pon = touch_page.locator('#call-options button').filter(has_text='ポン')
+    pon = touch_page.locator('#call-pon')
     pon.wait_for(state='visible')
     pon.tap()
     touch_page.wait_for_function("keyboardHelpState().game.players[0].melds.length === 1")

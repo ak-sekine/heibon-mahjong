@@ -55,6 +55,7 @@ MOCK = r"""
   let turnPlayerId = 0;
   let roundNumber = 1;
   let decision = null;
+  let callOptionCount = 1;
   let roundResult = null;
   let viewerOverride = null;
   const gameNameOverrides = {};
@@ -98,9 +99,13 @@ MOCK = r"""
         discardableTileIds: gameStatus === 'playing' && phase === 'awaiting-discard' && turnPlayerId === viewerSeat
           ? [...hands[viewerSeat].map(tile => tile.id), ...(drawnTiles[viewerSeat] ? [drawnTiles[viewerSeat].id] : [])] : [],
         riichiTileIds: [], canTsumo: false, canKyuushuKyuuhai: false, kanOptions: [],
-        callOptions: decision?.type === 'call' && viewerSeat === decision.seat ? [{
-          id: 'call-option-1', type: 'chi', tiles: callTiles, calledTileId: 'online-called', handTileIds: [callTiles[0].id, callTiles[1].id],
-        }] : [],
+        callOptions: decision?.type === 'call' && viewerSeat === decision.seat ? [
+          { id: 'call-option-1', type: 'chi', tiles: callTiles, calledTileId: 'online-called', handTileIds: [callTiles[0].id, callTiles[1].id] },
+          ...(callOptionCount > 1 ? [{
+            id: 'call-option-2', type: 'chi', tiles: [hands[viewerSeat][2], hands[viewerSeat][3], makeTile('online-called-alt', 7)],
+            calledTileId: 'online-called-alt', handTileIds: [hands[viewerSeat][2].id, hands[viewerSeat][3].id],
+          }] : []),
+        ] : [],
         canRon: decision?.type === 'ron' && viewerSeat === decision.seat,
         ronTile: decision?.type === 'ron' ? makeTile('online-ron-tile', 8) : null,
         decision: decision?.seat === viewerSeat ? { ...decision, answered: false, expectedGameRevision: decision.baseGameRevision } : null,
@@ -578,9 +583,18 @@ MOCK = r"""
     },
     showCall(timeoutMs = 30000) {
       if (!gameStarted || gameStatus !== 'playing') return;
+      callOptionCount = 1;
       gameRevision++;
       phase = 'awaiting-call';
       decision = { windowId: '2'.repeat(24), type: 'call', seat: 0, baseGameRevision: gameRevision, expiresAt: Date.now() + timeoutMs };
+      broadcastGame('game-state');
+    },
+    showCallCandidates(timeoutMs = 30000) {
+      if (!gameStarted || gameStatus !== 'playing') return;
+      callOptionCount = 2;
+      gameRevision++;
+      phase = 'awaiting-call';
+      decision = { windowId: '3'.repeat(24), type: 'call', seat: 0, baseGameRevision: gameRevision, expiresAt: Date.now() + timeoutMs };
       broadcastGame('game-state');
     },
     timeoutCall() {
@@ -2344,44 +2358,72 @@ with sync_playwright() as p:
     assert page.locator('#online-ron').is_enabled() and page.locator('#online-pass-ron').is_enabled(), 'ron choices were not actionable'
     page.locator('#online-pass-ron').click()
     wait_for("document.querySelector('#online-ron-controls').hidden === true")
+    def online_call_layout():
+      return page.evaluate("""()=>Object.fromEntries(['.app-header','.score-strip','#online-table','#online-player-hand','.online-rivers','.center-info']
+        .map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return [selector,[r.x,r.y,r.width,r.height]]}))""")
+    layout_before_call = online_call_layout()
     page.evaluate('window.onlineMock.showCall()')
     wait_for("document.querySelector('#online-call-controls').hidden === false")
-    assert page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'the online call window did not open its modal'
-    assert page.locator('#online-call-options button[data-online-call]').count() == 1, 'the legal call option was not shown'
+    assert online_call_layout() == layout_before_call, {'beforeCall':layout_before_call,'duringCall':online_call_layout()}
+    assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'the call dialog opened automatically'
+    assert page.locator('#online-call-chi').is_visible(), 'the unique chi button was not shown'
+    assert page.locator('#online-call-options button[data-online-call]').count() == 0, 'the candidate list appeared before selecting a type'
     call_actions_before_view = page.evaluate('window.onlineMock.gameActions.length')
-    seconds_before_view = page.locator('#call-decision-status').inner_text()
+    seconds_before_view = page.locator('#online-call-status').inner_text()
     assert '残り' in seconds_before_view, seconds_before_view
-    page.locator('#call-decision-view-table').click()
-    assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'viewing the table closed no dialog'
-    assert page.locator('#online-return-call-decision').is_visible(), 'the online reopen button was not shown'
-    assert page.evaluate('window.onlineMock.gameActions.length') == call_actions_before_view, 'viewing the table answered the call window'
-    seconds_before_wait = page.evaluate("Number(document.querySelector('#call-decision-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
-    page.wait_for_function("seconds => Number(document.querySelector('#call-decision-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0) < seconds", arg=seconds_before_wait, timeout=3000)
-    seconds_after_wait = page.evaluate("Number(document.querySelector('#call-decision-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
-    assert page.locator('#online-return-call-decision').is_enabled(), 'the online reopen button was disabled while the server timer continued'
-    page.locator('#online-return-call-decision').click()
-    assert page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'the online call window could not be reopened'
-    seconds_after_reopen = page.evaluate("Number(document.querySelector('#call-decision-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
-    assert seconds_after_reopen <= seconds_after_wait < seconds_before_wait, (seconds_before_wait, seconds_after_wait, seconds_after_reopen)
-    page.locator('#online-call-options button[data-online-call]').click()
+    seconds_before_wait = page.evaluate("Number(document.querySelector('#online-call-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
+    page.wait_for_function("seconds => Number(document.querySelector('#online-call-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0) < seconds", arg=seconds_before_wait, timeout=3000)
+    seconds_after_wait = page.evaluate("Number(document.querySelector('#online-call-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
+    assert seconds_after_wait < seconds_before_wait, (seconds_before_wait, seconds_after_wait)
+    assert page.evaluate('window.onlineMock.gameActions.length') == call_actions_before_view, 'showing the type buttons answered the call window'
+    page.locator('#online-call-chi').click()
+    page.wait_for_function('expected => window.onlineMock.gameActions.length === expected + 1', arg=call_actions_before_view)
     wait_for("document.querySelector('#online-call-controls').hidden === true")
-    assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'a submitted online call left the dialog open'
-    assert page.locator('#online-return-call-decision').is_hidden(), 'a submitted online call left a reopen button'
+    assert page.evaluate('window.onlineMock.gameActions.length') == call_actions_before_view + 1, 'the existing online call action was not submitted'
+
+    layout_before_multi = online_call_layout()
+    page.evaluate('window.onlineMock.showCallCandidates()')
+    wait_for("document.querySelector('#online-call-controls').hidden === false")
+    assert online_call_layout() == layout_before_multi
+    assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'multiple options opened the dialog automatically'
+    multi_actions_before = page.evaluate('window.onlineMock.gameActions.length')
+    page.locator('#online-call-chi').click()
+    assert page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'the selected online call type did not open the shared dialog'
+    dialog_options = page.locator('#online-call-options button[data-online-call]')
+    assert dialog_options.count() == 2
+    assert dialog_options.filter(has_text='チー').count() == 2
+    assert '残り' in page.locator('#call-decision-status').inner_text()
+    assert page.locator('.call-decision-target .tile-svg').count() == 1
+    assert online_call_layout() == layout_before_multi
+    seconds_before_table = page.evaluate("Number(document.querySelector('#call-decision-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
+    page.locator('#call-decision-view-table').click()
+    assert page.evaluate('window.onlineMock.gameActions.length') == multi_actions_before
+    assert page.locator('#online-call-chi').is_visible()
+    assert online_call_layout() == layout_before_multi
+    seconds_on_table = page.evaluate("Number(document.querySelector('#online-call-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
+    assert seconds_on_table <= seconds_before_table
+    page.locator('#online-call-chi').click()
+    assert page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'the same type could not be selected after returning to the table'
+    assert page.locator('#online-call-options button[data-online-call]').count() == 2
+    assert online_call_layout() == layout_before_multi
+    page.locator('#online-call-options button[data-online-call]').last.click()
+    page.wait_for_function('expected => window.onlineMock.gameActions.length === expected + 1', arg=multi_actions_before)
+    wait_for("document.querySelector('#online-call-controls').hidden === true")
+    assert page.evaluate('window.onlineMock.gameActions.length') == multi_actions_before + 1
+    assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
 
     page.evaluate('window.onlineMock.showCall(3000)')
-    wait_for("document.querySelector('#call-decision-dialog').open")
+    wait_for("document.querySelector('#online-call-controls').hidden === false")
     timeout_actions_before_view = page.evaluate('window.onlineMock.gameActions.length')
-    page.locator('#call-decision-view-table').click()
-    assert page.locator('#online-return-call-decision').is_visible(), 'the expiring call did not remain available while viewing the table'
-    page.wait_for_function("document.querySelector('#online-return-call-decision').hidden", timeout=7000)
+    page.wait_for_function("document.querySelector('#online-call-controls').hidden", timeout=7000)
     assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'an expired hidden call dialog reopened'
-    assert page.locator('#online-return-call-decision').is_hidden(), 'an expired call left a stale reopen button'
+    assert page.locator('#online-call-chi').is_hidden(), 'an expired call left a stale type button'
     assert page.evaluate('window.onlineMock.gameActions.length') == timeout_actions_before_view, 'viewing the table submitted a call before timeout'
     page.evaluate('window.onlineMock.timeoutCall()')
     wait_for("!document.querySelector('#online-game-action-status').innerText.includes('鳴き判断')")
     assert page.evaluate('window.onlineMock.currentDecision()') is None, 'the mock server did not commit the timed-out call'
     assert page.locator('#online-call-options button[data-online-call]').count() == 0, 'the server timeout left stale call candidates'
-    assert page.locator('#online-return-call-decision').is_hidden(), 'the server timeout left a stale reopen button'
+    assert page.locator('#online-call-chi').is_hidden(), 'the server timeout left a stale type button'
     assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'the server timeout reopened an expired dialog'
 
     assert page.locator('#online-open-room').count() == 0, 'room operations button remained in the game action area'
@@ -2745,9 +2787,9 @@ with sync_playwright() as p:
     assert hand_after_reconnect == hand_before_reconnect, 'the online hand was not restored after reconnect'
 
     page.evaluate('window.onlineMock.showCall(30000)')
-    wait_for("document.querySelector('#call-decision-dialog').open")
-    page.locator('#call-decision-view-table').click()
-    assert page.locator('#online-return-call-decision').is_visible(), 'the pending call could not be held before reconnect'
+    wait_for("document.querySelector('#online-call-controls').hidden === false")
+    assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'reconnect fixture opened the call dialog automatically'
+    assert page.locator('#online-call-chi').is_visible(), 'the pending chi button was not available before reconnect'
     tickets_before_call_reconnect = page.evaluate('window.onlineMock.ticketRequests')
     page.evaluate('window.__onlineMockConnectDelay = 1000; window.onlineMock.forceDisconnect()')
     wait_for("document.querySelector('#online-connection').textContent.includes('切れました')")
@@ -2756,7 +2798,7 @@ with sync_playwright() as p:
     wait_for_synced_own_turn()
     assert page.evaluate('window.onlineMock.currentDecision()') is None, 'the server retained an expired call after reconnect'
     assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'reconnect reopened an expired call dialog'
-    assert page.locator('#online-return-call-decision').is_hidden(), 'reconnect restored a stale call reopen button'
+    assert page.locator('#online-call-chi').is_hidden(), 'reconnect restored a stale call type button'
     assert page.locator('#online-call-options button[data-online-call]').count() == 0, 'reconnect restored stale call candidates'
     assert '鳴き判断' not in page.locator('#online-game-action-status').inner_text(), 'reconnect left stale call status text'
 

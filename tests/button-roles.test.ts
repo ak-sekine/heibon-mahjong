@@ -15,7 +15,7 @@ const roleById: Record<string, string> = {
 };
 const roleByPart: Record<string, string> = {
   'pass-call': 'c', 'cancel-kan': 'b', ron: 'a', 'pass-ron': 'c', discard: 'a', riichi: 'a',
-  'kan-toggle': 'a', 'return-call-decision': 'c', tsumo: 'a', kyuushu: 'a', 'show-result': 'b', 'show-match-result': 'b', 'next-round': 'a',
+  'kan-toggle': 'a', 'call-pon': 'a', 'call-kan': 'a', 'call-chi': 'a', tsumo: 'a', kyuushu: 'a', 'show-result': 'b', 'show-match-result': 'b', 'next-round': 'a',
 };
 
 function buttons(html: string): string[] {
@@ -26,7 +26,7 @@ test('every static operation button on product and verification pages has exactl
   for (const file of files) {
     const html = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     const nodes = buttons(html);
-    assert.equal(nodes.length, file === 'index.html' ? 44 : file === 'kan-test.html' ? 22 : 23);
+    assert.equal(nodes.length, file === 'index.html' ? 46 : file === 'kan-test.html' ? 24 : 25);
     for (const button of nodes) {
       const classes = button.match(/\bclass="([^"]*)"/u)?.[1]?.split(/\s+/u) ?? [];
       if (classes.includes('main-menu-item') || classes.includes('main-menu-toggle')) {

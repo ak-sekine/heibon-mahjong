@@ -69,7 +69,7 @@ controller.match=startMatch(g);render();};
    assert sum(snapshot['m']['points'])+snapshot['m']['depositSticks']*1000==100000
    assert not snapshot['leaks'],snapshot['leaks']
    assert page.evaluate("document.querySelector('#local-game-controls').getBoundingClientRect().top>=document.querySelector('.table').getBoundingClientRect().bottom")
-   for sel in ['#kan','#kan-options button','#cancel-kan','#call-options button','#ron','#pass-ron']:
+   for sel in ['#kan','#kan-options button','#cancel-kan','#call-pon','#call-kan','#call-chi','#ron','#pass-ron']:
     for e in page.locator(sel).all():
      if e.is_visible():assert e.bounding_box()['height']>=44 and e.bounding_box()['width']>=44
   page.evaluate("loadKan('choices')");page.locator('#kan').click();assert page.locator('#kan-options button').count()==2;check();shot('choices')
@@ -79,7 +79,7 @@ controller.match=startMatch(g);render();};
   tile=page.evaluate('kanCheck().game.players[0].drawnTile.id');page.locator(f'#player-hand button[data-tile-id="{tile}"]').click();page.locator('#discard').click();assert page.evaluate('kanCheck().game.players[0].drawnTile') is None
   for mode,kind in [('ankan','ankan'),('kakan','kakan'),('daiminkan','daiminkan')]:
    page.evaluate('loadKan',mode)
-   if mode=='daiminkan':page.locator('#call-options button').filter(has_text='大明カン').click()
+   if mode=='daiminkan':page.locator('#call-kan').click()
    else:page.locator('#kan').click();page.locator('#kan-options button').click()
    assert page.evaluate('kanCheck().game.players[0].melds[0].type')==kind
    assert page.evaluate('kanCheck().game.players[0].drawnTileSource')=='rinshan';check();shot(mode)

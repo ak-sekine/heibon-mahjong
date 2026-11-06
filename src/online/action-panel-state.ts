@@ -1,6 +1,7 @@
 import type { ActionButtonState, ActionChoiceOption, ActionPanelState } from '../ui/action-panel.ts';
 import { choiceAccessibleLabel } from '../ui/action-panel.ts';
 import { tileLabel } from '../rendering/tile-svg.ts';
+import { actionChoicesForDisplay } from '../ui/action-panel.ts';
 import type { PlayerGameView } from './game-view.ts';
 
 const button = (visible: boolean, enabled: boolean, label: string): ActionButtonState => ({ visible, enabled, label });
@@ -27,9 +28,9 @@ export function createOnlineActionPanelState(
     ? viewer.drawnTile?.id ?? null
     : selectedTileId && view.self.discardableTileIds.includes(selectedTileId) ? selectedTileId : null;
   const expired = Boolean(decision && secondsLeft === 0);
-  const callsAllowed = Boolean(decision?.type === 'call' && !decision.answered && !expired);
+  const callsAllowed = Boolean(decision?.type === 'call' && !decision.answered && !expired && !decisionPending);
   const ronAllowed = Boolean(decision?.type === 'ron' && !decision.answered && view.self.canRon && !expired);
-  const callChoices: ActionChoiceOption[] = decision?.type === 'call'
+  const allCallChoices: ActionChoiceOption[] = decision?.type === 'call'
     ? view.self.callOptions.map(option => {
       const label = option.type === 'pon' ? 'ポン' : option.type === 'chi' ? 'チー' : '大明カン';
       return {
@@ -40,6 +41,8 @@ export function createOnlineActionPanelState(
         enabled: callsAllowed && !actionPending,
       };
     }) : [];
+  const callChoices = actionChoicesForDisplay('call', allCallChoices);
+  const callCount = (label: string): number => callChoices.filter(option => option.label === label).length;
   const firstCall = view.self.callOptions[0];
   const callTarget = firstCall?.tiles.find(tile => tile.id === firstCall.calledTileId)?.tile ?? null;
   const kanChoices: ActionChoiceOption[] = view.self.kanOptions.map(option => ({
@@ -57,7 +60,7 @@ export function createOnlineActionPanelState(
 
   let actionStatus: string;
   if (actionPending) actionStatus = decisionPending
-    ? '回答をサーバーへ送信しています…'
+    ? `回答をサーバーへ送信しています…${decision?.type === 'call' ? ` ${decisionStatus}` : ''}`
     : 'サーバーで操作を確認しています…';
   else if (notice) actionStatus = notice;
   else if (decision?.answered) actionStatus = '回答を受け付けました。他のプレイヤーの回答を待っています。';
@@ -88,7 +91,9 @@ export function createOnlineActionPanelState(
       tsumo: button(ownTurn && view.self.canTsumo, ownTurn && view.self.canTsumo && !actionPending, 'ツモ和了'),
       kyuushu: button(ownTurn && view.self.canKyuushuKyuuhai, ownTurn && view.self.canKyuushuKyuuhai && !actionPending, '九種九牌'),
       'kan-toggle': button(ownTurn && kanChoices.length > 0, ownTurn && kanChoices.length > 0 && !actionPending, 'カン'),
-      'return-call-decision': button(false, false, '鳴き判断に戻る'),
+      'call-pon': button(callCount('ポン') > 0 && callsAllowed, callCount('ポン') > 0 && callsAllowed && !actionPending, 'ポン'),
+      'call-kan': button(callCount('大明カン') > 0 && callsAllowed, callCount('大明カン') > 0 && callsAllowed && !actionPending, 'カン'),
+      'call-chi': button(callCount('チー') > 0 && callsAllowed, callCount('チー') > 0 && callsAllowed && !actionPending, 'チー'),
       ron: button(decision?.type === 'ron', ronAllowed && !actionPending, 'ロン和了'),
       'pass-ron': button(decision?.type === 'ron', ronAllowed && !actionPending, '見逃す'),
       'pass-call': button(decision?.type === 'call', callsAllowed && !actionPending, '見送る'),
@@ -103,7 +108,7 @@ export function createOnlineActionPanelState(
     },
     actionStatus,
     callGroup: {
-      visible: decision?.type === 'call' && !decision.answered && !expired,
+      visible: decision?.type === 'call' && !decision.answered && !expired && !decisionPending,
       status: decision?.type === 'call' ? decisionStatus : '',
       options: callChoices,
       target: callTarget,

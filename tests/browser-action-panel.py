@@ -158,12 +158,12 @@ with sync_playwright() as p:
         }""")
         assert page.locator('[data-browser-action-panel] [data-panel-part="call-controls"]').nth(1).is_visible()
         assert page.locator('[data-browser-action-panel] [data-panel-part="pass-call"]').nth(1).is_enabled()
-        assert_common_colors('[data-browser-action-panel] [data-panel-part="call-options"] button.ui-button')
+        assert_common_colors('[data-browser-action-panel] [data-panel-part="call-pon"].ui-button')
         assert page.evaluate("""() => {
           const root = document.querySelector('[data-browser-action-panel]').children[1];
           const status = root.querySelector('[data-panel-part="call-status"]');
           const actionStatus = root.querySelector('[data-panel-part="action-status"]');
-          const options = root.querySelector('[data-panel-part="call-options"]');
+          const options = root.querySelector('.call-type-buttons');
           const pass = root.querySelector('[data-panel-part="pass-call"]');
           const box = element => element.getBoundingClientRect();
           const text = root.innerText;
@@ -188,10 +188,11 @@ with sync_playwright() as p:
           }""", {'callType': call_type})
           assert page.evaluate("""label => {
             const root = document.querySelector('[data-browser-action-panel]').children[1];
-            return root.querySelector('[data-panel-part="call-options"] button').innerText === label &&
+            const part = label === 'チー' ? 'call-chi' : label === 'ポン' ? 'call-pon' : 'call-kan';
+            return root.querySelector(`[data-panel-part="${part}"]`).innerText === label &&
               (root.innerText.match(/鳴き判断の残り/gu) || []).length === 1;
           }""", label)
-        online_panel.locator('[data-panel-part="call-options"] button').click()
+        online_panel.locator('[data-panel-part="call-pon"]').click()
         online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
         assert online_events[-1] == {'type': 'select-call', 'optionId': 'server-call-option'}, online_events
         page.evaluate("""() => {

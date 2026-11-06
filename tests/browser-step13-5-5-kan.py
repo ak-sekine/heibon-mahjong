@@ -12,8 +12,6 @@ with sync_playwright() as p:
   page.wait_for_selector('#scenario-help:not(:empty)')
   page.evaluate('window.readGame=()=>window.testController.game')
   def load_scenario(mode):
-   if page.locator('#call-decision-dialog').evaluate('(node)=>node.open'):
-    page.locator('#call-decision-view-table').click()
    page.select_option('#scenario',mode)
    # Fixture navigation is test-only and may be covered by a newly opened
    # decision while the previous fixed scenario is being replaced.
@@ -37,7 +35,7 @@ with sync_playwright() as p:
   page.screenshot(path=str(out/f'{width}-opening-ankan.png'),full_page=True)
   for mode in ['ankan','daiminkan','kakan','rinshan','multiple']:
    load_scenario(mode)
-   if mode=='daiminkan':page.locator('#call-options button').filter(has_text='大明カン').click()
+   if mode=='daiminkan':page.locator('#call-kan').click()
    else:page.locator('#kan').click();page.locator('#kan-options button').first.click()
    page.wait_for_timeout(200)
    assert page.locator('.dora-slot[data-tile-id]').count()==2

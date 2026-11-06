@@ -207,7 +207,7 @@ test('call choices and pass state match between a local call window and server l
   const online = createOnlineActionPanelState(onlineViewFor(game, { decision }), null, false, false, false, 10);
   assert.equal(local.callGroup.visible, true);
   assert.equal(online.callGroup.visible, true);
-  assertSharedButtons(local, online, ['pass-call']);
+  assertSharedButtons(local, online, ['pass-call', 'call-pon', 'call-kan', 'call-chi']);
   assert.deepEqual(
     actionChoicesForDisplay('call', local.callGroup.options).map(option => [option.id, option.label]),
     actionChoicesForDisplay('call', online.callGroup.options).map(option => [option.id, option.label]),
@@ -220,6 +220,12 @@ test('call choices and pass state match between a local call window and server l
   assert.equal(online.callGroup.status, '鳴き判断の残り 10 秒です。');
   assert.equal(online.ronGroup.status, '');
   assert.equal(online.actionStatus, '鳴き判断を待っています。');
+
+  const sending = createOnlineActionPanelState(onlineViewFor(game, { decision }), null, true, true, false, 9);
+  assert.equal(sending.callGroup.visible, false, 'a submitted online answer closes all call controls');
+  assert.equal(sending.buttons['pass-call'].enabled, false);
+  assert.equal(sending.buttons['call-pon'].visible, false);
+  assert.match(sending.actionStatus, /鳴き判断の残り 9 秒/u, 'the timer remains visible in the main action status while a call answer is pending');
 
   const ticking = createOnlineActionPanelState(onlineViewFor(game, { decision }), null, false, false, false, 9);
   assert.equal(ticking.callGroup.status, '鳴き判断の残り 9 秒です。');

@@ -9,6 +9,7 @@ import { canDeclareKyuushuKyuuhai } from '../game/special-draws.ts';
 import { canDiscard } from '../game/discard.ts';
 import { getKanOptions } from '../game/kan.ts';
 import { getCallOptions } from '../game/calls.ts';
+import { actionChoicesForDisplay } from '../ui/action-panel.ts';
 import { tileLabel } from './tile-svg.ts';
 
 const defaultSeatNames = ['自分', 'CPU1', 'CPU2', 'CPU3'] as const;
@@ -41,7 +42,7 @@ export function createLocalActionPanelState(
     ? game.players[callOptions[0].fromPlayerId].river.find(tile => tile.id === callOptions[0].calledTileId)?.tile ?? null
     : null;
   const ronTile = canRon ? getRonTile(game) : null;
-  const callChoices: ActionChoiceOption[] = callOptions.map(option => {
+  const allCallChoices: ActionChoiceOption[] = callOptions.map(option => {
     const label = option.type === 'pon' ? 'ポン' : option.type === 'daiminkan' ? '大明カン' : 'チー';
     return {
       id: option.id,
@@ -51,6 +52,8 @@ export function createLocalActionPanelState(
       enabled: !progressing,
     };
   });
+  const callChoices = actionChoicesForDisplay('call', allCallChoices);
+  const callCount = (label: string): number => callChoices.filter(option => option.label === label).length;
   const kanChoices: ActionChoiceOption[] = kanOptions.map(option => ({
     id: option.id,
     label: option.meld.type === 'ankan' ? '暗カン' : '加カン',
@@ -82,7 +85,9 @@ export function createLocalActionPanelState(
       tsumo: button(canTsumo, canTsumo && !progressing, 'ツモ和了'),
       kyuushu: button(kyuushu, kyuushu && !progressing, '九種九牌'),
       'kan-toggle': button(kanOptions.length > 0, kanOptions.length > 0 && !progressing, 'カン'),
-      'return-call-decision': button(false, false, '鳴き判断に戻る'),
+      'call-pon': button(callCount('ポン') > 0, callCount('ポン') > 0 && !progressing, 'ポン'),
+      'call-kan': button(callCount('大明カン') > 0, callCount('大明カン') > 0 && !progressing, 'カン'),
+      'call-chi': button(callCount('チー') > 0, callCount('チー') > 0 && !progressing, 'チー'),
       ron: button(canRon, canRon && !progressing, 'ロン和了'),
       'pass-ron': button(canRon, canRon && !progressing, '見逃す'),
       'pass-call': button(callChoices.length > 0, callChoices.length > 0 && !progressing, '見送る'),

@@ -108,13 +108,13 @@ def wait_for_human_action(page, timeout_ms=TURN_TIMEOUT_MS):
             return decisions
 
         call_dialog = page.locator('#call-decision-dialog')
-        if call_dialog.evaluate('(dialog) => dialog.open'):
-            pass_call = page.locator('#pass-calls')
-            if pass_call.is_enabled():
-                pass_call.click()
-                decisions['calls_passed'] += 1
+        pass_call = page.locator('#pass-calls')
+        if pass_call.is_visible() and pass_call.is_enabled():
+            pass_call.click()
+            decisions['calls_passed'] += 1
+            if call_dialog.evaluate('(dialog) => dialog.open'):
                 page.wait_for_function("!document.querySelector('#call-decision-dialog').open", timeout=3000)
-                continue
+            continue
 
         pass_ron = page.locator('#pass-ron')
         if pass_ron.is_visible() and pass_ron.is_enabled():
@@ -150,7 +150,7 @@ def capture_failure(page, context, events, repetition, error, observations):
     except Exception as screenshot_error:
         state = {'screenshotError': safe_message(screenshot_error)}
     try:
-        # If a call decision is pending, use the real "卓を確認する" control to
+        # If a call decision is pending, use the real "卓に戻る" control to
         # reveal the table before opening diagnostics. This does not pass it.
         dialog = page.locator('#call-decision-dialog')
         if dialog.count() and dialog.evaluate('(node) => node.open'):
