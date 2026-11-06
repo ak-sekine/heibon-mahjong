@@ -135,6 +135,34 @@ window.callState=()=>controller.game;
             assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
             assert page.locator('#local-game-controls [data-panel-part="return-call-decision"]').is_hidden()
             page.wait_for_function("document.activeElement===document.querySelector('#local-game-controls [data-panel-part=action-status]')")
-        assert not errors, errors
+
+    # Exercise the same maximum dialog inside the viewport-sized iframe used
+    # by itch.io's HTML5 embed.
+    page.set_viewport_size({'width': 375, 'height': 634})
+    page.set_content('''<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+      html,body{margin:0;width:100%;height:100%;overflow:hidden}iframe{display:block;width:100vw;height:100vh;border:0}
+    </style></head><body><iframe id="call-decision-frame" name="call-decision-frame" src="http://127.0.0.1:4173/heibon-mahjong/"></iframe></body></html>''')
+    page.frame_locator('#call-decision-frame').locator('#call-decision-dialog').wait_for(state='attached')
+    frame = page.frame(name='call-decision-frame')
+    assert frame is not None
+    frame.wait_for_function('typeof loadCalls === "function"')
+    frame.evaluate("loadCalls('max')")
+    iframe_metrics = frame.evaluate("""()=>{
+      const viewport=visualViewport, top=viewport?.offsetTop??0, bottom=top+(viewport?.height??innerHeight);
+      const dialog=document.querySelector('#call-decision-dialog').getBoundingClientRect();
+      const candidates=[...document.querySelectorAll('#call-options button')];
+      const controls=[...candidates,document.querySelector('#pass-calls'),document.querySelector('#call-decision-view-table')];
+      const visible=node=>{const r=node.getBoundingClientRect();return r.width>0&&r.height>0&&r.left>=0&&r.right<=innerWidth&&r.top>=top&&r.bottom<=bottom};
+      return {viewport:{width:innerWidth,height:innerHeight},candidateCount:candidates.length,
+        fit:document.querySelector('#call-decision-dialog').open&&dialog.left>=0&&dialog.right<=innerWidth&&
+          dialog.top>=top&&dialog.bottom<=bottom&&controls.every(visible)&&document.documentElement.scrollWidth<=innerWidth};
+    }""")
+    assert iframe_metrics['viewport'] == {'width': 375, 'height': 634}, iframe_metrics
+    assert iframe_metrics['candidateCount'] == 7 and iframe_metrics['fit'], iframe_metrics
+    frame.locator('#call-decision-view-table').click()
+    frame.locator('#local-game-controls [data-panel-part="return-call-decision"]').click()
+    assert frame.locator('#call-decision-dialog').evaluate('(node)=>node.open')
+    print(f'{browser_name} itch-style iframe maximum seven-candidate dialog: {iframe_metrics}')
+    assert not errors, errors
     page.close()
     browser.close()
