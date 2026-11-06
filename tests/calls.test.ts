@@ -62,7 +62,11 @@ for(const [called,owned,forbid] of [['man-1','234m',['man-1','man-4']],['man-3',
 test('passing calls does not cause furiten; runner pauses at pending call',async()=>{
  const g=discard(callStart());const runner=new AutomaticTurnRunner({wait:async()=>{throw Error('must pause');}});let current=g;
  await runner.run(()=>current,x=>{current=x;});assert.equal(current,g);
+ const calledId=g.ronWindow!.tileId;
  const passed=passCalls(g,0);assert.equal(passed.players[0].temporaryFuriten,false);assert.equal(passed.phase,'awaiting-draw');assert.throws(()=>passCalls(passed,0),RangeError);
+ assert.ok(passed.players[3].river.some(tile=>tile.id===calledId),'an uncalled discard must remain in its river');
+ assert.equal(passed.players[3].discardHistory!.at(-1)!.id,calledId);
+ assert.equal(passed.players[0].melds!.length,0);
 });
 test('ron before call: human pass sets furiten then permits independent chi choice',()=>{
  const g=discard(callStart(3,{0:['234m','345p','678s','22p','34s']},'sou-5'));
@@ -73,6 +77,11 @@ test('ron before call: human pass sets furiten then permits independent chi choi
 test('CPU yakuhai pon uses only own/public information and is deterministic',()=>{
  const initial={...callStart(3,{1:['55z','234m','456p','678s','19p']}),rules:{...DEFAULT_GAME_RULES,kuitan:false}};const g=discard(initial);
  assert.equal(g.turnPlayerId,1);assert.equal(g.players[1].melds![0].type,'pon');assert.equal(g.players[1].drawnTile,null);inventory(g,initial);
+ const calledId=initial.players[3].drawnTile!.id;
+ assert.equal(g.players[3].river.some(tile=>tile.id===calledId),false);
+ assert.equal(g.players[3].discardHistory!.at(-1)!.id,calledId);
+ assert.equal(g.players[1].melds![0].calledTileId,calledId);
+ assert.ok(g.players[1].melds![0].tiles.some(tile=>tile.id===calledId));
 });
 test('CPU pon outranks human chi on the same discard',()=>{
  const initial=callStart(3,{0:['34m','234p','678s','19p','123z'],1:['55m','246m','346p','678s','22p']},'man-5');

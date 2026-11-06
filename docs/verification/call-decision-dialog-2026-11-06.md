@@ -63,3 +63,22 @@ Chromium、WebKitはGitHub Actions上のブラウザー検証であり、iPhone 
 run #421558の失敗は鳴き判断やブラウザー回帰スクリプト内ではなく、別ステップのstandalone itch CPU smokeで発生しました。前回の本番デプロイrun #421487ではitch smokeが両エンジンでsuccessしています。これらの自動テスト結果はiPhone Safari／実際のitch.io実機確認の代わりではありません。
 
 その後、両エンジンのブラウザー回帰suiteが完了したため、WebKitの依存導入が停止していたtest-only push run #421539をcancelしました。テスト変更やdocs-only変更によるWorker／Pagesの再デプロイはありません。最終docs commitのdocs-checkはrun [#42157457266](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42157457266)でsuccessしました。
+
+## standalone itch smoke test の安定化 — 2026-11-06
+
+### 既存失敗の再確認
+
+GitHub APIのrun metadataで、run [#42155800715](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42155800715) はSHA `3ed7faadad903b071ffb062364dff6a476edd05b`、全体failure、Chromium job success／WebKit job failureであり、WebKitの失敗stepはstandalone itch smokeだけと確認しました。ChromiumのBrowser UI回帰を含む各job stepはsuccessでした。run [#42153947821](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42153947821) は同SHAで、Chromiumのstandalone itch smoke stepがfailure、WebKit側はOS依存パッケージ導入stepがfailureとなり、その後の検査はskipでした。
+
+GitHub APIのrun metadataと現行ソースは再確認できましたが、Actions実ログZIPは `results-receiver.actions.githubusercontent.com` がForbiddenを返し取得できませんでした。そのため個々のタイムアウト直前のゲーム状態・DOM・コンソール内容は独立には確認できていません。既存記録にある「WebKitは新規対局後の有効手牌ボタン待ち」「Chromiumは打牌後の河SVG待ち」という観測を維持し、ゲーム本体の停止・描画不具合だったかは未特定とします。
+
+### smokeの判定
+
+- Smokeはitch用の実ビルドZIP内容を相対パスで配信して検査し、初期座席・配牌を本番仕様のまま使います。itch ZIP専用のテスト入口や固定乱数は追加していません。
+- 20秒の状態待機中は、有効手牌だけを無条件に待たず、鳴きダイアログを識別して正規の「見送る」、ロン候補は「見逃す」で進めます。CPUが局を終えた場合は結果を閉じ、利用可能な「次の局へ」で進めます。
+- 打牌は受理された `discard` 操作の状態遷移を確認し、選んだ物理牌IDが手牌から消え、同じIDが河または副露の「鳴かれた牌」のいずれかに一度だけ存在することを検証します。河だけへの残存は要求しません。
+- 既存の鳴き判断ブラウザーテストを再利用します。関連するunit回帰では、見送った牌が河と履歴に残ること、およびCPUポンでは同じ物理牌が河から除かれて副露へ移ることを明示します。
+- Browser UI suiteの前後に、Chromium／WebKitごとにsmokeを各3回実行します。成功時は各反復と状態分岐をログに残します。失敗時は各stepの `/tmp/heibon-itch-smoke-{before}/<browser>-iteration-<n>.{json,png,zip}` または `/tmp/heibon-itch-smoke/<browser>-iteration-<n>.{json,png,zip}` をBrowser UI artifactに含めます。JSONは安全な診断キーだけ、URLはquery／fragment／credentialsを除いて保存します。Playwright traceは各反復開始から有効にし、失敗時だけ保存します。
+- Browser UI jobは後続stepで意図的なassertion失敗も実行し、診断snapshot、打牌遷移、PNG、trace ZIPが生成されたことを確認します。failure flagはPython smokeだけにあり、itch build／ZIPには含まれません。
+
+この追補に対するChromium／WebKitのActions結果とrun URLは、push後に追記します。自動検証とiPhone Safari／実際のitch.io実機検証は分けて記録し、Issue #46はOpenのままです。

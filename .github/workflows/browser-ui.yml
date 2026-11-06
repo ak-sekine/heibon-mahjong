@@ -206,6 +206,22 @@ jobs:
       - name: Install browser (${{ matrix.browser }})
         shell: bash
         run: python .github/scripts/timed-playwright-install.py install "${{ matrix.browser }}"
+      - name: Run standalone itch smoke test before Browser UI suite
+        shell: bash
+        env:
+          BROWSER: ${{ matrix.browser }}
+        run: |
+          python -m http.server 4175 --bind 127.0.0.1 --directory dist-itch > /tmp/heibon-itch-preview-before.log 2>&1 &
+          smoke_preview_pid=$!
+          trap 'kill "$smoke_preview_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4175/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:4175/ > /dev/null
+          mkdir -p /tmp/heibon-itch-smoke-before
+          set -o pipefail
+          HEIBON_BROWSER="$BROWSER" HEIBON_SMOKE_ARTIFACT_DIR=/tmp/heibon-itch-smoke-before HEIBON_SMOKE_REPETITIONS=3 python tests/browser-itch-package.py 2>&1 | tee /tmp/heibon-itch-smoke-before.log
       - name: Run Vite and browser regressions
         shell: bash
         env:
@@ -230,7 +246,7 @@ jobs:
           export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
           set -o pipefail
           python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
-      - name: Run the standalone itch package browser smoke test
+      - name: Run standalone itch smoke test after Browser UI suite
         shell: bash
         env:
           BROWSER: ${{ matrix.browser }}
@@ -243,7 +259,44 @@ jobs:
             sleep 1
           done
           curl --fail --silent http://127.0.0.1:4175/ > /dev/null
-          HEIBON_BROWSER="$BROWSER" python tests/browser-itch-package.py
+          mkdir -p /tmp/heibon-itch-smoke
+          set -o pipefail
+          HEIBON_BROWSER="$BROWSER" HEIBON_SMOKE_ARTIFACT_DIR=/tmp/heibon-itch-smoke HEIBON_SMOKE_REPETITIONS=3 python tests/browser-itch-package.py 2>&1 | tee /tmp/heibon-itch-smoke-after.log
+      - name: Verify standalone itch smoke failure diagnostics
+        shell: bash
+        env:
+          BROWSER: ${{ matrix.browser }}
+        run: |
+          python -m http.server 4175 --bind 127.0.0.1 --directory dist-itch > /tmp/heibon-itch-preview-controlled.log 2>&1 &
+          controlled_preview_pid=$!
+          trap 'kill "$controlled_preview_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4175/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:4175/ > /dev/null
+          set -o pipefail
+          if HEIBON_BROWSER="$BROWSER" HEIBON_SMOKE_ARTIFACT_DIR=/tmp/heibon-itch-smoke-controlled HEIBON_SMOKE_REPETITIONS=1 HEIBON_SMOKE_INDUCE_FAILURE=after-discard python tests/browser-itch-package.py 2>&1 | tee /tmp/heibon-itch-smoke-controlled.log; then
+            echo "Controlled failure did not fail as expected"
+            exit 1
+          fi
+          test -s "/tmp/heibon-itch-smoke-controlled/${BROWSER}-iteration-1.png"
+          test -s "/tmp/heibon-itch-smoke-controlled/${BROWSER}-iteration-1.zip"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          browser = os.environ["BROWSER"]
+          report = json.loads(Path(f"/tmp/heibon-itch-smoke-controlled/{browser}-iteration-1.json").read_text(encoding="utf-8"))
+          assert report["error"] == "controlled failure to verify smoke diagnostics artifact capture", report
+          assert report["observations"]["beforeDiscard"]["phase"] == "awaiting-discard", report
+          events = report["gameState"]["diagnostics"]
+          assert any(event["event"] == "local_game_diagnostic_snapshot" for event in events), report
+          action = report["observations"]["discardDestination"]
+          assert action["river"] + action["calledMeld"] == 1 and not action["hand"], report
+          print(f"{browser}: controlled failure produced screenshot, Playwright trace, and safe game-state JSON")
+          PY
       - name: Save browser results, script timings, and screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -257,6 +310,14 @@ jobs:
             /tmp/heibon-vite.log
             /tmp/heibon-preview.log
             /tmp/heibon-itch-preview.log
+            /tmp/heibon-itch-preview-controlled.log
+            /tmp/heibon-itch-preview-before.log
+            /tmp/heibon-itch-smoke-before.log
+            /tmp/heibon-itch-smoke-after.log
+            /tmp/heibon-itch-smoke-controlled.log
+            /tmp/heibon-itch-smoke
+            /tmp/heibon-itch-smoke-before
+            /tmp/heibon-itch-smoke-controlled
             docs/verification/step13.5.5
       - name: Save center round display screenshots and measurements
         if: always()
