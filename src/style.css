@@ -53,6 +53,7 @@ ul { list-style:none; padding:0; margin:0; }
 .call-controls > [data-panel-part="call-options"]:empty { display:none; }
 .call-type-buttons { display:flex; flex-wrap:wrap; align-items:stretch; gap:6px; width:100%; }
 .call-type-buttons .control-action-button { min-width:68px; min-height:44px; flex:1 1 68px; }
+.discard-controls:has(.call-controls:not([hidden])) { padding-bottom:8px; }
 .discard-controls:has(.call-controls:not([hidden])) > .action-status { display:none; }
 .control-option-button { display:flex; align-items:center; justify-content:center; gap:2px; min-width:44px; min-height:48px; flex:1 1 130px; padding:8px 12px; border:1px solid currentColor; border-radius:8px; font:inherit; cursor:pointer; touch-action:manipulation; }
 .action-option-list .tile-svg { width:22px; height:31px; }
