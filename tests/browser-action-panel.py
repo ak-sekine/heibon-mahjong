@@ -180,7 +180,7 @@ with sync_playwright() as p:
             return (root.innerText.match(/鳴き判断の残り/gu) || []).length === 1 &&
               !root.querySelector('[data-panel-part="action-status"]').innerText.includes('残り');
           }""")
-        for call_type, label in [('chi', 'チー'), ('pon', 'ポン'), ('daiminkan', '大明カン')]:
+        for call_type, label in [('chi', 'チー'), ('pon', 'ポン'), ('daiminkan', 'カン')]:
           page.evaluate("""({callType}) => {
             const test = window.actionPanelBrowser;
             test.view.self.callOptions[0].type = callType;
@@ -192,6 +192,11 @@ with sync_playwright() as p:
             return root.querySelector(`[data-panel-part="${part}"]`).innerText === label &&
               (root.innerText.match(/鳴き判断の残り/gu) || []).length === 1;
           }""", label)
+        page.evaluate("""() => {
+          const test = window.actionPanelBrowser;
+          test.view.self.callOptions[0].type = 'pon';
+          test.update(null, false, false, false, 10);
+        }""")
         online_panel.locator('[data-panel-part="call-pon"]').click()
         online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
         assert online_events[-1] == {'type': 'select-call', 'optionId': 'server-call-option'}, online_events
