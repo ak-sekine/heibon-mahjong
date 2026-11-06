@@ -93,6 +93,14 @@
       <p class="keyboard-help">Tabで牌とボタンへ移動、Enter／Spaceで選択・確定</p>
     </section>
   </template>
+  <dialog id="call-decision-dialog" aria-labelledby="call-decision-title" aria-describedby="call-decision-status">
+    <header class="call-decision-header"><h2 id="call-decision-title">鳴き判断</h2><p id="call-decision-status" aria-live="polite"></p></header>
+    <div class="call-decision-target" role="img" aria-label="鳴き対象の捨て牌"></div>
+    <div id="call-decision-options-host"></div>
+    <footer class="call-decision-footer">
+      <button id="call-decision-view-table" type="button" class="ui-button ui-button--b">卓を確認する</button>
+    </footer>
+  </dialog>
   <dialog id="result-dialog" aria-labelledby="result-title">
     <header class="result-header"><h2 id="result-title"></h2></header>
     <div id="result-body" tabindex="0" role="region" aria-label="結果の詳細">
