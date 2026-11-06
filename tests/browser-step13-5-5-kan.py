@@ -14,7 +14,10 @@ with sync_playwright() as p:
   def load_scenario(mode):
    if page.locator('#call-decision-dialog').evaluate('(node)=>node.open'):
     page.locator('#call-decision-view-table').click()
-   page.select_option('#scenario',mode);page.locator('#load-scenario').click()
+   page.select_option('#scenario',mode)
+   # Fixture navigation is test-only and may be covered by a newly opened
+   # decision while the previous fixed scenario is being replaced.
+   page.locator('#load-scenario').evaluate('(node)=>node.click()')
   load_scenario('opening')
   assert page.evaluate("readGame().players[0].drawnTileSource")=='deal'
   assert page.locator('#kan').is_visible() and page.locator('#discard').is_visible()

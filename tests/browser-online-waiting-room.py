@@ -576,13 +576,21 @@ MOCK = r"""
       decision = { windowId: '1'.repeat(24), type: 'ron', seat: 0, baseGameRevision: gameRevision, expiresAt: Date.now() + 30000 };
       broadcastGame('game-state');
     },
-    showCall() {
+    showCall(timeoutMs = 30000) {
       if (!gameStarted || gameStatus !== 'playing') return;
       gameRevision++;
       phase = 'awaiting-call';
-      decision = { windowId: '2'.repeat(24), type: 'call', seat: 0, baseGameRevision: gameRevision, expiresAt: Date.now() + 30000 };
+      decision = { windowId: '2'.repeat(24), type: 'call', seat: 0, baseGameRevision: gameRevision, expiresAt: Date.now() + timeoutMs };
       broadcastGame('game-state');
     },
+    timeoutCall() {
+      if (decision?.type !== 'call') return;
+      decision = null;
+      phase = 'awaiting-discard';
+      gameRevision++;
+      broadcastGame('game-state');
+    },
+    currentDecision() { return decision; },
     setResultScenario(kind, viewerSeat) {
       if (!gameStarted) return;
       rivers = [[], [], [], []];
@@ -2359,6 +2367,22 @@ with sync_playwright() as p:
     wait_for("document.querySelector('#online-call-controls').hidden === true")
     assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'a submitted online call left the dialog open'
     assert page.locator('#online-return-call-decision').is_hidden(), 'a submitted online call left a reopen button'
+
+    page.evaluate('window.onlineMock.showCall(3000)')
+    wait_for("document.querySelector('#call-decision-dialog').open")
+    timeout_actions_before_view = page.evaluate('window.onlineMock.gameActions.length')
+    page.locator('#call-decision-view-table').click()
+    assert page.locator('#online-return-call-decision').is_visible(), 'the expiring call did not remain available while viewing the table'
+    page.wait_for_function("document.querySelector('#online-return-call-decision').hidden", timeout=7000)
+    assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'an expired hidden call dialog reopened'
+    assert page.locator('#online-return-call-decision').is_hidden(), 'an expired call left a stale reopen button'
+    assert page.evaluate('window.onlineMock.gameActions.length') == timeout_actions_before_view, 'viewing the table submitted a call before timeout'
+    page.evaluate('window.onlineMock.timeoutCall()')
+    wait_for("!document.querySelector('#online-game-action-status').innerText.includes('鳴き判断')")
+    assert page.evaluate('window.onlineMock.currentDecision()') is None, 'the mock server did not commit the timed-out call'
+    assert page.locator('#online-call-options button[data-online-call]').count() == 0, 'the server timeout left stale call candidates'
+    assert page.locator('#online-return-call-decision').is_hidden(), 'the server timeout left a stale reopen button'
+    assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'the server timeout reopened an expired dialog'
 
     assert page.locator('#online-open-room').count() == 0, 'room operations button remained in the game action area'
     assert page.locator('#online-game-controls').get_attribute('class') == 'discard-controls', 'online action area did not use the shared controls class'
