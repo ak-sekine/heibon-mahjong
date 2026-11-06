@@ -40,12 +40,24 @@ Issue [#46](https://github.com/ak-sekine/heibon-mahjong/issues/46): Open（iPhon
 | `npm test` | 成功、1461 tests、失敗0 |
 | `npm run typecheck:worker` と `npm run build` | 成功。TypeScript型検査、Pages/PWA buildを含む |
 | `npm run build:itch` | 成功。3ファイル、展開後344,089 bytes、ZIP 89,699 bytes |
-| Chromium／WebKit Browser UI | 両方success。最大候補・4 viewport・itch iframe・局結果など既存UI回帰を確認 |
+| Chromium／WebKit Browser UI | run #421487で両方success。最大候補・4 viewport・itch iframe・局結果など既存UI回帰を確認。後続のrun #421558では両エンジンの回帰スクリプトもsuccess |
 | オフライン鳴き判断 | 自動表示、候補選択、見送り、卓確認、再表示、Escape、判断終了後の非表示を確認 |
 | オンライン鳴き判断 | サーバー期限を維持して開閉、卓表示中の期限切れ、期限確定後の候補・再表示ボタン消去を確認 |
-| standalone itch package | 相対パスで起動し、PWA登録を行わず、CPU対局で打牌するsmoke test成功 |
+| standalone itch package | run #421487で両エンジンsuccess。後続run #421558ではChromium success、WebKitは新規対局後の初回手牌ボタン待ちでtimeout |
 | Browser UI matrix audit / release freshness | 成功 |
 | Worker deploy / production test | 成功。Worker URLは`https://heibon-mahjong-online.ak-sekine.workers.dev`。本番7シナリオ成功 |
 | Pages build / deploy | 成功。両デプロイの記録SHAは上記`d963ca9…` |
 
 Chromium、WebKitはGitHub Actions上のブラウザー検証であり、iPhone Safari実機検証ではありません。itch.ioの実際のiframe、iPhoneのsafe-area・ブラウザーUI込みの表示、タッチ操作、実機オンライン期限切れ・再接続は未確認です。Issue #46は実機確認が終わるまでOpenのままにします。
+
+## テスト追補 — 2026-11-06
+
+本番コードの最終変更とデプロイはSHA `d963ca9fd4cf2a6970ec69cce6bf9ad28623ddbd`です。後続のSHA `d76aa7059fb0c53d57b0e207dacbadd771cccd31`と`3ed7faadad903b071ffb062364dff6a476edd05b`はブラウザーテストのみを変更しています。
+
+| run | 結果 |
+| --- | --- |
+| [#421513 attempt 1](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42151327112) | `verify`とChromium success。オンラインの保留中鳴き判断を再接続中に期限切れさせるシナリオはChromium／WebKit両方でsuccess。WebKitは後続の既存局結果ダイアログ再表示クリックでclick eventが発生せずtimeout。attempt 2の失敗job再実行はattempt別build artifactが見つからず、テストを開始できませんでした。 |
+| [#421558](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42155800715) | `verify-build` success。Chromium全job success。WebKitの`Run Vite and browser regressions`もsuccessし、局結果を閉じた後のEnter再表示とフォーカス復帰を確認。後続のstandalone itch smokeだけが、新規対局後に有効な手牌ボタンが現れずtimeout。 |
+| [#421539](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42153947821) | test-only push run。`verify` success。Chromiumのstandalone itch smokeは打牌後の河表示待ちでtimeout。WebKit jobは2026-11-06 03:32 UTC時点でOS依存パッケージ導入中のままです。 |
+
+run #421558の失敗は鳴き判断やブラウザー回帰スクリプト内ではなく、別ステップのstandalone itch CPU smokeで発生しました。前回の本番デプロイrun #421487ではitch smokeが両エンジンでsuccessしています。これらの自動テスト結果はiPhone Safari／実際のitch.io実機確認の代わりではありません。
