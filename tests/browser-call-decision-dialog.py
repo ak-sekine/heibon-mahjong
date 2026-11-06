@@ -40,7 +40,6 @@ window.loadCalls=(mode)=>{
  controller.match=startMatch(discardTile(game,3,game.players[3].drawnTile.id));render();
 };
 window.callState=()=>controller.game;
-window.loadBaseline=()=>{controller.newGame();render();};
 """
         route.fulfill(response=response, body=fixed_seat_fixture(source))
 
@@ -87,15 +86,11 @@ window.loadBaseline=()=>{controller.newGame();render();};
     for width, height in [(375, 634), (375, 667), (320, 568), (375, 568)]:
         page.set_viewport_size({'width': width, 'height': height})
         page.evaluate("window.scrollTo(0,0)")
-        page.evaluate('loadBaseline()')
-        page.wait_for_function("!document.querySelector('#local-table').hidden")
-        before = layout_snapshot()
         page.evaluate("loadCalls('max')")
         metrics = assert_dialog_fit(7)
         assert page.locator('#call-options button').filter(has_text='チー').count() == 5
         assert page.locator('#call-options button').filter(has_text='ポン').count() == 1
         assert page.locator('#call-options button').filter(has_text='大明カン').count() == 1
-        assert layout_snapshot() == before, {'before': before, 'after': layout_snapshot()}
         assert page.evaluate('scrollY') == 0
         print(f'{browser_name} {width}x{height} maximum seven-candidate dialog: {metrics}')
 
@@ -113,6 +108,7 @@ window.loadBaseline=()=>{controller.newGame();render();};
         reopen = page.locator('[data-panel-part="return-call-decision"]')
         assert reopen.is_visible()
         page.wait_for_function("document.activeElement===document.querySelector('[data-panel-part=return-call-decision]')")
+        before = layout_snapshot()
         rb = rect(reopen)
         assert rb['height'] >= 44 and rb['top'] >= 0 and rb['bottom'] <= height, rb
         assert page.evaluate("""()=>{
@@ -123,6 +119,7 @@ window.loadBaseline=()=>{controller.newGame();render();};
         reopen.click()
         assert page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
         assert page.locator('#call-options button').count() == 7
+        assert layout_snapshot() == before, {'before': before, 'after': layout_snapshot()}
         page.locator('#pass-calls').click()
         page.wait_for_function("callState().phase!=='awaiting-call'")
         assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
