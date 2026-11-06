@@ -51,7 +51,7 @@ window.callState=()=>controller.game;
         return element.evaluate('(node)=>{const r=node.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}}')
 
     def layout_snapshot():
-        return page.evaluate("""()=>Object.fromEntries(['.app-header','#local-score-strip-host','#local-table','#player-hand','.rivers','.center-info']
+        return page.evaluate("""()=>Object.fromEntries(['.app-header','#local-table-summary','#local-table','#player-hand','.rivers','.center-info']
           .map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return [selector,[r.x,r.y,r.width,r.height]]}))""")
 
     def assert_dialog_fit(expected):
