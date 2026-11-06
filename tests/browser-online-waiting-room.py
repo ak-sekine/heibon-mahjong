@@ -2743,6 +2743,23 @@ with sync_playwright() as p:
     assert '東風戦' not in center_after_reconnect and '半荘戦' not in center_after_reconnect, center_after_reconnect
     hand_after_reconnect = page.locator('#online-player-hand button[data-tile-id]').evaluate_all("nodes => nodes.map(node => node.dataset.tileId).join(',')")
     assert hand_after_reconnect == hand_before_reconnect, 'the online hand was not restored after reconnect'
+
+    page.evaluate('window.onlineMock.showCall(30000)')
+    wait_for("document.querySelector('#call-decision-dialog').open")
+    page.locator('#call-decision-view-table').click()
+    assert page.locator('#online-return-call-decision').is_visible(), 'the pending call could not be held before reconnect'
+    tickets_before_call_reconnect = page.evaluate('window.onlineMock.ticketRequests')
+    page.evaluate('window.__onlineMockConnectDelay = 1000; window.onlineMock.forceDisconnect()')
+    wait_for("document.querySelector('#online-connection').textContent.includes('切れました')")
+    page.evaluate('window.onlineMock.timeoutCall()')
+    wait_for(f'window.onlineMock.ticketRequests > {tickets_before_call_reconnect}', timeout=10000)
+    wait_for_synced_own_turn()
+    assert page.evaluate('window.onlineMock.currentDecision()') is None, 'the server retained an expired call after reconnect'
+    assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'reconnect reopened an expired call dialog'
+    assert page.locator('#online-return-call-decision').is_hidden(), 'reconnect restored a stale call reopen button'
+    assert page.locator('#online-call-options button[data-online-call]').count() == 0, 'reconnect restored stale call candidates'
+    assert '鳴き判断' not in page.locator('#online-game-action-status').inner_text(), 'reconnect left stale call status text'
+
     page.evaluate('''() => {
       window.onlineMock.dropNextGameResult();
       window.__shortNextActionTimeout = true;
