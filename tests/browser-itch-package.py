@@ -270,11 +270,10 @@ def run_iteration(browser, repetition):
               const accepted = Boolean(action && action.details?.previousPhase === 'awaiting-discard' &&
                 ['awaiting-ron','awaiting-call','awaiting-draw','awaiting-discard','won','wall-exhausted'].includes(action.details?.nextPhase) &&
                 action.details?.stateUpdateResult === 'accepted');
-              const samePhaseCall = rows.some(row => row.event === 'local_game_state_transition' &&
+              const confirmTransition = rows.some(row => row.event === 'local_game_state_transition' &&
                 row.details?.source === 'GameController.confirm' && row.details?.previousPhase === 'awaiting-discard' &&
-                row.details?.nextPhase === 'awaiting-discard');
-              const stateProgressed = accepted && (action.details.nextPhase !== 'awaiting-discard' || samePhaseCall);
-              return !hand && river + called === 1 && stateProgressed;
+                ['awaiting-ron','awaiting-call','awaiting-draw','awaiting-discard','won','wall-exhausted'].includes(row.details?.nextPhase));
+              return !hand && river + called === 1 && accepted && confirmTransition;
             }''', arg=selected_tile_id, timeout=5000)
         except Exception as error:
             try:
@@ -312,12 +311,12 @@ def run_iteration(browser, repetition):
         action = next((entry for entry in reversed(after['diagnostics'])
                        if entry['event'] == 'local_action_state_update_succeeded' and entry['details'].get('actionType') == 'discard'), None)
         assert action and action['details'].get('previousPhase') == 'awaiting-discard' and action['details'].get('nextPhase') in ('awaiting-ron', 'awaiting-call', 'awaiting-draw', 'awaiting-discard', 'won', 'wall-exhausted'), after
-        if action['details'].get('nextPhase') == 'awaiting-discard':
-            assert any(entry['event'] == 'local_game_state_transition' and
-                       entry['details'].get('source') == 'GameController.confirm' and
-                       entry['details'].get('previousPhase') == 'awaiting-discard' and
-                       entry['details'].get('nextPhase') == 'awaiting-discard'
-                       for entry in after['diagnostics']), after
+        confirm_transition = next((entry for entry in reversed(after['diagnostics'])
+                                   if entry['event'] == 'local_game_state_transition' and
+                                   entry['details'].get('source') == 'GameController.confirm' and
+                                   entry['details'].get('previousPhase') == 'awaiting-discard'), None)
+        assert confirm_transition and confirm_transition['details'].get('nextPhase') in (
+            'awaiting-ron', 'awaiting-call', 'awaiting-draw', 'awaiting-discard', 'won', 'wall-exhausted'), after
         location = page.evaluate('''tileId => ({
           hand: Boolean(document.querySelector(`#player-hand [data-tile-id="${CSS.escape(tileId)}"]`)),
           river: document.querySelectorAll(`.river-tile[data-tile-id="${CSS.escape(tileId)}"]`).length,
