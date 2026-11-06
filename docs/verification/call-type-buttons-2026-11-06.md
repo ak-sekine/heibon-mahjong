@@ -33,7 +33,7 @@ Chromium／WebKitのBrowser UI testが記録した`getBoundingClientRect()`値�
 
 | 検証 | 結果 |
 | --- | --- |
-| `npm test` | 成功、85 tests、失敗0 |
+| `npm test` | 成功、1,462 tests、失敗0（run #42247363486の実ログ） |
 | `npm run typecheck:worker` | 成功 |
 | `npm run build` | 成功。TypeScript検査、Pages build、PWA shell buildを含む |
 | `VITE_ONLINE_API_URL=https://heibon-mahjong-online.ak-sekine.workers.dev npm run build:itch` | 成功。ZIP内3ファイル、90,501 bytes |
@@ -69,7 +69,7 @@ ChromiumとWebKitで最大5件のチー候補を表示したときのダイア�
 
 | 検証 | 結果 |
 | --- | --- |
-| `npm test` | 成功、85 tests、失敗0 |
+| `npm test` | 成功、1,463 tests、失敗0（run #42254003679の実ログ） |
 | `npm run typecheck:worker` | 成功 |
 | `npm run build` | 成功。TypeScript、Pages、PWA buildを含む |
 | `VITE_ONLINE_API_URL=https://heibon-mahjong-online.ak-sekine.workers.dev npm run build:itch` | 成功 |
@@ -80,4 +80,4 @@ ChromiumとWebKitで最大5件のチー候補を表示したときのダイア�
 | Worker deploy / production test | success。本番Worker URL `https://heibon-mahjong-online.ak-sekine.workers.dev` |
 | Pages build / deploy | success。デプロイ環境URL `https://ak-sekine.github.io/heibon-mahjong/` |
 
-実装・Worker・Pages deployment SHA: `33cea3f5fae7d639ae3c8fb2cc8e1abd0581ad0f`。Issue #46はOpenのままです。iPhone Safari実機と公開中itch.ioページは未確認です。
+実装・Worker・Pages deployment SHA: `33cea3f5fae7d639ae3c8fb2cc8e1abd0581ad0f`。run #42254003679の実ログでは`npm test`は1,463 tests成功、失敗0です。Issue #46はOpenのままです。iPhone Safari実機と公開中itch.ioページは未確認です。

@@ -328,3 +328,48 @@ itch.io Draftに現在アップロード済みのZIPをそのまま使えます�
 今回の変更はWorker設定・自動テスト・文書で、クライアントbundleに変更はありません。itch.io Draftの既存ZIPを使えます。今回のWorker Origin許可のためのZIP再アップロードは不要です。Deploy runが生成した[SHA `4924682`用itch ZIP artifact](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42081081997/artifacts/13442341911)も記録用に残します。GitHub Pages版は同じSHAで再build/deployされ、Pages deployment successを確認しました。
 
 **Issue #46はOpenのままです。** Production testは自動通信の成功であり、iPhone実機のルーム作成、WebSocket Handshake Origin、Pages↔itch実機対局、鳴き・和了同期、Safari再接続、Draft公開準備の最終確認はユーザー確認待ちです。
+
+## 2026-11-06 最終確認
+
+### 最新mainと対象Actions
+
+作業開始時のGitHub `main` を再取得し、SHAは `7d82b29224c15f04aa940d8dfc3d62d0f4746b94`。指定された参考SHAと一致します。Issue #46本文を再取得しました。Issueコメントはありませんでした。
+
+| run | 対象SHA | 結果と確認内容 |
+| --- | --- | --- |
+| [#42247363486](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42247363486) | `c95cb315074ddfd5fe4ff9232b6564edcba250a1` | success。実ログの`npm test`は1,462 passed／0 failed。Worker型検査、Pages/PWA build、itch build、Chromium／WebKit Browser UI、standalone itch smoke、matrix audit、Worker deploy、Pages deploy、本番Worker通信検証がsuccess。 |
+| [#42254003679](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42254003679) | `33cea3f5fae7d639ae3c8fb2cc8e1abd0581ad0f` | success。実ログの`npm test`は1,463 passed／0 failed。最終「見送る」削除後のWorker型検査、Pages/PWA build、itch build、Chromium／WebKit Browser UI、standalone itch smoke、matrix audit、Worker deploy、Pages deploy、本番Worker通信検証がsuccess。 |
+| [#42256496527](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42256496527) | `7d82b29224c15f04aa940d8dfc3d62d0f4746b94` | success。検証記録文書更新のrun。docs-check success。変更分類によりアプリ検証、Browser UI、Worker／Pages build・deployはskipで、コードを再検証・再デプロイしたrunではない。 |
+
+従来の鳴き判断UI記録にあった「85 tests」は誤りとして訂正しました。成功ログで確認できる数はrun #42247363486が1,462件、実装SHAのrun #42254003679が1,463件です。ビルド／テスト成功、Worker／Pagesデプロイ成功、ユーザー実機報告は別の証拠として扱います。
+
+### 今回のユーザー実機報告
+
+以下はユーザー本人の報告を内容の範囲どおり記録したものです。確認日、端末、OS、ブラウザーバージョン、操作条件は提示されていないため補っていません。
+
+| 項目 | 報告と扱い |
+| --- | --- |
+| GitHub Pages版 | 「pagesで確認したところ問題なさそうです。」概ね良好な操作確認報告。PWAのインストール、更新、オフライン対局を個別に確認した報告ではない。 |
+| itch.io版 | 「itch.ioも問題なさそうです。」概ね良好な操作確認報告。PC実機とiPhone Safari実機を区別できる情報はなく、どちらか一方・両方の確認と推定しない。 |
+| Pages版とitch.io版の相互オンライン対戦 | 「相互オンラインも大丈夫そうです。」概ね良好な確認報告。Pages側／itch.io側のどちらがルーム作成したか、両方向を個別に確認したか、準備・座席確定・対局開始・打牌・鳴き・和了結果の個別同期は、この報告からは確定しない。 |
+| オンライン再接続 | 「再接続も問題なさそうです。」概ね良好な確認報告。切断条件、復帰時間、接続方向、対局状態の各項目を個別に確認したとは扱わない。 |
+
+既存記録の2026-11-05のユーザー報告では、iPhone Safari上のitch Draft起動はOK、CPU対局は「問題なさそう」、画面画像と実行Origin `https://html-classic.itch.zone` は報告済みです。Worker受信HTTP OPTIONSで同Originを観測し、許可前の拒否2件も確認済みですが、WebSocket Handshake Originの実測とは区別しています。今回の一般的な報告をPC実機結果へ転記しません。
+
+### 受入条件と最終判定
+
+| Issue #46受入条件 | 状態 | 根拠・未確認範囲 |
+| --- | --- | --- |
+| itch.io ZIPを再現可能に生成し、直下`index.html`と相対参照を持つ | 達成 | `build:itch`とパッケージ検査、Actions artifactで確認。Pages PWA用ファイル・検証ページを分離する手順も既存記録にある。 |
+| 非公開DraftでPC・iPhone Safariから起動し、CPU対局を開始・操作 | 一部達成 | iPhone Safariの起動OK／CPU対局「問題なさそう」は既存のユーザー報告。今回のitch報告は端末不明。PC実機は未確認。個別のタッチ操作・鳴き判断UI・ページスクロール有無を今回の報告からは確認できない。Chromium／WebKit UIとitch smokeは自動検証。 |
+| Pages作成→itch参加、itch作成→Pages参加と、準備・席確定・開始・打牌・鳴き・和了結果を実機で確認 | 一部達成 | Actionsの本番Worker production testは両方向ルーム作成／参加、準備、座席確定、開始、打牌同期を自動確認。今回のユーザー報告は相互オンライン全体を概ね良好とするが、方向と個別操作は不明。鳴き・和了結果同期の実機根拠は未確認。 |
+| 片側の再接続後も実機対局を継続 | 一部達成 | 本番Worker production testで切断・再接続後の状態同期を自動確認。ユーザーも再接続を概ね良好と報告したが、切断条件・端末・回復時間・状態各項目は未確認。 |
+| 不許可Origin拒否とPages PWAの回帰なし | 一部達成 | Workerの許可／拒否Originテスト、Chromium／WebKit PWA回帰、Pages build/deployは成功。iPhone SafariでのPWAインストール、更新、オフラインCPU対局は未確認。itch OriginのHTTP実測記録はあるが、実機WebSocket Handshake Originは未確認。 |
+| 未確認のブラウザー・PWA・実機項目を明記 | 達成 | 本表および既存の実機チェックリストに未確認事項を区別して記載。 |
+| 公開素材・手順を整え、一般公開へ進むか判断できる状態 | 一部達成 | 説明、操作方法、対応環境案、無料設定案、PWA案内、ZIP更新手順は文書化済み。公開用cover／screenshotは未確定。第三者素材・コード依存・名称・ルール説明を含む権利の最終確認は未完了で、itch.io上の無料・任意支援設定も実際のDraft設定として確認していない。一般公開へ進めるとの判断根拠が不足。 |
+
+**最終判定：Issue #46はOpenのまま維持します。** 必須受入条件のうちPC実機確認、実機の両方向・個別同期範囲、再接続の具体状態、公開素材・権利・Draft料金設定の最終確認が未確定です。ユーザーの概ね良好な報告と自動検証を厳密な個別項目OKへ拡張せず、未確認を残したままCloseしません。
+
+残作業は、PC実機のDraft／CPU確認、必要に応じてPCとiPhoneの対象を明示した相互対戦・再接続操作記録、鳴き・和了局面が出た場合の同期確認、公開用画像選定、第三者素材・コード依存・表示文言の権利確認、Draftの無料・支援設定確認です。Android／Firefox等の追加対応やitch内PWA導入は本Issueの必須条件にせず、追加対応を行う場合は別Issue候補として扱います。
+
+検証記録更新は文書のみの変更です。ゲームテストの再実行・Worker／Pages再デプロイは行わず、GitHub Actionsのdocs-checkを確認します。
