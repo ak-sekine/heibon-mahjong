@@ -98,21 +98,21 @@ window.callState=()=>controller.game;
             page.keyboard.press('Escape')
             assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
             assert page.evaluate("callState().phase==='awaiting-call'")
-            assert page.locator('[data-panel-part="return-call-decision"]').is_visible()
-            page.locator('[data-panel-part="return-call-decision"]').click()
+            assert page.locator('#local-game-controls [data-panel-part="return-call-decision"]').is_visible()
+            page.locator('#local-game-controls [data-panel-part="return-call-decision"]').click()
             assert page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
 
         page.locator('#call-decision-view-table').click()
         assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
         assert page.evaluate("callState().phase==='awaiting-call'")
-        reopen = page.locator('[data-panel-part="return-call-decision"]')
+        reopen = page.locator('#local-game-controls [data-panel-part="return-call-decision"]')
         assert reopen.is_visible()
-        page.wait_for_function("document.activeElement===document.querySelector('[data-panel-part=return-call-decision]')")
+        page.wait_for_function("document.activeElement===document.querySelector('#local-game-controls [data-panel-part=return-call-decision]')")
         before = layout_snapshot()
         rb = rect(reopen)
         assert rb['height'] >= 44 and rb['top'] >= 0 and rb['bottom'] <= height, rb
         assert page.evaluate("""()=>{
-          const b=document.querySelector('[data-panel-part="return-call-decision"]').getBoundingClientRect();
+          const b=document.querySelector('#local-game-controls [data-panel-part="return-call-decision"]').getBoundingClientRect();
           const table=document.querySelector('#local-table').getBoundingClientRect();
           return b.top>=table.bottom;
         }"""), {'button': rb, 'table': rect(page.locator('#local-table'))}
@@ -123,7 +123,7 @@ window.callState=()=>controller.game;
         page.locator('#pass-calls').click()
         page.wait_for_function("callState().phase!=='awaiting-call'")
         assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
-        assert page.locator('[data-panel-part="return-call-decision"]').is_hidden()
+        assert page.locator('#local-game-controls [data-panel-part="return-call-decision"]').is_hidden()
         page.wait_for_function("document.activeElement===document.querySelector('#local-game-controls [data-panel-part=action-status]')")
 
         for mode, count in [('one', 1), ('three', 3), ('mixed', 3), ('red', 2)]:
