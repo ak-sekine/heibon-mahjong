@@ -88,9 +88,8 @@ window.loadTurn=()=>{
         assert page.locator('#call-decision-title').inner_text() == {'pon':'ポンの選択','chi':'チーの選択','kan':'カンの選択'}[kind]
         options = page.locator('#call-decision-options-host button[data-action-choice="call"]')
         assert options.count() == expected
-        assert all(label in {'ポン','チー','大明カン'} for label in options.all_text_contents())
         expected_label = {'pon':'ポン','chi':'チー','kan':'大明カン'}[kind]
-        assert options.filter(has_text=expected_label).count() == expected
+        assert options.evaluate_all("nodes=>nodes.map(n=>n.childNodes[0]?.textContent.trim())") == [expected_label] * expected
         assert page.locator('#call-decision-options-host .tile-svg').count() > 0
         assert options.evaluate_all("nodes=>nodes.every(n=>{const r=n.getBoundingClientRect();return r.width>=44&&r.height>=44})")
         assert page.locator('#call-decision-options-host .tile-svg').evaluate_all("nodes=>nodes.every(n=>{const r=n.getBoundingClientRect();return r.width>=22&&r.height>=31})")
