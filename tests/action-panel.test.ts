@@ -24,6 +24,8 @@ class FakeClassList {
 }
 
 class FakeElement {
+  id = '';
+  open = false;
   hidden = false;
   disabled = false;
   focused = false;
@@ -54,6 +56,8 @@ class FakeElement {
       ? [child, ...child.querySelectorAll(selector)] : []);
   }
   addEventListener(name: string, callback: (event: Event) => void): void { this.listeners.set(name, callback); }
+  showModal(): void { this.open = true; }
+  close(): void { this.open = false; }
   replaceChildren(...children: unknown[]): void {
     for (const child of this.children) if (child instanceof FakeElement) child.parent = null;
     this.children.splice(0, this.children.length, ...children);
@@ -79,18 +83,28 @@ class FakeElement {
   }
 }
 
-function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPanelOptions = {}) {
+function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPanelOptions = {}, withClosedCallDialog = false) {
+  const queried = new Map<string, FakeElement>();
   const doc = {
     activeElement: null as FakeElement | null,
     createElement: (_tag: string) => new FakeElement(doc),
     createTextNode: (text: string) => text,
-    querySelector: (_selector: string) => null,
+    documentElement: { classList: new FakeClassList() },
+    querySelector: (selector: string) => queried.get(selector) ?? null,
   };
   const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
   const originalElement = Object.getOwnPropertyDescriptor(globalThis, 'Element');
   Object.defineProperty(globalThis, 'document', { configurable: true, value: doc });
   Object.defineProperty(globalThis, 'Element', { configurable: true, value: FakeElement });
   const root = new FakeElement(doc);
+  if (withClosedCallDialog) {
+    root.id = 'local-game-controls';
+    queried.set('#call-decision-dialog', new FakeElement(doc));
+    queried.set('#call-decision-options-host', new FakeElement(doc));
+    queried.set('#call-decision-status', new FakeElement(doc));
+    queried.set('.call-decision-target', new FakeElement(doc));
+    queried.set('#call-decision-view-table', new FakeElement(doc));
+  }
   root.dataset.panelPart = 'root';
   const parts = new Map<string, FakeElement>();
   const parents: Record<string, string> = {
@@ -264,6 +278,21 @@ test('ActionPanel delegates static and choice clicks through one mode callback a
     click(callButton);
     assert.deepEqual(events, [{ type: 'discard' }, { type: 'select-call', optionId: 'call-1' }]);
     assert.equal(fixture.parts.get('action-status')!.focused, true);
+  } finally { fixture.restore(); }
+});
+
+test('closed call dialog does not block a legal kan choice', () => {
+  const events: ActionPanelEvent[] = [];
+  const fixture = panelFixture(event => events.push(event), {}, true);
+  try {
+    fixture.panel.update(state({
+      kanGroup: { visible: true, status: 'カンする面子を選択', options: [
+        { id: 'ankan-1', label: '暗カン', tiles: [], enabled: true },
+      ] },
+    }));
+    const kanChoice = fixture.parts.get('kan-options')!.children[0] as FakeElement;
+    fixture.root.listeners.get('click')!({ target: kanChoice } as unknown as Event);
+    assert.deepEqual(events, [{ type: 'select-kan', optionId: 'ankan-1' }]);
   } finally { fixture.restore(); }
 });
 

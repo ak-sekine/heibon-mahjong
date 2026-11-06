@@ -383,7 +383,8 @@ export class ActionPanel {
         : this.trace(choice, choice.dataset.diagnosticActionType ?? 'unknown');
       this.pendingPointerTrace = null;
       this.recordInput('action_panel_click_received', choice, trace);
-      if (choice.disabled || choice.hidden || choice.closest('[hidden]') || (this.callDialog && !this.callDialog.open)) return;
+      if (choice.disabled || choice.hidden || choice.closest('[hidden]') ||
+        (choice.dataset.actionChoice === 'call' && this.callDialog && !this.callDialog.open)) return;
       const optionId = choice.dataset.optionId;
       if (!optionId) return;
       this.handler({ type: choice.dataset.actionChoice === 'call' ? 'select-call' : 'select-kan', optionId }, trace);
