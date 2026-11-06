@@ -196,6 +196,12 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         second_page.goto(base_url, wait_until='networkidle')
         second_page.wait_for_function('navigator.serviceWorker.controller !== null')
         page.on('dialog', lambda dialog: dialog.accept())
+        call_dialog = page.locator('#call-decision-dialog')
+        if call_dialog.evaluate('(node) => node.open'):
+            # A pending call is a modal. Return to the unchanged table before
+            # using the PWA update notice, keeping the decision unanswered.
+            page.locator('#call-decision-view-table').click()
+            assert page.locator('#local-game-controls [data-panel-part="return-call-decision"]').is_visible()
         page.locator('#pwa-update-notice button').click()
         page.get_by_text('別のタブでも開かれています。ほかのタブを閉じてから更新してください。').wait_for(timeout=10000)
         assert page.evaluate("document.querySelector('main').dataset.pwaVersion || 'v1'") == 'v1'
