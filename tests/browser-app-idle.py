@@ -16,6 +16,7 @@ with sync_playwright() as playwright:
         assert page.locator('#local-table').is_hidden(), f'{label}: offline table is visible'
         assert page.locator('#local-game-controls').is_hidden(), f'{label}: offline operation controls are visible'
         assert page.locator('#local-game-controls button:visible').count() == 0
+        assert page.locator('dialog[open]').count() == 0, f'{label}: unexpected modal is open: {page.locator("dialog[open]").evaluate_all("nodes => nodes.map(node => node.id)")}'
         width = page.evaluate('({viewport: innerWidth, document: document.documentElement.scrollWidth})')
         assert width['document'] <= width['viewport'], f'{label}: horizontal overflow at 320px: {width}'
 
@@ -24,6 +25,8 @@ with sync_playwright() as playwright:
     assert_waiting('reload')
 
     page.locator('#main-menu-toggle').click()
+    page.wait_for_timeout(100)
+    assert page.locator('dialog[open]').count() == 0, f"opening the menu opened an unrelated dialog: {page.locator('dialog[open]').evaluate_all('nodes => nodes.map(node => node.id)')}"
     page.locator('#new-game').click()
     assert page.locator('#new-game-dialog #new-game-rules-editor').is_visible()
     assert page.locator('#rule-settings-dialog').count() == 0

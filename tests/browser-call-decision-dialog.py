@@ -107,6 +107,7 @@ window.callState=()=>controller.game;
         assert page.evaluate("callState().phase==='awaiting-call'")
         reopen = page.locator('#local-game-controls [data-panel-part="return-call-decision"]')
         assert reopen.is_visible()
+        assert reopen.is_enabled(), 'the table-return button was not enabled'
         page.wait_for_function("document.activeElement===document.querySelector('#local-game-controls [data-panel-part=return-call-decision]')")
         before = layout_snapshot()
         rb = rect(reopen)

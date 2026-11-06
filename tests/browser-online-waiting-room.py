@@ -2350,6 +2350,7 @@ with sync_playwright() as p:
     seconds_before_wait = page.evaluate("Number(document.querySelector('#call-decision-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
     page.wait_for_function("seconds => Number(document.querySelector('#call-decision-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0) < seconds", arg=seconds_before_wait, timeout=3000)
     seconds_after_wait = page.evaluate("Number(document.querySelector('#call-decision-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
+    assert page.locator('#online-return-call-decision').is_enabled(), 'the online reopen button was disabled while the server timer continued'
     page.locator('#online-return-call-decision').click()
     assert page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'the online call window could not be reopened'
     seconds_after_reopen = page.evaluate("Number(document.querySelector('#call-decision-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")

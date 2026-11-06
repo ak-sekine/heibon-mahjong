@@ -299,6 +299,7 @@ export class ActionPanel {
       if (callDialogOwner === this) this.finishCallDecision();
       else if (this.originalCallControlsParent && callControls.parentElement !== this.originalCallControlsParent) this.originalCallControlsParent.append(callControls);
     }
+    returnCall.disabled = returnCall.hidden;
 
     const kanControls = this.part('kan-controls');
     kanControls.hidden = !state.kanGroup.visible;
@@ -428,8 +429,10 @@ export class ActionPanel {
     this.callDialog.close();
     this.callDecisionDismissed = returnToTable;
     document.documentElement.classList.remove('call-decision-open');
-    this.part('return-call-decision').hidden = !returnToTable;
-    if (returnToTable) this.part('return-call-decision').focus({ preventScroll: true });
+    const returnCall = this.part('return-call-decision') as HTMLButtonElement;
+    returnCall.hidden = !returnToTable;
+    returnCall.disabled = !returnToTable;
+    if (returnToTable) returnCall.focus({ preventScroll: true });
   }
 
   private finishCallDecision(): void {
