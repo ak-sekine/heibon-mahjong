@@ -6,6 +6,22 @@ import { discardTile } from '../src/game/discard.ts';
 import { callStart } from './calls-fixture.ts';
 import { inventory } from './helpers.ts';
 
+test('maximum display fixture has seven visually distinct candidates across chi, pon, and daiminkan', () => {
+  const initial = callStart(3, { 0: ['23m', '444m', '50m', '6m', '789p', '12z'] }, 'man-4');
+  const game = discardTile(initial, 3, initial.players[3].drawnTile!.id);
+  const raw = getCallOptions(game, 0);
+  const display = uniqueCallOptions(raw);
+  assert.equal(raw.length, 9, 'physical combinations remain available to the decision logic');
+  assert.equal(display.length, 7);
+  assert.deepEqual(display.map(option => option.type).sort(), ['chi', 'chi', 'chi', 'chi', 'chi', 'daiminkan', 'pon']);
+  assert.ok(display.every(option => raw.includes(option)));
+  for (const option of display) {
+    const result = declareCall(game, 0, option.id);
+    inventory(result, initial);
+    assert.deepEqual(result.players[0].melds![0].tiles, option.tiles);
+  }
+});
+
 for (const [name, hand, called, count] of [
   ['duplicate pon', ['555m','234p','678s','19p','12z'], 'red:man-5', 1],
   ['duplicate chi and distinct sequences', ['334467m','234p','19p','12z'], 'man-5', 3],

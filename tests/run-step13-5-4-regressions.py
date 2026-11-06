@@ -15,7 +15,7 @@ SUITES = [
     'browser-step13-5-3', 'browser-step13-5-2', 'browser-step13-5',
     'browser-step13-4', 'browser-step13-3', 'browser-step13-3-1',
     'browser-step13-3-regression', 'browser-action-controls',
-    'browser-call-viewport', 'browser-kan-page', 'browser-check',
+    'browser-call-decision-dialog', 'browser-kan-page', 'browser-check',
     'browser-tsumo-fixture', 'browser-cpu-riichi', 'browser-cpu-tsumo',
     'browser-match', 'browser-riichi', 'browser-ron', 'browser-scoring',
     'browser-shanten', 'dora-layout-check',

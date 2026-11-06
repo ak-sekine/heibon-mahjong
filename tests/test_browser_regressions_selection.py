@@ -85,6 +85,11 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
         self.assertEqual(len(both), 2)
         self.assertEqual({SUITE[index]['browser'] for index in both}, {'chromium', 'webkit'})
 
+    def test_call_decision_dialog_runs_in_both_engines(self):
+        both = select_scenarios(['browser-call-decision-dialog.py'], 'both')
+        self.assertEqual(len(both), 2)
+        self.assertEqual({SUITE[index]['browser'] for index in both}, {'chromium', 'webkit'})
+
     def test_unknown_script_is_rejected(self):
         with self.assertRaisesRegex(ValueError, 'unknown script'):
             select_scenarios(['missing-browser-test.py'])

@@ -37,6 +37,9 @@ export function createLocalActionPanelState(
   const kyuushu = ownTurn && canDeclareKyuushuKyuuhai(game, playerId);
   const canRon = player.control === 'human' && canDeclareRon(game, playerId);
   const callOptions = game.phase === 'awaiting-call' ? getCallOptions(game, playerId) : [];
+  const callTarget = callOptions.length
+    ? game.players[callOptions[0].fromPlayerId].river.find(tile => tile.id === callOptions[0].calledTileId)?.tile ?? null
+    : null;
   const ronTile = canRon ? getRonTile(game) : null;
   const callChoices: ActionChoiceOption[] = callOptions.map(option => {
     const label = option.type === 'pon' ? 'ポン' : option.type === 'daiminkan' ? '大明カン' : 'チー';
@@ -79,6 +82,7 @@ export function createLocalActionPanelState(
       tsumo: button(canTsumo, canTsumo && !progressing, 'ツモ和了'),
       kyuushu: button(kyuushu, kyuushu && !progressing, '九種九牌'),
       'kan-toggle': button(kanOptions.length > 0, kanOptions.length > 0 && !progressing, 'カン'),
+      'return-call-decision': button(false, false, '鳴き判断に戻る'),
       ron: button(canRon, canRon && !progressing, 'ロン和了'),
       'pass-ron': button(canRon, canRon && !progressing, '見逃す'),
       'pass-call': button(callChoices.length > 0, callChoices.length > 0 && !progressing, '見送る'),
@@ -89,7 +93,7 @@ export function createLocalActionPanelState(
         match.status === 'match-ended' && Boolean(match.lastSettlement?.matchEnded), '順位確認'),
     },
     actionStatus,
-    callGroup: { visible: callChoices.length > 0, status: '', options: callChoices },
+    callGroup: { visible: callChoices.length > 0, status: '', options: callChoices, target: callTarget },
     kanGroup: {
       visible: kanChoicesOpen && kanChoices.length > 0,
       status: 'カンする面子を選択してください。',

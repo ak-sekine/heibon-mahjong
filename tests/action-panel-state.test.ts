@@ -213,6 +213,8 @@ test('call choices and pass state match between a local call window and server l
     actionChoicesForDisplay('call', online.callGroup.options).map(option => [option.id, option.label]),
   );
   assert.equal(online.buttons['pass-call'].enabled, true);
+  assert.ok(local.callGroup.target);
+  assert.deepEqual(online.callGroup.target, local.callGroup.target);
   assert.equal(local.callGroup.status, '');
   assert.equal(local.actionStatus, '鳴き判断を待っています。');
   assert.equal(online.callGroup.status, '鳴き判断の残り 10 秒です。');
@@ -228,6 +230,12 @@ test('call choices and pass state match between a local call window and server l
   assert.equal(expired.callGroup.status.includes('残り'), false);
   assert.equal(expired.actionStatus, '鳴き判断を待っています。');
   assert.equal(expired.buttons['pass-call'].enabled, false);
+  assert.equal(expired.callGroup.visible, false, 'expired server windows cannot be reopened');
+
+  const answered = createOnlineActionPanelState(onlineViewFor(game, {
+    decision: { ...decision, answered: true },
+  }), null, false, false, false, 5);
+  assert.equal(answered.callGroup.visible, false, 'a server-confirmed answer closes the decision dialog');
 
   const resolved = createOnlineActionPanelState(onlineViewFor(game), null, false, false, false, null);
   assert.equal(resolved.callGroup.visible, false);

@@ -40,6 +40,8 @@ export function createOnlineActionPanelState(
         enabled: callsAllowed && !actionPending,
       };
     }) : [];
+  const firstCall = view.self.callOptions[0];
+  const callTarget = firstCall?.tiles.find(tile => tile.id === firstCall.calledTileId)?.tile ?? null;
   const kanChoices: ActionChoiceOption[] = view.self.kanOptions.map(option => ({
     id: option.id,
     label: option.type === 'ankan' ? '暗カン' : '加カン',
@@ -86,6 +88,7 @@ export function createOnlineActionPanelState(
       tsumo: button(ownTurn && view.self.canTsumo, ownTurn && view.self.canTsumo && !actionPending, 'ツモ和了'),
       kyuushu: button(ownTurn && view.self.canKyuushuKyuuhai, ownTurn && view.self.canKyuushuKyuuhai && !actionPending, '九種九牌'),
       'kan-toggle': button(ownTurn && kanChoices.length > 0, ownTurn && kanChoices.length > 0 && !actionPending, 'カン'),
+      'return-call-decision': button(false, false, '鳴き判断に戻る'),
       ron: button(decision?.type === 'ron', ronAllowed && !actionPending, 'ロン和了'),
       'pass-ron': button(decision?.type === 'ron', ronAllowed && !actionPending, '見逃す'),
       'pass-call': button(decision?.type === 'call', callsAllowed && !actionPending, '見送る'),
@@ -100,9 +103,10 @@ export function createOnlineActionPanelState(
     },
     actionStatus,
     callGroup: {
-      visible: decision?.type === 'call',
+      visible: decision?.type === 'call' && !decision.answered && !expired,
       status: decision?.type === 'call' ? decisionStatus : '',
       options: callChoices,
+      target: callTarget,
     },
     kanGroup: {
       visible: kanChoicesOpen && ownTurn && kanChoices.length > 0,

@@ -30,7 +30,7 @@ export function scrollPageToTop(reason: ProgrammaticScrollReason): void {
 
 /** Keep action panels in normal flow and leave page position under user control. */
 export function installCallViewport(): void {
-  const panels = ['#ron-controls','#call-controls','#kan-controls','#online-ron-controls','#online-call-controls','#online-kan-controls']
+  const panels = ['#ron-controls','#kan-controls','#online-ron-controls','#online-kan-controls']
     .map(selector => document.querySelector<HTMLElement>(selector))
     .filter((panel): panel is HTMLElement => panel !== null);
   const main = panels[0]?.closest('main');

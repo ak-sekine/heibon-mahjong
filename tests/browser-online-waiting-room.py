@@ -2338,9 +2338,26 @@ with sync_playwright() as p:
     wait_for("document.querySelector('#online-ron-controls').hidden === true")
     page.evaluate('window.onlineMock.showCall()')
     wait_for("document.querySelector('#online-call-controls').hidden === false")
+    assert page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'the online call window did not open its modal'
     assert page.locator('#online-call-options button[data-online-call]').count() == 1, 'the legal call option was not shown'
+    call_actions_before_view = page.evaluate('window.onlineMock.gameActions.length')
+    seconds_before_view = page.locator('#call-decision-status').inner_text()
+    assert '残り' in seconds_before_view, seconds_before_view
+    page.locator('#call-decision-view-table').click()
+    assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'viewing the table closed no dialog'
+    assert page.locator('#online-return-call-decision').is_visible(), 'the online reopen button was not shown'
+    assert page.evaluate('window.onlineMock.gameActions.length') == call_actions_before_view, 'viewing the table answered the call window'
+    seconds_before_wait = page.evaluate("Number(document.querySelector('#call-decision-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
+    page.wait_for_function("seconds => Number(document.querySelector('#call-decision-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0) < seconds", arg=seconds_before_wait, timeout=3000)
+    seconds_after_wait = page.evaluate("Number(document.querySelector('#call-decision-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
+    page.locator('#online-return-call-decision').click()
+    assert page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'the online call window could not be reopened'
+    seconds_after_reopen = page.evaluate("Number(document.querySelector('#call-decision-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
+    assert seconds_after_reopen <= seconds_after_wait < seconds_before_wait, (seconds_before_wait, seconds_after_wait, seconds_after_reopen)
     page.locator('#online-call-options button[data-online-call]').click()
     wait_for("document.querySelector('#online-call-controls').hidden === true")
+    assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open'), 'a submitted online call left the dialog open'
+    assert page.locator('#online-return-call-decision').is_hidden(), 'a submitted online call left a reopen button'
 
     assert page.locator('#online-open-room').count() == 0, 'room operations button remained in the game action area'
     assert page.locator('#online-game-controls').get_attribute('class') == 'discard-controls', 'online action area did not use the shared controls class'

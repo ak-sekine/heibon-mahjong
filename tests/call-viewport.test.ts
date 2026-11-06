@@ -90,18 +90,18 @@ function dispatchTouch(target: EventTarget, type: string, touches: Array<{ clien
   target.dispatchEvent(event);
 }
 
-test('call viewport never scrolls the page on initial display, resize, or panel height change', () => {
+test('ron and kan viewport monitoring never scrolls the page on initial display, resize, or panel height change', () => {
   const fixture = viewportFixture();
   diagnosticLog.clear();
   try {
     installCallViewport();
-    const panel = fixture.panels.get('#call-controls')!;
+    const panel = fixture.panels.get('#ron-controls')!;
     panel.hidden = false;
     panel.rect = { top: 700, bottom: 920, left: 0, right: 300 };
     fixture.observerFor(panel).trigger();
     assert.equal(fixture.frames.length, 0);
     assert.equal(fixture.scrollCalls.length, 0);
-    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_panel_displayed' && entry.details.source === 'initial_display_no_page_scroll'));
+    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_panel_displayed' && entry.details.panelType === 'ron'));
 
     panel.rect = { ...panel.rect, bottom: 960 };
     fixture.observerFor(panel).trigger();
@@ -121,19 +121,19 @@ test('call viewport never scrolls the page on initial display, resize, or panel 
   } finally { fixture.restore(); diagnosticLog.clear(); }
 });
 
-test('manual touch scrolling remains in control; ron and kan remain in flow', async () => {
+test('manual touch scrolling remains in control while ron and kan remain in flow', async () => {
   const fixture = viewportFixture();
   diagnosticLog.clear();
   try {
     installCallViewport();
-    const call = fixture.panels.get('#call-controls')!;
     dispatchTouch(fixture.mockWindow, 'touchstart', [{ clientX: 10, clientY: 200 }]);
-    call.hidden = false;
-    call.rect = { top: 700, bottom: 920, left: 0, right: 300 };
-    fixture.observerFor(call).trigger();
+    const ron = fixture.panels.get('#ron-controls')!;
+    ron.hidden = false;
+    ron.rect = { top: 700, bottom: 920, left: 0, right: 300 };
+    fixture.observerFor(ron).trigger();
     dispatchTouch(fixture.mockWindow, 'touchmove', [{ clientX: 10, clientY: 130 }]);
     assert.equal(fixture.scrollCalls.length, 0);
-    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_panel_displayed' && entry.details.source === 'initial_display_no_page_scroll'));
+    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_panel_displayed' && entry.details.panelType === 'ron'));
 
     dispatchTouch(fixture.mockWindow, 'touchend', []);
     Object.defineProperty(fixture.mockWindow, 'scrollY', { configurable: true, value: 120 });
@@ -142,8 +142,8 @@ test('manual touch scrolling remains in control; ron and kan remain in flow', as
     assert.equal(fixture.scrollCalls.length, 0);
     assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_user_scroll' && entry.details.source === 'user' && entry.details.scrollY === 120));
 
-    call.hidden = true;
-    fixture.observerFor(call).trigger();
+    ron.hidden = true;
+    fixture.observerFor(ron).trigger();
     for (const selector of ['#ron-controls', '#kan-controls']) {
       const panel = fixture.panels.get(selector)!;
       panel.hidden = false;

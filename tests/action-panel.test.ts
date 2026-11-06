@@ -33,6 +33,7 @@ class FakeElement {
   type = '';
   tabIndex = 0;
   parent: FakeElement | null = null;
+  get parentElement(): FakeElement | null { return this.parent; }
   readonly dataset: Record<string, string> = {};
   readonly attributes = new Map<string, string>();
   readonly children: unknown[] = [];
@@ -83,6 +84,7 @@ function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPan
     activeElement: null as FakeElement | null,
     createElement: (_tag: string) => new FakeElement(doc),
     createTextNode: (text: string) => text,
+    querySelector: (_selector: string) => null,
   };
   const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
   const originalElement = Object.getOwnPropertyDescriptor(globalThis, 'Element');
@@ -126,6 +128,7 @@ function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPan
 function state(overrides: Partial<ActionPanelState> = {}): ActionPanelState {
   const labels: Record<ActionPanelPart, string> = {
     discard: '打牌する', riichi: 'リーチ', tsumo: 'ツモ和了', kyuushu: '九種九牌', 'kan-toggle': 'カン',
+    'return-call-decision': '鳴き判断に戻る',
     ron: 'ロン和了', 'pass-ron': '見逃す', 'pass-call': '見送る', 'cancel-kan': 'キャンセル',
     'next-round': '次の局へ', 'show-result': '局の結果', 'show-match-result': '順位確認',
   };
