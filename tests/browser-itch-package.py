@@ -258,22 +258,55 @@ def run_iteration(browser, repetition):
         # The action log proves the controller accepted a discard transition;
         # the physical public tile ID must then occur exactly once in the river
         # or in a called meld. A river-only condition rejects valid calls.
-        page.wait_for_function('''tileId => {
-          const hand = document.querySelector(`#player-hand [data-tile-id="${CSS.escape(tileId)}"]`);
-          const river = document.querySelectorAll(`.river-tile[data-tile-id="${CSS.escape(tileId)}"]`).length;
-          const called = document.querySelectorAll(`.open-melds .called-tile[data-tile-id="${CSS.escape(tileId)}"]`).length;
-          const rows = JSON.parse(localStorage.getItem('heibon-mahjong-diagnostics-v2') || '[]');
-          const accepted = rows.some(row => row.event === 'local_action_state_update_succeeded' &&
-            row.details?.actionType === 'discard' && row.details?.previousPhase === 'awaiting-discard' &&
-            ['awaiting-ron','awaiting-call','awaiting-draw','awaiting-discard','won','wall-exhausted'].includes(row.details?.nextPhase) &&
-            row.details?.stateUpdateResult === 'accepted');
-          const samePhaseCall = rows.some(row => row.event === 'local_game_state_transition' &&
-            row.details?.source === 'GameController.confirm' && row.details?.previousPhase === 'awaiting-discard' &&
-            row.details?.nextPhase === 'awaiting-discard');
-          const action = rows.find(row => row.event === 'local_action_state_update_succeeded' && row.details?.actionType === 'discard');
-          const stateProgressed = accepted && (action.details.nextPhase !== 'awaiting-discard' || samePhaseCall);
-          return !hand && river + called === 1 && stateProgressed;
-        }''', arg=selected_tile_id, timeout=5000)
+        try:
+            page.wait_for_function('''tileId => {
+              const hand = document.querySelector(`#player-hand [data-tile-id="${CSS.escape(tileId)}"]`);
+              const river = document.querySelectorAll(`.river-tile[data-tile-id="${CSS.escape(tileId)}"]`).length;
+              const called = document.querySelectorAll(`.open-melds .called-tile[data-tile-id="${CSS.escape(tileId)}"]`).length;
+              const rows = JSON.parse(localStorage.getItem('heibon-mahjong-diagnostics-v2') || '[]');
+              const actions = rows.filter(row => row.event === 'local_action_state_update_succeeded' &&
+                row.details?.actionType === 'discard');
+              const action = actions.at(-1);
+              const accepted = Boolean(action && action.details?.previousPhase === 'awaiting-discard' &&
+                ['awaiting-ron','awaiting-call','awaiting-draw','awaiting-discard','won','wall-exhausted'].includes(action.details?.nextPhase) &&
+                action.details?.stateUpdateResult === 'accepted');
+              const samePhaseCall = rows.some(row => row.event === 'local_game_state_transition' &&
+                row.details?.source === 'GameController.confirm' && row.details?.previousPhase === 'awaiting-discard' &&
+                row.details?.nextPhase === 'awaiting-discard');
+              const stateProgressed = accepted && (action.details.nextPhase !== 'awaiting-discard' || samePhaseCall);
+              return !hand && river + called === 1 && stateProgressed;
+            }''', arg=selected_tile_id, timeout=5000)
+        except Exception as error:
+            try:
+                observations['discardProbe'] = page.evaluate('''tileId => {
+                  const hand = Boolean(document.querySelector(`#player-hand [data-tile-id="${CSS.escape(tileId)}"]`));
+                  const river = document.querySelectorAll(`.river-tile[data-tile-id="${CSS.escape(tileId)}"]`).length;
+                  const called = document.querySelectorAll(`.open-melds .called-tile[data-tile-id="${CSS.escape(tileId)}"]`).length;
+                  let rows = [];
+                  try { rows = JSON.parse(localStorage.getItem('heibon-mahjong-diagnostics-v2') || '[]'); } catch {}
+                  const action = rows.filter(row => row.event === 'local_action_state_update_succeeded' &&
+                    row.details?.actionType === 'discard').at(-1);
+                  const transition = rows.filter(row => row.event === 'local_game_state_transition' &&
+                    row.details?.source === 'GameController.confirm').at(-1);
+                  return {
+                    selectedTileStillInHand: hand, riverOccurrences: river, calledMeldOccurrences: called,
+                    actionAccepted: action?.details?.stateUpdateResult === 'accepted',
+                    actionPreviousPhase: action?.details?.previousPhase ?? null,
+                    actionNextPhase: action?.details?.nextPhase ?? null,
+                    transitionPreviousPhase: transition?.details?.previousPhase ?? null,
+                    transitionNextPhase: transition?.details?.nextPhase ?? null,
+                    handCount: document.querySelectorAll('#player-hand li').length,
+                    riverTileCount: document.querySelectorAll('.river-tile[data-tile-id]').length,
+                    meldTileCount: document.querySelectorAll('.open-melds [data-tile-id]').length,
+                    openDialogs: [...document.querySelectorAll('dialog[open]')].map(dialog => dialog.id || 'dialog'),
+                  };
+                }''', selected_tile_id)
+            except Exception as probe_error:
+                observations['discardProbeCollectionError'] = safe_message(probe_error)
+            raise AssertionError(
+                'Discard state did not settle within 5000ms; safeProbe=' +
+                json.dumps(observations.get('discardProbe', {'collectionFailed': True}), ensure_ascii=False)
+            ) from error
         after = collect_game_state(page)
         observations['afterDiscard'] = after
         action = next((entry for entry in reversed(after['diagnostics'])
