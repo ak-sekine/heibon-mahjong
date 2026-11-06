@@ -4,6 +4,7 @@
 
 - [Issue #46 itch.io Worker Origin許可・相互接続検証](issue46-itch-html5-2026-11-05.md#2026-11-05-実測-origin-許可と相互接続検証) — HTTP Originを完全一致で許可。Deploy run [#42081081997](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42081081997)・SHA `4924682d58feefaee16b3f7026c359ef6be5e179`でverify、Chromium／WebKit、matrix audit、Worker deploy、両方向production test、Pages build/deployがsuccess。iPhone Safari WebSocket Handshake Originと実機相互対戦は未確認。
 - [鳴き判断後のitch smoke安定化 — 2026-11-06](call-decision-dialog-2026-11-06.md#standalone-itch-smoke-test-の安定化--2026-11-06) — ランダムな座席と鳴き判断を許容する状態待機、物理牌IDによる河／副露の打牌追跡、失敗artifactと制御失敗検証を記録します。Browser UI run [#42225801512](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42225801512)でChromium／WebKit各6回のSmoke、両Browser UI suite、診断artifact検証がsuccessしました。Issue #46はOpenを維持します。
+- [鳴き判断の種類別ボタンUI — 2026-11-06](call-type-buttons-2026-11-06.md) — Deploy gate run [#42247363486](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42247363486)でChromium／WebKit、standalone itch smoke前後、Worker／Pages deployがsuccess。4画面寸法のスクロールなしとiframe操作、ボタン表示位置、Issue #46の未確認実機項目を記録します。
 
 ## Issue調査
 
