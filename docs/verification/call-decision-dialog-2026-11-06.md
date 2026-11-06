@@ -61,3 +61,5 @@ Chromium、WebKitはGitHub Actions上のブラウザー検証であり、iPhone 
 | [#421539](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42153947821) | test-only push run。`verify` success。Chromiumのstandalone itch smokeは打牌後の河表示待ちでtimeout。WebKit jobは2026-11-06 03:32 UTC時点でOS依存パッケージ導入中のままです。 |
 
 run #421558の失敗は鳴き判断やブラウザー回帰スクリプト内ではなく、別ステップのstandalone itch CPU smokeで発生しました。前回の本番デプロイrun #421487ではitch smokeが両エンジンでsuccessしています。これらの自動テスト結果はiPhone Safari／実際のitch.io実機確認の代わりではありません。
+
+その後、両エンジンのブラウザー回帰suiteが完了したため、WebKitの依存導入が停止していたtest-only push run #421539をcancelしました。テスト変更やdocs-only変更によるWorker／Pagesの再デプロイはありません。最終docs commitのdocs-checkはrun [#42157457266](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42157457266)でsuccessしました。
