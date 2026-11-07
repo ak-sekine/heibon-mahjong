@@ -159,7 +159,7 @@ with sync_playwright() as p:
         assert page.locator('[data-browser-action-panel] [data-panel-part="call-controls"]').nth(1).is_visible()
         assert page.locator('[data-browser-action-panel] [data-panel-part="pass-call"]').nth(1).is_enabled()
         assert_common_colors('[data-browser-action-panel] [data-panel-part="call-pon"].ui-button')
-        assert page.evaluate("""() => {
+        call_panel_metrics = page.evaluate("""() => {
           const root = document.querySelector('[data-browser-action-panel]').children[1];
           const status = root.querySelector('[data-panel-part="call-status"]');
           const actionStatus = root.querySelector('[data-panel-part="action-status"]');
@@ -167,12 +167,19 @@ with sync_playwright() as p:
           const pass = root.querySelector('[data-panel-part="pass-call"]');
           const box = element => element.getBoundingClientRect();
           const text = root.innerText;
-          return choices.length === 1 && status.innerText === '鳴き判断の残り 10 秒です。' &&
+          const statusBox = box(status), choiceBox = choices[0] ? box(choices[0]) : null, passBox = box(pass);
+          return { passed: choices.length === 1 && status.innerText === '鳴き判断の残り 10 秒です。' &&
             actionStatus.innerText === '鳴き判断を待っています。' &&
             (text.match(/鳴き判断の残り/gu) || []).length === 1 &&
-            box(status).bottom <= box(choices[0]).top && Math.abs(box(choices[0]).top - box(pass).top) < 1 &&
-            box(status).bottom <= box(pass).top;
+            statusBox.bottom <= choiceBox?.top && Math.abs(choiceBox?.top - passBox.top) < 1 &&
+            statusBox.bottom <= passBox.top,
+            choiceCount: choices.length, statusText: status.innerText, actionStatusText: actionStatus.innerText, text,
+            statusBox: statusBox.toJSON(), choiceBox: choiceBox?.toJSON() ?? null, passBox: passBox.toJSON(),
+            groupDisplay: getComputedStyle(root.querySelector('.call-type-buttons')).display,
+            groupColumns: getComputedStyle(root.querySelector('.call-type-buttons')).gridTemplateColumns,
+          };
         }""")
+        assert call_panel_metrics['passed'], (width, call_panel_metrics)
         for seconds in [9, 8]:
           page.evaluate("seconds => window.actionPanelBrowser.update(null, false, false, false, seconds)", seconds)
           assert page.evaluate("""() => {
