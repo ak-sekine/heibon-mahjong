@@ -2394,9 +2394,9 @@ with sync_playwright() as p:
     page.locator('#online-call-chi').click()
     dialog_options = page.locator('#online-call-options button[data-online-call]')
     assert dialog_options.count() == 2, 'the selected call type did not show its inline candidate list'
-    assert dialog_options.evaluate_all('nodes=>nodes.every(node=>node.innerText.trim()==="")'), 'candidate buttons repeated the call type label'
+    assert dialog_options.evaluate_all('nodes=>nodes.every(node=>{const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let text="";while(walker.nextNode()){if(!walker.currentNode.parentElement?.closest("svg"))text+=walker.currentNode.textContent;}return text.trim()===""})'), 'candidate buttons repeated the call type label outside the tile artwork'
     assert dialog_options.evaluate_all('nodes=>nodes.every(node=>node.getAttribute("aria-label"))'), 'candidate buttons lost accessible names'
-    assert page.locator('#online-call-back').inner_text() == '戻る'
+    assert page.locator('#online-call-back').inner_text().strip() == '戻る'
     assert page.locator('#online-call-back').is_visible()
     assert page.locator('#online-pass-call').is_visible(), 'the normal online pass button disappeared during candidate selection'
     assert '残り' in page.locator('#online-call-status').inner_text()

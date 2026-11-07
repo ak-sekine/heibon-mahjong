@@ -70,7 +70,12 @@ window.loadTurn=()=>{
         assert candidates.evaluate_all('nodes=>nodes.every(node=>Boolean(node.getAttribute("aria-label")))'), 'candidate accessible names were removed'
         assert candidates.evaluate_all('nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.width>=44&&r.height>=44&&r.left>=0&&r.right<=innerWidth})'), 'candidate hit target is clipped or too small'
         assert page.locator('#call-options .tile-svg').evaluate_all('nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.width>=22&&r.height>=31})'), 'candidate tile art became too small'
-        assert page.locator('#call-back').inner_text() == '戻る' and page.locator('#call-back').is_visible()
+        call_back = page.locator('#call-back')
+        assert call_back.inner_text().strip() == '戻る', f'back button label changed: {call_back.inner_text()!r}'
+        back_state = call_back.evaluate("""node=>({hidden:node.hidden,html:node.outerHTML,rect:node.getBoundingClientRect().toJSON(),display:getComputedStyle(node).display,visibility:getComputedStyle(node).visibility})""")
+        assert call_back.is_visible(), f'back button is hidden: {back_state}'
+        back_box = call_back.bounding_box()
+        assert back_box and back_box['width'] >= 44 and back_box['height'] >= 44 and back_box['bottom'] <= height, (width, height, back_box)
         assert page.locator('#pass-calls').is_visible(), 'pass disappeared while choosing a candidate'
         grid = page.locator('#call-options').evaluate("node=>({columns:getComputedStyle(node).gridTemplateColumns.split(' ').length,top:node.getBoundingClientRect().top})")
         if width >= 375:
