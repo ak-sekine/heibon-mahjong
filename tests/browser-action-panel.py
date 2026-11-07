@@ -163,14 +163,14 @@ with sync_playwright() as p:
           const root = document.querySelector('[data-browser-action-panel]').children[1];
           const status = root.querySelector('[data-panel-part="call-status"]');
           const actionStatus = root.querySelector('[data-panel-part="action-status"]');
-          const options = root.querySelector('.call-type-buttons');
+          const choices = [...root.querySelectorAll('.call-type-buttons button:not([hidden])')];
           const pass = root.querySelector('[data-panel-part="pass-call"]');
           const box = element => element.getBoundingClientRect();
           const text = root.innerText;
-          return status.innerText === '鳴き判断の残り 10 秒です。' &&
+          return choices.length === 1 && status.innerText === '鳴き判断の残り 10 秒です。' &&
             actionStatus.innerText === '鳴き判断を待っています。' &&
             (text.match(/鳴き判断の残り/gu) || []).length === 1 &&
-            box(status).bottom <= box(options).top && box(options).top <= box(pass).top &&
+            box(status).bottom <= box(choices[0]).top && Math.abs(box(choices[0]).top - box(pass).top) < 1 &&
             box(status).bottom <= box(pass).top;
         }""")
         for seconds in [9, 8]:
