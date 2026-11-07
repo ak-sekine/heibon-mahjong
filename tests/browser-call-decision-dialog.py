@@ -101,6 +101,9 @@ window.loadTurn=()=>{
 
             page.evaluate("loadCalls('max')")
             page.locator('#call-kan').click()
+            kan_options = page.locator('#call-options button[data-action-choice="call"]')
+            assert kan_options.count() == 1, 'the selected kan type did not show its candidate'
+            kan_options.click()
             page.wait_for_function("callState().phase!=='awaiting-call'")
 
             page.evaluate("loadCalls('red')")
