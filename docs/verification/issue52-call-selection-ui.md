@@ -4,14 +4,14 @@
 
 対象Issue: [#52 鳴き選択UIをダイアログから卓上ボタンに変更](https://github.com/ak-sekine/heibon-mahjong/issues/52)
 
-## 実装
+## 初回実装時の記録
 
 - オフラインとオンラインで共有する `ActionPanel` に種類選択、牌候補、戻る操作を配置し、鳴き専用ダイアログを削除した。
-- 種類を選ぶまで候補を隠し、種類選択後は1候補でも牌候補を表示する。候補ボタンは牌画像のみを見せ、アクセシブル名を維持する。
+- 初回実装では種類選択後に候補を表示していました。2026-11-07の後続修正で、候補1件は種類ボタン押下で即確定する仕様に変更しています（末尾の最終確認を参照）。
 - 候補は幅に応じて列数が変わる Grid とし、操作パネルの下端に固定して候補行を上方向に増やす。狭い画面で候補数が高さを超える場合は候補一覧内をスクロールさせ、戻る／見送るを操作領域に残す。
 - ゲーム状態遷移、合法性判定、オンライン送信と同期は既存の選択イベント経路を使う。
 
-## 自動検証
+## 初回実装時の自動検証
 
 | 検証 | 結果 |
 |---|---|
@@ -29,6 +29,8 @@ Browser UI の鳴き選択シナリオは、複数候補・単一候補・複数
 GitHub Actions run #707 は全体成功。regression test、Worker 型チェック、Pages/itch build、Chromium / WebKit Browser UI、browser-ui matrix audit、Worker deploy、production test、Pages build/deploy がすべて成功した。対象 commit SHA は `a896b3f034631f952ede6984e0709b7c97a9926991`。
 
 Playwright の Chromium / WebKit 結果は iPhone Safari 実機確認とは区別する。iPhone Safari 実機確認が完了するまで Issue #52 は Open のままにする。
+
+上記の未確認記載は初回実装時点の履歴です。後続の修正・検証経緯は下記に追記し、履歴は削除していません。
 
 ## 追加修正 — iPhone Safari実機指摘、2026-11-07
 
@@ -137,3 +139,52 @@ Issue #52は、ユーザーによるiPhone Safari実機再確認が完了する�
 - Deploy run [#727](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42356707763)、実装commit `afd86a23c08dcb9ed25558159211ca2e3719761d` ではverifyとChromiumが成功しましたが、両ブラウザーの回帰suite中にWebKitが追加したポン局面fixtureで `RangeError: Need thirteen` を検出しました。fixtureの手牌が12枚だったため、13枚になるよう追加修正commit `68aa7e542acc020a0a3a9eba0f8af8c400e8def3` をpushしました。
 - Deploy run [#728](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42357093260)、対象SHA `68aa7e542acc020a0a3a9eba0f8af8c400e8def3` は全job成功です。Chromium／WebKitのBrowser UI、matrix audit、release freshness、Worker deploy、本番通信テスト、Pages build／deployまでsuccessし、Worker／Pagesを同SHAで公開しました。
 - Issue #52はOpenのままです。修正後のiPhone Safari実機確認はユーザーの確認待ちです。
+
+## 最終仕様と確認結果 — 2026-11-07
+
+### 最終仕様
+
+- 鳴き判断はモーダル／ダイアログを使わず、卓を表示したままの共通 `ActionPanel` 上で操作します。種類選択ボタンと「見送る」は同じ領域で横並びにします。
+- 種類を押したとき、その種類の有効候補が1件なら候補画面を挟まず即確定します。2件以上なら、押した種類の候補だけを表示して選択します。複数種類が可能でも、押していない種類は確定しません。
+- 候補一覧と「戻る」は同じ操作枠に表示し、候補が複数行になると枠の下端を保って上方向へ展開します。高さが足りないときは候補一覧内だけをスクロールします。
+- 「見送る」は種類選択画面だけに表示し、候補画面では隠します。「戻る」は未回答のまま種類選択へ戻し、「見送る」を再表示します。
+- オフライン／オンラインは共通の `ActionPanel` と選択イベント経路を使います。オンラインのタイムアウト・再接続ではサーバー状態と同期します。
+
+### iPhone Safari 実機報告
+
+2026-11-07、ユーザー本人から次の8項目すべてOKとの報告がありました。NG 0件、報告された8項目の未確認0件です。
+
+| No. | 確認項目 | 結果 |
+|---|---|---|
+| 1 | ポン候補1件で「ポン」を押すと即確定する | OK |
+| 2 | チー候補1件で「チー」を押すと即確定する | OK |
+| 3 | チー候補2件以上では牌候補が表示される | OK |
+| 4 | 牌候補画面から「戻る」で種類選択に戻れる | OK |
+| 5 | チー・ポンなど複数種類がある場合、押した種類だけが確定する | OK |
+| 6 | 「見送る」が正常に動作する | OK |
+| 7 | ボタンの横並び、表示位置、スクロールに問題がない | OK |
+| 8 | オンライン対局・タイムアウト・再接続後も正常に動作する | OK |
+
+確認者はユーザー本人です。報告されていない端末機種、iOS詳細バージョン、確認時刻、画面幅、画面方向は記録していません。この報告を横画面・PC実機・アクセシビリティの個別確認済みとは扱いません。
+
+### 自動検証との照合
+
+| 検証 | 結果 |
+|---|---|
+| 実装・公開 Deploy workflow | [run #728](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42357093260)、対象SHA `68aa7e542acc020a0a3a9eba0f8af8c400e8def3`。実際のrun情報でSHA一致、status `completed`、conclusion `success` を確認 |
+| `verify` | success。報告済みの `npm test`、`npm run build`、`npm run typecheck:worker` を含む |
+| Chromium / WebKit Browser UI | success |
+| browser-ui matrix audit / release freshness | success |
+| Worker deploy / production test / Pages build / Pages deploy | success |
+| 文書更新workflow | [run #729](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42358352307)、head SHA `031669f33066a17902a2f7b1f5854a675c954005`、status `completed`、conclusion `success`。`docs-check` success。文書のみの変更によりコード検証・Browser UI・deploy系jobはskip |
+
+run #728のActions API job一覧では、`docs-check`、`detect-changes`、`verify`、Chromium、WebKit、matrix audit、release freshness、Worker deploy、production test、Pages build、Pages deployがsuccessでした。run #729では`docs-check`と変更検出がsuccessし、文書のみの変更に対応する未実行jobはskipでした。これらは自動検証・公開結果であり、iPhone Safari実機報告とは別に記録します。
+
+Browser UIの自動検証は320×568、375×634、375×844、844×390、667×375、1280×900等のviewportを含み、候補レイアウト・上方向展開・戻る・画面スクロールなし、アクセシブル名などを確認しています。これらのviewport結果をiPhone Safari横画面やPC実機の検証済みとはみなしません。
+
+### 受入条件と残る確認
+
+- 鳴きダイアログなし、種類ボタンの横並び、候補と「戻る」の同一枠、候補の上方向展開、候補1件の即確定、候補2件以上の選択、種類画面だけの「見送る」、オフライン／オンライン共通経路は、上記Actionsと実機報告で確認しました。
+- 候補はネイティブの`button`要素で、`aria-label`と`:focus-visible`スタイルを実装しています。Actionsでもアクセシブル名を確認しています。一方、候補間のTab移動・フォーカス表示をBrowser UIで個別に操作確認した結果はなく、ここではソース確認と自動検査を実機確認とは区別します。
+- 実機報告では画面方向が特定されていません。iPhone Safariの縦／横各方向の確認範囲、PC実機確認、候補選択のキーボード操作は個別に報告されていません。レスポンシブviewportの自動検証結果と混同しません。
+- Issue本文の受入条件にはiPhone Safariの縦・横画面確認が残っています。画面方向が特定された実機確認結果がないため、この必須条件は未確認としてIssue #52をOpenに維持し、completedでCloseしていません。候補のキーボードフォーカスも直接検証した記録が揃うまで未確認として扱います。
