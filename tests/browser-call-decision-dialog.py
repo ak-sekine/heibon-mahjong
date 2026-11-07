@@ -80,7 +80,8 @@ window.loadTurn=()=>{
         ordinary_controls_before = page.locator('#local-game-controls').bounding_box()
         assert panel_before and panel_before['y'] >= 0 and panel_before['y'] + panel_before['height'] <= height, (width, height, panel_before)
         if width < 960:
-            assert table_before and -1 <= panel_before['y'] - table_before['y'] - table_before['height'] <= 8, (table_before, panel_before)
+            assert table_before and ordinary_controls_before and 0 <= ordinary_controls_before['y'] - table_before['y'] - table_before['height'] <= 8, (table_before, ordinary_controls_before)
+            assert abs(panel_before['y'] - ordinary_controls_before['y'] - 1) < 1, (ordinary_controls_before, panel_before)
         page_size_before = page.evaluate("()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight})")
         page.locator('#call-chi').click()
         candidates = page.locator('#call-options button[data-action-choice="call"]')
