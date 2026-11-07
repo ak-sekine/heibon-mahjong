@@ -566,13 +566,13 @@ header > div { min-width:0; }
 }
 @media (min-width:600px) and (max-height:850px) {
  /* Reserve room for the header and compact operation panel in short views. */
- .table { container-type:inline-size; width:min(100%,calc(100svh - 88px)); margin-inline:0; align-self:center; --table-tile-width:min(42px,round(down,calc((100svh - 108px) / 14),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
+ .table { container-type:inline-size; width:min(100%,calc(100svh - 128px)); margin-inline:0; align-self:center; --table-tile-width:min(42px,round(down,calc((100svh - 148px) / 14),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
  .table .seat,.table .rivers { --table-tile-width:min(42px,round(down,calc((100cqw - 22px) / 14),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); --river-tile-width:calc(var(--table-tile-width)*.76); --river-tile-height:calc(var(--table-tile-height)*.76); }
  .table-summary { --table-tile-width:min(42px,round(down,calc((100svh - 96px) / 15.8),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
 }
 @supports (height:100dvh) {
  @media (min-width:600px) and (max-height:850px) {
-  .table { width:min(100%,calc(100dvh - 88px)); --table-tile-width:min(42px,round(down,calc((100dvh - 108px) / 14),.1px)); }
+  .table { width:min(100%,calc(100dvh - 128px)); --table-tile-width:min(42px,round(down,calc((100dvh - 148px) / 14),.1px)); }
   .table-summary { --table-tile-width:min(42px,round(down,calc((100dvh - 96px) / 15.8),.1px)); }
  }
 }
