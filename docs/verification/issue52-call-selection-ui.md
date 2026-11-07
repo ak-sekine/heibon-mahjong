@@ -54,8 +54,8 @@ CSSを調べると、モバイルでは `.discard-controls:has(.call-controls:no
 | `npm run typecheck:worker` | 成功 |
 | `git diff --check` | 成功 |
 | Browser UI Python syntax | 成功: 鳴き選択、卓レイアウト、オンライン対局の関連3スクリプトをcompile確認 |
-| Chromium / WebKit Browser UI | GitHub Actionsの結果待ち。iPhone Safari実機確認とは区別して後日追記 |
-| GitHub Actions | push後の対象commit runを確認して追記 |
+| Chromium / WebKit Browser UI | 成功: [GitHub Actions run #716](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42339185029)、commit `dba31fd9eb0f0e6e5b408c0f1082120374fd5a00` |
+| GitHub Actions | 成功: verify、Chromium／WebKit、browser-ui matrix audit、release freshness、Worker deploy、production test、Pages build／deploy |
 | 修正後のiPhone Safari実機 | 未確認。ユーザー本人による再確認が必要 |
 
 Browser UIでは通常時の打牌パネル配置が変わらないこと、卓直後の鳴きパネル、候補画面の「見送る」非表示と「戻る」による状態復帰、5件のチー候補の複数行表示、単一候補表示と選択前の未確定状態、320×568／375×634／375×844／844×390／667×375／1280×900 viewportを追加確認します。オンラインシナリオでは種類・候補選択、戻る、候補選択中のタイムアウトを確認します。実機の2指摘はユーザー報告に基づくもので、修正後の実機確認は未実施です。
@@ -71,3 +71,4 @@ Browser UIでは通常時の打牌パネル配置が変わらないこと、卓�
 - 間隔の値を直接推測しないよう、モバイルでは鳴きパネル上端を通常操作領域の上端と比較し、通常操作領域の方が卓直後にあることも併せて確認します。Chromium／WebKitの修正後結果は次のActions run後に追記します。iPhone Safari実機の修正後確認は引き続き未実施です。
 - Deploy run [#715](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42337185737)、commit `705d2f2b1f620fa5d437116bd2bbd37dcbe3d1f4` は `verify` と `docs-check` が成功しました。Chromium／WebKitとも鳴き選択Browser UIは既存5 viewportで成功しましたが、続く卓レイアウト回帰で667×375の通常プレイ時の卓が187px幅、牌幅11.5pxとなり失敗しました。短画面向け縮小ルールが鳴き判断のない通常プレイにも適用されていたことが原因です。Browser UI matrix auditは失敗を検出し、deploy jobは実行されていません。
 - run #715を受け、通常プレイ時は既存の短い横画面向け卓サイズに戻し、卓の追加縮小を鳴き判断中に限定しました。鳴き選択Browser UIへ667×375を追加し、通常状態と鳴き中の配置を分けて検証します。この修正版のChromium／WebKitとActions結果は次の実行後に追記します。実機の修正後確認は引き続き未実施です。
+- Deploy run [#716](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42339185029)、commit `dba31fd9eb0f0e6e5b408c0f1082120374fd5a00` は全job成功です。ChromiumとWebKitは追加した667×375を含む鳴き選択6 viewport、候補画面の「見送る」非表示、種類画面への戻り、単一／複数候補、候補選択時の画面スクロールなしを確認しました。既存オンラインBrowser UIでは種類・候補選択、戻る、候補中の時間切れも成功しました。`verify`、browser-ui matrix audit、release freshness、Worker deploy、production test、Pages build、Pages deployが成功し、Worker／Pagesの記録SHAはどちらも `dba31fd9eb0f0e6e5b408c0f1082120374fd5a00` です。Issue #52はOpenのままです。修正後のiPhone Safari実機確認は未実施です。
