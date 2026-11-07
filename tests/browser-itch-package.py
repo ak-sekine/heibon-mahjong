@@ -107,12 +107,7 @@ def wait_for_human_action(page, timeout_ms=TURN_TIMEOUT_MS):
         if page.locator('#player-hand button:enabled').count() > 0:
             return decisions
 
-        call_dialog = page.locator('#call-decision-dialog')
         pass_call = page.locator('#pass-calls')
-        if call_dialog.evaluate('(dialog) => dialog.open'):
-            page.locator('#call-decision-view-table').click()
-            decisions['call_dialogs_returned'] += 1
-            continue
         if pass_call.is_visible() and pass_call.is_enabled():
             pass_call.click()
             decisions['calls_passed'] += 1
@@ -152,11 +147,11 @@ def capture_failure(page, context, events, repetition, error, observations):
     except Exception as screenshot_error:
         state = {'screenshotError': safe_message(screenshot_error)}
     try:
-        # If a call decision is pending, use the real "卓に戻る" control to
-        # reveal the table before opening diagnostics. This does not pass it.
-        dialog = page.locator('#call-decision-dialog')
-        if dialog.count() and dialog.evaluate('(node) => node.open'):
-            page.locator('#call-decision-view-table').click()
+        # A candidate selection remains on the table; return to the type stage
+        # before collecting diagnostics when the back control is available.
+        call_back = page.locator('#call-back')
+        if call_back.count() and call_back.is_visible():
+            call_back.click()
         for dialog_id, close_id in (
             ('#diagnostic-dialog', '#diagnostic-close'),
             ('#result-dialog', '#view-table'),

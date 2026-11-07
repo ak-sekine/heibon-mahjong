@@ -71,5 +71,10 @@ test('shared templates provide all mode-specific mount parts and positions', () 
       expectedTableInfoParts,
       `${file} must provide every central table-information part`,
     );
+    const controls = templateBody(html, 'game-controls-template', file);
+    assert.match(controls, /data-panel-part="call-back"[^>]*>戻る</u, `${file} must provide the short call back button`);
+    assert.match(controls, /data-panel-part="call-options"[^>]*aria-label="鳴き候補"/u, `${file} must label the inline call choices`);
+    assert.match(controls, /data-panel-part="call-status"[^>]*role="status"[^>]*aria-live="polite"/u, `${file} must announce call decision updates`);
+    assert.doesNotMatch(html, /id="call-decision-dialog"/u, `${file} must not include the removed call dialog`);
   }
 });

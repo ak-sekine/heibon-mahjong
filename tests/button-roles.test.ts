@@ -9,12 +9,12 @@ const roleById: Record<string, string> = {
   'diagnostic-copy': 'b', 'diagnostic-clear': 'd1', 'online-join-close': 'b', 'online-join': 'a',
   'online-close': 'b', 'online-copy-code': 'b', 'online-confirm-rules': 'b', 'online-ready': 'a',
   'online-finalize': 'a', 'online-start-game': 'a', 'online-reconnect': 'a', 'online-leave': 'd1',
-  'view-table': 'b', 'call-decision-view-table': 'b', 'match-result-new-game': 'a', 'match-result-close': 'b',
+  'view-table': 'b', 'match-result-new-game': 'a', 'match-result-close': 'b',
   'cancel-new-game': 'b', 'confirm-new-game': 'a', 'online-rules-close': 'b', 'load-scenario': 'a',
   'start-cpu-kan': 'a', 'repeat-scenario': 'a', 'start-river-test': 'a',
 };
 const roleByPart: Record<string, string> = {
-  'pass-call': 'c', 'cancel-kan': 'b', ron: 'a', 'pass-ron': 'c', discard: 'a', riichi: 'a',
+  'pass-call': 'c', 'call-back': 'b', 'cancel-kan': 'b', ron: 'a', 'pass-ron': 'c', discard: 'a', riichi: 'a',
   'kan-toggle': 'a', 'call-pon': 'a', 'call-kan': 'a', 'call-chi': 'a', tsumo: 'a', kyuushu: 'a', 'show-result': 'b', 'show-match-result': 'b', 'next-round': 'a',
 };
 

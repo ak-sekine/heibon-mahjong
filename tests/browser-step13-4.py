@@ -64,14 +64,14 @@ g={...g,players,deadWall:pool.splice(-14),liveWall:pool,phase:'awaiting-discard'
    page.evaluate('load',mode);geometry();inventory();private()
    call_type='pon' if mode=='pon' else 'chi'
    page.locator(f'#call-{call_type}').click()
-   options=page.locator('#call-decision-options-host button[data-action-choice="call"]')
-   expected=3 if mode=='chi' else 2 if mode=='red' else 0
+   options=page.locator('#call-options button[data-action-choice="call"]')
+   expected=3 if mode=='chi' else 2 if mode=='red' else 1
    assert options.count()==expected
    if expected:
     assert all(options.nth(i).get_attribute('aria-label') for i in range(options.count()))
     assert options.first.bounding_box()['height']>=44
    page.screenshot(path=str(out/f'{width}x{height}-{mode}-options.png'),full_page=True)
-   if mode=='red':assert page.locator('#call-decision-options-host .tile-svg').count()==6
+   if mode=='red':assert page.locator('#call-options .tile-svg').count()==6
    g=page.evaluate('check().game');called=g['ronWindow']['tileId'];wall=len(g['liveWall'])
    if expected:
     options.last.click()

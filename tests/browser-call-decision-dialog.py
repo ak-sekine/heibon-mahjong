@@ -1,7 +1,4 @@
-"""Type-specific call buttons, filtered dialogs, and compact layout regression.
-
-Run against npm run dev -- --host 127.0.0.1 --port 4173.
-"""
+"""Inline call selection, responsive candidate grids and upward expansion regression."""
 import os
 import shutil
 
@@ -51,177 +48,89 @@ window.loadTurn=()=>{
     page.goto('http://127.0.0.1:4173/heibon-mahjong/')
     page.wait_for_function('typeof loadCalls === "function"')
 
-    def rect(element):
-        return element.evaluate('(node)=>{const r=node.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}}')
-
-    def layout_snapshot():
-        return page.evaluate("""()=>Object.fromEntries(['.app-header','#local-table-summary','.score-strip','#local-table','#player-hand','.rivers','.center-info']
-          .map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return [selector,[r.x,r.y,r.width,r.height]]}))""")
-
-    def assert_type_buttons():
-        page.wait_for_function("!document.querySelector('#call-decision-dialog').open")
-        assert page.locator('#call-controls').is_visible()
-        assert page.locator('#call-pon').is_visible()
-        assert page.locator('#call-chi').is_visible()
-        assert page.locator('#call-kan').is_visible()
-        assert page.locator('#pass-calls').is_visible()
-        assert page.locator('#call-options button').count() == 0, 'candidates were rendered before a type was selected'
-        boxes = [rect(page.locator(selector)) for selector in ['#call-pon','#call-kan','#call-chi','#pass-calls']]
-        for box in boxes:
-            assert box['width'] >= 44 and box['height'] >= 44 and box['left'] >= 0 and box['right'] <= page.viewport_size['width'], box
-        fit = page.evaluate("""()=>{
-          const controls=document.querySelector('#call-controls').getBoundingClientRect();
-          const table=document.querySelector('#local-table').getBoundingClientRect();
-          return {scrollY,scrollHeight:document.documentElement.scrollHeight,innerHeight,
-            controls:{top:controls.top,bottom:controls.bottom},table:{top:table.top,bottom:table.bottom},
-            buttons:[...document.querySelectorAll('#call-controls .call-type-buttons button')].map(e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}})};
-        }""")
-        assert fit['scrollY'] == 0 and fit['scrollHeight'] <= fit['innerHeight'], fit
-        assert fit['controls']['top'] >= fit['table']['bottom'], fit
-        assert all(button['left'] >= 0 and button['right'] <= page.viewport_size['width'] for button in fit['buttons']), fit
-        return fit
-
-    def open_kind(kind, expected):
-        before = layout_snapshot()
-        page.locator(f'#call-{kind}').click()
-        page.wait_for_function("document.querySelector('#call-decision-dialog').open")
-        assert page.locator('#call-decision-title').inner_text() == {'pon':'ポンの選択','chi':'チーの選択','kan':'カンの選択'}[kind]
-        options = page.locator('#call-decision-options-host button[data-action-choice="call"]')
-        assert options.count() == expected
-        expected_label = {'pon':'ポン','chi':'チー','kan':'大明カン'}[kind]
-        assert options.evaluate_all("nodes=>nodes.map(n=>n.childNodes[0]?.textContent.trim())") == [expected_label] * expected
-        assert page.locator('#call-decision-options-host .tile-svg').count() > 0
-        assert options.evaluate_all("nodes=>nodes.every(n=>{const r=n.getBoundingClientRect();return r.width>=44&&r.height>=44})")
-        assert page.locator('#call-decision-options-host .tile-svg').evaluate_all("nodes=>nodes.every(n=>{const r=n.getBoundingClientRect();return r.width>=22&&r.height>=31})")
-        assert page.locator('#call-decision-options-host [data-panel-part="pass-call"]').count() == 0
-        assert page.locator('#pass-calls').is_visible(), 'the normal pass button disappeared while choosing a candidate'
-        assert page.locator('#call-decision-view-table').inner_text() == '卓に戻る'
-        dialog_fit = page.evaluate("""()=>{
-          const vv=visualViewport, top=vv?.offsetTop??0, bottom=top+(vv?.height??innerHeight);
-          const dialog=document.querySelector('#call-decision-dialog').getBoundingClientRect();
-          const targets=[...document.querySelectorAll('#call-decision-title,#call-decision-status,.call-decision-target,#call-decision-options-host button,#call-decision-view-table')]
-            .filter(node=>node.id!=='call-decision-status'||node.textContent.trim());
-          const visible=targets.every(node=>{const r=node.getBoundingClientRect();return r.width>0&&r.height>0&&r.left>=0&&r.right<=innerWidth&&r.top>=top&&r.bottom<=bottom&&
-            (node.tagName!=='BUTTON'||(!node.disabled&&document.elementFromPoint((r.left+r.right)/2,(r.top+r.bottom)/2)?.closest('button')===node))});
-          return {fit:dialog.left>=0&&dialog.right<=innerWidth&&dialog.top>=top&&dialog.bottom<=bottom&&visible,
-            dialog:{left:dialog.left,right:dialog.right,top:dialog.top,bottom:dialog.bottom},top,bottom,
-            controls:targets.map(node=>{const r=node.getBoundingClientRect();return {name:node.id||node.className,left:r.left,right:r.right,top:r.top,bottom:r.bottom}}),
-            scrollY,scrollWidth:document.documentElement.scrollWidth,innerWidth};
-        }""")
-        assert dialog_fit['fit'] and dialog_fit['scrollWidth'] <= dialog_fit['innerWidth'] and dialog_fit['scrollY'] == 0, dialog_fit
-        assert layout_snapshot() == before, {'before':before,'after':layout_snapshot()}
-        print(f'{browser_name} call dialog at {page.viewport_size}: {dialog_fit["dialog"]}')
-        return options
-
-    for width, height in [(375, 634), (375, 667), (320, 568), (375, 568)]:
+    for width, height in [(375, 634), (320, 568), (375, 844), (844, 390), (1280, 900)]:
         page.set_viewport_size({'width': width, 'height': height})
         page.evaluate('window.scrollTo(0,0)')
-        page.evaluate('loadTurn()')
-        before_call = layout_snapshot()
         page.evaluate("loadCalls('max')")
         page.wait_for_function("document.querySelector('#call-controls').hidden === false")
-        assert layout_snapshot() == before_call, {'beforeCall':before_call,'duringCall':layout_snapshot()}
-        fit = assert_type_buttons()
-        assert page.locator('#call-pon').is_visible() and page.locator('#call-kan').is_visible() and page.locator('#call-chi').is_visible()
-        print(f'{browser_name} {width}x{height} four call buttons fit: {fit}')
+        assert page.locator('#call-decision-dialog').count() == 0, 'call modal remains in the page'
+        assert page.locator('dialog[open]').count() == 0, 'call decision unexpectedly opened a modal'
+        assert page.locator('#call-options button').count() == 0, 'candidates appeared before a type was selected'
+        call_position = page.locator('#call-controls').evaluate('node=>getComputedStyle(node).position')
+        assert call_position == ('absolute' if width >= 960 else 'static'), (width, call_position)
+        for selector in ['#call-pon', '#call-kan', '#call-chi', '#pass-calls']:
+            box = page.locator(selector).bounding_box()
+            assert box and box['width'] >= 44 and box['height'] >= 44, (width, height, selector, box)
 
-        if width == 375 and height == 634:
-            # Different call types are independent. One candidate executes without a dialog.
-            page.locator('#call-pon').click()
-            page.wait_for_function("callState().phase!=='awaiting-call'")
-            assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
+        panel_before = page.locator('#call-controls').bounding_box()
+        page.locator('#call-chi').click()
+        candidates = page.locator('#call-options button[data-action-choice="call"]')
+        assert candidates.count() == 5, f'{width}x{height}: expected five chi candidates'
+        assert candidates.evaluate_all('nodes=>nodes.every(node=>node.innerText.trim()==="")'), 'call kind text is duplicated in candidate buttons'
+        assert candidates.evaluate_all('nodes=>nodes.every(node=>Boolean(node.getAttribute("aria-label")))'), 'candidate accessible names were removed'
+        assert candidates.evaluate_all('nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.width>=44&&r.height>=44&&r.left>=0&&r.right<=innerWidth})'), 'candidate hit target is clipped or too small'
+        assert page.locator('#call-options .tile-svg').evaluate_all('nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.width>=22&&r.height>=31})'), 'candidate tile art became too small'
+        assert page.locator('#call-back').inner_text() == '戻る' and page.locator('#call-back').is_visible()
+        assert page.locator('#pass-calls').is_visible(), 'pass disappeared while choosing a candidate'
+        grid = page.locator('#call-options').evaluate("node=>({columns:getComputedStyle(node).gridTemplateColumns.split(' ').length,top:node.getBoundingClientRect().top})")
+        if width >= 375:
+            assert grid['columns'] >= 3, (width, grid)
+        panel_candidates = page.locator('#call-controls').bounding_box()
+        assert panel_before and panel_candidates and panel_candidates['bottom'] <= panel_before['bottom'] + 1, (panel_before, panel_candidates)
+        if width <= 375 or width == 1280:
+            assert panel_candidates['top'] < panel_before['top'], (width, panel_before, panel_candidates)
+        assert page.evaluate('scrollY') == 0, 'rendering call candidates scrolled the page'
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight'), 'call panel caused page overflow'
 
-            page.evaluate("loadCalls('max')")
-            before_escape = layout_snapshot()
-            open_kind('chi', 5)
+        if (width, height) == (375, 634):
+            actions_before = page.evaluate('callState().phase')
             page.keyboard.press('Escape')
-            assert layout_snapshot() == before_escape, {'beforeEscape':before_escape,'afterEscape':layout_snapshot()}
-            assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
-            assert page.evaluate("callState().phase==='awaiting-call'")
-            assert page.locator('#call-chi').is_visible(), 'Escape ended the call decision'
-            before_return = layout_snapshot()
-            open_kind('chi', 5)
-            page.locator('#call-decision-view-table').click()
-            assert layout_snapshot() == before_return, {'beforeTableReturn':before_return,'afterTableReturn':layout_snapshot()}
-            assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
-            assert page.evaluate("callState().phase==='awaiting-call'")
-            assert page.locator('#call-chi').is_visible(), 'returning to the table ended the call decision'
-            assert page.locator('#pass-calls').is_visible(), 'the normal pass button was not restored on the table'
-            open_kind('chi', 5).first.click()
+            assert page.locator('#call-options button').count() == 0
+            assert page.locator('#call-chi').is_visible() and page.locator('#call-back').is_hidden()
+            assert page.evaluate('callState().phase') == actions_before, 'Escape answered the call decision'
+            page.locator('#call-chi').click()
+            page.locator('#call-back').click()
+            assert page.evaluate('callState().phase') == actions_before, 'back answered the call decision'
+            page.locator('#pass-calls').click()
             page.wait_for_function("callState().phase!=='awaiting-call'")
-            assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
 
             page.evaluate("loadCalls('max')")
             page.locator('#call-kan').click()
             page.wait_for_function("callState().phase!=='awaiting-call'")
-            assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
-            assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
 
             page.evaluate("loadCalls('red')")
-            red_options = open_kind('chi', 2)
+            page.locator('#call-chi').click()
+            red_options = page.locator('#call-options button[data-action-choice="call"]')
+            assert red_options.count() == 2
             reds = red_options.evaluate_all("nodes=>nodes.map(n=>[...n.querySelectorAll('svg path')].some(p=>p.getAttribute('d')==='M48 4h7v7Z'))")
-            assert sorted(reds) == [False,True], reds
-            page.locator('#call-decision-options-host button:not(:has(path[d="M48 4h7v7Z"]))').first.click()
+            assert sorted(reds) == [False, True], reds
+            red_options.locator(':has(path[d="M48 4h7v7Z"])').click()
             page.wait_for_function("callState().phase!=='awaiting-call'")
-            assert not page.evaluate("callState().players[0].melds[0].tiles.some(t=>t.tile.isRed)"), 'the non-red chi option claimed the red five'
+            assert page.evaluate("callState().players[0].melds[0].tiles.some(t=>t.tile.isRed)"), 'red chi candidate lost its physical red tile'
 
             page.evaluate("loadCalls('pon-red')")
-            pon_options = open_kind('pon', 2)
+            page.locator('#call-pon').click()
+            pon_options = page.locator('#call-options button[data-action-choice="call"]')
+            assert pon_options.count() == 2
             pon_reds = pon_options.evaluate_all("nodes=>nodes.map(n=>[...n.querySelectorAll('svg path')].some(p=>p.getAttribute('d')==='M48 4h7v7Z'))")
-            assert sorted(pon_reds) == [False,True], pon_reds
-            page.locator('#call-decision-options-host button:has(path[d="M48 4h7v7Z"])').click()
+            assert sorted(pon_reds) == [False, True], pon_reds
+            pon_options.locator(':has(path[d="M48 4h7v7Z"])').click()
             page.wait_for_function("callState().phase!=='awaiting-call'")
-            assert page.evaluate("callState().players[0].melds[0].tiles.some(t=>t.tile.isRed)"), 'the red pon option lost its red physical tile'
+            assert page.evaluate("callState().players[0].melds[0].tiles.some(t=>t.tile.isRed)"), 'red pon candidate lost its physical red tile'
 
-            page.evaluate("loadCalls('max')")
-            open_kind('chi', 5)
-            page.locator('#call-decision-view-table').click()
-            assert page.evaluate("callState().phase==='awaiting-call'")
-            page.locator('#pass-calls').click()
+            page.evaluate("loadCalls('one')")
+            page.locator('#call-chi').click()
+            assert page.locator('#call-options button[data-action-choice="call"]').count() == 1
+            assert page.evaluate("callState().phase==='awaiting-call'"), 'a single candidate was selected before it was displayed'
+            page.locator('#call-options button[data-action-choice="call"]').click()
             page.wait_for_function("callState().phase!=='awaiting-call'")
-            assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
 
-        if not (width == 375 and height == 634):
-            # Verify a maximum type specific list fits every requested viewport.
-            page.evaluate("loadCalls('max')")
-            before_escape = layout_snapshot()
-            open_kind('chi', 5)
-            page.keyboard.press('Escape')
-            assert layout_snapshot() == before_escape, {'beforeEscape':before_escape,'afterEscape':layout_snapshot()}
-            assert page.evaluate("callState().phase==='awaiting-call'")
+            page.evaluate('loadTurn()')
+            assert page.locator('#call-controls').is_hidden(), 'call controls were shown for a ron decision'
+            assert page.locator('#ron-controls').is_visible(), 'ron controls were lost during call UI changes'
 
-    # A unique chi uses the existing select-call path immediately.
-    page.set_viewport_size({'width':375,'height':634})
-    page.evaluate("loadCalls('one')")
-    unique_count = page.evaluate("document.querySelectorAll('#call-chi').length && document.querySelectorAll('#call-options button').length")
-    assert unique_count == 0
-    page.locator('#call-chi').click()
-    page.wait_for_function("callState().phase!=='awaiting-call'")
-    assert not page.locator('#call-decision-dialog').evaluate('(node)=>node.open')
+        print(f'{browser_name} call UI at {width}x{height}: {grid["columns"]} candidate columns')
 
-    # Exercise the controls and modal inside the viewport-sized iframe used by itch.io.
-    page.set_content('''<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
-      html,body{margin:0;width:100%;height:100%;overflow:hidden}iframe{display:block;width:100vw;height:100vh;border:0}
-    </style></head><body><iframe id="call-decision-frame" name="call-decision-frame" src="http://127.0.0.1:4173/heibon-mahjong/"></iframe></body></html>''')
-    frame = page.frame(name='call-decision-frame')
-    page.frame_locator('#call-decision-frame').locator('#call-decision-dialog').wait_for(state='attached')
-    assert frame is not None
-    frame.wait_for_function('typeof loadCalls === "function"')
-    frame.evaluate("loadCalls('max')")
-    iframe_metrics = frame.evaluate("""()=>({viewport:{width:innerWidth,height:innerHeight},
-      scrollY,scrollHeight:document.documentElement.scrollHeight,
-      buttons:[...document.querySelectorAll('#call-controls .call-type-buttons button')].map(e=>{const r=e.getBoundingClientRect();return {visible:r.width>=44&&r.height>=44&&r.left>=0&&r.right<=innerWidth,top:r.top,bottom:r.bottom}})})""")
-    assert iframe_metrics['viewport'] == {'width':375,'height':634}, iframe_metrics
-    assert iframe_metrics['scrollY'] == 0 and iframe_metrics['scrollHeight'] <= 634, iframe_metrics
-    assert len(iframe_metrics['buttons']) == 4 and all(button['visible'] for button in iframe_metrics['buttons']), iframe_metrics
-    frame.locator('#call-chi').click()
-    assert frame.locator('#call-decision-dialog').evaluate('(node)=>node.open')
-    assert frame.locator('#call-decision-options-host button[data-action-choice="call"]').count() == 5
-    assert frame.locator('#call-decision-options-host [data-panel-part="pass-call"]').count() == 0
-    assert frame.locator('#pass-calls').is_visible()
-    frame.locator('#call-decision-view-table').click()
-    assert not frame.locator('#call-decision-dialog').evaluate('(node)=>node.open')
-    print(f'{browser_name} itch-style iframe four-button and filtered-dialog fit: {iframe_metrics}')
     assert not errors, errors
     page.close()
     browser.close()

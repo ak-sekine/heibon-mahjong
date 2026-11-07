@@ -97,7 +97,7 @@ class FakeElement {
   }
 }
 
-function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPanelOptions = {}, withClosedCallDialog = false) {
+function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPanelOptions = {}) {
   const queried = new Map<string, FakeElement>();
   const doc = {
     activeElement: null as FakeElement | null,
@@ -111,24 +111,10 @@ function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPan
   Object.defineProperty(globalThis, 'document', { configurable: true, value: doc });
   Object.defineProperty(globalThis, 'Element', { configurable: true, value: FakeElement });
   const root = new FakeElement(doc);
-  if (withClosedCallDialog) {
-    root.id = 'local-game-controls';
-    queried.set('#call-decision-dialog', new FakeElement(doc));
-    queried.set('#call-decision-options-host', new FakeElement(doc));
-    queried.set('#call-decision-status', new FakeElement(doc));
-    queried.set('.call-decision-target', new FakeElement(doc));
-    queried.set('#call-decision-view-table', new FakeElement(doc));
-    queried.set('#call-decision-title', new FakeElement(doc));
-    for (const selector of ['#call-decision-options-host', '#call-decision-status', '.call-decision-target', '#call-decision-view-table', '#call-decision-title']) {
-      const child = queried.get(selector)!;
-      child.parent = queried.get('#call-decision-dialog')!;
-      queried.get('#call-decision-dialog')!.children.push(child);
-    }
-  }
   root.dataset.panelPart = 'root';
   const parts = new Map<string, FakeElement>();
   const parents: Record<string, string> = {
-    'call-status': 'call-controls', 'call-options': 'call-controls', 'call-pon': 'call-controls', 'call-kan': 'call-controls', 'call-chi': 'call-controls', 'pass-call': 'call-controls',
+    'call-status': 'call-controls', 'call-options': 'call-controls', 'call-pon': 'call-controls', 'call-kan': 'call-controls', 'call-chi': 'call-controls', 'call-back': 'call-controls', 'pass-call': 'call-controls',
     'kan-status': 'kan-controls', 'kan-options': 'kan-controls', 'cancel-kan': 'kan-controls',
     'ron-status': 'ron-controls', 'ron-target': 'ron-controls', ron: 'ron-controls', 'pass-ron': 'ron-controls',
     'show-result': 'round-actions', 'next-round': 'round-actions',
@@ -137,6 +123,7 @@ function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPan
     if (part === 'root') continue;
     const node = new FakeElement(doc);
     node.dataset.panelPart = part;
+    if (part === 'call-back') node.textContent = '戻る';
     if (['call-controls', 'kan-controls', 'ron-controls', 'round-actions'].includes(part)) node.hidden = true;
     parts.set(part, node);
   }
@@ -149,8 +136,6 @@ function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPan
   return {
     panel,
     root,
-    dialog: queried.get('#call-decision-dialog')!,
-    callOptionsHost: queried.get('#call-decision-options-host')!,
     parts,
     restore() {
       if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
@@ -292,17 +277,22 @@ test('ActionPanel delegates static and choice clicks through one mode callback a
       callGroup: { visible: true, status: '', options: [{ ...option, enabled: true }] },
     }));
     const callButton = fixture.parts.get('call-pon')!;
-    assert.equal(fixture.parts.get('call-options')!.children.length, 0, 'a single call option stays out of the dialog');
+    assert.equal(fixture.parts.get('call-options')!.children.length, 0, 'call candidates stay hidden until their type is selected');
     click(fixture.parts.get('discard')!);
     click(callButton);
+    assert.deepEqual(events, [{ type: 'discard' }], 'selecting a type does not select its only candidate automatically');
+    fixture.panel.update(state({ callGroup: { visible: true, status: '鳴き判断の残り 9 秒です。', options: [{ ...option, enabled: true }] } }));
+    assert.equal(fixture.parts.get('call-options')!.children.length, 1, 'a countdown update keeps the selected single candidate visible');
+    const onlyCandidate = fixture.parts.get('call-options')!.children[0] as FakeElement;
+    click(onlyCandidate);
     assert.deepEqual(events, [{ type: 'discard' }, { type: 'select-call', optionId: 'call-1' }]);
     assert.equal(fixture.parts.get('action-status')!.focused, true);
   } finally { fixture.restore(); }
 });
 
-test('closed call dialog does not block a legal kan choice', () => {
+test('call candidate selection does not block a legal kan choice', () => {
   const events: ActionPanelEvent[] = [];
-  const fixture = panelFixture(event => events.push(event), {}, true);
+  const fixture = panelFixture(event => events.push(event));
   try {
     fixture.panel.update(state({
       kanGroup: { visible: true, status: 'カンする面子を選択', options: [
@@ -315,9 +305,9 @@ test('closed call dialog does not block a legal kan choice', () => {
   } finally { fixture.restore(); }
 });
 
-test('a multi-option call opens the shared dialog for only the selected type and does not answer on Escape', () => {
+test('a multi-option call shows inline candidates for one type and Escape returns without answering', () => {
   const events: ActionPanelEvent[] = [];
-  const fixture = panelFixture(event => events.push(event), {}, true);
+  const fixture = panelFixture(event => events.push(event));
   const face = (rank: 1 | 2) => ordinaryTile(TILE_KINDS.find(kind => kind.category === 'suited' && kind.suit === 'man' && kind.rank === rank)!);
   const options: ActionChoiceOption[] = [
     { id: 'pon-1', label: 'ポン', tiles: [{ id: 'face-a', tile: face(1) }], enabled: true },
@@ -328,32 +318,35 @@ test('a multi-option call opens the shared dialog for only the selected type and
     fixture.panel.update(state({ callGroup: { visible: true, status: '', options } }));
     const clickRoot = (target: FakeElement) => fixture.root.listeners.get('click')!({ target } as unknown as Event);
     clickRoot(fixture.parts.get('call-pon')!);
-    assert.equal(fixture.dialog.open, true);
     let shown = fixture.parts.get('call-options')!.children as FakeElement[];
     assert.equal(shown.length, 2);
     assert.ok(shown.every(option => option.dataset.optionId.startsWith('pon-')));
-    assert.equal(fixture.parts.get('call-chi')!.hidden, false, 'a different available type remains available on the table');
+    assert.ok(shown.every(option => option.attributes.has('aria-label')));
+    assert.equal(fixture.parts.get('call-pon')!.hidden, true);
+    assert.equal(fixture.parts.get('call-chi')!.hidden, true);
+    assert.equal(fixture.parts.get('call-back')!.textContent, '戻る');
+    assert.equal(fixture.parts.get('call-back')!.hidden, false);
+    assert.equal(fixture.parts.get('pass-call')!.hidden, false);
 
-    fixture.dialog.listeners.get('cancel')!({ preventDefault() {} } as unknown as Event);
-    assert.equal(fixture.dialog.open, false);
-    assert.deepEqual(events, [], 'closing the dialog leaves the decision unanswered');
+    fixture.root.listeners.get('keydown')!({ key: 'Escape', preventDefault() {} } as unknown as Event);
+    assert.deepEqual(events, [], 'returning to call types leaves the decision unanswered');
+    assert.equal(fixture.parts.get('call-options')!.children.length, 0);
+    assert.equal(fixture.parts.get('call-back')!.hidden, true);
     assert.equal(fixture.parts.get('call-pon')!.hidden, false);
     clickRoot(fixture.parts.get('call-pon')!);
-    assert.equal(fixture.dialog.open, true, 'the same type can be chosen again after returning to the table');
     shown = fixture.parts.get('call-options')!.children as FakeElement[];
     const chosen = shown.find(button => button.dataset.optionId === 'pon-2')!;
-    fixture.dialog.listeners.get('click')!({ target: chosen, detail: 1 } as unknown as Event);
+    fixture.root.listeners.get('click')!({ target: chosen, detail: 1 } as unknown as Event);
     assert.deepEqual(events, [{ type: 'select-call', optionId: 'pon-2' }]);
-    assert.equal(fixture.dialog.open, false);
   } finally {
     fixture.panel.update(state());
     fixture.restore();
   }
 });
 
-test('the call dialog omits pass and the table pass button remains delegated', () => {
+test('inline candidate back and pass controls remain independent', () => {
   const events: ActionPanelEvent[] = [];
-  const fixture = panelFixture(event => events.push(event), {}, true);
+  const fixture = panelFixture(event => events.push(event));
   const face = (rank: 1 | 2) => ordinaryTile(TILE_KINDS.find(kind => kind.category === 'suited' && kind.suit === 'man' && kind.rank === rank)!);
   const options: ActionChoiceOption[] = [
     { id: 'chi-1', label: 'チー', tiles: [{ id: 'one', tile: face(1) }], enabled: true },
@@ -366,17 +359,14 @@ test('the call dialog omits pass and the table pass button remains delegated', (
     }));
     fixture.root.listeners.get('click')!({ target: fixture.parts.get('call-chi')! } as unknown as Event);
 
-    assert.equal(fixture.dialog.open, true);
-    assert.equal(fixture.parts.get('pass-call')!.parent, fixture.parts.get('call-controls'));
-    assert.equal(fixture.callOptionsHost.children.includes(fixture.parts.get('pass-call')), false);
+    assert.equal(fixture.parts.get('call-back')!.hidden, false);
     assert.equal(fixture.parts.get('pass-call')!.hidden, false);
     assert.equal(fixture.parts.get('pass-call')!.disabled, false);
     assert.deepEqual(events, [], 'opening candidate selection does not answer the call window');
 
-    fixture.dialog.listeners.get('cancel')!({ preventDefault() {} } as unknown as Event);
-    assert.equal(fixture.dialog.open, false);
+    fixture.root.listeners.get('click')!({ target: fixture.parts.get('call-back')! } as unknown as Event);
     assert.equal(fixture.parts.get('call-chi')!.hidden, false);
-    assert.equal(fixture.parts.get('pass-call')!.parent, fixture.parts.get('call-controls'));
+    assert.equal(fixture.parts.get('call-options')!.children.length, 0);
     fixture.root.listeners.get('click')!({ target: fixture.parts.get('pass-call')! } as unknown as Event);
     assert.deepEqual(events, [{ type: 'pass-call' }]);
   } finally { fixture.restore(); }
@@ -447,7 +437,8 @@ test('call panel diagnostics correlate displayed choices and clicks without reta
       buttons: { ...state().buttons, 'pass-call': { visible: true, enabled: true, label: '見送る' } },
       callGroup: { visible: true, status: '', options },
     }));
-    const button = fixture.parts.get('call-chi')!;
+    fixture.root.listeners.get('click')!({ target: fixture.parts.get('call-chi')!, detail: 1 } as unknown as Event);
+    const button = fixture.parts.get('call-options')!.children[0] as FakeElement;
     fixture.root.listeners.get('pointerdown')!({ target: button } as unknown as Event);
     fixture.root.listeners.get('click')!({ target: button, detail: 1 } as unknown as Event);
 
@@ -457,8 +448,8 @@ test('call panel diagnostics correlate displayed choices and clicks without reta
     assert.equal(traces[0]?.actionType, 'chi');
     const entries = diagnosticLog.all();
     const displayed = entries.find(entry => entry.event === 'action_panel_displayed');
-    const pointer = entries.find(entry => entry.event === 'action_panel_pointer_received');
-    const click = entries.find(entry => entry.event === 'action_panel_click_received');
+    const pointer = entries.find(entry => entry.event === 'action_panel_pointer_received' && entry.details.candidateId === 'call-1');
+    const click = entries.filter(entry => entry.event === 'action_panel_click_received' && entry.details.candidateId === 'call-1').at(-1);
     assert.equal(displayed?.details.panelType, 'call');
     assert.equal(displayed?.details.candidateCount, 2);
     assert.equal(pointer?.details.operationId, click?.details.operationId);
