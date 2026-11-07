@@ -86,8 +86,8 @@ with sync_playwright() as p:
                   const riichiMainCenterStepExpected=(normalMainSize+declarationMainSize)/2+1;
                   const regularCrossGapExpected=1;
                   const riichiMainGapExpected=1;
-                  const table=q('#local-table');
-                  const publicIds=new Set([...table.querySelectorAll('[data-tile-id]')].map(e=>e.dataset.tileId));
+                  const tableElement=q('#local-table');
+                  const publicIds=new Set([...tableElement.querySelectorAll('[data-tile-id]')].map(e=>e.dataset.tileId));
                   const visibleIds=new Set([...shown.players.flatMap(p=>p.river),...shown.players.flatMap(p=>p.melds.flatMap(m=>m.tiles)),...dora.exposedDoraIndicators(shown)].map(t=>t.id));
                   const privateTiles=[...shown.players.slice(1).flatMap(p=>[...p.hand,...(p.drawnTile?[p.drawnTile]:[])]),...shown.liveWall,...shown.deadWall].filter(t=>!visibleIds.has(t.id));
                   const allRiverSvgs=[...document.querySelectorAll('#local-table .river svg')].map(rect);
@@ -111,7 +111,7 @@ with sync_playwright() as p:
                     noScroll:document.documentElement.scrollWidth<=innerWidth,
                     viewport:{scrollWidth:document.documentElement.scrollWidth,innerWidth,outsideViewport},
                     inTable:allRiverSvgs.every(a=>a.left>=table.left-.2&&a.right<=table.right+.2&&a.top>=table.top-.2&&a.bottom<=table.bottom+.2),
-                    privateIds:privateTiles.every(t=>!publicIds.has(t.id)&&!table.innerHTML.includes(t.id)),
+                    privateIds:privateTiles.every(t=>!publicIds.has(t.id)&&!tableElement.innerHTML.includes(t.id)),
                     decBox:decSvg?{x:d.x,y:d.y,width:d.width,height:d.height}:null,normalBox:{x:n.x,y:n.y,width:n.width,height:n.height}
                   };
                 }''', {'seat':seat,'position':position})
