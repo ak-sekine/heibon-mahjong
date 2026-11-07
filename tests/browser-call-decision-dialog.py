@@ -66,7 +66,7 @@ window.loadTurn=()=>{
         page.locator('#call-chi').click()
         candidates = page.locator('#call-options button[data-action-choice="call"]')
         assert candidates.count() == 5, f'{width}x{height}: expected five chi candidates'
-        assert candidates.evaluate_all('nodes=>nodes.every(node=>node.innerText.trim()==="")'), 'call kind text is duplicated in candidate buttons'
+        assert candidates.evaluate_all('nodes=>nodes.every(node=>{const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let text="";while(walker.nextNode()){if(!walker.currentNode.parentElement?.closest("svg"))text+=walker.currentNode.textContent;}return text.trim()===""})'), 'call kind text is duplicated outside the tile artwork'
         assert candidates.evaluate_all('nodes=>nodes.every(node=>Boolean(node.getAttribute("aria-label")))'), 'candidate accessible names were removed'
         assert candidates.evaluate_all('nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.width>=44&&r.height>=44&&r.left>=0&&r.right<=innerWidth})'), 'candidate hit target is clipped or too small'
         assert page.locator('#call-options .tile-svg').evaluate_all('nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.width>=22&&r.height>=31})'), 'candidate tile art became too small'
