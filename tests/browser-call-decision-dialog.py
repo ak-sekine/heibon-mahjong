@@ -126,7 +126,8 @@ window.loadTurn=()=>{
         option_frame = page.locator('#call-options').evaluate("node=>({border:getComputedStyle(node).borderWidth,background:getComputedStyle(node).backgroundColor,shadow:getComputedStyle(node).boxShadow})")
         assert option_frame == {'border':'0px','background':'rgba(0, 0, 0, 0)','shadow':'none'}, option_frame
         assert panel_candidates['y'] <= panel_before['y'] + 1, (panel_before, panel_candidates)
-        assert abs(panel_candidates['y'] + panel_candidates['height'] - panel_before['y'] - panel_before['height']) < 1, (panel_before, panel_candidates)
+        multi_candidate_panel = panel_candidates if grid['rows'] >= 2 else None
+        candidate_panel_bottom = panel_candidates['y'] + panel_candidates['height']
         if grid['rows'] >= 2:
             assert panel_candidates['y'] < panel_before['y'], (panel_before, panel_candidates, grid)
         if (width, height) == (375, 634):
@@ -171,8 +172,12 @@ window.loadTurn=()=>{
                 if expected_count == 3:
                     assert exact_grid == {'columns':3,'rows':1}, exact_grid
                 exact_box = page.locator('#call-options').bounding_box()
+                exact_panel_box = page.locator('#call-controls').bounding_box()
                 exact_back = page.locator('#call-back').bounding_box()
-                assert exact_box and exact_back and 0 <= exact_back['y'] - exact_box['y'] - exact_box['height'] <= 8, (exact_box, exact_back)
+                assert exact_box and exact_back and exact_panel_box and 0 <= exact_back['y'] - exact_box['y'] - exact_box['height'] <= 8, (exact_box, exact_panel_box, exact_back)
+                assert abs(exact_panel_box['y'] + exact_panel_box['height'] - candidate_panel_bottom) < 1, (exact_panel_box, candidate_panel_bottom)
+                if multi_candidate_panel:
+                    assert multi_candidate_panel['y'] < exact_panel_box['y'], (multi_candidate_panel, exact_panel_box, mode)
                 page.locator('#call-back').click()
                 assert page.locator('#pass-calls').is_visible(), f'{mode} candidate Back did not restore the type screen'
 
@@ -218,6 +223,9 @@ window.loadTurn=()=>{
             single_panel_box = page.locator('#call-controls').bounding_box()
             single_back_box = page.locator('#call-back').bounding_box()
             assert single_candidate_box and single_panel_box and single_back_box and 0 <= single_back_box['y'] - single_candidate_box['y'] - single_candidate_box['height'] <= 8, (single_candidate_box, single_back_box)
+            assert abs(single_panel_box['y'] + single_panel_box['height'] - candidate_panel_bottom) < 1, (single_panel_box, candidate_panel_bottom)
+            if multi_candidate_panel:
+                assert multi_candidate_panel['y'] < single_panel_box['y'], (multi_candidate_panel, single_panel_box)
             assert page.evaluate("callState().phase==='awaiting-call'"), 'a single candidate was selected before it was displayed'
             page.locator('#call-options button[data-action-choice="call"]').click()
             page.wait_for_function("callState().phase!=='awaiting-call'")
