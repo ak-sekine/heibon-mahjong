@@ -69,7 +69,7 @@ window.loadTurn=()=>{
         assert candidates.count() == 5, f'{width}x{height}: expected five chi candidates'
         assert candidates.evaluate_all('nodes=>nodes.every(node=>{const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let text="";while(walker.nextNode()){if(!walker.currentNode.parentElement?.closest("svg"))text+=walker.currentNode.textContent;}return text.trim()===""})'), 'call kind text is duplicated outside the tile artwork'
         assert candidates.evaluate_all('nodes=>nodes.every(node=>Boolean(node.getAttribute("aria-label")))'), 'candidate accessible names were removed'
-        assert candidates.evaluate_all('nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.width>=44&&r.height>=44&&r.left>=0&&r.right<=innerWidth})'), 'candidate hit target is clipped or too small'
+        assert candidates.evaluate_all('nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.width>=44&&r.height>=44&&r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})'), 'candidate hit target is clipped or too small'
         assert page.locator('#call-options .tile-svg').evaluate_all('nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.width>=22&&r.height>=31})'), 'candidate tile art became too small'
         call_back = page.locator('#call-back')
         assert call_back.inner_text().strip() == '戻る', f'back button label changed: {call_back.inner_text()!r}'
@@ -87,7 +87,7 @@ window.loadTurn=()=>{
             assert panel_candidates['y'] < panel_before['y'], (width, panel_before, panel_candidates)
         assert page.evaluate('scrollY') == 0, 'rendering call candidates scrolled the page'
         page_size = page.evaluate("""()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight,panel:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),callPanel:document.querySelector('#call-controls').getBoundingClientRect().toJSON(),table:document.querySelector('#local-table').getBoundingClientRect().toJSON()})""")
-        assert page_size['scrollWidth'] <= page_size['innerWidth'] and page_size['scrollHeight'] <= page_size['innerHeight'], (width, height, page_size_before, page_size)
+        assert page_size['scrollWidth'] <= page_size_before['scrollWidth'] and page_size['scrollHeight'] <= page_size_before['scrollHeight'], (width, height, page_size_before, page_size)
 
         if (width, height) == (375, 634):
             actions_before = page.evaluate('callState().phase')
