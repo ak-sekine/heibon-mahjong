@@ -353,6 +353,8 @@ test('inline candidate back and pass controls remain independent', () => {
     { id: 'chi-2', label: 'チー', tiles: [{ id: 'two', tile: face(2) }], enabled: true },
   ];
   try {
+    fixture.panel.clear();
+    assert.equal(fixture.parts.get('call-back')!.textContent, '戻る', 'clearing a game must preserve the static back label');
     fixture.panel.update(state({
       buttons: { ...state().buttons, 'pass-call': { visible: true, enabled: true, label: '見送る' } },
       callGroup: { visible: true, status: '残り10秒', options },

@@ -220,7 +220,7 @@ export class ActionPanel {
       const button = this.part(part) as HTMLButtonElement;
       button.hidden = true;
       button.disabled = true;
-      button.textContent = '';
+      if (part !== 'call-back') button.textContent = '';
       button.removeAttribute('aria-busy');
     }
     for (const part of ['call-controls', 'kan-controls', 'ron-controls', 'round-actions']) this.part(part).hidden = true;
