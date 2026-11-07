@@ -63,6 +63,7 @@ window.loadTurn=()=>{
             assert box and box['width'] >= 44 and box['height'] >= 44, (width, height, selector, box)
 
         panel_before = page.locator('#call-controls').bounding_box()
+        page_size_before = page.evaluate("()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight})")
         page.locator('#call-chi').click()
         candidates = page.locator('#call-options button[data-action-choice="call"]')
         assert candidates.count() == 5, f'{width}x{height}: expected five chi candidates'
@@ -85,7 +86,8 @@ window.loadTurn=()=>{
         if width <= 375 or width == 1280:
             assert panel_candidates['y'] < panel_before['y'], (width, panel_before, panel_candidates)
         assert page.evaluate('scrollY') == 0, 'rendering call candidates scrolled the page'
-        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight'), 'call panel caused page overflow'
+        page_size = page.evaluate("""()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight,panel:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),callPanel:document.querySelector('#call-controls').getBoundingClientRect().toJSON(),table:document.querySelector('#local-table').getBoundingClientRect().toJSON()})""")
+        assert page_size['scrollWidth'] <= page_size['innerWidth'] and page_size['scrollHeight'] <= page_size['innerHeight'], (width, height, page_size_before, page_size)
 
         if (width, height) == (375, 634):
             actions_before = page.evaluate('callState().phase')
