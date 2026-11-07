@@ -99,7 +99,9 @@ window.loadTurn=()=>{
         assert candidate_box and panel_candidates and candidate_box['y'] + candidate_box['height'] <= panel_candidates['y'] + 1, (candidate_box, panel_candidates)
         assert table_before and table_candidates and abs(table_candidates['y'] - table_before['y']) < 1, (table_before, table_candidates)
         assert ordinary_controls_before and ordinary_controls_candidates and abs(ordinary_controls_candidates['y'] - ordinary_controls_before['y']) < 1, (ordinary_controls_before, ordinary_controls_candidates)
-        assert panel_before and panel_candidates and abs(panel_candidates['y'] - panel_before['y']) < 1, (panel_before, panel_candidates)
+        assert panel_before and panel_candidates and abs(
+            panel_candidates['y'] + panel_candidates['height'] - panel_before['y'] - panel_before['height']
+        ) < 1, (panel_before, panel_candidates)
         assert page.evaluate('scrollY') == 0, 'rendering call candidates scrolled the page'
         page_size = page.evaluate("""()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight,panel:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),callPanel:document.querySelector('#call-controls').getBoundingClientRect().toJSON(),table:document.querySelector('#local-table').getBoundingClientRect().toJSON()})""")
         assert page_size['scrollWidth'] <= page_size_before['scrollWidth'] and page_size['scrollHeight'] <= page_size_before['scrollHeight'], (width, height, page_size_before, page_size)
