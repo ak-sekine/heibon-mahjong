@@ -49,7 +49,7 @@ ul { list-style:none; padding:0; margin:0; }
 .action-group-status { flex:1 1 100%; min-width:0; margin:0; font-size:14px; overflow-wrap:anywhere; }
 .action-option-list { display:flex; flex-wrap:wrap; gap:4px; width:100%; }
 .action-choice-group [data-panel-part="pass-call"],.action-choice-group [data-panel-part="cancel-kan"] { flex-basis:100%; }
-.call-controls { position:absolute; z-index:10; right:0; bottom:0; left:0; justify-content:flex-start; padding:8px; border:1px solid #39765e; border-radius:8px; background:#123f32; box-shadow:0 4px 18px rgb(0 0 0 / 28%); }
+.call-controls { position:absolute; z-index:10; top:0; right:0; bottom:auto; left:0; justify-content:space-between; min-height:136px; padding:8px; border:1px solid #39765e; border-radius:8px; background:#123f32; box-shadow:0 4px 18px rgb(0 0 0 / 28%); }
 .discard-controls:has(.call-controls:not([hidden])) { position:relative; overflow:visible; }
 .call-controls > [data-panel-part="call-options"]:empty { display:none; }
 .call-type-buttons { display:flex; flex-wrap:wrap; align-items:stretch; gap:6px; width:100%; }
@@ -564,19 +564,42 @@ header > div { min-width:0; }
 @media (max-height:650px) and (max-width:599px) {
  .table .seat-bottom { gap:8px; padding:0; }
 }
-@media (min-width:600px) and (max-height:850px) {
- /* Reserve room for the header and compact operation panel in short views. */
- .table { container-type:inline-size; width:min(100%,calc(100svh - 128px)); margin-inline:0; align-self:center; --table-tile-width:min(42px,round(down,calc((100svh - 148px) / 14),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
+@media (min-width:600px) and (max-height:960px) {
+ /* Reserve room for the header, table summary, and action panel on tablets. */
+ .table { container-type:inline-size; width:min(100%,calc(100svh - 288px)); margin-inline:0; align-self:center; --table-tile-width:min(42px,round(down,calc((100svh - 308px) / 14),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
  .table .seat,.table .rivers { --table-tile-width:min(42px,round(down,calc((100cqw - 22px) / 14),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); --river-tile-width:calc(var(--table-tile-width)*.76); --river-tile-height:calc(var(--table-tile-height)*.76); }
  .table-summary { --table-tile-width:min(42px,round(down,calc((100svh - 96px) / 15.8),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
 }
 @supports (height:100dvh) {
- @media (min-width:600px) and (max-height:850px) {
-  .table { width:min(100%,calc(100dvh - 128px)); --table-tile-width:min(42px,round(down,calc((100dvh - 148px) / 14),.1px)); }
+ @media (min-width:600px) and (max-height:960px) {
+  .table { width:min(100%,calc(100dvh - 288px)); --table-tile-width:min(42px,round(down,calc((100dvh - 308px) / 14),.1px)); }
   .table-summary { --table-tile-width:min(42px,round(down,calc((100dvh - 96px) / 15.8),.1px)); }
  }
 }
-
+/* The small portrait board also leaves room for the fixed-height call strip. */
+@media (max-width:599px) and (max-height:600px) {
+ .table { width:min(100%,calc(100svh - 268px)); margin-inline:0; align-self:center; }
+}
+@supports (height:100dvh) {
+ @media (max-width:599px) and (max-height:600px) {
+  .table { width:min(100%,calc(100dvh - 268px)); }
+ }
+}
+/* Keep the compact call controls directly below the table on short views. */
+@media (min-width:600px) and (max-height:650px) {
+ .table { width:min(100%,calc(100svh - 188px)); --table-tile-width:min(42px,round(down,calc((100svh - 208px) / 14),.1px)); }
+ .call-controls { display:grid; grid-template-columns:minmax(0,3fr) minmax(88px,1fr); grid-template-rows:auto 44px; gap:4px; min-height:74px; padding:4px; }
+ .call-controls > [data-panel-part="call-status"] { grid-column:1 / -1; min-height:14px; margin:0; font-size:12px; line-height:1.2; }
+ .call-type-buttons { grid-column:1; grid-row:2; flex-wrap:nowrap; gap:4px; width:auto; min-width:0; }
+ .call-type-buttons .control-action-button { min-width:0; flex:1 1 0; padding:4px 2px; font-size:12px; }
+ .call-choice-footer { grid-column:2; grid-row:2; width:auto; }
+ .call-choice-footer .control-action-button { min-width:0; padding-inline:4px; font-size:13px; }
+}
+@supports (height:100dvh) {
+ @media (min-width:600px) and (max-height:650px) {
+  .table { width:min(100%,calc(100dvh - 188px)); --table-tile-width:min(42px,round(down,calc((100dvh - 208px) / 14),.1px)); }
+ }
+}
 /* The shared absolute layout sizes each interval from the displayed face, so
    local and online rivers keep the same spacing around a declaration. */
 .table .river-tile { width:var(--river-tile-width); height:var(--river-tile-height); justify-self:center; align-self:center; }
@@ -706,6 +729,7 @@ header > div { min-width:0; }
  }
  #local-game-layout > #round-result-summary { grid-column:2; grid-row:2; align-self:center; }
  #local-game-layout > #local-game-controls { grid-column:2; grid-row:3; align-self:end; width:100%; }
+ .call-controls { top:auto; bottom:0; }
 
  #online-match {
    display:grid;

@@ -57,10 +57,13 @@ window.loadTurn=()=>{
         page.evaluate("loadCalls('max')")
         page.wait_for_function("document.querySelector('#call-controls').hidden === false")
         call_action_position = page.evaluate("()=>({table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON()})")
-        assert abs(
-            normal_action_position['controls']['y'] + normal_action_position['controls']['height']
-            - call_action_position['controls']['y'] - call_action_position['controls']['height']
-        ) < 1, (normal_action_position, call_action_position)
+        if width >= 960:
+            assert abs(
+                normal_action_position['controls']['y'] + normal_action_position['controls']['height']
+                - call_action_position['controls']['y'] - call_action_position['controls']['height']
+            ) < 1, (normal_action_position, call_action_position)
+        else:
+            assert abs(normal_action_position['controls']['y'] - call_action_position['controls']['y']) < 1, (normal_action_position, call_action_position)
         assert abs(normal_action_position['table']['y'] - call_action_position['table']['y']) < 1, (normal_action_position, call_action_position)
         assert page.locator('#call-decision-dialog').count() == 0, 'call modal remains in the page'
         assert page.locator('dialog[open]').count() == 0, 'call decision unexpectedly opened a modal'
@@ -75,6 +78,9 @@ window.loadTurn=()=>{
         panel_before = page.locator('#call-controls').bounding_box()
         table_before = page.locator('#local-table').bounding_box()
         ordinary_controls_before = page.locator('#local-game-controls').bounding_box()
+        assert panel_before and panel_before['y'] >= 0 and panel_before['y'] + panel_before['height'] <= height, (width, height, panel_before)
+        if width < 960:
+            assert table_before and -1 <= panel_before['y'] - table_before['y'] - table_before['height'] <= 8, (table_before, panel_before)
         page_size_before = page.evaluate("()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight})")
         page.locator('#call-chi').click()
         candidates = page.locator('#call-options button[data-action-choice="call"]')
@@ -102,7 +108,7 @@ window.loadTurn=()=>{
         assert candidate_box and panel_candidates and candidate_box['y'] + candidate_box['height'] <= panel_candidates['y'] + 1, (candidate_box, panel_candidates)
         assert table_before and table_candidates and abs(table_candidates['y'] - table_before['y']) < 1, (table_before, table_candidates)
         assert ordinary_controls_before and ordinary_controls_candidates and abs(ordinary_controls_candidates['y'] - ordinary_controls_before['y']) < 1, (ordinary_controls_before, ordinary_controls_candidates)
-        assert panel_before and panel_candidates and abs(
+        assert panel_before and panel_candidates and abs(panel_candidates['y'] - panel_before['y']) < 1 and abs(
             panel_candidates['y'] + panel_candidates['height'] - panel_before['y'] - panel_before['height']
         ) < 1, (panel_before, panel_candidates)
         assert page.evaluate('scrollY') == 0, 'rendering call candidates scrolled the page'

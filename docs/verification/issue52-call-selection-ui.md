@@ -40,8 +40,8 @@ CSSを調べると、モバイルでは `.discard-controls:has(.call-controls:no
 
 ### 修正
 
-- 通常の打牌などを含む `.discard-controls` の配置を保ち、鳴き選択パネルをその操作領域の下端に重ねるよう共通化しました。viewport下端への固定を削除し、`main` に加算していた鳴き用viewport insetも除去しました。
-- 幅600px以上で高さ850px以下の横長画面では、ヘッダー・卓情報・操作領域が画面内に収まるよう卓幅の高さ上限を `100dvh - 128px` にします。操作欄は卓の直後に保ちます。
+- 通常の打牌などを含む `.discard-controls` 自体の配置を保ち、モバイルでは鳴きパネルを操作領域の上端、すなわち卓直後に配置します。種類選択と候補選択でパネルの基準・高さをそろえ、PCの右側操作欄では下端に合わせます。viewport下端への固定を削除し、`main` に加算していた鳴き用viewport insetも除去しました。
+- 幅600px以上・高さ650px以下の横長画面では、卓直後に鳴き操作を収めるため操作ボタンを横一列にし、卓幅の高さ上限を `100dvh - 188px` にします。同幅で高さ651〜960pxでは `100dvh - 288px`、幅600px未満・高さ600px以下では `100dvh - 268px` を上限にし、卓と固定高パネルが画面内に収まる余地を確保します。
 - 牌候補一覧は鳴きパネルの上端から上向きに展開する絶対配置にし、`max-height`、内部スクロール、overscroll containmentを設定しました。候補の行数はページの通常フローに影響しません。
 - 牌候補選択では「戻る」だけを残し、「見送る」を隠します。「戻る」は種類選択へ戻して「見送る」を再表示し、鳴き判断イベントを発生させません。種類選択画面の見送り、候補が1つでも選択前には候補を明示する既存動作、時間切れ処理は維持します。
 
@@ -65,4 +65,5 @@ Browser UIでは通常の操作領域と卓の位置が鳴き判断中に変化�
 - Deploy run [#711](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42334177990)、commit `029e7e54fd34052d6ed29100c6c4dd068828cdb9` は `verify`、回帰テスト、Worker型チェック、Pages／itch buildが成功しました。ChromiumとWebKitは両方とも `tests/browser-call-decision-dialog.py` の844×390 viewportで失敗し、候補画面の「戻る」が `y=374`、高さ44pxとなって画面下端から28pxはみ出すことを検出しました。browser-ui matrix auditも両エンジンの失敗を検出したため、deploy jobは実行されていません。
 - この結果を受け、幅600px以上・高さ850px以下では卓の高さ上限を `100dvh - 128px` とし、通常操作欄を画面内に残す余裕を広げました。変更後は `npm test`（85 test files成功）、`npm run build`、`npm run typecheck:worker`、`git diff --check`、関連Browser UI Python構文確認が成功しています。
 - Deploy run [#712](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42334971322)、commit `5bbdef376119df6119eedc5e0596de1e80c6f074` は `verify` と `docs-check` が成功しました。Chromium／WebKitとも844×390の候補画面まで通過し、「戻る」も表示範囲内でしたが、1280×900で通常操作欄と鳴き操作欄の親要素の上端を比較する既存回帰assertionが失敗しました。PCのグリッドでは状態ごとに親要素の高さが変わり、下端は共通のままです。Browser UI matrix auditも両エンジンの失敗を検出し、deploy jobは実行されていません。
-- このPC向け検証の前提を修正し、操作領域の高さに左右されないよう親要素の上端ではなく下端を比較します。Chromium／WebKitの修正後結果は次のActions run後に追記します。iPhone Safari実機の修正後確認は引き続き未実施です。
+- Deploy run [#713](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42335426664)、commit `72d45aa4a6283ed0f163d5f516bcbfd7a180ee19` は `verify` と `docs-check` が成功しましたが、Chromium／WebKitとも375×634で、通常操作中と鳴き判断中の `.discard-controls` 上端は卓直後の同じ位置でも、高さが159pxから14pxへ変わるため下端比較が失敗しました。これは鳴きパネルを可変高さの親下端に結び付けると種類画面の位置が変わることを示します。両Browser UIとmatrix auditは失敗し、deploy jobは実行されていません。
+- この結果を受け、モバイルの鳴きパネルを操作領域の上端（卓直後）へ固定し、2段階でパネルの高さを保ちます。600〜959px幅の短い横画面では種類・見送り／候補・戻るを一列の操作帯に収め、卓はその上限内に縮めます。PCでは従来どおり操作欄の下端へ結び付けます。変更後のローカル検証は `npm test`（85 test files成功）、`npm run build`、`npm run typecheck:worker`、`git diff --check`、関連Browser UI Python構文確認が成功しています。Chromium／WebKitとActionsの再検証は次のrun後に追記します。iPhone Safari実機の修正後確認は引き続き未実施です。
