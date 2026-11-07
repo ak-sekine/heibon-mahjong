@@ -58,7 +58,9 @@ with sync_playwright() as p:
             check()
         for mode in ['ankan','daiminkan','kakan','rinshan']:
             load(mode)
-            if mode=='daiminkan': page.locator('#call-kan').tap()
+            if mode=='daiminkan':
+                page.locator('#call-kan').tap()
+                page.locator('#call-options button[data-action-choice="call"]').tap()
             else:
                 page.locator('#kan').tap()
                 page.locator('#kan-options button').tap()

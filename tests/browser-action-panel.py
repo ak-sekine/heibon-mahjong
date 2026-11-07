@@ -198,6 +198,7 @@ with sync_playwright() as p:
           test.update(null, false, false, false, 10);
         }""")
         online_panel.locator('[data-panel-part="call-pon"]').click()
+        online_panel.locator('[data-panel-part="call-options"] button[data-action-choice="call"]').click()
         online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
         assert online_events[-1] == {'type': 'select-call', 'optionId': 'server-call-option'}, online_events
         page.evaluate("""() => {

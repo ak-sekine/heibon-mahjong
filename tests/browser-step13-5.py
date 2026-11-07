@@ -79,7 +79,8 @@ controller.match=startMatch(g);render();};
   tile=page.evaluate('kanCheck().game.players[0].drawnTile.id');page.locator(f'#player-hand button[data-tile-id="{tile}"]').click();page.locator('#discard').click();assert page.evaluate('kanCheck().game.players[0].drawnTile') is None
   for mode,kind in [('ankan','ankan'),('kakan','kakan'),('daiminkan','daiminkan')]:
    page.evaluate('loadKan',mode)
-   if mode=='daiminkan':page.locator('#call-kan').click()
+   if mode=='daiminkan':
+    page.locator('#call-kan').click();page.locator('#call-options button[data-action-choice="call"]').click()
    else:page.locator('#kan').click();page.locator('#kan-options button').click()
    assert page.evaluate('kanCheck().game.players[0].melds[0].type')==kind
    assert page.evaluate('kanCheck().game.players[0].drawnTileSource')=='rinshan';check();shot(mode)
