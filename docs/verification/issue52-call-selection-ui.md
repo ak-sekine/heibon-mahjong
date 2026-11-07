@@ -41,7 +41,7 @@ CSSを調べると、モバイルでは `.discard-controls:has(.call-controls:no
 ### 修正
 
 - 通常の打牌などを含む `.discard-controls` 自体の配置を保ち、モバイルでは鳴きパネルを操作領域の上端、すなわち卓直後に配置します。種類選択と候補選択でパネルの基準・高さをそろえ、PCの右側操作欄では下端に合わせます。viewport下端への固定を削除し、`main` に加算していた鳴き用viewport insetも除去しました。
-- 幅600px以上・高さ650px以下の横長画面では、卓直後に鳴き操作を収めるため操作ボタンを横一列にし、卓幅の高さ上限を `100dvh - 188px` にします。同幅で高さ651〜960pxでは `100dvh - 288px`、幅600px未満・高さ600px以下では `100dvh - 268px` を上限にし、卓と固定高パネルが画面内に収まる余地を確保します。
+- 短い画面で鳴き操作を卓直後に収める必要がある場合に限り、鳴き判断中の卓の高さ上限を縮めます。幅600px以上・高さ650px以下では操作ボタンを横一列にして `100dvh - 188px`、同幅で高さ651〜960pxでは `100dvh - 288px`、幅600px未満・高さ600px以下では `100dvh - 268px` を使います。通常の対局中の卓寸法は既存のレスポンシブ設定を維持します。
 - 牌候補一覧は鳴きパネルの上端から上向きに展開する絶対配置にし、`max-height`、内部スクロール、overscroll containmentを設定しました。候補の行数はページの通常フローに影響しません。
 - 牌候補選択では「戻る」だけを残し、「見送る」を隠します。「戻る」は種類選択へ戻して「見送る」を再表示し、鳴き判断イベントを発生させません。種類選択画面の見送り、候補が1つでも選択前には候補を明示する既存動作、時間切れ処理は維持します。
 
@@ -53,12 +53,12 @@ CSSを調べると、モバイルでは `.discard-controls:has(.call-controls:no
 | `npm run build` | 成功: TypeScript・Vite build・PWA shell build |
 | `npm run typecheck:worker` | 成功 |
 | `git diff --check` | 成功 |
-| Browser UI Python syntax | 成功: Issue #52関連3スクリプトをcompile確認 |
+| Browser UI Python syntax | 成功: 鳴き選択、卓レイアウト、オンライン対局の関連3スクリプトをcompile確認 |
 | Chromium / WebKit Browser UI | GitHub Actionsの結果待ち。iPhone Safari実機確認とは区別して後日追記 |
 | GitHub Actions | push後の対象commit runを確認して追記 |
 | 修正後のiPhone Safari実機 | 未確認。ユーザー本人による再確認が必要 |
 
-Browser UIでは通常の操作領域と卓の位置が鳴き判断中に変化しないこと、候補画面の「見送る」非表示と「戻る」による状態復帰、5件のチー候補の複数行表示、単一候補表示と選択前の未確定状態、320×568／375×634／375×844／844×390／1280×900 viewportを追加確認します。オンラインシナリオでは種類・候補選択、戻る、候補選択中のタイムアウトを確認します。実機の2指摘はユーザー報告に基づくもので、修正後の実機確認は未実施です。
+Browser UIでは通常時の打牌パネル配置が変わらないこと、卓直後の鳴きパネル、候補画面の「見送る」非表示と「戻る」による状態復帰、5件のチー候補の複数行表示、単一候補表示と選択前の未確定状態、320×568／375×634／375×844／844×390／667×375／1280×900 viewportを追加確認します。オンラインシナリオでは種類・候補選択、戻る、候補選択中のタイムアウトを確認します。実機の2指摘はユーザー報告に基づくもので、修正後の実機確認は未実施です。
 
 ### Actions再検証の経緯
 
@@ -69,3 +69,5 @@ Browser UIでは通常の操作領域と卓の位置が鳴き判断中に変化�
 - この結果を受け、モバイルの鳴きパネルを操作領域の上端（卓直後）へ固定し、2段階でパネルの高さを保ちます。600〜959px幅の短い横画面では種類・見送り／候補・戻るを一列の操作帯に収め、卓はその上限内に縮めます。PCでは従来どおり操作欄の下端へ結び付けます。変更後のローカル検証は `npm test`（85 test files成功）、`npm run build`、`npm run typecheck:worker`、`git diff --check`、関連Browser UI Python構文確認が成功しています。Chromium／WebKitとActionsの再検証は次のrun後に追記します。iPhone Safari実機の修正後確認は引き続き未実施です。
 - Deploy run [#714](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42336729385)、commit `7d9c5a7e0583fcc96bd952f3a9595a90fe520592` は `verify` と `docs-check` が成功しました。Chromium／WebKitとも375×634と320×568を通過し、375×844でBrowser UIの卓直後間隔assertionが失敗しました。実測は卓下端491px、鳴きパネル上端500pxで、通常レイアウトの8px gapと親枠線1pxの合計9pxです。操作パネルは画面内にあり、表示のはみ出しではなく許容幅の不足でした。両Browser UIとmatrix auditは失敗し、deploy jobは実行されていません。
 - 間隔の値を直接推測しないよう、モバイルでは鳴きパネル上端を通常操作領域の上端と比較し、通常操作領域の方が卓直後にあることも併せて確認します。Chromium／WebKitの修正後結果は次のActions run後に追記します。iPhone Safari実機の修正後確認は引き続き未実施です。
+- Deploy run [#715](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42337185737)、commit `705d2f2b1f620fa5d437116bd2bbd37dcbe3d1f4` は `verify` と `docs-check` が成功しました。Chromium／WebKitとも鳴き選択Browser UIは既存5 viewportで成功しましたが、続く卓レイアウト回帰で667×375の通常プレイ時の卓が187px幅、牌幅11.5pxとなり失敗しました。短画面向け縮小ルールが鳴き判断のない通常プレイにも適用されていたことが原因です。Browser UI matrix auditは失敗を検出し、deploy jobは実行されていません。
+- run #715を受け、通常プレイ時は既存の短い横画面向け卓サイズに戻し、卓の追加縮小を鳴き判断中に限定しました。鳴き選択Browser UIへ667×375を追加し、通常状態と鳴き中の配置を分けて検証します。この修正版のChromium／WebKitとActions結果は次の実行後に追記します。実機の修正後確認は引き続き未実施です。

@@ -564,30 +564,38 @@ header > div { min-width:0; }
 @media (max-height:650px) and (max-width:599px) {
  .table .seat-bottom { gap:8px; padding:0; }
 }
-@media (min-width:600px) and (max-height:960px) {
- /* Reserve room for the header, table summary, and action panel on tablets. */
- .table { container-type:inline-size; width:min(100%,calc(100svh - 288px)); margin-inline:0; align-self:center; --table-tile-width:min(42px,round(down,calc((100svh - 308px) / 14),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
+@media (min-width:600px) and (max-height:850px) {
+ /* Preserve the existing compact landscape scale during regular play. */
+ .table { container-type:inline-size; width:min(100%,calc(100svh - 32px)); margin-inline:0; align-self:center; --table-tile-width:min(42px,round(down,calc((100svh - 53px) / 14),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
  .table .seat,.table .rivers { --table-tile-width:min(42px,round(down,calc((100cqw - 22px) / 14),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); --river-tile-width:calc(var(--table-tile-width)*.76); --river-tile-height:calc(var(--table-tile-height)*.76); }
  .table-summary { --table-tile-width:min(42px,round(down,calc((100svh - 96px) / 15.8),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); }
 }
 @supports (height:100dvh) {
- @media (min-width:600px) and (max-height:960px) {
-  .table { width:min(100%,calc(100dvh - 288px)); --table-tile-width:min(42px,round(down,calc((100dvh - 308px) / 14),.1px)); }
+ @media (min-width:600px) and (max-height:850px) {
+  .table { width:min(100%,calc(100dvh - 32px)); --table-tile-width:min(42px,round(down,calc((100dvh - 53px) / 14),.1px)); }
   .table-summary { --table-tile-width:min(42px,round(down,calc((100dvh - 96px) / 15.8),.1px)); }
  }
 }
-/* The small portrait board also leaves room for the fixed-height call strip. */
+@media (min-width:600px) and (max-height:960px) {
+ main:has(.call-controls:not([hidden])) .table { width:min(100%,calc(100svh - 288px)); --table-tile-width:min(42px,round(down,calc((100svh - 308px) / 14),.1px)); }
+}
+@supports (height:100dvh) {
+ @media (min-width:600px) and (max-height:960px) {
+  main:has(.call-controls:not([hidden])) .table { width:min(100%,calc(100dvh - 288px)); --table-tile-width:min(42px,round(down,calc((100dvh - 308px) / 14),.1px)); }
+ }
+}
+/* Compact the board only while the call strip needs room on short portraits. */
 @media (max-width:599px) and (max-height:600px) {
- .table { width:min(100%,calc(100svh - 268px)); margin-inline:0; align-self:center; }
+ main:has(.call-controls:not([hidden])) .table { width:min(100%,calc(100svh - 268px)); margin-inline:0; align-self:center; }
 }
 @supports (height:100dvh) {
  @media (max-width:599px) and (max-height:600px) {
-  .table { width:min(100%,calc(100dvh - 268px)); }
+  main:has(.call-controls:not([hidden])) .table { width:min(100%,calc(100dvh - 268px)); }
  }
 }
 /* Keep the compact call controls directly below the table on short views. */
 @media (min-width:600px) and (max-height:650px) {
- .table { width:min(100%,calc(100svh - 188px)); --table-tile-width:min(42px,round(down,calc((100svh - 208px) / 14),.1px)); }
+ main:has(.call-controls:not([hidden])) .table { width:min(100%,calc(100svh - 188px)); --table-tile-width:min(42px,round(down,calc((100svh - 208px) / 14),.1px)); }
  .call-controls { display:grid; grid-template-columns:minmax(0,3fr) minmax(88px,1fr); grid-template-rows:auto 44px; gap:4px; min-height:74px; padding:4px; }
  .call-controls > [data-panel-part="call-status"] { grid-column:1 / -1; min-height:14px; margin:0; font-size:12px; line-height:1.2; }
  .call-type-buttons { grid-column:1; grid-row:2; flex-wrap:nowrap; gap:4px; width:auto; min-width:0; }
@@ -597,7 +605,7 @@ header > div { min-width:0; }
 }
 @supports (height:100dvh) {
  @media (min-width:600px) and (max-height:650px) {
-  .table { width:min(100%,calc(100dvh - 188px)); --table-tile-width:min(42px,round(down,calc((100dvh - 208px) / 14),.1px)); }
+  main:has(.call-controls:not([hidden])) .table { width:min(100%,calc(100dvh - 188px)); --table-tile-width:min(42px,round(down,calc((100dvh - 208px) / 14),.1px)); }
  }
 }
 /* The shared absolute layout sizes each interval from the displayed face, so

@@ -48,7 +48,7 @@ window.loadTurn=()=>{
     page.goto('http://127.0.0.1:4173/heibon-mahjong/')
     page.wait_for_function('typeof loadCalls === "function"')
 
-    for width, height in [(375, 634), (320, 568), (375, 844), (844, 390), (1280, 900)]:
+    for width, height in [(375, 634), (320, 568), (375, 844), (844, 390), (667, 375), (1280, 900)]:
         page.set_viewport_size({'width': width, 'height': height})
         page.evaluate('window.scrollTo(0,0)')
         page.evaluate('loadTurn()')
@@ -62,8 +62,6 @@ window.loadTurn=()=>{
                 normal_action_position['controls']['y'] + normal_action_position['controls']['height']
                 - call_action_position['controls']['y'] - call_action_position['controls']['height']
             ) < 1, (normal_action_position, call_action_position)
-        else:
-            assert abs(normal_action_position['controls']['y'] - call_action_position['controls']['y']) < 1, (normal_action_position, call_action_position)
         assert abs(normal_action_position['table']['y'] - call_action_position['table']['y']) < 1, (normal_action_position, call_action_position)
         assert page.locator('#call-decision-dialog').count() == 0, 'call modal remains in the page'
         assert page.locator('dialog[open]').count() == 0, 'call decision unexpectedly opened a modal'
@@ -71,6 +69,7 @@ window.loadTurn=()=>{
         call_position = page.locator('#call-controls').evaluate('node=>getComputedStyle(node).position')
         assert call_position == 'absolute', (width, call_position)
         assert page.locator('#local-game-controls').evaluate('node=>getComputedStyle(node).position') == 'relative'
+        assert '見送る' in page.locator('#call-controls').inner_text(), 'the call type screen lost its pass action'
         for selector in ['#call-pon', '#call-kan', '#call-chi', '#pass-calls']:
             box = page.locator(selector).bounding_box()
             assert box and box['width'] >= 44 and box['height'] >= 44, (width, height, selector, box)
@@ -97,6 +96,7 @@ window.loadTurn=()=>{
         back_box = call_back.bounding_box()
         assert back_box and back_box['width'] >= 44 and back_box['height'] >= 44 and back_box['y'] + back_box['height'] <= height, (width, height, back_box)
         assert page.locator('#pass-calls').is_hidden(), 'pass remained available while choosing a candidate'
+        assert '見送る' not in page.locator('#call-controls').inner_text(), 'candidate screen still includes pass text'
         grid = page.locator('#call-options').evaluate("node=>({columns:getComputedStyle(node).gridTemplateColumns.split(' ').length,rows:getComputedStyle(node).gridTemplateRows.split(' ').length,top:node.getBoundingClientRect().top})")
         if width >= 375:
             assert grid['columns'] >= 3, (width, grid)
@@ -108,7 +108,11 @@ window.loadTurn=()=>{
         ordinary_controls_candidates = page.locator('#local-game-controls').bounding_box()
         assert candidate_box and panel_candidates and candidate_box['y'] + candidate_box['height'] <= panel_candidates['y'] + 1, (candidate_box, panel_candidates)
         assert table_before and table_candidates and abs(table_candidates['y'] - table_before['y']) < 1, (table_before, table_candidates)
-        assert ordinary_controls_before and ordinary_controls_candidates and abs(ordinary_controls_candidates['y'] - ordinary_controls_before['y']) < 1, (ordinary_controls_before, ordinary_controls_candidates)
+        if width < 960:
+            assert ordinary_controls_candidates and 0 <= ordinary_controls_candidates['y'] - table_candidates['y'] - table_candidates['height'] <= 8, (table_candidates, ordinary_controls_candidates)
+            assert abs(panel_candidates['y'] - ordinary_controls_candidates['y'] - 1) < 1, (ordinary_controls_candidates, panel_candidates)
+        else:
+            assert ordinary_controls_before and ordinary_controls_candidates and abs(ordinary_controls_candidates['y'] - ordinary_controls_before['y']) < 1, (ordinary_controls_before, ordinary_controls_candidates)
         assert panel_before and panel_candidates and abs(panel_candidates['y'] - panel_before['y']) < 1 and abs(
             panel_candidates['y'] + panel_candidates['height'] - panel_before['y'] - panel_before['height']
         ) < 1, (panel_before, panel_candidates)
@@ -170,6 +174,12 @@ window.loadTurn=()=>{
             page.evaluate('loadTurn()')
             assert page.locator('#call-controls').is_hidden(), 'call controls were shown for a ron decision'
             assert page.locator('#ron-controls').is_visible(), 'ron controls were lost during call UI changes'
+
+        page.evaluate('loadTurn()')
+        page.wait_for_function("document.querySelector('#ron-controls').hidden === false")
+        normal_after = page.evaluate("()=>({table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON()})")
+        assert abs(normal_after['table']['width'] - normal_action_position['table']['width']) < 1, (normal_action_position, normal_after)
+        assert abs(normal_after['controls']['y'] - normal_action_position['controls']['y']) < 1, (normal_action_position, normal_after)
 
         print(f'{browser_name} call UI at {width}x{height}: {grid["columns"]} candidate columns')
 
