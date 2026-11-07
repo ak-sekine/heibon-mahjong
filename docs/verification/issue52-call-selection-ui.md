@@ -82,8 +82,8 @@ Browser UIでは通常時の打牌パネル配置が変わらないこと、卓�
 ### 原因と修正
 
 - 種類ボタンと見送りは別々のFlexコンテナにあり、鳴き種類が1つでも見送りが専用の下段に配置されていました。種類ボタンと見送りを同じCSS Gridの項目として配置し、2項目なら同じ行、3種類以上ならグリッド幅に応じて並べます。44px以上のタップ領域を保ちます。
-- `.call-controls` には `min-height:136px` があり、候補一覧は `position:absolute` で独立の背景・枠線・余白を持っていました。候補枠と「戻る」が同じ外観に見えず、候補一覧の上方向の伸長も親パネルに反映されませんでした。
-- 鳴きパネルの基準高さを136pxから76px（短い横画面は従来どおり74px）に下げ、候補一覧を親 `.call-controls` 内の通常のGrid項目として「戻る」の直前に配置しました。パネル下端を種類選択時の卓直下基準に保ち、候補行が増えた分だけパネル上端が上がります。候補の列幅は84px以上で画面幅に応じて折り返し、3候補が収まる画面では3列にします。候補部分だけに高さ上限と内部スクロールを設定し、パネル全体とページの意図しないスクロールを避けます。
+- `.call-controls` には `min-height:136px` があり、候補一覧は `position:absolute` で独立の背景・枠線・余白を持っていました。候補枠と「戻る」が同じ外観に見えず、候補一覧の上方向の伸長も親パネルに反映されませんでした。別の下端基準へ移した試行では、絶対配置の親 `.discard-controls` が14pxまで縮み、鳴きパネルが卓と重なりました。
+- 種類選択は親操作領域の上端、つまり卓直後から始まり、内容の高さだけを使います。候補画面では候補一覧と「戻る」を同じ `.call-controls` Grid内に置き、パネル下端を親上端から118px（短い横画面では74px）に固定します。候補が1行を超えると、下端を保ったまま上へ広がります。PCの右側操作欄では下端を親に合わせます。候補の列幅は84px以上で画面幅に応じて折り返し、3候補が収まる画面では3列にします。候補部分だけに高さ上限と内部スクロールを設定し、ページ全体の意図しないスクロールを防ぎます。
 - `ActionPanel` の状態遷移、合法性判定、鳴き確定、戻る、見送り、タイムアウト、オンライン同期には手を加えていません。共通テンプレートとCSSを使い、オンライン／オフラインの表示を共通化しています。
 
 ### 今回の検証
@@ -93,11 +93,18 @@ Browser UIでは通常時の打牌パネル配置が変わらないこと、卓�
 | `npm test` | 成功: 85 tests passed |
 | `npm run build` | 成功: TypeScript・Vite・PWA shell build |
 | `npm run typecheck:worker` | 成功 |
-| Browser UI Python構文 | 成功: 鳴き選択、オンライン対局、共通ActionPanelの関連3スクリプト |
-| Chromium／WebKit Browser UI | push後のGitHub Actions runで確認予定。ローカル実行はCodex Cloudの既知Chromium起動制限により未実施 |
-| GitHub Actions | push後、今回の対象commitの全jobを確認して記録 |
+| Browser UI Python構文 | 成功: 鳴き選択、卓レイアウト、オンライン対局、共通ActionPanelの関連4スクリプト |
+| Chromium／WebKit Browser UI | 成功: [GitHub Actions run #724](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42345971656)、commit `312b917bf272bfeb07e5e112797c7d7119ec154d` |
+| GitHub Actions | 成功: verify、Chromium／WebKit、browser-ui matrix audit、release freshness、Worker deploy、production test、Pages build／deploy |
 | iPhone Safari実機 | 未確認。実機で再確認が必要 |
 
 `tests/browser-call-decision-dialog.py` では種類画面の2ボタン行、候補1・2・3・複数候補、共通パネル内のDOM所属、候補枠の独立した境界線・背景がないこと、候補と戻るの間隔、複数行時にパネル上端が上がり下端が維持されること、候補部分だけのスクロールを測定します。320×568、375×634、375×844、844×390、667×375、1280×900をChromiumとWebKitで検証します。既存のオンライン対局Browser UIで戻る・見送り・鳴き確定・時間切れ、共有ActionPanel、通常打牌操作を引き続き確認します。
 
 Issue #52は、ユーザーによるiPhone Safari実機再確認が完了するまでOpenのままにします。
+
+### 今回のActions再検証
+
+- run [#722](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42344690057)、commit `7232f41f1426fc383bd6537606a416ae82700728` では `docs-check`、`verify` とbuild／型チェックが成功しましたが、Browser UIの診断assertionが鳴き種類ボタン数に「見送る」も含めて失敗しました。320px幅の実測では種類ボタンと見送りは同じ行に各147×44pxで並んでいました。テストを種類ボタンだけ数えるよう修正しました。
+- run [#723](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42345023631)、commit `57224c98f00141fe01a72d54411de6a198281a7d` では、WebKitが種類画面のパネル位置assertionに失敗しました。`.discard-controls` が絶対配置の鳴きパネルによって高さ14pxまで縮み、76pxの下端基準が卓の直後からずれていました。ChromiumはBrowser UI本体の前段のstandalone itch smokeで、CPUの九種九牌後に `wall-exhausted` となる初期局に当たり、打牌待ちの確認へ進めませんでした。
+- 上記を受け、種類画面を操作領域の上端に固定し、内容高のみで表示するよう変更しました。候補画面は候補数にかかわらず下端基準を固定し、候補行が増えると上へ広がるようにし、候補画面どうしで下端が維持されるassertionを追加しました。
+- run [#724](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42345971656)、commit `312b917bf272bfeb07e5e112797c7d7119ec154d` は全job成功です。ChromiumとWebKitのBrowser UIで種類画面、候補1／2／3個、複数行候補、共通枠のDOM構造・座標、戻る、見送り、卓位置、320px／縦横画面／PCを確認しました。オンライン対局の時間切れ・戻る・鳴き操作、既存の通常対局シナリオも成功しました。事前／事後standalone itch smoke、matrix audit、release freshness、Worker deploy、production test、Pages build／deployもすべて成功しました。修正後のiPhone Safari実機確認は引き続き未実施です。
