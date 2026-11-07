@@ -25,7 +25,7 @@ import {startMatch} from '/heibon-mahjong/src/game/match.ts';
 window.loadCalls=(mode)=>{
  controller.newGame();
  const hands=mode==='one'?{0:['345m','234p','678s','19p','12z']}:
-   mode==='pon-one'?{0:['55m','234p','678s','9p','123z']}:
+   mode==='pon-one'?{0:['155m','234p','678s','9p','123z']}:
    mode==='two'?{0:['3456m','234p','678s','19p','1z']}:
    mode==='three'?{0:['3467m','234p','678s','19p','1z']}:
    mode==='multi'?{0:['345m','5m','234p','678s','12z','9p']}:
