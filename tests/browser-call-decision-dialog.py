@@ -112,7 +112,7 @@ window.loadTurn=()=>{
             assert red_options.count() == 2
             reds = red_options.evaluate_all("nodes=>nodes.map(n=>[...n.querySelectorAll('svg path')].some(p=>p.getAttribute('d')==='M48 4h7v7Z'))")
             assert sorted(reds) == [False, True], reds
-            red_options.locator(':has(path[d="M48 4h7v7Z"])').click()
+            red_options.nth(reds.index(True)).click()
             page.wait_for_function("callState().phase!=='awaiting-call'")
             assert page.evaluate("callState().players[0].melds[0].tiles.some(t=>t.tile.isRed)"), 'red chi candidate lost its physical red tile'
 
@@ -122,7 +122,7 @@ window.loadTurn=()=>{
             assert pon_options.count() == 2
             pon_reds = pon_options.evaluate_all("nodes=>nodes.map(n=>[...n.querySelectorAll('svg path')].some(p=>p.getAttribute('d')==='M48 4h7v7Z'))")
             assert sorted(pon_reds) == [False, True], pon_reds
-            pon_options.locator(':has(path[d="M48 4h7v7Z"])').click()
+            pon_options.nth(pon_reds.index(True)).click()
             page.wait_for_function("callState().phase!=='awaiting-call'")
             assert page.evaluate("callState().players[0].melds[0].tiles.some(t=>t.tile.isRed)"), 'red pon candidate lost its physical red tile'
 
