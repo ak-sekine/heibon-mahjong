@@ -64,4 +64,5 @@ Browser UIでは通常の操作領域と卓の位置が鳴き判断中に変化�
 
 - Deploy run [#711](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42334177990)、commit `029e7e54fd34052d6ed29100c6c4dd068828cdb9` は `verify`、回帰テスト、Worker型チェック、Pages／itch buildが成功しました。ChromiumとWebKitは両方とも `tests/browser-call-decision-dialog.py` の844×390 viewportで失敗し、候補画面の「戻る」が `y=374`、高さ44pxとなって画面下端から28pxはみ出すことを検出しました。browser-ui matrix auditも両エンジンの失敗を検出したため、deploy jobは実行されていません。
 - この結果を受け、幅600px以上・高さ850px以下では卓の高さ上限を `100dvh - 128px` とし、通常操作欄を画面内に残す余裕を広げました。変更後は `npm test`（85 test files成功）、`npm run build`、`npm run typecheck:worker`、`git diff --check`、関連Browser UI Python構文確認が成功しています。
-- この追加調整を含むBrowser UIのChromium／WebKit結果とGitHub Actions runは、push後に追記します。iPhone Safari実機の修正後確認は引き続き未実施です。
+- Deploy run [#712](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42334971322)、commit `5bbdef376119df6119eedc5e0596de1e80c6f074` は `verify` と `docs-check` が成功しました。Chromium／WebKitとも844×390の候補画面まで通過し、「戻る」も表示範囲内でしたが、1280×900で通常操作欄と鳴き操作欄の親要素の上端を比較する既存回帰assertionが失敗しました。PCのグリッドでは状態ごとに親要素の高さが変わり、下端は共通のままです。Browser UI matrix auditも両エンジンの失敗を検出し、deploy jobは実行されていません。
+- このPC向け検証の前提を修正し、操作領域の高さに左右されないよう親要素の上端ではなく下端を比較します。Chromium／WebKitの修正後結果は次のActions run後に追記します。iPhone Safari実機の修正後確認は引き続き未実施です。

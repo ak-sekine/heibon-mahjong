@@ -57,7 +57,10 @@ window.loadTurn=()=>{
         page.evaluate("loadCalls('max')")
         page.wait_for_function("document.querySelector('#call-controls').hidden === false")
         call_action_position = page.evaluate("()=>({table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON()})")
-        assert abs(normal_action_position['controls']['y'] - call_action_position['controls']['y']) < 1, (normal_action_position, call_action_position)
+        assert abs(
+            normal_action_position['controls']['y'] + normal_action_position['controls']['height']
+            - call_action_position['controls']['y'] - call_action_position['controls']['height']
+        ) < 1, (normal_action_position, call_action_position)
         assert abs(normal_action_position['table']['y'] - call_action_position['table']['y']) < 1, (normal_action_position, call_action_position)
         assert page.locator('#call-decision-dialog').count() == 0, 'call modal remains in the page'
         assert page.locator('dialog[open]').count() == 0, 'call decision unexpectedly opened a modal'
