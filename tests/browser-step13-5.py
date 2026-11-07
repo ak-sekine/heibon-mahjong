@@ -80,7 +80,7 @@ controller.match=startMatch(g);render();};
   for mode,kind in [('ankan','ankan'),('kakan','kakan'),('daiminkan','daiminkan')]:
    page.evaluate('loadKan',mode)
    if mode=='daiminkan':
-    page.locator('#call-kan').click();page.locator('#call-options button[data-action-choice="call"]').click()
+    page.locator('#call-kan').click()
    else:page.locator('#kan').click();page.locator('#kan-options button').click()
    assert page.evaluate('kanCheck().game.players[0].melds[0].type')==kind
    assert page.evaluate('kanCheck().game.players[0].drawnTileSource')=='rinshan';check();shot(mode)

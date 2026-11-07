@@ -253,7 +253,7 @@ test('ActionPanel keeps one countdown in the decision group while it updates and
   } finally { fixture.restore(); }
 });
 
-test('ActionPanel delegates static and choice clicks through one mode callback and keeps choices disabled while pending', () => {
+test('ActionPanel delegates a single call candidate directly and locks duplicate taps while pending', () => {
   const events: ActionPanelEvent[] = [];
   const fixture = panelFixture(event => events.push(event));
   try {
@@ -280,13 +280,41 @@ test('ActionPanel delegates static and choice clicks through one mode callback a
     assert.equal(fixture.parts.get('call-options')!.children.length, 0, 'call candidates stay hidden until their type is selected');
     click(fixture.parts.get('discard')!);
     click(callButton);
-    assert.deepEqual(events, [{ type: 'discard' }], 'selecting a type does not select its only candidate automatically');
-    fixture.panel.update(state({ callGroup: { visible: true, status: '鳴き判断の残り 9 秒です。', options: [{ ...option, enabled: true }] } }));
-    assert.equal(fixture.parts.get('call-options')!.children.length, 1, 'a countdown update keeps the selected single candidate visible');
-    const onlyCandidate = fixture.parts.get('call-options')!.children[0] as FakeElement;
-    click(onlyCandidate);
+    assert.deepEqual(events, [{ type: 'discard' }, { type: 'select-call', optionId: 'call-1' }]);
+    assert.equal(fixture.parts.get('call-options')!.children.length, 0, 'single candidate selection does not open the candidate screen');
+    assert.equal(fixture.parts.get('call-back')!.hidden, true, 'single candidate selection does not expose Back');
+    click(callButton);
     assert.deepEqual(events, [{ type: 'discard' }, { type: 'select-call', optionId: 'call-1' }]);
     assert.equal(fixture.parts.get('action-status')!.focused, true);
+  } finally { fixture.restore(); }
+});
+
+test('single chi and pon choices are selected by the pressed type with mixed option order', () => {
+  const events: ActionPanelEvent[] = [];
+  const fixture = panelFixture(event => events.push(event));
+  try {
+    fixture.panel.update(state({ callGroup: { visible: true, status: '', options: [
+      { id: 'pon-only', label: 'ポン', tiles: [], enabled: true },
+      { id: 'chi-only', label: 'チー', tiles: [], enabled: true },
+    ] } }));
+    assert.deepEqual(events, [], 'candidates are not auto-selected before a button press');
+    fixture.root.listeners.get('click')!({ target: fixture.parts.get('call-chi')! } as unknown as Event);
+    assert.deepEqual(events, [{ type: 'select-call', optionId: 'chi-only' }]);
+    assert.equal(fixture.parts.get('call-options')!.children.length, 0);
+    assert.equal(fixture.parts.get('call-back')!.hidden, true);
+
+    fixture.panel.update(state());
+    fixture.panel.update(state({ callGroup: { visible: true, status: '', options: [
+      { id: 'pon-only', label: 'ポン', tiles: [], enabled: true },
+      { id: 'chi-1', label: 'チー', tiles: [], enabled: true },
+      { id: 'chi-2', label: 'チー', tiles: [], enabled: true },
+    ] } }));
+    fixture.root.listeners.get('click')!({ target: fixture.parts.get('call-pon')! } as unknown as Event);
+    assert.deepEqual(events, [
+      { type: 'select-call', optionId: 'chi-only' },
+      { type: 'select-call', optionId: 'pon-only' },
+    ], 'a single pon is immediate even when another type has multiple candidates');
+    assert.equal(fixture.parts.get('call-options')!.children.length, 0);
   } finally { fixture.restore(); }
 });
 
@@ -432,9 +460,11 @@ test('call panel diagnostics correlate displayed choices and clicks without reta
   });
   diagnosticLog.clear();
   try {
+    const face = (rank: 5 | 6) => ordinaryTile(TILE_KINDS.find(kind => kind.category === 'suited' && kind.suit === 'man' && kind.rank === rank)!);
     const options: ActionChoiceOption[] = [
-      { id: 'chi:man-5:private-tile-a', label: 'チー', tiles: [], enabled: true },
-      { id: 'pon:man-5:private-tile-b', label: 'ポン', tiles: [], enabled: true },
+      { id: 'chi:man-5:private-tile-a', label: 'チー', tiles: [{ id: 'private-a', tile: face(5) }], enabled: true },
+      { id: 'chi:man-5:private-tile-b', label: 'チー', tiles: [{ id: 'private-b', tile: face(6) }], enabled: true },
+      { id: 'pon:man-5:private-tile-c', label: 'ポン', tiles: [], enabled: true },
     ];
     fixture.panel.update(state({
       buttons: { ...state().buttons, 'pass-call': { visible: true, enabled: true, label: '見送る' } },
@@ -454,7 +484,7 @@ test('call panel diagnostics correlate displayed choices and clicks without reta
     const pointer = entries.find(entry => entry.event === 'action_panel_pointer_received' && entry.details.candidateId === 'call-1');
     const click = entries.filter(entry => entry.event === 'action_panel_click_received' && entry.details.candidateId === 'call-1').at(-1);
     assert.equal(displayed?.details.panelType, 'call');
-    assert.equal(displayed?.details.candidateCount, 2);
+    assert.equal(displayed?.details.candidateCount, 3);
     assert.equal(pointer?.details.operationId, click?.details.operationId);
     assert.equal(click?.details.candidateId, 'call-1');
     assert.equal(click?.details.phase, 'awaiting-call');

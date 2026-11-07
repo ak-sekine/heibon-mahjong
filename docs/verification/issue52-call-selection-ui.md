@@ -108,3 +108,26 @@ Issue #52は、ユーザーによるiPhone Safari実機再確認が完了する�
 - run [#723](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42345023631)、commit `57224c98f00141fe01a72d54411de6a198281a7d` では、WebKitが種類画面のパネル位置assertionに失敗しました。`.discard-controls` が絶対配置の鳴きパネルによって高さ14pxまで縮み、76pxの下端基準が卓の直後からずれていました。ChromiumはBrowser UI本体の前段のstandalone itch smokeで、CPUの九種九牌後に `wall-exhausted` となる初期局に当たり、打牌待ちの確認へ進めませんでした。
 - 上記を受け、種類画面を操作領域の上端に固定し、内容高のみで表示するよう変更しました。候補画面は候補数にかかわらず下端基準を固定し、候補行が増えると上へ広がるようにし、候補画面どうしで下端が維持されるassertionを追加しました。
 - run [#724](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42345971656)、commit `312b917bf272bfeb07e5e112797c7d7119ec154d` は全job成功です。ChromiumとWebKitのBrowser UIで種類画面、候補1／2／3個、複数行候補、共通枠のDOM構造・座標、戻る、見送り、卓位置、320px／縦横画面／PCを確認しました。オンライン対局の時間切れ・戻る・鳴き操作、既存の通常対局シナリオも成功しました。事前／事後standalone itch smoke、matrix audit、release freshness、Worker deploy、production test、Pages build／deployもすべて成功しました。修正後のiPhone Safari実機確認は引き続き未実施です。
+
+## 追加修正 — 種類別の単一候補を即確定、2026-11-07
+
+### 変更
+
+- 共通 `ActionPanel` で、押された種類に一致する実行可能な表示候補だけを数えます。1件ならその候補IDを既存の `select-call` イベントへ渡して確定し、候補画面・「戻る」・追加確認を出しません。2件以上なら従来どおりその種類の候補選択へ進みます。候補情報そのものを並び順から推測せず、候補オブジェクトのIDを使います。
+- ローカルとオンラインは同じ `ActionPanel`／`select-call` 経路を使います。確定前は候補を自動選択せず、クリック後は共通の送信待ちロックを使って二重タップを拒否します。オンラインでは既存の送信中／サーバー判断待ち状態と期限処理を維持し、通信プロトコル・ゲーム判定は変更しません。種類選択以外の暗カン・加カン・ロン処理も変更しません。
+- 単一候補のチー・ポン・大明カン、同一種類の複数候補、チーとポンの同時候補、戻る・見送り、オンライン応答待ち・期限切れ・再接続後の候補選択を自動検証へ追加しました。既存の候補UIレイアウトと複数候補検証を保っています。
+
+### 検証結果
+
+| 検証 | 結果 |
+|---|---|
+| `npm test` | 成功: 85 test files passed |
+| `npm run build` | 成功 |
+| `npm run typecheck:worker` | 成功 |
+| `git diff --check` | 成功 |
+| Browser UI Python構文 | 成功: 鳴き選択、オンライン対局、共通ActionPanel、キーボード、関連するカン回帰6スクリプト |
+| Chromium／WebKit Browser UI | Actions実行待ち。Codex Cloud内でのローカルブラウザー起動は既知のCrashpad/seccomp制限があるため、既存のGitHub Actions Browser UIを使用 |
+| GitHub Actions | push後に対象SHAを照合して追記 |
+| iPhone Safari実機 | 未確認。実機確認までIssue #52をOpenのまま維持 |
+
+種類別即確定の主なシナリオは `tests/browser-call-decision-dialog.py` と `tests/browser-online-waiting-room.py`、ActionPanel単体は `tests/action-panel.test.ts` です。カン・ロンや配置・候補枠・上方向展開の既存シナリオも維持し、全体回帰で確認します。

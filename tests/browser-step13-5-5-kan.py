@@ -36,7 +36,7 @@ with sync_playwright() as p:
   for mode in ['ankan','daiminkan','kakan','rinshan','multiple']:
    load_scenario(mode)
    if mode=='daiminkan':
-    page.locator('#call-kan').click();page.locator('#call-options button[data-action-choice="call"]').click()
+    page.locator('#call-kan').click()
    else:page.locator('#kan').click();page.locator('#kan-options button').first.click()
    page.wait_for_timeout(200)
    assert page.locator('.dora-slot[data-tile-id]').count()==2

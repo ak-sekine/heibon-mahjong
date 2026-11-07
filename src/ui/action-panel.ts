@@ -371,8 +371,7 @@ export class ActionPanel {
         const option = this.activeCallOptions.find(candidate => candidate.id === optionId);
         if (!option?.enabled || this.callSelectionPending || !this.callType || callTypeForLabel(option.label) !== this.callType) return;
         this.callType = null;
-        this.lockCallButtons();
-        this.handler({ type: 'select-call', optionId }, trace);
+        this.selectCall(optionId, trace);
       } else this.handler({ type: 'select-kan', optionId }, trace);
       this.part('action-status').focus({ preventScroll: true });
       return;
@@ -413,6 +412,13 @@ export class ActionPanel {
     if (this.callSelectionPending) return;
     const candidates = this.activeCallOptions.filter(option => callTypeForLabel(option.label) === type && option.enabled);
     if (candidates.length > 0) {
+      if (candidates.length === 1) {
+        this.callType = null;
+        const button = this.part(callButtonPart(type)) as HTMLButtonElement;
+        this.selectCall(candidates[0]!.id, this.trace(button, type));
+        this.part('action-status').focus({ preventScroll: true });
+        return;
+      }
       this.callType = type;
       for (const part of ['call-pon', 'call-kan', 'call-chi']) (this.part(part) as HTMLButtonElement).hidden = true;
       (this.part('call-back') as HTMLButtonElement).hidden = false;
@@ -454,6 +460,11 @@ export class ActionPanel {
       button.disabled = true;
       button.setAttribute('aria-busy', 'true');
     }
+  }
+
+  private selectCall(optionId: string, trace: ActionPanelTrace): void {
+    this.lockCallButtons();
+    this.handler({ type: 'select-call', optionId }, trace);
   }
 
   private recordPanelDisplay(panelType: 'call' | 'kan' | 'ron', wasHidden: boolean, visible: boolean, candidateCount: number, disabled: boolean): void {

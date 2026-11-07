@@ -207,7 +207,8 @@ with sync_playwright() as p:
         }""")
         online_panel.locator('[data-panel-part="call-pon"]').click()
         assert page.locator('[data-browser-action-panel] [data-panel-part="pass-call"]').nth(1).is_hidden()
-        online_panel.locator('[data-panel-part="call-options"] button[data-action-choice="call"]').click()
+        assert online_panel.locator('[data-panel-part="call-options"] button[data-action-choice="call"]').count() == 0
+        assert online_panel.locator('[data-panel-part="call-back"]').is_hidden()
         online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
         assert online_events[-1] == {'type': 'select-call', 'optionId': 'server-call-option'}, online_events
         page.evaluate("""() => {

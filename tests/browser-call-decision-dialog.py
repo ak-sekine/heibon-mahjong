@@ -25,6 +25,7 @@ import {startMatch} from '/heibon-mahjong/src/game/match.ts';
 window.loadCalls=(mode)=>{
  controller.newGame();
  const hands=mode==='one'?{0:['345m','234p','678s','19p','12z']}:
+   mode==='pon-one'?{0:['55m','234p','678s','9p','123z']}:
    mode==='two'?{0:['3456m','234p','678s','19p','1z']}:
    mode==='three'?{0:['3467m','234p','678s','19p','1z']}:
    mode==='multi'?{0:['345m','5m','234p','678s','12z','9p']}:
@@ -185,12 +186,25 @@ window.loadTurn=()=>{
             multi_choices = [page.locator(selector).bounding_box() for selector in ['#call-chi', '#call-pon', '#pass-calls']]
             assert all(multi_choices) and len({round(box['y']) for box in multi_choices}) == 1, multi_choices
             assert all(box['width'] >= 44 and box['height'] >= 44 for box in multi_choices), multi_choices
+            page.locator('#call-pon').click()
+            page.wait_for_function("callState().phase!=='awaiting-call'")
+            assert page.evaluate("callState().players[0].melds[0].type") == 'pon', 'the pressed pon type was not selected'
+
+            page.evaluate("loadCalls('multi')")
+            page.locator('#call-chi').click()
+            page.wait_for_function("callState().phase!=='awaiting-call'")
+            assert page.evaluate("callState().players[0].melds[0].type") == 'chi', 'the pressed chi type was not selected'
 
             page.evaluate("loadCalls('max')")
             page.locator('#call-kan').click()
-            kan_options = page.locator('#call-options button[data-action-choice="call"]')
-            assert kan_options.count() == 1, 'the selected kan type did not show its candidate'
-            kan_options.click()
+            assert page.locator('#call-options button[data-action-choice="call"]').count() == 0
+            assert page.locator('#call-back').is_hidden(), 'single daiminkan exposed Back'
+            page.wait_for_function("callState().phase!=='awaiting-call'")
+
+            page.evaluate("loadCalls('pon-one')")
+            page.locator('#call-pon').click()
+            assert page.locator('#call-options button[data-action-choice="call"]').count() == 0
+            assert page.locator('#call-back').is_hidden(), 'single pon exposed Back'
             page.wait_for_function("callState().phase!=='awaiting-call'")
 
             page.evaluate("loadCalls('red')")
@@ -218,16 +232,8 @@ window.loadTurn=()=>{
             assert type_only[0] and type_only[1] and abs(type_only[0]['y'] - type_only[1]['y']) < 1, type_only
             assert abs(type_only[0]['x'] + type_only[0]['width'] / 2 - (type_only[1]['x'] + type_only[1]['width'] / 2)) > 40, type_only
             page.locator('#call-chi').click()
-            assert page.locator('#call-options button[data-action-choice="call"]').count() == 1
-            single_candidate_box = page.locator('#call-options').bounding_box()
-            single_panel_box = page.locator('#call-controls').bounding_box()
-            single_back_box = page.locator('#call-back').bounding_box()
-            assert single_candidate_box and single_panel_box and single_back_box and 0 <= single_back_box['y'] - single_candidate_box['y'] - single_candidate_box['height'] <= 8, (single_candidate_box, single_back_box)
-            assert abs(single_panel_box['y'] + single_panel_box['height'] - candidate_panel_bottom) < 1, (single_panel_box, candidate_panel_bottom)
-            if multi_candidate_panel:
-                assert multi_candidate_panel['y'] < single_panel_box['y'], (multi_candidate_panel, single_panel_box)
-            assert page.evaluate("callState().phase==='awaiting-call'"), 'a single candidate was selected before it was displayed'
-            page.locator('#call-options button[data-action-choice="call"]').click()
+            assert page.locator('#call-options button[data-action-choice="call"]').count() == 0
+            assert page.locator('#call-back').is_hidden(), 'single chi exposed Back'
             page.wait_for_function("callState().phase!=='awaiting-call'")
 
             page.evaluate('loadTurn()')

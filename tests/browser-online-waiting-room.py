@@ -2377,10 +2377,9 @@ with sync_playwright() as p:
     assert seconds_after_wait < seconds_before_wait, (seconds_before_wait, seconds_after_wait)
     assert page.evaluate('window.onlineMock.gameActions.length') == call_actions_before_view, 'showing the type buttons answered the call window'
     page.locator('#online-call-chi').click()
-    single_candidate = page.locator('#online-call-options button[data-online-call]')
-    assert single_candidate.count() == 1, 'the selected type did not show its single candidate'
-    assert page.evaluate('window.onlineMock.gameActions.length') == call_actions_before_view, 'a single candidate was selected before display'
-    single_candidate.click()
+    assert page.locator('#online-call-options button[data-online-call]').count() == 0, 'single candidate opened a selection screen'
+    assert page.locator('#online-call-back').is_hidden(), 'single candidate exposed Back'
+    page.evaluate("document.querySelector('#online-call-chi').dispatchEvent(new MouseEvent('click', {bubbles:true}))")
     page.wait_for_function('expected => window.onlineMock.gameActions.length === expected + 1', arg=call_actions_before_view)
     wait_for("document.querySelector('#online-call-controls').hidden === true")
     assert page.evaluate('window.onlineMock.gameActions.length') == call_actions_before_view + 1, 'the existing online call action was not submitted'
@@ -2432,10 +2431,10 @@ with sync_playwright() as p:
     assert page.evaluate('window.onlineMock.gameActions.at(-1)') == 'pass-call'
     wait_for("document.querySelector('#online-call-controls').hidden === true")
 
-    page.evaluate('window.onlineMock.showCall(3000)')
+    page.evaluate('window.onlineMock.showCallCandidates(3000)')
     wait_for("document.querySelector('#online-call-controls').hidden === false")
     page.locator('#online-call-chi').click()
-    assert page.locator('#online-call-options button[data-online-call]').count() == 1, 'timed call did not enter candidate selection'
+    assert page.locator('#online-call-options button[data-online-call]').count() == 2, 'timed call did not enter candidate selection'
     assert page.locator('#online-pass-call').is_hidden(), 'candidate screen exposed pass before timeout'
     timeout_actions_before_view = page.evaluate('window.onlineMock.gameActions.length')
     page.wait_for_function("document.querySelector('#online-call-controls').hidden", timeout=7000)
@@ -2824,6 +2823,22 @@ with sync_playwright() as p:
     assert page.locator('#online-call-chi').is_hidden(), 'reconnect restored a stale call type button'
     assert page.locator('#online-call-options button[data-online-call]').count() == 0, 'reconnect restored stale call candidates'
     assert '鳴き判断' not in page.locator('#online-game-action-status').inner_text(), 'reconnect left stale call status text'
+
+    page.evaluate('window.onlineMock.showCallCandidates(30000)')
+    wait_for("document.querySelector('#online-call-controls').hidden === false")
+    reconnect_selection_actions = page.evaluate('window.onlineMock.gameActions.length')
+    reconnect_selection_tickets = page.evaluate('window.onlineMock.ticketRequests')
+    page.evaluate('window.__onlineMockConnectDelay = 500; window.onlineMock.forceDisconnect()')
+    wait_for("document.querySelector('#online-connection').textContent.includes('切れました')")
+    wait_for(f'window.onlineMock.ticketRequests > {reconnect_selection_tickets}', timeout=10000)
+    wait_for("document.querySelector('#online-connection').textContent === '接続中'", timeout=10000)
+    wait_for("document.querySelector('#online-call-controls').hidden === false", timeout=10000)
+    page.locator('#online-call-chi').click()
+    reconnect_candidates = page.locator('#online-call-options button[data-online-call]')
+    assert reconnect_candidates.count() == 2, 'reconnect did not restore the multiple legal choices'
+    reconnect_candidates.first.click()
+    page.wait_for_function('expected => window.onlineMock.gameActions.length === expected + 1', arg=reconnect_selection_actions)
+    wait_for("document.querySelector('#online-call-controls').hidden === true")
 
     page.evaluate('''() => {
       window.onlineMock.dropNextGameResult();
