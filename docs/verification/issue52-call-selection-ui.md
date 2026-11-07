@@ -126,8 +126,14 @@ Issue #52は、ユーザーによるiPhone Safari実機再確認が完了する�
 | `npm run typecheck:worker` | 成功 |
 | `git diff --check` | 成功 |
 | Browser UI Python構文 | 成功: 鳴き選択、オンライン対局、共通ActionPanel、キーボード、関連するカン回帰6スクリプト |
-| Chromium／WebKit Browser UI | Actions実行待ち。Codex Cloud内でのローカルブラウザー起動は既知のCrashpad/seccomp制限があるため、既存のGitHub Actions Browser UIを使用 |
-| GitHub Actions | push後に対象SHAを照合して追記 |
+| Chromium／WebKit Browser UI | 成功: [GitHub Actions run #728](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42357093260)、対象SHA `68aa7e542acc020a0a3a9eba0f8af8c400e8def3` |
+| GitHub Actions | 成功: verify／npm test／Worker型チェック／Pages・itch build、Chromium／WebKit Browser UI、browser-ui matrix audit、release freshness、Worker deploy、本番通信テスト、Pages build／deploy。Worker／Pages成功SHAは `68aa7e542acc020a0a3a9eba0f8af8c400e8def3` |
 | iPhone Safari実機 | 未確認。実機確認までIssue #52をOpenのまま維持 |
 
 種類別即確定の主なシナリオは `tests/browser-call-decision-dialog.py` と `tests/browser-online-waiting-room.py`、ActionPanel単体は `tests/action-panel.test.ts` です。カン・ロンや配置・候補枠・上方向展開の既存シナリオも維持し、全体回帰で確認します。
+
+### Actionsの実行履歴
+
+- Deploy run [#727](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42356707763)、実装commit `afd86a23c08dcb9ed25558159211ca2e3719761d` ではverifyとChromiumが成功しましたが、両ブラウザーの回帰suite中にWebKitが追加したポン局面fixtureで `RangeError: Need thirteen` を検出しました。fixtureの手牌が12枚だったため、13枚になるよう追加修正commit `68aa7e542acc020a0a3a9eba0f8af8c400e8def3` をpushしました。
+- Deploy run [#728](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42357093260)、対象SHA `68aa7e542acc020a0a3a9eba0f8af8c400e8def3` は全job成功です。Chromium／WebKitのBrowser UI、matrix audit、release freshness、Worker deploy、本番通信テスト、Pages build／deployまでsuccessし、Worker／Pagesを同SHAで公開しました。
+- Issue #52はOpenのままです。修正後のiPhone Safari実機確認はユーザーの確認待ちです。
