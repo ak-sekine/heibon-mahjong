@@ -75,15 +75,15 @@ window.loadTurn=()=>{
         back_state = call_back.evaluate("""node=>({hidden:node.hidden,html:node.outerHTML,rect:node.getBoundingClientRect().toJSON(),display:getComputedStyle(node).display,visibility:getComputedStyle(node).visibility})""")
         assert call_back.is_visible(), f'back button is hidden: {back_state}'
         back_box = call_back.bounding_box()
-        assert back_box and back_box['width'] >= 44 and back_box['height'] >= 44 and back_box['bottom'] <= height, (width, height, back_box)
+        assert back_box and back_box['width'] >= 44 and back_box['height'] >= 44 and back_box['y'] + back_box['height'] <= height, (width, height, back_box)
         assert page.locator('#pass-calls').is_visible(), 'pass disappeared while choosing a candidate'
         grid = page.locator('#call-options').evaluate("node=>({columns:getComputedStyle(node).gridTemplateColumns.split(' ').length,top:node.getBoundingClientRect().top})")
         if width >= 375:
             assert grid['columns'] >= 3, (width, grid)
         panel_candidates = page.locator('#call-controls').bounding_box()
-        assert panel_before and panel_candidates and panel_candidates['bottom'] <= panel_before['bottom'] + 1, (panel_before, panel_candidates)
+        assert panel_before and panel_candidates and panel_candidates['y'] + panel_candidates['height'] <= panel_before['y'] + panel_before['height'] + 1, (panel_before, panel_candidates)
         if width <= 375 or width == 1280:
-            assert panel_candidates['top'] < panel_before['top'], (width, panel_before, panel_candidates)
+            assert panel_candidates['y'] < panel_before['y'], (width, panel_before, panel_candidates)
         assert page.evaluate('scrollY') == 0, 'rendering call candidates scrolled the page'
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight'), 'call panel caused page overflow'
 
