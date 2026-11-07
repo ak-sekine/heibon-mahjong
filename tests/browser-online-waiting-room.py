@@ -2398,13 +2398,15 @@ with sync_playwright() as p:
     assert dialog_options.evaluate_all('nodes=>nodes.every(node=>node.getAttribute("aria-label"))'), 'candidate buttons lost accessible names'
     assert page.locator('#online-call-back').inner_text().strip() == '戻る'
     assert page.locator('#online-call-back').is_visible()
-    assert page.locator('#online-pass-call').is_visible(), 'the normal online pass button disappeared during candidate selection'
+    assert page.locator('#online-pass-call').is_hidden(), 'pass remained available during candidate selection'
+    assert '見送る' not in page.locator('#online-call-controls').inner_text(), 'candidate screen still includes pass text'
     assert '残り' in page.locator('#online-call-status').inner_text()
     assert online_call_layout() == layout_before_multi
     seconds_before_table = page.evaluate("Number(document.querySelector('#online-call-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
     page.locator('#online-call-back').click()
     assert page.evaluate('window.onlineMock.gameActions.length') == multi_actions_before
     assert page.locator('#online-call-chi').is_visible()
+    assert page.locator('#online-pass-call').is_visible(), 'returning to type selection did not restore pass'
     assert online_call_layout() == layout_before_multi
     seconds_on_table = page.evaluate("Number(document.querySelector('#online-call-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
     assert seconds_on_table <= seconds_before_table
@@ -2432,6 +2434,9 @@ with sync_playwright() as p:
 
     page.evaluate('window.onlineMock.showCall(3000)')
     wait_for("document.querySelector('#online-call-controls').hidden === false")
+    page.locator('#online-call-chi').click()
+    assert page.locator('#online-call-options button[data-online-call]').count() == 1, 'timed call did not enter candidate selection'
+    assert page.locator('#online-pass-call').is_hidden(), 'candidate screen exposed pass before timeout'
     timeout_actions_before_view = page.evaluate('window.onlineMock.gameActions.length')
     page.wait_for_function("document.querySelector('#online-call-controls').hidden", timeout=7000)
     assert page.locator('#call-decision-dialog').count() == 0, 'call decision dialog was not removed'

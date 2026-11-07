@@ -116,7 +116,7 @@ test('ron and kan viewport monitoring never scrolls the page on initial display,
     fixture.visualViewport.dispatchEvent(new Event('resize'));
     fixture.mockWindow.dispatchEvent(new Event('resize'));
     assert.equal(fixture.scrollCalls.length, 0);
-    assert.equal(fixture.values.get('--call-viewport-inset'), '324px');
+    assert.equal(fixture.values.has('--call-viewport-inset'), false, 'viewport changes do not add bottom padding for in-flow call panels');
     assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_adjustment_skipped' && entry.details.reason === 'viewport_change_does_not_reposition'));
   } finally { fixture.restore(); diagnosticLog.clear(); }
 });

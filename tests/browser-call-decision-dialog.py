@@ -51,18 +51,27 @@ window.loadTurn=()=>{
     for width, height in [(375, 634), (320, 568), (375, 844), (844, 390), (1280, 900)]:
         page.set_viewport_size({'width': width, 'height': height})
         page.evaluate('window.scrollTo(0,0)')
+        page.evaluate('loadTurn()')
+        page.wait_for_function("document.querySelector('#ron-controls').hidden === false")
+        normal_action_position = page.evaluate("()=>({table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON()})")
         page.evaluate("loadCalls('max')")
         page.wait_for_function("document.querySelector('#call-controls').hidden === false")
+        call_action_position = page.evaluate("()=>({table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON()})")
+        assert abs(normal_action_position['controls']['y'] - call_action_position['controls']['y']) < 1, (normal_action_position, call_action_position)
+        assert abs(normal_action_position['table']['y'] - call_action_position['table']['y']) < 1, (normal_action_position, call_action_position)
         assert page.locator('#call-decision-dialog').count() == 0, 'call modal remains in the page'
         assert page.locator('dialog[open]').count() == 0, 'call decision unexpectedly opened a modal'
         assert page.locator('#call-options button').count() == 0, 'candidates appeared before a type was selected'
         call_position = page.locator('#call-controls').evaluate('node=>getComputedStyle(node).position')
-        assert call_position == ('absolute' if width >= 960 else 'static'), (width, call_position)
+        assert call_position == 'absolute', (width, call_position)
+        assert page.locator('#local-game-controls').evaluate('node=>getComputedStyle(node).position') == 'relative'
         for selector in ['#call-pon', '#call-kan', '#call-chi', '#pass-calls']:
             box = page.locator(selector).bounding_box()
             assert box and box['width'] >= 44 and box['height'] >= 44, (width, height, selector, box)
 
         panel_before = page.locator('#call-controls').bounding_box()
+        table_before = page.locator('#local-table').bounding_box()
+        ordinary_controls_before = page.locator('#local-game-controls').bounding_box()
         page_size_before = page.evaluate("()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight})")
         page.locator('#call-chi').click()
         candidates = page.locator('#call-options button[data-action-choice="call"]')
@@ -77,14 +86,20 @@ window.loadTurn=()=>{
         assert call_back.is_visible(), f'back button is hidden: {back_state}'
         back_box = call_back.bounding_box()
         assert back_box and back_box['width'] >= 44 and back_box['height'] >= 44 and back_box['y'] + back_box['height'] <= height, (width, height, back_box)
-        assert page.locator('#pass-calls').is_visible(), 'pass disappeared while choosing a candidate'
-        grid = page.locator('#call-options').evaluate("node=>({columns:getComputedStyle(node).gridTemplateColumns.split(' ').length,top:node.getBoundingClientRect().top})")
+        assert page.locator('#pass-calls').is_hidden(), 'pass remained available while choosing a candidate'
+        grid = page.locator('#call-options').evaluate("node=>({columns:getComputedStyle(node).gridTemplateColumns.split(' ').length,rows:getComputedStyle(node).gridTemplateRows.split(' ').length,top:node.getBoundingClientRect().top})")
         if width >= 375:
             assert grid['columns'] >= 3, (width, grid)
+        if width == 320:
+            assert grid['rows'] >= 2, (width, grid)
+        candidate_box = page.locator('#call-options').bounding_box()
         panel_candidates = page.locator('#call-controls').bounding_box()
-        assert panel_before and panel_candidates and panel_candidates['y'] + panel_candidates['height'] <= panel_before['y'] + panel_before['height'] + 1, (panel_before, panel_candidates)
-        if width <= 375 or width == 1280:
-            assert panel_candidates['y'] < panel_before['y'], (width, panel_before, panel_candidates)
+        table_candidates = page.locator('#local-table').bounding_box()
+        ordinary_controls_candidates = page.locator('#local-game-controls').bounding_box()
+        assert candidate_box and panel_candidates and candidate_box['y'] + candidate_box['height'] <= panel_candidates['y'] + 1, (candidate_box, panel_candidates)
+        assert table_before and table_candidates and abs(table_candidates['y'] - table_before['y']) < 1, (table_before, table_candidates)
+        assert ordinary_controls_before and ordinary_controls_candidates and abs(ordinary_controls_candidates['y'] - ordinary_controls_before['y']) < 1, (ordinary_controls_before, ordinary_controls_candidates)
+        assert panel_before and panel_candidates and abs(panel_candidates['y'] - panel_before['y']) < 1, (panel_before, panel_candidates)
         assert page.evaluate('scrollY') == 0, 'rendering call candidates scrolled the page'
         page_size = page.evaluate("""()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight,panel:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),callPanel:document.querySelector('#call-controls').getBoundingClientRect().toJSON(),table:document.querySelector('#local-table').getBoundingClientRect().toJSON()})""")
         assert page_size['scrollWidth'] <= page_size_before['scrollWidth'] and page_size['scrollHeight'] <= page_size_before['scrollHeight'], (width, height, page_size_before, page_size)
@@ -94,10 +109,12 @@ window.loadTurn=()=>{
             page.keyboard.press('Escape')
             assert page.locator('#call-options button').count() == 0
             assert page.locator('#call-chi').is_visible() and page.locator('#call-back').is_hidden()
+            assert page.locator('#pass-calls').is_visible(), 'back did not restore the type screen pass action'
             assert page.evaluate('callState().phase') == actions_before, 'Escape answered the call decision'
             page.locator('#call-chi').click()
             page.locator('#call-back').click()
             assert page.evaluate('callState().phase') == actions_before, 'back answered the call decision'
+            assert page.locator('#pass-calls').is_visible(), 'back did not restore the type screen pass action'
             page.locator('#pass-calls').click()
             page.wait_for_function("callState().phase!=='awaiting-call'")
 
@@ -131,6 +148,9 @@ window.loadTurn=()=>{
             page.evaluate("loadCalls('one')")
             page.locator('#call-chi').click()
             assert page.locator('#call-options button[data-action-choice="call"]').count() == 1
+            single_candidate_box = page.locator('#call-options').bounding_box()
+            single_panel_box = page.locator('#call-controls').bounding_box()
+            assert single_candidate_box and single_panel_box and single_candidate_box['y'] + single_candidate_box['height'] <= single_panel_box['y'] + 1, (single_candidate_box, single_panel_box)
             assert page.evaluate("callState().phase==='awaiting-call'"), 'a single candidate was selected before it was displayed'
             page.locator('#call-options button[data-action-choice="call"]').click()
             page.wait_for_function("callState().phase!=='awaiting-call'")

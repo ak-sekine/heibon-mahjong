@@ -49,16 +49,6 @@ export function installCallViewport(): void {
   let pendingProgrammaticFromScrollY: number | null = null;
 
   const panelType = (panel: HTMLElement): string => panel.id.includes('ron') ? 'ron' : panel.id.includes('kan') ? 'kan' : 'call';
-  const viewportInset = (): number => {
-    const viewport = window.visualViewport;
-    return Math.max(0, window.innerHeight - (viewport?.height ?? window.innerHeight) - (viewport?.offsetTop ?? 0));
-  };
-  const updateInset = (): void => {
-    const visible = panels.some(panel => !panel.hidden && panel.getClientRects().length > 0);
-    const next = visible ? viewportInset() : 0;
-    const current = Number.parseFloat(main.style.getPropertyValue('--call-viewport-inset')) || 0;
-    if (Math.abs(current - next) >= 1) main.style.setProperty('--call-viewport-inset', `${next}px`);
-  };
   const recordPanelHeight = (panel: HTMLElement): void => {
     const height = panel.getBoundingClientRect().height;
     const previous = heightByPanel.get(panel);
@@ -69,8 +59,7 @@ export function installCallViewport(): void {
       panelType: panelType(panel), previousHeight: Math.round(previous), panelHeight: Math.round(height), candidateCount,
     });
   };
-  const inspectPanels = (recalculateInset = true): void => {
-    if (recalculateInset) updateInset();
+  const inspectPanels = (): void => {
     for (const panel of panels) {
       const visible = !panel.hidden && panel.getClientRects().length > 0;
       if (!visible) {
@@ -135,7 +124,7 @@ export function installCallViewport(): void {
     attributes: true, attributeFilter: ['hidden'], childList: true, subtree: true,
   });
   window.visualViewport?.addEventListener('resize', () => { inspectPanels(); recordViewportChange(); });
-  window.visualViewport?.addEventListener('scroll', () => { inspectPanels(false); recordViewportChange(); });
+  window.visualViewport?.addEventListener('scroll', () => { inspectPanels(); recordViewportChange(); });
   window.addEventListener('resize', () => { inspectPanels(); recordViewportChange(); });
   window.addEventListener('scroll', () => {
     const expected = expectedProgrammaticScroll;

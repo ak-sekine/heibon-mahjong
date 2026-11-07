@@ -326,12 +326,13 @@ test('a multi-option call shows inline candidates for one type and Escape return
     assert.equal(fixture.parts.get('call-chi')!.hidden, true);
     assert.equal(fixture.parts.get('call-back')!.textContent, '戻る');
     assert.equal(fixture.parts.get('call-back')!.hidden, false);
-    assert.equal(fixture.parts.get('pass-call')!.hidden, false);
+    assert.equal(fixture.parts.get('pass-call')!.hidden, true, 'pass is only available on the call-type screen');
 
     fixture.root.listeners.get('keydown')!({ key: 'Escape', preventDefault() {} } as unknown as Event);
     assert.deepEqual(events, [], 'returning to call types leaves the decision unanswered');
     assert.equal(fixture.parts.get('call-options')!.children.length, 0);
     assert.equal(fixture.parts.get('call-back')!.hidden, true);
+    assert.equal(fixture.parts.get('pass-call')!.hidden, false);
     assert.equal(fixture.parts.get('call-pon')!.hidden, false);
     clickRoot(fixture.parts.get('call-pon')!);
     shown = fixture.parts.get('call-options')!.children as FakeElement[];
@@ -344,7 +345,7 @@ test('a multi-option call shows inline candidates for one type and Escape return
   }
 });
 
-test('inline candidate back and pass controls remain independent', () => {
+test('inline candidate selection only shows back; returning restores pass without answering', () => {
   const events: ActionPanelEvent[] = [];
   const fixture = panelFixture(event => events.push(event));
   const face = (rank: 1 | 2) => ordinaryTile(TILE_KINDS.find(kind => kind.category === 'suited' && kind.suit === 'man' && kind.rank === rank)!);
@@ -362,13 +363,13 @@ test('inline candidate back and pass controls remain independent', () => {
     fixture.root.listeners.get('click')!({ target: fixture.parts.get('call-chi')! } as unknown as Event);
 
     assert.equal(fixture.parts.get('call-back')!.hidden, false);
-    assert.equal(fixture.parts.get('pass-call')!.hidden, false);
-    assert.equal(fixture.parts.get('pass-call')!.disabled, false);
+    assert.equal(fixture.parts.get('pass-call')!.hidden, true);
     assert.deepEqual(events, [], 'opening candidate selection does not answer the call window');
 
     fixture.root.listeners.get('click')!({ target: fixture.parts.get('call-back')! } as unknown as Event);
     assert.equal(fixture.parts.get('call-chi')!.hidden, false);
     assert.equal(fixture.parts.get('call-options')!.children.length, 0);
+    assert.equal(fixture.parts.get('pass-call')!.hidden, false);
     fixture.root.listeners.get('click')!({ target: fixture.parts.get('pass-call')! } as unknown as Event);
     assert.deepEqual(events, [{ type: 'pass-call' }]);
   } finally { fixture.restore(); }

@@ -272,7 +272,7 @@ export class ActionPanel {
       this.choiceSignatures.delete('call-options');
     }
     const passCall = this.part('pass-call') as HTMLButtonElement;
-    passCall.hidden = !state.callGroup.visible;
+    passCall.hidden = !state.callGroup.visible || this.callType !== null;
     if (!state.callGroup.visible) this.callType = null;
     passCall.disabled = this.callSelectionPending || !state.buttons['pass-call'].enabled;
 
@@ -416,6 +416,7 @@ export class ActionPanel {
       this.callType = type;
       for (const part of ['call-pon', 'call-kan', 'call-chi']) (this.part(part) as HTMLButtonElement).hidden = true;
       (this.part('call-back') as HTMLButtonElement).hidden = false;
+      (this.part('pass-call') as HTMLButtonElement).hidden = true;
       this.renderOptions('call-options', 'call', candidates, this.callSelectionPending);
       this.firstCallChoice()?.focus({ preventScroll: true });
     }
@@ -439,6 +440,7 @@ export class ActionPanel {
       (this.part(part) as HTMLButtonElement).hidden = candidates.length === 0;
     }
     (this.part('call-back') as HTMLButtonElement).hidden = true;
+    (this.part('pass-call') as HTMLButtonElement).hidden = false;
     const button = previous ? this.part(callButtonPart(previous)) : this.part('call-pon');
     const typeButton = button as HTMLButtonElement;
     if (focus && !typeButton.hidden && !typeButton.disabled) typeButton.focus({ preventScroll: true });

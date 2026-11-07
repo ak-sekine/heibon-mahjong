@@ -8,7 +8,7 @@
 }
 * { box-sizing:border-box; }
 body { margin:0; }
-main { container-type:inline-size; width:min(100%,620px); min-height:100vh; min-height:100svh; min-height:100dvh; margin:auto; padding:max(8px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom, 0px) + var(--call-viewport-inset, 0px)) max(4px,env(safe-area-inset-left)); display:flex; flex-direction:column; gap:8px; }
+main { container-type:inline-size; width:min(100%,620px); min-height:100vh; min-height:100svh; min-height:100dvh; margin:auto; padding:max(8px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom, 0px)) max(4px,env(safe-area-inset-left)); display:flex; flex-direction:column; gap:8px; }
 header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 6px; }
 .app-header { min-height:44px; }
 .app-idle { display:flex; min-height:clamp(180px,42vh,360px); flex-direction:column; align-items:center; justify-content:center; padding:24px 16px; text-align:center; }
@@ -49,17 +49,17 @@ ul { list-style:none; padding:0; margin:0; }
 .action-group-status { flex:1 1 100%; min-width:0; margin:0; font-size:14px; overflow-wrap:anywhere; }
 .action-option-list { display:flex; flex-wrap:wrap; gap:4px; width:100%; }
 .action-choice-group [data-panel-part="pass-call"],.action-choice-group [data-panel-part="cancel-kan"] { flex-basis:100%; }
-.call-controls { justify-content:flex-start; padding:0; }
+.call-controls { position:absolute; z-index:10; right:0; bottom:0; left:0; justify-content:flex-start; padding:8px; border:1px solid #39765e; border-radius:8px; background:#123f32; box-shadow:0 4px 18px rgb(0 0 0 / 28%); }
+.discard-controls:has(.call-controls:not([hidden])) { position:relative; overflow:visible; }
 .call-controls > [data-panel-part="call-options"]:empty { display:none; }
 .call-type-buttons { display:flex; flex-wrap:wrap; align-items:stretch; gap:6px; width:100%; }
 .call-type-buttons .control-action-button { min-width:68px; min-height:44px; flex:1 1 68px; }
 .call-choice-footer { display:flex; align-items:stretch; gap:6px; width:100%; }
 .call-choice-footer .control-action-button { min-width:0; min-height:44px; flex:1 1 0; }
-.discard-controls:has(.call-controls:not([hidden])) { padding-bottom:4px; }
 .discard-controls:has(.call-controls:not([hidden])) > .action-status { display:none; }
 .control-option-button { display:flex; align-items:center; justify-content:center; gap:2px; min-width:44px; min-height:48px; flex:1 1 130px; padding:8px 12px; border:1px solid currentColor; border-radius:8px; font:inherit; cursor:pointer; touch-action:manipulation; }
 .action-option-list .tile-svg { width:22px; height:31px; }
-.call-option-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,108px),1fr)); align-items:stretch; gap:5px; width:100%; min-width:0; }
+.call-option-list { position:absolute; z-index:11; right:0; bottom:calc(100% + 6px); left:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,108px),1fr)); align-items:stretch; gap:5px; width:100%; min-width:0; max-height:calc(100dvh - 176px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)); padding:8px; border:1px solid #39765e; border-radius:8px; background:#123f32; box-shadow:0 4px 18px rgb(0 0 0 / 28%); overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
 .call-option-list .control-option-button { min-width:0; min-height:58px; flex:none; flex-direction:column; gap:3px; padding:4px 3px; font-size:13px; line-height:1.15; }
 .call-option-list .action-option-tiles { display:flex; flex:none; align-items:center; justify-content:center; gap:2px; max-width:100%; }
 .call-option-list .control-option-button .tile-svg { flex:none; width:22px; min-width:22px; height:31px; }
@@ -150,17 +150,9 @@ header > div { min-width:0; }
   .keyboard-help { display:none; }
   .discard-controls { padding:4px 6px calc(8px + env(safe-area-inset-bottom, 0px)); gap:4px; }
 }
-/* A pending call stays attached to the viewport bottom. Its candidate grid is
-   inserted above the persistent footer, so adding rows only moves the top edge. */
-@media (max-width:959px) {
- .discard-controls:has(.call-controls:not([hidden])) {
-   position:fixed; z-index:12; left:max(4px,env(safe-area-inset-left,0px)); right:max(4px,env(safe-area-inset-right,0px));
-   bottom:max(4px,env(safe-area-inset-bottom,0px),var(--call-viewport-inset,0px));
-   width:min(calc(100% - 8px),620px); margin-inline:auto; box-shadow:0 0 0 1px rgb(0 0 0 / 12%),0 4px 18px rgb(0 0 0 / 28%);
- }
- .call-controls { display:flex; flex-direction:column; align-items:stretch; gap:6px; width:100%; }
- .call-option-list { max-height:calc(100dvh - 176px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)); overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
-}
+/* Call choices overlay the normal action area. The call panel stays anchored to
+   that area, while the candidate list grows upward without changing page flow. */
+.call-controls { display:flex; flex-direction:column; align-items:stretch; gap:6px; width:100%; }
 .result-open { overflow:hidden; }
 #result-dialog {
   --result-height:100vh;
@@ -737,10 +729,6 @@ header > div { min-width:0; }
  }
  #online-match > #online-round-result { grid-column:2; grid-row:2; align-self:center; }
  #online-match > #online-game-controls { grid-column:2; grid-row:3; align-self:end; width:100%; }
- #local-game-controls:has(.call-controls:not([hidden])),#online-game-controls:has(.call-controls:not([hidden])) { position:relative; overflow:visible; }
- .call-controls { position:absolute; z-index:10; right:0; bottom:0; left:0; display:flex; flex-direction:column; align-items:stretch; gap:6px; padding:8px; border:1px solid #39765e; border-radius:8px; background:#123f32; box-shadow:0 4px 18px rgb(0 0 0 / 28%); }
- .call-option-list { max-height:calc(100dvh - 180px); overflow-y:auto; overscroll-behavior:contain; }
-
  .table .seat-label,.score-strip .seat-label { font-size:14px; line-height:1.2; }
  .table .seat,.table .rivers { --table-tile-width:min(52px,round(down,calc((100cqw - 22px) / 16.2),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); --river-tile-width:calc(var(--table-tile-width)*.76); --river-tile-height:calc(var(--table-tile-height)*.76); --cell:calc(var(--table-tile-height) + 1px); }
  .table .seat { --meld-headroom:calc(var(--table-tile-width) + 2px); }
