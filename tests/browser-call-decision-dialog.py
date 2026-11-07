@@ -38,8 +38,8 @@ window.loadCalls=(mode)=>{
 window.callState=()=>controller.game;
 window.loadTurn=()=>{
  controller.newGame();
- const game=callStart(3,{0:['55z','234m','456p','678s','19p']},'white');
- controller.match=startMatch(game);render();
+ const game=callStart(3,{0:['55z','234m','456p','678s','11p']},'white');
+ controller.match=startMatch(discardTile(game,3,game.players[3].drawnTile.id));render();
 };
 """
         route.fulfill(response=response, body=fixed_seat_fixture(source))
