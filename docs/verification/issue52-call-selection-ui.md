@@ -20,10 +20,12 @@
 | `npm run typecheck:worker` | 成功 |
 | `git diff --check` | 成功 |
 | Browser UI regression selection / Python syntax | 成功 |
-| Chromium Playwright UI | push後の GitHub Actions で確認予定 |
-| WebKit Playwright UI | push後の GitHub Actions で確認予定 |
+| Chromium Playwright UI | 成功: [GitHub Actions run #707](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42325846848)、commit `a896b3f034631f952ede6984e0709b7c97a9926991` |
+| WebKit Playwright UI | 成功: [GitHub Actions run #707](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42325846848)、commit `a896b3f034631f952ede6984e0709b7c97a9926991` |
 | iPhone Safari 実機 | 未確認。公開後に実機確認が必要 |
 
 Browser UI の鳴き選択シナリオは、複数候補・単一候補・複数鳴き種・カン・ロン・戻る・見送り、候補列数と上方向の伸長を、375×634、320×568、375×844、844×390、1280×900 の viewport で確認する。オンラインの同期・タイムアウト・再接続は既存のオンライン対局 Browser UI シナリオで確認する。
 
-GitHub Actions の実行結果は、push後に対象 commit SHA とともに追記する。Playwright の Chromium / WebKit 結果は iPhone Safari 実機確認とは区別する。実機確認が完了するまで Issue #52 は Open のままにする。
+GitHub Actions run #707 は全体成功。regression test、Worker 型チェック、Pages/itch build、Chromium / WebKit Browser UI、browser-ui matrix audit、Worker deploy、production test、Pages build/deploy がすべて成功した。対象 commit SHA は `a896b3f034631f952ede6984e0709b7c97a9926991`。
+
+Playwright の Chromium / WebKit 結果は iPhone Safari 実機確認とは区別する。iPhone Safari 実機確認が完了するまで Issue #52 は Open のままにする。
