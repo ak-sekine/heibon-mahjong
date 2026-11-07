@@ -72,3 +72,32 @@ Browser UIでは通常時の打牌パネル配置が変わらないこと、卓�
 - Deploy run [#715](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42337185737)、commit `705d2f2b1f620fa5d437116bd2bbd37dcbe3d1f4` は `verify` と `docs-check` が成功しました。Chromium／WebKitとも鳴き選択Browser UIは既存5 viewportで成功しましたが、続く卓レイアウト回帰で667×375の通常プレイ時の卓が187px幅、牌幅11.5pxとなり失敗しました。短画面向け縮小ルールが鳴き判断のない通常プレイにも適用されていたことが原因です。Browser UI matrix auditは失敗を検出し、deploy jobは実行されていません。
 - run #715を受け、通常プレイ時は既存の短い横画面向け卓サイズに戻し、卓の追加縮小を鳴き判断中に限定しました。鳴き選択Browser UIへ667×375を追加し、通常状態と鳴き中の配置を分けて検証します。この修正版のChromium／WebKitとActions結果は次の実行後に追記します。実機の修正後確認は引き続き未実施です。
 - Deploy run [#716](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42339185029)、commit `dba31fd9eb0f0e6e5b408c0f1082120374fd5a00` は全job成功です。ChromiumとWebKitは追加した667×375を含む鳴き選択6 viewport、候補画面の「見送る」非表示、種類画面への戻り、単一／複数候補、候補選択時の画面スクロールなしを確認しました。既存オンラインBrowser UIでは種類・候補選択、戻る、候補中の時間切れも成功しました。`verify`、browser-ui matrix audit、release freshness、Worker deploy、production test、Pages build、Pages deployが成功し、Worker／Pagesの記録SHAはどちらも `dba31fd9eb0f0e6e5b408c0f1082120374fd5a00` です。Issue #52はOpenのままです。修正後のiPhone Safari実機確認は未実施です。
+
+## 追加修正 — 2026-11-07 iPhone Safari再確認指摘
+
+### 指摘
+
+2026-11-07のiPhone Safari実機確認で、種類選択時に「チー」と「見送る」が縦並びになること、チー候補の枠が「戻る」の操作パネルから分離して見え、戻るの上に大きな空白ができることが報告されました。これは今回の実機確認でのユーザー報告です。修正後の実機確認はまだ行っていません。
+
+### 原因と修正
+
+- 種類ボタンと見送りは別々のFlexコンテナにあり、鳴き種類が1つでも見送りが専用の下段に配置されていました。種類ボタンと見送りを同じCSS Gridの項目として配置し、2項目なら同じ行、3種類以上ならグリッド幅に応じて並べます。44px以上のタップ領域を保ちます。
+- `.call-controls` には `min-height:136px` があり、候補一覧は `position:absolute` で独立の背景・枠線・余白を持っていました。候補枠と「戻る」が同じ外観に見えず、候補一覧の上方向の伸長も親パネルに反映されませんでした。
+- 鳴きパネルの基準高さを136pxから76px（短い横画面は従来どおり74px）に下げ、候補一覧を親 `.call-controls` 内の通常のGrid項目として「戻る」の直前に配置しました。パネル下端を種類選択時の卓直下基準に保ち、候補行が増えた分だけパネル上端が上がります。候補の列幅は84px以上で画面幅に応じて折り返し、3候補が収まる画面では3列にします。候補部分だけに高さ上限と内部スクロールを設定し、パネル全体とページの意図しないスクロールを避けます。
+- `ActionPanel` の状態遷移、合法性判定、鳴き確定、戻る、見送り、タイムアウト、オンライン同期には手を加えていません。共通テンプレートとCSSを使い、オンライン／オフラインの表示を共通化しています。
+
+### 今回の検証
+
+| 検証 | 結果 |
+|---|---|
+| `npm test` | 成功: 85 tests passed |
+| `npm run build` | 成功: TypeScript・Vite・PWA shell build |
+| `npm run typecheck:worker` | 成功 |
+| Browser UI Python構文 | 成功: 鳴き選択、オンライン対局、共通ActionPanelの関連3スクリプト |
+| Chromium／WebKit Browser UI | push後のGitHub Actions runで確認予定。ローカル実行はCodex Cloudの既知Chromium起動制限により未実施 |
+| GitHub Actions | push後、今回の対象commitの全jobを確認して記録 |
+| iPhone Safari実機 | 未確認。実機で再確認が必要 |
+
+`tests/browser-call-decision-dialog.py` では種類画面の2ボタン行、候補1・2・3・複数候補、共通パネル内のDOM所属、候補枠の独立した境界線・背景がないこと、候補と戻るの間隔、複数行時にパネル上端が上がり下端が維持されること、候補部分だけのスクロールを測定します。320×568、375×634、375×844、844×390、667×375、1280×900をChromiumとWebKitで検証します。既存のオンライン対局Browser UIで戻る・見送り・鳴き確定・時間切れ、共有ActionPanel、通常打牌操作を引き続き確認します。
+
+Issue #52は、ユーザーによるiPhone Safari実機再確認が完了するまでOpenのままにします。
