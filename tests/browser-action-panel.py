@@ -163,7 +163,8 @@ with sync_playwright() as p:
           const root = document.querySelector('[data-browser-action-panel]').children[1];
           const status = root.querySelector('[data-panel-part="call-status"]');
           const actionStatus = root.querySelector('[data-panel-part="action-status"]');
-          const choices = [...root.querySelectorAll('.call-type-buttons button:not([hidden])')];
+          const choices = [...root.querySelectorAll('.call-type-buttons button:not([hidden])')]
+            .filter(button => button.dataset.panelPart !== 'call-back' && button.dataset.panelPart !== 'pass-call');
           const pass = root.querySelector('[data-panel-part="pass-call"]');
           const box = element => element.getBoundingClientRect();
           const text = root.innerText;
