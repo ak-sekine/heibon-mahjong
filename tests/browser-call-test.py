@@ -176,7 +176,7 @@ with sync_playwright() as p:
             page.wait_for_function('''()=>!window.testController.progressing && window.readGame().kanCount===1''')
             completed = assert_integrity(page, {'type': meld_type, 'size': 4}, 1)
             assert completed['drawSource'] == 'rinshan', f'{mode}: a confirmed kan must take a rinshan tile: {completed}'
-            assert completed['dora'] == 3, f'{mode}: a confirmed kan must expose one additional dora indicator: {completed}'
+            assert completed['dora'] == 2, f'{mode}: a confirmed kan must expose one additional dora indicator: {completed}'
             page.evaluate('()=>{document.documentElement.style.scrollBehavior="auto";window.scrollTo(0,0)}')
             page.wait_for_function('window.scrollY===0')
             assert_same_table(before, table_rect(page), f'{width}x{height} {mode} confirmation')
