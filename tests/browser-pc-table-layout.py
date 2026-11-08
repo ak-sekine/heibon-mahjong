@@ -120,6 +120,7 @@ import {fixedRound} from '/heibon-mahjong/tests/match-fixture.ts';
 """ + response.text() + """
 window.pcOnlineController=onlineGameController;
 window.pcCallStart=callStart;
+window.pcDiscardTile=discardTile;
 window.pcLoadCalls=()=>{
   controller.newGame();
   const game=callStart(3,{0:['23m','444m','50m','6m','789p','12z']},'man-4');
@@ -320,7 +321,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         online_board = page.locator('#online-table').bounding_box()
         page.evaluate('''async()=>{
           const game=pcCallStart(3,{0:['23m','444m','50m','6m','789p','12z']},'man-4');
-          const pending=discardTile(game,3,game.players[3].drawnTile.id);
+          const pending=pcDiscardTile(game,3,game.players[3].drawnTile.id);
           const onlineGame={...pending,players:pending.players.map((player,seat)=>({...player,control:seat?'cpu':'human'}))};
           const match=(await import('/heibon-mahjong/src/game/match.ts')).startMatch(onlineGame);
           const now=Date.now();
