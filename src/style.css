@@ -754,16 +754,34 @@ header > div { min-width:0; }
    max-height:none;
    overflow:visible;
  }
- .call-controls:has(.call-option-list:not(:empty)) {
+ .call-controls:has(.call-option-list:not(:empty)),.kan-controls:has(.action-option-list:not(:empty)) {
    position:absolute;
    inset:auto 6px 0;
+   z-index:10;
    width:auto;
    max-height:calc(100vh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
-   align-content:end;
    overflow:hidden;
  }
+ .call-controls:has(.call-option-list:not(:empty)) { align-content:end; }
+ .discard-controls:has(.kan-controls:not([hidden])) { position:relative; overflow:visible; }
+ .kan-controls { align-items:stretch; }
+ .kan-controls:has(.action-option-list:not(:empty)) {
+   padding:8px;
+   border:1px solid #39765e;
+   border-radius:8px;
+   background:#123f32;
+   box-shadow:0 4px 18px rgb(0 0 0 / 28%);
+ }
+ .kan-controls .action-option-list {
+   min-height:0;
+   max-height:calc(100vh - 196px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+   overflow-y:auto;
+   overscroll-behavior:contain;
+   -webkit-overflow-scrolling:touch;
+ }
  @supports (height:100dvh) {
-  .call-controls:has(.call-option-list:not(:empty)) { max-height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)); }
+   .call-controls:has(.call-option-list:not(:empty)),.kan-controls:has(.action-option-list:not(:empty)) { max-height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)); }
+   .kan-controls .action-option-list { max-height:calc(100dvh - 196px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)); }
  }
  #local-game-controls.result-available,#online-game-controls.result-available { min-height:0; padding:4px 6px; gap:4px; }
  #round-result-summary { padding:4px 8px; line-height:1.2; }

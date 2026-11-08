@@ -415,6 +415,83 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         assert online_board and online_normal_after_call
         assert_same_table(online_board, online_normal_after_call, f'{width}x{height} online call resolution')
 
+        page.evaluate('''async()=>{
+          const {scenarioGame}=await import('/heibon-mahjong/src/verification/scenarios.ts');
+          const {startMatch}=await import('/heibon-mahjong/src/game/match.ts');
+          const match=startMatch(scenarioGame('ankan'));
+          const session={...pcOnlineSession,gameRevision:6,match,status:'playing',decision:null};
+          window.pcOnlineKanSession=session;
+          window.pcOnlineSent=[];
+          pcOnlineController.setActionSender((action,revision,requestId)=>{pcOnlineSent.push({action,revision,requestId});return true;});
+          pcOnlineController.receive({type:'game-state',view:pcCreateOnlineView(session,0,'PCTEST',new Set([0]))});
+        }''')
+        page.wait_for_function("!document.querySelector('#online-kan').hidden")
+        online_kan_board = page.locator('#online-table').bounding_box()
+        online_kan_before = page.evaluate('''()=>({
+          controls:document.querySelector('#online-game-controls').getBoundingClientRect().toJSON(),
+          actions:document.querySelector('#online-game-controls .action-buttons').getBoundingClientRect().toJSON(),
+          toggle:document.querySelector('#online-kan').getBoundingClientRect().toJSON()
+        })''')
+        page.locator('#online-kan').click()
+        page.wait_for_function("!document.querySelector('#online-kan-controls').hidden && document.querySelectorAll('#online-kan-options button').length===1")
+        online_kan_open = page.evaluate('''()=>({
+          table:document.querySelector('#online-table').getBoundingClientRect().toJSON(),
+          controls:document.querySelector('#online-game-controls').getBoundingClientRect().toJSON(),
+          actions:document.querySelector('#online-game-controls .action-buttons').getBoundingClientRect().toJSON(),
+          toggle:document.querySelector('#online-kan').getBoundingClientRect().toJSON(),
+          panel:document.querySelector('#online-kan-controls').getBoundingClientRect().toJSON(),
+          candidate:document.querySelector('#online-kan-options button').getBoundingClientRect().toJSON(),
+          cancel:document.querySelector('#online-cancel-kan').getBoundingClientRect().toJSON(),
+          actionButtons:[...document.querySelectorAll('#online-game-controls .action-buttons .control-action-button')]
+            .filter(button=>!button.hidden&&getComputedStyle(button).display!=='none'&&getComputedStyle(button).visibility!=='hidden')
+            .map(button=>{const r=button.getBoundingClientRect();return {id:button.id,left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}}),
+          position:getComputedStyle(document.querySelector('#online-kan-controls')).position,
+          overflow:getComputedStyle(document.querySelector('#online-kan-options')).overflowY,
+          scrollTop:document.scrollingElement.scrollTop
+        })''')
+        assert online_kan_board
+        assert_same_table(online_kan_board, online_kan_open['table'], f'{width}x{height} online kan candidates')
+        assert online_kan_open['position'] == 'absolute' and online_kan_open['panel']['top'] < online_kan_open['controls']['top'], f'{width}x{height}: online kan panel did not expand upward: {online_kan_open}'
+        assert abs(online_kan_open['panel']['bottom']-online_kan_open['controls']['bottom']) <= 2, f'{width}x{height}: online kan panel lost its bottom anchor: {online_kan_open}'
+        assert online_kan_open['panel']['top'] < online_kan_open['toggle']['top'], f'{width}x{height}: online kan candidates expanded below the toggle: {online_kan_open}'
+        assert online_kan_open['overflow'] == 'auto' and online_kan_open['scrollTop'] <= 1, f'{width}x{height}: online kan list cannot scroll internally or page moved: {online_kan_open}'
+        for area in ('controls','actions'):
+            for key in ('top','left','width','height','bottom'):
+                assert abs(online_kan_open[area][key]-online_kan_before[area][key]) < 1, f'{width}x{height}: online kan opening moved the {area} area: {online_kan_open}'
+        assert online_kan_open['actionButtons'] and all(button['top']>=0 and button['bottom']<=height and button['width']>=44 and button['height']>=44 for button in online_kan_open['actionButtons']), f'{width}x{height}: online kan panel pushed normal actions out of view: {online_kan_open}'
+        for selector in ('#online-kan-options button','#online-cancel-kan'):
+            box=page.locator(selector).evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {top:r.top,bottom:r.bottom,width:r.width,height:r.height,receivesPointer:hit===node||node.contains(hit)}}''')
+            assert 0<=box['top'] and box['bottom']<=height and box['width']>=44 and box['height']>=44 and box['receivesPointer'], f'{width}x{height}: online kan target is not initially clickable: {selector} {box}'
+        page.locator('#online-cancel-kan').click()
+        page.wait_for_function("document.querySelector('#online-kan-controls').hidden")
+        assert not page.evaluate('pcOnlineSent.length'), f'{width}x{height}: cancelling online kan should be a local UI action'
+        page.locator('#online-kan').click()
+        page.wait_for_function("!document.querySelector('#online-kan-controls').hidden")
+        online_kan_choice=page.locator('#online-kan-options button').first
+        online_kan_choice_hit=online_kan_choice.evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {x:r.left+r.width/2,y:r.top+r.height/2,ok:r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}}''')
+        assert online_kan_choice_hit['ok'], f'{width}x{height}: online kan candidate needs scrolling or is covered: {online_kan_choice_hit}'
+        online_kan_choice.click()
+        page.wait_for_function("pcOnlineSent.some(item=>item.action.type==='declare-kan')")
+        online_kan_action=page.evaluate("pcOnlineSent.find(item=>item.action.type==='declare-kan')")
+        online_kan_resolved=page.evaluate('''async(optionId)=>{
+          const {scenarioGame}=await import('/heibon-mahjong/src/verification/scenarios.ts');
+          const {getKanOptions,declareKan}=await import('/heibon-mahjong/src/game/kan.ts');
+          const {startMatch}=await import('/heibon-mahjong/src/game/match.ts');
+          const game=scenarioGame('ankan');
+          const option=getKanOptions(game,0).find(candidate=>candidate.id===optionId);
+          if(!option)throw new Error('online kan option is not legal');
+          const match=startMatch(declareKan(game,0,optionId));
+          const session={...pcOnlineSession,gameRevision:7,match,status:'playing',decision:null};
+          pcOnlineController.receive({type:'game-action-result',requestId:pcOnlineSent.find(item=>item.action.type==='declare-kan').requestId,ok:true,gameRevision:7});
+          pcOnlineController.receive({type:'game-state',view:pcCreateOnlineView(session,0,'PCTEST',new Set([0]))});
+          return {kanCount:match.game.kanCount,drawSource:match.game.players[0].drawnTileSource,meldType:match.game.players[0].melds.at(-1)?.type,optionId};
+        }''', online_kan_action['action']['optionId'])
+        assert online_kan_resolved['kanCount']==1 and online_kan_resolved['drawSource']=='rinshan' and online_kan_resolved['meldType']=='ankan', f'{width}x{height}: online declared kan did not restore normal play: {online_kan_resolved}'
+        assert page.locator('#online-discard').is_visible() and page.locator('#online-discard').is_enabled(), f'{width}x{height}: online discard did not return after kan'
+        online_after_kan=page.evaluate("()=>({table:document.querySelector('#online-table').getBoundingClientRect().toJSON(),dora:document.querySelectorAll('#online-table .dora-slot[data-tile-id]').length,scrollTop:document.scrollingElement.scrollTop})")
+        assert_same_table(online_kan_board, online_after_kan['table'], f'{width}x{height} online kan completion')
+        assert online_after_kan['dora']==2 and online_after_kan['scrollTop']<=1, f'{width}x{height}: online dora or viewport did not update after kan: {online_after_kan}'
+
         page.evaluate('''()=>{
           const match=pcMakeDrawMatch();
           const session={...pcOnlineSession,gameRevision:6,match,status:match.status,decision:null};

@@ -23,8 +23,10 @@
       <div class="call-test-actions">
         <label for="scenario">検証シナリオ</label>
         <select id="scenario">
-          <option value="pon">ポン</option>
+          <option value="pon">ポン（単一候補・東）</option>
+          <option value="pon-multiple">ポン（複数候補・赤五萬）</option>
           <option value="daiminkan">大明カン</option>
+          <option value="opening">暗カン（配牌後・2候補）</option>
           <option value="ankan">暗カン</option>
           <option value="kakan">加カン</option>
         </select>
@@ -83,7 +85,7 @@
           <button class="control-action-button ui-button ui-button--c" data-panel-part="pass-call" type="button">見送る</button>
         </div>
       </div>
-      <div class="action-choice-group" data-panel-part="kan-controls" role="group" aria-label="暗カン・加カンの選択" hidden>
+      <div class="action-choice-group kan-controls" data-panel-part="kan-controls" role="group" aria-label="暗カン・加カンの選択" hidden>
         <p class="action-group-status" data-panel-part="kan-status">カンする面子を選択</p>
         <div class="action-option-list" data-panel-part="kan-options"></div>
         <button class="control-action-button ui-button ui-button--b" data-panel-part="cancel-kan" type="button">キャンセル</button>
