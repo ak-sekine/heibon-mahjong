@@ -184,7 +184,8 @@ with sync_playwright() as p:
             page.locator('#repeat-scenario').click()
             page.wait_for_function("()=>!window.testController.progressing && window.readGame().kanCount===0 && !document.querySelector('#kan').hidden")
             repeated = assert_integrity(page, {'type': 'pon', 'size': 3} if mode == 'kakan' else None, 0)
-            assert repeated['melds'] == original['melds'], f'{mode}: repeat must restore the initial melds: {repeated}'
+            repeated_melds = page.evaluate('()=>readGame().players[0].melds.map(m=>({type:m.type,ids:m.tiles.map(t=>t.id).sort()}))')
+            assert repeated_melds == original['melds'], f'{mode}: repeat must restore the same initial melds: {original["melds"]} -> {repeated_melds}'
             assert_same_table(before, table_rect(page), f'{width}x{height} {mode} repeat')
 
         assert page.evaluate('document.scrollingElement.scrollTop') <= 1, f'{width}x{height}: PC verification required a scroll before action checks'
