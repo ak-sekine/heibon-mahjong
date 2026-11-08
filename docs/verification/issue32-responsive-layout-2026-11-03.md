@@ -431,4 +431,13 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - シナリオはポン、大明カン、暗カン、加カンです。既存の`src/verification/kan-fixture.ts`と`src/verification/scenarios.ts`を使い、全136枚の物理牌を重複なく配ります。ポン／大明カンはCPU3が対象牌を実際に打牌した直後、暗カン／加カンは合法なカン候補がある自分の手番です。
 - 卓・操作パネルは通常ゲームのHTMLテンプレート、`src/main.ts`のcontrollerとrender、既存の`ActionPanel`・ゲーム操作イベント・共通CSSを使います。テストページ専用の模擬操作ボタンはありません。シナリオを再実行するとcontrollerの通常ライフサイクルを通じて局面をリセットします。
 - このページと自動検証を作成したことだけでは、ポン・カンのPC本人実機確認をOKにしません。ユーザー本人によるPC確認の報告は未受領で、ポン・カンの実機結果は未確認です。Issue #32はOpenのままです。
-- GitHub ActionsのChromium／WebKit Browser UI matrixとDeploy gateは、このページを含むSHAのpush後に確認して追記します。
+
+### 自動検証・公開結果
+
+- Deploy run [#42480588556](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42480588556) はattempt 2で`completed / success`、実装・公開SHA `79ab18cd163aa2b917fd3e9cdfa8dd71ee3f2386`。verify、Worker型検査、Pages／itch build、Chromium／WebKit Browser UI、matrix audit、release freshness、Worker deploy、本番production-test、Pages build／deployが成功しました。
+- `tests/browser-call-test.py`はChromiumとWebKitの両方で、1280×720、1366×768、1440×900、1660×825、1920×1080を通過しました。各viewportでポン／大明カンの見送り・実行、暗カン／加カンの候補・キャンセル・確定、136枚整合性、通常の打牌／嶺上ツモ、ドラ・副露表示、同一局面への再実行、卓矩形の安定、ボタンの44px以上・画面内矩形・`elementFromPoint()`のクリック先を検査しました。1280×550ではスクロールしてカン操作・キャンセルが可能なことも両engineで通過しました。
+- production-testのattempt 1では混在Origin再接続直後にhost revision 6／guest revision 5のsnapshot比較が発生し、Pages公開を停止しました。過去にも記録された別時点のsnapshotを比較する既存の競合と同型です。ゲームソースと受入条件を変更せず失敗jobを再実行したattempt 2で本番検証、Pages build、Pages deployが成功しました。最初の不一致の根本原因は未確定として履歴に残します。
+- Worker deployment `7636024701`とPages deployment `7636075038`は、どちらもSHA `79ab18cd163aa2b917fd3e9cdfa8dd71ee3f2386`でGitHub deployment status `success`です。Pagesのdeployment URLは <https://ak-sekine.github.io/heibon-mahjong/>、検証ページは <https://ak-sekine.github.io/heibon-mahjong/call-test.html> です。Codex Cloudから検証ページへ直接HTTP取得を試みましたが、ネットワークproxyのCONNECT 403で応答本文は取得できませんでした。公開確認の根拠は成功したPages deployment記録と、そのSHAのPages buildに`dist/call-test.html`が含まれることです。
+- ローカルでは`npm test`が1467件成功、Pages build、Worker型検査、itch build、Browser UI選択テスト、Python構文検査、`git diff --check`が成功しました。itch buildには`call-test.html`が含まれません。
+
+ユーザー本人によるPC実機確認の報告はまだありません。公開URLをPCブラウザーで開き、上記5 viewportでポン・大明カン・暗カン・加カンを選択してボタン位置・44px以上の高さ・画面外へのはみ出し・クリック・見送り／候補選択／キャンセル／確定後の牌表示を確認してください。暗カン・加カンでは候補とキャンセルが必要に応じてスクロール後も操作できることを確認します。短いウィンドウではスクロールし、同じ局面を再実行して初期状態へ戻ることも確認してください。**PC本人実機結果は未確認のまま、Issue #32はOpenを維持します。**
