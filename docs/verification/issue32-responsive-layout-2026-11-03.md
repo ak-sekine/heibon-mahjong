@@ -13,7 +13,7 @@
 - `index.html` は `width=device-width, initial-scale=1, viewport-fit=cover` を使い、PWAのmanifestとstandalone設定を持っています。セーフエリア用 `env()` も既存CSSにあります。
 - `main` は最大620px幅で、共通UIを維持しています。手牌は14列、卓は正方形で、卓・河・牌は `--table-tile-width` 等のCSS変数とContainer Query単位から計算されます。PCで卓が過度に拡大しない既存の上限は維持します。
 - 低い画面高の既存ルールは卓幅だけを `100svh - 102px` に縮めていました。`.table` 内の席・河牌は既に卓のContainer Queryサイズを参照していましたが、卓の外枠グリッドの `--table-tile-width` は親 `main` の幅基準で残っていました。そのため 667×375 や 844×390 相当では、卓枠・外側の席トラックが大きい幅のまま、内側の牌だけが小さくなり、中央の河領域が狭くなる計算不一致がありました。これが今回修正した具体的なレイアウト欠陥です。
-- 手牌、CPUの手牌、河、副露、ドラ表示牌と卓中央情報、共通操作パネルはオフライン／オンラインで共有するCSS変数を使います。コール候補は通常ドキュメントフローでスクロールでき、viewport変化でページ位置を強制変更しない既存対策があります。
+- 初回調査時点では、手牌、CPUの手牌、河、副露、ドラ表示牌と卓中央情報、共通操作パネルがオフライン／オンラインでCSS変数を共有していました。コール候補は通常ドキュメントフローでスクロールできましたが、viewport内のBack可視性・初期表示領域内でのクリックを検査していませんでした。後続PC修正は下記の各節に時系列で記録します。
 - 新規対局・オンライン作成／参加・待機・局結果・対局結果・ルール確認・診断ログには画面高制限、内部スクロール、固定フッターまたは44px以上の操作ボタンがあります。新規対局設定の黄色スクロールインジケーター、既存のボタン色、メニュー白背景は維持します。
 - CSSには重複した `max-width:350px` の操作文字指定と、隣接した幅別の見出し固定値がありました。見出しを流体サイズにまとめ、重複指定を除きました。
 
@@ -290,7 +290,7 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 
 - 追加の本人実機確認で見つかった2件を新しい修正対象として記録する。通常対局から局結果へ移ると、卓の下へ結果概要が加わる一方、卓サイズ計算はその高さを考慮せず、従来の操作欄 `min-height:108px` も残って結果ボタンが初期表示領域から外れていた。鳴き判断時は `--pc-controls-space:244px` を卓サイズから固定で差し引き、絶対配置の鳴き欄と下端アンカーを使っていたため、通常時より卓が縮小し、卓下の空白も増えていた。
 - 修正前の既存値は操作欄108px、鳴き時の卓予約244px、卓の最大860px／下限450px。上限・下限は維持し、操作状態だけでは卓計算を変えない。960px以上のオフライン／オンライン共通フローはヘッダー→座席・点数→正方形の卓→（局結果概要）→操作欄。卓サイズは `100dvh`（fallback `100svh`）からヘッダー44px、点数76px、gap24px、上下safe area、固定操作領域120pxを差し引いて計算し、450〜860pxに制限する。ウィンドウ高さが変わればviewport値で再計算し、短い画面・長文は自然な縦スクロールで到達できる。
-- 通常操作欄の108pxは維持する。鳴き欄はPCの通常フローへ戻し、固定244px予約・absolute配置・固定max-heightを外す。鳴き種類の少数ボタンはその内容高だけを使い、候補選択時は欄をフロー内で展開する。ページ位置をアプリから強制変更しない。種類選択・候補・戻る・見送るのゲームロジックは変更していない。
+- 通常操作欄の108pxは維持する。鳴き欄はPCの通常フローへ戻し、固定244px予約・absolute配置・固定max-heightを外す。鳴き種類の少数ボタンはその内容高だけを使い、この段階では候補選択時も欄をフロー内で展開していた。ページ位置をアプリから強制変更しない。種類選択・候補・戻る・見送るのゲームロジックは変更していない。複数候補でBackが切れる報告への後続修正は次節に記録する。
 - 局結果では操作欄の108px最小高を解除し、結果概要と表示中ボタンの実寸で高さを決める。詳細ダイアログ、順位、次局のUI経路とオンライン対局の通信仕様は変更していない。
 - 初回Browser UI実測の[#42451158250](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42451158250)は1280×720の卓450px、結果概要43.59px、結果操作欄108px、次局ボタン下端728.78pxを測定し、画面下端を8.78px超えていた。原因は `.discard-controls.result-available` の指定が `#local-game-controls`／`#online-game-controls` のID指定より詳細度が低く、108pxを上書きできなかったこと。IDを含む状態別指定へ直し、テストに結果操作欄が108px未満であることを追加した。この検出を成功扱いせず、後続Browser UIで再検証した。
 - テスト修正途中の[#42450444204](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42450444204)、[#42452002575](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42452002575)、[#42452788340](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42452788340)、[#42453608402](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42453608402)では、候補数の前提、module内fixture参照、オンラインpassボタンのid、合成オンライン操作のack／revision不足を修正した。これらはテスト条件の調整であり、受入条件を緩めたりゲームロジックを変更したりしていない。[#42452708319](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42452708319)は未公開fixture参照を見つけた時点で不要なrunとして取消した。
@@ -300,7 +300,7 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - `tests/browser-pc-table-layout.py` のChromium／WebKit双方で、1280×720、1366×768、1440×900、1660×825、1920×1080を検証した。通常手番・鳴き判断・候補展開・戻る・見送る・局結果で卓の矩形（位置と一辺）が一致し、正方形・状態間サイズ安定・viewportリサイズ後の再計算が成功した。マウス打牌とTab／Enter／Space、横overflowなしも成功した。
 - 座席・持ち点・中央情報・局表示・残り牌数の文字は14〜16px、主要操作は14px以上・各ボタン44px以上を両engineで確認した。18枚の河、1面子／4面子（大明槓含む）の局面でテキストと牌の重なり0件。既存の牌・河・副露の非重複回帰もChromium／WebKitで成功した。
 - WebKitの結果JSONで測定した卓は各viewportで `x/y/一辺`: 1280×720=`415/143.19/450px`、1366×768=`439/143.19/488px`、1440×900=`410/143.19/620px`、1660×825=`557.5/143.19/545px`、1920×1080=`560/143.19/800px`。通常・鳴き・局結果の全状態で同じ卓矩形だった。Chromiumも同じ5サイズの位置・寸法一致検査を通過した。
-- 通常操作欄は108px。鳴き種類パネルは卓下13pxの位置に表示し、WebKit計測ではローカル68px／オンライン86px。鳴き欄を含む操作wrapperはローカル105px／オンライン123pxで、オンラインに追加される状態表示分を実寸で確保した。鳴き開始時のページscrollTopは0で、候補表示・戻る・見送る・判断終了後に卓サイズは不変。多数候補時は縦スクロールで戻る／見送るへ到達した。
+- 通常操作欄は108px。鳴き種類パネルは卓下13pxの位置に表示し、WebKit計測ではローカル68px／オンライン86px。鳴き欄を含む操作wrapperはローカル105px／オンライン123pxで、オンラインに追加される状態表示分を実寸で確保した。鳴き開始時のページscrollTopは0で、候補表示・戻る・見送る・判断終了後に卓サイズは不変。多数候補時の一覧内スクロールを確認したが、この段階では操作欄全体が通常flowで伸びるため、下端のBackと見送るは必要に応じてページスクロールで到達する仕様だった。初期表示内のBack可視性は次節の追加検証で改めて確認する。
 - 局結果は概要43.59px（ローカル）／41.19px（オンライン）、結果操作欄54px。次局ボタンの画面下端はローカルで順に701.78、739.78、871.78、796.78、1051.78px、オンラインで699.38、737.38、869.38、794.38、1049.38pxで、対応するviewport高さ内に収まった。長文概要でボタンと重ならず、スクロールが必要な場合の到達性、詳細ダイアログ、次局操作もChromium／WebKitで成功した。
 - 追加の短いスマホviewportを含む既存Browser UIもChromium／WebKitとも成功。CSS変更は960px以上に限定し、スマホ・タブレット向けCSSと過去のiPhone Safari／PWA実機OK記録を変更していない。実機確認ではないAndroid／タブレット表示は引き続き未確認。
 
@@ -310,3 +310,34 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - 最終Actions run `#42455608521` のhead／公開SHAは `cfccc2bd03b318078d1b1425ba0558b3312bfaf7`。Worker deployment `7632606251`、`heibon-production-pages` deployment `7632619156`、GitHub Pages deployment `7632616785` はすべて同じSHAでAPI status `success`。Pages URLは [HEIBON MAHJONG](https://ak-sekine.github.io/heibon-mahjong/)。これらはActions／Deployment結果であり、PC実機確認とは区別する。
 - `npm test` 1464件成功、`npm run build`（TypeScript検査を含む）、`npm run typecheck:worker`、Browser UI engine選択検査8件、変更Pythonの構文検査、`git diff --check` が成功。ローカルにPlaywright browser binaryはなくBrowser UIはActionsで実施した。
 - 以前のPCレイアウト実機NGと、本人報告のスクロールバーのドラッグ操作OKは削除・変更しない。今回見つかった「局結果ボタンが初期表示外」「鳴き判断時に卓が縮んで空白が増える」も新たな修正対象として追記する。ユーザー本人のPCで通常／鳴き判断／局結果、詳細・順位・次局、オンライン、リサイズ、短い画面のスクロール、マウス・キーボード操作を再確認するまではIssue #32をOpenのまま維持する。
+
+## 追加修正: PC複数チー候補パネルの上方展開（2026-11-08）
+
+### 原因と修正
+
+- 今回ユーザー本人のPCで、チー候補が複数あると候補パネルが下へ伸び、画面下端で「戻る」が切れる現象が報告された。修正前のPC CSSは候補画面でも操作欄を通常フローに置き、候補一覧の `max-height:none`／`overflow:visible` を指定していた。既存Browser UIテストも「戻る」を `scroll_into_view_if_needed()` で画面内へ移動した後に成功扱いしており、初期表示領域内で操作可能かを保証していなかった。
+- PC（幅960px以上）の種類選択は従来どおり卓下の共通操作欄に表示する。種類を押して候補一覧に切り替えたときだけ、候補パネルを操作欄の下端に合わせた絶対配置へ切り替え、卓に重なりながら上方向へ広げる。操作欄wrapperの108px高は通常手番・鳴き判断・候補選択で変えない。パネルを卓の上へ重ねることを許容し、候補クリックとBackの中心点で `document.elementFromPoint()` がボタンを返すことも検証する。
+- 候補一覧のviewport依存 `max-height` と内部 `overflow-y:auto` は有効にし、候補過多・低い画面では候補一覧内スクロールを使う。パネルの重なり順を保ちながら候補領域とBackを分離する。幅960px未満の既存スマホ・タブレットCSSは変更しない。時間制限、種類／候補の選択、Back、見送る、通信、ゲーム判断ロジックは変更していない。
+- 最初の修正SHA `c9477d9ab98fcd84320ab0e9ed34e220701ec010` を検証したrun [#42461652119](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42461652119) はChromium／WebKitとも `browser-call-decision-dialog.py` の操作wrapper高さ比較で停止した。通常手番では表示ボタン数によってwrapperが161.19px、鳴き時は108pxになるケースがあり、卓矩形は両状態で同一だった。これは通常手番のwrapper高と卓寸法を同一視したテスト条件の誤りだったため、親wrapperは位置・幅を確認し、卓は位置・幅・高さを確認する条件へ修正した。鳴き種類画面から候補画面へのwrapper寸法不変は従来どおり全辺を比較する。修正SHA `05d75a716d38f8913da7b01f34c61286723ac602` で再実行したmatrixの結果を下に記録する。
+
+### Chromium／WebKitの実測
+
+- `tests/browser-pc-table-layout.py` は各viewportで通常手番、鳴き種類、複数候補の卓矩形が同一であることを検査した。ChromiumとWebKitの実測は一致し、操作wrapperも全状態で同じ位置・幅・高さ108pxだった。表の種類画面上端はローカル／オンライン共通、候補パネル上端は「ローカル／オンライン」、Backはローカル／オンラインとも同じ矩形（viewport座標、px）。
+
+| viewport | 卓 x/y/一辺（通常・種類・候補） | 種類パネル上端 | 5候補パネル上端（ローカル／オンライン） | Back y範囲 |
+| --- | --- | --- | --- | --- |
+| 1280×720 | 415 / 143.2 / 450px | 608.2 | 513.2 / 495.2 | 655.2–699.2 |
+| 1366×768 | 439 / 143.2 / 488px | 646.2 | 614.2 / 596.2 | 693.2–737.2 |
+| 1440×900 | 410 / 143.2 / 620px | 778.2 | 746.2 / 728.2 | 825.2–869.2 |
+| 1660×825 | 557.5 / 143.2 / 545px | 703.2 | 671.2 / 653.2 | 750.2–794.2 |
+| 1920×1080 | 560 / 143.2 / 800px | 958.2 | 926.2 / 908.2 | 1005.2–1049.2 |
+
+- 種類画面のローカル／オンライン操作欄はそれぞれ68px／86px、5候補時は1280×720で195px／213px、他の4viewportで132px／150pxだった。候補画面のパネル上端は種類画面より上がり、Backはすべて初期viewport内に収まった。PCテストではscrollや `scroll_into_view_if_needed()` をBackクリック前に行わず、矩形・elementFromPoint判定後に画面座標でクリックした。候補を卓上へ重ねた状態の候補ボタンも同じ判定後にクリックできた。
+- 1280×720では候補60個に増やして、一覧に有限の `max-height` と内部スクロールがあること、最後の候補が内部スクロール後に表示・クリックできること、ページscrollが0のままであることを検査した。極端に低い1280×400は別条件としてページスクロール可能であることを確認し、スクロール後に種類・Back・見送るを押して判断を終了した。
+- ローカル／オンライン両方で戻る→種類選択、見送る、チー候補操作を確認した。ポン・カン・ロン、局結果概要・次局、44px以上の操作、短い画面、その他のBrowser UI回帰もmatrix内で検査した。`tests/browser-call-decision-dialog.py` と `tests/browser-pc-table-layout.py` は `getBoundingClientRect()` と `document.elementFromPoint()` の結果を使って初期表示内のクリック可否を判定する。
+
+### Actions／公開・実機確認待ち
+
+- Deploy gate run [#42462421050](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42462421050) はSHA `05d75a716d38f8913da7b01f34c61286723ac602` で `docs-check`、verify、Chromium、WebKit、matrix audit、release freshness、Worker deploy／production test、Pages build／deployがすべてsuccessした。Worker production testは7シナリオ成功。Worker deployment `7633553319`、`heibon-production-pages` deployment `7633568510`、GitHub Pages deployment `7633565671` は同じSHAでAPI status `success`。Pagesは [HEIBON MAHJONG](https://ak-sekine.github.io/heibon-mahjong/) に公開済み。
+- `npm test`、`npm run build`、`npm run typecheck:worker` は最新実装で成功。テスト条件変更後のPython構文検査とBrowser UI engine選択テストも成功した。Browser UI matrixはGitHub ActionsのChromium／WebKitで実施し、ローカルCloud Chromiumは起動していない。
+- 今回のPC実機NGは修正前のユーザー本人の確認として保持する。修正後のPC実機結果は未確認であり、今回のPlaywright測定を実機結果とは扱わない。以前のiPhone Safari／PWA OKは過去のユーザー報告であり、この修正後には再確認していない。Issue #32はOpenのままにし、ユーザー本人による修正後のPC確認を待つ。Android／タブレット実機も未確認。
