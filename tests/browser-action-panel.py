@@ -234,7 +234,7 @@ with sync_playwright() as p:
         assert online_panel.locator('[data-panel-part="candidate-back"]').inner_text() == '戻る'
         assert online_panel.locator('[data-panel-part="normal-controls"]').is_hidden()
         online_panel.locator('[data-panel-part="candidate-back"]').click()
-        assert online_panel.locator('[data-panel-part="candidate-options"]').is_empty()
+        assert online_panel.locator('[data-panel-part="candidate-options"] button').count() == 0
         assert page.evaluate("window.actionPanelBrowser.onlineEvents.length") == events_before_back, 'Back must not send a call action'
         assert online_panel.locator('[data-panel-part="call-pon"]').is_visible()
         online_panel.locator('[data-panel-part="call-pon"]').click()
