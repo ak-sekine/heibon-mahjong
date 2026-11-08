@@ -716,13 +716,13 @@ header > div { min-width:0; }
 }
 
 /* Reserve header (44), four readable score rows (76), three gaps (24),
-   page safety padding (16), and normal controls (84). At least 470px keeps
+   page safety padding (16), and normal controls plus keyboard help (108). At least 450px keeps
    the fixed 14–16px labels readable; shorter windows scroll naturally. */
 @media (min-width:960px) {
  main:has(#local-game-layout),main:has(#online-match) { width:min(100%,1440px); padding:max(8px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(8px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px)); }
  #local-game-layout,#online-match {
-   --pc-controls-space:84px;
-   --pc-board-size:min(860px,max(470px,calc(100svh - 44px - 76px - 24px - max(8px,env(safe-area-inset-top,0px)) - max(8px,env(safe-area-inset-bottom,0px)) - var(--pc-controls-space))));
+   --pc-controls-space:108px;
+   --pc-board-size:min(860px,max(450px,calc(100svh - 44px - 76px - 24px - max(8px,env(safe-area-inset-top,0px)) - max(8px,env(safe-area-inset-bottom,0px)) - var(--pc-controls-space))));
    display:flex;
    flex:none;
    flex-direction:column;
@@ -732,7 +732,7 @@ header > div { min-width:0; }
    min-width:0;
  }
  @supports (height:100dvh) {
-   #local-game-layout,#online-match { --pc-board-size:min(860px,max(470px,calc(100dvh - 44px - 76px - 24px - max(8px,env(safe-area-inset-top,0px)) - max(8px,env(safe-area-inset-bottom,0px)) - var(--pc-controls-space)))); }
+   #local-game-layout,#online-match { --pc-board-size:min(860px,max(450px,calc(100dvh - 44px - 76px - 24px - max(8px,env(safe-area-inset-top,0px)) - max(8px,env(safe-area-inset-bottom,0px)) - var(--pc-controls-space)))); }
  }
  #local-game-layout:has(.call-controls:not([hidden])),#online-match:has(.call-controls:not([hidden])) { --pc-controls-space:244px; }
  #local-game-layout > *,#online-match > * { width:min(100%,var(--pc-board-size)); flex:none; }
@@ -742,7 +742,7 @@ header > div { min-width:0; }
    align-self:center;
    --table-tile-width:min(52px,round(down,calc((100cqw - 18px) / 16.2),.1px));
  }
- #local-game-controls,#online-game-controls { min-height:84px; padding:6px; }
+ #local-game-controls,#online-game-controls { min-height:108px; padding:6px; }
  /* Reserve room for candidates before selecting a kind. Their bottom stays
     anchored as the absolute panel grows upward, entirely below the hand. */
  #local-game-controls:has(.call-controls:not([hidden])),#online-game-controls:has(.call-controls:not([hidden])) { min-height:244px; }
@@ -755,7 +755,7 @@ header > div { min-width:0; }
  .table .seat-right .open-melds { transform:translate(calc(var(--river-tile-width)*.75 + 4.5px),calc(var(--river-tile-width)*.1)); }
  .table .seat-left .open-melds { transform:translate(calc(0px - var(--river-tile-width)*.75 + 9px),calc(var(--river-tile-width)*.1)); }
  .table .center-info { font-size:14px; }
- .table .round-summary { font-size:16px; letter-spacing:normal; }
+ .table .round-summary { flex-wrap:wrap; font-size:16px; letter-spacing:normal; }
  .table .round-label { font-size:16px; }
  .table .wall-count { font-size:14px; }
  .table .center-info .dora-area h2 { font-size:14px; }

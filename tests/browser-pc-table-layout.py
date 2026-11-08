@@ -149,6 +149,10 @@ with sync_playwright() as p:
         fixture_results=[]
         for fixture_index, expected_melds in enumerate((1, 4)):
             page.evaluate('''index=>pcTableRenderer.renderTable(pcMeldFixtures[index],[25000,25000,25000,25000])''', fixture_index)
+            page.evaluate('''async()=>{
+              const {renderTableRoundInfo}=await import('/heibon-mahjong/src/rendering/shared-table-components.ts');
+              renderTableRoundInfo(document.querySelector('#local-table .round-label'),document.querySelector('#local-table .wall-count'),{format:'tonnan',roundWind:'south',roundNumber:4,honba:2,liveWallCount:12,deadWallCount:14});
+            }''')
             result=inspect_page(page)
             for region in ('header', 'scoreStrip'):
                 box=result[region]
