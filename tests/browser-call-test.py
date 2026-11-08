@@ -371,8 +371,10 @@ with sync_playwright() as p:
     page.wait_for_selector('#scenario-help:not(:empty)')
     page.evaluate('window.readGame=()=>window.testController.game')
     start_scenario(page, 'opening')
+    if page.locator('#kan').evaluate('''e=>{const r=e.getBoundingClientRect();return r.top<0||r.bottom>innerHeight}'''):
+        page.locator('#kan').scroll_into_view_if_needed()
     before = table_rect(page)
-    assert_click_target(page, '#kan', '959x900 opening ankan toggle')
+    assert_click_target(page, '#kan', '959x900 opening ankan toggle', in_initial_view=False)
     page.locator('#kan').click()
     page.wait_for_function("!document.querySelector('#kan-controls').hidden && document.querySelectorAll('#kan-options button').length===2")
     assert page.locator('#kan-controls').evaluate('e=>getComputedStyle(e).position') != 'absolute', 'kan controls below 960px must remain in normal flow'
