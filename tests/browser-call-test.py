@@ -129,6 +129,17 @@ with sync_playwright() as p:
         assert page.title().startswith('ポン・カン実機検証')
         assert page.locator('meta[name="robots"]').get_attribute('content') == 'noindex, nofollow'
         assert page.locator('#scenario option').evaluate_all('nodes=>nodes.map(node=>node.value)') == ['pon', 'pon-multiple', 'daiminkan', 'opening', 'ankan', 'kakan']
+        settings_geometry = page.evaluate('''()=>{
+          const rect=e=>{const r=e.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
+          const targets=['#scenario','#load-scenario'].map(selector=>{
+            const node=document.querySelector(selector),r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+            return {selector,...rect(node),receivesPointer:hit===node||node.contains(hit)};
+          });
+          return {lab:rect(document.querySelector('#call-test-lab')),targets,scrollY:document.scrollingElement.scrollTop};
+        }''')
+        assert settings_geometry['scrollY'] <= 1 and settings_geometry['lab']['top'] >= -0.5 and settings_geometry['lab']['bottom'] <= height + 0.5, f'{width}x{height}: scenario controls are outside the initial viewport: {settings_geometry}'
+        for target in settings_geometry['targets']:
+            assert target['top'] >= -0.5 and target['bottom'] <= height + 0.5 and target['height'] >= 44 and target['receivesPointer'], f'{width}x{height}: scenario control is not initially clickable: {settings_geometry}'
         page.evaluate('window.readGame=()=>window.testController.game')
 
         for mode, call_selector, meld_type, meld_size, dora_count in [
