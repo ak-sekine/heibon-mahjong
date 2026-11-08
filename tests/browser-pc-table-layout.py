@@ -276,6 +276,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         assert not result_geometry['summaryHidden'] and not result_geometry['buttonHidden'], f'{width}x{height}: result summary or action is hidden: {result_geometry}'
         assert result_geometry['summary']['top'] >= result_geometry['table']['bottom'], f'{width}x{height}: summary is not below the table: {result_geometry}'
         assert result_geometry['controls']['top'] >= result_geometry['summary']['bottom'], f'{width}x{height}: controls overlap the summary: {result_geometry}'
+        assert result_geometry['controls']['height'] < 108, f'{width}x{height}: result controls kept the regular 108px minimum: {result_geometry}'
         assert result_geometry['scroll']['width'] <= width + 1 and result_geometry['scroll']['top'] <= 1, f'{width}x{height}: result created horizontal overflow or moved the page: {result_geometry}'
         assert result_geometry['button']['top'] >= 0 and result_geometry['button']['bottom'] <= height + 1, f'{width}x{height}: compact result actions are not initially visible: {result_geometry}'
         page.evaluate("""()=>{const p=document.createElement('p');p.textContent='長文の結果概要を確認するための追加説明です。 '.repeat(30);document.querySelector('#round-result-summary').append(p)}""")
@@ -370,6 +371,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         assert online_board
         assert_same_table(online_board, online_result_geometry['table'], f'{width}x{height} online result')
         assert online_result_geometry['summary']['top'] >= online_result_geometry['table']['bottom'] and online_result_geometry['controls']['top'] >= online_result_geometry['summary']['bottom'], f'{width}x{height}: online result sections overlap: {online_result_geometry}'
+        assert online_result_geometry['controls']['height'] < 108, f'{width}x{height}: online result controls kept the regular 108px minimum: {online_result_geometry}'
         assert online_result_geometry['next']['bottom'] <= height + 1, f'{width}x{height}: online result action is not initially visible: {online_result_geometry}'
         page.evaluate("""()=>{const p=document.createElement('p');p.textContent='長文のオンライン結果概要を確認するための追加説明です。 '.repeat(30);document.querySelector('#online-round-result').append(p)}""")
         online_long = page.evaluate('''()=>({table:document.querySelector('#online-table').getBoundingClientRect().toJSON(),summary:document.querySelector('#online-round-result').getBoundingClientRect().toJSON(),

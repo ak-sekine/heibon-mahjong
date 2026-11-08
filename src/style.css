@@ -753,7 +753,7 @@ header > div { min-width:0; }
    overflow:visible;
  }
  .call-option-list { max-height:none; overflow:visible; overscroll-behavior:auto; }
- .discard-controls.result-available { min-height:0; padding:4px 6px; gap:4px; }
+ #local-game-controls.result-available,#online-game-controls.result-available { min-height:0; padding:4px 6px; gap:4px; }
  #round-result-summary { padding:4px 8px; line-height:1.2; }
  #round-result-summary p { margin:0; }
  #online-match:has(.discard-controls.result-available) #online-round-result { padding:4px 8px; }
