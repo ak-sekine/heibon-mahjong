@@ -105,14 +105,20 @@ with sync_playwright() as playwright:
         page.mouse.wheel(0, 500)
         page.wait_for_function('selector => document.querySelector(selector).scrollTop > 0', arg=content_selector)
         content.focus()
-        page.keyboard.press('Control+End')
-        assert_position(True)
-        page.keyboard.press('Control+Home')
-        assert_position(False)
+
+        def keyboard_to_edge(bottom):
+            for _ in range(30):
+                if content.evaluate('(e, bottom) => bottom ? e.scrollTop >= e.scrollHeight-e.clientHeight-1 : e.scrollTop<=1', bottom):
+                    break
+                page.keyboard.press('PageDown' if bottom else 'PageUp')
+                page.wait_for_timeout(200)
+            assert_position(bottom)
+
+        keyboard_to_edge(True)
+        keyboard_to_edge(False)
         page.keyboard.press('PageDown')
         page.wait_for_function('selector => document.querySelector(selector).scrollTop > 0', arg=content_selector)
-        page.keyboard.press('Control+Home')
-        assert_position(False)
+        keyboard_to_edge(False)
 
         # Touch events must stay uncancelled, with native vertical panning
         # allowed. Playwright has no portable WebKit swipe API.

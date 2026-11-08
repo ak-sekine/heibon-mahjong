@@ -8,7 +8,7 @@ export function mountDialogScrollIndicators(root: ParentNode = document): void {
 
     // The content remains the accessible, native scrolling region. Keep the
     // decorative mouse shortcut out of the tab order and preserve touch panning.
-    content.tabIndex = 0;
+    content.tabIndex = -1;
     let drag: { pointerId: number; grabOffset: number } | undefined;
 
     const endDrag = (): void => {

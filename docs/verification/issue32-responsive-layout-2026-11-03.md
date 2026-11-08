@@ -229,8 +229,10 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - ユーザー本人のPC実機報告: **NG**。ルール設定画面の黄色いスクロールバーをマウスでドラッグしてもスクロールできない。旧実装は位置表示のみで、ドラッグ操作がなかった。
 - 開始ブランチは `work`、作業ツリーはclean、未push commitなし。`git fetch origin` 成功後の `origin/main` と開始HEADはともに `31f33d8d69fb57e9516697ec4b35f2abf51fc97f`、behind/aheadは0/0。remoteは `https://github.com/ak-sekine/heibon-mahjong.git`。
 - `src/ui/dialog-scroll-indicator.ts` の共通処理へマウスPointer Eventsを追加。掴んだ位置を維持して、つまみの移動可能距離と本文のscroll範囲を比例対応させ、背景クリックではクリック位置へつまみの中央を移動する。pointer captureでバー外でも追従し、終了・キャンセル・capture喪失・window blurで解除する。
-- 黄色いつまみの色・幅・配置とスマートフォンUI、固定フッターの構造は維持。本文はnative scrollを維持し、Tabで到達できる名前付きregionとしてキーボードスクロールを利用可能にした。装飾バーは従来どおり支援技術とTab順序から除外し、同じ機能を本文で利用できる。
+- 黄色いつまみの色・幅・配置とスマートフォンUI、固定フッターの構造は維持。本文はnative scrollを維持し、既存のTab移動順を維持し、マウス操作後は名前付きregionへフォーカスを渡してキーボードスクロールを利用可能にした。装飾バーは従来どおり支援技術とTab順序から除外し、同じ機能を本文で利用できる。
 - `tests/browser-create-dialog-layout.py` を拡張し、既存ActionsのChromium／WebKit双方で、新規対局・オンライン作成の上下端ドラッグ、中央への比例移動、背景クリック、バー外移動、終了後の非追従、キャンセル／capture喪失後の再操作、ホイール、キーボード、固定フッターを検査する。既存の12 viewport検査も維持する。
 - タッチについては両engineでtouch pointerをキャンセルしないこととnative panning設定を検査し、ChromiumではCDPのnative touch swipeでも本文移動を検査する。Playwright WebKitには公開swipe APIがないため、WebKitのnative swipeとユーザー所有端末の実機タッチ操作は未確認として区別する。
 - ローカル検証・対象コミットのActions結果は下記へ追記する。公開後のPC実機再確認はユーザー本人が行う。Issue #32はOpenを維持する。
 - ローカル結果: `npm test` 1464件成功、`npm run build`（TypeScript検査を含む）成功、`python tests/test_browser_regressions_selection.py` 8件成功、Python構文検査と `git diff --check` 成功。ブラウザー自動検証はリポジトリの既知制限に従いActionsで実施する。
+- 初回修正 `98b1381a4988abf5d7fcdc976c2ed712e134ad39` の[Actions #42436684947](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42436684947)はverify成功、Chromiumでは今回のスクロール検査が成功したが、既存のオンライン作成画面のTab順序検査が失敗した。本文を追加のTab停止位置にせず、プログラムによるfocusのみ許可する `tabIndex=-1` へ修正した。WebKitはCtrl+Endで本文最下部に移動せず検査がtimeoutしたため、キーボード検査をPageDown／PageUpで上下端へ到達する方法に変更した。両失敗によりDeploy gateが公開を停止した。
+- `gh run view --log-failed` はログ配信先 `results-receiver.actions.githubusercontent.com` への要求がForbiddenになった。GitHub接続ツールのjob logs取得で両engineのログを読み、失敗箇所を確認した。
