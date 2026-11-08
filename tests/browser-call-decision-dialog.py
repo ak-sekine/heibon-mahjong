@@ -67,7 +67,7 @@ window.loadTurn=()=>{
         assert page.locator('dialog[open]').count() == 0, 'call decision unexpectedly opened a modal'
         assert page.locator('#call-options button').count() == 0, 'candidates appeared before a type was selected'
         call_position = page.locator('#call-controls').evaluate('node=>getComputedStyle(node).position')
-        assert call_position == 'absolute', (width, call_position)
+        assert call_position == ('relative' if width >= 960 else 'absolute'), (width, call_position)
         assert page.locator('#local-game-controls').evaluate('node=>getComputedStyle(node).position') == 'relative'
         assert '見送る' in page.locator('#call-controls').inner_text(), 'the call type screen lost its pass action'
         type_choices = [page.locator(selector).bounding_box() for selector in ['#call-pon', '#call-kan', '#call-chi', '#pass-calls'] if page.locator(selector).is_visible()]
@@ -102,7 +102,15 @@ window.loadTurn=()=>{
         back_state = call_back.evaluate("""node=>({hidden:node.hidden,html:node.outerHTML,rect:node.getBoundingClientRect().toJSON(),display:getComputedStyle(node).display,visibility:getComputedStyle(node).visibility})""")
         assert call_back.is_visible(), f'back button is hidden: {back_state}'
         back_box = call_back.bounding_box()
-        assert back_box and back_box['width'] >= 44 and back_box['height'] >= 44 and back_box['y'] + back_box['height'] <= height, (width, height, back_box)
+        assert back_box and back_box['width'] >= 44 and back_box['height'] >= 44, (width, height, back_box)
+        if back_box['y'] + back_box['height'] > height:
+            assert width >= 960 and page.evaluate('document.scrollingElement.scrollHeight>innerHeight'), (width, height, back_box)
+            call_back.scroll_into_view_if_needed()
+            reached_back = call_back.evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}''')
+            assert reached_back, (width, height, back_box)
+            page.evaluate('window.scrollTo(0,0)')
+        else:
+            assert back_box['y'] >= 0, (width, height, back_box)
         assert page.locator('#pass-calls').is_hidden(), 'pass remained available while choosing a candidate'
         assert '見送る' not in page.locator('#call-controls').inner_text(), 'candidate screen still includes pass text'
         grid = page.locator('#call-options').evaluate("node=>({columns:getComputedStyle(node).gridTemplateColumns.split(' ').length,rows:getComputedStyle(node).gridTemplateRows.split(' ').length,top:node.getBoundingClientRect().top})")
@@ -124,11 +132,18 @@ window.loadTurn=()=>{
         assert 0 <= back_box['y'] - candidate_box['y'] - candidate_box['height'] <= 8, (candidate_box, back_box)
         option_frame = page.locator('#call-options').evaluate("node=>({border:getComputedStyle(node).borderWidth,background:getComputedStyle(node).backgroundColor,shadow:getComputedStyle(node).boxShadow})")
         assert option_frame == {'border':'0px','background':'rgba(0, 0, 0, 0)','shadow':'none'}, option_frame
-        assert panel_candidates['y'] <= panel_before['y'] + 1, (panel_before, panel_candidates)
+        if width < 960:
+            assert panel_candidates['y'] <= panel_before['y'] + 1, (panel_before, panel_candidates)
+        else:
+            assert abs(panel_candidates['y'] - panel_before['y']) < 1, (panel_before, panel_candidates)
+            assert panel_candidates['height'] >= panel_before['height'], (panel_before, panel_candidates)
         multi_candidate_panel = panel_candidates if grid['rows'] >= 2 else None
         candidate_panel_bottom = panel_candidates['y'] + panel_candidates['height']
         if grid['rows'] >= 2:
-            assert panel_candidates['y'] < panel_before['y'], (panel_before, panel_candidates, grid)
+            if width < 960:
+                assert panel_candidates['y'] < panel_before['y'], (panel_before, panel_candidates, grid)
+            else:
+                assert panel_candidates['height'] > panel_before['height'], (panel_before, panel_candidates, grid)
         if (width, height) == (375, 634):
             page.locator('#call-options').evaluate("node=>{node.style.maxHeight='55px';node.scrollTop=0}")
             scroll_metrics = page.locator('#call-options').evaluate("node=>({height:node.clientHeight,content:node.scrollHeight,overflow:getComputedStyle(node).overflowY})")
@@ -146,7 +161,13 @@ window.loadTurn=()=>{
         assert panel_before and panel_candidates, (panel_before, panel_candidates)
         assert page.evaluate('scrollY') == 0, 'rendering call candidates scrolled the page'
         page_size = page.evaluate("""()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight,panel:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),callPanel:document.querySelector('#call-controls').getBoundingClientRect().toJSON(),table:document.querySelector('#local-table').getBoundingClientRect().toJSON()})""")
-        assert page_size['scrollWidth'] <= page_size_before['scrollWidth'] and page_size['scrollHeight'] <= page_size_before['scrollHeight'], (width, height, page_size_before, page_size)
+        assert page_size['scrollWidth'] <= page_size_before['scrollWidth'], (width, height, page_size_before, page_size)
+        if width < 960:
+            assert page_size['scrollHeight'] <= page_size_before['scrollHeight'], (width, height, page_size_before, page_size)
+        else:
+            assert page_size['scrollHeight'] >= page_size_before['scrollHeight'], (width, height, page_size_before, page_size)
+            assert page_size['callPanel']['top'] >= page_size['table']['bottom'], (width, height, page_size)
+            assert page_size['panel']['bottom'] >= page_size['callPanel']['bottom'], (width, height, page_size)
 
         if (width, height) == (375, 634):
             actions_before = page.evaluate('callState().phase')
@@ -174,8 +195,11 @@ window.loadTurn=()=>{
                 exact_panel_box = page.locator('#call-controls').bounding_box()
                 exact_back = page.locator('#call-back').bounding_box()
                 assert exact_box and exact_back and exact_panel_box and 0 <= exact_back['y'] - exact_box['y'] - exact_box['height'] <= 8, (exact_box, exact_panel_box, exact_back)
-                assert abs(exact_panel_box['y'] + exact_panel_box['height'] - candidate_panel_bottom) < 1, (exact_panel_box, candidate_panel_bottom)
-                if multi_candidate_panel:
+                if width < 960:
+                    assert abs(exact_panel_box['y'] + exact_panel_box['height'] - candidate_panel_bottom) < 1, (exact_panel_box, candidate_panel_bottom)
+                elif multi_candidate_panel:
+                    assert exact_panel_box['y'] == panel_before['y'] and exact_panel_box['height'] < multi_candidate_panel['height'], (exact_panel_box, multi_candidate_panel)
+                if multi_candidate_panel and width < 960:
                     assert multi_candidate_panel['y'] < exact_panel_box['y'], (multi_candidate_panel, exact_panel_box, mode)
                 page.locator('#call-back').click()
                 assert page.locator('#pass-calls').is_visible(), f'{mode} candidate Back did not restore the type screen'

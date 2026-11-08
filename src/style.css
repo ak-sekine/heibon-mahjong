@@ -715,13 +715,13 @@ header > div { min-width:0; }
  }
 }
 
-/* Reserve header (44), four readable score rows (76), three gaps (24),
-   page safety padding (16), and normal controls plus keyboard help (108). At least 450px keeps
-   the fixed 14–16px labels readable; shorter windows scroll naturally. */
+/* Keep the board calculation independent of transient action state. Reserve
+   120px for regular controls or a compact result summary plus actions; longer
+   content expands the document and remains reachable by scrolling. */
 @media (min-width:960px) {
  main:has(#local-game-layout),main:has(#online-match) { width:min(100%,1440px); padding:max(8px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(8px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px)); }
  #local-game-layout,#online-match {
-   --pc-controls-space:108px;
+   --pc-controls-space:120px;
    --pc-board-size:min(860px,max(450px,calc(100svh - 44px - 76px - 24px - max(8px,env(safe-area-inset-top,0px)) - max(8px,env(safe-area-inset-bottom,0px)) - var(--pc-controls-space))));
    display:flex;
    flex:none;
@@ -734,7 +734,6 @@ header > div { min-width:0; }
  @supports (height:100dvh) {
    #local-game-layout,#online-match { --pc-board-size:min(860px,max(450px,calc(100dvh - 44px - 76px - 24px - max(8px,env(safe-area-inset-top,0px)) - max(8px,env(safe-area-inset-bottom,0px)) - var(--pc-controls-space)))); }
  }
- #local-game-layout:has(.call-controls:not([hidden])),#online-match:has(.call-controls:not([hidden])) { --pc-controls-space:244px; }
  #local-game-layout > *,#online-match > * { width:min(100%,var(--pc-board-size)); flex:none; }
  #local-game-layout > #local-table,#online-match > #online-table {
    width:min(100%,var(--pc-board-size));
@@ -743,10 +742,24 @@ header > div { min-width:0; }
    --table-tile-width:min(52px,round(down,calc((100cqw - 18px) / 16.2),.1px));
  }
  #local-game-controls,#online-game-controls { min-height:108px; padding:6px; }
- /* Reserve room for candidates before selecting a kind. Their bottom stays
-    anchored as the absolute panel grows upward, entirely below the hand. */
- #local-game-controls:has(.call-controls:not([hidden])),#online-game-controls:has(.call-controls:not([hidden])) { min-height:244px; }
- .call-controls,.call-controls:has(.call-option-list:not(:empty)) { top:auto; bottom:0; max-height:100%; overflow-y:auto; }
+ /* Call choices participate in normal flow and grow only to their content.
+    This keeps the first action row close to the hand without resizing the table. */
+ #local-game-controls:has(.call-controls:not([hidden])),#online-game-controls:has(.call-controls:not([hidden])) { min-height:0; padding:4px 6px; }
+ .call-controls,.call-controls:has(.call-option-list:not(:empty)) {
+   position:relative;
+   inset:auto;
+   align-content:start;
+   max-height:none;
+   overflow:visible;
+ }
+ .call-option-list { max-height:none; overflow:visible; overscroll-behavior:auto; }
+ .discard-controls.result-available { min-height:0; padding:4px 6px; gap:4px; }
+ #round-result-summary { padding:4px 8px; line-height:1.2; }
+ #round-result-summary p { margin:0; }
+ #online-match:has(.discard-controls.result-available) #online-round-result { padding:4px 8px; }
+ #online-match:has(.discard-controls.result-available) #online-round-result h2,
+ #online-match:has(.discard-controls.result-available) #online-round-result h3,
+ #online-match:has(.discard-controls.result-available) #online-round-result p { margin:0; line-height:1.2; }
  .call-controls > [data-panel-part="call-status"],.call-type-buttons .control-action-button { font-size:14px; }
  .table .seat-label,.score-strip .seat-label { font-size:14px; line-height:1.2; }
  .table .seat,.table .rivers { --table-tile-width:min(52px,round(down,calc((100cqw - 22px) / 16.2),.1px)); --table-tile-height:calc(var(--table-tile-width)*1.4); --river-tile-width:calc(var(--table-tile-width)*.76); --river-tile-height:calc(var(--table-tile-height)*.76); --cell:calc(var(--table-tile-height) + 1px); }

@@ -3,9 +3,10 @@ import json
 import os
 import pathlib
 from playwright.sync_api import sync_playwright
+from browser_main_fixtures import fixed_seat_fixture
 
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
-VIEWPORTS = [(1280, 720), (1366, 768), (1440, 900), (1920, 1080)]
+VIEWPORTS = [(1280, 720), (1366, 768), (1440, 900), (1660, 825), (1920, 1080)]
 reports = []
 out = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 out.mkdir(parents=True, exist_ok=True)
@@ -95,15 +96,42 @@ def assert_pc_layout(page, width, height, label, fit=True, online=False):
     return result
 
 
+def assert_same_table(expected, actual, label):
+    expected_left = expected.get('x', expected.get('left'))
+    expected_top = expected.get('y', expected.get('top'))
+    actual_left = actual.get('x', actual.get('left'))
+    actual_top = actual.get('y', actual.get('top'))
+    assert all(abs(a-b) < 1 for a, b in (
+        (expected_left, actual_left), (expected_top, actual_top),
+        (expected['width'], actual['width']), (expected['height'], actual['height']),
+    )), f'{label}: table position or size changed: expected={expected}, actual={actual}'
+
+
 with sync_playwright() as p:
     browser = getattr(p, ENGINE).launch()
     for width, height in VIEWPORTS:
         page = browser.new_page(viewport={'width': width, 'height': height})
         def expose_app(route):
             response = route.fetch()
-            route.fulfill(response=response, body=response.text() + '\nwindow.pcOnlineController=onlineGameController;\n')
+            source = """import {callStart} from '/heibon-mahjong/tests/calls-fixture.ts';
+import {discardTile} from '/heibon-mahjong/src/game/discard.ts';
+import {startMatch} from '/heibon-mahjong/src/game/match.ts';
+import {fixedRound} from '/heibon-mahjong/tests/match-fixture.ts';
+""" + response.text() + """
+window.pcOnlineController=onlineGameController;
+window.pcLoadCalls=()=>{
+  controller.newGame();
+  const game=callStart(3,{0:['345m','5m','234p','678s','12z','9p']},'man-5');
+  controller.match=startMatch(discardTile(game,3,game.players[3].drawnTile.id));
+  render();
+};
+window.pcMakeDrawMatch=()=>startMatch(fixedRound(0,[0,2]));
+window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMatch();render();};
+"""
+            route.fulfill(response=response, body=fixed_seat_fixture(source))
         page.route('**/src/main.ts', expose_app)
         page.goto('http://localhost:4173/heibon-mahjong/')
+        page.evaluate('window.scrollTo(0,0)')
         page.evaluate('''async()=>{
           const app=await import('/heibon-mahjong/src/main.ts');
           window.pcResponsiveApp=app;
@@ -194,18 +222,177 @@ with sync_playwright() as p:
         page.wait_for_function('''previous=>pcResponsiveApp.controller.game.players[pcResponsiveApp.controller.playerSeat].river.length>previous''', arg=before_keyboard)
         assert page.evaluate('document.scrollingElement.scrollTop') <= 1, f'{width}x{height}: keyboard flow unexpectedly scrolled the page'
 
+        normal_board = page.locator('#local-table').bounding_box()
+        page.evaluate('pcLoadCalls()')
+        page.wait_for_selector('#call-controls:not([hidden])')
+        call_start = page.evaluate('''()=>({table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),
+          controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),
+          panel:document.querySelector('#call-controls').getBoundingClientRect().toJSON(),
+          scrollTop:document.scrollingElement.scrollTop,
+          panelPosition:getComputedStyle(document.querySelector('#call-controls')).position})''')
+        assert normal_board
+        assert_same_table(normal_board, call_start['table'], f'{width}x{height} local call decision')
+        assert call_start['panelPosition'] == 'relative', f'{width}x{height}: PC call panel is not in document flow: {call_start}'
+        assert 0 <= call_start['controls']['top']-call_start['table']['bottom'] <= 8.5, f'{width}x{height}: call controls are not under the table: {call_start}'
+        assert 0 <= call_start['panel']['top']-call_start['table']['bottom'] <= 16, f'{width}x{height}: call choices are far from the hand: {call_start}'
+        assert call_start['scrollTop'] <= 1, f'{width}x{height}: opening the call panel moved the page: {call_start}'
+        for selector in ('#call-chi', '#call-pon', '#pass-calls'):
+            assert page.locator(selector).is_visible(), f'{width}x{height}: missing call action {selector}'
+        page.locator('#call-chi').click()
+        call_candidates = page.locator('#call-options button[data-action-choice="call"]')
+        assert call_candidates.count() > 1, f'{width}x{height}: call candidate selection did not expand'
+        candidate_metrics = page.evaluate('''()=>({table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),
+          controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),
+          candidates:[...document.querySelectorAll('#call-options button[data-action-choice="call"]')].map(node=>node.getBoundingClientRect().toJSON()),
+          back:document.querySelector('#call-back').getBoundingClientRect().toJSON(),
+          scrollTop:document.scrollingElement.scrollTop,scrollHeight:document.scrollingElement.scrollHeight})''')
+        assert_same_table(normal_board, candidate_metrics['table'], f'{width}x{height} local candidates')
+        assert all(box['width'] >= 44 and box['height'] >= 44 for box in candidate_metrics['candidates']), f'{width}x{height}: a call candidate is too small: {candidate_metrics}'
+        assert candidate_metrics['controls']['bottom'] >= candidate_metrics['back']['bottom'], f'{width}x{height}: candidate panel does not expand in flow: {candidate_metrics}'
+        assert candidate_metrics['scrollTop'] <= 1, f'{width}x{height}: showing candidates moved the page: {candidate_metrics}'
+        page.locator('#call-back').scroll_into_view_if_needed()
+        back_hit = page.locator('#call-back').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}''')
+        assert back_hit, f'{width}x{height}: Back did not become reachable after scrolling'
+        page.locator('#call-back').click()
+        assert page.locator('#call-options button').count() == 0 and page.locator('#pass-calls').is_visible(), f'{width}x{height}: Back did not restore call types'
+        page.locator('#pass-calls').scroll_into_view_if_needed()
+        page.locator('#pass-calls').click()
+        page.wait_for_function("pcResponsiveApp.controller.game.phase!=='awaiting-call'")
+        assert page.locator('#call-controls').is_hidden(), f'{width}x{height}: pass did not end call judgment'
+        after_call = page.locator('#local-table').bounding_box()
+        assert after_call and abs(after_call['width']-normal_board['width']) < 1 and abs(after_call['height']-normal_board['height']) < 1, f'{width}x{height}: board did not return to the normal size'
+
+        page.evaluate('window.scrollTo(0,0);pcShowDrawResult()')
+        page.wait_for_function("pcResponsiveApp.controller.match.status==='round-ended'")
+        result_geometry = page.evaluate('''()=>{
+          const rect=selector=>document.querySelector(selector).getBoundingClientRect().toJSON();
+          const button=rect('#next-round');
+          return {table:rect('#local-table'),summary:rect('#round-result-summary'),controls:rect('#local-game-controls'),button,
+            summaryHidden:document.querySelector('#round-result-summary').hidden,
+            buttonHidden:document.querySelector('#next-round').hidden,
+            scroll:{top:document.scrollingElement.scrollTop,width:document.scrollingElement.scrollWidth,height:document.scrollingElement.scrollHeight}};
+        }''')
+        assert_same_table(normal_board, result_geometry['table'], f'{width}x{height} local result')
+        assert not result_geometry['summaryHidden'] and not result_geometry['buttonHidden'], f'{width}x{height}: result summary or action is hidden: {result_geometry}'
+        assert result_geometry['summary']['top'] >= result_geometry['table']['bottom'], f'{width}x{height}: summary is not below the table: {result_geometry}'
+        assert result_geometry['controls']['top'] >= result_geometry['summary']['bottom'], f'{width}x{height}: controls overlap the summary: {result_geometry}'
+        assert result_geometry['scroll']['width'] <= width + 1 and result_geometry['scroll']['top'] <= 1, f'{width}x{height}: result created horizontal overflow or moved the page: {result_geometry}'
+        assert result_geometry['button']['top'] >= 0 and result_geometry['button']['bottom'] <= height + 1, f'{width}x{height}: compact result actions are not initially visible: {result_geometry}'
+        page.evaluate("""()=>{const p=document.createElement('p');p.textContent='長文の結果概要を確認するための追加説明です。 '.repeat(30);document.querySelector('#round-result-summary').append(p)}""")
+        long_result = page.evaluate('''()=>({table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),
+          summary:document.querySelector('#round-result-summary').getBoundingClientRect().toJSON(),
+          controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),
+          next:document.querySelector('#next-round').getBoundingClientRect().toJSON(),
+          scroll:{top:document.scrollingElement.scrollTop,width:document.scrollingElement.scrollWidth,height:document.scrollingElement.scrollHeight}})''')
+        assert_same_table(normal_board, long_result['table'], f'{width}x{height} long local result')
+        assert long_result['summary']['bottom'] <= long_result['controls']['top'], f'{width}x{height}: long result text overlaps controls: {long_result}'
+        assert long_result['scroll']['width'] <= width + 1, f'{width}x{height}: long result caused horizontal overflow: {long_result}'
+        if long_result['next']['bottom'] > height:
+            assert long_result['scroll']['height'] > height, f'{width}x{height}: hidden result action has no page scroll path: {long_result}'
+            page.locator('#next-round').scroll_into_view_if_needed()
+        next_hit = page.locator('#next-round').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}''')
+        assert next_hit, f'{width}x{height}: next round was not operable after scrolling when required'
+        page.locator('#show-result').scroll_into_view_if_needed()
+        page.locator('#show-result').click()
+        assert page.locator('#result-dialog').is_visible(), f'{width}x{height}: result detail dialog did not open'
+        page.locator('#view-table').click()
+        page.locator('#next-round').scroll_into_view_if_needed()
+        page.locator('#next-round').click()
+        page.wait_for_function("pcResponsiveApp.controller.match.status==='playing'")
+        assert page.locator('#round-result-summary').is_hidden(), f'{width}x{height}: next round did not clear the result summary'
+
+        page.evaluate('window.scrollTo(0,0)')
         page.evaluate('''async()=>{
-          const {startOnlineGame}=await import('/heibon-mahjong/src/online/game-engine.ts');
+          const {startOnlineGameWithSeatAssignment}=await import('/heibon-mahjong/src/online/game-engine.ts');
           const {createPlayerGameView}=await import('/heibon-mahjong/src/online/game-view.ts');
           const identities=[0,1,2,3].map(seat=>({seat,name:seat?'CPU'+seat:'あなた',control:seat?'cpu':'human',connected:true}));
-          const session=startOnlineGame(identities,0,()=>.999999);
+          const session=startOnlineGameWithSeatAssignment(identities,0,'tonpu',()=>.999999);
+          window.pcOnlineSession=session;
+          window.pcCreateOnlineView=createPlayerGameView;
           pcOnlineController.receive({type:'game-started',view:createPlayerGameView(session,0,'PCTEST',new Set([0]))});
         }''')
         page.wait_for_selector('#online-player-hand button:enabled')
         page.locator('#online-player-hand button:enabled').first.evaluate('e=>e.click()')
         online_result = assert_pc_layout(page, width, height, f'{width}x{height} online turn', online=True)
 
-        report={'viewport':f'{width}x{height}','browser':ENGINE,'initial':initial,'online':online_result,'resized':resized_result,'restored':restored,'meldFixtures':fixture_results,'mouse':'passed','keyboard':'passed','result':'passed'}
+        online_board = page.locator('#online-table').bounding_box()
+        page.evaluate('''async()=>{
+          const game=callStart(3,{0:['345m','5m','234p','678s','12z','9p']},'man-5');
+          const pending=discardTile(game,3,game.players[3].drawnTile.id);
+          const onlineGame={...pending,players:pending.players.map((player,seat)=>({...player,control:seat?'cpu':'human'}))};
+          const match=(await import('/heibon-mahjong/src/game/match.ts')).startMatch(onlineGame);
+          const now=Date.now();
+          const session={...pcOnlineSession,gameRevision:2,match,status:'playing',decision:{windowId:'pc-call',type:'call',openedAt:now,expiresAt:now+30000,baseGameRevision:2,requiredSeats:[0],responses:{0:'pending'}}};
+          window.pcOnlineCallSession=session;
+          pcOnlineController.receive({type:'game-state',view:pcCreateOnlineView(session,0,'PCTEST',new Set([0]))});
+        }''')
+        page.wait_for_selector('#online-call-controls:not([hidden])')
+        online_call = page.evaluate('''()=>({table:document.querySelector('#online-table').getBoundingClientRect().toJSON(),
+          controls:document.querySelector('#online-game-controls').getBoundingClientRect().toJSON(),
+          panel:document.querySelector('#online-call-controls').getBoundingClientRect().toJSON(),
+          position:getComputedStyle(document.querySelector('#online-call-controls')).position,scrollTop:document.scrollingElement.scrollTop})''')
+        assert online_board
+        assert_same_table(online_board, online_call['table'], f'{width}x{height} online call decision')
+        assert online_call['position'] == 'relative' and 0 <= online_call['controls']['top']-online_call['table']['bottom'] <= 8.5, f'{width}x{height}: online call panel is not close to the table: {online_call}'
+        page.locator('#online-call-chi').click()
+        assert page.locator('#online-call-options button[data-action-choice="call"]').count() > 1
+        page.locator('#online-call-back').scroll_into_view_if_needed()
+        page.locator('#online-call-back').click()
+        assert page.locator('#online-pass-calls').is_visible(), f'{width}x{height}: online Back did not restore call choices'
+        page.evaluate('''()=>{
+          window.pcOnlineSent=[];
+          pcOnlineController.setActionSender((action,revision,requestId)=>{pcOnlineSent.push({action,revision,requestId});return true;});
+        }''')
+        page.locator('#online-pass-calls').scroll_into_view_if_needed()
+        page.locator('#online-pass-calls').click()
+        page.wait_for_function("pcOnlineSent.some(item=>item.action.type==='pass-call')")
+        page.evaluate('''()=>{
+          const normal={...pcOnlineSession,gameRevision:3};
+          pcOnlineController.receive({type:'game-state',view:pcCreateOnlineView(normal,0,'PCTEST',new Set([0]))});
+        }''')
+        page.wait_for_function("document.querySelector('#online-call-controls').hidden")
+        online_normal_after_call = page.locator('#online-table').bounding_box()
+        assert online_board and online_normal_after_call
+        assert_same_table(online_board, online_normal_after_call, f'{width}x{height} online call resolution')
+
+        page.evaluate('''()=>{
+          const match=pcMakeDrawMatch();
+          const session={...pcOnlineSession,gameRevision:4,match,status:match.status,decision:null};
+          window.pcOnlineResultSession=session;
+          pcOnlineController.receive({type:'game-state',view:pcCreateOnlineView(session,0,'PCTEST',new Set([0]))});
+        }''')
+        page.wait_for_function("pcOnlineController && document.querySelector('#online-round-result').hidden===false")
+        online_result_geometry = page.evaluate('''()=>({table:document.querySelector('#online-table').getBoundingClientRect().toJSON(),
+          summary:document.querySelector('#online-round-result').getBoundingClientRect().toJSON(),
+          controls:document.querySelector('#online-game-controls').getBoundingClientRect().toJSON(),
+          next:document.querySelector('#online-next-round').getBoundingClientRect().toJSON(),
+          scroll:{top:document.scrollingElement.scrollTop,width:document.scrollingElement.scrollWidth,height:document.scrollingElement.scrollHeight}})''')
+        assert online_board
+        assert_same_table(online_board, online_result_geometry['table'], f'{width}x{height} online result')
+        assert online_result_geometry['summary']['top'] >= online_result_geometry['table']['bottom'] and online_result_geometry['controls']['top'] >= online_result_geometry['summary']['bottom'], f'{width}x{height}: online result sections overlap: {online_result_geometry}'
+        assert online_result_geometry['next']['bottom'] <= height + 1, f'{width}x{height}: online result action is not initially visible: {online_result_geometry}'
+        page.evaluate("""()=>{const p=document.createElement('p');p.textContent='長文のオンライン結果概要を確認するための追加説明です。 '.repeat(30);document.querySelector('#online-round-result').append(p)}""")
+        online_long = page.evaluate('''()=>({table:document.querySelector('#online-table').getBoundingClientRect().toJSON(),summary:document.querySelector('#online-round-result').getBoundingClientRect().toJSON(),
+          controls:document.querySelector('#online-game-controls').getBoundingClientRect().toJSON(),next:document.querySelector('#online-next-round').getBoundingClientRect().toJSON(),
+          scroll:{top:document.scrollingElement.scrollTop,width:document.scrollingElement.scrollWidth,height:document.scrollingElement.scrollHeight}})''')
+        assert_same_table(online_board, online_long['table'], f'{width}x{height} long online result')
+        assert online_long['summary']['bottom'] <= online_long['controls']['top'] and online_long['scroll']['width'] <= width + 1, f'{width}x{height}: online long summary overlaps or overflows: {online_long}'
+        if online_long['next']['bottom'] > height:
+            assert online_long['scroll']['height'] > height, f'{width}x{height}: online result action has no page scroll path: {online_long}'
+        page.locator('#online-show-result').scroll_into_view_if_needed()
+        online_detail_hit = page.locator('#online-show-result').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}''')
+        assert online_detail_hit, f'{width}x{height}: online result details did not become operable after scrolling'
+        page.locator('#online-show-result').click()
+        assert page.locator('#result-dialog').is_visible(), f'{width}x{height}: online result detail dialog did not open'
+        page.locator('#view-table').click()
+        page.locator('#online-next-round').scroll_into_view_if_needed()
+        online_next_hit = page.locator('#online-next-round').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}''')
+        assert online_next_hit, f'{width}x{height}: online next-round action did not become operable after scrolling'
+        page.evaluate("""()=>{pcOnlineSent=[];pcOnlineController.setActionSender((action,revision,requestId)=>{pcOnlineSent.push({action,revision,requestId});return true;})}""")
+        page.locator('#online-next-round').click()
+        page.wait_for_function("pcOnlineSent.some(item=>item.action.type==='next-round')")
+
+        report={'viewport':f'{width}x{height}','browser':ENGINE,'initial':initial,'online':online_result,'resized':resized_result,'restored':restored,'meldFixtures':fixture_results,'localCall':call_start,'localResult':result_geometry,'onlineCall':online_call,'onlineResult':online_result_geometry,'mouse':'passed','keyboard':'passed','result':'passed'}
         reports.append(report)
         print(f'{ENGINE} {width}x{height} PC table, controls, resize, mouse, and keyboard passed')
         page.close()
