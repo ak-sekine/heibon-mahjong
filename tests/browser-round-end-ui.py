@@ -745,6 +745,24 @@ with sync_playwright() as p:
         assert not page.locator('#next-round').is_visible()
         assert page.locator('#result-dialog #result-new-game').count() == 0
         assert page.locator('#match-result-dialog #match-result-new-game').inner_text() == '次の対局を始める'
+        if not page.locator('#result-dialog').is_visible():
+            debug = page.evaluate('''() => {
+          const rect=element=>{const r=element.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
+          const result=document.querySelector('#result-dialog'),view=document.querySelector('#view-table');
+          const match=document.querySelector('#match-result-dialog'),reopen=document.querySelector('#show-result');
+          return {viewport:[innerWidth,innerHeight],resultOpen:result.open,resultDisplay:getComputedStyle(result).display,
+            resultRect:rect(result),viewRect:rect(view),viewDisplay:getComputedStyle(view).display,
+            resultOpenClass:document.documentElement.classList.contains('result-open'),matchOpen:match.open,
+            newGameOpen:document.querySelector('#new-game-dialog').open,showResult:{hidden:reopen.hidden,disabled:reopen.disabled},
+            status:window.roundEndTest.controller.match.status,hasSettlement:Boolean(window.roundEndTest.controller.match.lastSettlement),
+            activeElement:document.activeElement?.id,openDialogs:[...document.querySelectorAll('dialog[open]')].map(dialog=>dialog.id)};
+            }''')
+            page.screenshot(path=str(OUT / f'{ENGINE}-{width}x{height}-result-reopen-failure.png'), full_page=True)
+            raise AssertionError(f'result dialog did not reopen after closing match results at {width}x{height}: {debug}')
+        assert page.locator('#view-table').is_visible(), page.evaluate('''() => {
+          const button=document.querySelector('#view-table'),r=button.getBoundingClientRect();
+          return {display:getComputedStyle(button).display,rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
+        }''')
         page.locator('#view-table').click()
         page.locator('#show-match-result').click()
         page.locator('#match-result-new-game').click()
