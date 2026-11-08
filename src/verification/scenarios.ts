@@ -2,6 +2,7 @@ import { ankanGame, kakanGame, kanGame, openingAnkanGame } from './kan-fixture.t
 import { discardTile } from '../game/discard.ts';
 
 export const scenarioHelp = {
+  pon: 'CPU3が東を打牌した直後の局面です。東を2枚持った状態で「ポン」または「見送る」を選び、河・副露・通常の手番進行を確認します。',
   opening: '親の配牌直後に暗カン候補が2つあります。「カン」から選択するか、キャンセルして通常打牌できます。',
   ankan: '「カン」→「暗カン」を選択。嶺上牌を選んで「打牌する」、または「ツモ和了」で結果を確認。',
   daiminkan: 'CPUの打牌に対して「大明カン」を選択。嶺上牌を打牌するか「ツモ和了」。見送る操作も可能です。',
@@ -14,6 +15,14 @@ export type Scenario = keyof typeof scenarioHelp;
 
 /** Same physical-wall fixtures and setup actions as browser-step13-5.py. */
 export function scenarioGame(mode: Scenario) {
+  if (mode === 'pon') {
+    const game = kanGame({
+      hands: { 0: ['11z','234m','456p','678s','23z'] },
+      turn: 3,
+      draw: 'east',
+    });
+    return discardTile(game, 3, game.players[3].drawnTile!.id);
+  }
   if (mode === 'opening') return openingAnkanGame();
   if (mode === 'ankan' || mode === 'rinshan') return ankanGame();
   if (mode === 'kakan') return kakanGame();

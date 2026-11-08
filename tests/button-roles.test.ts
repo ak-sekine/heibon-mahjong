@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-const files = ['index.html', 'test.html', 'kan-test.html'];
+const files = ['index.html', 'test.html', 'kan-test.html', 'call-test.html'];
 const roleById: Record<string, string> = {
   'new-game': 'a',
   'online-create-close': 'b', 'online-create-cancel': 'b', 'online-create': 'a', 'diagnostic-close': 'b',
@@ -11,7 +11,7 @@ const roleById: Record<string, string> = {
   'online-finalize': 'a', 'online-start-game': 'a', 'online-reconnect': 'a', 'online-leave': 'd1',
   'view-table': 'b', 'match-result-new-game': 'a', 'match-result-close': 'b',
   'cancel-new-game': 'b', 'confirm-new-game': 'a', 'online-rules-close': 'b', 'load-scenario': 'a',
-  'start-cpu-kan': 'a', 'repeat-scenario': 'a', 'start-river-test': 'a',
+  'start-cpu-kan': 'a', 'repeat-scenario': 'a', 'toggle-call-test-settings': 'b', 'start-river-test': 'a',
 };
 const roleByPart: Record<string, string> = {
   'pass-call': 'c', 'call-back': 'b', 'cancel-kan': 'b', ron: 'a', 'pass-ron': 'c', discard: 'a', riichi: 'a',
@@ -26,7 +26,7 @@ test('every static operation button on product and verification pages has exactl
   for (const file of files) {
     const html = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     const nodes = buttons(html);
-    assert.equal(nodes.length, file === 'index.html' ? 46 : file === 'kan-test.html' ? 24 : 25);
+    assert.equal(nodes.length, file === 'index.html' ? 46 : file === 'kan-test.html' ? 24 : file === 'call-test.html' ? 25 : 25);
     for (const button of nodes) {
       const classes = button.match(/\bclass="([^"]*)"/u)?.[1]?.split(/\s+/u) ?? [];
       if (classes.includes('main-menu-item') || classes.includes('main-menu-toggle')) {

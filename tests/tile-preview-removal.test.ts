@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 test('development tile catalog markup is absent from every built HTML entry page', () => {
-  for (const file of ['index.html', 'kan-test.html', 'test.html']) {
+  for (const file of ['index.html', 'kan-test.html', 'test.html', 'call-test.html']) {
     const html = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     assert.doesNotMatch(html, /tile-gallery|開発用：全34種類と赤5を見る/);
   }

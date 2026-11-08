@@ -147,7 +147,7 @@ with sync_playwright() as playwright:
         page.wait_for_function("document.activeElement.id === 'main-menu-toggle'")
         assert page.evaluate("document.activeElement.id") == 'main-menu-toggle'
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'post-dialog horizontal overflow')
-    for path in ('test.html', 'kan-test.html'):
+    for path in ('test.html', 'kan-test.html', 'call-test.html'):
         page.goto(base + path)
         assert page.locator('button.ui-button').count() > 0, path
         assert page.locator('button:not(.ui-button)').count() == 0, path

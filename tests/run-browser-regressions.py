@@ -46,6 +46,8 @@ SUITE = [
     run('tests/browser-action-panel.py', 'webkit'),
     run('tests/browser-call-decision-dialog.py'),
     run('tests/browser-call-decision-dialog.py', 'webkit'),
+    run('tests/browser-call-test.py'),
+    run('tests/browser-call-test.py', 'webkit'),
     run('tests/browser-table-ui.py'),
     run('tests/browser-random-seating.py'),
     run('tests/browser-random-seating.py', 'webkit'),

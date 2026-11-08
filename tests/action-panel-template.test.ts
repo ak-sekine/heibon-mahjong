@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { ACTION_PANEL_TEMPLATE_PARTS } from '../src/ui/action-panel.ts';
 
-const pages = ['index.html', 'test.html', 'kan-test.html'].map((file) => ({
+const pages = ['index.html', 'test.html', 'kan-test.html', 'call-test.html'].map((file) => ({
   file,
   html: readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'),
 }));

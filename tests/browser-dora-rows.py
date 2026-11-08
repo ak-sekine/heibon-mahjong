@@ -10,7 +10,7 @@ with sync_playwright() as p:
     browser_type = getattr(p, browser_name)
     launch_args = {'args': ['--no-sandbox']} if browser_name == 'chromium' else {}
     browser = browser_type.launch(executable_path=(os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium')) if browser_name == 'chromium' else None, **launch_args)
-    for entry in ['', 'kan-test.html']:
+    for entry in ['', 'kan-test.html', 'call-test.html']:
         for width in [320, 375, 390, 430, 1280]:
             page = browser.new_page(viewport={'width': width, 'height': 844})
             page.goto('http://localhost:4173/heibon-mahjong/' + entry)

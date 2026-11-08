@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
   }
   const input: Record<string, string> = isItchBuild
     ? { main: 'index.html' }
-    : { main: 'index.html', kanTest: 'kan-test.html', test: 'test.html' };
+    : { main: 'index.html', kanTest: 'kan-test.html', test: 'test.html', callTest: 'call-test.html' };
   return {
     base: isItchBuild ? './' : '/heibon-mahjong/',
     define: { __APP_BUILD_INFO__: JSON.stringify(buildInfo) },

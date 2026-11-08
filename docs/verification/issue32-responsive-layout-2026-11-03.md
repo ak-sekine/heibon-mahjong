@@ -424,3 +424,11 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 ### Close可否
 
 **Issue #32はOpenのまま維持する。** 今回のチー候補上方向展開・候補操作と局結果概要・次局ボタンは、本人の報告がある具体的な範囲で修正後OKと判定する。一方、Issue必須のPC実機確認全体は完了していない。特にポン・カン、ウィンドウ変更、文字視認性、短いPC画面のゲームスクロール、手牌のマウス打牌、Tab／Enter／Space、各ダイアログ、オンライン待機・対局・再接続の本人確認が残る。自動テスト成功をこれらのPC実機確認の代替にせず、Android・タブレット実機未確認もIssue規定どおり必須条件には数えない。
+
+## 2026-11-08 ポン・カン実機検証ページ
+
+- 公開先として`call-test.html`を追加しました。URLは <https://ak-sekine.github.io/heibon-mahjong/call-test.html> です。ページには「TEST」を表示し、`noindex, nofollow`を指定しています。通常メニューには追加せず、itch.ioビルドから除外しています。
+- シナリオはポン、大明カン、暗カン、加カンです。既存の`src/verification/kan-fixture.ts`と`src/verification/scenarios.ts`を使い、全136枚の物理牌を重複なく配ります。ポン／大明カンはCPU3が対象牌を実際に打牌した直後、暗カン／加カンは合法なカン候補がある自分の手番です。
+- 卓・操作パネルは通常ゲームのHTMLテンプレート、`src/main.ts`のcontrollerとrender、既存の`ActionPanel`・ゲーム操作イベント・共通CSSを使います。テストページ専用の模擬操作ボタンはありません。シナリオを再実行するとcontrollerの通常ライフサイクルを通じて局面をリセットします。
+- このページと自動検証を作成したことだけでは、ポン・カンのPC本人実機確認をOKにしません。ユーザー本人によるPC確認の報告は未受領で、ポン・カンの実機結果は未確認です。Issue #32はOpenのままです。
+- GitHub ActionsのChromium／WebKit Browser UI matrixとDeploy gateは、このページを含むSHAのpush後に確認して追記します。
