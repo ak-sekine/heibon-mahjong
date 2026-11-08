@@ -283,3 +283,28 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - 検証記録コミット `ed9d726d4c2738e751edb97dd97cb2833c2d5a47` をmainへ直接pushし、リモートSHA一致・cleanを確認。[文書チェック #42443546829](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42443546829)はsuccess。文書のみのためブラウザー再検証・再公開はskippedで、公開SHAは引き続き `1aa498bea53a6147a55b233765b5cd269b5d2e57`。
 - 続く補助診断[ #42443578657](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42443578657)のattempt 1で既存の `Mixed-Origin reconnect snapshots differed (host 7, guest 6)` が再発した。ログでは再接続クライアントが経過11711msにrevision 6を取得し、hostは11751ms、再接続側は11753msにrevision 7を取得している。`tests/online-production.mjs` のsnapshot比較箇所も確認し、異なる時点のsnapshotを取得・比較する既存の競合が再現したものとして記録する。今回の公開ゲート内の本番検証successとは別の補助runのfailureであり、成功で上書きしない。
 - ソース・通信仕様・テスト条件を変えず、この補助診断だけを1回再実行したattempt 2はsuccess。比較テストの不安定さは残る別途検討事項であり、今回のレイアウト修正では解消したと扱わない。Issue #32はOpenを維持する。
+
+## 追加修正: 局結果・鳴き判断中のPC卓サイズ安定化（2026-11-08）
+
+### 原因と設計変更
+
+- 追加の本人実機確認で見つかった2件を新しい修正対象として記録する。通常対局から局結果へ移ると、卓の下へ結果概要が加わる一方、卓サイズ計算はその高さを考慮せず、従来の操作欄 `min-height:108px` も残って結果ボタンが初期表示領域から外れていた。鳴き判断時は `--pc-controls-space:244px` を卓サイズから固定で差し引き、絶対配置の鳴き欄と下端アンカーを使っていたため、通常時より卓が縮小し、卓下の空白も増えていた。
+- 修正前の既存値は操作欄108px、鳴き時の卓予約244px、卓の最大860px／下限450px。上限・下限は維持し、操作状態だけでは卓計算を変えない。960px以上のオフライン／オンライン共通フローはヘッダー→座席・点数→正方形の卓→（局結果概要）→操作欄。卓サイズは `100dvh`（fallback `100svh`）からヘッダー44px、点数76px、gap24px、上下safe area、固定操作領域120pxを差し引いて計算し、450〜860pxに制限する。ウィンドウ高さが変わればviewport値で再計算し、短い画面・長文は自然な縦スクロールで到達できる。
+- 通常操作欄の108pxは維持する。鳴き欄はPCの通常フローへ戻し、固定244px予約・absolute配置・固定max-heightを外す。鳴き種類の少数ボタンはその内容高だけを使い、候補選択時は欄をフロー内で展開する。ページ位置をアプリから強制変更しない。種類選択・候補・戻る・見送るのゲームロジックは変更していない。
+- 局結果では操作欄の108px最小高を解除し、結果概要と表示中ボタンの実寸で高さを決める。詳細ダイアログ、順位、次局のUI経路とオンライン対局の通信仕様は変更していない。
+
+### Browser UIの実測
+
+- `tests/browser-pc-table-layout.py` のChromium／WebKit双方で、1280×720、1366×768、1440×900、1660×825、1920×1080を検証した。通常手番・鳴き判断・候補展開・戻る・見送る・局結果で卓の矩形（位置と一辺）が一致し、正方形・状態間サイズ安定・viewportリサイズ後の再計算が成功した。マウス打牌とTab／Enter／Space、横overflowなしも成功した。
+- 座席・持ち点・中央情報・局表示・残り牌数の文字は14〜16px、主要操作は14px以上・各ボタン44px以上を両engineで確認した。18枚の河、1面子／4面子（大明槓含む）の局面でテキストと牌の重なり0件。既存の牌・河・副露の非重複回帰もChromium／WebKitで成功した。
+- WebKitの結果JSONで測定した卓は各viewportで `x/y/一辺`: 1280×720=`415/143.19/450px`、1366×768=`439/143.19/488px`、1440×900=`410/143.19/620px`、1660×825=`557.5/143.19/545px`、1920×1080=`560/143.19/800px`。通常・鳴き・局結果の全状態で同じ卓矩形だった。Chromiumも同じ5サイズの位置・寸法一致検査を通過した。
+- 通常操作欄は108px。鳴き種類パネルは卓下13pxの位置に表示し、WebKit計測ではローカル68px／オンライン86px。鳴き欄を含む操作wrapperはローカル105px／オンライン123pxで、オンラインに追加される状態表示分を実寸で確保した。鳴き開始時のページscrollTopは0で、候補表示・戻る・見送る・判断終了後に卓サイズは不変。多数候補時は縦スクロールで戻る／見送るへ到達した。
+- 局結果は概要43.59px（ローカル）／41.19px（オンライン）、結果操作欄54px。次局ボタンの画面下端はローカルで順に701.78、739.78、871.78、796.78、1051.78px、オンラインで699.38、737.38、869.38、794.38、1049.38pxで、対応するviewport高さ内に収まった。長文概要でボタンと重ならず、スクロールが必要な場合の到達性、詳細ダイアログ、次局操作もChromium／WebKitで成功した。
+- 追加の短いスマホviewportを含む既存Browser UIもChromium／WebKitとも成功。CSS変更は960px以上に限定し、スマホ・タブレット向けCSSと過去のiPhone Safari／PWA実機OK記録を変更していない。実機確認ではないAndroid／タブレット表示は引き続き未確認。
+
+### Actions・公開結果、実機確認待ち
+
+- 調査中の[#42454352930](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42454352930)ではChromiumが成功した一方、WebKitの短い画面の結果再表示で `#view-table` が見えず停止した。この結果を隠さず記録する。失敗箇所の可視性を明示する検査を追加し、続く[#42455608521](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42455608521)ではChromium／WebKitの全Browser UI matrix、matrix audit、verify、release freshness、Worker deploy／production-test、Pages build／deployがすべてsuccessした。短い画面を含むWebKitも再表示からリセットまで成功した。
+- 最終Actions run `#42455608521` のhead／公開SHAは `cfccc2bd03b318078d1b1425ba0558b3312bfaf7`。Worker deployment `7632606251`、`heibon-production-pages` deployment `7632619156`、GitHub Pages deployment `7632616785` はすべて同じSHAでAPI status `success`。Pages URLは [HEIBON MAHJONG](https://ak-sekine.github.io/heibon-mahjong/)。これらはActions／Deployment結果であり、PC実機確認とは区別する。
+- `npm test` 1464件成功、`npm run build`（TypeScript検査を含む）、`npm run typecheck:worker`、Browser UI engine選択検査8件、変更Pythonの構文検査、`git diff --check` が成功。ローカルにPlaywright browser binaryはなくBrowser UIはActionsで実施した。
+- 以前のPCレイアウト実機NGと、本人報告のスクロールバーのドラッグ操作OKは削除・変更しない。今回見つかった「局結果ボタンが初期表示外」「鳴き判断時に卓が縮んで空白が増える」も新たな修正対象として追記する。ユーザー本人のPCで通常／鳴き判断／局結果、詳細・順位・次局、オンライン、リサイズ、短い画面のスクロール、マウス・キーボード操作を再確認するまではIssue #32をOpenのまま維持する。
