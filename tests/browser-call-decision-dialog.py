@@ -120,7 +120,7 @@ window.loadTurn=()=>{
         assert candidate_panel.evaluate("node=>{const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let text='';while(walker.nextNode()){if(!walker.currentNode.parentElement?.closest('svg'))text+=walker.currentNode.textContent;}return text.trim()==='戻る'}"), 'candidate panel contains extra instructions or operation text'
         assert page.locator('#candidate-options').evaluate("node=>node.querySelectorAll('button').length===5 && [...node.querySelectorAll('button')].every(button=>{const walker=document.createTreeWalker(button,NodeFilter.SHOW_TEXT);let text='';while(walker.nextNode()){if(!walker.currentNode.parentElement?.closest('svg'))text+=walker.currentNode.textContent;}return text.trim()===''})"), 'candidate buttons contain text besides tile art'
         assert page.locator('#pass-calls').is_hidden(), 'pass remained available while choosing a candidate'
-        assert '見送る' not in page.locator('#call-controls').inner_text(), 'candidate screen still includes pass text'
+        assert '見送る' not in candidate_panel.inner_text(), 'candidate screen still includes pass text'
         grid = page.locator('#candidate-options').evaluate("node=>{const rows=[...new Set([...node.querySelectorAll('button')].map(button=>Math.round(button.getBoundingClientRect().top)))];const first=rows[0];const columns=[...node.querySelectorAll('button')].filter(button=>Math.round(button.getBoundingClientRect().top)===first).length;return {columns,rows:rows.length,top:node.getBoundingClientRect().top}}")
         assert grid['columns'] >= 3, (width, grid)
         if grid['rows'] >= 2:

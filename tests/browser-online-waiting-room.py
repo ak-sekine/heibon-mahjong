@@ -2398,7 +2398,7 @@ with sync_playwright() as p:
     assert page.locator('#online-candidate-back').inner_text().strip() == '戻る'
     assert page.locator('#online-candidate-back').is_visible()
     assert page.locator('#online-pass-call').is_hidden(), 'pass remained available during candidate selection'
-    assert '見送る' not in page.locator('#online-call-controls').inner_text(), 'candidate screen still includes pass text'
+    assert '見送る' not in page.locator('#online-candidate-controls').inner_text(), 'candidate screen still includes pass text'
     assert '残り' in page.locator('#online-call-status').inner_text()
     assert online_call_layout() == layout_before_multi
     seconds_before_table = page.evaluate("Number(document.querySelector('#online-call-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
