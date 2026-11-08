@@ -223,3 +223,14 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - 各サイズで幅を160px・高さを80px小さくして再検査し、元のviewportへ戻して位置を再確認しました。通常手番のマウスで牌を選択して打牌する操作、Tab／Enter／Spaceによるキーボード操作もすべて成功しました。既存の `browser-seat-kan-overlap.py` は1280×800の四人槓を含む各座席・副露局面で成功し、スマートフォン縦横・タブレットを含む既存matrixもChromium／WebKitで通過しました。
 - `heibon-production-worker` と `heibon-production-pages` の最新成功Deployment SHAはどちらも `74570f3ccdb7c8b808822de998840937aeb26a02` です。Pagesの公開先は [https://ak-sekine.github.io/heibon-mahjong/](https://ak-sekine.github.io/heibon-mahjong/) です。Issue #32はOpenのままです。
 - PlaywrightはGitHub ActionsのBrowser UI環境で実行し、Codex Cloud内の実ブラウザーやユーザーのPC実機確認とは区別します。本人による修正版PCの再確認までIssueはOpenを維持します。以前のiPhone Safari／PWAの追加修正3件のOK記録は維持し、ウィンドウサイズ変更・実機マウス／キーボード・ダイアログ・オンライン対局などのPC実機項目は未確認です。
+
+## 追加修正: PCルール設定スクロールバー（2026-11-08）
+
+- ユーザー本人のPC実機報告: **NG**。ルール設定画面の黄色いスクロールバーをマウスでドラッグしてもスクロールできない。旧実装は位置表示のみで、ドラッグ操作がなかった。
+- 開始ブランチは `work`、作業ツリーはclean、未push commitなし。`git fetch origin` 成功後の `origin/main` と開始HEADはともに `31f33d8d69fb57e9516697ec4b35f2abf51fc97f`、behind/aheadは0/0。remoteは `https://github.com/ak-sekine/heibon-mahjong.git`。
+- `src/ui/dialog-scroll-indicator.ts` の共通処理へマウスPointer Eventsを追加。掴んだ位置を維持して、つまみの移動可能距離と本文のscroll範囲を比例対応させ、背景クリックではクリック位置へつまみの中央を移動する。pointer captureでバー外でも追従し、終了・キャンセル・capture喪失・window blurで解除する。
+- 黄色いつまみの色・幅・配置とスマートフォンUI、固定フッターの構造は維持。本文はnative scrollを維持し、Tabで到達できる名前付きregionとしてキーボードスクロールを利用可能にした。装飾バーは従来どおり支援技術とTab順序から除外し、同じ機能を本文で利用できる。
+- `tests/browser-create-dialog-layout.py` を拡張し、既存ActionsのChromium／WebKit双方で、新規対局・オンライン作成の上下端ドラッグ、中央への比例移動、背景クリック、バー外移動、終了後の非追従、キャンセル／capture喪失後の再操作、ホイール、キーボード、固定フッターを検査する。既存の12 viewport検査も維持する。
+- タッチについては両engineでtouch pointerをキャンセルしないこととnative panning設定を検査し、ChromiumではCDPのnative touch swipeでも本文移動を検査する。Playwright WebKitには公開swipe APIがないため、WebKitのnative swipeとユーザー所有端末の実機タッチ操作は未確認として区別する。
+- ローカル検証・対象コミットのActions結果は下記へ追記する。公開後のPC実機再確認はユーザー本人が行う。Issue #32はOpenを維持する。
+- ローカル結果: `npm test` 1464件成功、`npm run build`（TypeScript検査を含む）成功、`python tests/test_browser_regressions_selection.py` 8件成功、Python構文検査と `git diff --check` 成功。ブラウザー自動検証はリポジトリの既知制限に従いActionsで実施する。

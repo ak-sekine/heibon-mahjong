@@ -38,6 +38,106 @@ with sync_playwright() as playwright:
         standard.check()
         assert standard.is_checked(), f'{name} standard radio could not be restored'
 
+    def verify_mouse_scrolling(dialog_selector, content_selector, footer_selector, name):
+        page.set_viewport_size({'width': 1280, 'height': 720})
+        content = page.locator(content_selector)
+        track = page.locator(f'{dialog_selector} .dialog-scroll-indicator')
+        thumb = track.locator('span')
+        content.evaluate('element => element.scrollTop = 0')
+        page.wait_for_function("selector => document.querySelector(selector).querySelector('span').style.transform === 'translateY(0px)'", arg=f'{dialog_selector} .dialog-scroll-indicator')
+        footer = page.locator(f'{dialog_selector} {footer_selector}').bounding_box()
+        track_box = track.bounding_box()
+        assert track_box and content.evaluate('e => e.scrollHeight > e.clientHeight'), name
+        x = track_box['x'] + track_box['width'] / 2
+
+        def assert_position(bottom):
+            page.wait_for_function("([selector, bottom]) => { const e=document.querySelector(selector); return bottom ? Math.abs(e.scrollTop-(e.scrollHeight-e.clientHeight))<=1 : e.scrollTop<=1; }", arg=[content_selector, bottom])
+            assert page.locator(f'{dialog_selector} {footer_selector}').bounding_box() == footer, f'{name} footer moved'
+
+        def drag_to(bottom):
+            box = thumb.bounding_box()
+            # Grab away from the center: starting a drag must not jump.
+            before = content.evaluate('e => e.scrollTop')
+            page.mouse.move(x, box['y'] + 3)
+            page.mouse.down()
+            assert abs(content.evaluate('e => e.scrollTop') - before) <= 1, f'{name} jumped on grab'
+            assert track.evaluate('e => e.hasPointerCapture(1)'), f'{name} missing mouse capture'
+            # Move horizontally outside the six-pixel track while dragging.
+            page.mouse.move(x - 50, track_box['y'] + (track_box['height'] + 30 if bottom else -30), steps=12)
+            assert_position(bottom)
+            page.mouse.up()
+            assert not track.evaluate('e => e.hasPointerCapture(1)'), f'{name} retained capture'
+            after = content.evaluate('e => e.scrollTop')
+            page.mouse.move(x, track_box['y'] + track_box['height'] / 2)
+            assert content.evaluate('e => e.scrollTop') == after, f'{name} continued after release'
+
+        drag_to(True)
+        drag_to(False)
+        box = thumb.bounding_box()
+        page.mouse.move(x, box['y'] + 3)
+        page.mouse.down()
+        page.mouse.move(x, track_box['y'] + (track_box['height'] - box['height']) / 2 + 3, steps=8)
+        page.mouse.up()
+        ratio = content.evaluate('e => e.scrollTop / (e.scrollHeight-e.clientHeight)')
+        assert abs(ratio - 0.5) < 0.01, f'{name} drag ratio mismatch: {ratio}'
+        drag_to(False)
+        page.mouse.click(x, track_box['y'] + track_box['height'] - 1)
+        assert_position(True)
+        page.mouse.click(x, track_box['y'] + 1)
+        assert_position(False)
+
+        # Cancellation and unexpected loss of capture must both end the drag.
+        for event_type in ['pointercancel', 'lostpointercapture']:
+            box = thumb.bounding_box()
+            page.mouse.move(x, box['y'] + 3)
+            page.mouse.down()
+            track.dispatch_event(event_type, {'pointerId': 1, 'pointerType': 'mouse'})
+            assert not track.evaluate('e => e.hasPointerCapture(1)'), f'{name} capture after {event_type}'
+            page.mouse.move(x, track_box['y'] + track_box['height'])
+            page.mouse.up()
+            assert_position(False)
+        drag_to(True)
+        drag_to(False)
+
+        # Verify native wheel and keyboard scrolling in the content region.
+        box = content.bounding_box()
+        page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+        page.mouse.wheel(0, 500)
+        page.wait_for_function('selector => document.querySelector(selector).scrollTop > 0', arg=content_selector)
+        content.focus()
+        page.keyboard.press('Control+End')
+        assert_position(True)
+        page.keyboard.press('Control+Home')
+        assert_position(False)
+        page.keyboard.press('PageDown')
+        page.wait_for_function('selector => document.querySelector(selector).scrollTop > 0', arg=content_selector)
+        page.keyboard.press('Control+Home')
+        assert_position(False)
+
+        # Touch events must stay uncancelled, with native vertical panning
+        # allowed. Playwright has no portable WebKit swipe API.
+        assert content.evaluate("e => getComputedStyle(e).touchAction") == 'auto'
+        for target in [content, track]:
+            assert target.evaluate("""e => {
+              const event = new PointerEvent('pointerdown', {bubbles:true, cancelable:true,
+                pointerType:'touch', pointerId:42, button:0});
+              return e.dispatchEvent(event) && !event.defaultPrevented;
+            }"""), f'{name} touch pointer was cancelled'
+        if ENGINE == 'chromium':
+            session = page.context.new_cdp_session(page)
+            sx, sy = box['x'] + box['width'] / 2, box['y'] + box['height'] * 0.8
+            session.send('Input.dispatchTouchEvent', {'type':'touchStart', 'touchPoints':[{'x':sx, 'y':sy}]})
+            for step in range(1, 9):
+                session.send('Input.dispatchTouchEvent', {'type':'touchMove', 'touchPoints':[{'x':sx, 'y':sy - box['height'] * 0.6 * step / 8}]})
+                page.wait_for_timeout(20)
+            session.send('Input.dispatchTouchEvent', {'type':'touchEnd', 'touchPoints':[]})
+            page.wait_for_function('selector => document.querySelector(selector).scrollTop > 0', arg=content_selector)
+            session.detach()
+        assert page.locator(f'{dialog_selector} {footer_selector}').bounding_box() == footer, f'{name} footer moved during native scrolling'
+        return {'dragBothDirections':True, 'trackClicks':True, 'pointerCleanup':True,
+                'wheel':True, 'keyboard':True, 'touchNotCancelled':True,
+                'nativeTouchSwipe':'pass' if ENGINE == 'chromium' else 'unsupported by Playwright WebKit API', 'fixedFooter':True}
+
     def verify_dialog(dialog_selector, content_selector, footer_selector, action_selector, name):
         snapshots = []
         for width, height in VIEWPORTS:
@@ -117,6 +217,7 @@ with sync_playwright() as playwright:
     open_menu_item('#new-game')
     verify_cpu_difficulty_options('#new-game-dialog', 'offline')
     offline = verify_dialog('#new-game-dialog', '#new-game-content', '.new-game-actions', '#confirm-new-game', 'offline')
+    offline_input = verify_mouse_scrolling('#new-game-dialog', '#new-game-content', '.new-game-actions', 'offline')
     page.locator('#cancel-new-game').click()
     assert not page.locator('#new-game-dialog').evaluate('dialog => dialog.open'), 'offline cancel was blocked by scrolling'
 
@@ -124,11 +225,12 @@ with sync_playwright() as playwright:
     page.locator('#online-create-name').fill('テストホスト')
     verify_cpu_difficulty_options('#online-create-dialog', 'online')
     online = verify_dialog('#online-create-dialog', '#online-create-content', '#online-create-actions', '#online-create', 'online')
+    online_input = verify_mouse_scrolling('#online-create-dialog', '#online-create-content', '#online-create-actions', 'online')
     page.locator('#online-create-cancel').click()
     assert not page.locator('#online-create-dialog').evaluate('dialog => dialog.open'), 'online cancel was blocked by scrolling'
     assert not errors, f'browser errors occurred: {errors}'
 
-    result = {'browser':ENGINE, 'viewports':VIEWPORTS, 'offline':offline, 'online':online, 'result':'pass'}
+    result = {'browser':ENGINE, 'viewports':VIEWPORTS, 'offline':offline, 'online':online, 'input':{'offline':offline_input,'online':online_input}, 'result':'pass'}
     (OUT / f'create-dialog-layout-{ENGINE}.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(result, ensure_ascii=False))
     browser.close()
