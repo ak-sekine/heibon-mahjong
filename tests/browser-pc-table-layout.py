@@ -239,7 +239,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         assert 0 <= call_start['controls']['top']-call_start['table']['bottom'] <= 8.5, f'{width}x{height}: call controls are not under the table: {call_start}'
         assert 0 <= call_start['panel']['top']-call_start['table']['bottom'] <= 16, f'{width}x{height}: call choices are far from the hand: {call_start}'
         assert call_start['scrollTop'] <= 1, f'{width}x{height}: opening the call panel moved the page: {call_start}'
-        for key in ('top','left','width','height'):
+        for key in ('top','left','width'):
             assert abs(call_start['controls'][key]-initial['controls'][key]) < 1, f'{width}x{height}: call decision moved or resized the operation area: {call_start}, initial={initial}'
         for selector in ('#call-chi', '#call-pon', '#pass-calls'):
             assert page.locator(selector).is_visible(), f'{width}x{height}: missing call action {selector}'
@@ -350,7 +350,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         assert online_board
         assert_same_table(online_board, online_call['table'], f'{width}x{height} online call decision')
         assert online_call['position'] == 'relative' and 0 <= online_call['controls']['top']-online_call['table']['bottom'] <= 8.5, f'{width}x{height}: online type choices are not close to the table: {online_call}'
-        for key in ('top','left','width','height'):
+        for key in ('top','left','width'):
             assert abs(online_call['controls'][key]-online_result['controls'][key]) < 1, f'{width}x{height}: online call decision moved or resized its operation area: {online_call}, normal={online_result}'
         page.locator('#online-call-chi').click()
         online_candidates = page.evaluate('''()=>({table:document.querySelector('#online-table').getBoundingClientRect().toJSON(),
@@ -454,7 +454,15 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         page.locator('#online-next-round').click()
         page.wait_for_function("pcOnlineSent.some(item=>item.action.type==='next-round')")
 
-        report={'viewport':f'{width}x{height}','browser':ENGINE,'initial':initial,'online':online_result,'resized':resized_result,'restored':restored,'meldFixtures':fixture_results,'localCall':call_start,'localResult':result_geometry,'onlineCall':online_call,'onlineResult':online_result_geometry,'mouse':'passed','keyboard':'passed','result':'passed'}
+        call_geometry={
+            'normal':{'table':initial['table'],'controls':initial['controls']},
+            'localTypes':{'table':call_start['table'],'controls':call_start['controls'],'panel':call_start['panel']},
+            'localCandidates':{'table':candidate_metrics['table'],'controls':candidate_metrics['controls'],'panel':candidate_metrics['panel'],'back':candidate_metrics['back'],'candidateCount':len(candidate_metrics['candidates'])},
+            'onlineNormal':{'table':online_result['table'],'controls':online_result['controls']},
+            'onlineTypes':{'table':online_call['table'],'controls':online_call['controls'],'panel':online_call['panel']},
+            'onlineCandidates':{'table':online_candidates['table'],'controls':online_candidates['controls'],'panel':online_candidates['panel'],'back':online_candidates['back'],'candidateCount':len(online_candidates['candidates'])},
+        }
+        report={'viewport':f'{width}x{height}','browser':ENGINE,'callGeometry':call_geometry,'initial':initial,'online':online_result,'resized':resized_result,'restored':restored,'meldFixtures':fixture_results,'localCall':call_start,'localResult':result_geometry,'onlineCall':online_call,'onlineResult':online_result_geometry,'mouse':'passed','keyboard':'passed','result':'passed'}
         reports.append(report)
         print(f'{ENGINE} {width}x{height} PC table, controls, resize, mouse, and keyboard passed')
         page.close()

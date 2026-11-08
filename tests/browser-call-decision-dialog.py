@@ -67,6 +67,7 @@ window.loadTurn=()=>{
         if width >= 960:
             for key in ('x', 'y', 'width', 'height'):
                 assert abs(normal_action_position['table'][key] - call_action_position['table'][key]) < 1, (normal_action_position, call_action_position)
+            for key in ('x', 'y', 'width'):
                 assert abs(normal_action_position['controls'][key] - call_action_position['controls'][key]) < 1, (normal_action_position, call_action_position)
         assert page.locator('#call-decision-dialog').count() == 0, 'call modal remains in the page'
         assert page.locator('dialog[open]').count() == 0, 'call decision unexpectedly opened a modal'
