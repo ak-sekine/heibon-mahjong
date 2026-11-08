@@ -742,9 +742,11 @@ header > div { min-width:0; }
    --table-tile-width:min(52px,round(down,calc((100cqw - 18px) / 16.2),.1px));
  }
  #local-game-controls,#online-game-controls { min-height:108px; padding:6px; }
- /* Call choices participate in normal flow and grow only to their content.
-    This keeps the first action row close to the hand without resizing the table. */
- #local-game-controls:has(.call-controls:not([hidden])),#online-game-controls:has(.call-controls:not([hidden])) { min-height:0; padding:4px 6px; }
+ /* Keep the call controls area at its regular size. Type choices stay beside
+    the hand; candidate choices anchor to its bottom and grow upward over the
+    table when they need more room. */
+ #local-game-controls:has(.call-controls:not([hidden])),#online-game-controls:has(.call-controls:not([hidden])) { min-height:108px; padding:6px; }
+ .discard-controls:has(.call-controls:not([hidden])) > .keyboard-help { display:none; }
  .call-controls,.call-controls:has(.call-option-list:not(:empty)) {
    position:relative;
    inset:auto;
@@ -752,7 +754,17 @@ header > div { min-width:0; }
    max-height:none;
    overflow:visible;
  }
- .call-option-list { max-height:none; overflow:visible; overscroll-behavior:auto; }
+ .call-controls:has(.call-option-list:not(:empty)) {
+   position:absolute;
+   inset:auto 6px 0;
+   width:auto;
+   max-height:calc(100vh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+   align-content:end;
+   overflow:hidden;
+ }
+ @supports (height:100dvh) {
+  .call-controls:has(.call-option-list:not(:empty)) { max-height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)); }
+ }
  #local-game-controls.result-available,#online-game-controls.result-available { min-height:0; padding:4px 6px; gap:4px; }
  #round-result-summary { padding:4px 8px; line-height:1.2; }
  #round-result-summary p { margin:0; }

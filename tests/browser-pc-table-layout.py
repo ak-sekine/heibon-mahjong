@@ -231,34 +231,47 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
           controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),
           panel:document.querySelector('#call-controls').getBoundingClientRect().toJSON(),
           scrollTop:document.scrollingElement.scrollTop,
+          scrollHeight:document.scrollingElement.scrollHeight,
           panelPosition:getComputedStyle(document.querySelector('#call-controls')).position})''')
         assert normal_board
         assert_same_table(normal_board, call_start['table'], f'{width}x{height} local call decision')
-        assert call_start['panelPosition'] == 'relative', f'{width}x{height}: PC call panel is not in document flow: {call_start}'
+        assert call_start['panelPosition'] == 'relative', f'{width}x{height}: PC type choices left their table-side position: {call_start}'
         assert 0 <= call_start['controls']['top']-call_start['table']['bottom'] <= 8.5, f'{width}x{height}: call controls are not under the table: {call_start}'
         assert 0 <= call_start['panel']['top']-call_start['table']['bottom'] <= 16, f'{width}x{height}: call choices are far from the hand: {call_start}'
         assert call_start['scrollTop'] <= 1, f'{width}x{height}: opening the call panel moved the page: {call_start}'
+        for key in ('top','left','width','height'):
+            assert abs(call_start['controls'][key]-initial['controls'][key]) < 1, f'{width}x{height}: call decision moved or resized the operation area: {call_start}, initial={initial}'
         for selector in ('#call-chi', '#call-pon', '#pass-calls'):
             assert page.locator(selector).is_visible(), f'{width}x{height}: missing call action {selector}'
-        page.locator('#call-chi').click()
+        chi_hit = page.locator('#call-chi').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {x:r.left+r.width/2,y:r.top+r.height/2,ok:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}}''')
+        assert chi_hit['ok'], f'{width}x{height}: PC chi type button was not an initial-viewport hit target: {chi_hit}'
+        page.mouse.click(chi_hit['x'], chi_hit['y'])
         call_candidates = page.locator('#call-options button[data-action-choice="call"]')
         assert call_candidates.count() > 1, f'{width}x{height}: call candidate selection did not expand'
         candidate_metrics = page.evaluate('''()=>({table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),
           controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),
-          candidates:[...document.querySelectorAll('#call-options button[data-action-choice="call"]')].map(node=>node.getBoundingClientRect().toJSON()),
+          panel:document.querySelector('#call-controls').getBoundingClientRect().toJSON(),
+          candidates:[...document.querySelectorAll('#call-options button[data-action-choice="call"]')].map(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {...r.toJSON(),receivesPointer:hit===node||node.contains(hit)}}),
           back:document.querySelector('#call-back').getBoundingClientRect().toJSON(),
           scrollTop:document.scrollingElement.scrollTop,scrollHeight:document.scrollingElement.scrollHeight})''')
         assert_same_table(normal_board, candidate_metrics['table'], f'{width}x{height} local candidates')
         assert all(box['width'] >= 44 and box['height'] >= 44 for box in candidate_metrics['candidates']), f'{width}x{height}: a call candidate is too small: {candidate_metrics}'
-        assert candidate_metrics['controls']['bottom'] >= candidate_metrics['back']['bottom'], f'{width}x{height}: candidate panel does not expand in flow: {candidate_metrics}'
+        for key in ('top','left','width','height'):
+            assert abs(candidate_metrics['controls'][key]-call_start['controls'][key]) < 1, f'{width}x{height}: candidates moved or resized the operation area: {candidate_metrics}, type={call_start}'
+        assert page.locator('#call-controls').evaluate('node=>getComputedStyle(node).position') == 'absolute', f'{width}x{height}: candidate panel did not leave normal flow'
+        assert candidate_metrics['panel']['top'] < candidate_metrics['table']['bottom'], f'{width}x{height}: candidate panel did not grow upward over the table: {candidate_metrics}'
+        assert abs(candidate_metrics['panel']['bottom']-candidate_metrics['controls']['bottom']) <= 2, f'{width}x{height}: candidate panel lost its bottom anchor: {candidate_metrics}'
+        assert candidate_metrics['candidates'] and all(box['receivesPointer'] for box in candidate_metrics['candidates']), f'{width}x{height}: a candidate is covered at its click point: {candidate_metrics}'
         assert candidate_metrics['scrollTop'] <= 1, f'{width}x{height}: showing candidates moved the page: {candidate_metrics}'
-        page.locator('#call-back').scroll_into_view_if_needed()
         back_hit = page.locator('#call-back').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}''')
-        assert back_hit, f'{width}x{height}: Back did not become reachable after scrolling'
-        page.locator('#call-back').click()
+        assert back_hit, f'{width}x{height}: Back was not clickable before any scrolling'
+        back_box = page.locator('#call-back').bounding_box()
+        assert back_box, f'{width}x{height}: Back has no visible bounds'
+        page.mouse.click(back_box['x']+back_box['width']/2,back_box['y']+back_box['height']/2)
         assert page.locator('#call-options button').count() == 0 and page.locator('#pass-calls').is_visible(), f'{width}x{height}: Back did not restore call types'
-        page.locator('#pass-calls').scroll_into_view_if_needed()
-        page.locator('#pass-calls').click()
+        pass_hit = page.locator('#pass-calls').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {x:r.left+r.width/2,y:r.top+r.height/2,ok:r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}}''')
+        assert pass_hit['ok'], f'{width}x{height}: PC pass was not clickable in the initial viewport: {pass_hit}'
+        page.mouse.click(pass_hit['x'],pass_hit['y'])
         page.wait_for_function("pcResponsiveApp.controller.game.phase!=='awaiting-call'")
         assert page.locator('#call-controls').is_hidden(), f'{width}x{height}: pass did not end call judgment'
         after_call = page.locator('#local-table').bounding_box()
@@ -336,23 +349,65 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
           position:getComputedStyle(document.querySelector('#online-call-controls')).position,scrollTop:document.scrollingElement.scrollTop})''')
         assert online_board
         assert_same_table(online_board, online_call['table'], f'{width}x{height} online call decision')
-        assert online_call['position'] == 'relative' and 0 <= online_call['controls']['top']-online_call['table']['bottom'] <= 8.5, f'{width}x{height}: online call panel is not close to the table: {online_call}'
+        assert online_call['position'] == 'relative' and 0 <= online_call['controls']['top']-online_call['table']['bottom'] <= 8.5, f'{width}x{height}: online type choices are not close to the table: {online_call}'
+        for key in ('top','left','width','height'):
+            assert abs(online_call['controls'][key]-online_result['controls'][key]) < 1, f'{width}x{height}: online call decision moved or resized its operation area: {online_call}, normal={online_result}'
         page.locator('#online-call-chi').click()
-        assert page.locator('#online-call-options button[data-action-choice="call"]').count() > 1
-        page.locator('#online-call-back').scroll_into_view_if_needed()
-        page.locator('#online-call-back').click()
+        online_candidates = page.evaluate('''()=>({table:document.querySelector('#online-table').getBoundingClientRect().toJSON(),
+          controls:document.querySelector('#online-game-controls').getBoundingClientRect().toJSON(),
+          panel:document.querySelector('#online-call-controls').getBoundingClientRect().toJSON(),
+          candidates:[...document.querySelectorAll('#online-call-options button[data-action-choice="call"]')].map(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {...r.toJSON(),receivesPointer:hit===node||node.contains(hit)}}),
+          back:document.querySelector('#online-call-back').getBoundingClientRect().toJSON(),scrollTop:document.scrollingElement.scrollTop})''')
+        assert len(online_candidates['candidates']) > 1, f'{width}x{height}: online chi candidates did not expand: {online_candidates}'
+        assert_same_table(online_board, online_candidates['table'], f'{width}x{height} online candidates')
+        for key in ('top','left','width','height'):
+            assert abs(online_candidates['controls'][key]-online_call['controls'][key]) < 1, f'{width}x{height}: online candidates moved or resized the operation area: {online_candidates}'
+        assert page.locator('#online-call-controls').evaluate('node=>getComputedStyle(node).position') == 'absolute', f'{width}x{height}: online candidate panel did not leave normal flow'
+        assert online_candidates['panel']['top'] < online_candidates['table']['bottom'], f'{width}x{height}: online candidates did not expand upward: {online_candidates}'
+        assert abs(online_candidates['panel']['bottom']-online_candidates['controls']['bottom']) <= 2, f'{width}x{height}: online panel lost its bottom anchor: {online_candidates}'
+        assert online_candidates['candidates'] and all(box['width'] >= 44 and box['height'] >= 44 and box['receivesPointer'] for box in online_candidates['candidates']), f'{width}x{height}: an online candidate was covered or too small: {online_candidates}'
+        assert 0 <= online_candidates['back']['top'] and online_candidates['back']['bottom'] <= height + 1, f'{width}x{height}: online Back left the initial viewport: {online_candidates}'
+        online_back_hit = page.locator('#online-call-back').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return hit===node||node.contains(hit)}''')
+        assert online_back_hit and online_candidates['scrollTop'] <= 1, f'{width}x{height}: online Back was not clickable before scrolling: {online_candidates}'
+        online_back_box = page.locator('#online-call-back').bounding_box()
+        assert online_back_box
+        page.mouse.click(online_back_box['x']+online_back_box['width']/2,online_back_box['y']+online_back_box['height']/2)
         assert page.locator('#online-pass-call').is_visible(), f'{width}x{height}: online Back did not restore call choices'
         page.evaluate('''()=>{
           window.pcOnlineSent=[];
           pcOnlineController.setActionSender((action,revision,requestId)=>{pcOnlineSent.push({action,revision,requestId});return true;});
         }''')
-        page.locator('#online-pass-call').scroll_into_view_if_needed()
-        page.locator('#online-pass-call').click()
+        online_pass = page.locator('#online-pass-call').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {x:r.left+r.width/2,y:r.top+r.height/2,ok:r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}}''')
+        assert online_pass['ok'], f'{width}x{height}: online pass was not clickable in the initial viewport: {online_pass}'
+        page.mouse.click(online_pass['x'],online_pass['y'])
         page.wait_for_function("pcOnlineSent.some(item=>item.action.type==='pass-call')")
         page.evaluate('''()=>{
           const passAction=pcOnlineSent.find(item=>item.action.type==='pass-call');
           pcOnlineController.receive({type:'game-action-result',requestId:passAction.requestId,ok:true,gameRevision:3});
           const normal={...pcOnlineSession,gameRevision:3};
+          pcOnlineController.receive({type:'game-state',view:pcCreateOnlineView(normal,0,'PCTEST',new Set([0]))});
+        }''')
+        page.wait_for_function("document.querySelector('#online-call-controls').hidden")
+        page.evaluate('''()=>{
+          const now=Date.now();
+          const session={...pcOnlineCallSession,gameRevision:4,decision:{...pcOnlineCallSession.decision,
+            windowId:'pc-call-select',openedAt:now,expiresAt:now+30000,baseGameRevision:4,responses:{0:'pending'}}};
+          pcOnlineController.receive({type:'game-state',view:pcCreateOnlineView(session,0,'PCTEST',new Set([0]))});
+          window.pcOnlineSent=[];
+          pcOnlineController.setActionSender((action,revision,requestId)=>{pcOnlineSent.push({action,revision,requestId});return true;});
+        }''')
+        page.wait_for_function("document.querySelector('#online-call-controls').hidden===false")
+        page.locator('#online-call-chi').click()
+        online_selected_candidate = page.locator('#online-call-options button[data-action-choice="call"]').first
+        online_selected_box = online_selected_candidate.bounding_box()
+        online_selected_hit = online_selected_candidate.evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {x:r.left+r.width/2,y:r.top+r.height/2,ok:r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}}''')
+        assert online_selected_box and online_selected_hit['ok'], f'{width}x{height}: online candidate was not clickable above the table: {online_selected_hit}'
+        page.mouse.click(online_selected_hit['x'],online_selected_hit['y'])
+        page.wait_for_function("pcOnlineSent.some(item=>item.action.type==='declare-call')")
+        page.evaluate('''()=>{
+          const callAction=pcOnlineSent.find(item=>item.action.type==='declare-call');
+          pcOnlineController.receive({type:'game-action-result',requestId:callAction.requestId,ok:true,gameRevision:5});
+          const normal={...pcOnlineSession,gameRevision:5};
           pcOnlineController.receive({type:'game-state',view:pcCreateOnlineView(normal,0,'PCTEST',new Set([0]))});
         }''')
         page.wait_for_function("document.querySelector('#online-call-controls').hidden")
@@ -362,7 +417,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
 
         page.evaluate('''()=>{
           const match=pcMakeDrawMatch();
-          const session={...pcOnlineSession,gameRevision:4,match,status:match.status,decision:null};
+          const session={...pcOnlineSession,gameRevision:6,match,status:match.status,decision:null};
           window.pcOnlineResultSession=session;
           pcOnlineController.receive({type:'game-state',view:pcCreateOnlineView(session,0,'PCTEST',new Set([0]))});
         }''')

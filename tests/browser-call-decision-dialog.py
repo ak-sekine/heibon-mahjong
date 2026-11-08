@@ -50,7 +50,8 @@ window.loadTurn=()=>{
     page.goto('http://127.0.0.1:4173/heibon-mahjong/')
     page.wait_for_function('typeof loadCalls === "function"')
 
-    for width, height in [(375, 634), (320, 568), (375, 844), (844, 390), (667, 375), (1280, 900)]:
+    for width, height in [(375, 634), (320, 568), (375, 844), (844, 390), (667, 375),
+                          (1280, 720), (1366, 768), (1440, 900), (1660, 825), (1920, 1080)]:
         page.set_viewport_size({'width': width, 'height': height})
         page.evaluate('window.scrollTo(0,0)')
         page.evaluate('loadTurn()')
@@ -63,6 +64,10 @@ window.loadTurn=()=>{
             for position in (normal_action_position, call_action_position):
                 assert 0 <= position['controls']['y'] - position['table']['bottom'] <= 8.5, position
         assert abs(normal_action_position['table']['y'] - call_action_position['table']['y']) < 1, (normal_action_position, call_action_position)
+        if width >= 960:
+            for key in ('x', 'y', 'width', 'height'):
+                assert abs(normal_action_position['table'][key] - call_action_position['table'][key]) < 1, (normal_action_position, call_action_position)
+                assert abs(normal_action_position['controls'][key] - call_action_position['controls'][key]) < 1, (normal_action_position, call_action_position)
         assert page.locator('#call-decision-dialog').count() == 0, 'call modal remains in the page'
         assert page.locator('dialog[open]').count() == 0, 'call decision unexpectedly opened a modal'
         assert page.locator('#call-options button').count() == 0, 'candidates appeared before a type was selected'
@@ -95,7 +100,7 @@ window.loadTurn=()=>{
         assert candidates.count() == 5, f'{width}x{height}: expected five chi candidates'
         assert candidates.evaluate_all('nodes=>nodes.every(node=>{const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let text="";while(walker.nextNode()){if(!walker.currentNode.parentElement?.closest("svg"))text+=walker.currentNode.textContent;}return text.trim()===""})'), 'call kind text is duplicated outside the tile artwork'
         assert candidates.evaluate_all('nodes=>nodes.every(node=>Boolean(node.getAttribute("aria-label")))'), 'candidate accessible names were removed'
-        assert candidates.evaluate_all('nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.width>=44&&r.height>=44&&r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})'), 'candidate hit target is clipped or too small'
+        assert candidates.evaluate_all('nodes=>nodes.every(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.width>=44&&r.height>=44&&r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))})'), 'candidate hit target is clipped, covered, or too small'
         assert page.locator('#call-options .tile-svg').evaluate_all('nodes=>nodes.every(node=>{const r=node.getBoundingClientRect();return r.width>=22&&r.height>=31})'), 'candidate tile art became too small'
         call_back = page.locator('#call-back')
         assert call_back.inner_text().strip() == '戻る', f'back button label changed: {call_back.inner_text()!r}'
@@ -103,8 +108,12 @@ window.loadTurn=()=>{
         assert call_back.is_visible(), f'back button is hidden: {back_state}'
         back_box = call_back.bounding_box()
         assert back_box and back_box['width'] >= 44 and back_box['height'] >= 44, (width, height, back_box)
-        if back_box['y'] + back_box['height'] > height:
-            assert width >= 960 and page.evaluate('document.scrollingElement.scrollHeight>innerHeight'), (width, height, back_box)
+        if width >= 960:
+            assert 0 <= back_box['y'] and back_box['y'] + back_box['height'] <= height, (width, height, back_box)
+            back_hit = call_back.evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return hit===node||node.contains(hit)}''')
+            assert back_hit, (width, height, back_box)
+        elif back_box['y'] + back_box['height'] > height:
+            assert page.evaluate('document.scrollingElement.scrollHeight>innerHeight'), (width, height, back_box)
             call_back.scroll_into_view_if_needed()
             reached_back = call_back.evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}''')
             assert reached_back, (width, height, back_box)
@@ -135,15 +144,16 @@ window.loadTurn=()=>{
         if width < 960:
             assert panel_candidates['y'] <= panel_before['y'] + 1, (panel_before, panel_candidates)
         else:
-            assert abs(panel_candidates['y'] - panel_before['y']) < 1, (panel_before, panel_candidates)
-            assert panel_candidates['height'] >= panel_before['height'], (panel_before, panel_candidates)
+            assert panel_candidates['y'] < panel_before['y'], (panel_before, panel_candidates)
+            assert ordinary_controls_before and abs(panel_candidates['y'] + panel_candidates['height'] - ordinary_controls_before['y'] - ordinary_controls_before['height']) <= 2, (ordinary_controls_before, panel_candidates)
+            assert page.locator('#call-controls').evaluate('node=>getComputedStyle(node).position') == 'absolute'
         multi_candidate_panel = panel_candidates if grid['rows'] >= 2 else None
         candidate_panel_bottom = panel_candidates['y'] + panel_candidates['height']
         if grid['rows'] >= 2:
             if width < 960:
                 assert panel_candidates['y'] < panel_before['y'], (panel_before, panel_candidates, grid)
             else:
-                assert panel_candidates['height'] > panel_before['height'], (panel_before, panel_candidates, grid)
+                assert panel_candidates['y'] + panel_candidates['height'] >= panel_before['y'] + panel_before['height'], (panel_before, panel_candidates, grid)
         if (width, height) == (375, 634):
             page.locator('#call-options').evaluate("node=>{node.style.maxHeight='55px';node.scrollTop=0}")
             scroll_metrics = page.locator('#call-options').evaluate("node=>({height:node.clientHeight,content:node.scrollHeight,overflow:getComputedStyle(node).overflowY})")
@@ -165,9 +175,9 @@ window.loadTurn=()=>{
         if width < 960:
             assert page_size['scrollHeight'] <= page_size_before['scrollHeight'], (width, height, page_size_before, page_size)
         else:
-            assert page_size['scrollHeight'] >= page_size_before['scrollHeight'], (width, height, page_size_before, page_size)
-            assert page_size['callPanel']['top'] >= page_size['table']['bottom'], (width, height, page_size)
-            assert page_size['panel']['bottom'] >= page_size['callPanel']['bottom'], (width, height, page_size)
+            assert abs(page_size['scrollHeight'] - page_size_before['scrollHeight']) <= 1, (width, height, page_size_before, page_size)
+            assert page_size['callPanel']['top'] < page_size['table']['bottom'], (width, height, page_size)
+            assert abs(page_size['panel']['bottom'] - page_size['callPanel']['bottom']) <= 2, (width, height, page_size)
 
         if (width, height) == (375, 634):
             actions_before = page.evaluate('callState().phase')
@@ -198,7 +208,7 @@ window.loadTurn=()=>{
                 if width < 960:
                     assert abs(exact_panel_box['y'] + exact_panel_box['height'] - candidate_panel_bottom) < 1, (exact_panel_box, candidate_panel_bottom)
                 elif multi_candidate_panel:
-                    assert exact_panel_box['y'] == panel_before['y'] and exact_panel_box['height'] < multi_candidate_panel['height'], (exact_panel_box, multi_candidate_panel)
+                    assert abs(exact_panel_box['y'] + exact_panel_box['height'] - candidate_panel_bottom) < 2 and exact_panel_box['height'] <= multi_candidate_panel['height'], (exact_panel_box, multi_candidate_panel)
                 if multi_candidate_panel and width < 960:
                     assert multi_candidate_panel['y'] < exact_panel_box['y'], (multi_candidate_panel, exact_panel_box, mode)
                 page.locator('#call-back').click()
@@ -262,6 +272,45 @@ window.loadTurn=()=>{
             assert page.locator('#call-controls').is_hidden(), 'call controls were shown for a ron decision'
             assert page.locator('#ron-controls').is_visible(), 'ron controls were lost during call UI changes'
 
+        if width >= 960:
+            back_box = page.locator('#call-back').bounding_box()
+            assert back_box and 0 <= back_box['y'] and back_box['y'] + back_box['height'] <= height, (width, height, back_box)
+            page.mouse.click(back_box['x'] + back_box['width'] / 2, back_box['y'] + back_box['height'] / 2)
+            assert page.locator('#call-back').is_hidden() and page.locator('#pass-calls').is_visible(), f'{width}x{height}: PC Back did not restore call types'
+            page.locator('#call-chi').click()
+            candidate_box = page.locator('#call-options button[data-action-choice="call"]').first.bounding_box()
+            assert candidate_box and 0 <= candidate_box['y'] and candidate_box['y'] + candidate_box['height'] <= height, (width, height, candidate_box)
+            candidate_hit = page.locator('#call-options button[data-action-choice="call"]').first.evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return hit===node||node.contains(hit)}''')
+            assert candidate_hit, f'{width}x{height}: PC candidate was covered at its click point'
+            page.mouse.click(candidate_box['x'] + candidate_box['width'] / 2, candidate_box['y'] + candidate_box['height'] / 2)
+            page.wait_for_function("callState().phase!=='awaiting-call'")
+
+            if (width, height) == (1280, 720):
+                page.evaluate('loadCalls("max")')
+                page.locator('#call-chi').click()
+                page.locator('#call-options').evaluate('''node=>{
+                  const first=node.querySelector('button[data-action-choice="call"]');
+                  for(let i=0;i<55;i++) node.append(first.cloneNode(true));
+                  node.scrollTop=0;
+                }''')
+                scroll_metrics = page.locator('#call-options').evaluate('''node=>({
+                  count:node.querySelectorAll('button[data-action-choice="call"]').length,
+                  maxHeight:getComputedStyle(node).maxHeight,
+                  clientHeight:node.clientHeight,
+                  scrollHeight:node.scrollHeight,
+                  overflow:getComputedStyle(node).overflowY,
+                  pageScroll:document.scrollingElement.scrollTop
+                })''')
+                assert scroll_metrics['count'] == 60 and scroll_metrics['maxHeight'] != 'none', scroll_metrics
+                assert scroll_metrics['scrollHeight'] > scroll_metrics['clientHeight'] and scroll_metrics['overflow'] == 'auto', scroll_metrics
+                page.locator('#call-options').evaluate('node=>node.scrollTop=node.scrollHeight')
+                last_candidate = page.locator('#call-options button[data-action-choice="call"]').last
+                last_box = last_candidate.bounding_box()
+                last_hit = last_candidate.evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}''')
+                assert last_box and last_hit and page.evaluate('scrollY') == 0, (last_box, scroll_metrics)
+                page.mouse.click(last_box['x'] + last_box['width'] / 2, last_box['y'] + last_box['height'] / 2)
+                page.wait_for_function("callState().phase!=='awaiting-call'")
+
         page.evaluate('loadTurn()')
         page.wait_for_function("document.querySelector('#ron-controls').hidden === false")
         normal_after = page.evaluate("()=>({table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON()})")
@@ -269,6 +318,26 @@ window.loadTurn=()=>{
         assert abs(normal_after['controls']['y'] - normal_action_position['controls']['y']) < 1, (normal_action_position, normal_after)
 
         print(f'{browser_name} call UI at {width}x{height}: {grid["columns"]} candidate columns')
+
+    # Very low PC viewports may need page scrolling to reach the anchored
+    # action area. The normal desktop matrix above must remain scroll-free.
+    page.set_viewport_size({'width': 1280, 'height': 400})
+    page.evaluate('window.scrollTo(0,0);loadCalls("max")')
+    assert page.evaluate('document.scrollingElement.scrollHeight>innerHeight'), 'the low viewport did not provide a page-scroll path'
+    low_table = page.locator('#local-table').bounding_box()
+    page.locator('#call-chi').scroll_into_view_if_needed()
+    page.locator('#call-chi').click()
+    low_back = page.locator('#call-back')
+    low_back.scroll_into_view_if_needed()
+    low_back_box = low_back.bounding_box()
+    assert low_back_box and 0 <= low_back_box['y'] and low_back_box['y'] + low_back_box['height'] <= 400, (low_back_box, page.evaluate('scrollY'))
+    assert low_back.evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return hit===node||node.contains(hit)}'''), 'low viewport Back remained covered after page scrolling'
+    page.mouse.click(low_back_box['x'] + low_back_box['width'] / 2, low_back_box['y'] + low_back_box['height'] / 2)
+    assert page.locator('#pass-calls').is_visible(), 'low viewport Back did not restore call types'
+    page.locator('#pass-calls').scroll_into_view_if_needed()
+    page.locator('#pass-calls').click()
+    page.wait_for_function("callState().phase!=='awaiting-call'")
+    assert low_table and page.locator('#local-table').bounding_box()['width'] == low_table['width'], 'low viewport call state changed the table size'
 
     assert not errors, errors
     page.close()
