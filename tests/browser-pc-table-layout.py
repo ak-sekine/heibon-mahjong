@@ -350,6 +350,8 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         page.locator('#online-pass-call').click()
         page.wait_for_function("pcOnlineSent.some(item=>item.action.type==='pass-call')")
         page.evaluate('''()=>{
+          const passAction=pcOnlineSent.find(item=>item.action.type==='pass-call');
+          pcOnlineController.receive({type:'game-action-result',requestId:passAction.requestId,ok:true,gameRevision:3});
           const normal={...pcOnlineSession,gameRevision:3};
           pcOnlineController.receive({type:'game-state',view:pcCreateOnlineView(normal,0,'PCTEST',new Set([0]))});
         }''')
@@ -393,6 +395,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         online_next_hit = page.locator('#online-next-round').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}''')
         assert online_next_hit, f'{width}x{height}: online next-round action did not become operable after scrolling'
         page.evaluate("""()=>{pcOnlineSent=[];pcOnlineController.setActionSender((action,revision,requestId)=>{pcOnlineSent.push({action,revision,requestId});return true;})}""")
+        assert page.locator('#online-next-round').is_enabled(), f'{width}x{height}: online next-round is disabled after confirmed result'
         page.locator('#online-next-round').click()
         page.wait_for_function("pcOnlineSent.some(item=>item.action.type==='next-round')")
 
