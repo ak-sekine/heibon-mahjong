@@ -47,8 +47,9 @@ export function createLocalActionPanelState(
     return {
       id: option.id,
       label,
+      operationType: option.type,
       tiles: option.tiles,
-      accessibleLabel: choiceAccessibleLabel(label, option.tiles, option.handTileIds.join('、')),
+      accessibleLabel: choiceAccessibleLabel(label, option.tiles),
       enabled: !progressing,
     };
   });
@@ -57,6 +58,7 @@ export function createLocalActionPanelState(
   const kanChoices: ActionChoiceOption[] = kanOptions.map(option => ({
     id: option.id,
     label: option.meld.type === 'ankan' ? '暗カン' : '加カン',
+    operationType: option.meld.type,
     tiles: option.meld.tiles,
     enabled: !progressing,
   }));
@@ -91,7 +93,6 @@ export function createLocalActionPanelState(
       ron: button(canRon, canRon && !progressing, 'ロン和了'),
       'pass-ron': button(canRon, canRon && !progressing, '見逃す'),
       'pass-call': button(callChoices.length > 0, callChoices.length > 0 && !progressing, '見送る'),
-      'cancel-kan': button(kanChoicesOpen && kanChoices.length > 0, kanChoicesOpen && kanChoices.length > 0 && !progressing, 'キャンセル'),
       'next-round': button(match.status === 'round-ended', match.status === 'round-ended' && !progressing, '次の局へ'),
       'show-result': button(roundResultAvailable, roundResultAvailable, '局の結果'),
       'show-match-result': button(match.status === 'match-ended' && Boolean(match.lastSettlement?.matchEnded),
@@ -101,7 +102,7 @@ export function createLocalActionPanelState(
     callGroup: { visible: callChoices.length > 0, status: '', options: callChoices, target: callTarget },
     kanGroup: {
       visible: kanChoicesOpen && kanChoices.length > 0,
-      status: 'カンする面子を選択してください。',
+      status: '',
       options: kanChoices,
     },
     ronGroup: {

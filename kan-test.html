@@ -62,19 +62,16 @@
     <section class="discard-controls" data-panel-part="root">
       <div class="action-choice-group call-controls" data-panel-part="call-controls" role="group" aria-label="鳴き判断" hidden>
         <p class="action-group-status" data-panel-part="call-status" role="status" aria-live="polite"></p>
-        <div class="action-option-list call-option-list" data-panel-part="call-options" role="group" aria-label="鳴き候補"></div>
         <div class="call-type-buttons" role="group" aria-label="鳴き種類と判断操作">
           <button class="control-action-button ui-button ui-button--a" data-panel-part="call-pon" type="button" hidden>ポン</button>
           <button class="control-action-button ui-button ui-button--a" data-panel-part="call-kan" type="button" hidden>カン</button>
           <button class="control-action-button ui-button ui-button--a" data-panel-part="call-chi" type="button" hidden>チー</button>
-          <button class="control-action-button ui-button ui-button--b" data-panel-part="call-back" type="button" hidden>戻る</button>
           <button class="control-action-button ui-button ui-button--c" data-panel-part="pass-call" type="button">見送る</button>
         </div>
       </div>
-      <div class="action-choice-group kan-controls" data-panel-part="kan-controls" role="group" aria-label="暗カン・加カンの選択" hidden>
-        <p class="action-group-status" data-panel-part="kan-status">カンする面子を選択</p>
-        <div class="action-option-list" data-panel-part="kan-options"></div>
-        <button class="control-action-button ui-button ui-button--b" data-panel-part="cancel-kan" type="button">キャンセル</button>
+      <div class="candidate-controls" data-panel-part="candidate-controls" role="group" aria-label="候補選択" hidden>
+        <div class="candidate-option-list" data-panel-part="candidate-options" role="group" aria-label="候補"></div>
+        <button class="candidate-back-button control-action-button ui-button ui-button--b" data-panel-part="candidate-back" type="button">戻る</button>
       </div>
       <div class="action-choice-group" data-panel-part="ron-controls" role="group" aria-label="ロン判断" hidden>
         <p class="action-group-status" data-panel-part="ron-status"></p>
@@ -82,6 +79,7 @@
         <button class="control-action-button ui-button ui-button--a" data-panel-part="ron" type="button">ロン和了</button>
         <button class="control-action-button ui-button ui-button--c" data-panel-part="pass-ron" type="button">見逃す</button>
       </div>
+      <div class="normal-controls" data-panel-part="normal-controls">
       <p class="action-status" data-panel-part="action-status" role="status" aria-live="polite"></p>
       <div class="action-buttons">
         <button class="control-action-button ui-button ui-button--a" data-panel-part="discard" type="button" disabled>打牌する</button>
@@ -96,6 +94,7 @@
         </div>
       </div>
       <p class="keyboard-help">Tabで牌とボタンへ移動、Enter／Spaceで選択・確定</p>
+      </div>
     </section>
   </template>
   <dialog id="result-dialog" aria-labelledby="result-title">

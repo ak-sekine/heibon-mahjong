@@ -72,11 +72,13 @@ test('shared templates provide all mode-specific mount parts and positions', () 
       `${file} must provide every central table-information part`,
     );
     const controls = templateBody(html, 'game-controls-template', file);
-    assert.match(controls, /data-panel-part="call-back"[^>]*>戻る</u, `${file} must provide the short call back button`);
-    assert.match(controls, /data-panel-part="call-options"[^>]*aria-label="鳴き候補"/u, `${file} must label the inline call choices`);
-    const callPanel = controls.match(/<div class="action-choice-group call-controls"[^>]*>[\s\S]*?<\/div>\s*<div class="action-choice-group"/u)?.[0];
+    assert.match(controls, /data-panel-part="candidate-back"[^>]*>戻る</u, `${file} must provide the shared Back button`);
+    assert.match(controls, /data-panel-part="candidate-options"[^>]*aria-label="候補"/u, `${file} must label the shared candidate list`);
+    const callPanel = controls.match(/<div class="action-choice-group call-controls"[^>]*>[\s\S]*?<\/div>/u)?.[0];
     assert.ok(callPanel, `${file} must keep call actions inside one panel`);
-    assert.ok(callPanel.indexOf('data-panel-part="call-options"') < callPanel.indexOf('data-panel-part="call-back"'), `${file} must put candidates before Back in the shared panel`);
+    assert.doesNotMatch(callPanel, /candidate-options|candidate-back/u, `${file} must keep type selection separate from candidates`);
+    assert.match(controls, /data-panel-part="normal-controls"/u, `${file} must provide a stateful normal-controls wrapper`);
+    assert.doesNotMatch(controls, /call-options|kan-options|kan-controls|call-back|cancel-kan/u, `${file} must not duplicate candidate DOM`);
     assert.match(controls, /data-panel-part="call-status"[^>]*role="status"[^>]*aria-live="polite"/u, `${file} must announce call decision updates`);
     assert.doesNotMatch(html, /id="call-decision-dialog"/u, `${file} must not include the removed call dialog`);
   }

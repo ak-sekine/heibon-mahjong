@@ -1,12 +1,13 @@
+import type { Tile } from '../model/tile.ts';
 import { createTileElement, tileLabel } from '../rendering/tile-svg.ts';
-import { tileKindKey, type Tile } from '../model/tile.ts';
 import { diagnosticLog } from '../online/diagnostics.ts';
 import { uniqueCallOptionsByDisplay } from './call-options.ts';
+import { CandidateSelection, operationFor, type CandidateOperation, type CandidateOption } from './candidate-selection.ts';
 
 export type ActionPanelMode = 'local' | 'online';
 export type ActionPanelPart =
   | 'discard' | 'riichi' | 'tsumo' | 'kyuushu' | 'kan-toggle' | 'call-pon' | 'call-kan' | 'call-chi'
-  | 'ron' | 'pass-ron' | 'pass-call' | 'cancel-kan'
+  | 'ron' | 'pass-ron' | 'pass-call'
   | 'next-round' | 'show-result' | 'show-match-result';
 
 export type ActionButtonState = Readonly<{
@@ -16,13 +17,7 @@ export type ActionButtonState = Readonly<{
 }>;
 
 export type ActionTile = Readonly<{ id: string; tile: Tile }>;
-export type ActionChoiceOption = Readonly<{
-  id: string;
-  label: string;
-  tiles: readonly ActionTile[];
-  accessibleLabel?: string;
-  enabled: boolean;
-}>;
+export type ActionChoiceOption = CandidateOption;
 
 export type ActionPanelState = Readonly<{
   buttons: Readonly<Record<ActionPanelPart, ActionButtonState>>;
@@ -82,17 +77,15 @@ const LOCAL_IDS: Readonly<Record<string, string>> = {
   root: 'local-game-controls',
   'call-controls': 'call-controls',
   'call-status': 'call-status',
-  'call-options': 'call-options',
   'call-pon': 'call-pon',
   'call-kan': 'call-kan',
   'call-chi': 'call-chi',
-  'call-back': 'call-back',
+  'candidate-controls': 'candidate-controls',
+  'candidate-options': 'candidate-options',
+  'candidate-back': 'candidate-back',
   'pass-call': 'pass-calls',
-  'kan-controls': 'kan-controls',
-  'kan-status': 'kan-status',
   'kan-toggle': 'kan',
-  'kan-options': 'kan-options',
-  'cancel-kan': 'cancel-kan',
+  'normal-controls': 'normal-controls',
   'ron-controls': 'ron-controls',
   'ron-status': 'ron-status',
   'ron-target': 'ron-target',
@@ -113,17 +106,15 @@ const ONLINE_IDS: Readonly<Record<string, string>> = {
   root: 'online-game-controls',
   'call-controls': 'online-call-controls',
   'call-status': 'online-call-status',
-  'call-options': 'online-call-options',
   'call-pon': 'online-call-pon',
   'call-kan': 'online-call-kan',
   'call-chi': 'online-call-chi',
-  'call-back': 'online-call-back',
+  'candidate-controls': 'online-candidate-controls',
+  'candidate-options': 'online-candidate-options',
+  'candidate-back': 'online-candidate-back',
   'pass-call': 'online-pass-call',
-  'kan-controls': 'online-kan-controls',
-  'kan-status': 'online-kan-status',
   'kan-toggle': 'online-kan',
-  'kan-options': 'online-kan-options',
-  'cancel-kan': 'online-cancel-kan',
+  'normal-controls': 'online-normal-controls',
   'ron-controls': 'online-ron-controls',
   'ron-status': 'online-ron-status',
   'ron-target': 'online-ron-target',
@@ -166,15 +157,17 @@ export function mountActionPanel(host: HTMLElement, mode: ActionPanelMode): HTML
 /** Owns all action-panel DOM state and delegates button actions to the active game mode. */
 export class ActionPanel {
   private readonly parts = new Map<string, HTMLElement>();
-  private readonly choiceSignatures = new Map<string, string>();
   private handler: ActionPanelHandler;
   private readonly root: HTMLElement;
   private readonly options: ActionPanelOptions;
   private readonly visiblePanelIds = new Map<string, number>();
   private pendingPointerTrace: { target: HTMLButtonElement; trace: ActionPanelTrace } | null = null;
+  private candidateClickTrace: ActionPanelTrace | null = null;
+  private candidateAnchorDocumentBottom: number | null = null;
   private callType: 'pon' | 'daiminkan' | 'chi' | null = null;
   private activeCallOptions: readonly ActionChoiceOption[] = [];
   private callSelectionPending = false;
+  private readonly candidates: CandidateSelection;
 
   constructor(root: HTMLElement, handler: ActionPanelHandler = () => {}, options: ActionPanelOptions = {}) {
     this.root = root;
@@ -188,7 +181,7 @@ export class ActionPanel {
     this.part('action-status').tabIndex = -1;
     for (const part of [
       'discard', 'riichi', 'tsumo', 'kyuushu', 'kan-toggle', 'call-pon', 'call-kan', 'call-chi', 'ron', 'pass-ron', 'pass-call',
-      'cancel-kan', 'next-round', 'show-result', 'show-match-result',
+      'next-round', 'show-result', 'show-match-result',
     ] as const) {
       this.part(part).dataset.panelAction = part;
       this.part(part).dataset.diagnosticActionType = part;
@@ -196,14 +189,43 @@ export class ActionPanel {
     this.part('call-pon').dataset.diagnosticActionType = 'pon';
     this.part('call-kan').dataset.diagnosticActionType = 'daiminkan';
     this.part('call-chi').dataset.diagnosticActionType = 'chi';
-    this.part('call-back').dataset.panelAction = 'call-back';
-    this.part('call-back').dataset.diagnosticActionType = 'call-back';
+    const candidateBack = this.part('candidate-back') as HTMLButtonElement;
+    candidateBack.textContent = '戻る';
+    candidateBack.dataset.panelAction = 'candidate-back';
+    candidateBack.dataset.diagnosticActionType = 'candidate-back';
+    const candidateList = this.part('candidate-options');
+    this.part('candidate-controls').tabIndex = -1;
+    this.candidates = new CandidateSelection(this.part('candidate-controls'), candidateList, choice => {
+      const actionButton = choice.button ?? this.part(callButtonPart(choice.operationType as 'pon' | 'daiminkan' | 'chi')) as HTMLButtonElement;
+      const baseTrace = this.trace(actionButton, choice.operationType);
+      const trace = this.candidateClickTrace ?? { ...baseTrace, candidateId: choice.candidateId };
+      const candidateBack = this.part('candidate-back') as HTMLButtonElement;
+      candidateBack.disabled = true;
+      candidateBack.setAttribute('aria-busy', 'true');
+      if (choice.operationType === 'pon' || choice.operationType === 'chi' || choice.operationType === 'daiminkan') {
+        this.callType = null;
+        this.lockCallButtons();
+        this.handler({ type: 'select-call', optionId: choice.id }, trace);
+      } else {
+        this.handler({ type: 'select-kan', optionId: choice.id }, trace);
+      }
+      if (this.part('candidate-controls').hidden) this.part('action-status').focus({ preventScroll: true });
+      else this.part('candidate-controls').focus({ preventScroll: true });
+    });
+    if (typeof window !== 'undefined') {
+      const repositionCandidates = () => this.repositionCandidatePanel();
+      window.addEventListener('resize', repositionCandidates, { passive: true });
+      window.addEventListener('scroll', repositionCandidates, { passive: true });
+      window.visualViewport?.addEventListener('resize', repositionCandidates, { passive: true });
+      window.visualViewport?.addEventListener('scroll', repositionCandidates, { passive: true });
+    }
     root.addEventListener('pointerdown', event => this.onPointerDown(event), true);
     root.addEventListener('click', event => this.onClick(event));
     root.addEventListener('keydown', event => {
-      if ((event as KeyboardEvent).key === 'Escape' && this.callType) {
+      if ((event as KeyboardEvent).key === 'Escape' && !this.part('candidate-controls').hidden &&
+        !(this.part('candidate-back') as HTMLButtonElement).disabled) {
         event.preventDefault();
-        this.returnToCallTypes();
+        this.returnFromCandidates();
       }
     });
   }
@@ -216,17 +238,18 @@ export class ActionPanel {
     this.activeCallOptions = [];
     this.callSelectionPending = false;
     this.callType = null;
-    for (const part of ['discard', 'riichi', 'tsumo', 'kyuushu', 'kan-toggle', 'call-pon', 'call-kan', 'call-chi', 'call-back', 'ron', 'pass-ron', 'pass-call', 'cancel-kan', 'next-round', 'show-result', 'show-match-result']) {
+    this.candidates.hide();
+    this.clearCandidateAnchor();
+    for (const part of ['discard', 'riichi', 'tsumo', 'kyuushu', 'kan-toggle', 'call-pon', 'call-kan', 'call-chi', 'candidate-back', 'ron', 'pass-ron', 'pass-call', 'next-round', 'show-result', 'show-match-result']) {
       const button = this.part(part) as HTMLButtonElement;
       button.hidden = true;
       button.disabled = true;
-      if (part !== 'call-back') button.textContent = '';
+      button.textContent = part === 'candidate-back' ? '戻る' : '';
       button.removeAttribute('aria-busy');
     }
-    for (const part of ['call-controls', 'kan-controls', 'ron-controls', 'round-actions']) this.part(part).hidden = true;
-    for (const part of ['call-options', 'kan-options', 'ron-target']) this.part(part).replaceChildren();
-    for (const part of ['call-status', 'kan-status', 'ron-status', 'action-status']) this.part(part).textContent = '';
-    this.choiceSignatures.clear();
+    for (const part of ['call-controls', 'candidate-controls', 'normal-controls', 'ron-controls', 'round-actions']) this.part(part).hidden = true;
+    for (const part of ['ron-target']) this.part(part).replaceChildren();
+    for (const part of ['call-status', 'ron-status', 'action-status']) this.part(part).textContent = '';
     this.root.classList.remove('ron-pending', 'game-ended', 'result-available');
   }
 
@@ -234,9 +257,10 @@ export class ActionPanel {
     const progressing = this.context().progressing === true || /送信しています|送信中|操作を確認しています/u.test(state.actionStatus);
     const wasHidden = {
       call: this.part('call-controls').hidden,
-      kan: this.part('kan-controls').hidden,
+      candidate: this.part('candidate-controls').hidden,
       ron: this.part('ron-controls').hidden,
     };
+    const candidateHadFocus = !wasHidden.candidate && this.part('candidate-controls').contains(document.activeElement);
     this.activeCallOptions = actionChoicesForDisplay('call', state.callGroup.options);
     if (!state.callGroup.visible || !progressing) this.callSelectionPending = false;
     const wasRonHidden = this.part('ron-controls').hidden;
@@ -250,36 +274,48 @@ export class ActionPanel {
     }
 
     const callControls = this.part('call-controls');
-    callControls.hidden = !state.callGroup.visible || this.callSelectionPending;
+    callControls.hidden = !state.callGroup.visible || this.callType !== null || this.callSelectionPending;
     this.part('call-status').textContent = state.callGroup.status;
     for (const [type, part] of [['pon', 'call-pon'], ['daiminkan', 'call-kan'], ['chi', 'call-chi']] as const) {
       const button = this.part(part) as HTMLButtonElement;
       const candidates = this.activeCallOptions.filter(option => callTypeForLabel(option.label) === type);
-      button.hidden = !state.callGroup.visible || candidates.length === 0 || this.callType !== null;
+      button.hidden = !state.callGroup.visible || candidates.length === 0 || this.callType !== null || this.callSelectionPending;
       button.disabled = candidates.length === 0 || this.callSelectionPending || !candidates.some(option => option.enabled);
       if (this.callSelectionPending || (progressing && candidates.length > 0 && !candidates.some(option => option.enabled))) button.setAttribute('aria-busy', 'true');
       else button.removeAttribute('aria-busy');
-    }
-    const callBack = this.part('call-back') as HTMLButtonElement;
-    callBack.hidden = !state.callGroup.visible || this.callType === null;
-    callBack.disabled = this.callSelectionPending;
-    if (this.callType) {
-      const candidates = this.optionsForSelection();
-      if (candidates.length === 0) this.returnToCallTypes(false);
-      else this.renderOptions('call-options', 'call', candidates, progressing || this.callSelectionPending);
-    } else {
-      this.part('call-options').replaceChildren();
-      this.choiceSignatures.delete('call-options');
     }
     const passCall = this.part('pass-call') as HTMLButtonElement;
     passCall.hidden = !state.callGroup.visible || this.callType !== null;
     if (!state.callGroup.visible) this.callType = null;
     passCall.disabled = this.callSelectionPending || !state.buttons['pass-call'].enabled;
 
-    const kanControls = this.part('kan-controls');
-    kanControls.hidden = !state.kanGroup.visible;
-    this.part('kan-status').textContent = state.kanGroup.status;
-    this.renderOptions('kan-options', 'kan', state.kanGroup.options, progressing);
+    const candidateMode = this.callType !== null || state.kanGroup.visible;
+    const selectedOptions = this.callType ? this.optionsForSelection() : state.kanGroup.options;
+    const selectedOperation = this.callType ?? operationFor(selectedOptions[0] ?? { id: '', label: '', tiles: [], enabled: false }) ?? 'ankan';
+    const candidatePanel = this.part('candidate-controls');
+    candidatePanel.hidden = !candidateMode || selectedOptions.length === 0;
+    if (candidateMode) candidatePanel.dataset.mode = this.callType ? 'call' : 'kan';
+    else delete candidatePanel.dataset.mode;
+    const candidateBack = this.part('candidate-back') as HTMLButtonElement;
+    candidateBack.hidden = !candidateMode || selectedOptions.length === 0;
+    candidateBack.dataset.diagnosticActionType = this.callType ?? selectedOperation;
+    candidateBack.setAttribute('aria-label', '戻る');
+    if (candidateMode && selectedOptions.length > 0) {
+      this.activateCandidateAnchor(this.callType ? 'call' : 'kan');
+      this.candidates.show(selectedOptions, selectedOperation, progressing || this.callSelectionPending);
+      if (progressing || this.callSelectionPending) candidatePanel.setAttribute('aria-busy', 'true');
+      else candidatePanel.removeAttribute('aria-busy');
+      if (wasHidden.candidate) this.candidates.focusFirst();
+    }
+    else {
+      this.candidates.hide();
+      this.clearCandidateAnchor();
+      if (!candidateMode && candidateHadFocus) this.part('action-status').focus({ preventScroll: true });
+    }
+    candidateBack.disabled = progressing || this.callSelectionPending || this.candidates.pending;
+    if (candidateBack.disabled) candidateBack.setAttribute('aria-busy', 'true');
+    else candidateBack.removeAttribute('aria-busy');
+    this.part('normal-controls').hidden = candidateMode;
 
     const ronControls = this.part('ron-controls');
     ronControls.hidden = !state.ronGroup.visible;
@@ -306,10 +342,10 @@ export class ActionPanel {
     if (!state.ronGroup.visible && this.part('ron-controls').contains(document.activeElement)) {
       (document.activeElement as HTMLElement).blur();
     }
-    this.recordPanelDisplay('call', wasHidden.call, state.callGroup.visible, actionChoicesForDisplay('call', state.callGroup.options).length,
+    this.recordPanelDisplay('call', wasHidden.call, state.callGroup.visible && this.callType === null, actionChoicesForDisplay('call', state.callGroup.options).length,
       !state.callGroup.options.some(option => option.enabled) && (this.part('pass-call') as HTMLButtonElement).disabled);
-    this.recordPanelDisplay('kan', wasHidden.kan, state.kanGroup.visible, state.kanGroup.options.length,
-      !state.kanGroup.options.some(option => option.enabled));
+    this.recordPanelDisplay('candidate', wasHidden.candidate, candidateMode && selectedOptions.length > 0, selectedOptions.length,
+      !selectedOptions.some(option => option.enabled));
     this.recordPanelDisplay('ron', wasHidden.ron, state.ronGroup.visible, state.ronGroup.visible ? 1 : 0,
       state.ronGroup.visible && !state.buttons.ron.enabled);
   }
@@ -325,8 +361,8 @@ export class ActionPanel {
     const candidates = callType ? this.activeCallOptions.filter(option => callTypeForLabel(option.label) === callType) : [];
     return {
       operationId: Date.now() * 1000 + (++nextOperationId % 1000),
-      panelId: this.visiblePanelIds.get(button.closest('[data-panel-part="call-controls"]') ? 'call'
-        : button.closest('[data-panel-part="kan-controls"]') ? 'kan'
+      panelId: this.visiblePanelIds.get(button.closest('[data-panel-part="candidate-controls"]') ? 'candidate'
+        : button.closest('[data-panel-part="call-controls"]') ? 'call'
           : button.closest('[data-panel-part="ron-controls"]') ? 'ron' : '') ?? null,
       actionType,
       ...(button.dataset.candidateId ? { candidateId: button.dataset.candidateId }
@@ -363,17 +399,9 @@ export class ActionPanel {
         : this.trace(choice, choice.dataset.diagnosticActionType ?? 'unknown');
       this.pendingPointerTrace = null;
       this.recordInput('action_panel_click_received', choice, trace);
-      if (choice.disabled || choice.hidden || choice.closest('[hidden]') ||
-        (choice.dataset.actionChoice === 'call' && !this.callType)) return;
-      const optionId = choice.dataset.optionId;
-      if (!optionId) return;
-      if (choice.dataset.actionChoice === 'call') {
-        const option = this.activeCallOptions.find(candidate => candidate.id === optionId);
-        if (!option?.enabled || this.callSelectionPending || !this.callType || callTypeForLabel(option.label) !== this.callType) return;
-        this.callType = null;
-        this.selectCall(optionId, trace);
-      } else this.handler({ type: 'select-kan', optionId }, trace);
-      this.part('action-status').focus({ preventScroll: true });
+      this.candidateClickTrace = trace;
+      this.candidates.select(choice);
+      this.candidateClickTrace = null;
       return;
     }
     const button = target.closest<HTMLButtonElement>('[data-panel-action]');
@@ -383,10 +411,10 @@ export class ActionPanel {
     this.pendingPointerTrace = null;
     this.recordInput('action_panel_click_received', button, trace);
     if (button.disabled || button.hidden || button.closest('[hidden]')) return;
-    const action = button.dataset.panelAction as ActionPanelPart | 'call-back' | undefined;
+    const action = button.dataset.panelAction as ActionPanelPart | 'candidate-back' | undefined;
     if (!action) return;
-    if (action === 'call-back') {
-      this.returnToCallTypes();
+    if (action === 'candidate-back') {
+      this.returnFromCandidates(trace);
       return;
     }
     if (action === 'call-pon' || action === 'call-kan' || action === 'call-chi') {
@@ -399,9 +427,6 @@ export class ActionPanel {
       this.lockCallButtons();
     }
     this.handler({ type: action }, trace);
-    if (action === 'cancel-kan') {
-      this.part('kan-toggle').focus({ preventScroll: true });
-    }
   }
 
   private ownsButton(button: HTMLButtonElement): boolean {
@@ -414,17 +439,24 @@ export class ActionPanel {
     if (candidates.length > 0) {
       if (candidates.length === 1) {
         this.callType = null;
-        const button = this.part(callButtonPart(type)) as HTMLButtonElement;
-        this.selectCall(candidates[0]!.id, this.trace(button, type));
+        this.candidates.show(candidates, type, this.callSelectionPending, 'select');
         this.part('action-status').focus({ preventScroll: true });
         return;
       }
       this.callType = type;
+      this.part('call-controls').hidden = true;
       for (const part of ['call-pon', 'call-kan', 'call-chi']) (this.part(part) as HTMLButtonElement).hidden = true;
-      (this.part('call-back') as HTMLButtonElement).hidden = false;
+      (this.part('candidate-back') as HTMLButtonElement).hidden = false;
       (this.part('pass-call') as HTMLButtonElement).hidden = true;
-      this.renderOptions('call-options', 'call', candidates, this.callSelectionPending);
-      this.firstCallChoice()?.focus({ preventScroll: true });
+      this.candidates.show(candidates, type, this.callSelectionPending);
+      this.part('candidate-controls').hidden = false;
+      this.activateCandidateAnchor('call');
+      this.part('candidate-controls').dataset.mode = 'call';
+      this.recordPanelDisplay('candidate', true, true, candidates.length, false, type);
+      this.part('normal-controls').hidden = true;
+      (this.part('candidate-back') as HTMLButtonElement).hidden = false;
+      (this.part('candidate-back') as HTMLButtonElement).dataset.diagnosticActionType = type;
+      this.candidates.focusFirst();
     }
   }
 
@@ -432,24 +464,41 @@ export class ActionPanel {
     return this.callType ? this.activeCallOptions.filter(option => callTypeForLabel(option.label) === this.callType) : [];
   }
 
-  private firstCallChoice(): HTMLButtonElement | null {
-    return this.part('call-options').querySelector<HTMLButtonElement>('button[data-action-choice]:not(:disabled)');
-  }
-
   private returnToCallTypes(focus = true): void {
     const previous = this.callType;
     this.callType = null;
-    this.part('call-options').replaceChildren();
-    this.choiceSignatures.delete('call-options');
+    this.candidates.hide();
+    this.part('candidate-controls').hidden = true;
+    this.clearCandidateAnchor();
+    delete this.part('candidate-controls').dataset.mode;
+    this.part('call-controls').hidden = false;
+    this.part('normal-controls').hidden = false;
     for (const [type, part] of [['pon', 'call-pon'], ['daiminkan', 'call-kan'], ['chi', 'call-chi']] as const) {
       const candidates = this.activeCallOptions.filter(option => callTypeForLabel(option.label) === type);
       (this.part(part) as HTMLButtonElement).hidden = candidates.length === 0;
     }
-    (this.part('call-back') as HTMLButtonElement).hidden = true;
+    (this.part('candidate-back') as HTMLButtonElement).hidden = true;
     (this.part('pass-call') as HTMLButtonElement).hidden = false;
     const button = previous ? this.part(callButtonPart(previous)) : this.part('call-pon');
     const typeButton = button as HTMLButtonElement;
     if (focus && !typeButton.hidden && !typeButton.disabled) typeButton.focus({ preventScroll: true });
+  }
+
+  private returnFromCandidates(trace?: ActionPanelTrace): void {
+    if ((this.part('candidate-back') as HTMLButtonElement).disabled) return;
+    if (this.callType) {
+      this.returnToCallTypes();
+      return;
+    }
+    const button = this.part('candidate-back') as HTMLButtonElement;
+    const backTrace = trace ?? this.trace(button, button.dataset.diagnosticActionType ?? 'candidate-back');
+    this.candidates.hide();
+    this.part('candidate-controls').hidden = true;
+    this.clearCandidateAnchor();
+    delete this.part('candidate-controls').dataset.mode;
+    this.part('normal-controls').hidden = false;
+    this.handler({ type: 'cancel-kan' }, backTrace);
+    (this.part('kan-toggle') as HTMLButtonElement).focus({ preventScroll: true });
   }
 
   private lockCallButtons(): void {
@@ -462,12 +511,34 @@ export class ActionPanel {
     }
   }
 
-  private selectCall(optionId: string, trace: ActionPanelTrace): void {
-    this.lockCallButtons();
-    this.handler({ type: 'select-call', optionId }, trace);
+  private activateCandidateAnchor(mode: 'call' | 'kan'): void {
+    const panel = this.part('candidate-controls');
+    if (panel.hidden || this.candidateAnchorDocumentBottom === null) {
+      const bounds = this.root.getBoundingClientRect();
+      this.candidateAnchorDocumentBottom = bounds.bottom + (typeof window === 'undefined' ? 0 : window.scrollY);
+    }
+    panel.dataset.mode = mode;
+    this.repositionCandidatePanel();
   }
 
-  private recordPanelDisplay(panelType: 'call' | 'kan' | 'ron', wasHidden: boolean, visible: boolean, candidateCount: number, disabled: boolean): void {
+  private repositionCandidatePanel(): void {
+    const panel = this.part('candidate-controls');
+    if (panel.hidden || this.candidateAnchorDocumentBottom === null || typeof window === 'undefined') return;
+    const visual = window.visualViewport;
+    const visualBottom = Math.min(window.innerHeight, (visual?.offsetTop ?? 0) + (visual?.height ?? window.innerHeight));
+    const rootBottom = this.candidateAnchorDocumentBottom - window.scrollY;
+    const visibleBottom = Math.min(rootBottom, visualBottom - 8);
+    panel.style.setProperty('--candidate-panel-bottom', `${Math.max(8, window.innerHeight - visibleBottom)}px`);
+  }
+
+  private clearCandidateAnchor(): void {
+    const panel = this.part('candidate-controls');
+    delete panel.dataset.mode;
+    panel.style.removeProperty('--candidate-panel-bottom');
+    this.candidateAnchorDocumentBottom = null;
+  }
+
+  private recordPanelDisplay(panelType: 'call' | 'candidate' | 'ron', wasHidden: boolean, visible: boolean, candidateCount: number, disabled: boolean, actionType?: string): void {
     if (!visible) {
       this.visiblePanelIds.delete(panelType);
       return;
@@ -477,55 +548,8 @@ export class ActionPanel {
     this.visiblePanelIds.set(panelType, panelId);
     const context = this.context();
     diagnosticLog.record('INFO', 'action_panel_displayed', {
-      panelId, panelType, candidateCount, disabled, progressing: context.progressing, phase: context.phase,
+      panelId, panelType, actionType, candidateCount, disabled, progressing: context.progressing, phase: context.phase,
     });
-  }
-
-  private renderOptions(part: string, action: 'call' | 'kan', options: readonly ActionChoiceOption[], progressing: boolean): void {
-    const list = this.part(part);
-    const displayOptions = actionChoicesForDisplay(action, options);
-    const signature = JSON.stringify(displayOptions.map(option => [
-      option.id,
-      option.label,
-      option.accessibleLabel ?? '',
-      option.enabled,
-      progressing,
-      option.tiles.map(tile => [tile.id, tileKindKey(tile.tile), tile.tile.isRed]),
-    ]));
-    if (this.choiceSignatures.get(part) === signature) return;
-    this.choiceSignatures.set(part, signature);
-    list.replaceChildren(...displayOptions.map((option, index) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'control-option-button ui-button ui-button--a';
-      button.dataset.actionChoice = action;
-      button.dataset.optionId = option.id;
-      button.dataset.candidateId = `${action}-${index + 1}`;
-      button.dataset.diagnosticActionType = action === 'call'
-        ? option.label === 'ポン' ? 'pon' : option.label === 'チー' ? 'chi' : 'daiminkan'
-        : option.label === '暗カン' ? 'ankan' : 'kakan';
-      if (action === 'call') {
-        button.dataset.callId = option.id;
-        button.dataset.onlineCall = option.id;
-      } else {
-        button.dataset.kanId = option.id;
-      }
-      button.disabled = !option.enabled;
-      if (progressing && !option.enabled) button.setAttribute('aria-busy', 'true');
-      if (option.accessibleLabel || action === 'call') {
-        button.setAttribute('aria-label', option.accessibleLabel ?? choiceAccessibleLabel(option.label, option.tiles));
-      }
-      if (action !== 'call') button.append(document.createTextNode(option.label));
-      if (action === 'call') {
-        const faces = document.createElement('span');
-        faces.className = 'action-option-tiles';
-        for (const tile of option.tiles) faces.append(createTileElement(tile.tile));
-        button.append(faces);
-      } else {
-        for (const tile of option.tiles) button.append(createTileElement(tile.tile));
-      }
-      return button;
-    }));
   }
 
   private part(name: string): HTMLElement {

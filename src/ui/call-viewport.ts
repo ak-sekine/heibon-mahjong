@@ -28,9 +28,9 @@ export function scrollPageToTop(reason: ProgrammaticScrollReason): void {
   window.scrollTo(0, 0);
 }
 
-/** Keep action panels in normal flow and leave page position under user control. */
+/** Observe call and shared candidate panels without forcing page scrolling. */
 export function installCallViewport(): void {
-  const panels = ['#ron-controls','#kan-controls','#call-controls','#online-ron-controls','#online-kan-controls','#online-call-controls']
+  const panels = ['#ron-controls','#candidate-controls','#call-controls','#online-ron-controls','#online-candidate-controls','#online-call-controls']
     .map(selector => document.querySelector<HTMLElement>(selector))
     .filter((panel): panel is HTMLElement => panel !== null);
   const main = panels[0]?.closest('main');
@@ -48,7 +48,9 @@ export function installCallViewport(): void {
   let pendingProgrammaticReason: ProgrammaticScrollReason | null = null;
   let pendingProgrammaticFromScrollY: number | null = null;
 
-  const panelType = (panel: HTMLElement): string => panel.id.includes('ron') ? 'ron' : panel.id.includes('kan') ? 'kan' : 'call';
+  const panelType = (panel: HTMLElement): string => panel.id.includes('ron') ? 'ron'
+    : panel.id.includes('candidate') ? 'candidate'
+      : 'call';
   const recordPanelHeight = (panel: HTMLElement): void => {
     const height = panel.getBoundingClientRect().height;
     const previous = heightByPanel.get(panel);
@@ -88,8 +90,10 @@ export function installCallViewport(): void {
     if (active && !viewportChangeLogged.has(active)) {
       viewportChangeLogged.add(active);
       const viewport = window.visualViewport;
-      diagnosticLog.record('INFO', 'call_viewport_adjustment_skipped', {
-        panelType: panelType(active), reason: 'viewport_change_does_not_reposition',
+      const activeType = panelType(active);
+      diagnosticLog.record('INFO', activeType === 'candidate' ? 'candidate_viewport_reposition_requested' : 'call_viewport_adjustment_skipped', {
+        panelType: activeType,
+        reason: activeType === 'candidate' ? 'candidate_panel_tracks_visual_viewport' : 'viewport_change_does_not_reposition',
         scrollY: Math.round(window.scrollY),
         visualViewportHeight: Math.round(viewport?.height ?? window.innerHeight),
         offsetTop: Math.round(viewport?.offsetTop ?? 0),

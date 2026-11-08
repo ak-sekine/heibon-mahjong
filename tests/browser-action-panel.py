@@ -140,10 +140,18 @@ with sync_playwright() as p:
           test.view.self.kanOptions = [{ id: 'server-kan-option', type: 'ankan', tiles: [test.tile] }];
           test.update(test.tile.id, false, false, true);
         }""")
-        assert page.locator('[data-browser-action-panel] [data-panel-part="kan-controls"]').nth(1).is_visible()
-        assert_common_colors('[data-browser-action-panel] [data-panel-part="kan-options"] button.ui-button')
+        assert page.locator('[data-browser-action-panel] [data-panel-part="candidate-controls"]').nth(1).is_visible()
+        assert page.locator('[data-browser-action-panel] [data-panel-part="normal-controls"]').nth(1).is_hidden()
+        assert_common_colors('[data-browser-action-panel] [data-panel-part="candidate-options"] button.ui-button')
         online_panel = page.locator('[data-browser-action-panel] > [data-panel-part="root"]').nth(1)
-        online_panel.locator('[data-panel-part="kan-options"] button').click()
+        events_before_kan_back = page.evaluate("window.actionPanelBrowser.onlineEvents.length")
+        online_panel.locator('[data-panel-part="candidate-back"]').click()
+        assert page.evaluate("window.actionPanelBrowser.onlineEvents.length") == events_before_kan_back, 'kan Back must not send a game operation'
+        assert online_panel.locator('[data-panel-part="candidate-controls"]').is_hidden()
+        assert online_panel.locator('[data-panel-part="normal-controls"]').is_visible(), 'kan Back did not restore ordinary controls'
+        page.evaluate("window.actionPanelBrowser.update(null, false, false, true)")
+        assert online_panel.locator('[data-panel-part="candidate-controls"]').is_visible()
+        online_panel.locator('[data-panel-part="candidate-options"] button').click()
         online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
         assert online_events[-1] == {'type': 'select-kan', 'optionId': 'server-kan-option'}, online_events
 
@@ -164,7 +172,7 @@ with sync_playwright() as p:
           const status = root.querySelector('[data-panel-part="call-status"]');
           const actionStatus = root.querySelector('[data-panel-part="action-status"]');
           const choices = [...root.querySelectorAll('.call-type-buttons button:not([hidden])')]
-            .filter(button => button.dataset.panelPart !== 'call-back' && button.dataset.panelPart !== 'pass-call');
+            .filter(button => button.dataset.panelPart !== 'candidate-back' && button.dataset.panelPart !== 'pass-call');
           const pass = root.querySelector('[data-panel-part="pass-call"]');
           const box = element => element.getBoundingClientRect();
           const text = root.innerText;
@@ -205,12 +213,28 @@ with sync_playwright() as p:
           test.view.self.callOptions[0].type = 'pon';
           test.update(null, false, false, false, 10);
         }""")
+        page.evaluate("""() => {
+          const test = window.actionPanelBrowser;
+          test.view.self.callOptions = [
+            { id: 'server-call-option-a', type: 'pon', tiles: [test.tile], calledTileId: 'called', handTileIds: ['own-a'] },
+            { id: 'server-call-option-b', type: 'pon', tiles: [test.tile], calledTileId: 'called', handTileIds: ['own-b'] },
+          ];
+          test.update(null, false, false, false, 10);
+        }""")
+        events_before_back = page.evaluate("window.actionPanelBrowser.onlineEvents.length")
         online_panel.locator('[data-panel-part="call-pon"]').click()
         assert page.locator('[data-browser-action-panel] [data-panel-part="pass-call"]').nth(1).is_hidden()
-        assert online_panel.locator('[data-panel-part="call-options"] button[data-action-choice="call"]').count() == 0
-        assert online_panel.locator('[data-panel-part="call-back"]').is_hidden()
+        assert online_panel.locator('[data-panel-part="candidate-options"] button[data-action-choice="call"]').count() == 2
+        assert online_panel.locator('[data-panel-part="candidate-back"]').inner_text() == '戻る'
+        assert online_panel.locator('[data-panel-part="normal-controls"]').is_hidden()
+        online_panel.locator('[data-panel-part="candidate-back"]').click()
+        assert online_panel.locator('[data-panel-part="candidate-options"]').is_empty()
+        assert page.evaluate("window.actionPanelBrowser.onlineEvents.length") == events_before_back, 'Back must not send a call action'
+        assert online_panel.locator('[data-panel-part="call-pon"]').is_visible()
+        online_panel.locator('[data-panel-part="call-pon"]').click()
+        online_panel.locator('[data-panel-part="candidate-options"] button[data-action-choice="call"]').last.click()
         online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
-        assert online_events[-1] == {'type': 'select-call', 'optionId': 'server-call-option'}, online_events
+        assert online_events[-1] == {'type': 'select-call', 'optionId': 'server-call-option-b'}, online_events
         page.evaluate("""() => {
           const test = window.actionPanelBrowser;
           test.view.self.decision = null;

@@ -153,9 +153,9 @@ with sync_playwright() as playwright:
     pon = touch_page.locator('#call-pon')
     pon.wait_for(state='visible')
     pon.tap()
-    candidates = touch_page.locator('#call-options button[data-action-choice="call"]')
+    candidates = touch_page.locator('#candidate-options button[data-action-choice="call"]')
     assert candidates.count() == 0, 'single pon opened a candidate screen'
-    assert touch_page.locator('#call-back').is_hidden(), 'single pon exposed Back'
+    assert touch_page.locator('#candidate-back').is_hidden(), 'single pon exposed Back'
     touch_page.wait_for_function("keyboardHelpState().game.players[0].melds.length === 1")
     assert touch_page.evaluate("keyboardHelpState().game.players[0].melds[0].type") == 'pon'
 

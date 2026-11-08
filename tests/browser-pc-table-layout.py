@@ -246,13 +246,13 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         chi_hit = page.locator('#call-chi').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {x:r.left+r.width/2,y:r.top+r.height/2,ok:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}}''')
         assert chi_hit['ok'], f'{width}x{height}: PC chi type button was not an initial-viewport hit target: {chi_hit}'
         page.mouse.click(chi_hit['x'], chi_hit['y'])
-        call_candidates = page.locator('#call-options button[data-action-choice="call"]')
+        call_candidates = page.locator('#candidate-options button[data-action-choice="call"]')
         assert call_candidates.count() > 1, f'{width}x{height}: call candidate selection did not expand'
         candidate_metrics = page.evaluate('''()=>({table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),
           controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),
           panel:document.querySelector('#call-controls').getBoundingClientRect().toJSON(),
-          candidates:[...document.querySelectorAll('#call-options button[data-action-choice="call"]')].map(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {...r.toJSON(),receivesPointer:hit===node||node.contains(hit)}}),
-          back:document.querySelector('#call-back').getBoundingClientRect().toJSON(),
+          candidates:[...document.querySelectorAll('#candidate-options button[data-action-choice="call"]')].map(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {...r.toJSON(),receivesPointer:hit===node||node.contains(hit)}}),
+          back:document.querySelector('#candidate-back').getBoundingClientRect().toJSON(),
           scrollTop:document.scrollingElement.scrollTop,scrollHeight:document.scrollingElement.scrollHeight})''')
         assert_same_table(normal_board, candidate_metrics['table'], f'{width}x{height} local candidates')
         assert all(box['width'] >= 44 and box['height'] >= 44 for box in candidate_metrics['candidates']), f'{width}x{height}: a call candidate is too small: {candidate_metrics}'
@@ -263,12 +263,12 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         assert abs(candidate_metrics['panel']['bottom']-candidate_metrics['controls']['bottom']) <= 2, f'{width}x{height}: candidate panel lost its bottom anchor: {candidate_metrics}'
         assert candidate_metrics['candidates'] and all(box['receivesPointer'] for box in candidate_metrics['candidates']), f'{width}x{height}: a candidate is covered at its click point: {candidate_metrics}'
         assert candidate_metrics['scrollTop'] <= 1, f'{width}x{height}: showing candidates moved the page: {candidate_metrics}'
-        back_hit = page.locator('#call-back').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}''')
+        back_hit = page.locator('#candidate-back').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}''')
         assert back_hit, f'{width}x{height}: Back was not clickable before any scrolling'
-        back_box = page.locator('#call-back').bounding_box()
+        back_box = page.locator('#candidate-back').bounding_box()
         assert back_box, f'{width}x{height}: Back has no visible bounds'
         page.mouse.click(back_box['x']+back_box['width']/2,back_box['y']+back_box['height']/2)
-        assert page.locator('#call-options button').count() == 0 and page.locator('#pass-calls').is_visible(), f'{width}x{height}: Back did not restore call types'
+        assert page.locator('#candidate-options button').count() == 0 and page.locator('#pass-calls').is_visible(), f'{width}x{height}: Back did not restore call types'
         pass_hit = page.locator('#pass-calls').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {x:r.left+r.width/2,y:r.top+r.height/2,ok:r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}}''')
         assert pass_hit['ok'], f'{width}x{height}: PC pass was not clickable in the initial viewport: {pass_hit}'
         page.mouse.click(pass_hit['x'],pass_hit['y'])
@@ -356,8 +356,8 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         online_candidates = page.evaluate('''()=>({table:document.querySelector('#online-table').getBoundingClientRect().toJSON(),
           controls:document.querySelector('#online-game-controls').getBoundingClientRect().toJSON(),
           panel:document.querySelector('#online-call-controls').getBoundingClientRect().toJSON(),
-          candidates:[...document.querySelectorAll('#online-call-options button[data-action-choice="call"]')].map(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {...r.toJSON(),receivesPointer:hit===node||node.contains(hit)}}),
-          back:document.querySelector('#online-call-back').getBoundingClientRect().toJSON(),scrollTop:document.scrollingElement.scrollTop})''')
+          candidates:[...document.querySelectorAll('#online-candidate-options button[data-action-choice="call"]')].map(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {...r.toJSON(),receivesPointer:hit===node||node.contains(hit)}}),
+          back:document.querySelector('#online-candidate-back').getBoundingClientRect().toJSON(),scrollTop:document.scrollingElement.scrollTop})''')
         assert len(online_candidates['candidates']) > 1, f'{width}x{height}: online chi candidates did not expand: {online_candidates}'
         assert_same_table(online_board, online_candidates['table'], f'{width}x{height} online candidates')
         for key in ('top','left','width','height'):
@@ -367,9 +367,9 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         assert abs(online_candidates['panel']['bottom']-online_candidates['controls']['bottom']) <= 2, f'{width}x{height}: online panel lost its bottom anchor: {online_candidates}'
         assert online_candidates['candidates'] and all(box['width'] >= 44 and box['height'] >= 44 and box['receivesPointer'] for box in online_candidates['candidates']), f'{width}x{height}: an online candidate was covered or too small: {online_candidates}'
         assert 0 <= online_candidates['back']['top'] and online_candidates['back']['bottom'] <= height + 1, f'{width}x{height}: online Back left the initial viewport: {online_candidates}'
-        online_back_hit = page.locator('#online-call-back').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return hit===node||node.contains(hit)}''')
+        online_back_hit = page.locator('#online-candidate-back').evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return hit===node||node.contains(hit)}''')
         assert online_back_hit and online_candidates['scrollTop'] <= 1, f'{width}x{height}: online Back was not clickable before scrolling: {online_candidates}'
-        online_back_box = page.locator('#online-call-back').bounding_box()
+        online_back_box = page.locator('#online-candidate-back').bounding_box()
         assert online_back_box
         page.mouse.click(online_back_box['x']+online_back_box['width']/2,online_back_box['y']+online_back_box['height']/2)
         assert page.locator('#online-pass-call').is_visible(), f'{width}x{height}: online Back did not restore call choices'
@@ -398,7 +398,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         }''')
         page.wait_for_function("document.querySelector('#online-call-controls').hidden===false")
         page.locator('#online-call-chi').click()
-        online_selected_candidate = page.locator('#online-call-options button[data-action-choice="call"]').first
+        online_selected_candidate = page.locator('#online-candidate-options button[data-action-choice="call"]').first
         online_selected_box = online_selected_candidate.bounding_box()
         online_selected_hit = online_selected_candidate.evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {x:r.left+r.width/2,y:r.top+r.height/2,ok:r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}}''')
         assert online_selected_box and online_selected_hit['ok'], f'{width}x{height}: online candidate was not clickable above the table: {online_selected_hit}'
@@ -433,20 +433,20 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
           toggle:document.querySelector('#online-kan').getBoundingClientRect().toJSON()
         })''')
         page.locator('#online-kan').click()
-        page.wait_for_function("!document.querySelector('#online-kan-controls').hidden && document.querySelectorAll('#online-kan-options button').length===1")
+        page.wait_for_function("!document.querySelector('#online-candidate-controls').hidden && document.querySelectorAll('#online-candidate-options button').length===1")
         online_kan_open = page.evaluate('''()=>({
           table:document.querySelector('#online-table').getBoundingClientRect().toJSON(),
           controls:document.querySelector('#online-game-controls').getBoundingClientRect().toJSON(),
           actions:document.querySelector('#online-game-controls .action-buttons').getBoundingClientRect().toJSON(),
           toggle:document.querySelector('#online-kan').getBoundingClientRect().toJSON(),
-          panel:document.querySelector('#online-kan-controls').getBoundingClientRect().toJSON(),
-          candidate:document.querySelector('#online-kan-options button').getBoundingClientRect().toJSON(),
-          cancel:document.querySelector('#online-cancel-kan').getBoundingClientRect().toJSON(),
+          panel:document.querySelector('#online-candidate-controls').getBoundingClientRect().toJSON(),
+          candidate:document.querySelector('#online-candidate-options button').getBoundingClientRect().toJSON(),
+          cancel:document.querySelector('#online-candidate-back').getBoundingClientRect().toJSON(),
           actionButtons:[...document.querySelectorAll('#online-game-controls .action-buttons .control-action-button')]
             .filter(button=>!button.hidden&&getComputedStyle(button).display!=='none'&&getComputedStyle(button).visibility!=='hidden')
             .map(button=>{const r=button.getBoundingClientRect();return {id:button.id,left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}}),
-          position:getComputedStyle(document.querySelector('#online-kan-controls')).position,
-          overflow:getComputedStyle(document.querySelector('#online-kan-options')).overflowY,
+          position:getComputedStyle(document.querySelector('#online-candidate-controls')).position,
+          overflow:getComputedStyle(document.querySelector('#online-candidate-options')).overflowY,
           scrollTop:document.scrollingElement.scrollTop
         })''')
         assert online_kan_board
@@ -459,15 +459,15 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
             for key in ('top','left','width','height','bottom'):
                 assert abs(online_kan_open[area][key]-online_kan_before[area][key]) < 1, f'{width}x{height}: online kan opening moved the {area} area: {online_kan_open}'
         assert online_kan_open['actionButtons'] and all(button['top']>=0 and button['bottom']<=height and button['width']>=44 and button['height']>=44 for button in online_kan_open['actionButtons']), f'{width}x{height}: online kan panel pushed normal actions out of view: {online_kan_open}'
-        for selector in ('#online-kan-options button','#online-cancel-kan'):
+        for selector in ('#online-candidate-options button','#online-candidate-back'):
             box=page.locator(selector).evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {top:r.top,bottom:r.bottom,width:r.width,height:r.height,receivesPointer:hit===node||node.contains(hit)}}''')
             assert 0<=box['top'] and box['bottom']<=height and box['width']>=44 and box['height']>=44 and box['receivesPointer'], f'{width}x{height}: online kan target is not initially clickable: {selector} {box}'
-        page.locator('#online-cancel-kan').click()
-        page.wait_for_function("document.querySelector('#online-kan-controls').hidden")
+        page.locator('#online-candidate-back').click()
+        page.wait_for_function("document.querySelector('#online-candidate-controls').hidden")
         assert not page.evaluate('pcOnlineSent.length'), f'{width}x{height}: cancelling online kan should be a local UI action'
         page.locator('#online-kan').click()
-        page.wait_for_function("!document.querySelector('#online-kan-controls').hidden")
-        online_kan_choice=page.locator('#online-kan-options button').first
+        page.wait_for_function("!document.querySelector('#online-candidate-controls').hidden")
+        online_kan_choice=page.locator('#online-candidate-options button').first
         online_kan_choice_hit=online_kan_choice.evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {x:r.left+r.width/2,y:r.top+r.height/2,ok:r.top>=0&&r.bottom<=innerHeight&&(hit===node||node.contains(hit))}}''')
         assert online_kan_choice_hit['ok'], f'{width}x{height}: online kan candidate needs scrolling or is covered: {online_kan_choice_hit}'
         online_kan_choice.click()

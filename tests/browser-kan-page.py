@@ -60,10 +60,10 @@ with sync_playwright() as p:
             load(mode)
             if mode=='daiminkan':
                 page.locator('#call-kan').tap()
-                page.locator('#call-options button[data-action-choice="call"]').tap()
+                page.locator('#candidate-options button[data-action-choice="call"]').tap()
             else:
                 page.locator('#kan').tap()
-                page.locator('#kan-options button').tap()
+                page.locator('#candidate-options button').tap()
             page.wait_for_function('!testController.progressing')
             assert page.locator('.dora-slot[data-tile-id]').count()==2
             check()
@@ -118,7 +118,7 @@ with sync_playwright() as p:
         load('multiple')
         for i in range(2):
             page.locator('#kan').tap()
-            page.locator('#kan-options button').first.tap()
+            page.locator('#candidate-options button').first.tap()
             page.wait_for_function('!testController.progressing')
             check()
         assert page.locator('.dora-slot[data-tile-id]').count()==3
@@ -129,7 +129,7 @@ with sync_playwright() as p:
         load('ankan')
         page.set_viewport_size({'width':width,'height':max(380,height-120)})
         page.locator('#kan').tap()
-        page.locator('#cancel-kan').tap()
+        page.locator('#candidate-back').tap()
         check()
         page.locator('.kan-lab a').tap()
         page.wait_for_url('**/heibon-mahjong/')

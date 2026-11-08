@@ -14,7 +14,7 @@ const roleById: Record<string, string> = {
   'start-cpu-kan': 'a', 'repeat-scenario': 'a', 'toggle-call-test-settings': 'b', 'start-river-test': 'a',
 };
 const roleByPart: Record<string, string> = {
-  'pass-call': 'c', 'call-back': 'b', 'cancel-kan': 'b', ron: 'a', 'pass-ron': 'c', discard: 'a', riichi: 'a',
+  'pass-call': 'c', 'candidate-back': 'b', ron: 'a', 'pass-ron': 'c', discard: 'a', riichi: 'a',
   'kan-toggle': 'a', 'call-pon': 'a', 'call-kan': 'a', 'call-chi': 'a', tsumo: 'a', kyuushu: 'a', 'show-result': 'b', 'show-match-result': 'b', 'next-round': 'a',
 };
 
@@ -26,7 +26,7 @@ test('every static operation button on product and verification pages has exactl
   for (const file of files) {
     const html = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     const nodes = buttons(html);
-    assert.equal(nodes.length, file === 'index.html' ? 46 : file === 'kan-test.html' ? 24 : file === 'call-test.html' ? 25 : 25);
+    assert.equal(nodes.length, file === 'index.html' ? 45 : file === 'kan-test.html' ? 23 : file === 'call-test.html' ? 24 : 24);
     for (const button of nodes) {
       const classes = button.match(/\bclass="([^"]*)"/u)?.[1]?.split(/\s+/u) ?? [];
       if (classes.includes('main-menu-item') || classes.includes('main-menu-toggle')) {

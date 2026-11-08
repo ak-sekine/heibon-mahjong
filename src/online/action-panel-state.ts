@@ -33,24 +33,30 @@ export function createOnlineActionPanelState(
   const allCallChoices: ActionChoiceOption[] = decision?.type === 'call'
     ? view.self.callOptions.map(option => {
       const label = option.type === 'pon' ? 'ポン' : option.type === 'chi' ? 'チー' : '大明カン';
+      const operationType: NonNullable<ActionChoiceOption['operationType']> = option.type === 'pon' ? 'pon' : option.type === 'chi' ? 'chi' : 'daiminkan';
       return {
         id: option.id,
         label,
+        operationType,
         tiles: option.tiles,
-        accessibleLabel: choiceAccessibleLabel(label, option.tiles, option.handTileIds.join('、')),
+        accessibleLabel: choiceAccessibleLabel(label, option.tiles),
         enabled: callsAllowed && !actionPending,
-      };
+      } satisfies ActionChoiceOption;
     }) : [];
   const callChoices = actionChoicesForDisplay('call', allCallChoices);
   const callCount = (label: string): number => callChoices.filter(option => option.label === label).length;
   const firstCall = view.self.callOptions[0];
   const callTarget = firstCall?.tiles.find(tile => tile.id === firstCall.calledTileId)?.tile ?? null;
-  const kanChoices: ActionChoiceOption[] = view.self.kanOptions.map(option => ({
-    id: option.id,
-    label: option.type === 'ankan' ? '暗カン' : '加カン',
-    tiles: option.tiles,
-    enabled: !actionPending && active && decision === null,
-  }));
+  const kanChoices: ActionChoiceOption[] = view.self.kanOptions.map(option => {
+    const operationType: NonNullable<ActionChoiceOption['operationType']> = option.type === 'ankan' ? 'ankan' : 'kakan';
+    return {
+      id: option.id,
+      label: operationType === 'ankan' ? '暗カン' : '加カン',
+      operationType,
+      tiles: option.tiles,
+      enabled: !actionPending && active && decision === null,
+    } satisfies ActionChoiceOption;
+  });
   const seconds = secondsLeft === null ? 0 : secondsLeft;
   const decisionStatus = !decision ? '' : expired
     ? '判断期限が過ぎました。サーバーの確定を待っています。'
@@ -97,8 +103,6 @@ export function createOnlineActionPanelState(
       ron: button(decision?.type === 'ron', ronAllowed && !actionPending, 'ロン和了'),
       'pass-ron': button(decision?.type === 'ron', ronAllowed && !actionPending, '見逃す'),
       'pass-call': button(decision?.type === 'call', callsAllowed && !actionPending, '見送る'),
-      'cancel-kan': button(kanChoicesOpen && ownTurn && kanChoices.length > 0,
-        kanChoicesOpen && ownTurn && kanChoices.length > 0 && !actionPending, 'キャンセル'),
       'next-round': button(nextRound,
         nextRound && !nextRoundReady && !actionPending,
         nextRoundReady ? '他のプレイヤーを待っています…' : '次の局へ'),
@@ -115,7 +119,7 @@ export function createOnlineActionPanelState(
     },
     kanGroup: {
       visible: kanChoicesOpen && ownTurn && kanChoices.length > 0,
-      status: 'カンする面子を選択してください。',
+      status: '',
       options: kanChoices,
     },
     ronGroup: {

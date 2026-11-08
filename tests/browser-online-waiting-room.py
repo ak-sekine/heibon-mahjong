@@ -2367,7 +2367,7 @@ with sync_playwright() as p:
     assert online_call_layout() == layout_before_call, {'beforeCall':layout_before_call,'duringCall':online_call_layout()}
     assert page.locator('#call-decision-dialog').count() == 0, 'call decision dialog was not removed'
     assert page.locator('#online-call-chi').is_visible(), 'the unique chi button was not shown'
-    assert page.locator('#online-call-options button[data-online-call]').count() == 0, 'the candidate list appeared before selecting a type'
+    assert page.locator('#online-candidate-options button[data-action-choice="call"]').count() == 0, 'the candidate list appeared before selecting a type'
     call_actions_before_view = page.evaluate('window.onlineMock.gameActions.length')
     seconds_before_view = page.locator('#online-call-status').inner_text()
     assert '残り' in seconds_before_view, seconds_before_view
@@ -2377,8 +2377,8 @@ with sync_playwright() as p:
     assert seconds_after_wait < seconds_before_wait, (seconds_before_wait, seconds_after_wait)
     assert page.evaluate('window.onlineMock.gameActions.length') == call_actions_before_view, 'showing the type buttons answered the call window'
     page.locator('#online-call-chi').click()
-    assert page.locator('#online-call-options button[data-online-call]').count() == 0, 'single candidate opened a selection screen'
-    assert page.locator('#online-call-back').is_hidden(), 'single candidate exposed Back'
+    assert page.locator('#online-candidate-options button[data-action-choice="call"]').count() == 0, 'single candidate opened a selection screen'
+    assert page.locator('#online-candidate-back').is_hidden(), 'single candidate exposed Back'
     page.evaluate("document.querySelector('#online-call-chi').dispatchEvent(new MouseEvent('click', {bubbles:true}))")
     page.wait_for_function('expected => window.onlineMock.gameActions.length === expected + 1', arg=call_actions_before_view)
     wait_for("document.querySelector('#online-call-controls').hidden === true")
@@ -2391,18 +2391,18 @@ with sync_playwright() as p:
     assert page.locator('#call-decision-dialog').count() == 0, 'call decision dialog was not removed'
     multi_actions_before = page.evaluate('window.onlineMock.gameActions.length')
     page.locator('#online-call-chi').click()
-    dialog_options = page.locator('#online-call-options button[data-online-call]')
+    dialog_options = page.locator('#online-candidate-options button[data-action-choice="call"]')
     assert dialog_options.count() == 2, 'the selected call type did not show its inline candidate list'
     assert dialog_options.evaluate_all('nodes=>nodes.every(node=>{const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let text="";while(walker.nextNode()){if(!walker.currentNode.parentElement?.closest("svg"))text+=walker.currentNode.textContent;}return text.trim()===""})'), 'candidate buttons repeated the call type label outside the tile artwork'
     assert dialog_options.evaluate_all('nodes=>nodes.every(node=>node.getAttribute("aria-label"))'), 'candidate buttons lost accessible names'
-    assert page.locator('#online-call-back').inner_text().strip() == '戻る'
-    assert page.locator('#online-call-back').is_visible()
+    assert page.locator('#online-candidate-back').inner_text().strip() == '戻る'
+    assert page.locator('#online-candidate-back').is_visible()
     assert page.locator('#online-pass-call').is_hidden(), 'pass remained available during candidate selection'
     assert '見送る' not in page.locator('#online-call-controls').inner_text(), 'candidate screen still includes pass text'
     assert '残り' in page.locator('#online-call-status').inner_text()
     assert online_call_layout() == layout_before_multi
     seconds_before_table = page.evaluate("Number(document.querySelector('#online-call-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
-    page.locator('#online-call-back').click()
+    page.locator('#online-candidate-back').click()
     assert page.evaluate('window.onlineMock.gameActions.length') == multi_actions_before
     assert page.locator('#online-call-chi').is_visible()
     assert page.locator('#online-pass-call').is_visible(), 'returning to type selection did not restore pass'
@@ -2410,20 +2410,20 @@ with sync_playwright() as p:
     seconds_on_table = page.evaluate("Number(document.querySelector('#online-call-status').innerText.match(/(\\d+) 秒/)?.[1] ?? 0)")
     assert seconds_on_table <= seconds_before_table
     page.locator('#online-call-chi').click()
-    assert page.locator('#online-call-back').is_visible(), 'the same type could not be selected after returning to type choices'
-    assert page.locator('#online-call-options button[data-online-call]').count() == 2
+    assert page.locator('#online-candidate-back').is_visible(), 'the same type could not be selected after returning to type choices'
+    assert page.locator('#online-candidate-options button[data-action-choice="call"]').count() == 2
     assert online_call_layout() == layout_before_multi
-    page.locator('#online-call-options button[data-online-call]').last.click()
+    page.locator('#online-candidate-options button[data-action-choice="call"]').last.click()
     page.wait_for_function('expected => window.onlineMock.gameActions.length === expected + 1', arg=multi_actions_before)
     wait_for("document.querySelector('#online-call-controls').hidden === true")
     assert page.evaluate('window.onlineMock.gameActions.length') == multi_actions_before + 1
-    assert page.locator('#online-call-options button[data-online-call]').count() == 0
+    assert page.locator('#online-candidate-options button[data-action-choice="call"]').count() == 0
 
     page.evaluate('window.onlineMock.showCallCandidates()')
     page.locator('#online-call-chi').click()
-    assert page.locator('#online-call-back').is_visible()
+    assert page.locator('#online-candidate-back').is_visible()
     pass_actions_before = page.evaluate('window.onlineMock.gameActions.length')
-    page.locator('#online-call-back').click()
+    page.locator('#online-candidate-back').click()
     assert page.evaluate('window.onlineMock.gameActions.length') == pass_actions_before, 'returning to the table answered the online call window'
     assert page.locator('#online-pass-call').is_visible()
     page.locator('#online-pass-call').click()
@@ -2434,7 +2434,7 @@ with sync_playwright() as p:
     page.evaluate('window.onlineMock.showCallCandidates(3000)')
     wait_for("document.querySelector('#online-call-controls').hidden === false")
     page.locator('#online-call-chi').click()
-    assert page.locator('#online-call-options button[data-online-call]').count() == 2, 'timed call did not enter candidate selection'
+    assert page.locator('#online-candidate-options button[data-action-choice="call"]').count() == 2, 'timed call did not enter candidate selection'
     assert page.locator('#online-pass-call').is_hidden(), 'candidate screen exposed pass before timeout'
     timeout_actions_before_view = page.evaluate('window.onlineMock.gameActions.length')
     page.wait_for_function("document.querySelector('#online-call-controls').hidden", timeout=7000)
@@ -2444,10 +2444,8 @@ with sync_playwright() as p:
     page.evaluate('window.onlineMock.timeoutCall()')
     wait_for("!document.querySelector('#online-game-action-status').innerText.includes('鳴き判断')")
     assert page.evaluate('window.onlineMock.currentDecision()') is None, 'the mock server did not commit the timed-out call'
-    assert page.locator('#online-call-options button[data-online-call]').count() == 0, 'the server timeout left stale call candidates'
+    assert page.locator('#online-candidate-options button[data-action-choice="call"]').count() == 0, 'the server timeout left stale call candidates'
     assert page.locator('#online-call-chi').is_hidden(), 'the server timeout left a stale type button'
-    assert page.locator('#call-decision-options button[data-online-call]').count() == 0, 'timeout left stale inline call candidates'
-
     assert page.locator('#online-open-room').count() == 0, 'room operations button remained in the game action area'
     assert page.locator('#online-game-controls').get_attribute('class') == 'discard-controls', 'online action area did not use the shared controls class'
     action_sizes = page.evaluate('''() => {
@@ -2464,16 +2462,15 @@ with sync_playwright() as p:
         const host = document.querySelector(selector);
         let button = host.querySelector('button');
         const created = !button;
-        if (!button) { button = document.createElement('button'); button.type = 'button'; button.textContent = '操作'; host.append(button); }
+        if (!button) { button = document.createElement('button'); button.type = 'button'; button.className = 'candidate-option-button ui-button ui-button--a'; host.append(button); }
         const style = getComputedStyle(button);
         const result = {minHeight: style.minHeight, minWidth: style.minWidth, padding: style.padding, flex: style.flex};
         if (created) button.remove();
         return result;
       };
-      return Object.fromEntries(['#call-options','#online-call-options','#kan-options','#online-kan-options'].map(selector => [selector, measure(selector)]));
+      return Object.fromEntries(['#candidate-options','#online-candidate-options'].map(selector => [selector, measure(selector)]));
     }''')
-    assert option_sizes['#call-options'] == option_sizes['#online-call-options'], f'call option buttons do not share dimensions: {option_sizes}'
-    assert option_sizes['#kan-options'] == option_sizes['#online-kan-options'], f'kan option buttons do not share dimensions: {option_sizes}'
+    assert option_sizes['#candidate-options'] == option_sizes['#online-candidate-options'], f'call option buttons do not share dimensions: {option_sizes}'
 
     spacing_viewports = [(320,568),(375,812),(390,844),(414,896)] if RIVER_SPACING_ONLY else [(320,700),(355,812),(375,812),(390,844),(414,896),(430,932),(1280,900)]
     spacing_repeats = 3 if RIVER_SPACING_ONLY else 1
@@ -2821,7 +2818,7 @@ with sync_playwright() as p:
     assert page.evaluate('window.onlineMock.currentDecision()') is None, 'the server retained an expired call after reconnect'
     assert page.locator('#call-decision-dialog').count() == 0, 'reconnect must not restore a call dialog'
     assert page.locator('#online-call-chi').is_hidden(), 'reconnect restored a stale call type button'
-    assert page.locator('#online-call-options button[data-online-call]').count() == 0, 'reconnect restored stale call candidates'
+    assert page.locator('#online-candidate-options button[data-action-choice="call"]').count() == 0, 'reconnect restored stale call candidates'
     assert '鳴き判断' not in page.locator('#online-game-action-status').inner_text(), 'reconnect left stale call status text'
 
     page.evaluate('window.onlineMock.showCallCandidates(30000)')
@@ -2834,7 +2831,7 @@ with sync_playwright() as p:
     wait_for("document.querySelector('#online-connection').textContent === '接続中'", timeout=10000)
     wait_for("document.querySelector('#online-call-controls').hidden === false", timeout=10000)
     page.locator('#online-call-chi').click()
-    reconnect_candidates = page.locator('#online-call-options button[data-online-call]')
+    reconnect_candidates = page.locator('#online-candidate-options button[data-action-choice="call"]')
     assert reconnect_candidates.count() == 2, 'reconnect did not restore the multiple legal choices'
     reconnect_candidates.first.click()
     page.wait_for_function('expected => window.onlineMock.gameActions.length === expected + 1', arg=reconnect_selection_actions)

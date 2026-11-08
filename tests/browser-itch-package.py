@@ -149,7 +149,7 @@ def capture_failure(page, context, events, repetition, error, observations):
     try:
         # A candidate selection remains on the table; return to the type stage
         # before collecting diagnostics when the back control is available.
-        call_back = page.locator('#call-back')
+        call_back = page.locator('#candidate-back')
         if call_back.count() and call_back.is_visible():
             call_back.click()
         for dialog_id, close_id in (

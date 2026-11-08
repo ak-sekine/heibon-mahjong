@@ -69,19 +69,19 @@ controller.match=startMatch(g);render();};
    assert sum(snapshot['m']['points'])+snapshot['m']['depositSticks']*1000==100000
    assert not snapshot['leaks'],snapshot['leaks']
    assert page.evaluate("document.querySelector('#local-game-controls').getBoundingClientRect().top>=document.querySelector('.table').getBoundingClientRect().bottom")
-   for sel in ['#kan','#kan-options button','#cancel-kan','#call-pon','#call-kan','#call-chi','#ron','#pass-ron']:
+   for sel in ['#kan','#candidate-options button','#candidate-back','#call-pon','#call-kan','#call-chi','#ron','#pass-ron']:
     for e in page.locator(sel).all():
      if e.is_visible():assert e.bounding_box()['height']>=44 and e.bounding_box()['width']>=44
-  page.evaluate("loadKan('choices')");page.locator('#kan').click();assert page.locator('#kan-options button').count()==2;check();shot('choices')
-  page.locator('#cancel-kan').click();assert page.locator('#kan-controls').is_hidden();assert page.evaluate('kanCheck().game.kanCount')==0
-  page.locator('#kan').click();page.locator('#kan-options button').filter(has_text='暗カン').last.click();check();assert page.evaluate('kanCheck().game.kanCount')==1
+  page.evaluate("loadKan('choices')");page.locator('#kan').click();assert page.locator('#candidate-options button').count()==2;check();shot('choices')
+  page.locator('#candidate-back').click();assert page.locator('#candidate-controls').is_hidden();assert page.evaluate('kanCheck().game.kanCount')==0
+  page.locator('#kan').click();page.locator('#candidate-options button[data-diagnostic-action-type="ankan"]').last.click();check();assert page.evaluate('kanCheck().game.kanCount')==1
   # Discard after rinshan without winning, using actual selection controls.
   tile=page.evaluate('kanCheck().game.players[0].drawnTile.id');page.locator(f'#player-hand button[data-tile-id="{tile}"]').click();page.locator('#discard').click();assert page.evaluate('kanCheck().game.players[0].drawnTile') is None
   for mode,kind in [('ankan','ankan'),('kakan','kakan'),('daiminkan','daiminkan')]:
    page.evaluate('loadKan',mode)
    if mode=='daiminkan':
     page.locator('#call-kan').click()
-   else:page.locator('#kan').click();page.locator('#kan-options button').click()
+   else:page.locator('#kan').click();page.locator('#candidate-options button').click()
    assert page.evaluate('kanCheck().game.players[0].melds[0].type')==kind
    assert page.evaluate('kanCheck().game.players[0].drawnTileSource')=='rinshan';check();shot(mode)
    assert page.locator('.dora-slot[data-tile-id]').count()==2
@@ -114,7 +114,7 @@ controller.match=startMatch(g);render();};
   page.evaluate("loadKan('seats')");page.locator('#view-table').click();check();assert page.locator('.open-meld').count()==4;assert page.locator('.dora-slot[data-tile-id]').count()==5;shot('four-seats')
   page.evaluate("loadKan('choices')");page.locator('#kan').click()
   page.evaluate("""()=>{window.nativeViewport=window.visualViewport;window.testViewport=new EventTarget();Object.assign(testViewport,{height:380,offsetTop:24});Object.defineProperty(window,'visualViewport',{configurable:true,get:()=>testViewport});nativeViewport.dispatchEvent(new Event('resize'));}""")
-  page.wait_for_function("""()=>{const v=visualViewport;return [...document.querySelectorAll('#kan-options button,#cancel-kan')].every(e=>{const r=e.getBoundingClientRect();return r.top>=v.offsetTop&&r.bottom<=v.offsetTop+v.height;});}""")
+  page.wait_for_function("""()=>{const v=visualViewport;return [...document.querySelectorAll('#candidate-options button,#candidate-back')].every(e=>{const r=e.getBoundingClientRect();return r.top>=v.offsetTop&&r.bottom<=v.offsetTop+v.height;});}""")
   check();shot('visual-viewport');page.evaluate("Object.defineProperty(window,'visualViewport',{configurable:true,get:()=>nativeViewport})")
   assert not errors,errors
   reports.append({'width':width,'height':height,'passed':True,'jsErrors':errors});print(f'{width}x{height}: passed',flush=True);page.close()

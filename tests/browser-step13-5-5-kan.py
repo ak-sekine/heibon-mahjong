@@ -20,14 +20,14 @@ with sync_playwright() as p:
   assert page.evaluate("readGame().players[0].drawnTileSource")=='deal'
   assert page.locator('#kan').is_visible() and page.locator('#discard').is_visible()
   page.locator('#kan').click()
-  assert page.locator('#kan-options button').count()==2
-  page.locator('#cancel-kan').click()
+  assert page.locator('#candidate-options button').count()==2
+  page.locator('#candidate-back').click()
   page.locator('#player-hand .drawn-tile .tile-choice').click()
   page.locator('#discard').click()
   page.wait_for_function("readGame().players[0].river.length===1")
   assert page.evaluate('readGame().kanCount')==0
   load_scenario('opening')
-  page.locator('#kan').click();page.locator('#kan-options button').nth(1).click()
+  page.locator('#kan').click();page.locator('#candidate-options button').nth(1).click()
   page.wait_for_function("readGame().kanCount===1 && readGame().players[0].drawnTileSource==='rinshan'")
   assert page.locator('.open-meld[data-meld-type="ankan"]').count()==1
   assert page.locator('.dora-slot[data-tile-id]').count()==2
@@ -37,7 +37,7 @@ with sync_playwright() as p:
    load_scenario(mode)
    if mode=='daiminkan':
     page.locator('#call-kan').click()
-   else:page.locator('#kan').click();page.locator('#kan-options button').first.click()
+   else:page.locator('#kan').click();page.locator('#candidate-options button').first.click()
    page.wait_for_timeout(200)
    assert page.locator('.dora-slot[data-tile-id]').count()==2
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
@@ -69,7 +69,7 @@ with sync_playwright() as p:
     assert '嶺上開花 1翻' in page.locator('#win-result').inner_text()
     page.locator('#view-table').click()
     load_scenario('kakan')
-    page.locator('#kan').click();page.locator('#kan-options button').first.click()
+    page.locator('#kan').click();page.locator('#candidate-options button').first.click()
     page.wait_for_timeout(200)
     assert page.locator('.dora-slot[data-tile-id]').count()==2
     page.locator('#player-hand .drawn-tile .tile-choice').click()

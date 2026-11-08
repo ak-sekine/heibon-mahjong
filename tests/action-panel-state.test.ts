@@ -170,7 +170,7 @@ test('kan options are shared and processing disables legal controls without hidi
   assert.ok(options.length > 0);
   const local = createLocalActionPanelState(match, null, true, true);
   const online = createOnlineActionPanelState(onlineViewFor(match.game), null, true, false, true, null);
-  assertSharedButtons(local, online, ['discard', 'kan-toggle', 'cancel-kan']);
+  assertSharedButtons(local, online, ['discard', 'kan-toggle']);
   assert.equal(local.buttons['kan-toggle'].visible, true);
   assert.equal(local.buttons['kan-toggle'].enabled, false);
   assert.equal(local.kanGroup.visible, true);

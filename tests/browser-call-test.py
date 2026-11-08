@@ -4,7 +4,8 @@ from playwright.sync_api import sync_playwright
 
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 BASE_URL = os.environ.get('HEIBON_BASE_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
-VIEWPORTS = [(1280, 720), (1366, 768), (1440, 900), (1660, 825), (1920, 1080)]
+VIEWPORTS = [(320, 568), (375, 634), (390, 844), (430, 932), (768, 1024),
+             (1024, 768), (1280, 720), (1366, 768), (1440, 900), (1660, 825), (1920, 1080)]
 
 
 def assert_integrity(page, expected_meld=None, expected_kan_count=None):
@@ -169,7 +170,7 @@ with sync_playwright() as p:
             assert_click_target(page, call_selector, f'{width}x{height} {mode} call after repeat', below_table=True)
             page.locator(call_selector).click()
             if mode == 'pon':
-                assert page.locator('#call-options button').count() == 0, 'a single Pon choice must execute immediately without opening candidate selection'
+                assert page.locator('#candidate-options button').count() == 0, 'a single Pon choice must execute immediately without opening candidate selection'
             page.wait_for_function('''type=>!window.testController.progressing && window.readGame().players[0].melds.some(m=>m.type===type)''', arg=meld_type)
             called = assert_integrity(page, {'type': meld_type, 'size': meld_size}, 1 if mode == 'daiminkan' else 0)
             assert called['cpuRiver'] == 0, f'{mode}: the called discard must leave the river: {called}'
@@ -201,31 +202,34 @@ with sync_playwright() as p:
         original_hand = page.evaluate('readGame().players[0].hand.map(tile=>tile.id).sort()')
         assert_click_target(page, '#call-pon', f'{width}x{height} multi-Pon action', below_table=True)
         page.locator('#call-pon').click()
-        page.wait_for_function("document.querySelectorAll('#call-options button[data-action-choice=call]').length===2")
-        candidate_data = page.locator('#call-options button[data-action-choice="call"]').evaluate_all('''nodes=>nodes.map(node=>({
-          id:node.dataset.optionId,label:node.getAttribute('aria-label'),
+        page.wait_for_function("document.querySelectorAll('#candidate-options button[data-action-choice=call]').length===2")
+        candidate_data = page.locator('#candidate-options button[data-action-choice="call"]').evaluate_all('''nodes=>nodes.map(node=>({
+          id:node.dataset.candidateId,label:node.getAttribute('aria-label'),text:node.innerText.trim(),
           faces:[...node.querySelectorAll('.tile-svg')].map(tile=>tile.getAttribute('aria-label')),
+          hasRed:[...node.querySelectorAll('.tile-svg')].some(tile=>(tile.getAttribute('aria-label')||'').includes('赤5萬')),
           rect:(()=>{const r=node.getBoundingClientRect();const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {x:r.left,y:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height,receivesPointer:hit===node||node.contains(hit)}})()
         }))''')
         assert len(candidate_data) == 2, f'{width}x{height}: expected two visible Pon choices: {candidate_data}'
         assert len({item['label'] for item in candidate_data}) == 2, f'{width}x{height}: candidates must show different tiles: {candidate_data}'
+        assert all('ポン：' in item['label'] and item['text'] == '' for item in candidate_data), f'{width}x{height}: candidates must expose operation and tiles accessibly while showing only images: {candidate_data}'
         assert sum(any('赤5萬' in (face or '') for face in item['faces']) for item in candidate_data) == 1, f'{width}x{height}: exactly one candidate must show a red five: {candidate_data}'
+        assert_integrity(page)
         for index, _ in enumerate(candidate_data):
-            assert_click_target(page, f'#call-options button[data-action-choice="call"]:nth-child({index + 1})', f'{width}x{height} multi-Pon candidate {index + 1}')
+            assert_click_target(page, f'#candidate-options button[data-action-choice="call"]:nth-child({index + 1})', f'{width}x{height} multi-Pon candidate {index + 1}')
         assert_same_table(before, table_rect(page), f'{width}x{height} multi-Pon candidates open')
-        assert_click_target(page, '#call-back', f'{width}x{height} multi-Pon back')
-        page.locator('#call-back').click()
-        page.wait_for_function("document.querySelector('#call-options').children.length===0 && !document.querySelector('#call-pon').hidden")
+        assert_click_target(page, '#candidate-back', f'{width}x{height} multi-Pon back')
+        page.locator('#candidate-back').click()
+        page.wait_for_function("document.querySelector('#candidate-options').children.length===0 && !document.querySelector('#call-pon').hidden")
+        assert_integrity(page)
         assert_same_table(before, table_rect(page), f'{width}x{height} multi-Pon back')
         assert_click_target(page, '#call-pon', f'{width}x{height} multi-Pon action after back', below_table=True)
         page.locator('#call-pon').click()
-        page.wait_for_function("document.querySelectorAll('#call-options button[data-action-choice=call]').length===2")
+        page.wait_for_function("document.querySelectorAll('#candidate-options button[data-action-choice=call]').length===2")
         red_index = next(index for index, item in enumerate(candidate_data) if any('赤5萬' in (face or '') for face in item['faces']))
-        chosen = page.locator('#call-options button[data-action-choice="call"]').nth(red_index)
-        selected_id = chosen.get_attribute('data-option-id')
-        selected_option = next(option for option in legal_pon['options'] if option['id'] == selected_id)
+        chosen = page.locator('#candidate-options button[data-action-choice="call"]').nth(red_index)
+        selected_option = next(option for option in legal_pon['options'] if option['hasRed'] == candidate_data[red_index]['hasRed'])
         assert selected_option['hasRed'], f'{width}x{height}: the red-five candidate was not selected: {selected_option}'
-        assert_click_target(page, f'#call-options button[data-action-choice="call"]:nth-child({red_index + 1})', f'{width}x{height} red Pon candidate')
+        assert_click_target(page, f'#candidate-options button[data-action-choice="call"]:nth-child({red_index + 1})', f'{width}x{height} red Pon candidate')
         chosen.click()
         page.wait_for_function("()=>!window.testController.progressing && window.readGame().players[0].melds.some(m=>m.type==='pon')")
         called = assert_integrity(page, {'type': 'pon', 'size': 3}, 0)
@@ -249,34 +253,41 @@ with sync_playwright() as p:
             controls_before = control_rects(page)
             assert_click_target(page, '#kan', f'{width}x{height} {mode} kan toggle', below_table=True)
             page.locator('#kan').click()
-            page.wait_for_function("()=>!document.querySelector('#kan-controls').hidden && document.querySelectorAll('#kan-options button').length>0")
+            page.wait_for_function("()=>!document.querySelector('#candidate-controls').hidden && document.querySelectorAll('#candidate-options button').length>0")
             assert_same_table(before, table_rect(page), f'{width}x{height} {mode} candidates open')
             panel_geometry = page.evaluate('''()=>({
               controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),
               actions:document.querySelector('#local-game-controls .action-buttons').getBoundingClientRect().toJSON(),
               toggle:document.querySelector('#kan').getBoundingClientRect().toJSON(),
-              panel:document.querySelector('#kan-controls').getBoundingClientRect().toJSON(),
-              list:document.querySelector('#kan-options').getBoundingClientRect().toJSON(),
-              listOverflow:getComputedStyle(document.querySelector('#kan-options')).overflowY,
-              listMaxHeight:getComputedStyle(document.querySelector('#kan-options')).maxHeight,
-              position:getComputedStyle(document.querySelector('#kan-controls')).position,
+              panel:document.querySelector('#candidate-controls').getBoundingClientRect().toJSON(),
+              list:document.querySelector('#candidate-options').getBoundingClientRect().toJSON(),
+              listOverflow:getComputedStyle(document.querySelector('#candidate-options')).overflowY,
+              listMaxHeight:getComputedStyle(document.querySelector('#candidate-options')).maxHeight,
+              position:getComputedStyle(document.querySelector('#candidate-controls')).position,
+              normalHidden:document.querySelector('#normal-controls').hidden,
+              panelText:document.querySelector('#candidate-controls').innerText.trim(),
+              visibleNormalButtons:[...document.querySelectorAll('#normal-controls button')].filter(button=>button.getClientRects().length>0).map(button=>button.id),
               scrollY:document.scrollingElement.scrollTop
             })''')
             assert panel_geometry['scrollY'] <= 1, f'{width}x{height} {mode}: opening candidates scrolled the page: {panel_geometry}'
-            assert panel_geometry['position'] == 'absolute', f'{width}x{height} {mode}: kan candidates stayed in normal flow: {panel_geometry}'
-            assert panel_geometry['panel']['top'] < panel_geometry['controls']['top'], f'{width}x{height} {mode}: kan candidates did not expand upward: {panel_geometry}'
-            assert abs(panel_geometry['panel']['bottom']-panel_geometry['controls']['bottom']) <= 2, f'{width}x{height} {mode}: panel lost its controls-bottom anchor: {panel_geometry}'
+            assert panel_geometry['position'] == 'fixed', f'{width}x{height} {mode}: shared candidate panel is not viewport anchored: {panel_geometry}'
+            assert panel_geometry['panel']['top'] < panel_geometry['panel']['bottom'] and panel_geometry['panel']['bottom'] <= height + 0.5, f'{width}x{height} {mode}: panel did not expand upward inside the viewport: {panel_geometry}'
+            anchor_bottom = min(controls_before['controls']['bottom'], height - 8)
+            assert abs(panel_geometry['panel']['bottom']-anchor_bottom) <= 2, f'{width}x{height} {mode}: panel bottom did not stay at the control-panel baseline: {panel_geometry}, before={controls_before}'
             assert panel_geometry['panel']['top'] < panel_geometry['toggle']['top'], f'{width}x{height} {mode}: candidate panel expanded below the Kan button: {panel_geometry}'
             assert panel_geometry['listOverflow'] == 'auto' and panel_geometry['listMaxHeight'] != 'none', f'{width}x{height} {mode}: candidate list is not internally scrollable: {panel_geometry}'
-            assert_same_rect(controls_before, control_rects(page), f'{width}x{height} {mode} candidates open')
-            assert_action_row_in_initial_view(page, f'{width}x{height} {mode}')
-            candidate_count = page.locator('#kan-options button').count()
+            assert panel_geometry['normalHidden'] and panel_geometry['panelText'] == '戻る' and not panel_geometry['visibleNormalButtons'], f'{width}x{height} {mode}: candidate mode exposed ordinary operations: {panel_geometry}'
+            candidate_count = page.locator('#candidate-options button').count()
             if mode == 'opening':
                 assert candidate_count == 2, f'{width}x{height}: opening ankan must expose two candidates'
+            expected_operation = '加カン：' if mode == 'kakan' else '暗カン：'
+            assert page.locator('#candidate-options button').evaluate_all("(nodes,prefix)=>nodes.every(node=>node.getAttribute('aria-label')?.startsWith(prefix) && [...node.childNodes].every(child=>child.nodeType!==Node.TEXT_NODE || !child.textContent.trim()))", expected_operation), f'{width}x{height} {mode}: candidate must expose operation and tile names accessibly while displaying tile art only'
+            assert page.locator('#candidate-back').inner_text().strip() == '戻る'
+            assert_integrity(page)
             for index in range(candidate_count):
-                assert_click_target(page, f'#kan-options button:nth-child({index + 1})', f'{width}x{height} {mode} candidate {index + 1}')
+                assert_click_target(page, f'#candidate-options button:nth-child({index + 1})', f'{width}x{height} {mode} candidate {index + 1}')
             if mode == 'opening':
-                page.locator('#cancel-kan').focus()
+                page.locator('#candidate-back').focus()
                 page.keyboard.press('Shift+Tab')
                 candidate_focus = page.evaluate('''()=>{const e=document.activeElement,s=getComputedStyle(e);return {
                   action:e.dataset.actionChoice,visible:e.matches(':focus-visible'),outlineStyle:s.outlineStyle,outlineWidth:parseFloat(s.outlineWidth)
@@ -286,9 +297,9 @@ with sync_playwright() as p:
                 focus = page.evaluate('''()=>{const e=document.activeElement,s=getComputedStyle(e);return {
                   id:e.id,visible:e.matches(':focus-visible'),outlineStyle:s.outlineStyle,outlineWidth:parseFloat(s.outlineWidth)
                 }}''')
-                assert focus['id'] == 'cancel-kan' and focus['visible'] and focus['outlineStyle'] != 'none' and focus['outlineWidth'] >= 2, f'{width}x{height}: keyboard focus indicator is missing: {focus}'
+                assert focus['id'] == 'candidate-back' and focus['visible'] and focus['outlineStyle'] != 'none' and focus['outlineWidth'] >= 2, f'{width}x{height}: keyboard focus indicator is missing: {focus}'
                 scroll_metrics = page.evaluate('''()=>{
-                  const list=document.querySelector('#kan-options'),template=list.querySelector('button');
+                  const list=document.querySelector('#candidate-options'),template=list.querySelector('button');
                   for(let i=0;i<100;i++){const clone=template.cloneNode(true);clone.dataset.overflowTest='true';list.append(clone);}
                   list.scrollTop=list.scrollHeight;
                   const last=list.querySelector('button[data-overflow-test="true"]:last-child');
@@ -302,23 +313,24 @@ with sync_playwright() as p:
                 }''')
                 assert scroll_metrics['overflow'] == 'auto' and scroll_metrics['scrollHeight'] > scroll_metrics['clientHeight'] and scroll_metrics['scrollTop'] > 0, f'{width}x{height}: many kan candidates did not scroll inside the list: {scroll_metrics}'
                 assert scroll_metrics['lastVisible'] and scroll_metrics['lastReceivesPointer'] and scroll_metrics['pageScroll'] <= 1, f'{width}x{height}: last kan candidate was not reachable without page scrolling: {scroll_metrics}'
-            assert_click_target(page, '#cancel-kan', f'{width}x{height} {mode} cancel')
-            page.locator('#cancel-kan').click()
-            page.wait_for_function("()=>document.querySelector('#kan-controls').hidden")
+            assert_click_target(page, '#candidate-back', f'{width}x{height} {mode} cancel')
+            page.locator('#candidate-back').click()
+            page.wait_for_function("()=>document.querySelector('#candidate-controls').hidden")
             after_cancel = page.evaluate('''()=>{
               const g=readGame();return {kanCount:g.kanCount??0,liveWall:g.liveWall.length,
                 hand:[...g.players[0].hand.map(t=>t.id),...(g.players[0].drawnTile?[g.players[0].drawnTile.id]:[])].sort(),
                 melds:g.players[0].melds.map(m=>({type:m.type,ids:m.tiles.map(t=>t.id).sort()}))};
             }''')
             assert after_cancel == original, f'{mode}: cancellation changed the game: {original} -> {after_cancel}'
+            assert_integrity(page)
             assert_same_table(before, table_rect(page), f'{width}x{height} {mode} candidate cancel')
-            assert_same_rect(controls_before, control_rects(page), f'{width}x{height} {mode} candidate cancel')
+            assert not page.locator('#normal-controls').evaluate('e=>e.hidden'), f'{width}x{height} {mode}: normal operation state did not return after Back'
 
             page.locator('#kan').click()
-            page.wait_for_function("()=>!document.querySelector('#kan-controls').hidden")
-            assert page.locator('#kan-options button').count() >= 1
-            assert_click_target(page, '#kan-options button', f'{width}x{height} {mode} candidate')
-            page.locator('#kan-options button').first.click()
+            page.wait_for_function("()=>!document.querySelector('#candidate-controls').hidden")
+            assert page.locator('#candidate-options button').count() >= 1
+            assert_click_target(page, '#candidate-options button', f'{width}x{height} {mode} candidate')
+            page.locator('#candidate-options button').first.click()
             page.wait_for_function('''()=>!window.testController.progressing && window.readGame().kanCount===1''')
             completed = assert_integrity(page, {'type': meld_type, 'size': 4}, 1)
             assert completed['phase'] == 'awaiting-discard' and completed['turn'] == 0, f'{mode}: kan must return to the normal discard turn: {completed}'
@@ -355,16 +367,14 @@ with sync_playwright() as p:
     scrolled = assert_click_target(page, '#kan', '1280x550 ankan toggle after scrolling', below_table=False, in_initial_view=False)
     assert scrolled['scrollY'] > 0, 'short window should scroll before the control is operated'
     page.locator('#kan').click()
-    page.locator('#cancel-kan').scroll_into_view_if_needed()
-    assert_click_target(page, '#cancel-kan', '1280x550 cancel after scrolling', below_table=False, in_initial_view=False)
-    page.locator('#cancel-kan').click()
-    page.wait_for_function("()=>document.querySelector('#kan-controls').hidden")
+    assert_click_target(page, '#candidate-back', '1280x550 cancel after scrolling')
+    page.locator('#candidate-back').click()
+    page.wait_for_function("()=>document.querySelector('#candidate-controls').hidden")
     assert_integrity(page)
     print(f'{ENGINE} 1280x550: scrollable kan controls passed', flush=True)
     page.close()
 
-    # The desktop overlay starts at 960px. Below that breakpoint the existing
-    # in-flow controls and scroll path must remain unchanged.
+    # The common candidate UI stays viewport anchored below the desktop breakpoint.
     page = browser.new_page(viewport={'width': 959, 'height': 900})
     page.route('**/src/verification/page.ts', expose_page_controller)
     page.goto(BASE_URL + 'call-test.html')
@@ -376,14 +386,12 @@ with sync_playwright() as p:
     before = table_rect(page)
     assert_click_target(page, '#kan', '959x900 opening ankan toggle', in_initial_view=False)
     page.locator('#kan').click()
-    page.wait_for_function("!document.querySelector('#kan-controls').hidden && document.querySelectorAll('#kan-options button').length===2")
-    assert page.locator('#kan-controls').evaluate('e=>getComputedStyle(e).position') != 'absolute', 'kan controls below 960px must remain in normal flow'
+    page.wait_for_function("!document.querySelector('#candidate-controls').hidden && document.querySelectorAll('#candidate-options button').length===2")
+    assert page.locator('#candidate-controls').evaluate('e=>getComputedStyle(e).position') == 'fixed', 'candidate controls below 960px must use the shared viewport layout'
     assert_same_table(before, table_rect(page), '959x900 opening ankan candidates')
-    if page.locator('#cancel-kan').evaluate('e=>{const r=e.getBoundingClientRect();return r.top<0||r.bottom>innerHeight}'):
-        page.locator('#cancel-kan').scroll_into_view_if_needed()
-    assert_click_target(page, '#cancel-kan', '959x900 opening ankan cancel', below_table=False, in_initial_view=False)
-    page.locator('#cancel-kan').click()
-    page.wait_for_function("document.querySelector('#kan-controls').hidden")
+    assert_click_target(page, '#candidate-back', '959x900 opening ankan cancel')
+    page.locator('#candidate-back').click()
+    page.wait_for_function("document.querySelector('#candidate-controls').hidden")
     assert_integrity(page)
     print(f'{ENGINE} 959x900: existing in-flow kan controls passed', flush=True)
     page.close()

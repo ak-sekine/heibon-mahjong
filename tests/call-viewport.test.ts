@@ -16,7 +16,7 @@ function viewportFixture() {
     getPropertyValue: (key: string) => values.get(key) ?? '',
     setProperty: (key: string, value: string) => values.set(key, value),
   } } as unknown as HTMLElement;
-  const panelNames = ['ron-controls','call-controls','kan-controls','online-ron-controls','online-call-controls','online-kan-controls'];
+  const panelNames = ['ron-controls','call-controls','candidate-controls','online-ron-controls','online-call-controls','online-candidate-controls'];
   const panels = new Map<string, MockPanel>();
   for (const id of panelNames) panels.set(`#${id}`, {
     id,
@@ -90,7 +90,7 @@ function dispatchTouch(target: EventTarget, type: string, touches: Array<{ clien
   target.dispatchEvent(event);
 }
 
-test('ron and kan viewport monitoring never scrolls the page on initial display, resize, or panel height change', () => {
+test('ron and candidate viewport monitoring never scrolls the page on initial display, resize, or panel height change', () => {
   const fixture = viewportFixture();
   diagnosticLog.clear();
   try {
@@ -116,12 +116,12 @@ test('ron and kan viewport monitoring never scrolls the page on initial display,
     fixture.visualViewport.dispatchEvent(new Event('resize'));
     fixture.mockWindow.dispatchEvent(new Event('resize'));
     assert.equal(fixture.scrollCalls.length, 0);
-    assert.equal(fixture.values.has('--call-viewport-inset'), false, 'viewport changes do not add bottom padding for in-flow call panels');
+    assert.equal(fixture.values.has('--call-viewport-inset'), false, 'viewport monitoring never applies a legacy panel inset');
     assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_adjustment_skipped' && entry.details.reason === 'viewport_change_does_not_reposition'));
   } finally { fixture.restore(); diagnosticLog.clear(); }
 });
 
-test('manual touch scrolling remains in control while ron and kan remain in flow', async () => {
+test('manual touch scrolling remains in control while ron and candidate panels do not move the page', async () => {
   const fixture = viewportFixture();
   diagnosticLog.clear();
   try {
@@ -144,19 +144,22 @@ test('manual touch scrolling remains in control while ron and kan remain in flow
 
     ron.hidden = true;
     fixture.observerFor(ron).trigger();
-    for (const selector of ['#ron-controls', '#kan-controls']) {
+    for (const selector of ['#ron-controls', '#candidate-controls']) {
       const panel = fixture.panels.get(selector)!;
       panel.hidden = false;
       panel.rect = { top: 200, bottom: 400, left: 0, right: 300 };
       fixture.observerFor(panel).trigger();
-      panel.hidden = true;
-      fixture.observerFor(panel).trigger();
+      if (selector === '#ron-controls') {
+        panel.hidden = true;
+        fixture.observerFor(panel).trigger();
+      }
     }
     fixture.visualViewport.dispatchEvent(new Event('resize'));
     fixture.visualViewport.dispatchEvent(new Event('scroll'));
     assert.equal(fixture.scrollCalls.length, 0);
     assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_panel_displayed' && entry.details.panelType === 'ron'));
-    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_panel_displayed' && entry.details.panelType === 'kan'));
+    assert.ok(diagnosticLog.all().some(entry => entry.event === 'call_viewport_panel_displayed' && entry.details.panelType === 'candidate'));
+    assert.ok(diagnosticLog.all().some(entry => entry.event === 'candidate_viewport_reposition_requested' && entry.details.reason === 'candidate_panel_tracks_visual_viewport'));
   } finally { fixture.restore(); diagnosticLog.clear(); }
 });
 
