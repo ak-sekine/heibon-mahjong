@@ -173,6 +173,7 @@ with sync_playwright() as playwright:
           c.game = window.rulesFixtures.fixedRound(0, [0]);
           render();
         }''')
+        assert page.locator('#show-result').is_visible(), 'settled-round result action is hidden by action-panel layout'
         page.locator('#show-result').click()
         page.locator('#view-table').click()
         capture_state()
