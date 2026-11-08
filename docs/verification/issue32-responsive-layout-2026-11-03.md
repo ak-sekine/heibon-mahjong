@@ -236,3 +236,11 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - ローカル結果: `npm test` 1464件成功、`npm run build`（TypeScript検査を含む）成功、`python tests/test_browser_regressions_selection.py` 8件成功、Python構文検査と `git diff --check` 成功。ブラウザー自動検証はリポジトリの既知制限に従いActionsで実施する。
 - 初回修正 `98b1381a4988abf5d7fcdc976c2ed712e134ad39` の[Actions #42436684947](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42436684947)はverify成功、Chromiumでは今回のスクロール検査が成功したが、既存のオンライン作成画面のTab順序検査が失敗した。本文を追加のTab停止位置にせず、プログラムによるfocusのみ許可する `tabIndex=-1` へ修正した。WebKitはCtrl+Endで本文最下部に移動せず検査がtimeoutしたため、キーボード検査をPageDown／PageUpで上下端へ到達する方法に変更した。両失敗によりDeploy gateが公開を停止した。
 - `gh run view --log-failed` はログ配信先 `results-receiver.actions.githubusercontent.com` への要求がForbiddenになった。GitHub接続ツールのjob logs取得で両engineのログを読み、失敗箇所を確認した。
+
+### スクロールバー修正の最終自動検証・公開
+
+- 修正SHA `821dcde93a5a453626f7c32ef41e72fe4d9fcb09` の[Actions #42437041618](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42437041618)は最終的にsuccess。初回attemptのChromium 42 scenario／WebKit 32 scenarioがすべてsuccess、matrix auditとrelease freshnessもsuccess。両engineの結果JSONで、新規対局・オンライン作成の上下ドラッグ、中央への比例連動、背景クリック、captureとキャンセル解除、ホイール、PageDown／PageUp、固定フッターがすべてpassであることを確認した。
+- Chromiumでは両画面のnative touch swipeもpass。WebKitではtouch pointerをキャンセルしないこととnative panning設定がpassで、native swipe自体は公開APIの制約により未確認。既存12 viewportのレイアウト検査と、既存のTab順序を含む回帰検査も両engineで成功した。
+- 初回attemptはWorker公開後の本番オンライン検査で `Mixed-Origin reconnect snapshots differed (host 7, guest 6)` が発生し、Pages公開を停止した。テストの異なる時点のsnapshot比較箇所（`tests/online-production.mjs`）を確認し、ソースや条件を変えず失敗ジョブを再実行した。attempt 2のproduction-testはsuccessで、続くPages build／deployもsuccessとなった。最初の不一致の根本原因は未確定であり、成功結果で上書きしない。
+- WorkerとPagesの成功DeploymentはともにSHA `821dcde93a5a453626f7c32ef41e72fe4d9fcb09`。公開先: [HEIBON MAHJONG](https://ak-sekine.github.io/heibon-mahjong/)。実装は `98b1381` と `821dcde` をmainへ直接pushし、各push後にリモートSHA一致を確認した。PRは作成していない。
+- PC実機の修正版再確認は未確認。公開ページを再読み込みし、PWA更新案内があれば適用したうえで、新規対局／オンラインルーム作成の両方を開き、黄色いつまみを上下端へドラッグ、背景クリック、ホイール・キーボード操作、フッター不動をユーザー本人が確認する。以前のPC実機NG記録を残し、Issue #32はOpenのまま維持する。
