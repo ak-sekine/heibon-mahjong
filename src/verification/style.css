@@ -39,7 +39,7 @@ main:has(.call-test-lab):has(#local-game-layout) { gap:4px; padding-top:0; paddi
     .call-test-page #local-game-layout { --pc-board-size:min(860px,max(430px,calc(100dvh - 44px - 76px - 24px - max(8px,env(safe-area-inset-top,0px)) - max(8px,env(safe-area-inset-bottom,0px)) - var(--pc-controls-space)))); }
   }
 }
-@media (min-width:960px) and (min-height:651px) and (max-height:960px) {
+@media (min-width:960px) and (min-height:651px) {
   /* The verification header remains above the game, so keep extra room for
      its 44px call buttons on the compact desktop-height layout. */
   .call-test-page #local-game-layout > #local-table { width:min(100%,calc(100svh - 328px)); }
