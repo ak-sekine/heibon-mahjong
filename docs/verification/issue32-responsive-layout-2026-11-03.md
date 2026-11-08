@@ -277,3 +277,9 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - 成功Deployment: Worker `7630886344`、Pages `7630901415`、GitHub Pages `7630898571`。いずれもSHA **`1aa498bea53a6147a55b233765b5cd269b5d2e57`**で、APIの最新statusがsuccessであることを確認。公開先: [HEIBON MAHJONG](https://ak-sekine.github.io/heibon-mahjong/)。公開URLへのCodex Cloudからの直接HTTP取得はproxyのCONNECT 403で拒否され、実ページの直接取得・再描画は未確認。公開確認の根拠はActions deployとGitHub Deploymentの成功記録であり、実機確認とは区別する。
 - 最終ローカル検査は `npm test` 1464/1464成功、`npm run build`、Worker型検査、Browser UI選択8件、変更Pythonの構文検査、PCテスト内JavaScript式19箇所の構文検査、`git diff --check` が成功。PC／Safari実機確認を自動検証で代替しない。
 - Issue #32のOpenを公開後にも確認した。本人による縦並び版PCの再確認まではOpenを維持する。以前のiPhone Safari／PWAのOK、今回本人報告のPCスクロールバー「ドラッグ操作OK」を維持し、背景クリックやホイールの個別実機OKは推定しない。
+
+### 公開後の補助診断と記録反映
+
+- 検証記録コミット `ed9d726d4c2738e751edb97dd97cb2833c2d5a47` をmainへ直接pushし、リモートSHA一致・cleanを確認。[文書チェック #42443546829](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42443546829)はsuccess。文書のみのためブラウザー再検証・再公開はskippedで、公開SHAは引き続き `1aa498bea53a6147a55b233765b5cd269b5d2e57`。
+- 続く補助診断[ #42443578657](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42443578657)のattempt 1で既存の `Mixed-Origin reconnect snapshots differed (host 7, guest 6)` が再発した。ログでは再接続クライアントが経過11711msにrevision 6を取得し、hostは11751ms、再接続側は11753msにrevision 7を取得している。`tests/online-production.mjs` のsnapshot比較箇所も確認し、異なる時点のsnapshotを取得・比較する既存の競合が再現したものとして記録する。今回の公開ゲート内の本番検証successとは別の補助runのfailureであり、成功で上書きしない。
+- ソース・通信仕様・テスト条件を変えず、この補助診断だけを1回再実行したattempt 2はsuccess。比較テストの不安定さは残る別途検討事項であり、今回のレイアウト修正では解消したと扱わない。Issue #32はOpenを維持する。
