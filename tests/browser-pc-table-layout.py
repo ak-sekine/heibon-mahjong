@@ -341,13 +341,13 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         assert page.locator('#online-call-options button[data-action-choice="call"]').count() > 1
         page.locator('#online-call-back').scroll_into_view_if_needed()
         page.locator('#online-call-back').click()
-        assert page.locator('#online-pass-calls').is_visible(), f'{width}x{height}: online Back did not restore call choices'
+        assert page.locator('#online-pass-call').is_visible(), f'{width}x{height}: online Back did not restore call choices'
         page.evaluate('''()=>{
           window.pcOnlineSent=[];
           pcOnlineController.setActionSender((action,revision,requestId)=>{pcOnlineSent.push({action,revision,requestId});return true;});
         }''')
-        page.locator('#online-pass-calls').scroll_into_view_if_needed()
-        page.locator('#online-pass-calls').click()
+        page.locator('#online-pass-call').scroll_into_view_if_needed()
+        page.locator('#online-pass-call').click()
         page.wait_for_function("pcOnlineSent.some(item=>item.action.type==='pass-call')")
         page.evaluate('''()=>{
           const normal={...pcOnlineSession,gameRevision:3};
