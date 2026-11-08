@@ -496,7 +496,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
 
         page.evaluate('''()=>{
           const match=pcMakeDrawMatch();
-          const session={...pcOnlineSession,gameRevision:6,match,status:match.status,decision:null};
+          const session={...pcOnlineSession,gameRevision:8,match,status:match.status,decision:null};
           window.pcOnlineResultSession=session;
           pcOnlineController.receive({type:'game-state',view:pcCreateOnlineView(session,0,'PCTEST',new Set([0]))});
         }''')
