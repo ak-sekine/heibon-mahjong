@@ -292,6 +292,8 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - 修正前の既存値は操作欄108px、鳴き時の卓予約244px、卓の最大860px／下限450px。上限・下限は維持し、操作状態だけでは卓計算を変えない。960px以上のオフライン／オンライン共通フローはヘッダー→座席・点数→正方形の卓→（局結果概要）→操作欄。卓サイズは `100dvh`（fallback `100svh`）からヘッダー44px、点数76px、gap24px、上下safe area、固定操作領域120pxを差し引いて計算し、450〜860pxに制限する。ウィンドウ高さが変わればviewport値で再計算し、短い画面・長文は自然な縦スクロールで到達できる。
 - 通常操作欄の108pxは維持する。鳴き欄はPCの通常フローへ戻し、固定244px予約・absolute配置・固定max-heightを外す。鳴き種類の少数ボタンはその内容高だけを使い、候補選択時は欄をフロー内で展開する。ページ位置をアプリから強制変更しない。種類選択・候補・戻る・見送るのゲームロジックは変更していない。
 - 局結果では操作欄の108px最小高を解除し、結果概要と表示中ボタンの実寸で高さを決める。詳細ダイアログ、順位、次局のUI経路とオンライン対局の通信仕様は変更していない。
+- 初回Browser UI実測の[#42451158250](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42451158250)は1280×720の卓450px、結果概要43.59px、結果操作欄108px、次局ボタン下端728.78pxを測定し、画面下端を8.78px超えていた。原因は `.discard-controls.result-available` の指定が `#local-game-controls`／`#online-game-controls` のID指定より詳細度が低く、108pxを上書きできなかったこと。IDを含む状態別指定へ直し、テストに結果操作欄が108px未満であることを追加した。この検出を成功扱いせず、後続Browser UIで再検証した。
+- テスト修正途中の[#42450444204](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42450444204)、[#42452002575](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42452002575)、[#42452788340](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42452788340)、[#42453608402](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42453608402)では、候補数の前提、module内fixture参照、オンラインpassボタンのid、合成オンライン操作のack／revision不足を修正した。これらはテスト条件の調整であり、受入条件を緩めたりゲームロジックを変更したりしていない。[#42452708319](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42452708319)は未公開fixture参照を見つけた時点で不要なrunとして取消した。
 
 ### Browser UIの実測
 
