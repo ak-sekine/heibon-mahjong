@@ -146,7 +146,9 @@ with sync_playwright() as p:
         online_panel = page.locator('[data-browser-action-panel] > [data-panel-part="root"]').nth(1)
         events_before_kan_back = page.evaluate("window.actionPanelBrowser.onlineEvents.length")
         online_panel.locator('[data-panel-part="candidate-back"]').click()
-        assert page.evaluate("window.actionPanelBrowser.onlineEvents.length") == events_before_kan_back, 'kan Back must not send a game operation'
+        assert page.evaluate("before => window.actionPanelBrowser.onlineEvents.slice(before)", events_before_kan_back) == [
+          {'type': 'cancel-kan'}
+        ], 'kan Back may only update local candidate UI state, never declare a kan'
         assert online_panel.locator('[data-panel-part="candidate-controls"]').is_hidden()
         assert online_panel.locator('[data-panel-part="normal-controls"]').is_visible(), 'kan Back did not restore ordinary controls'
         page.evaluate("window.actionPanelBrowser.update(null, false, false, true)")
