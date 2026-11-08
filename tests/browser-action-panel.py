@@ -32,7 +32,7 @@ with sync_playwright() as p:
         page.evaluate("""async () => {
           const { ActionPanel } = await import('/heibon-mahjong/src/ui/action-panel.ts');
           const { createOnlineActionPanelState } = await import('/heibon-mahjong/src/online/action-panel-state.ts');
-          const { TILE_KINDS, ordinaryTile } = await import('/heibon-mahjong/src/model/tile.ts');
+          const { TILE_KINDS, ordinaryTile, redFive } = await import('/heibon-mahjong/src/model/tile.ts');
           const template = document.querySelector('#game-controls-template');
           const host = document.createElement('div');
           host.style.width = '100%';
@@ -65,6 +65,9 @@ with sync_playwright() as p:
             },
           };
           const privateMarker = 'opponent-private-physical-id';
+          const secondFive = { id: 'own-physical-tile-2', tile: ordinaryTile(tile.tile) };
+          const redFiveTile = { id: 'own-red-physical-tile', tile: redFive('sou') };
+          const calledFive = { id: 'called-physical-tile', tile: ordinaryTile(tile.tile) };
           view.seats[1].hand = [{ id: privateMarker, tile: tile.tile }];
           const update = (selected = null, pending = false, decisionPending = false, kanOpen = false, seconds = null) => {
             const state = createOnlineActionPanelState(view, selected, pending, decisionPending, kanOpen, seconds);
@@ -72,7 +75,8 @@ with sync_playwright() as p:
             onlinePanel.update(state);
             return state;
           };
-          window.actionPanelBrowser = { host, localEvents, onlineEvents, localPanel, onlinePanel, view, tile, update, privateMarker };
+          window.actionPanelBrowser = { host, localEvents, onlineEvents, localPanel, onlinePanel, view, tile, update, privateMarker,
+            secondFive, redFiveTile, calledFive };
         }""")
 
         page.evaluate("""() => {
@@ -218,8 +222,8 @@ with sync_playwright() as p:
         page.evaluate("""() => {
           const test = window.actionPanelBrowser;
           test.view.self.callOptions = [
-            { id: 'server-call-option-a', type: 'pon', tiles: [test.tile], calledTileId: 'called', handTileIds: ['own-a'] },
-            { id: 'server-call-option-b', type: 'pon', tiles: [test.tile], calledTileId: 'called', handTileIds: ['own-b'] },
+            { id: 'server-call-option-a', type: 'pon', tiles: [test.tile, test.redFiveTile, test.calledFive], calledTileId: test.calledFive.id, handTileIds: [test.tile.id, test.redFiveTile.id] },
+            { id: 'server-call-option-b', type: 'pon', tiles: [test.tile, test.secondFive, test.calledFive], calledTileId: test.calledFive.id, handTileIds: [test.tile.id, test.secondFive.id] },
           ];
           test.update(null, false, false, false, 10);
         }""")
