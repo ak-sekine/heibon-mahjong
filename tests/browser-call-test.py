@@ -324,7 +324,10 @@ with sync_playwright() as p:
             assert completed['phase'] == 'awaiting-discard' and completed['turn'] == 0, f'{mode}: kan must return to the normal discard turn: {completed}'
             assert completed['drawSource'] == 'rinshan', f'{mode}: a confirmed kan must take a rinshan tile: {completed}'
             assert completed['dora'] == 2, f'{mode}: a confirmed kan must expose one additional dora indicator: {completed}'
-            assert page.locator('#discard').is_visible() and page.locator('#discard').is_enabled(), f'{mode}: ordinary discard did not return after kan'
+            assert page.locator('#discard').is_visible(), f'{mode}: ordinary discard control did not return after kan'
+            page.locator('#player-hand button[data-tile-id]').first.click()
+            page.wait_for_function("()=>{const button=document.querySelector('#discard');return button&&!button.hidden&&!button.disabled}")
+            assert_click_target(page, '#discard', f'{width}x{height} {mode} ordinary discard after kan', below_table=True)
             assert page.evaluate('document.scrollingElement.scrollTop') <= 1, f'{width}x{height} {mode}: normal PC kan operation required page scrolling'
             assert_same_table(before, table_rect(page), f'{width}x{height} {mode} confirmation')
 
