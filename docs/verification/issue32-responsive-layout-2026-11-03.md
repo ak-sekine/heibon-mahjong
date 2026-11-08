@@ -322,7 +322,7 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 
 ### Chromium／WebKitの実測
 
-- `tests/browser-pc-table-layout.py` は各viewportで通常手番、鳴き種類、複数候補の卓矩形が同一であることを検査した。ChromiumとWebKitの実測は一致し、操作wrapperも全状態で同じ位置・幅・高さ108pxだった。表の種類画面上端はローカル／オンライン共通、候補パネル上端は「ローカル／オンライン」、Backはローカル／オンラインとも同じ矩形（viewport座標、px）。
+- `tests/browser-pc-table-layout.py` は各viewportで通常手番、鳴き種類、複数候補の卓矩形が同一であることを検査した。ChromiumとWebKitの実測は一致した。このテストの通常手番fixtureでは操作wrapperが全3状態で同位置・同幅・108px高、鳴き種類から候補へ切り替える間も操作wrapperの全辺が不変だった。一方、別fixtureでは通常手番の表示ボタン数によりwrapperが161.19px高となる場合があるため、通常手番と鳴き判断間で要求するwrapper条件は位置・幅とし、卓は矩形全体を比較する。表の種類画面上端はローカル／オンライン共通、候補パネル上端は「ローカル／オンライン」、Backはローカル／オンラインとも同じ矩形（viewport座標、px）。
 
 | viewport | 卓 x/y/一辺（通常・種類・候補） | 種類パネル上端 | 5候補パネル上端（ローカル／オンライン） | Back y範囲 |
 | --- | --- | --- | --- | --- |
