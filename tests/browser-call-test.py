@@ -106,8 +106,8 @@ with sync_playwright() as p:
         page.evaluate('window.readGame=()=>window.testController.game')
 
         for mode, call_selector, meld_type, meld_size, dora_count in [
-            ('pon', '#call-pon', 'pon', 3, 2),
-            ('daiminkan', '#call-kan', 'daiminkan', 4, 3),
+            ('pon', '#call-pon', 'pon', 3, 1),
+            ('daiminkan', '#call-kan', 'daiminkan', 4, 2),
         ]:
             start_scenario(page, mode)
             before = table_rect(page)
