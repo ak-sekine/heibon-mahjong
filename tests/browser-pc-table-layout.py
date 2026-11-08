@@ -487,7 +487,9 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
           return {kanCount:match.game.kanCount,drawSource:match.game.players[0].drawnTileSource,meldType:match.game.players[0].melds.at(-1)?.type,optionId};
         }''', online_kan_action['action']['optionId'])
         assert online_kan_resolved['kanCount']==1 and online_kan_resolved['drawSource']=='rinshan' and online_kan_resolved['meldType']=='ankan', f'{width}x{height}: online declared kan did not restore normal play: {online_kan_resolved}'
-        assert page.locator('#online-discard').is_visible() and page.locator('#online-discard').is_enabled(), f'{width}x{height}: online discard did not return after kan'
+        assert page.locator('#online-discard').is_visible(), f'{width}x{height}: online discard control did not return after kan'
+        page.locator('#online-player-hand button:enabled').first.click()
+        page.wait_for_function("()=>{const button=document.querySelector('#online-discard');return button&&!button.hidden&&!button.disabled}")
         online_after_kan=page.evaluate("()=>({table:document.querySelector('#online-table').getBoundingClientRect().toJSON(),dora:document.querySelectorAll('#online-table .dora-slot[data-tile-id]').length,scrollTop:document.scrollingElement.scrollTop})")
         assert_same_table(online_kan_board, online_after_kan['table'], f'{width}x{height} online kan completion')
         assert online_after_kan['dora']==2 and online_after_kan['scrollTop']<=1, f'{width}x{height}: online dora or viewport did not update after kan: {online_after_kan}'
