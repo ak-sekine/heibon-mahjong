@@ -244,3 +244,19 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - 初回attemptはWorker公開後の本番オンライン検査で `Mixed-Origin reconnect snapshots differed (host 7, guest 6)` が発生し、Pages公開を停止した。テストの異なる時点のsnapshot比較箇所（`tests/online-production.mjs`）を確認し、ソースや条件を変えず失敗ジョブを再実行した。attempt 2のproduction-testはsuccessで、続くPages build／deployもsuccessとなった。最初の不一致の根本原因は未確定であり、成功結果で上書きしない。
 - WorkerとPagesの成功DeploymentはともにSHA `821dcde93a5a453626f7c32ef41e72fe4d9fcb09`。公開先: [HEIBON MAHJONG](https://ak-sekine.github.io/heibon-mahjong/)。実装は `98b1381` と `821dcde` をmainへ直接pushし、各push後にリモートSHA一致を確認した。PRは作成していない。
 - PC実機の修正版再確認は未確認。公開ページを再読み込みし、PWA更新案内があれば適用したうえで、新規対局／オンラインルーム作成の両方を開き、黄色いつまみを上下端へドラッグ、背景クリック、ホイール・キーボード操作、フッター不動をユーザー本人が確認する。以前のPC実機NG記録を残し、Issue #32はOpenのまま維持する。
+
+
+## 追加修正: PC対局の縦並び化（2026-11-08）
+
+- ユーザー本人のPC実機報告: 右側操作パネルと自分の手牌が離れており、マウス操作がしづらい。スマホ・タブレットと同じ操作順序に揃えるため、PCもヘッダー→座席・点数→正方形の卓→操作状態・ボタンの縦並びに変更する。
+- 作業開始: `/workspace/heibon-mahjong`、ブランチ `work`、clean、未push commitなし。開始HEAD `31f33d8d69fb57e9516697ec4b35f2abf51fc97f`。fetch成功後の `origin/main` は `d52d55372c134e21ed3e5de510e0f0bac56d3689`、behind/ahead 3/0。fast-forwardで同期。Issue #32本文・既存コメント・検証記録を取得しOpenを確認した。
+- 修正前の最新ソースはmain最大1440px、2列Grid、卓最大860px／`100dvh - 80px`、名前・点数／中央14px、局16pxだった。オフライン・オンラインは共通の点数・操作コンポーネントを使い、局結果を右列中央に表示していた。
+- 修正後は両対局を同じ1列flexとし、卓・点数・操作欄・局結果を同じ幅で中央に置く。main上限1440pxと卓上限860pxを維持。卓幅は `min(利用可能幅,860px,max(470px,100dvh - 44px - 76px - 24px - 上下safe area余白 - 操作領域))`。操作領域は通常84px、鳴き中244px。safe area上下は各8px以上、`svh`をfallbackにする。470pxの下限で14〜16pxの文字と牌の可読性を優先し、短いウィンドウ・長い状態文・局結果は自然に縦スクロールする。スクロール位置の強制変更は追加しない。
+- 自分の手牌を含む卓と操作欄のgapは8px。鳴き中は候補を表示する前から244pxを卓下に予約し、absoluteパネルの下端を維持して候補を上方向へ展開する。最大高さを予約枠に制限し、必要時はパネル内スクロールで到達可能にする。既存の種類別選択、複数候補、戻る・見送る、カン、ロン・ツモ・リーチ、結果・順位・次局のイベント経路は変更しない。
+- 文字サイズは名前・点数／中央14px、局16px、主要操作14px以上を維持。卓内の河・副露・ドラ・座席配置と牌サイズの計算係数は維持。幅960px未満のスマホ・タブレット、PWA、通信・ルール・CPUは変更しない。幅960px以上のタブレット横画面はPCと同じ縦並びになる。
+- 自動検証: PC4 viewportでスクロール前の矩形、卓下配置・中央揃え・同幅・正方形、初期表示とクリック可能領域、14〜16px文字と牌の非重複、マウス打牌、Tab/Enter/Space、リサイズを検査。オンラインは実際のOnlineGameControllerにサーバー用公開viewを渡して同じ矩形を検査する。通信は既存オンラインBrowser UIと本番公開検証で別途検査する。既存のスマホ320〜430px・タブレット・鳴き・カン・結果・次局・再接続のmatrixを維持する。
+- ユーザー本人からPCスクロールバーの**ドラッグ操作は修正済み（実機OK）**と報告された。未報告の背景クリック・ホイールを個別の実機OKとはしない。過去のiPhone Safari／PWAのOK記録を維持する。
+- PC縦並び版の実機再確認は未実施: 通常手番の卓全体・手牌・打牌ボタン、手牌との距離、文字／牌の可読性、リサイズ、小さいウィンドウでのスクロール、マウス／Tab・Enter・Space、チー複数候補・ポン・カン・戻る・見送る、ロン・ツモ・リーチ、結果／順位／次局、オンラインと再接続。Issue #32はOpenのまま維持し、本人確認後にClose可否を判断する。
+- ローカル・Actions・実装SHA・公開SHAの確定結果は後続追記に記録する。未実施を成功として扱わない。
+
+- ローカル結果: `npm test` 1464件成功、`npm run build`（TypeScript含む）、`npm run typecheck:worker`、Browser UI選択検査8件、変更Pythonの構文検査、`git diff --check` が成功。既知のブラウザー起動制限はAGENTS.mdに従い、Chromium／WebKitは既存Actions matrixで実施する。

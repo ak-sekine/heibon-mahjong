@@ -11,23 +11,24 @@ out = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 out.mkdir(parents=True, exist_ok=True)
 
 
-def inspect_page(page):
-    return page.evaluate('''()=>{
+def inspect_page(page, online=False):
+    return page.evaluate('''online=>{
       const rect=e=>{const r=e.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
       const visible=e=>e&&e.getClientRects().length>0&&getComputedStyle(e).display!=='none'&&getComputedStyle(e).visibility!=='hidden';
+      const prefix=online?'online':'local';
       const header=rect(document.querySelector('main > header'));
-      const table=rect(document.querySelector('#local-table'));
-      const scoreStrip=rect(document.querySelector('#local-table-summary'));
-      const controls=document.querySelector('#local-game-controls');
+      const table=rect(document.querySelector(`#${prefix}-table`));
+      const scoreStrip=rect(document.querySelector(`#${prefix}-table-summary`));
+      const controls=document.querySelector(`#${prefix}-game-controls`);
       const buttons=[...controls.querySelectorAll('.control-action-button')].filter(visible).map(button=>{
         const r=rect(button),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
-        return {id:button.id,label:button.textContent.trim(),...r,enabled:!button.disabled,receivesPointer:hit===button||button.contains(hit)};
+        return {fontSize:parseFloat(getComputedStyle(button).fontSize),id:button.id,label:button.textContent.trim(),...r,enabled:!button.disabled,receivesPointer:hit===button||button.contains(hit)};
       });
-      const scoreLabels=[...document.querySelectorAll('.score-strip .seat-label')].map(e=>parseFloat(getComputedStyle(e).fontSize));
-      const center=document.querySelector('#local-table .center-info');
-      const round=document.querySelector('#local-table .round-summary');
-      const roundLabel=document.querySelector('#local-table .round-label');
-      const wallCount=document.querySelector('#local-table .wall-count');
+      const scoreLabels=[...document.querySelectorAll('.score-strip .seat-label')].filter(visible).map(e=>parseFloat(getComputedStyle(e).fontSize));
+      const center=document.querySelector(`#${prefix}-table .center-info`);
+      const round=document.querySelector(`#${prefix}-table .round-summary`);
+      const roundLabel=document.querySelector(`#${prefix}-table .round-label`);
+      const wallCount=document.querySelector(`#${prefix}-table .wall-count`);
       const textNodes=[...document.querySelectorAll('.score-strip .seat-label,.table .seat-label,.table .center-info > .round-summary,.table .round-label,.table .wall-count')]
         .filter(e=>visible(e)&&e.textContent.trim());
       const tileNodes=[...document.querySelectorAll('.table .tile-svg,.table .tile-back')]
@@ -44,7 +45,7 @@ def inspect_page(page):
       const scroll=document.scrollingElement;
       return {
         viewport:{width:innerWidth,height:innerHeight},
-        header,scoreStrip,
+        header,scoreStrip,controls:rect(controls),
         table,
         scoreFontSizes:scoreLabels,
         centerFontSize:parseFloat(getComputedStyle(center).fontSize),
@@ -56,19 +57,19 @@ def inspect_page(page):
         scroll:{top:scroll.scrollTop,width:scroll.scrollWidth,height:scroll.scrollHeight},
         meldCount:document.querySelectorAll('#local-table .seat-bottom .open-meld').length,
       };
-    }''')
+    }''', online)
 
 
-def assert_pc_layout(page, width, height, label):
-    result = inspect_page(page)
+def assert_pc_layout(page, width, height, label, fit=True, online=False):
+    result = inspect_page(page, online)
     for region in ('header', 'scoreStrip'):
         box = result[region]
         assert box['top'] >= -0.5 and box['bottom'] <= height + 0.5, f'{label}: {region} is outside the initial viewport: {result}'
     table = result['table']
     assert table['left'] >= -0.5 and table['right'] <= width + 0.5, f'{label}: table is outside viewport width: {result}'
-    assert table['top'] >= -0.5 and table['bottom'] <= height + 0.5, f'{label}: table is outside viewport height: {result}'
+    assert table['top'] >= -0.5 and (not fit or table['bottom'] <= height + 0.5), f'{label}: table is outside viewport height: {result}'
     assert result['scroll']['width'] <= width + 1, f'{label}: horizontal page overflow: {result}'
-    assert result['scroll']['height'] <= height + 1, f'{label}: vertical page overflow before scrolling: {result}'
+    assert not fit or result['scroll']['height'] <= height + 1, f'{label}: vertical page overflow before scrolling: {result}'
     assert result['scroll']['top'] <= 1, f'{label}: page scrolled before initial-view checks: {result}'
     assert result['scoreFontSizes'] and all(14 <= size <= 16 for size in result['scoreFontSizes']), f'{label}: player/score text is outside 14–16px: {result}'
     assert 14 <= result['centerFontSize'] <= 16, f'{label}: center information is outside 14–16px: {result}'
@@ -77,12 +78,20 @@ def assert_pc_layout(page, width, height, label):
     assert 14 <= result['wallCountFontSize'] <= 16, f'{label}: remaining-wall count is outside 14–16px: {result}'
     assert result['textCount'] >= 5 and result['tileCount'] > 0, f'{label}: expected visible seat, round, and tile content: {result}'
     assert not result['overlaps'], f'{label}: text overlaps a tile, river, dora, or meld: {result}'
-    discard = next((button for button in result['visibleActionButtons'] if button['id'] == 'discard'), None)
-    assert discard and discard['enabled'] and discard['receivesPointer'], f'{label}: discard is not operable without scrolling: {result}'
+    controls = result['controls']
+    assert 0 <= controls['top'] - table['bottom'] <= 8.5, f'{label}: controls must follow table: {result}'
+    assert abs(controls['width'] - table['width']) <= 1, f'{label}: panel width differs: {result}'
+    assert abs((table['left'] + table['right']) / 2 - width / 2) <= 1, f'{label}: table is not centered: {result}'
+    assert abs(controls['left'] - table['left']) <= 1, f'{label}: controls are not centered: {result}'
+    assert abs(table['width'] - table['height']) <= 1, f'{label}: table must be square: {result}'
+    assert result['scoreStrip']['bottom'] <= table['top'], f'{label}: scores must precede table: {result}'
+    discard = next((button for button in result['visibleActionButtons'] if button['id'] == ('online-discard' if online else 'discard')), None)
+    assert discard and discard['enabled'] and (not fit or discard['receivesPointer']), f'{label}: discard is not operable without scrolling: {result}'
     for button in result['visibleActionButtons']:
-        assert button['top'] >= 0 and button['bottom'] <= height, f'{label}: visible action button is outside initial viewport: {result}'
+        assert button['top'] >= 0 and (not fit or button['bottom'] <= height), f'{label}: visible action button is outside initial viewport: {result}'
+        assert button['fontSize'] >= 14, f'{label}: action font too small: {result}'
         assert button['width'] >= 44 and button['height'] >= 44, f'{label}: visible action button is too small: {result}'
-        assert button['receivesPointer'], f'{label}: visible action button is covered: {result}'
+        assert not fit or button['receivesPointer'], f'{label}: visible action button is covered: {result}'
     return result
 
 
@@ -90,6 +99,10 @@ with sync_playwright() as p:
     browser = getattr(p, ENGINE).launch()
     for width, height in VIEWPORTS:
         page = browser.new_page(viewport={'width': width, 'height': height})
+        def expose_app(route):
+            response = route.fetch()
+            route.fulfill(response=response, body=response.text() + '\nwindow.pcOnlineController=onlineGameController;\n')
+        page.route('**/src/main.ts', expose_app)
         page.goto('http://localhost:4173/heibon-mahjong/')
         page.evaluate('''async()=>{
           const app=await import('/heibon-mahjong/src/main.ts');
@@ -98,15 +111,18 @@ with sync_playwright() as p:
           app.controller.newGame();
         }''')
         page.wait_for_selector('#player-hand button:enabled')
-        page.locator('#player-hand button:enabled').first.click()
+        page.locator('#player-hand button:enabled').first.evaluate('e=>e.click()')
         page.locator('#discard').wait_for(state='visible')
         initial = assert_pc_layout(page, width, height, f'{width}x{height} initial turn')
         page.screenshot(path=str(out / f'pc-table-{ENGINE}-{width}x{height}.png'))
 
         resized = {'width': width - 160, 'height': height - 80}
         page.set_viewport_size(resized)
-        resized_result = assert_pc_layout(page, resized['width'], resized['height'], f'{width}x{height} resized to {resized}')
+        resized_result = assert_pc_layout(page, resized['width'], resized['height'], f'{width}x{height} resized to {resized}', fit=False)
+        page.locator('#discard').scroll_into_view_if_needed()
+        assert page.locator('#discard').evaluate('e=>{const r=e.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===e||e.contains(hit)}'), 'discard must remain reachable in short windows'
         page.set_viewport_size({'width': width, 'height': height})
+        page.evaluate('window.scrollTo(0,0)')
         restored = assert_pc_layout(page, width, height, f'{width}x{height} restored')
 
         page.evaluate('''async()=>{
@@ -174,7 +190,18 @@ with sync_playwright() as p:
         page.wait_for_function('''previous=>pcResponsiveApp.controller.game.players[pcResponsiveApp.controller.playerSeat].river.length>previous''', arg=before_keyboard)
         assert page.evaluate('document.scrollingElement.scrollTop') <= 1, f'{width}x{height}: keyboard flow unexpectedly scrolled the page'
 
-        report={'viewport':f'{width}x{height}','browser':ENGINE,'initial':initial,'resized':resized_result,'restored':restored,'meldFixtures':fixture_results,'mouse':'passed','keyboard':'passed','result':'passed'}
+        page.evaluate('''async()=>{
+          const {startOnlineGame}=await import('/heibon-mahjong/src/online/game-engine.ts');
+          const {createPlayerGameView}=await import('/heibon-mahjong/src/online/game-view.ts');
+          const identities=[0,1,2,3].map(seat=>({seat,name:seat?'CPU'+seat:'あなた',control:seat?'cpu':'human',connected:true}));
+          const session=startOnlineGame(identities,0,()=>.999999);
+          pcOnlineController.receive({type:'game-started',view:createPlayerGameView(session,0,'PCTEST',new Set([0]))});
+        }''')
+        page.wait_for_selector('#online-player-hand button:enabled')
+        page.locator('#online-player-hand button:enabled').first.evaluate('e=>e.click()')
+        online_result = assert_pc_layout(page, width, height, f'{width}x{height} online turn', online=True)
+
+        report={'viewport':f'{width}x{height}','browser':ENGINE,'initial':initial,'online':online_result,'resized':resized_result,'restored':restored,'meldFixtures':fixture_results,'mouse':'passed','keyboard':'passed','result':'passed'}
         reports.append(report)
         print(f'{ENGINE} {width}x{height} PC table, controls, resize, mouse, and keyboard passed')
         page.close()

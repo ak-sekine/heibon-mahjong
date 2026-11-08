@@ -32,8 +32,7 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
   baseline = []
   measurements = []
   def geometry():
-   # Mobile keeps the controls below the table; the PC layout gives them a
-   # separate column and should not require a scroll to reach the active turn.
+   # Controls follow the table on every device; normal PC turns fit initially.
    if width < 960:
     page.locator('#local-game-controls').scroll_into_view_if_needed()
    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
@@ -44,7 +43,7 @@ window.riichiDiscard = () => {controller.game=discardTile(controller.game,contro
    if width >= 960:
     table=page.locator('#local-table').bounding_box()
     assert all(b['x']>=table['x'] and b['x']+b['w']<=table['x']+table['width'] for b in boxes),(width,height,boxes[-1],table)
-    assert table['x']+table['width']<=controls['x'] or controls['x']+controls['width']<=table['x'],(width,height,table,controls)
+    assert 0 <= controls['y']-table['y']-table['height'] <= 8.5,(width,height,table,controls)
    else:
     assert all(b['y']+b['h']<=controls['y'] for b in boxes),(width,height,boxes[-1],controls)
    assert page.locator('.dora-slot').count()==5
