@@ -153,9 +153,12 @@ with sync_playwright() as p:
             page.locator('#kan').click()
             page.wait_for_function("()=>!document.querySelector('#kan-controls').hidden && document.querySelectorAll('#kan-options button').length>0")
             assert_same_table(before, table_rect(page), f'{width}x{height} {mode} candidates open')
-            assert_click_target(page, '#cancel-kan', f'{width}x{height} {mode} cancel', below_table=False)
+            page.locator('#cancel-kan').scroll_into_view_if_needed()
+            assert_click_target(page, '#cancel-kan', f'{width}x{height} {mode} cancel', below_table=False, in_initial_view=False)
             page.locator('#cancel-kan').click()
             page.wait_for_function("()=>document.querySelector('#kan-controls').hidden")
+            page.evaluate('()=>{document.documentElement.style.scrollBehavior="auto";window.scrollTo(0,0)}')
+            page.wait_for_function('window.scrollY===0')
             after_cancel = page.evaluate('''()=>{
               const g=readGame();return {kanCount:g.kanCount??0,liveWall:g.liveWall.length,
                 hand:[...g.players[0].hand.map(t=>t.id),...(g.players[0].drawnTile?[g.players[0].drawnTile.id]:[])].sort(),
@@ -167,12 +170,15 @@ with sync_playwright() as p:
             page.locator('#kan').click()
             page.wait_for_function("()=>!document.querySelector('#kan-controls').hidden")
             assert page.locator('#kan-options button').count() >= 1
-            assert_click_target(page, '#kan-options button', f'{width}x{height} {mode} candidate', below_table=False)
+            page.locator('#kan-options button').first.scroll_into_view_if_needed()
+            assert_click_target(page, '#kan-options button', f'{width}x{height} {mode} candidate', below_table=False, in_initial_view=False)
             page.locator('#kan-options button').first.click()
             page.wait_for_function('''()=>!window.testController.progressing && window.readGame().kanCount===1''')
             completed = assert_integrity(page, {'type': meld_type, 'size': 4}, 1)
             assert completed['drawSource'] == 'rinshan', f'{mode}: a confirmed kan must take a rinshan tile: {completed}'
             assert completed['dora'] == 3, f'{mode}: a confirmed kan must expose one additional dora indicator: {completed}'
+            page.evaluate('()=>{document.documentElement.style.scrollBehavior="auto";window.scrollTo(0,0)}')
+            page.wait_for_function('window.scrollY===0')
             assert_same_table(before, table_rect(page), f'{width}x{height} {mode} confirmation')
 
             page.locator('#repeat-scenario').click()
