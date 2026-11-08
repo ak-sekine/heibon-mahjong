@@ -262,3 +262,18 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - ローカル結果: `npm test` 1464件成功、`npm run build`（TypeScript含む）、`npm run typecheck:worker`、Browser UI選択検査8件、変更Pythonの構文検査、`git diff --check` が成功。既知のブラウザー起動制限はAGENTS.mdに従い、Chromium／WebKitは既存Actions matrixで実施する。
 
 - CSS確認で通常操作欄のキーボード案内の高さも予算に含め、通常操作の予約を108pxとした。長い「南4局 2本場」等は中央情報を同じ14〜16pxのまま必要時に折り返し、PC4 viewportの副露・河局面でも検査する。
+
+- 初回実装 `271d10061331ca85bcf70d29489fb4a17a9e26e6` の[Actions #42441804298](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42441804298)は両engineで1280×720の縦overflowを検出しfailure。スクロール前の卓476px、点数欄75.1875px、操作欄103px、ページ高738pxで、打牌ボタンは702.1875pxまでだった。主ボタンは到達可能だが操作欄全体と安全余白が収まらなかったため公開はゲートで停止。CSS調査で既に追加していた108pxの操作予約と450pxの卓下限を、後続 `1aa498bea53a6147a55b233765b5cd269b5d2e57` の[Actions #42442235683](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42442235683)で再検査する。失敗を成功として上書きしない。
+
+- 追加修正版のWebKitは32シナリオすべてsuccess。結果JSON・timings CSV・1280×720スクリーンショットをActions artifactから取得して確認した。通常時の卓幅は1280×720:452px／1366×768:500px／1440×900:632px／1920×1080:812px、卓上端143.1875px、操作欄高さ108px・卓とのgap8px。操作欄の下端は順に711.1875／759.1875／891.1875／1071.1875pxで、安全余白を含めviewport内に収まる。オンラインも同じ卓矩形。各サイズで南4局2本場・18枚の河・1面子／4面子と大明槓の文字対牌の重なりは0件。マウス・Tab/Enter/Space・リサイズ・小ウィンドウの到達性もsuccess。スマホ・タブレット、鳴き選択・結果・次局・オンライン再接続を含む既存WebKit matrixもsuccess。
+
+
+### 縦並び版の最終自動検証・公開
+
+- 実装コミットは `271d10061331ca85bcf70d29489fb4a17a9e26e6` と追加修正 `1aa498bea53a6147a55b233765b5cd269b5d2e57`。両方ともPRを作らずmainへ直接pushし、リモートSHA一致を確認した。
+- [Actions #42442235683](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42442235683) は最終success。Chromium **42シナリオ**／WebKit **32シナリオ**がすべてsuccess。両engineのPC4 viewportの結果JSON・job logsを照合し、上記と同じ卓／操作欄矩形、中央揃え、同幅、初期スクロール0・横縦overflowなし、主要操作44px以上／14px、名前・点数・中央14px／局16px、長い局表示・河・ドラ・副露との重なり0件、マウス打牌、Tab/Enter/Space、リサイズ、短いウィンドウでの打牌操作の到達性を確認した。
+- 既存のスマホ320〜430px・縦横回転・768×1024／1024×768タブレット、鳴きの種類選択と複数候補／戻る／見送る、カン、リーチ・ツモ・ロン、結果・順位・次局、オンラインと再接続の回帰検査が通過した。PCの候補表示は従来の1280×900を含む鳴きテストで確認し、4つの指定PC viewportすべてで各鳴き局面を個別に実機確認したという意味ではない。Android・タブレットの実機確認も未実施。
+- Deploy gateのmatrix audit、release freshness、Worker deploy、本番オンライン検証、Pages build／deployがすべてsuccess。既存の本番オンライン検査は条件や通信仕様を変更せず、今回runでは再実行なしで成功した。
+- 成功Deployment: Worker `7630886344`、Pages `7630901415`、GitHub Pages `7630898571`。いずれもSHA **`1aa498bea53a6147a55b233765b5cd269b5d2e57`**で、APIの最新statusがsuccessであることを確認。公開先: [HEIBON MAHJONG](https://ak-sekine.github.io/heibon-mahjong/)。公開URLへのCodex Cloudからの直接HTTP取得はproxyのCONNECT 403で拒否され、実ページの直接取得・再描画は未確認。公開確認の根拠はActions deployとGitHub Deploymentの成功記録であり、実機確認とは区別する。
+- 最終ローカル検査は `npm test` 1464/1464成功、`npm run build`、Worker型検査、Browser UI選択8件、変更Pythonの構文検査、PCテスト内JavaScript式19箇所の構文検査、`git diff --check` が成功。PC／Safari実機確認を自動検証で代替しない。
+- Issue #32のOpenを公開後にも確認した。本人による縦並び版PCの再確認まではOpenを維持する。以前のiPhone Safari／PWAのOK、今回本人報告のPCスクロールバー「ドラッグ操作OK」を維持し、背景クリックやホイールの個別実機OKは推定しない。
