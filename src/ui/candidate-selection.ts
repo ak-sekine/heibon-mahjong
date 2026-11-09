@@ -69,10 +69,10 @@ export class CandidateSelection {
     delete this.list.dataset.signature;
   }
 
-  focusFirst(): void {
+  focusFirst(scrollPosition?: Readonly<{ x: number; y: number }>): void {
     const candidate = this.list.querySelector<HTMLButtonElement>('button[data-action-choice]:not(:disabled)');
-    if (candidate) this.focusWithoutPageScroll(candidate);
-    else this.focusWithoutPageScroll(this.root);
+    if (candidate) this.focusWithoutPageScroll(candidate, scrollPosition);
+    else this.focusWithoutPageScroll(this.root, scrollPosition);
   }
 
   get operationType(): CandidateOperation | null { return this.operation; }
@@ -98,13 +98,13 @@ export class CandidateSelection {
     this.onSelect({ id: option.id, operationType, candidateId: `${operationType}-${index + 1}`, button });
   }
 
-  private focusWithoutPageScroll(target: HTMLElement): void {
+  private focusWithoutPageScroll(target: HTMLElement, scrollPosition?: Readonly<{ x: number; y: number }>): void {
     if (typeof window === 'undefined') {
       target.focus();
       return;
     }
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
+    const scrollX = scrollPosition?.x ?? window.scrollX;
+    const scrollY = scrollPosition?.y ?? window.scrollY;
     const restoreScroll = () => window.scrollTo(scrollX, scrollY);
     target.focus({ preventScroll: true });
     // Some WebKit versions still adjust the document when focusing a fixed

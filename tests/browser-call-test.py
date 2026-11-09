@@ -385,13 +385,27 @@ with sync_playwright() as p:
     start_scenario(page, 'opening')
     if page.locator('#kan').evaluate('''e=>{const r=e.getBoundingClientRect();return r.top<0||r.bottom>innerHeight}'''):
         page.locator('#kan').scroll_into_view_if_needed()
-    page_scroll_before_candidates = page.evaluate('document.scrollingElement.scrollTop')
+    scroll_before_candidates = page.evaluate('''()=>{
+      const controls=document.querySelector('#local-game-controls');
+      const bounds=controls.getBoundingClientRect();
+      window.__issue32ScrollTrace=[];
+      window.addEventListener('scroll',()=>window.__issue32ScrollTrace.push({type:'scroll',top:document.scrollingElement.scrollTop,time:performance.now()}),{passive:true});
+      document.addEventListener('focusin',event=>window.__issue32ScrollTrace.push({type:'focusin',target:event.target.id||event.target.className||event.target.tagName,top:document.scrollingElement.scrollTop,time:performance.now()}),true);
+      return {top:document.scrollingElement.scrollTop,scrollHeight:document.scrollingElement.scrollHeight,controlsHeight:bounds.height,
+        controlsMinHeight:getComputedStyle(controls).minHeight,normalHidden:document.querySelector('#normal-controls').hidden,
+        activeElement:document.activeElement.id||document.activeElement.tagName};
+    }''')
     before = table_rect(page)
     assert_click_target(page, '#kan', '959x900 opening ankan toggle', in_initial_view=False)
     page.locator('#kan').click()
     page.wait_for_function("!document.querySelector('#candidate-controls').hidden && document.querySelectorAll('#candidate-options button').length===2")
     assert page.locator('#candidate-controls').evaluate('e=>getComputedStyle(e).position') == 'fixed', 'candidate controls below 960px must use the shared viewport layout'
-    assert page.evaluate('document.scrollingElement.scrollTop') == page_scroll_before_candidates, '959x900 opening ankan candidates: candidate mode moved the page scroll position'
+    scroll_after_candidates = page.evaluate('''()=>({top:document.scrollingElement.scrollTop,scrollHeight:document.scrollingElement.scrollHeight,
+      controlsHeight:document.querySelector('#local-game-controls').getBoundingClientRect().height,
+      controlsMinHeight:getComputedStyle(document.querySelector('#local-game-controls')).minHeight,
+      normalHidden:document.querySelector('#normal-controls').hidden,activeElement:document.activeElement.id||document.activeElement.tagName,
+      events:window.__issue32ScrollTrace})''')
+    assert scroll_after_candidates['top'] == scroll_before_candidates['top'], f'959x900 opening ankan candidates: candidate mode moved page scroll: before={scroll_before_candidates}, after={scroll_after_candidates}'
     assert_same_table(before, table_rect(page), '959x900 opening ankan candidates')
     assert_click_target(page, '#candidate-back', '959x900 opening ankan cancel')
     page.locator('#candidate-back').click()

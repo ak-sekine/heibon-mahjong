@@ -162,6 +162,7 @@ export class ActionPanel {
   private readonly options: ActionPanelOptions;
   private readonly visiblePanelIds = new Map<string, number>();
   private pendingPointerTrace: { target: HTMLButtonElement; trace: ActionPanelTrace } | null = null;
+  private pendingCandidateScroll: Readonly<{ x: number; y: number }> | null = null;
   private candidateClickTrace: ActionPanelTrace | null = null;
   private candidateAnchorDocumentBottom: number | null = null;
   private candidateAnchorRootHeight: number | null = null;
@@ -221,6 +222,10 @@ export class ActionPanel {
       window.visualViewport?.addEventListener('scroll', repositionCandidates, { passive: true });
     }
     root.addEventListener('pointerdown', event => this.onPointerDown(event), true);
+    root.addEventListener('pointercancel', () => {
+      this.pendingPointerTrace = null;
+      this.pendingCandidateScroll = null;
+    }, true);
     root.addEventListener('click', event => this.onClick(event));
     root.addEventListener('keydown', event => {
       if ((event as KeyboardEvent).key === 'Escape' && !this.part('candidate-controls').hidden &&
@@ -239,6 +244,7 @@ export class ActionPanel {
     this.activeCallOptions = [];
     this.callSelectionPending = false;
     this.callType = null;
+    this.pendingCandidateScroll = null;
     this.candidates.hide();
     this.clearCandidateAnchor();
     for (const part of ['discard', 'riichi', 'tsumo', 'kyuushu', 'kan-toggle', 'call-pon', 'call-kan', 'call-chi', 'candidate-back', 'ron', 'pass-ron', 'pass-call', 'next-round', 'show-result', 'show-match-result']) {
@@ -306,7 +312,7 @@ export class ActionPanel {
       this.candidates.show(selectedOptions, selectedOperation, progressing || this.callSelectionPending);
       if (progressing || this.callSelectionPending) candidatePanel.setAttribute('aria-busy', 'true');
       else candidatePanel.removeAttribute('aria-busy');
-      if (wasHidden.candidate) this.candidates.focusFirst();
+      if (wasHidden.candidate) this.focusFirstCandidate();
     }
     else {
       this.candidates.hide();
@@ -386,6 +392,10 @@ export class ActionPanel {
     if (!(target instanceof Element)) return;
     const button = target.closest<HTMLButtonElement>('button[data-action-choice],button[data-panel-action]');
     if (!button || !this.ownsButton(button)) return;
+    const action = button.dataset.panelAction;
+    this.pendingCandidateScroll = action && ['kan-toggle', 'call-pon', 'call-kan', 'call-chi'].includes(action)
+      ? { x: window.scrollX, y: window.scrollY }
+      : null;
     const trace = this.trace(button, button.dataset.diagnosticActionType ?? 'unknown');
     this.pendingPointerTrace = { target: button, trace };
     this.recordInput('action_panel_pointer_received', button, trace);
@@ -440,6 +450,7 @@ export class ActionPanel {
     if (candidates.length > 0) {
       if (candidates.length === 1) {
         this.callType = null;
+        this.pendingCandidateScroll = null;
         this.candidates.show(candidates, type, this.callSelectionPending, 'select');
         this.part('action-status').focus({ preventScroll: true });
         return;
@@ -460,8 +471,14 @@ export class ActionPanel {
       this.part('normal-controls').hidden = true;
       (this.part('candidate-back') as HTMLButtonElement).hidden = false;
       (this.part('candidate-back') as HTMLButtonElement).dataset.diagnosticActionType = type;
-      this.candidates.focusFirst();
+      this.focusFirstCandidate();
     }
+  }
+
+  private focusFirstCandidate(): void {
+    const scrollPosition = this.pendingCandidateScroll ?? undefined;
+    this.pendingCandidateScroll = null;
+    this.candidates.focusFirst(scrollPosition);
   }
 
   private optionsForSelection(): readonly ActionChoiceOption[] {
