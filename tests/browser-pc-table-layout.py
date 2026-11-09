@@ -235,7 +235,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
           panelPosition:getComputedStyle(document.querySelector('#call-controls')).position})''')
         assert normal_board
         assert_same_table(normal_board, call_start['table'], f'{width}x{height} local call decision')
-        assert call_start['panelPosition'] == 'relative', f'{width}x{height}: PC type choices left their table-side position: {call_start}'
+        assert call_start['panelPosition'] == 'absolute', f'{width}x{height}: PC call type choices lost their table-side overlay position: {call_start}'
         assert 0 <= call_start['controls']['top']-call_start['table']['bottom'] <= 8.5, f'{width}x{height}: call controls are not under the table: {call_start}'
         assert 0 <= call_start['panel']['top']-call_start['table']['bottom'] <= 16, f'{width}x{height}: call choices are far from the hand: {call_start}'
         assert call_start['scrollTop'] <= 1, f'{width}x{height}: opening the call panel moved the page: {call_start}'
@@ -250,7 +250,9 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         assert call_candidates.count() > 1, f'{width}x{height}: call candidate selection did not expand'
         candidate_metrics = page.evaluate('''()=>({table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),
           controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),
-          panel:document.querySelector('#call-controls').getBoundingClientRect().toJSON(),
+          panel:document.querySelector('#candidate-controls').getBoundingClientRect().toJSON(),
+          panelPosition:getComputedStyle(document.querySelector('#candidate-controls')).position,
+          normalControlsHidden:document.querySelector('#normal-controls').hidden,
           candidates:[...document.querySelectorAll('#candidate-options button[data-action-choice="call"]')].map(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {...r.toJSON(),receivesPointer:hit===node||node.contains(hit)}}),
           back:document.querySelector('#candidate-back').getBoundingClientRect().toJSON(),
           scrollTop:document.scrollingElement.scrollTop,scrollHeight:document.scrollingElement.scrollHeight})''')
@@ -258,7 +260,8 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         assert all(box['width'] >= 44 and box['height'] >= 44 for box in candidate_metrics['candidates']), f'{width}x{height}: a call candidate is too small: {candidate_metrics}'
         for key in ('top','left','width','height'):
             assert abs(candidate_metrics['controls'][key]-call_start['controls'][key]) < 1, f'{width}x{height}: candidates moved or resized the operation area: {candidate_metrics}, type={call_start}'
-        assert page.locator('#call-controls').evaluate('node=>getComputedStyle(node).position') == 'absolute', f'{width}x{height}: candidate panel did not leave normal flow'
+        assert candidate_metrics['panelPosition'] == 'fixed', f'{width}x{height}: common candidate panel is not fixed to the viewport: {candidate_metrics}'
+        assert candidate_metrics['normalControlsHidden'], f'{width}x{height}: normal actions remained visible during candidate selection: {candidate_metrics}'
         assert candidate_metrics['panel']['top'] < candidate_metrics['table']['bottom'], f'{width}x{height}: candidate panel did not grow upward over the table: {candidate_metrics}'
         assert abs(candidate_metrics['panel']['bottom']-candidate_metrics['controls']['bottom']) <= 2, f'{width}x{height}: candidate panel lost its bottom anchor: {candidate_metrics}'
         assert candidate_metrics['candidates'] and all(box['receivesPointer'] for box in candidate_metrics['candidates']), f'{width}x{height}: a candidate is covered at its click point: {candidate_metrics}'
