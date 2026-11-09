@@ -113,4 +113,4 @@ npm run build
 
 開発記録には当時の仕様や未実装項目も保存されています。現在の仕様として参照するのは[SPEC.md](docs/SPEC.md)です。
 
-候補選択パネルの下端固定・操作領域の高さ保持（Issue #32）の設計と自動検証は[検証記録](docs/verification/issue32-candidate-anchor-2026-11-09.md)を参照してください。iPhone Safari実機の修正後確認は未確認です。
+候補選択パネルの下端固定・操作領域の高さ保持（Issue #32）は実装・Chromium／WebKit検証・公開済みです。設計と検証結果は[検証記録](docs/verification/issue32-candidate-anchor-2026-11-09.md)を参照してください。iPhone Safari実機の修正後確認は未確認です。

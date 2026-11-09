@@ -34,11 +34,11 @@
 
 ローカルで`npm test`、`npm run build`、`npm run typecheck:worker`成功。`npm run build:itch`はWorker URL未指定の最初の実行で設定エラーとなり、既存の公開Worker URLを指定した再実行は成功しました。
 
-ブラウザー座標の検証を既存のChromium／WebKit matrixへ追加します。11 viewport（320×568、375×634、390×844、430×932、768×1024、1024×768、1280×720、1366×768、1440×900、1660×825、1920×1080）で、実際のローカル／オンラインcontroller・状態生成と合法局面を使用します。ポン複数（赤五萬）、チー5候補、単一大明カン即実行、暗カン単一／複数、加カンを対象にします。
+ブラウザー座標の検証を既存のChromium／WebKit matrixへ追加しました。11 viewport（320×568、375×634、390×844、430×932、768×1024、1024×768、1280×720、1366×768、1440×900、1660×825、1920×1080）で、実際のローカル／オンラインcontroller・状態生成と合法局面を使用します。ポン複数（赤五萬）、チー5候補、単一大明カン即実行、暗カン単一／複数、加カンを対象にします。
 
 `getBoundingClientRect()`で候補表示前のrootと実表示の鳴き種類パネル、候補表示後、候補増加・内部スクロール、Safari相当のvisualViewport変更・復元、戻る後を記録します。元root下端との差2px以内、予約領域・卓矩形・scrollY不変、ヒットテスト、通常操作非表示、戻るのゲーム状態不変、オンライン送信二重実行防止を検証します。初期表示でPlaywrightの自動scrollIntoViewを使わず、クリック座標を先に検査します。
 
-旧SHAのActionPanelとCSSを使うbaseline passは、旧挙動の差分を観測用JSONへ保存します。修正後passのassertを緩めるものではありません。両engineの座標JSONは既存artifactの`candidate-geometry/`配下に保存されます。Actions実行・座標実測・公開結果は実行確認後に追記します。
+旧SHAのActionPanelとCSSを使うbaseline passは、旧挙動の差分を観測用JSONへ保存します。修正後passのassertを緩めるものではありません。両engineの座標JSONは既存artifactの`candidate-geometry/`配下に保存されます。Actions実行・座標実測・公開結果は以下に記録しています。
 
 ## 修正後のiPhone Safari再確認（すべて未確認）
 
@@ -123,3 +123,38 @@ run #42559867159の追加共通座標テストは、Chromium／WebKitの両方�
 [run #42560838359](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42560838359)は両engineで共通座標検査・既存チー検査・11 viewportのポン／カン検査まで成功し、その後の例外的な959×900スクロール検査で失敗しました。操作ボタン1個を手動で表示した時点でも、通常領域の下端はviewport外に残っていました。候補下端をそのまま維持した結果、戻るはbottom=924.59375となり、viewport高さ900pxを超えました（scrollY=36）。
 
 このケースは当初から手動スクロールを許す例外のため、通常パネル全体へ到達してから元の下端を保存するように検証準備を修正しました。候補を開いた後の下端・高さ・scrollY不変の検査は維持します。指定11 viewportの初期表示には事前スクロールを追加していません。製品コードの初回クランプや自動ページスクロールも追加していません。既存回帰を先に実行し、大きい座標matrixを最後へ移すことで、既存検査の失敗を早く検出します。
+
+## 最終ゲート・公開結果
+
+最終SHA **`3171cdb8298bd20795c348ae0a0fb3b005027916`** の[Deploy run #42561771978](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42561771978)は**success**です。
+
+| 検証 | 結果 |
+| --- | --- |
+| npm test | success（ローカル86 test files、CI verifyもsuccess） |
+| npm run build | success |
+| npm run typecheck:worker | success |
+| npm run build:itch | success（ローカルは既存公開Worker URL指定、CI検証buildはmock URL、公開buildはdeploy出力URL） |
+| Chromium Browser UI | success（45本、観測baseline 1本を含む） |
+| WebKit Browser UI | success（35本、観測baseline 1本を含む） |
+| 共通座標matrix | 両engine、11 viewport×2対局mode×6局面がsuccess |
+| standalone itch smoke前後、制御失敗診断 | 両engine success |
+| browser-ui-matrix-audit／release-freshness | success |
+| Worker deploy／production-test | success（HTTPS、room、WebSocket、再接続、auth、privacyの7本番シナリオ） |
+| Pages build／deploy | success |
+
+Worker deployment `7647183310`、GitHub Pages deployment `7647197557`、production Pages追跡deployment `7647201219`はいずれも最終SHAでstatus **success**。公開URLは https://ak-sekine.github.io/heibon-mahjong/ 、ポン・カン確認ページは https://ak-sekine.github.io/heibon-mahjong/call-test.html です。buildとdeployを別jobで確認し、Deployment APIでSHAを照合しました。
+
+実装・修正コミットは `dff73626b56609d6212f466a85ea6f79f0da6b84`（共通化）、`7a14f98a56382d4f9c9791f7eaad69a6ea2e541c`（余白重複解消）、`31773cbd2cca55778de7711b028511c2547646e4`（overflow検査）、`31404609482c34e2ee3ae2201f8524d0738ccc7a`（局面別基準検査）、`3171cdb8298bd20795c348ae0a0fb3b005027916`（例外スクロール検査準備）です。すべてPRなしでmainへ直接fast-forward pushしました。
+
+## 座標ログと出典
+
+- [修正前CSV（264行）](issue32-candidate-anchor-2026-11-09/candidate-geometry-baseline.csv)
+- [修正後CSV（264行）](issue32-candidate-anchor-2026-11-09/candidate-geometry-current.csv)
+
+各行の`source_sha`、`source_run`、`source_result`が実測出典です。元rootの上端・高さ・下端、可視種類パネル下端、候補上端・高さ・下端と差分、予約領域、卓の表示前後矩形、scrollY、戻る後、候補増加時、可視領域変更時を保存しています。単一大明カンは`immediate_execution=true`、候補座標は空欄です。
+
+Chromium CSVはrun #42559867159で共通座標テストがsuccessした全132局面、WebKit CSVは最終run #42561771978の全132局面です。Chromiumの前者run全体は後続の既存検査で失敗した履歴を持ちますが、共通座標テスト自体は完走しています。製品の`action-panel.ts`／`style.css`は`7a14f98`、`31773cb`、最終公開SHAでそれぞれ同じGit blob SHAであることを確認しました。最終WebKitの元root・候補・卓・増加時・戻る後の全矩形も前者runと最大差0pxです。最終runのChromiumでも同一の共通座標テストを再実行してsuccessを確認しています。
+
+最終runの両engineの全JSONはActionsの`browser-ui-{engine}-3171cdb8298bd20795c348ae0a0fb3b005027916-1` artifactの`tmp/heibon-table-ui/candidate-geometry/`に保存されています。最終Chromium artifactは約37MBでローカル取得ツールの32MiB上限を超え、正規のネットワーク許可付き直接取得もHTTP 403でした。このため上記Chromium CSVは取得できた同一製品コードの実測出典を明記して保持し、最終artifactを取得したとは報告しません。
+
+**iPhone Safari実機の修正後確認は未確認、Issue #32はOpenです。** 過去の実機OK／NG履歴は維持し、自動検証・公開成功を実機OKに置き換えません。
