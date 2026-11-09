@@ -164,6 +164,7 @@ export class ActionPanel {
   private pendingPointerTrace: { target: HTMLButtonElement; trace: ActionPanelTrace } | null = null;
   private candidateClickTrace: ActionPanelTrace | null = null;
   private candidateAnchorDocumentBottom: number | null = null;
+  private candidateAnchorRootHeight: number | null = null;
   private callType: 'pon' | 'daiminkan' | 'chi' | null = null;
   private activeCallOptions: readonly ActionChoiceOption[] = [];
   private callSelectionPending = false;
@@ -524,6 +525,11 @@ export class ActionPanel {
   private captureCandidateAnchor(): void {
     const bounds = this.root.getBoundingClientRect();
     this.candidateAnchorDocumentBottom = bounds.bottom + (typeof window === 'undefined' ? 0 : window.scrollY);
+    this.candidateAnchorRootHeight = Math.ceil(bounds.height);
+    // The candidate list is fixed to the viewport. Retain the action panel's
+    // prior flow height while its ordinary controls are hidden so a scrolled
+    // document does not clamp scrollTop as the candidate screen opens.
+    this.root.style.minHeight = `${this.candidateAnchorRootHeight}px`;
   }
 
   private repositionCandidatePanel(): void {
@@ -541,6 +547,8 @@ export class ActionPanel {
     delete panel.dataset.mode;
     panel.style.removeProperty('--candidate-panel-bottom');
     this.candidateAnchorDocumentBottom = null;
+    this.candidateAnchorRootHeight = null;
+    this.root.style.removeProperty('min-height');
   }
 
   private recordPanelDisplay(panelType: 'call' | 'candidate' | 'ron', wasHidden: boolean, visible: boolean, candidateCount: number, disabled: boolean, actionType?: string): void {
