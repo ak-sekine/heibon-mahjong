@@ -71,8 +71,8 @@ export class CandidateSelection {
 
   focusFirst(): void {
     const candidate = this.list.querySelector<HTMLButtonElement>('button[data-action-choice]:not(:disabled)');
-    if (candidate) candidate.focus({ preventScroll: true });
-    else this.root.focus({ preventScroll: true });
+    if (candidate) this.focusWithoutPageScroll(candidate);
+    else this.focusWithoutPageScroll(this.root);
   }
 
   get operationType(): CandidateOperation | null { return this.operation; }
@@ -96,6 +96,19 @@ export class CandidateSelection {
     }
     this.root.setAttribute('aria-busy', 'true');
     this.onSelect({ id: option.id, operationType, candidateId: `${operationType}-${index + 1}`, button });
+  }
+
+  private focusWithoutPageScroll(target: HTMLElement): void {
+    if (typeof window === 'undefined') {
+      target.focus();
+      return;
+    }
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    target.focus({ preventScroll: true });
+    // Some WebKit versions still adjust the document when focusing a fixed
+    // candidate panel. Restore the exact viewport position before the frame paints.
+    if (window.scrollX !== scrollX || window.scrollY !== scrollY) window.scrollTo(scrollX, scrollY);
   }
 
   private renderButtons(): void {
