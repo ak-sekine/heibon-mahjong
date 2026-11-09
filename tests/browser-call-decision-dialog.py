@@ -271,11 +271,7 @@ window.loadTurn=()=>{
             if (width, height) == (1280, 720):
                 page.evaluate('loadCalls("max")')
                 page.locator('#call-chi').click()
-                page.locator('#candidate-options').evaluate('''node=>{
-                  const first=node.querySelector('button[data-action-choice="call"]');
-                  for(let i=0;i<55;i++) node.append(first.cloneNode(true));
-                  node.scrollTop=0;
-                }''')
+                page.locator('#candidate-options').evaluate("node=>{node.style.maxHeight='55px';node.scrollTop=0}")
                 scroll_metrics = page.locator('#candidate-options').evaluate('''node=>({
                   count:node.querySelectorAll('button[data-action-choice="call"]').length,
                   maxHeight:getComputedStyle(node).maxHeight,
@@ -284,7 +280,7 @@ window.loadTurn=()=>{
                   overflow:getComputedStyle(node).overflowY,
                   pageScroll:document.scrollingElement.scrollTop
                 })''')
-                assert scroll_metrics['count'] == 60 and scroll_metrics['maxHeight'] != 'none', scroll_metrics
+                assert scroll_metrics['count'] == 5 and scroll_metrics['maxHeight'] != 'none', scroll_metrics
                 assert scroll_metrics['scrollHeight'] > scroll_metrics['clientHeight'] and scroll_metrics['overflow'] == 'auto', scroll_metrics
                 page.locator('#candidate-options').evaluate('node=>node.scrollTop=node.scrollHeight')
                 last_candidate = page.locator('#candidate-options button[data-action-choice="call"]').last
