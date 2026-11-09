@@ -74,7 +74,7 @@ window.loadTurn=()=>{
         assert page.locator('dialog[open]').count() == 0, 'call decision unexpectedly opened a modal'
         assert page.locator('#candidate-options button').count() == 0, 'candidates appeared before a type was selected'
         call_position = page.locator('#call-controls').evaluate('node=>getComputedStyle(node).position')
-        assert call_position == 'absolute', (width, call_position)
+        assert call_position == 'relative', (width, call_position)
         assert page.locator('#local-game-controls').evaluate('node=>getComputedStyle(node).position') == 'relative'
         assert '見送る' in page.locator('#call-controls').inner_text(), 'the call type screen lost its pass action'
         type_choices = [page.locator(selector).bounding_box() for selector in ['#call-pon', '#call-kan', '#call-chi', '#pass-calls'] if page.locator(selector).is_visible()]
@@ -95,7 +95,7 @@ window.loadTurn=()=>{
         assert panel_before and panel_before['y'] >= 0 and panel_before['y'] + panel_before['height'] <= height, (width, height, panel_before)
         if width < 960:
             assert table_before and ordinary_controls_before and 0 <= ordinary_controls_before['y'] - table_before['y'] - table_before['height'] <= 8, (table_before, ordinary_controls_before)
-            assert abs(panel_before['y'] - ordinary_controls_before['y'] - 1) < 1, (ordinary_controls_before, panel_before)
+            assert panel_before['y'] >= ordinary_controls_before['y'] and panel_before['y'] + panel_before['height'] <= ordinary_controls_before['y'] + ordinary_controls_before['height'], (ordinary_controls_before, panel_before)
         page_size_before = page.evaluate("()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight})")
         page.locator('#call-chi').click()
         candidates = page.locator('#candidate-options button[data-action-choice="call"]')
@@ -141,7 +141,7 @@ window.loadTurn=()=>{
         option_frame = page.locator('#candidate-options').evaluate("node=>({border:getComputedStyle(node).borderWidth,background:getComputedStyle(node).backgroundColor,shadow:getComputedStyle(node).boxShadow})")
         assert option_frame == {'border':'0px','background':'rgba(0, 0, 0, 0)','shadow':'none'}, option_frame
         assert panel_candidates['y'] < panel_before['y'], (panel_before, panel_candidates)
-        assert ordinary_controls_before and abs(panel_candidates['y'] + panel_candidates['height'] - min(ordinary_controls_before['y'] + ordinary_controls_before['height'], height - 8)) <= 2, (ordinary_controls_before, panel_candidates)
+        assert ordinary_controls_before and abs(panel_candidates['y'] + panel_candidates['height'] - (ordinary_controls_before['y'] + ordinary_controls_before['height'])) <= 2, (ordinary_controls_before, panel_candidates)
         multi_candidate_panel = panel_candidates if grid['rows'] >= 2 else None
         candidate_panel_bottom = panel_candidates['y'] + panel_candidates['height']
         if grid['rows'] >= 2:

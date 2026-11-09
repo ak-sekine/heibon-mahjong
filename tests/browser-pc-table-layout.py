@@ -235,7 +235,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
           panelPosition:getComputedStyle(document.querySelector('#call-controls')).position})''')
         assert normal_board
         assert_same_table(normal_board, call_start['table'], f'{width}x{height} local call decision')
-        assert call_start['panelPosition'] == 'absolute', f'{width}x{height}: PC call type choices lost their table-side overlay position: {call_start}'
+        assert call_start['panelPosition'] == 'relative', f'{width}x{height}: PC call type choices lost their position below the table: {call_start}'
         assert 0 <= call_start['controls']['top']-call_start['table']['bottom'] <= 8.5, f'{width}x{height}: call controls are not under the table: {call_start}'
         assert 0 <= call_start['panel']['top']-call_start['table']['bottom'] <= 16, f'{width}x{height}: call choices are far from the hand: {call_start}'
         assert call_start['scrollTop'] <= 1, f'{width}x{height}: opening the call panel moved the page: {call_start}'
@@ -352,7 +352,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
           position:getComputedStyle(document.querySelector('#online-call-controls')).position,scrollTop:document.scrollingElement.scrollTop})''')
         assert online_board
         assert_same_table(online_board, online_call['table'], f'{width}x{height} online call decision')
-        assert online_call['position'] == 'absolute' and 0 <= online_call['controls']['top']-online_call['table']['bottom'] <= 8.5, f'{width}x{height}: online type choices lost their table-side overlay position: {online_call}'
+        assert online_call['position'] == 'relative' and 0 <= online_call['controls']['top']-online_call['table']['bottom'] <= 8.5, f'{width}x{height}: online type choices lost their position below the table: {online_call}'
         for key in ('top','left','width'):
             assert abs(online_call['controls'][key]-online_result['controls'][key]) < 1, f'{width}x{height}: online call decision moved or resized its operation area: {online_call}, normal={online_result}'
         page.locator('#online-call-chi').click()

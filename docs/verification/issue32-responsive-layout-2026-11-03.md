@@ -482,3 +482,9 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 - 最終run [#42549243547](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42549243547)は全job success。verifyでnpm test、Worker typecheck、Pages build、itch buildを通過し、Chromium／WebKitのBrowser UI、browser-ui-matrix-audit、release-freshness、deploy-worker、production-test、pages-build、pages-deployがsuccessした。共通候補選択のpon単一・複数（赤五萬）、chi複数、大明カン、暗カン単一・複数、加カンと、320×568から1920×1080の11 viewportでの候補UI検査を含む。通常viewportでの自動スクロール、低いviewportでの候補一覧内スクロール・操作到達性、卓矩形の不変、候補確定・戻る、オンライン送信経路をBrowser UIで検証した。
 - Pages deploy jobはdeployment successを報告し、Pages URLはhttps://ak-sekine.github.io/heibon-mahjong/。WorkerとPagesの公開記録SHAはどちらもf2edf4b343d546c272fd3374fbd4cac0817a4661。この環境から公開URLへ直接HTTP要求した場合はネットワークproxyの403で本文を取得できなかったため、URLの独立したHTTP応答確認は未了とし、Actionsのdeployment successと区別する。
 - Playwright WebKit／Chromiumは自動検証であり、iPhone Safari実機確認ではない。今回のiPhone Safari実機NG（暗カン候補の下方向展開とポン候補との表示不一致）を解消したことは、公開後の本人による実機再確認を待つ。PC実機確認など既存履歴も保持し、Issue #32はOpenのままとする。
+
+## 2026-11-09: iPhone Safariのポン／カン表示差異と位置・高さ管理の共通化
+
+ユーザーのiPhone Safari実機報告: ポンは候補選択へ切り替えるとパネル全体が上方向へ移動する。カンは元の操作パネルの下端を維持し、候補が増えた分だけ上方向へ伸びる。これは今回の修正前の報告であり、従来の実機確認履歴を取り消すものではありません。
+
+ポン・チー・大明カン・暗カン・加カンの候補開始・位置採寸・高さ予約を共通化しました。原因、修正前後の座標、自動検証、公開結果は[今回の検証記録](issue32-candidate-anchor-2026-11-09.md)に追記します。修正後のiPhone Safari実機確認は**未確認**です。Issue #32は**Open**を維持します。

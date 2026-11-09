@@ -165,7 +165,8 @@ export class ActionPanel {
   private pendingCandidateScroll: Readonly<{ x: number; y: number }> | null = null;
   private candidateClickTrace: ActionPanelTrace | null = null;
   private candidateAnchorDocumentBottom: number | null = null;
-  private candidateAnchorRootHeight: number | null = null;
+  private candidateAnchorViewport: string | null = null;
+  private state: ActionPanelState | null = null;
   private callType: 'pon' | 'daiminkan' | 'chi' | null = null;
   private activeCallOptions: readonly ActionChoiceOption[] = [];
   private callSelectionPending = false;
@@ -241,6 +242,7 @@ export class ActionPanel {
   }
 
   clear(): void {
+    this.state = null;
     this.activeCallOptions = [];
     this.callSelectionPending = false;
     this.callType = null;
@@ -261,6 +263,7 @@ export class ActionPanel {
   }
 
   update(state: ActionPanelState): void {
+    this.state = state;
     const progressing = this.context().progressing === true || /送信しています|送信中|操作を確認しています/u.test(state.actionStatus);
     const wasHidden = {
       call: this.part('call-controls').hidden,
@@ -281,48 +284,29 @@ export class ActionPanel {
     }
 
     const callControls = this.part('call-controls');
-    callControls.hidden = !state.callGroup.visible || this.callType !== null || this.callSelectionPending;
+    if (!state.callGroup.visible) this.callType = null;
+    callControls.hidden = !state.callGroup.visible || this.callSelectionPending;
     this.part('call-status').textContent = state.callGroup.status;
     for (const [type, part] of [['pon', 'call-pon'], ['daiminkan', 'call-kan'], ['chi', 'call-chi']] as const) {
       const button = this.part(part) as HTMLButtonElement;
       const candidates = this.activeCallOptions.filter(option => callTypeForLabel(option.label) === type);
-      button.hidden = !state.callGroup.visible || candidates.length === 0 || this.callType !== null || this.callSelectionPending;
+      button.hidden = !state.callGroup.visible || candidates.length === 0 || this.callSelectionPending;
       button.disabled = candidates.length === 0 || this.callSelectionPending || !candidates.some(option => option.enabled);
       if (this.callSelectionPending || (progressing && candidates.length > 0 && !candidates.some(option => option.enabled))) button.setAttribute('aria-busy', 'true');
       else button.removeAttribute('aria-busy');
     }
     const passCall = this.part('pass-call') as HTMLButtonElement;
-    passCall.hidden = !state.callGroup.visible || this.callType !== null;
-    if (!state.callGroup.visible) this.callType = null;
+    passCall.hidden = !state.callGroup.visible;
     passCall.disabled = this.callSelectionPending || !state.buttons['pass-call'].enabled;
 
     const candidateMode = this.callType !== null || state.kanGroup.visible;
     const selectedOptions = this.callType ? this.optionsForSelection() : state.kanGroup.options;
     const selectedOperation = this.callType ?? operationFor(selectedOptions[0] ?? { id: '', label: '', tiles: [], enabled: false }) ?? 'ankan';
     const candidatePanel = this.part('candidate-controls');
-    candidatePanel.hidden = !candidateMode || selectedOptions.length === 0;
-    if (candidateMode) candidatePanel.dataset.mode = this.callType ? 'call' : 'kan';
-    else delete candidatePanel.dataset.mode;
     const candidateBack = this.part('candidate-back') as HTMLButtonElement;
-    candidateBack.hidden = !candidateMode || selectedOptions.length === 0;
-    candidateBack.dataset.diagnosticActionType = this.callType ?? selectedOperation;
-    candidateBack.setAttribute('aria-label', '戻る');
-    if (candidateMode && selectedOptions.length > 0) {
-      this.activateCandidateAnchor(this.callType ? 'call' : 'kan');
-      this.candidates.show(selectedOptions, selectedOperation, progressing || this.callSelectionPending);
-      if (progressing || this.callSelectionPending) candidatePanel.setAttribute('aria-busy', 'true');
-      else candidatePanel.removeAttribute('aria-busy');
-      if (wasHidden.candidate) this.focusFirstCandidate();
-    }
-    else {
-      this.candidates.hide();
-      this.clearCandidateAnchor();
-      if (!candidateMode && candidateHadFocus) this.part('action-status').focus({ preventScroll: true });
-    }
-    candidateBack.disabled = progressing || this.callSelectionPending || this.candidates.pending;
-    if (candidateBack.disabled) candidateBack.setAttribute('aria-busy', 'true');
-    else candidateBack.removeAttribute('aria-busy');
-    this.part('normal-controls').hidden = candidateMode;
+    // Render the ordinary operation area before the single candidate-entry path
+    // measures it. Neither call types nor self-turn kans hide controls earlier.
+    this.part('normal-controls').hidden = false;
 
     const ronControls = this.part('ron-controls');
     ronControls.hidden = !state.ronGroup.visible;
@@ -343,6 +327,20 @@ export class ActionPanel {
     this.root.classList.toggle('game-ended', state.gameEnded);
     this.root.classList.toggle('result-available', state.resultAvailable);
 
+    if (candidateMode && selectedOptions.length > 0) {
+      this.showCandidates(selectedOptions, selectedOperation, progressing || this.callSelectionPending);
+      if (wasHidden.candidate) this.focusFirstCandidate();
+    } else {
+      this.candidates.hide();
+      candidatePanel.hidden = true;
+      candidateBack.hidden = true;
+      this.clearCandidateAnchor();
+      if (!candidateMode && candidateHadFocus) this.part('action-status').focus({ preventScroll: true });
+    }
+    candidateBack.disabled = progressing || this.callSelectionPending || this.candidates.pending;
+    if (candidateBack.disabled) candidateBack.setAttribute('aria-busy', 'true');
+    else candidateBack.removeAttribute('aria-busy');
+
     if (state.ronGroup.visible && state.buttons.ron.enabled && wasRonHidden) {
       this.part('ron').focus({ preventScroll: true });
     }
@@ -352,7 +350,7 @@ export class ActionPanel {
     this.recordPanelDisplay('call', wasHidden.call, state.callGroup.visible && this.callType === null, actionChoicesForDisplay('call', state.callGroup.options).length,
       !state.callGroup.options.some(option => option.enabled) && (this.part('pass-call') as HTMLButtonElement).disabled);
     this.recordPanelDisplay('candidate', wasHidden.candidate, candidateMode && selectedOptions.length > 0, selectedOptions.length,
-      !selectedOptions.some(option => option.enabled));
+      !selectedOptions.some(option => option.enabled), selectedOperation);
     this.recordPanelDisplay('ron', wasHidden.ron, state.ronGroup.visible, state.ronGroup.visible ? 1 : 0,
       state.ronGroup.visible && !state.buttons.ron.enabled);
   }
@@ -455,23 +453,8 @@ export class ActionPanel {
         this.part('action-status').focus({ preventScroll: true });
         return;
       }
-      // Preserve the action panel's normal baseline before hiding the call
-      // type controls and ordinary actions for the candidate view.
-      this.captureCandidateAnchor();
       this.callType = type;
-      this.part('call-controls').hidden = true;
-      for (const part of ['call-pon', 'call-kan', 'call-chi']) (this.part(part) as HTMLButtonElement).hidden = true;
-      (this.part('candidate-back') as HTMLButtonElement).hidden = false;
-      (this.part('pass-call') as HTMLButtonElement).hidden = true;
-      this.candidates.show(candidates, type, this.callSelectionPending);
-      this.part('candidate-controls').hidden = false;
-      this.activateCandidateAnchor('call');
-      this.part('candidate-controls').dataset.mode = 'call';
-      this.recordPanelDisplay('candidate', true, true, candidates.length, false, type);
-      this.part('normal-controls').hidden = true;
-      (this.part('candidate-back') as HTMLButtonElement).hidden = false;
-      (this.part('candidate-back') as HTMLButtonElement).dataset.diagnosticActionType = type;
-      this.focusFirstCandidate();
+      if (this.state) this.update(this.state);
     }
   }
 
@@ -532,40 +515,72 @@ export class ActionPanel {
     }
   }
 
-  private activateCandidateAnchor(mode: 'call' | 'kan'): void {
+  /** One entry path for pon, chi, daiminkan, ankan and kakan. */
+  private showCandidates(options: readonly ActionChoiceOption[], operation: CandidateOperation, busy: boolean): void {
+    if (this.candidateAnchorDocumentBottom === null) this.captureCandidateAnchor();
+    this.part('normal-controls').hidden = true;
+    this.part('call-controls').hidden = true;
+    for (const name of ['call-pon', 'call-kan', 'call-chi', 'pass-call']) this.part(name).hidden = true;
     const panel = this.part('candidate-controls');
-    if (panel.hidden || this.candidateAnchorDocumentBottom === null) this.captureCandidateAnchor();
-    panel.dataset.mode = mode;
+    // Informational only: geometry never depends on call/kan mode.
+    panel.dataset.mode = this.callType ? 'call' : 'kan';
+    panel.hidden = false;
+    const back = this.part('candidate-back') as HTMLButtonElement;
+    back.hidden = false;
+    back.dataset.diagnosticActionType = operation;
+    back.setAttribute('aria-label', '戻る');
+    this.candidates.show(options, operation, busy);
+    if (busy) panel.setAttribute('aria-busy', 'true');
+    else panel.removeAttribute('aria-busy');
     this.repositionCandidatePanel();
+  }
+
+  private viewportSignature(): string {
+    if (typeof window === 'undefined') return '';
+    const visual = window.visualViewport;
+    return JSON.stringify([window.innerWidth, window.innerHeight, visual?.height, visual?.offsetTop, visual?.width]);
   }
 
   private captureCandidateAnchor(): void {
     const bounds = this.root.getBoundingClientRect();
     this.candidateAnchorDocumentBottom = bounds.bottom + (typeof window === 'undefined' ? 0 : window.scrollY);
-    this.candidateAnchorRootHeight = Math.ceil(bounds.height);
-    // The candidate list is fixed to the viewport. Retain the action panel's
-    // prior flow height while its ordinary controls are hidden so a scrolled
-    // document does not clamp scrollTop as the candidate screen opens.
-    this.root.style.minHeight = `${this.candidateAnchorRootHeight}px`;
+    this.candidateAnchorViewport = this.viewportSignature();
+    // Retain the measured border box exactly, including the operation area
+    // occupied by call types. Hiding ordinary controls must not shrink the flow.
+    this.root.style.setProperty('--candidate-anchor-height', `${bounds.height}px`);
+    this.root.classList.add('candidate-active');
   }
 
   private repositionCandidatePanel(): void {
     const panel = this.part('candidate-controls');
     if (panel.hidden || this.candidateAnchorDocumentBottom === null || typeof window === 'undefined') return;
     const visual = window.visualViewport;
-    const visualBottom = Math.min(window.innerHeight, (visual?.offsetTop ?? 0) + (visual?.height ?? window.innerHeight));
+    const visualTop = visual?.offsetTop ?? 0;
+    const visualBottom = Math.min(window.innerHeight, visualTop + (visual?.height ?? window.innerHeight));
     const rootBottom = this.candidateAnchorDocumentBottom - window.scrollY;
-    const visibleBottom = Math.min(rootBottom, visualBottom - 8);
-    panel.style.setProperty('--candidate-panel-bottom', `${Math.max(8, window.innerHeight - visibleBottom)}px`);
+    // Initial display uses the original bottom, without moving or scrolling it.
+    // Only a changed visible viewport may require a smaller bottom coordinate.
+    const style = getComputedStyle(panel);
+    const first = this.part('candidate-options').querySelector<HTMLElement>('button');
+    const minimumHeight = this.part('candidate-back').getBoundingClientRect().height + (first?.getBoundingClientRect().height ?? 0) +
+      ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth', 'rowGap'].reduce((sum, key) =>
+        sum + (Number.parseFloat(style[key as keyof CSSStyleDeclaration] as string) || 0), 0);
+    const minimumBottom = visualTop + 8 + Math.min(minimumHeight, Math.max(0, visualBottom - visualTop - 16));
+    const bottom = this.candidateAnchorViewport === this.viewportSignature()
+      ? rootBottom : Math.min(Math.max(rootBottom, minimumBottom), visualBottom - 8);
+    panel.style.setProperty('--candidate-panel-bottom', `${window.innerHeight - bottom}px`);
+    panel.style.setProperty('--candidate-panel-available-height', `${Math.max(0, bottom - visualTop - 8)}px`);
   }
 
   private clearCandidateAnchor(): void {
     const panel = this.part('candidate-controls');
     delete panel.dataset.mode;
     panel.style.removeProperty('--candidate-panel-bottom');
+    panel.style.removeProperty('--candidate-panel-available-height');
     this.candidateAnchorDocumentBottom = null;
-    this.candidateAnchorRootHeight = null;
-    this.root.style.removeProperty('min-height');
+    this.candidateAnchorViewport = null;
+    this.root.classList.remove('candidate-active');
+    this.root.style.removeProperty('--candidate-anchor-height');
   }
 
   private recordPanelDisplay(panelType: 'call' | 'candidate' | 'ron', wasHidden: boolean, visible: boolean, candidateCount: number, disabled: boolean, actionType?: string): void {

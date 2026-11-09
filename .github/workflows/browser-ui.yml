@@ -115,6 +115,8 @@ jobs:
         browser: [chromium, webkit]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Prepare engine-specific diagnostics
         env:
           BROWSER: ${{ matrix.browser }}

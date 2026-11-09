@@ -274,7 +274,7 @@ with sync_playwright() as p:
             assert panel_geometry['scrollY'] <= 1, f'{width}x{height} {mode}: opening candidates scrolled the page: {panel_geometry}'
             assert panel_geometry['position'] == 'fixed', f'{width}x{height} {mode}: shared candidate panel is not viewport anchored: {panel_geometry}'
             assert panel_geometry['panel']['top'] < panel_geometry['panel']['bottom'] and panel_geometry['panel']['bottom'] <= height + 0.5, f'{width}x{height} {mode}: panel did not expand upward inside the viewport: {panel_geometry}'
-            anchor_bottom = min(controls_before['controls']['bottom'], height - 8)
+            anchor_bottom = controls_before['controls']['bottom']
             assert abs(panel_geometry['panel']['bottom']-anchor_bottom) <= 2, f'{width}x{height} {mode}: panel bottom did not stay at the control-panel baseline: {panel_geometry}, before={controls_before}'
             assert panel_geometry['panel']['top'] < controls_before['kanToggle']['top'], f'{width}x{height} {mode}: candidate panel did not expand above its original Kan trigger: {panel_geometry}, before={controls_before}'
             assert panel_geometry['listOverflow'] == 'auto' and panel_geometry['listMaxHeight'] != 'none', f'{width}x{height} {mode}: candidate list is not internally scrollable: {panel_geometry}'

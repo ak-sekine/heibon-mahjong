@@ -39,7 +39,9 @@ class FakeElement {
   get parentElement(): FakeElement | null { return this.parent; }
   readonly dataset: Record<string, string> = {};
   readonly attributes = new Map<string, string>();
-  readonly style = { setProperty: (_name: string, _value: string) => {}, removeProperty: (_name: string) => {} };
+  readonly styleValues = new Map<string, string>();
+  readonly style = { setProperty: (name: string, value: string) => { this.styleValues.set(name, value); },
+    removeProperty: (name: string) => { this.styleValues.delete(name); } };
   readonly children: unknown[] = [];
   readonly content: { firstElementChild: FakeElement };
   readonly classList = new FakeClassList();
@@ -550,4 +552,44 @@ test('ActionPanel clears stale operation state and can render the same choices a
     fixture.panel.update(state({ callGroup: { visible: true, status: '', options } }));
     assert.equal(fixture.parts.get('call-pon')!.hidden, false);
   } finally { fixture.restore(); }
+});
+
+
+test('all candidate operations capture the ordinary area once and release its exact reserved height', () => {
+  for (const operation of ['pon', 'chi', 'daiminkan', 'ankan', 'kakan'] as const) {
+    const fixture = panelFixture();
+    try {
+      const isCall = ['pon', 'chi', 'daiminkan'].includes(operation);
+      const label = { pon: 'ポン', chi: 'チー', daiminkan: '大明カン', ankan: '暗カン', kakan: '加カン' }[operation];
+      const options: ActionChoiceOption[] = [1, 2].map(rank => ({
+        id: `${operation}-${rank}`, operationType: operation, label, enabled: true,
+        tiles: [{ id: `tile-${rank}`, tile: ordinaryTile(TILE_KINDS.find(kind => kind.category === 'suited' && kind.suit === 'man' && kind.rank === rank)!) }],
+      }));
+      const ordinary = state(isCall ? { callGroup: { visible: true, status: '', options } }
+        : { kanGroup: { visible: false, status: '', options } });
+      fixture.panel.update(ordinary);
+      let measurements = 0;
+      fixture.root.getBoundingClientRect = () => {
+        measurements++;
+        assert.equal(fixture.parts.get('normal-controls')!.hidden, false, `${operation}: capture before hiding normal area`);
+        assert.equal(fixture.parts.get('call-controls')!.hidden, !isCall, `${operation}: capture before hiding type area`);
+        return { top: 400, bottom: 508.25, height: 108.25 } as DOMRect;
+      };
+      const opened = isCall ? ordinary : { ...ordinary, kanGroup: { ...ordinary.kanGroup, visible: true } };
+      if (isCall) {
+        const part = operation === 'pon' ? 'call-pon' : operation === 'chi' ? 'call-chi' : 'call-kan';
+        fixture.root.listeners.get('click')!({ target: fixture.parts.get(part)! } as unknown as Event);
+      } else fixture.panel.update(opened);
+      assert.equal(fixture.root.styleValues.get('--candidate-anchor-height'), '108.25px');
+      assert.equal(fixture.root.classList.values.has('candidate-active'), true);
+      fixture.panel.update(opened);
+      assert.equal(measurements, 1, `${operation}: updates must preserve the original anchor`);
+      fixture.root.listeners.get('click')!({ target: fixture.parts.get('candidate-back')! } as unknown as Event);
+      assert.equal(fixture.root.classList.values.has('candidate-active'), false);
+      assert.equal(fixture.root.styleValues.has('--candidate-anchor-height'), false);
+      fixture.panel.update(opened);
+      fixture.panel.clear();
+      assert.equal(fixture.root.styleValues.has('--candidate-anchor-height'), false);
+    } finally { fixture.restore(); }
+  }
 });
