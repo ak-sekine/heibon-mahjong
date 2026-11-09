@@ -591,11 +591,13 @@ header > div { min-width:0; }
  }
 }
 @media (max-width:599px) and (max-height:600px) {
- main:has(.call-controls:not([hidden])) .table,main:has(.candidate-controls[data-mode="call"]:not([hidden])) .table { width:min(100%,calc(100svh - 268px)); margin-inline:0; align-self:center; }
+ /* Keep the small-screen board geometry stable across pending calls, passes,
+    and ordinary play so transient action visibility never resizes the table. */
+ .table { width:min(100%,calc(100svh - 268px)); margin-inline:0; align-self:center; }
 }
 @supports (height:100dvh) {
  @media (max-width:599px) and (max-height:600px) {
-  main:has(.call-controls:not([hidden])) .table,main:has(.candidate-controls[data-mode="call"]:not([hidden])) .table { width:min(100%,calc(100dvh - 268px)); }
+  .table { width:min(100%,calc(100dvh - 268px)); }
  }
 }
 /* The shared absolute layout sizes each interval from the displayed face, so
