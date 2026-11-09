@@ -8,6 +8,7 @@
 }
 * { box-sizing:border-box; }
 body { margin:0; }
+html:has(.candidate-controls:not([hidden])) { overflow-anchor:none; }
 main { container-type:inline-size; width:min(100%,620px); min-height:100vh; min-height:100svh; min-height:100dvh; margin:auto; padding:max(8px,env(safe-area-inset-top)) max(4px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom, 0px)) max(4px,env(safe-area-inset-left)); display:flex; flex-direction:column; gap:8px; }
 header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 6px; }
 .app-header { min-height:44px; }
