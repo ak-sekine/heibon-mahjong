@@ -267,7 +267,7 @@ with sync_playwright() as p:
               listMaxHeight:getComputedStyle(document.querySelector('#candidate-options')).maxHeight,
               position:getComputedStyle(document.querySelector('#candidate-controls')).position,
               normalHidden:document.querySelector('#normal-controls').hidden,
-              panelText:document.querySelector('#candidate-controls').innerText.trim(),
+              panelText:(()=>{const node=document.querySelector('#candidate-controls'),walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let text='';while(walker.nextNode()){if(!walker.currentNode.parentElement?.closest('svg'))text+=walker.currentNode.textContent;}return text.trim()})(),
               visibleNormalButtons:[...document.querySelectorAll('#normal-controls button')].filter(button=>button.getClientRects().length>0).map(button=>button.id),
               scrollY:document.scrollingElement.scrollTop
             })''')
