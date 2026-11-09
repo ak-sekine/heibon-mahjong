@@ -204,14 +204,16 @@ with sync_playwright() as p:
         page.locator('#call-pon').click()
         page.wait_for_function("document.querySelectorAll('#candidate-options button[data-action-choice=call]').length===2")
         candidate_data = page.locator('#candidate-options button[data-action-choice="call"]').evaluate_all('''nodes=>nodes.map(node=>({
-          id:node.dataset.candidateId,label:node.getAttribute('aria-label'),text:node.innerText.trim(),
+          id:node.dataset.candidateId,label:node.getAttribute('aria-label'),
+          nonImageChildren:[...node.children].filter(child=>!child.classList.contains('tile-svg')).map(child=>child.outerHTML),
+          directText:[...node.childNodes].filter(child=>child.nodeType===Node.TEXT_NODE).map(child=>child.textContent.trim()).join(''),
           faces:[...node.querySelectorAll('.tile-svg')].map(tile=>tile.getAttribute('aria-label')),
           hasRed:[...node.querySelectorAll('.tile-svg')].some(tile=>(tile.getAttribute('aria-label')||'').includes('赤5萬')),
           rect:(()=>{const r=node.getBoundingClientRect();const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {x:r.left,y:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height,receivesPointer:hit===node||node.contains(hit)}})()
         }))''')
         assert len(candidate_data) == 2, f'{width}x{height}: expected two visible Pon choices: {candidate_data}'
         assert len({item['label'] for item in candidate_data}) == 2, f'{width}x{height}: candidates must show different tiles: {candidate_data}'
-        assert all('ポン：' in item['label'] and item['text'] == '' for item in candidate_data), f'{width}x{height}: candidates must expose operation and tiles accessibly while showing only images: {candidate_data}'
+        assert all('ポン：' in item['label'] and not item['nonImageChildren'] and not item['directText'] for item in candidate_data), f'{width}x{height}: candidates must expose operation and tiles accessibly while containing only tile images: {candidate_data}'
         assert sum(any('赤5萬' in (face or '') for face in item['faces']) for item in candidate_data) == 1, f'{width}x{height}: exactly one candidate must show a red five: {candidate_data}'
         assert_integrity(page)
         for index, _ in enumerate(candidate_data):
