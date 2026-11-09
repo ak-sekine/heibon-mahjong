@@ -29,6 +29,7 @@ function load() {
 function startFromCallTest() {
   load();
   if (callTestSettings) callTestSettings.open = false;
+  document.querySelector('#call-test-lab')?.setAttribute('data-game-active', 'true');
 }
 if (callTestSettings) {
   const updateSettingsToggle = () => {
