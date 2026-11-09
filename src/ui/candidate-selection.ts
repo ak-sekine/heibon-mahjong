@@ -105,10 +105,13 @@ export class CandidateSelection {
     }
     const scrollX = window.scrollX;
     const scrollY = window.scrollY;
+    const restoreScroll = () => window.scrollTo(scrollX, scrollY);
     target.focus({ preventScroll: true });
     // Some WebKit versions still adjust the document when focusing a fixed
-    // candidate panel. Restore the exact viewport position before the frame paints.
-    if (window.scrollX !== scrollX || window.scrollY !== scrollY) window.scrollTo(scrollX, scrollY);
+    // candidate panel. Restore immediately and again before the next paint in
+    // case its focus scroll is deferred until layout has completed.
+    if (window.scrollX !== scrollX || window.scrollY !== scrollY) restoreScroll();
+    window.requestAnimationFrame(restoreScroll);
   }
 
   private renderButtons(): void {
