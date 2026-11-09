@@ -44,10 +44,6 @@ SUITE = [
     run('tests/browser-action-controls.py'),
     run('tests/browser-action-panel.py'),
     run('tests/browser-action-panel.py', 'webkit'),
-    run('tests/browser-candidate-geometry.py', HEIBON_CANDIDATE_BASELINE='1'),
-    run('tests/browser-candidate-geometry.py', 'webkit', HEIBON_CANDIDATE_BASELINE='1'),
-    run('tests/browser-candidate-geometry.py'),
-    run('tests/browser-candidate-geometry.py', 'webkit'),
     run('tests/browser-call-decision-dialog.py'),
     run('tests/browser-call-decision-dialog.py', 'webkit'),
     run('tests/browser-call-test.py'),
@@ -97,6 +93,11 @@ SUITE = [
     run('tests/browser-diagnostics.py', 'webkit'),
     run('tests/browser-button-roles.py'),
     run('tests/browser-button-roles.py', 'webkit'),
+    # Run existing regressions before the larger before/after measurement matrix.
+    run('tests/browser-candidate-geometry.py', HEIBON_CANDIDATE_BASELINE='1'),
+    run('tests/browser-candidate-geometry.py', 'webkit', HEIBON_CANDIDATE_BASELINE='1'),
+    run('tests/browser-candidate-geometry.py'),
+    run('tests/browser-candidate-geometry.py', 'webkit'),
 ]
 
 

@@ -383,8 +383,11 @@ with sync_playwright() as p:
     page.wait_for_selector('#scenario-help:not(:empty)')
     page.evaluate('window.readGame=()=>window.testController.game')
     start_scenario(page, 'opening')
-    if page.locator('#kan').evaluate('''e=>{const r=e.getBoundingClientRect();return r.top<0||r.bottom>innerHeight}'''):
-        page.locator('#kan').scroll_into_view_if_needed()
+    # This exceptional scrollable layout starts with part of the ordinary
+    # panel below the viewport. Manually reveal its complete baseline first;
+    # the 11 normal-size profiles above never scroll before measuring.
+    if page.locator('#local-game-controls').evaluate('''e=>{const r=e.getBoundingClientRect();return r.top<0||r.bottom>innerHeight}'''):
+        page.locator('#local-game-controls').scroll_into_view_if_needed()
     scroll_before_candidates = page.evaluate('''()=>{
       const controls=document.querySelector('#local-game-controls');
       const bounds=controls.getBoundingClientRect();
