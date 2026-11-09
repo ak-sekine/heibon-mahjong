@@ -180,6 +180,10 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     settle(page)
     record['before'] = before = snapshot(page, online)
     check(record, before['scrollY'] == 0, 'normal-size scenario started after page scrolling')
+    if before['callRect']:
+        check(record, before['callRect']['top'] >= before['root']['top'] and
+              before['callRect']['bottom'] <= before['root']['bottom'] + 1,
+              'visible call operation area is outside the measured root baseline')
     fingerprint = page.evaluate('online=>issue32Geometry.fingerprint(online)', online)
     click_part(page, online, trigger, record)
     record['open'] = after = snapshot(page, online)
@@ -202,7 +206,7 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     # remain unchanged and confirmation below always clicks an actual button.
     page.locator(root_selector + ' [data-panel-part="candidate-options"]').evaluate(r'''list=>{
       const template=list.querySelector('button');
-      for(let i=0;i<40;i++){const clone=template.cloneNode(true);clone.dataset.geometryOverflow='true';list.append(clone);}
+      for(let i=0;i<100;i++){const clone=template.cloneNode(true);clone.dataset.geometryOverflow='true';list.append(clone);}
     }''')
     settle(page)
     record['grown'] = grown = snapshot(page, online)
