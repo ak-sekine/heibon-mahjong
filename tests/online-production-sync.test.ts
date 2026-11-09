@@ -6,6 +6,7 @@ import {
   waitForClientMessage,
   waitForCpuProgress,
   waitForHumanTurn,
+  waitForMatchingGameStates,
 } from './online-production-sync.mjs';
 
 class FakeSocket extends EventEmitter {
@@ -115,6 +116,261 @@ test('accepts a valid host human turn while the guest remains on an older revisi
   assert.equal(latestGameMessage(guest)?.view.gameRevision, 1, 'a late lower revision did not replace the guest state');
   assertReleased([host, guest], timers);
 });
+
+function snapshotView(gameRevision: number, viewerSeat = 0) {
+  return {
+    ...makeView(gameRevision, { viewerSeat }),
+    type: 'game-state',
+    roomCode: 'TEST01',
+    rules: { schemaVersion: 1, matchFormat: 'tonpu' },
+    format: 'tonpu',
+    round: { points: [25000, 25000, 25000, 25000], dealerId: 0, roundNumber: 1, honba: 0 },
+    liveWallCount: 60,
+    pendingDiscard: null,
+    doraIndicators: [],
+    declarations: [],
+    result: null,
+    seats: makeView(gameRevision).seats.map(seat => ({
+      ...seat, connected: true, concealedCount: 13, points: 25000, melds: [],
+      ...(seat.seat === viewerSeat ? { hand: [{ id: `private-${viewerSeat}` }], drawnTile: null } : {}),
+    })),
+  };
+}
+
+function snapshotHarness(viewerSeats = [0, 1], requestState: (client: ReturnType<typeof makeClient>) => void = () => {}) {
+  const clients = [makeClient('host'), makeClient('guest')];
+  const diagnostics: Array<Record<string, any>> = [];
+  let time = 1000;
+  let timer: (() => void) | undefined;
+  let timerCount = 0;
+  let sends = 0;
+  const options = {
+    roomCode: 'TEST01', viewerSeats, minimumRevision: 5, timeoutMs: 100,
+    requestState: client => { sends++; requestState(client); },
+    diagnostic: (event, details) => diagnostics.push({ event, ...details }),
+    now: () => time,
+    setTimer: callback => { timerCount++; timer = callback; return callback; },
+    clearTimer: () => { timer = undefined; },
+  };
+  return {
+    clients, diagnostics, options,
+    publish(index: number, revision: number, patch: Record<string, any> = {}) {
+      return publishState(clients[index], { ...snapshotView(revision, viewerSeats[index]), ...patch });
+    },
+    advance(ms: number) { time += ms; },
+    expire() { time = 1100; assert.ok(timer); timer(); },
+    assertReleased() {
+      assert.equal(timer, undefined, 'snapshot deadline cleared');
+      assert.equal(timerCount, 1, 'one deadline, never extended');
+      assertReleased(clients, { active: new Set() } as ReturnType<typeof timerTracker>);
+    },
+    get sends() { return sends; },
+  };
+}
+
+for (const [direction, viewerSeats] of [['primary-host', [0, 1]], ['secondary-host', [1, 0]]] as const) {
+  test(`snapshot sync: ${direction} 6/5 converges to 7/7 with distinct authenticated views`, async () => {
+    const h = snapshotHarness([...viewerSeats]);
+    const waiting = waitForMatchingGameStates(h.clients, h.options);
+    h.publish(0, 6);
+    h.advance(10);
+    h.publish(1, 5);
+    assert.equal(h.diagnostics.some(item => item.event === 'snapshot-sync-failed'), false);
+    h.advance(10);
+    h.publish(0, 7);
+    h.advance(10);
+    h.publish(1, 7, { self: { seat: viewerSeats[1], decision: decision('call', 'private-window', 6) } });
+    const result = await waiting;
+    assert.equal(result.gameRevision, 7);
+    assert.deepEqual(result.messages.map(message => message.view.viewerSeat), [...viewerSeats]);
+    const log = h.diagnostics.find(item => item.event === 'snapshot-sync-satisfied');
+    assert.equal(log?.comparedRevision, 7);
+    assert.equal(log?.waitElapsedMs, 30);
+    assert.deepEqual(log?.clients.map(client => client.receivedAt), [1020, 1030]);
+    assert.equal(h.sends, 2, 'one fresh request per player');
+    h.assertReleased();
+  });
+}
+
+test('snapshot sync: observes several CPU revisions and never matches a historical lower revision', async () => {
+  const h = snapshotHarness();
+  const waiting = waitForMatchingGameStates(h.clients, h.options);
+  h.publish(0, 6);
+  h.publish(1, 5);
+  h.publish(0, 7);
+  h.publish(0, 8);
+  h.publish(1, 6);
+  h.publish(0, 6); // This delayed state must not pair with guest 6.
+  h.publish(1, 7);
+  h.publish(1, 9);
+  h.publish(0, 9);
+  assert.equal((await waiting).gameRevision, 9);
+  assert.equal(h.diagnostics.filter(item => item.event === 'snapshot-sync-satisfied').length, 1);
+  assert.equal(h.diagnostics.some(item => item.ignoredRevision === 6), true);
+  h.assertReleased();
+});
+
+test('snapshot sync: registers both listeners before a synchronous snapshot response', async () => {
+  const h = snapshotHarness([0, 1], client => {
+    assert.equal(h.clients.every(target => target.waiters.size === 1), true);
+    const index = h.clients.indexOf(client);
+    h.publish(index, 5);
+  });
+  assert.equal((await waitForMatchingGameStates(h.clients, h.options)).gameRevision, 5);
+  h.assertReleased();
+});
+
+for (const kind of ['different-revisions', 'no-messages', 'equal-preexisting-history', 'below-revision-floor'] as const) {
+  test(`snapshot sync: ${kind} times out and records both latest revisions`, async () => {
+    const h = snapshotHarness();
+    if (kind === 'equal-preexisting-history') {
+      h.publish(0, 7);
+      h.publish(1, 7);
+    }
+    if (kind === 'below-revision-floor') h.publish(0, 8);
+    const waiting = waitForMatchingGameStates(h.clients, h.options);
+    if (kind === 'different-revisions') {
+      h.publish(0, 6);
+      h.publish(1, 5);
+      h.advance(99);
+      h.publish(0, 7); // Updates must not extend the original deadline.
+    }
+    if (kind === 'below-revision-floor') {
+      h.publish(0, 7);
+      h.publish(1, 7);
+    }
+    h.expire();
+    await assert.rejects(waiting, /Timed out waiting for matching/u);
+    const failure = h.diagnostics.find(item => item.event === 'snapshot-sync-failed');
+    assert.equal(failure?.reason, 'timeout');
+    assert.equal(failure?.waitElapsedMs, 100);
+    assert.deepEqual(failure?.clients.map(client => client.gameRevision), kind === 'different-revisions' ? [7, 5] : [null, null]);
+    assert.equal(h.sends, 2);
+    h.assertReleased();
+  });
+}
+
+test('snapshot sync: late matching messages fail even if the timer callback was delayed', async () => {
+  const h = snapshotHarness();
+  const waiting = waitForMatchingGameStates(h.clients, h.options);
+  h.publish(0, 6);
+  h.advance(100);
+  h.publish(1, 6);
+  await assert.rejects(waiting, /Timed out/u);
+  h.assertReleased();
+});
+
+for (const kind of ['close', 'error', 'already-closed', 'closing', 'send-failure'] as const) {
+  test(`snapshot sync: ${kind} fails and releases resources`, async () => {
+    const h = snapshotHarness([0, 1], () => {
+      if (kind === 'send-failure') throw new Error('send failed');
+    });
+    h.publish(0, 6);
+    h.publish(1, 6); // Even matching history cannot mask a broken connection.
+    if (kind === 'already-closed') h.clients[1].socket.readyState = 3;
+    if (kind === 'closing') h.clients[1].socket.readyState = 2;
+    const waiting = waitForMatchingGameStates(h.clients, h.options);
+    if (kind === 'close') h.clients[1].socket.close();
+    if (kind === 'error') h.clients[1].socket.emit('error', new Error('connection failed'));
+    await assert.rejects(waiting, /WebSocket|snapshot request failed/u);
+    assert.equal(h.diagnostics.some(item => item.event === 'snapshot-sync-satisfied'), false);
+    h.assertReleased();
+  });
+}
+
+for (const kind of ['room', 'viewer', 'self', 'aborted', 'status', 'missing-seats', 'missing-hand', 'missing-round', 'unsafe-revision', 'missing-turn', 'missing-wall', 'invalid-points', 'invalid-seat-count'] as const) {
+  test(`snapshot sync: rejects invalid ${kind} instead of matching revisions`, async () => {
+    const h = snapshotHarness();
+    const invalid: Record<string, any> = snapshotView(6, 1);
+    if (kind === 'room') invalid.roomCode = 'OTHER';
+    if (kind === 'viewer') invalid.viewerSeat = 0;
+    if (kind === 'self') invalid.self.seat = 0;
+    if (kind === 'aborted') invalid.status = 'aborted';
+    if (kind === 'status') invalid.status = undefined;
+    if (kind === 'missing-seats') invalid.seats = [];
+    if (kind === 'missing-hand') delete invalid.seats[1].hand;
+    if (kind === 'missing-round') delete invalid.round;
+    if (kind === 'unsafe-revision') invalid.gameRevision = Number.MAX_SAFE_INTEGER + 1;
+    if (kind === 'missing-turn') delete invalid.turnPlayerId;
+    if (kind === 'missing-wall') delete invalid.liveWallCount;
+    if (kind === 'invalid-points') invalid.round.points = [null, null, null, null];
+    if (kind === 'invalid-seat-count') invalid.seats[0].concealedCount = -1;
+    const waiting = waitForMatchingGameStates(h.clients, h.options);
+    h.publish(0, 6);
+    publishState(h.clients[1], invalid as ReturnType<typeof makeView>);
+    await assert.rejects(waiting, /Invalid post-reconnect game snapshot/u);
+    assert.equal(h.diagnostics.find(item => item.event === 'snapshot-sync-failed')?.reason, 'invalid-state');
+    const rejected = h.diagnostics.find(item => item.event === 'snapshot-sync-invalid-state')?.rejected;
+    assert.equal(rejected.receivedAt, 1000);
+    assert.equal(rejected.gameRevision, kind === 'unsafe-revision' ? null : 6);
+    h.assertReleased();
+  });
+}
+
+test('snapshot sync: both human connection flags must reflect reconnect, even without a revision increment', async () => {
+  const h = snapshotHarness();
+  const waiting = waitForMatchingGameStates(h.clients, h.options);
+  const disconnected = snapshotView(6);
+  disconnected.seats[1].connected = false;
+  h.publish(0, 6, { seats: disconnected.seats });
+  h.publish(1, 6);
+  assert.equal(h.diagnostics.some(item => item.event === 'snapshot-sync-satisfied'), false);
+  h.publish(0, 6);
+  assert.equal((await waiting).gameRevision, 6);
+  h.assertReleased();
+});
+
+test('snapshot sync: a disconnected higher revision blocks a delayed connected lower revision', async () => {
+  const h = snapshotHarness();
+  const waiting = waitForMatchingGameStates(h.clients, h.options);
+  const disconnected = snapshotView(7);
+  disconnected.seats[1].connected = false;
+  h.publish(0, 7, { seats: disconnected.seats });
+  h.publish(0, 6);
+  h.publish(1, 6);
+  h.expire();
+  await assert.rejects(waiting, /Timed out/u);
+  h.assertReleased();
+});
+
+for (const field of ['round', 'phase', 'seats', 'doraIndicators', 'declarations', 'rules', 'result', 'paoResponsibilities', 'futurePublicField']) {
+  test(`snapshot sync: same-revision ${field} mismatch fails immediately and cannot be hidden by later convergence`, async () => {
+    const h = snapshotHarness();
+    const host = snapshotView(6);
+    const changed: Record<string, any> = {
+      round: { ...host.round, honba: 1 }, phase: 'awaiting-discard',
+      seats: snapshotView(6, 1).seats.map(seat => ({ ...seat, river: [{ id: 'public-river' }] })),
+      doraIndicators: [{ id: 'public-dora' }], declarations: [{ id: 1, kind: 'kan' }],
+      rules: { ...host.rules, pao: true }, result: { reason: 'draw' },
+      paoResponsibilities: { daisangen: 2 }, futurePublicField: true,
+    };
+    const waiting = waitForMatchingGameStates(h.clients, h.options);
+    h.publish(0, 6);
+    h.publish(1, 6, { [field]: changed[field] });
+    h.publish(0, 7);
+    h.publish(1, 7);
+    await assert.rejects(waiting, /Common game state differed at revision 6/u);
+    const failure = h.diagnostics.find(item => item.event === 'snapshot-sync-failed');
+    assert.equal(failure?.reason, 'state-mismatch');
+    assert.equal(failure?.comparedRevision, 6);
+    assert.equal(h.diagnostics.some(item => item.event === 'snapshot-sync-satisfied'), false);
+    assert.equal(JSON.stringify(h.diagnostics).includes('private-'), false, 'diagnostics omit private tiles');
+    h.assertReleased();
+  });
+}
+
+for (const status of ['playing', 'round-ended', 'match-ended']) {
+  test(`snapshot sync: existing valid ${status} state succeeds on fresh snapshots at the revision floor`, async () => {
+    const h = snapshotHarness();
+    h.publish(0, 5, { status });
+    h.publish(1, 5, { status });
+    const waiting = waitForMatchingGameStates(h.clients, h.options);
+    h.publish(0, 5, { status });
+    h.publish(1, 5, { status });
+    assert.equal((await waiting).gameRevision, 5);
+    h.assertReleased();
+  });
+}
 
 test('observes a new call window delivered after the wait started with no decision', async () => {
   const host = makeClient('host');

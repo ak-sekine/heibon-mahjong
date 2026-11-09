@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from 'node:util';
+
 function isGameState(message) {
   return (message?.type === 'game-state' || message?.type === 'game-started') &&
     Number.isSafeInteger(message.view?.gameRevision);
@@ -66,6 +68,178 @@ export function latestGameMessage(client) {
     if (!latest || message.view.gameRevision >= latest.view.gameRevision) latest = message;
   }
   return latest;
+}
+
+// PlayerGameView exposes these fields only to the authenticated player. Everything
+// else (including revealed hands, rivers, melds and connection flags) is public.
+function commonGameState(view) {
+  const { viewerSeat, self, seats, ...common } = view;
+  return {
+    ...common,
+    seats: seats.map(({ hand, drawnTile, ...seat }) => seat),
+  };
+}
+
+function validSnapshot(view, roomCode, viewerSeat) {
+  const isSeat = seat => Number.isInteger(seat) && seat >= 0 && seat < 4;
+  const nonnegativeInteger = value => Number.isSafeInteger(value) && value >= 0;
+  return view?.type === 'game-state' && view.roomCode === roomCode &&
+    Number.isSafeInteger(view.gameRevision) && view.gameRevision >= 1 &&
+    ['playing', 'round-ended', 'match-ended'].includes(view.status) &&
+    ['awaiting-draw', 'awaiting-call', 'awaiting-ron', 'awaiting-discard', 'wall-exhausted', 'won'].includes(view.phase) &&
+    view.viewerSeat === viewerSeat && view.self?.seat === viewerSeat &&
+    isSeat(view.turnPlayerId) && nonnegativeInteger(view.liveWallCount) &&
+    isSeat(view.round?.dealerId) && Number.isSafeInteger(view.round?.roundNumber) && view.round.roundNumber >= 1 &&
+    nonnegativeInteger(view.round?.honba) &&
+    Array.isArray(view.round?.points) && view.round.points.length === 4 && view.round.points.every(Number.isFinite) &&
+    Array.isArray(view.doraIndicators) && Array.isArray(view.seats) && view.seats.length === 4 &&
+    view.seats.every((seat, index) => seat?.seat === index &&
+      ['human', 'cpu'].includes(seat.control) && typeof seat.connected === 'boolean' &&
+      Number.isFinite(seat.points) && nonnegativeInteger(seat.concealedCount) &&
+      Array.isArray(seat.river) && Array.isArray(seat.melds)) &&
+    view.seats[viewerSeat].control === 'human' && Array.isArray(view.seats[viewerSeat].hand);
+}
+
+export function waitForMatchingGameStates(clients, {
+  roomCode,
+  viewerSeats,
+  minimumRevision,
+  requestState,
+  timeoutMs = 15000,
+  diagnostic = () => {},
+  setTimer = setTimeout,
+  clearTimer = clearTimeout,
+  now = Date.now,
+} = {}) {
+  if (clients.length !== 2 || new Set(clients).size !== 2 ||
+      !Array.isArray(viewerSeats) || viewerSeats.length !== 2 || new Set(viewerSeats).size !== 2 ||
+      !viewerSeats.every(seat => Number.isInteger(seat) && seat >= 0 && seat < 4) ||
+      typeof roomCode !== 'string' || !roomCode || !Number.isSafeInteger(minimumRevision) || minimumRevision < 1 ||
+      !Number.isFinite(timeoutMs) || timeoutMs < 0 || typeof requestState !== 'function') {
+    throw new Error('Two distinct authenticated players, a room, revision, snapshot requester and bounded timeout are required.');
+  }
+  const startedAt = now();
+  const deadline = startedAt + timeoutMs;
+  // Existing messages establish a floor only; they can never satisfy this wait.
+  const revisionFloor = Math.max(minimumRevision, ...clients.map(client => latestGameMessage(client)?.view.gameRevision ?? 0));
+  const latest = new Map();
+  const listeners = [];
+  let timer;
+  let settled = false;
+  let comparedRevision = null;
+  return new Promise((resolve, reject) => {
+    const details = () => ({
+      minimumRevision: revisionFloor,
+      timeoutMs,
+      startedAt,
+      waitElapsedMs: now() - startedAt,
+      clients: clients.map(client => ({
+        ...stateSummary(client, latest.get(client)?.message),
+        receivedAt: latest.get(client)?.receivedAt ?? null,
+      })),
+    });
+    const finish = (reason, error, value) => {
+      if (settled) return;
+      settled = true;
+      if (timer !== undefined) clearTimer(timer);
+      for (const { client, onMessage, onClose, onError } of listeners) {
+        client.waiters.delete(onMessage);
+        client.socket.off('close', onClose);
+        client.socket.off('error', onError);
+      }
+      diagnostic(error ? 'snapshot-sync-failed' : 'snapshot-sync-satisfied', {
+        ...details(), reason, comparedRevision,
+      });
+      if (error) reject(error);
+      else resolve(value);
+    };
+    const fail = (reason, message) => finish(reason, new Error(message));
+    const timeout = () => fail('timeout', 'Timed out waiting for matching post-reconnect game snapshots.');
+    const evaluate = () => {
+      if (settled) return;
+      if (now() >= deadline) return timeout();
+      if (clients.some(client => client.socket.readyState !== 1)) {
+        fail('disconnect', 'A WebSocket is not open while comparing game snapshots.');
+        return;
+      }
+      if (clients.some(client => !latest.get(client)?.reconnected)) return;
+      const snapshots = clients.map(client => latest.get(client)?.message);
+      if (snapshots.some(message => !message)) return;
+      const [host, guest] = snapshots.map(message => message.view);
+      if (host.gameRevision !== guest.gameRevision) {
+        diagnostic('snapshot-sync-revision-pending', details());
+        return;
+      }
+      comparedRevision = host.gameRevision;
+      const common = snapshots.map(message => commonGameState(message.view));
+      const mismatchedFields = [...new Set(common.flatMap(Object.keys))]
+        .filter(key => !isDeepStrictEqual(common[0][key], common[1][key]));
+      if (mismatchedFields.length) {
+        diagnostic('snapshot-sync-state-mismatch', {
+          ...details(), comparedRevision: host.gameRevision, mismatchedFields,
+        });
+        fail('state-mismatch', `Common game state differed at revision ${host.gameRevision} (${mismatchedFields.join(', ')}).`);
+        return;
+      }
+      finish('matched', null, { gameRevision: host.gameRevision, messages: snapshots });
+    };
+
+    diagnostic('snapshot-sync-start', { ...details(), viewerSeats });
+    for (const [index, client] of clients.entries()) {
+      const onMessage = message => {
+        if (settled || !['game-state', 'game-started'].includes(message?.type)) return;
+        if (now() >= deadline) return timeout();
+        const view = message.view;
+        if (!validSnapshot(view, roomCode, viewerSeats[index])) {
+          diagnostic('snapshot-sync-invalid-state', {
+            ...details(), rejected: { ...stateSummary(client, message), receivedAt: now() },
+            reason: 'wrong-room-authentication-status-or-shape',
+          });
+          fail('invalid-state', `Invalid post-reconnect game snapshot from ${client.diagnosticLabel}.`);
+          return;
+        }
+        const previous = latest.get(client)?.message.view.gameRevision;
+        if (view.gameRevision < revisionFloor || (previous !== undefined && view.gameRevision < previous)) {
+          diagnostic('snapshot-sync-stale-state-ignored', {
+            ...details(), client: client.diagnosticLabel, ignoredRevision: view.gameRevision,
+          });
+          return;
+        }
+        const reconnected = viewerSeats.every(seat => view.seats[seat].connected === true);
+        latest.set(client, { message, receivedAt: now(), reconnected });
+        // Connection flags do not increment gameRevision. A snapshot that still
+        // shows either authenticated human disconnected cannot prove reconnect.
+        if (!reconnected) {
+          diagnostic('snapshot-sync-reconnect-pending', details());
+          return;
+        }
+        diagnostic('snapshot-sync-state-received', details());
+        evaluate();
+      };
+      const onClose = () => fail('disconnect', `WebSocket ${client.diagnosticLabel} closed while waiting for matching game snapshots.`);
+      const onError = () => fail('socket-error', `WebSocket ${client.diagnosticLabel} failed while waiting for matching game snapshots.`);
+      client.waiters.add(onMessage);
+      client.socket.on('close', onClose);
+      client.socket.on('error', onError);
+      listeners.push({ client, onMessage, onClose, onError });
+    }
+    timer = setTimer(timeout, Math.max(0, deadline - now()));
+    // Register both listeners before requesting either snapshot. Requests are
+    // sent once; ongoing broadcasts may bring the latest revisions together.
+    for (const client of clients) {
+      if (settled) break;
+      if (client.socket.readyState !== 1) {
+        fail('disconnect', `WebSocket ${client.diagnosticLabel} is not open for game snapshot synchronization.`);
+        break;
+      }
+    }
+    if (now() >= deadline && !settled) timeout();
+    for (const client of clients) {
+      if (settled) break;
+      try { requestState(client); }
+      catch { fail('request-failed', `Game snapshot request failed for ${client.diagnosticLabel}.`); }
+    }
+  });
 }
 
 function pendingDecision(view) {

@@ -5,6 +5,7 @@ import {
   waitForCpuProgress as waitForSynchronizedCpuProgress,
   waitForClientMessage,
   waitForHumanTurn as waitForSynchronizedHumanTurn,
+  waitForMatchingGameStates,
 } from './online-production-sync.mjs';
 
 const apiUrl = (process.env.ONLINE_API_URL ?? '').replace(/\/+$/u, '');
@@ -814,10 +815,13 @@ async function main() {
           const active = turn.viewerSeat === crossViews[0].view.viewerSeat ? crossOrigin.host : crossOrigin.guest;
           const discard = await sendGameAction(active, { type: 'discard', tileId: turn.self.discardableTileIds[0] }, turn.gameRevision, 'cross-discard');
           check(discard.result.ok === true, 'A legal discard was rejected in the mixed-Origin game.');
-          const synchronized = await Promise.all([crossOrigin.host, crossOrigin.guest].map(client => waitForGameState(client,
-            view => view?.roomCode === crossOrigin.roomCode && Number(view.gameRevision) >= Number(discard.result.gameRevision))));
-          check(synchronized[0].view.gameRevision === synchronized[1].view.gameRevision,
-            'Mixed-Origin participants did not synchronize the game revision after a discard.');
+          await waitForMatchingGameStates([crossOrigin.host, crossOrigin.guest], {
+            roomCode: crossOrigin.roomCode,
+            viewerSeats: crossViews.map(message => message.view.viewerSeat),
+            minimumRevision: Number(discard.result.gameRevision),
+            requestState: client => client.socket.send(JSON.stringify({ type: 'request-game-state' })),
+            diagnostic: (event, details) => diagnostic(event, { ...details, direction, stage: 'after-discard' }),
+          });
         }
         const disconnectIndex = crossOrigin.host.messages.length;
         const observedDisconnect = waitForRoomState(crossOrigin.host,
@@ -831,15 +835,13 @@ async function main() {
           'mixed-origin-reconnected', guestOrigin);
         crossOrigin.sockets.push(reconnected);
         crossOrigin.guest = reconnected;
-        const snapshotIndexes = [crossOrigin.host.messages.length, crossOrigin.guest.messages.length];
-        crossOrigin.host.socket.send(JSON.stringify({ type: 'request-game-state' }));
-        crossOrigin.guest.socket.send(JSON.stringify({ type: 'request-game-state' }));
-        const [hostSnapshot, guestSnapshot] = await Promise.all([crossOrigin.host, crossOrigin.guest].map(client =>
-          waitForGameState(client, view => view?.roomCode === crossOrigin.roomCode && view.status !== 'aborted' &&
-            Number(view.gameRevision) >= reconnectMinimumRevision,
-          snapshotIndexes[client === crossOrigin.host ? 0 : 1])));
-        check(hostSnapshot.view.gameRevision === guestSnapshot.view.gameRevision,
-          `Mixed-Origin reconnect snapshots differed (host ${hostSnapshot.view.gameRevision}, guest ${guestSnapshot.view.gameRevision}).`);
+        await waitForMatchingGameStates([crossOrigin.host, crossOrigin.guest], {
+          roomCode: crossOrigin.roomCode,
+          viewerSeats: crossViews.map(message => message.view.viewerSeat),
+          minimumRevision: reconnectMinimumRevision,
+          requestState: client => client.socket.send(JSON.stringify({ type: 'request-game-state' })),
+          diagnostic: (event, details) => diagnostic(event, { ...details, direction, stage: 'reconnect' }),
+        });
         const hostExit = await sendAction(crossOrigin.host, { type: 'leave-room' }, 'cross-cleanup-host-exit');
         check(hostExit.result.ok === true, `The ${direction} host could not leave during test cleanup.`);
         const finalGuestExit = await sendAction(crossOrigin.guest, { type: 'leave-room' }, 'cross-cleanup-final-exit');
