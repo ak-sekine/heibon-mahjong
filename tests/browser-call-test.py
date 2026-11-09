@@ -51,7 +51,8 @@ def control_rects(page):
     return page.evaluate('''()=> {
       const rect=e=>{const r=e.getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height,bottom:r.bottom}};
       return {controls:rect(document.querySelector('#local-game-controls')),
-        actions:rect(document.querySelector('#local-game-controls .action-buttons'))};
+        actions:rect(document.querySelector('#local-game-controls .action-buttons')),
+        kanToggle:rect(document.querySelector('#kan'))};
     }''')
 
 
@@ -260,7 +261,6 @@ with sync_playwright() as p:
             panel_geometry = page.evaluate('''()=>({
               controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),
               actions:document.querySelector('#local-game-controls .action-buttons').getBoundingClientRect().toJSON(),
-              toggle:document.querySelector('#kan').getBoundingClientRect().toJSON(),
               panel:document.querySelector('#candidate-controls').getBoundingClientRect().toJSON(),
               list:document.querySelector('#candidate-options').getBoundingClientRect().toJSON(),
               listOverflow:getComputedStyle(document.querySelector('#candidate-options')).overflowY,
@@ -276,7 +276,7 @@ with sync_playwright() as p:
             assert panel_geometry['panel']['top'] < panel_geometry['panel']['bottom'] and panel_geometry['panel']['bottom'] <= height + 0.5, f'{width}x{height} {mode}: panel did not expand upward inside the viewport: {panel_geometry}'
             anchor_bottom = min(controls_before['controls']['bottom'], height - 8)
             assert abs(panel_geometry['panel']['bottom']-anchor_bottom) <= 2, f'{width}x{height} {mode}: panel bottom did not stay at the control-panel baseline: {panel_geometry}, before={controls_before}'
-            assert panel_geometry['panel']['top'] < panel_geometry['toggle']['top'], f'{width}x{height} {mode}: candidate panel expanded below the Kan button: {panel_geometry}'
+            assert panel_geometry['panel']['top'] < controls_before['kanToggle']['top'], f'{width}x{height} {mode}: candidate panel did not expand above its original Kan trigger: {panel_geometry}, before={controls_before}'
             assert panel_geometry['listOverflow'] == 'auto' and panel_geometry['listMaxHeight'] != 'none', f'{width}x{height} {mode}: candidate list is not internally scrollable: {panel_geometry}'
             assert panel_geometry['normalHidden'] and panel_geometry['panelText'] == '戻る' and not panel_geometry['visibleNormalButtons'], f'{width}x{height} {mode}: candidate mode exposed ordinary operations: {panel_geometry}'
             candidate_count = page.locator('#candidate-options button').count()
