@@ -158,3 +158,11 @@ Chromium CSVはrun #42559867159で共通座標テストがsuccessした全132局
 最終runの両engineの全JSONはActionsの`browser-ui-{engine}-3171cdb8298bd20795c348ae0a0fb3b005027916-1` artifactの`tmp/heibon-table-ui/candidate-geometry/`に保存されています。最終Chromium artifactは約37MBでローカル取得ツールの32MiB上限を超え、正規のネットワーク許可付き直接取得もHTTP 403でした。このため上記Chromium CSVは取得できた同一製品コードの実測出典を明記して保持し、最終artifactを取得したとは報告しません。
 
 **iPhone Safari実機の修正後確認は未確認、Issue #32はOpenです。** 過去の実機OK／NG履歴は維持し、自動検証・公開成功を実機OKに置き換えません。
+
+## CSV記録コミットの再検証・最新公開
+
+座標CSVの追加は既存の変更分類で文書のみではなく全検証対象となったため、記録SHA **`1e0c6a7c90aa9c96f3f51166c5ef707a823cca7c`** でも[Deploy run #42563507924](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42563507924)を完了まで確認しました。verify、Chromium45本／WebKit35本、共通座標matrix、standalone itch smoke前後、matrix audit、release freshness、Worker deploy、本番7シナリオ、Pages build／deployはすべて**success**です。
+
+最新の公開SHAは上記`1e0c6a7`です。Worker deployment `7647435460`、GitHub Pages `7647451885`、production Pages追跡`7647455874`も同SHAでstatus successを確認しました。直前の公開SHA`3171cdb`からの変更は検証CSVと文書だけで、製品コードは同一です。CSVの実測出典は各行のSHA／runを維持します。今回の公開結果追記はMarkdownのみです。
+
+Issue #32に[今回の実機報告・修正・公開結果](https://github.com/ak-sekine/heibon-mahjong/issues/32#issuecomment-6732460273)を追記し、Openを確認しました。修正後のiPhone Safari実機確認は引き続き未確認です。

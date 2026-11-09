@@ -490,3 +490,5 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 ポン・チー・大明カン・暗カン・加カンの候補開始・位置採寸・高さ予約を共通化しました。原因、修正前後の座標、自動検証、公開結果は[今回の検証記録](issue32-candidate-anchor-2026-11-09.md)に追記します。修正後のiPhone Safari実機確認は**未確認**です。Issue #32は**Open**を維持します。
 
 2026-11-09公開結果: [Deploy #42561771978](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42561771978)はChromium／WebKitを含む全ゲートとPages公開がsuccess。公開SHAは`3171cdb8298bd20795c348ae0a0fb3b005027916`。全指定viewport・両対局modeの座標CSV、修正前の55〜123pxの可視パネル下端差、修正後の基準下端差0px、途中の修正履歴は[今回の検証記録](issue32-candidate-anchor-2026-11-09.md)に保存しました。修正後のiPhone Safari実機確認は未確認、Issue #32はOpenを維持します。
+
+CSV記録コミット`1e0c6a7c90aa9c96f3f51166c5ef707a823cca7c`も既存CIで全検証・再公開対象となり、[run #42563507924](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42563507924)の全ゲートとPages公開がsuccess。最新公開SHAは`1e0c6a7`です。製品コードは直前の`3171cdb`と同一で、実機確認は未確認のままです。

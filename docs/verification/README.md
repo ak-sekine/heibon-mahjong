@@ -119,4 +119,4 @@
 
 画像と画面別の測定データは[スクリーンショット](../screenshots/)にあります。既存のログ・画像は文書整理では移動・削除していません。
 
-- [Issue #32 候補パネルの位置・高さ管理共通化 — 2026-11-09](issue32-candidate-anchor-2026-11-09.md) — iPhone Safariでのポン／カン展開差異を記録し、操作領域の実測高さ予約と下端固定を共通化。Deploy #42561771978はChromium45本／WebKit35本、全ゲート・Pages公開success（SHA `3171cdb8298bd20795c348ae0a0fb3b005027916`）。11 viewport・両対局modeの座標CSV、公開結果、実機未確認範囲を記録。
+- [Issue #32 候補パネルの位置・高さ管理共通化 — 2026-11-09](issue32-candidate-anchor-2026-11-09.md) — iPhone Safariでのポン／カン展開差異を記録し、操作領域の実測高さ予約と下端固定を共通化。Deploy #42563507924はChromium45本／WebKit35本、全ゲート・Pages公開success（SHA `1e0c6a7c90aa9c96f3f51166c5ef707a823cca7c`）。11 viewport・両対局modeの座標CSV、公開結果、実機未確認範囲を記録。
