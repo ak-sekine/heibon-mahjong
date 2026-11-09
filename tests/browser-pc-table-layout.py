@@ -448,8 +448,9 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
           panel:document.querySelector('#online-candidate-controls').getBoundingClientRect().toJSON(),
           candidate:document.querySelector('#online-candidate-options button').getBoundingClientRect().toJSON(),
           cancel:document.querySelector('#online-candidate-back').getBoundingClientRect().toJSON(),
+          normalControlsHidden:document.querySelector('#online-normal-controls').hidden,
           actionButtons:[...document.querySelectorAll('#online-game-controls .action-buttons .control-action-button')]
-            .filter(button=>!button.hidden&&getComputedStyle(button).display!=='none'&&getComputedStyle(button).visibility!=='hidden')
+            .filter(button=>!button.hidden&&!button.closest('[hidden]')&&getComputedStyle(button).display!=='none'&&getComputedStyle(button).visibility!=='hidden')
             .map(button=>{const r=button.getBoundingClientRect();return {id:button.id,left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}}),
           position:getComputedStyle(document.querySelector('#online-candidate-controls')).position,
           overflow:getComputedStyle(document.querySelector('#online-candidate-options')).overflowY,
@@ -457,14 +458,13 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         })''')
         assert online_kan_board
         assert_same_table(online_kan_board, online_kan_open['table'], f'{width}x{height} online kan candidates')
-        assert online_kan_open['position'] == 'absolute' and online_kan_open['panel']['top'] < online_kan_open['controls']['top'], f'{width}x{height}: online kan panel did not expand upward: {online_kan_open}'
+        assert online_kan_open['position'] == 'fixed' and online_kan_open['panel']['top'] < online_kan_open['controls']['top'], f'{width}x{height}: online shared kan panel did not expand upward: {online_kan_open}'
         assert abs(online_kan_open['panel']['bottom']-online_kan_open['controls']['bottom']) <= 2, f'{width}x{height}: online kan panel lost its bottom anchor: {online_kan_open}'
-        assert online_kan_open['panel']['top'] < online_kan_open['toggle']['top'], f'{width}x{height}: online kan candidates expanded below the toggle: {online_kan_open}'
+        assert online_kan_open['panel']['top'] < online_kan_before['toggle']['top'], f'{width}x{height}: online kan candidates expanded below the trigger: {online_kan_open}, before={online_kan_before}'
         assert online_kan_open['overflow'] == 'auto' and online_kan_open['scrollTop'] <= 1, f'{width}x{height}: online kan list cannot scroll internally or page moved: {online_kan_open}'
-        for area in ('controls','actions'):
-            for key in ('top','left','width','height','bottom'):
-                assert abs(online_kan_open[area][key]-online_kan_before[area][key]) < 1, f'{width}x{height}: online kan opening moved the {area} area: {online_kan_open}'
-        assert online_kan_open['actionButtons'] and all(button['top']>=0 and button['bottom']<=height and button['width']>=44 and button['height']>=44 for button in online_kan_open['actionButtons']), f'{width}x{height}: online kan panel pushed normal actions out of view: {online_kan_open}'
+        for key in ('top','left','width','height','bottom'):
+            assert abs(online_kan_open['controls'][key]-online_kan_before['controls'][key]) < 1, f'{width}x{height}: online kan opening moved the operation panel: {online_kan_open}'
+        assert online_kan_open['normalControlsHidden'] and not online_kan_open['actionButtons'], f'{width}x{height}: online normal actions remained visible during candidate selection: {online_kan_open}'
         for selector in ('#online-candidate-options button','#online-candidate-back'):
             box=page.locator(selector).evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {top:r.top,bottom:r.bottom,width:r.width,height:r.height,receivesPointer:hit===node||node.contains(hit)}}''')
             assert 0<=box['top'] and box['bottom']<=height and box['width']>=44 and box['height']>=44 and box['receivesPointer'], f'{width}x{height}: online kan target is not initially clickable: {selector} {box}'
