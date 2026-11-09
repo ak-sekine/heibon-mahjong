@@ -352,20 +352,23 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
           position:getComputedStyle(document.querySelector('#online-call-controls')).position,scrollTop:document.scrollingElement.scrollTop})''')
         assert online_board
         assert_same_table(online_board, online_call['table'], f'{width}x{height} online call decision')
-        assert online_call['position'] == 'relative' and 0 <= online_call['controls']['top']-online_call['table']['bottom'] <= 8.5, f'{width}x{height}: online type choices are not close to the table: {online_call}'
+        assert online_call['position'] == 'absolute' and 0 <= online_call['controls']['top']-online_call['table']['bottom'] <= 8.5, f'{width}x{height}: online type choices lost their table-side overlay position: {online_call}'
         for key in ('top','left','width'):
             assert abs(online_call['controls'][key]-online_result['controls'][key]) < 1, f'{width}x{height}: online call decision moved or resized its operation area: {online_call}, normal={online_result}'
         page.locator('#online-call-chi').click()
         online_candidates = page.evaluate('''()=>({table:document.querySelector('#online-table').getBoundingClientRect().toJSON(),
           controls:document.querySelector('#online-game-controls').getBoundingClientRect().toJSON(),
-          panel:document.querySelector('#online-call-controls').getBoundingClientRect().toJSON(),
+          panel:document.querySelector('#online-candidate-controls').getBoundingClientRect().toJSON(),
+          panelPosition:getComputedStyle(document.querySelector('#online-candidate-controls')).position,
+          normalControlsHidden:document.querySelector('#online-normal-controls').hidden,
           candidates:[...document.querySelectorAll('#online-candidate-options button[data-action-choice="call"]')].map(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {...r.toJSON(),receivesPointer:hit===node||node.contains(hit)}}),
           back:document.querySelector('#online-candidate-back').getBoundingClientRect().toJSON(),scrollTop:document.scrollingElement.scrollTop})''')
         assert len(online_candidates['candidates']) > 1, f'{width}x{height}: online chi candidates did not expand: {online_candidates}'
         assert_same_table(online_board, online_candidates['table'], f'{width}x{height} online candidates')
         for key in ('top','left','width','height'):
             assert abs(online_candidates['controls'][key]-online_call['controls'][key]) < 1, f'{width}x{height}: online candidates moved or resized the operation area: {online_candidates}'
-        assert page.locator('#online-call-controls').evaluate('node=>getComputedStyle(node).position') == 'absolute', f'{width}x{height}: online candidate panel did not leave normal flow'
+        assert online_candidates['panelPosition'] == 'fixed', f'{width}x{height}: online shared candidate panel is not fixed to the viewport: {online_candidates}'
+        assert online_candidates['normalControlsHidden'], f'{width}x{height}: online normal actions remained visible during candidate selection: {online_candidates}'
         assert online_candidates['panel']['top'] < online_candidates['table']['bottom'], f'{width}x{height}: online candidates did not expand upward: {online_candidates}'
         assert abs(online_candidates['panel']['bottom']-online_candidates['controls']['bottom']) <= 2, f'{width}x{height}: online panel lost its bottom anchor: {online_candidates}'
         assert online_candidates['candidates'] and all(box['width'] >= 44 and box['height'] >= 44 and box['receivesPointer'] for box in online_candidates['candidates']), f'{width}x{height}: an online candidate was covered or too small: {online_candidates}'
