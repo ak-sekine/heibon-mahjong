@@ -53,6 +53,8 @@ ul { list-style:none; padding:0; margin:0; }
 .action-option-list { display:flex; flex-wrap:wrap; gap:4px; width:100%; }
 .call-controls { position:relative; z-index:10; box-sizing:border-box; grid-template-columns:repeat(auto-fit,minmax(min(100%,84px),1fr)); align-content:end; gap:6px; min-height:0; max-height:calc(100vh - 16px); padding:8px; border:1px solid #39765e; border-radius:8px; background:#123f32; box-shadow:0 4px 18px rgb(0 0 0 / 28%); overflow:hidden; }
 .call-controls:not([hidden]) { display:grid; }
+/* The in-flow type panel already supplies the operation padding and gaps. */
+.discard-controls:has(.call-controls:not([hidden])) { padding:0; gap:0; }
 .discard-controls:has(.call-controls:not([hidden])) > .normal-controls > .action-status,
 .discard-controls:has(.call-controls:not([hidden])) > .normal-controls > .keyboard-help { display:none; }
 .call-type-buttons { display:grid; grid-column:1 / -1; grid-template-columns:repeat(auto-fit,minmax(min(100%,84px),1fr)); align-items:stretch; gap:6px; width:100%; }
