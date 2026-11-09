@@ -443,6 +443,9 @@ export class ActionPanel {
         this.part('action-status').focus({ preventScroll: true });
         return;
       }
+      // Preserve the action panel's normal baseline before hiding the call
+      // type controls and ordinary actions for the candidate view.
+      this.captureCandidateAnchor();
       this.callType = type;
       this.part('call-controls').hidden = true;
       for (const part of ['call-pon', 'call-kan', 'call-chi']) (this.part(part) as HTMLButtonElement).hidden = true;
@@ -513,12 +516,14 @@ export class ActionPanel {
 
   private activateCandidateAnchor(mode: 'call' | 'kan'): void {
     const panel = this.part('candidate-controls');
-    if (panel.hidden || this.candidateAnchorDocumentBottom === null) {
-      const bounds = this.root.getBoundingClientRect();
-      this.candidateAnchorDocumentBottom = bounds.bottom + (typeof window === 'undefined' ? 0 : window.scrollY);
-    }
+    if (panel.hidden || this.candidateAnchorDocumentBottom === null) this.captureCandidateAnchor();
     panel.dataset.mode = mode;
     this.repositionCandidatePanel();
+  }
+
+  private captureCandidateAnchor(): void {
+    const bounds = this.root.getBoundingClientRect();
+    this.candidateAnchorDocumentBottom = bounds.bottom + (typeof window === 'undefined' ? 0 : window.scrollY);
   }
 
   private repositionCandidatePanel(): void {
