@@ -143,7 +143,6 @@ window.loadTurn=()=>{
         assert panel_candidates['y'] < panel_before['y'], (panel_before, panel_candidates)
         assert ordinary_controls_before and abs(panel_candidates['y'] + panel_candidates['height'] - (ordinary_controls_before['y'] + ordinary_controls_before['height'])) <= 2, (ordinary_controls_before, panel_candidates)
         multi_candidate_panel = panel_candidates if grid['rows'] >= 2 else None
-        candidate_panel_bottom = panel_candidates['y'] + panel_candidates['height']
         if grid['rows'] >= 2:
             assert panel_candidates['y'] < panel_before['y'], (panel_before, panel_candidates, grid)
         if (width, height) == (375, 634):
@@ -181,6 +180,7 @@ window.loadTurn=()=>{
 
             for mode, expected_count in [('two', 2), ('three', 3)]:
                 page.evaluate(f"loadCalls('{mode}')")
+                exact_before = page.evaluate("()=>({root:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),scrollY})")
                 page.locator('#call-chi').click()
                 exact_options = page.locator('#candidate-options button[data-action-choice="call"]')
                 assert exact_options.count() == expected_count, (mode, exact_options.count())
@@ -191,11 +191,21 @@ window.loadTurn=()=>{
                 exact_panel_box = page.locator('#candidate-controls').bounding_box()
                 exact_back = page.locator('#candidate-back').bounding_box()
                 assert exact_box and exact_back and exact_panel_box and 0 <= exact_back['y'] - exact_box['y'] - exact_box['height'] <= 8, (exact_box, exact_panel_box, exact_back)
-                assert abs(exact_panel_box['y'] + exact_panel_box['height'] - candidate_panel_bottom) < 2, (exact_panel_box, candidate_panel_bottom)
+                assert abs(exact_panel_box['y'] + exact_panel_box['height'] - exact_before['root']['bottom']) < 2, (exact_panel_box, exact_before)
+                exact_open = page.evaluate("()=>({root:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),scrollY})")
+                for area in ('root', 'table'):
+                    for key in ('x', 'y', 'width', 'height'):
+                        assert abs(exact_open[area][key] - exact_before[area][key]) < 1, (mode, area, key, exact_before, exact_open)
+                assert exact_open['scrollY'] == exact_before['scrollY'] == 0, (exact_before, exact_open)
                 if multi_candidate_panel:
-                    assert exact_panel_box['height'] <= multi_candidate_panel['height'] and multi_candidate_panel['y'] < exact_panel_box['y'], (exact_panel_box, multi_candidate_panel, mode)
+                    assert exact_panel_box['height'] <= multi_candidate_panel['height'], (exact_panel_box, multi_candidate_panel, mode)
                 page.locator('#candidate-back').click()
                 assert page.locator('#pass-calls').is_visible(), f'{mode} candidate Back did not restore the type screen'
+                exact_restored = page.evaluate("()=>({root:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),scrollY})")
+                for area in ('root', 'table'):
+                    for key in ('x', 'y', 'width', 'height'):
+                        assert abs(exact_restored[area][key] - exact_before[area][key]) < 1, (mode, area, key, exact_before, exact_restored)
+                assert exact_restored['scrollY'] == exact_before['scrollY'], (exact_before, exact_restored)
 
             page.evaluate("loadCalls('multi')")
             multi_choices = [page.locator(selector).bounding_box() for selector in ['#call-chi', '#call-pon', '#pass-calls']]

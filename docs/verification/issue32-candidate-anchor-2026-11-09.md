@@ -76,3 +76,19 @@
 余白修正SHA `7a14f98a56382d4f9c9791f7eaad69a6ea2e541c` の[run #42559167701](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42559167701)は、両engineで768×1024の多数候補検査に失敗しました。40個の追加候補が広い領域に収まってしまい、内部スクロールの前提を満たしていませんでした。この時点でポンの元rootはtop=744、height=70、bottom=814、候補top=688、height=126、bottom=814、下端差0px、卓620×620、scrollY=0でした。
 
 既存の同種検査と同じ100個を追加して確実にoverflowを発生させるよう、検証データを修正しました。位置・高さのassertは維持し、元の種類選択パネルが採寸root内に収まるassertも追加しました。この追加では製品コードを変更していません。両失敗runの公開はゲートで停止しました。
+
+## 変更ファイル
+
+- 製品コード: `src/ui/action-panel.ts`、`src/style.css`。
+- 単体検査: `tests/action-panel.test.ts`。
+- Browser UI: `tests/browser-candidate-geometry.py`（新規）、`tests/browser-call-decision-dialog.py`、`tests/browser-call-test.py`、`tests/browser-pc-table-layout.py`。
+- Browser UI登録・CI: `tests/run-browser-regressions.py`、`tests/test_browser_regressions_selection.py`、`.github/workflows/browser-ui.yml`（baseline採取のため履歴を取得）。
+- 文書: `README.md`、`docs/SPEC.md`、`docs/ROADMAP.md`、`docs/verification/README.md`、`docs/verification/issue32-responsive-layout-2026-11-03.md`、本記録と座標CSV。
+
+`src/ui/candidate-selection.ts`、`src/ui/call-viewport.ts`、ローカル／オンライン状態生成、共通HTMLテンプレートは調査のうえ変更不要と判断しました。既存共通候補部品と観測処理を再利用し、位置管理は操作パネル所有者の単一経路に集約しています。
+
+## 既存の異なる局面間比較の修正
+
+[run #42559867159](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42559867159)で、追加した11 viewport・ローカル／オンライン全候補の座標検査はWebKitで成功しました。その後の既存チーテストは、5候補の局面で得た下端607pxを、別の2候補局面（通常パネル下端557px）にも要求して失敗しました。旧実装ではどちらも縮んだrootを使っていたため、別局面の下端も同じになっていました。
+
+既存検査を各局面の表示前rootを`getBoundingClientRect()`で保存する方式に変更し、その局面の下端、予約領域・卓・scrollY、戻る後の復元を検査します。異なる局面の通常領域の高さは同じ値へ固定しません。同じ基準のまま候補を増やして上へ伸ばす検査は、共通座標テストの100候補追加で独立して厳密に維持しています。この追加も製品コードの変更はありません。
