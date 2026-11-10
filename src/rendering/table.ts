@@ -27,15 +27,16 @@ function tileOrder(tile: Tile): number {
   return tile.category === 'suited' ? SUITS.indexOf(tile.suit) * 9 + tile.rank - 1 : 27 + HONORS.indexOf(tile.honor);
 }
 
-function renderSelf(player: PlayerState, enabled: boolean): void {
+function renderSelf(player: PlayerState, enabled: boolean, winningTile?: PhysicalTile): void {
   const hand = document.querySelector<HTMLUListElement>('#player-hand')!;
-  const items = [...player.hand].sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id)).map((physical: PhysicalTile) => {
+  const items = [...player.hand, ...(winningTile ? [winningTile] : [])].sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id)).map((physical: PhysicalTile) => {
     const item = document.createElement('li');
     item.dataset.tileId = physical.id;
+    if (physical.id === winningTile?.id) item.className = 'winning-tile';
     item.append(tileButton(physical, enabled && !player.riichi));
     return item;
   });
-  if (player.drawnTile) {
+  if (player.drawnTile && !winningTile) {
     const item = document.createElement('li');
     item.className = 'drawn-tile';
     item.dataset.tileId = player.drawnTile.id;
@@ -43,7 +44,7 @@ function renderSelf(player: PlayerState, enabled: boolean): void {
     items.push(item);
   }
   hand.replaceChildren(...items);
-  hand.dataset.hasDrawn = String(player.drawnTile !== null);
+  hand.dataset.hasDrawn = String(player.drawnTile !== null && !winningTile);
 }
 
 function tileButton(physical: PhysicalTile, enabled: boolean): HTMLButtonElement {
@@ -112,7 +113,7 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
       isConnected: true,
     });
     if (id === viewerSeat) {
-      renderSelf(player, canDiscard(game, viewerSeat));
+      renderSelf(player, canDiscard(game, viewerSeat), winningResult ? winningPhysicalTile(game, winningResult) : undefined);
       if (settlement?.reason === 'kyuushu-kyuuhai' && game.abortiveDrawPlayerId === id) {
         renderRevealedOwnHand(document.querySelector<HTMLUListElement>('#player-hand')!, player);
       }
@@ -252,14 +253,15 @@ function winningPhysicalTile(game: GameState, result: TsumoResult | RonCandidate
   throw new RangeError('Missing physical winning tile');
 }
 
+/** Sort a display-only copy; ron remains in the river and tsumo in drawnTile. */
+function sortedWinningTiles(game: GameState, result: TsumoResult | RonCandidate): PhysicalTile[] {
+  return [...game.players[result.winnerId].hand, winningPhysicalTile(game, result)]
+    .sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
+}
+
 function renderPublicCpuHand(container: HTMLElement, game: GameState, result: TsumoResult | RonCandidate, seatNames: readonly string[]): void {
   const player = game.players[result.winnerId];
-  const winningTile = winningPhysicalTile(game, result);
-  const concealedTiles = [...player.hand]
-    .sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
-  // The confirmed winning tile is a current draw for tsumo, or the existing
-  // physical discard for ron. Rendering adds no tile to GameState.
-  renderRevealedCpuHand(container, player, [...concealedTiles, winningTile], seatNames, result.winningTileId);
+  renderRevealedCpuHand(container, player, sortedWinningTiles(game, result), seatNames, result.winningTileId);
 }
 
 function renderPublicCpuDrawHand(container: HTMLElement, player: PlayerState, seatNames: readonly string[]): void {
@@ -321,9 +323,8 @@ function renderWinResult(game: GameState, settlement: RoundSettlement | null, se
       const hand = document.createElement('ol');
       hand.className = 'winning-hand';
       hand.setAttribute('aria-label', '和了手牌');
-      const tiles = [...player.hand].sort((a, b) => tileOrder(a.tile) - tileOrder(b.tile) || a.id.localeCompare(b.id));
-      const winningTile = winningPhysicalTile(game, result);
-      for (const physical of [...tiles, winningTile]) {
+      const tiles = sortedWinningTiles(game, result);
+      for (const physical of tiles) {
         const item = document.createElement('li');
         if (physical.id === result.winningTileId) item.className = 'winning-draw';
         item.append(createTileElement(physical.tile));

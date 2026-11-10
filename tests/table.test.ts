@@ -507,7 +507,7 @@ test('confirmed draw publishes only tenpai CPU hands, summarizes settlement and 
   } finally { globalThis.document = original; }
 });
 
-for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner, sorted thirteen plus accessible red winning draw, disables UI and resets`, async () => {
+for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner, sorted complete hand with accessible red winning tile, disables UI and resets`, async () => {
   const { cpuTsumoGame, cpuTsumoStart } = await import('./cpu-tsumo-fixture.ts');
   const nodes = new Map<string, ElementStub>();
   for (const seat of [0, 1, 2, 3]) {
@@ -545,18 +545,18 @@ for (const id of [1, 2, 3] as const) test(`CPU${id} result publishes only winner
     const order = (t: typeof player.hand[number]) => t.tile.category === 'suited'
       ? ['man', 'pin', 'sou'].indexOf(t.tile.suit) * 9 + t.tile.rank - 1
       : 27 + ['east','south','west','north','white','green','red'].indexOf(t.tile.honor);
-    const sorted = [...player.hand].sort((a,b) => order(a)-order(b) || a.id.localeCompare(b.id));
+    const sorted = [...player.hand, player.drawnTile!].sort((a,b) => order(a)-order(b) || a.id.localeCompare(b.id));
     assert.ok(hand.children.every(n => n.dataset.tileId === undefined));
-    assert.deepEqual(hand.children.map(n => n.children[0].innerHTML), [...sorted, player.drawnTile!].map(t => tileSvgMarkup(t.tile)));
-    assert.equal(hand.children[13].className, 'winning-draw');
-    assert.equal(hand.children[13].children[0].innerHTML, tileSvgMarkup(player.drawnTile!.tile));
-    assert.match(hand.children[13].children[0].innerHTML, /aria-label="赤5索"/);
+    assert.deepEqual(hand.children.map(n => n.children[0].innerHTML), sorted.map(t => tileSvgMarkup(t.tile)));
+    const winningIndex = sorted.findIndex(tile => tile.id === player.drawnTile!.id);
+    assert.equal(hand.children[winningIndex].className, 'winning-draw');
+    assert.match(hand.children[winningIndex].children[0].innerHTML, /aria-label="赤5索"/);
     const publicHand = nodes.get(`.concealed-hand[data-player-id="${id}"]`)!;
     assert.equal(publicHand.children.length, 14);
     assert.ok(publicHand.children.every(n => n.className.startsWith('revealed-tile')));
     assert.ok(publicHand.children.every(n => n.dataset.tileId === undefined));
-    assert.equal(publicHand.children.at(-1)!.className, 'revealed-tile winning-tile');
-    assert.equal(publicHand.children.at(-1)!.children[0].innerHTML, tileSvgMarkup(player.drawnTile!.tile));
+    assert.equal(publicHand.children[winningIndex].className, 'revealed-tile winning-tile');
+    assert.equal(publicHand.children[winningIndex].children[0].innerHTML, tileSvgMarkup(player.drawnTile!.tile));
     const summary = nodes.get('#round-result-summary')!;
     assert.equal(summary.hidden, false);
     const summaryText = descend(summary).map(n => n.textContent).join(' ');
@@ -697,7 +697,7 @@ for (const scenario of ['waiting','same-kind','call-waiting','human','double','t
           assert.equal(concealed.children.length, player.hand.length + 1);
           assert.ok(concealed.children.every(n => n.className.startsWith('revealed-tile')));
           assert.ok(concealed.children.every(n => n.dataset.tileId === undefined));
-          assert.equal(concealed.children.at(-1)!.children[0].innerHTML, tileSvgMarkup(ronResult!.winningTile!.tile));
+          assert.equal(concealed.children.find(n => n.className.includes('winning-tile'))!.children[0].innerHTML, tileSvgMarkup(ronResult!.winningTile!.tile));
         } else {
           assert.ok(concealed.children.every(n => n.className === 'tile-back' && n.children.length === 0 && Object.keys(n.dataset).length === 0));
         }
@@ -706,14 +706,13 @@ for (const scenario of ['waiting','same-kind','call-waiting','human','double','t
         const list = section.children.find(c=>c.className==='winning-hand')!;
         assert.equal(list.children.length,14);
         assert.ok(list.children.every(n=>n.dataset.tileId===undefined));
-        assert.equal(list.children[13].className,'winning-draw');
-        assert.match(list.children[13].children[0].innerHTML,/aria-label="赤5索"/);
+        assert.match(list.children.find(n => n.className === 'winning-draw')!.children[0].innerHTML,/aria-label="赤5索"/);
         assert.ok(!descend(section).some(n=>n.textContent.includes('門前清自摸和')));
       }
       const publicNodes = [...nodes.values()].flatMap(descend);
       if (game.winResult?.winMethod === 'ron') {
         assert.equal(allTiles(game).filter(tile=>tile.id===game.winResult!.winningTileId).length,1);
-        assert.equal(publicNodes.filter(node=>node.dataset.tileId===game.winResult!.winningTileId).length,1);
+        assert.equal(publicNodes.filter(node=>node.dataset.tileId===game.winResult!.winningTileId).length,actualWinners.includes(0) ? 3 : 1);
       }
       for (const player of game.players.slice(1).filter(p=>!actualWinners.includes(p.id))) {
         for (const tile of player.hand) assert.ok(!publicNodes.some(n=>n.dataset.tileId===tile.id));
@@ -888,4 +887,48 @@ test('Step 13.5.2 chi retains numeric order and marks the acquired tile',async()
     assert.equal(group.children.find(n=>n.className==='called-tile')!.dataset.tileId,meld.calledTileId);
     assert.equal(group.dataset.fromDirection,'3');
   } finally {globalThis.document=original;}
+});
+
+for (const method of ['pairs-ron', 'standard-ron', 'tsumo'] as const) test(`Issue 53: complete sorted winning DOM and immutable state (${method})`, async () => {
+  const { ronGame } = await import('./ron-fixture.ts');
+  const pre = method === 'tsumo'
+    ? tsumoGame(['123m', '789p', '456s', '22p', '456m'])
+    : ronGame(1, [0], method === 'pairs-ron'
+      ? [['11z', '66s', '11m', '22p', '99m', '44s', '5m']] : undefined,
+    method === 'pairs-ron' ? 'man-5' : undefined);
+  const game = method === 'tsumo' ? declareTsumo(pre, 0) : declareRon(pre, 0);
+  const snapshot = structuredClone(game);
+  const nodes = new Map<string, ElementStub>();
+  for (const id of [0, 1, 2, 3]) {
+    nodes.set(`#label-${id}`, new ElementStub());
+    nodes.set(`.river[data-player-id="${id}"]`, new ElementStub());
+  }
+  for (const key of ['#player-hand', '#wall-count', '#win-result', '#round-result-summary', '#dora-indicators']) nodes.set(key, new ElementStub());
+  const original = globalThis.document;
+  globalThis.document = {
+    querySelector: (selector: string) => nodes.get(selector),
+    createElement: (tag: string) => new ElementStub(tag),
+  } as unknown as Document;
+  try {
+    renderTable(game);
+    const own = nodes.get('#player-hand')!;
+    const detail = nodes.get('#win-result')!.children[0].children.find(n => n.className === 'winning-hand')!;
+    const kindOrder = (tile: PhysicalTile) => tile.tile.category === 'suited'
+      ? SUITS.indexOf(tile.tile.suit) * 9 + tile.tile.rank - 1
+      : 27 + ['east', 'south', 'west', 'north', 'white', 'green', 'red'].indexOf(tile.tile.honor);
+    const win = game.winResult!;
+    const winning = win.winMethod === 'ron' ? win.winningTile! : game.players[0].drawnTile!;
+    const expected = [...game.players[0].hand, winning].sort((a, b) => kindOrder(a) - kindOrder(b) || a.id.localeCompare(b.id));
+    assert.equal(own.children.length, 14);
+    assert.equal(new Set(own.children.map(n => n.dataset.tileId)).size, 14);
+    assert.deepEqual(own.children.map(n => n.dataset.tileId), expected.map(t => t.id));
+    assert.deepEqual(detail.children.map(n => n.children[0].innerHTML), expected.map(t => tileSvgMarkup(t.tile)));
+    assert.equal(own.dataset.hasDrawn, 'false');
+    assert.equal(own.children.filter(n => n.className === 'winning-tile').length, 1);
+    assert.ok(own.children.every(n => n.children[0].disabled));
+    if (method === 'pairs-ron') for (let index = 0; index < 14; index += 2) {
+      assert.equal(tileKindKey(expected[index].tile), tileKindKey(expected[index + 1].tile));
+    }
+    assert.deepEqual(game, snapshot);
+  } finally { globalThis.document = original; }
 });

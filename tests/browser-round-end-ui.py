@@ -126,6 +126,10 @@ with sync_playwright() as p:
                 : player.id === source.id ? { ...player, hand: sourceHand } : player) };
               return { pre, win: tsumo.declareTsumo(riichi, 0) };
             }
+            if (name === 'pairs-ron') {
+              const pre = ronFixture.ronGame(1, [0], [['11z','66s','11m','22p','99m','44s','5m']], 'man-5');
+              return { pre, win: ron.declareRon(pre, 0) };
+            }
             if (name === 'human-ron') {
               const pre = window.roundEndModules.ronGame(1, [0]);
               return { pre, win: ron.declareRon(pre, 0) };
@@ -214,7 +218,9 @@ with sync_playwright() as p:
             if (matchEnd) match = matches.settleRound({ ...match, status: 'playing', lastSettlement: null,
               roundNumber: 4, dealerId: game.dealerId });
             controller.match = match;
+            const snapshot = JSON.stringify(game);
             render();
+            if (JSON.stringify(game) !== snapshot) throw new Error('Rendering mutated GameState');
             const result = game.winResult?.winMethod === 'ron' ? game.winResult.winners
               : game.winResult ? [game.winResult] : [];
             return {
@@ -346,7 +352,7 @@ with sync_playwright() as p:
 
         # Result variants verify dynamic yaku totals, no automatic dialog,
         # repeatable table/detail toggling, flow labels, and match-end actions.
-        variants = ['human-tsumo','human-ron','yakuman-tsumo','yakuman-ron','haneman-tsumo','ura-tsumo','cpu1-tsumo','cpu2-tsumo','cpu3-tsumo',
+        variants = ['human-tsumo','human-ron','pairs-ron','yakuman-tsumo','yakuman-ron','haneman-tsumo','ura-tsumo','cpu1-tsumo','cpu2-tsumo','cpu3-tsumo',
             'cpu1-ron','cpu2-ron','cpu3-ron','double-cpu-ron','triple-cpu-ron',
             'double-mixed-ron','triple-mixed-ron','adjusted-cpu1-ron','draw','draw-0','draw-1','draw-2','draw-3','draw-4',
             'draw-self','draw-cpu1','draw-cpu2','draw-cpu3','draw-cpu-only','four-kans','kyuushu']
@@ -408,6 +414,34 @@ with sync_playwright() as p:
                 if scenario.startswith('draw') and int(hand['seat']) == 2:
                     assert hand['order'] == meta['players'][2]['handLabels'], (width, scenario, hand, meta['players'][2]['handLabels'])
             assert not page.locator('#result-dialog').is_visible(), (width, scenario, 'result auto-opened')
+            order_report = page.evaluate('''() => {
+              const game = window.roundEndTest.controller.game;
+              const wins = game.winResult?.winMethod === 'ron' ? game.winResult.winners : game.winResult ? [game.winResult] : [];
+              const key = tile => tile.category === 'suited' ? ['man','pin','sou'].indexOf(tile.suit)*9+tile.rank-1
+                : 27+['east','south','west','north','white','green','red'].indexOf(tile.honor);
+              return wins.map(win => {
+                const player = game.players[win.winnerId];
+                const winning = win.winMethod === 'ron' ? game.winResult.winningTile : player.drawnTile;
+                const expected = [...player.hand, winning].sort((a,b) => key(a.tile)-key(b.tile) || a.id.localeCompare(b.id));
+                const selector = win.winnerId === 0 ? '#player-hand' : `.concealed-hand[data-player-id="${win.winnerId}"]`;
+                const nodes = [...document.querySelector(selector).children];
+                const boxes = nodes.map(node => node.getBoundingClientRect());
+                const label = tile => tile.category === 'honor' ? ({east:'東',south:'南',west:'西',north:'北',white:'白',green:'發',red:'中'})[tile.honor]
+                  : `${tile.isRed?'赤':''}${tile.rank}${({man:'萬',pin:'筒',sou:'索'})[tile.suit]}`;
+                return {id:win.winnerId, expected:expected.map(tile => label(tile.tile)),
+                  actual:nodes.map(node => node.querySelector('svg').getAttribute('aria-label')),
+                  monotonic:boxes.every((box,i) => box.width>0 && (!i || (getComputedStyle(document.querySelector(selector)).flexDirection==='column'
+                    ? box.top>=boxes[i-1].bottom-0.1 : box.left>=boxes[i-1].right-0.1))),
+                  winningCount:nodes.filter(node => node.classList.contains('winning-tile')).length};
+              });
+            }''')
+            for hand_order in order_report:
+                assert hand_order['actual'] == hand_order['expected'], (width, scenario, hand_order)
+                assert hand_order['monotonic'] and hand_order['winningCount'] == 1, (width, scenario, hand_order)
+            if scenario == 'pairs-ron':
+                labels = [label.replace('赤', '') for label in order_report[0]['actual']]
+                assert len(labels) == 14 and all(labels[i] == labels[i+1] for i in range(0,14,2)), (width, labels)
+
             assert page.locator('#round-result-summary').is_visible(), (width, scenario, 'summary hidden')
             assert page.locator('#show-result').is_visible(), (width, scenario)
             assert page.locator('#show-result').inner_text() == '局の結果', (width, scenario)
@@ -563,6 +597,11 @@ with sync_playwright() as p:
             assert not page.locator('#public-winning-hands').count(), (width, 'old CPU hand block remains')
             page.locator('#show-result').click()
             assert page.locator('#result-dialog').is_visible(), (width, scenario, 'detail did not open')
+            for hand_order in order_report:
+                detail = page.locator(f'.winner-result[data-winner-id="{hand_order["id"]}"] .winning-hand')
+                assert detail.locator('svg').evaluate_all('nodes => nodes.map(node => node.getAttribute("aria-label"))') == hand_order['expected'], (width, scenario, hand_order)
+                assert detail.locator('li').evaluate_all('nodes => nodes.every((node,i) => { const box=node.getBoundingClientRect(); return box.width>0 && (!i || box.left>=nodes[i-1].getBoundingClientRect().right-0.1); })'), (width, scenario, 'detail visual order')
+
             if meta['reason'] == 'draw':
                 ready_names = ['自分','CPU1','CPU2','CPU3']
                 detail_hands = page.locator('#match-result .winning-hand')
@@ -594,7 +633,7 @@ with sync_playwright() as p:
                     cpuSeats:count('.concealed-hand [data-tile-id]'),main:count('main [data-tile-id]')};
                 }''', shared_id)
                 assert id_copies == {'stateCount':1,'stateUnique':True,'river':1,
-                    'details':0,'cpuSeats':0,'main':1}, (width, scenario, id_copies)
+                    'details':0,'cpuSeats':0,'main':3 if any(result['winnerId'] == 0 for result in ron_results) else 1}, (width, scenario, id_copies)
             if meta['status'] == 'match-ended':
                 assert page.locator('#result-title').inner_text() == '東風戦終了'
                 assert not page.locator('#next-round').is_visible()
