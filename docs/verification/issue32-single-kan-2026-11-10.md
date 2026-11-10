@@ -37,4 +37,15 @@
 - `call-test.html`の暗カン単一・複数・加カンは即実行／パネル表示を分けて検査する。複数候補の戻る、再選択、内部スクロール、Safari相当可視領域、卓矩形・操作領域下端の保持を維持する。PCの候補位置テストと短画面の戻るテストは複数暗カン局面へ移した。
 - Cloudの既知のChromium起動制限はリポジトリの手順に従い再調査せず、Browser UIとDeploy gateは対象コミットのActions結果を確認して記録する。
 
-Actions run／公開SHA／push後の状態は、実行結果の確認後に追記する。
+## Actions結果
+
+- 実装コミット: `71988435adf6396900394f78ec3dd1a5604a4531`。`git push origin HEAD:main`成功、push直後の`git ls-remote origin refs/heads/main`で同SHAを確認した。
+- [Deploy run #42725848081](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42725848081)、attempt 1。Chromium **45本成功**、WebKit **35本成功**（baseline観測を含む）。両jobのログから成功notice数と対象scriptの成功を確認した。失敗・再実行なし。
+- 両engineで`browser-action-panel.py`、`browser-call-test.py`、`browser-pc-table-layout.py`、`browser-candidate-geometry.py`が成功。通常対局／検証ページ／オンラインUIの3経路を検査した。
+- 現行geometryは各engineで11 viewport × 2モード × 7局面 = **154ケース**成功。単一候補3局面（大明カン、暗カン、加カン）はパネルなしの確定、複数／混在候補4局面は戻ると配置維持を検査した。現行geometry実行時間はChromium 94.182秒、WebKit 117.738秒。
+- `verify`（全単体・結合テスト、Worker型チェック、Pages／itchビルド）、`browser-ui-matrix-audit`、`release-freshness`、`deploy-worker`、`production-test`はsuccess。Worker Deployment ID: `7669913856`（同実装SHA）。
+- 同runのPages build／deployもsuccessし、run全体がsuccessで完了した。Worker `7669913856`、GitHub Pages `7669938648`、production Pages追跡 `7669943798`のDeployment statusはすべてsuccess、SHAは `71988435adf6396900394f78ec3dd1a5604a4531`で一致した。
+- **公開SHA: `71988435adf6396900394f78ec3dd1a5604a4531`**。公開URL: https://ak-sekine.github.io/heibon-mahjong/ 、検証ページ: https://ak-sekine.github.io/heibon-mahjong/call-test.html 。公開確認はActionsとDeployment statusで行い、iPhone Safari実機確認とは区別する。
+- 最終結果を追記する記録はMarkdownのみの変更として別コミットでmainへ直接pushする。製品コードは上記公開SHAと同一。
+
+公開後のiPhone Safari実機確認は**未確認**。Issue #32は**Open**を維持する。公開ページの暗カン単一／加カンは「カン」1回で確定し、暗カン複数は候補→戻る→再選択を行えること、Safariツールバー変化後も複数候補を操作できることを本人の再確認項目として残す。
