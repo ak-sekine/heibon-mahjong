@@ -2,6 +2,8 @@
 
 [Issue #32](https://github.com/ak-sekine/heibon-mahjong/issues/32) のスマートフォン・タブレット・PC向けレイアウトと操作可能性の回帰検証を記録します。iPhone Safari／PWAの過去のユーザー実機OK、PC初回の修正前NG、PCスクロールバーのドラッグ操作OKを維持します。2026-11-08の最新PC実機報告では、複数チー候補と局結果の指定範囲がOK、ポン・カンは未確認です。ほかの必須PC実機項目も残るため、Issue #32はOpenを維持します。
 
+**最新のiPhone Safari本人実機報告（2026-11-10）**は、[単一候補の検証記録](issue32-single-kan-2026-11-10.md#修正後のiphone-safari実機確認結果)を参照してください。今回の報告4項目はOK 3件・NG 0件・未確認1件。カン操作の確認は進みましたが、複数候補の下端固定・上方向展開、Safariツールバー表示・収納後の操作と必須PC実機確認が残り、Close不可・Open維持です。以下の各日付のOK／NG／未確認や受け入れ条件評価は当時の履歴として保持します。
+
 ## Git作業基準
 
 - 作業開始時のcleanな `work` branch HEADは `716fcf567abc690eaa8ceb2c7073faefd24fe14b` でした。
@@ -492,3 +494,9 @@ Browser UIは既存ルールに従いGitHub Actionsで実行し、Playwright emu
 2026-11-09公開結果: [Deploy #42561771978](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42561771978)はChromium／WebKitを含む全ゲートとPages公開がsuccess。公開SHAは`3171cdb8298bd20795c348ae0a0fb3b005027916`。全指定viewport・両対局modeの座標CSV、修正前の55〜123pxの可視パネル下端差、修正後の基準下端差0px、途中の修正履歴は[今回の検証記録](issue32-candidate-anchor-2026-11-09.md)に保存しました。修正後のiPhone Safari実機確認は未確認、Issue #32はOpenを維持します。
 
 CSV記録コミット`1e0c6a7c90aa9c96f3f51166c5ef707a823cca7c`も既存CIで全検証・再公開対象となり、[run #42563507924](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42563507924)の全ゲートとPages公開がsuccess。最新公開SHAは`1e0c6a7`です。製品コードは直前の`3171cdb`と同一で、実機確認は未確認のままです。
+
+## 2026-11-10: カン単一候補の修正後実機報告とClose再評価
+
+後続の単一カン即時実行修正（実装・公開SHA `71988435adf6396900394f78ec3dd1a5604a4531`）に対するユーザー本人のiPhone Safari実機報告を受領しました。修正前の暗カン単一候補NGは今回の範囲で解消確認済みです。加カン単一候補の即時実行、暗カン複数候補の表示・戻る・再選択・確定もOKですが、位置・高さ・スクロールやSafariツールバー変化後の操作まで確認済みとはしません。
+
+4項目の個別結果、自動検証との区別、残るPC必須項目とIssue本文の受け入れ条件の再評価は[単一候補の検証記録](issue32-single-kan-2026-11-10.md#修正後のiphone-safari実機確認結果)に集約しました。今回のiPhone報告でPC未確認項目は変更しません。**Issue #32はClose不可・Open維持、本文のチェックボックスは変更しません。**
