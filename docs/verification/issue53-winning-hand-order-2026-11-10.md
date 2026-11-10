@@ -78,3 +78,28 @@ Pagesとitchは同じ`table.ts`を実行する。mode/base、エントリ、PWA�
 | iPhone Safari | **未確認** |
 
 Issue #53はOpenを維持しClose不可。まずCI失敗の診断と解消、両エンジンの追加描画試験成功、Pages公開が必要。修正ZIP再アップロード後、iPhone Safariで七対子ロン、通常ロン/ツモ、赤牌、卓下部と局の結果の両方、選択・打牌・リーチ・副露/カン・河・次局を確認する必要がある。機種/iOS、ビルドIDと結果を記録する。自動WebKit成功を実機成功とは扱わない。元の全体的な混在が残る場合は画像と診断ビルドID・局面を再取得して調査する。
+
+## 追加調査: 回転席の座標判定（2026-11-10）
+
+### 開始状態と前回報告の訂正
+
+開始HEAD / fetch後origin/mainは`c17b514daab957dbc1d7f209707e52be5ffafe41`、`work`、作業ツリーはクリーン、behind/ahead=0/0、未pushなし。Issue本文・コメントを再取得し、Open・コメント0件を確認。
+
+ユーザーが取得した4ジョブのログでは、すべて`tests/browser-round-end-ui.py:440`、320px / `yakuman-ron` / winnerId=1で失敗。DOMのexpected/actualは一致、winningCount=1、monotonic=falseだった。**前回の「和了描画テストに未到達」という推定は誤りで、訂正する。** API注釈の取得結果だけから実行位置を断定すべきではなかった。上の初回記録は当時の判断履歴として残し、最新判定はこの節とする。
+
+### 原因と修正する検証
+
+`.table .seat-right`は`transform: ... rotate(270deg)`、左席は90deg。`.table .seat .concealed-hand`は`flex-direction:row`であり、flexの局所座標と`getBoundingClientRect()`のviewport座標は異なる。旧assertはrowなら常に`current.left >= previous.right`と比較していた。右席ではDOM順に画面の下から上へ進むため、このX比較は表示順の条件にならない。
+
+今回変更するアプリ本体ソース・CSSは**0件**。DOM順序・和了牌1枚のassertを維持し、画面上の位置検証を以下へ変更する。
+
+- computed styleのflex方向から局所進行ベクトルを作り、手牌から祖先までのtransform / 個別scale / rotateを適用して画面上の進行方向を求める。
+- 実測DOM矩形をその方向へ射影し、正の寸法、DOM順の前進、隣接牌の非重複（許容誤差0.1px）、垂直方向の中心揃え（0.2px）をすべて検証。現行の90度単位の回転であることも検証し、未対応の傾きを黙って通さない。
+- 320×568の`yakuman-ron`では旧X判定がfalseとなることを実測で確認する。同じ実DOMへ一時的に重なりとCSS order変更を与え、新しい検証が両方を拒否することを確認後、元のstyleへ戻す。assert削除・skipなし。
+- raw DOM矩形、computed transform、進行方向、牌間隔をJSON artifactへ保存し、代表局面をActions noticeにも出力する。結果画面のDOM順・横方向の非重複、既存全シナリオは維持する。
+
+### 検証・公開（追加修正）
+
+ローカルPython構文検査、browser manifest選択の9テストは成功。`npm test`と新しい対象SHAのChromium/WebKit全体、実測値、Pages公開結果は完了後に追記する。ローカルブラウザは既知Chromium制限・WebKit配布元403が継続するため既存Actionsで実行する。
+
+iPhone Safari実機は引き続き未確認。Issue #53はOpenのまま維持する。itch.ioへの再アップロードは未実施。

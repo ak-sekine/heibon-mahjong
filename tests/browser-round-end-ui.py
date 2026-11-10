@@ -414,30 +414,95 @@ with sync_playwright() as p:
                 if scenario.startswith('draw') and int(hand['seat']) == 2:
                     assert hand['order'] == meta['players'][2]['handLabels'], (width, scenario, hand, meta['players'][2]['handLabels'])
             assert not page.locator('#result-dialog').is_visible(), (width, scenario, 'result auto-opened')
-            order_report = page.evaluate('''() => {
+            order_report = page.evaluate('''({diagnose}) => {
               const game = window.roundEndTest.controller.game;
               const wins = game.winResult?.winMethod === 'ron' ? game.winResult.winners : game.winResult ? [game.winResult] : [];
               const key = tile => tile.category === 'suited' ? ['man','pin','sou'].indexOf(tile.suit)*9+tile.rank-1
                 : 27+['east','south','west','north','white','green','red'].indexOf(tile.honor);
+              // flex-direction describes local layout, whereas DOMRects are in viewport
+              // coordinates. Transform the local advance vector through every ancestor.
+              const geometry = hand => {
+                const direction = getComputedStyle(hand).flexDirection;
+                let axis = direction.startsWith('column') ? {x:0,y:1} : {x:1,y:0};
+                if (direction.endsWith('reverse')) axis = {x:-axis.x,y:-axis.y};
+                const transforms = [];
+                for (let node = hand; node; node = node.parentElement) {
+                  const style = getComputedStyle(node);
+                  const matrix = style.transform === 'none' ? new DOMMatrix() : new DOMMatrix(style.transform);
+                  axis = {x:matrix.a*axis.x+matrix.c*axis.y, y:matrix.b*axis.x+matrix.d*axis.y};
+                  if (style.scale !== 'none') {
+                    const scale = style.scale.split(' ').map(Number);
+                    axis = {x:axis.x*scale[0], y:axis.y*(scale[1] ?? scale[0])};
+                  }
+                  if (style.rotate !== 'none') {
+                    const matrix = new DOMMatrix().rotate(parseFloat(style.rotate));
+                    axis = {x:matrix.a*axis.x+matrix.c*axis.y, y:matrix.b*axis.x+matrix.d*axis.y};
+                  }
+                  if (style.transform !== 'none' || style.rotate !== 'none' || style.scale !== 'none') {
+                    transforms.push({node:node.id || node.className, transform:style.transform, rotate:style.rotate, scale:style.scale});
+                  }
+                }
+                const length = Math.hypot(axis.x,axis.y);
+                axis = {x:axis.x/length,y:axis.y/length};
+                // Current table CSS uses quarter turns. Bounding rectangles are exact
+                // along these axes; reject unsupported geometry instead of guessing.
+                const quarterTurn = Math.min(Math.abs(axis.x),Math.abs(axis.y)) < 0.0001;
+                const boxes = [...hand.children].map(node => {
+                  const r = node.getBoundingClientRect();
+                  return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};
+                });
+                const projected = boxes.map(r => {
+                  const advance = [r.left*axis.x+r.top*axis.y,r.right*axis.x+r.bottom*axis.y];
+                  return {start:Math.min(...advance),end:Math.max(...advance),
+                    cross:-(r.left+r.right)/2*axis.y+(r.top+r.bottom)/2*axis.x};
+                });
+                const gaps = projected.slice(1).map((r,i) => r.start-projected[i].end);
+                const aligned = projected.every(r => Math.abs(r.cross-projected[0].cross) <= 0.2);
+                const ordered = projected.every((r,i) => !i || r.start > projected[i-1].start+0.1);
+                return {valid:quarterTurn && boxes.every(r => r.width>0 && r.height>0) && aligned && ordered && gaps.every(gap => gap>=-0.1),
+                  direction,axis,transforms,boxes,gaps,aligned,ordered,quarterTurn,
+                  legacyMonotonic:boxes.every((r,i) => !i || (direction==='column'
+                    ? r.top>=boxes[i-1].bottom-0.1 : r.left>=boxes[i-1].right-0.1))};
+              };
               return wins.map(win => {
                 const player = game.players[win.winnerId];
                 const winning = win.winMethod === 'ron' ? game.winResult.winningTile : player.drawnTile;
                 const expected = [...player.hand, winning].sort((a,b) => key(a.tile)-key(b.tile) || a.id.localeCompare(b.id));
                 const selector = win.winnerId === 0 ? '#player-hand' : `.concealed-hand[data-player-id="${win.winnerId}"]`;
-                const nodes = [...document.querySelector(selector).children];
-                const boxes = nodes.map(node => node.getBoundingClientRect());
+                const hand = document.querySelector(selector);
+                const nodes = [...hand.children];
+                const measured = geometry(hand);
+                let negativeControls = null;
+                if (diagnose) {
+                  const original = nodes.slice(0,2).map(node => node.style.cssText);
+                  try {
+                    nodes[1].style.transform = 'translateX(-50%)';
+                    const overlapRejected = !geometry(hand).valid;
+                    nodes[1].style.cssText = original[1];
+                    nodes[0].style.order = '1';
+                    negativeControls = {overlapRejected,reorderRejected:!geometry(hand).valid};
+                  } finally {
+                    nodes.slice(0,2).forEach((node,i) => { node.style.cssText = original[i]; });
+                  }
+                }
                 const label = tile => tile.category === 'honor' ? ({east:'東',south:'南',west:'西',north:'北',white:'白',green:'發',red:'中'})[tile.honor]
                   : `${tile.isRed?'赤':''}${tile.rank}${({man:'萬',pin:'筒',sou:'索'})[tile.suit]}`;
                 return {id:win.winnerId, expected:expected.map(tile => label(tile.tile)),
                   actual:nodes.map(node => node.querySelector('svg').getAttribute('aria-label')),
-                  monotonic:boxes.every((box,i) => box.width>0 && (!i || (getComputedStyle(document.querySelector(selector)).flexDirection==='column'
-                    ? box.top>=boxes[i-1].bottom-0.1 : box.left>=boxes[i-1].right-0.1))),
+                  geometry:measured,negativeControls,
                   winningCount:nodes.filter(node => node.classList.contains('winning-tile')).length};
               });
-            }''')
+            }''', {'diagnose': width == 320 and height == 568 and scenario == 'yakuman-ron'})
             for hand_order in order_report:
+                if hand_order['negativeControls'] is not None:
+                    print('::notice title=Issue 53 hand geometry::' + json.dumps({'browser': ENGINE, 'width': width,
+                        'scenario': scenario, **hand_order}), flush=True)
                 assert hand_order['actual'] == hand_order['expected'], (width, scenario, hand_order)
-                assert hand_order['monotonic'] and hand_order['winningCount'] == 1, (width, scenario, hand_order)
+                assert hand_order['geometry']['valid'] and hand_order['winningCount'] == 1, (width, scenario, hand_order)
+                if hand_order['negativeControls'] is not None:
+                    assert not hand_order['geometry']['legacyMonotonic'], (width, scenario, 'old viewport-X predicate should fail on the rotated seat', hand_order)
+                    assert all(hand_order['negativeControls'].values()), (width, scenario, hand_order)
+
             if scenario == 'pairs-ron':
                 labels = [label.replace('赤', '') for label in order_report[0]['actual']]
                 assert len(labels) == 14 and all(labels[i] == labels[i+1] for i in range(0,14,2)), (width, labels)
@@ -643,7 +708,7 @@ with sync_playwright() as p:
             page.locator('#show-result').click()
             assert page.locator('#result-dialog').is_visible()
             page.locator('#view-table').click()
-            variant_reports.append({'scenario': scenario, 'winners': len(meta['winners']), 'status': meta['status'],
+            variant_reports.append({'handOrder': order_report, 'scenario': scenario, 'winners': len(meta['winners']), 'status': meta['status'],
                 'scores': [{'tier':winner['scoreTier'],'han':winner['totalHanIncludingDora'],'yakuman':winner['yakumanCount'],
                     'points':winner['totalPoints']} for winner in meta['winners']]})
 
