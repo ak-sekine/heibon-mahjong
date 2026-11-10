@@ -248,6 +248,26 @@ jobs:
           export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
           set -o pipefail
           python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
+      - name: Report winning hand geometry
+        env:
+          BROWSER: ${{ matrix.browser }}
+        run: |
+          python - <<'PY_GEOMETRY'
+          import json
+          import os
+          from pathlib import Path
+
+          reports = json.loads(Path('/tmp/heibon-table-ui/round-end-ui.json').read_text(encoding='utf-8'))
+          viewport = next(report for report in reports if report['viewport'] == [320, 568])
+          variant = next(case for case in viewport['roundVariants'] if case['scenario'] == 'yakuman-ron')
+          hand = next(hand for hand in variant['handOrder'] if hand['id'] == 1)
+          # A separate step keeps this measurement within GitHub's per-step
+          # annotation limit, independently of the full suite's timing notices.
+          print('::notice title=Winning hand geometry::' + json.dumps({
+              'browser': os.environ['BROWSER'], 'viewport': viewport['viewport'],
+              'scenario': variant['scenario'], **hand,
+          }))
+          PY_GEOMETRY
       - name: Run standalone itch smoke test after Browser UI suite
         shell: bash
         env:

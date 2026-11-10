@@ -54,7 +54,7 @@ Pagesとitchは同じ`table.ts`を実行する。mode/base、エントリ、PWA�
 
 ローカルZIP: `artifacts/itch/heibon-mahjong.zip`（git管理外）。修正コミット`4297b5bcb0a36c42267f1d9e0fa94acf35d501f6`で再ビルドし、JS内のSHA一致とZIP整合性を確認。91,915 bytes、SHA256 `9b5ea39b7423b340a315d49f2aa0c4ba75428348f943017d403b1975f573df59`。Deploy workflowもPagesと同じ公開Worker URLでitch ZIPを作成しartifactへ保存する。**itch.ioへの実際の再アップロードは行っていない。修正ZIPの手動再アップロードが必要で、公開済みitch版の修正済み宣言はしない。**
 
-## Actions・受入条件・実機
+## 初回検証のActions・受入条件・実機
 
 検証記録コミット`a4c86ce4cc946000f9bae8d1c36a376d04cd8f1a`のpushで[run 42804037115](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42804037115)も自動開始された（実装は同一）。`verify`/文書検査はsuccess、WebKitは同じ最終成功項目app-idleの後でfailure。記録時点でChromiumは実行中。元runの失敗を上書きせず、再検証も描画検証完了・公開成功とは扱わない。ログ配信先の許可追加をユーザーへ依頼済み、回答待ち。これ以上の再実行は行わない。
 
@@ -100,6 +100,15 @@ Issue #53はOpenを維持しClose不可。まずCI失敗の診断と解消、両
 
 ### 検証・公開（追加修正）
 
-ローカルPython構文検査、browser manifest選択の9テストは成功。`npm test`と新しい対象SHAのChromium/WebKit全体、実測値、Pages公開結果は完了後に追記する。ローカルブラウザは既知Chromium制限・WebKit配布元403が継続するため既存Actionsで実行する。
+ローカルPython構文検査、browser manifest選択9テスト、`npm test`全86ファイル、`npm run build`、`build:itch`は成功。ローカルブラウザは既知Chromium制限・WebKit配布元403が継続するため既存Actionsで実行する。
 
 iPhone Safari実機は引き続き未確認。Issue #53はOpenのまま維持する。itch.ioへの再アップロードは未実施。
+
+
+### 全体検証とPages公開の成功
+
+テスト修正SHA `063926f18e113d5ed2b6568c7abd410aa239402a`をmainへpushし、リモートSHAを照合。[run 42825786468](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42825786468)の`verify`、Chromium全45本、WebKit全35本、matrix audit、release freshness、Worker deploy、production-test、Pages build/deployがすべてsuccess。今回の追加修正ではアプリ本体を変更しておらず、既存の和了表示修正を含むこのSHAがPagesへ公開された。
+
+代表局面では新しい座標assertと負例のassertも成功した。ただし同じsuite step内の大量のnoticeにより、代表測定のnoticeはActions APIの注釈に保持されなかった（per-stepのnotice上限）。実測JSONは既存artifactの`round-end-ui.json`に保存している。配信先のネットワーク制限を回避せずに実測値を確認できるよう、`.github/workflows/browser-ui.yml`へ独立した`Report winning hand geometry` stepを追加する。保存済みJSONを読むだけで、テスト判定・アプリ・配布設定は変更しない。新しいCI変更を含む全体検証と実測値は、次の実行完了後に追記する。
+
+同SHAのローカルitch ZIPも再生成成功。`artifacts/itch/heibon-mahjong.zip`、SHA256 `a1fad53e5a2c9fb19f0950bf1aced7d26029d966790f6468369ac79ca99b0957`。CIも同SHAの本番Worker URLを注入したZIPを生成・artifact保存済み。実際のitch.io再アップロードは行っていない。
