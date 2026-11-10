@@ -17,6 +17,8 @@
 
 ロンは`winResult.winningTile`（通常は放銃者の河にある物理牌、槍槓にも対応）、ツモは勝者の`drawnTile`を参照する。いずれも`player.hand`には含まれない。ゲーム処理はこの保持方法を変更しない。
 
+固定七対子の和了直後は`phase=won`、`hand=[東,東,6索,6索,1萬,1萬,2筒,2筒,9萬,9萬,4索,4索,5萬]`、`drawnTile=null`。和了牌は`man-5-0`（赤5萬）、河に1枚保持、`shape=seven-pairs`、25符。表示は`1萬,1萬,赤5萬,5萬,9萬,9萬,2筒,2筒,4索,4索,6索,6索,東,東`となる。
+
 七対子の固定壁（`11z 66s 11m 22p 99m 44s 5m`、赤5萬ロン）と通常ロン・途中順位の牌でのツモで確認。旧ソースに追加回帰テストを適用すると3ケースとも失敗し、修正後は成功。七対子は14枚・7対子となり、赤5萬も5萬に隣接する。
 
 **元報告の全現象を特定したとは扱わない。** 現行ソースの自分の13枚は和了後もソートされるため、「萬子・索子・字牌が全体的に入り交じる」という報告を末尾追加だけでは説明できない。元画像・当時のGameState・公開itch版のSHAがなく、同一現象の再現は未確定。修正は確認できた和了手の欠落・順序違反に限定する。
@@ -48,22 +50,29 @@
 
 ## ビルド・配布
 
-Pagesとitchは同じ`table.ts`を実行する。mode/base、エントリ、PWA、Worker URL注入方式が異なるが、手牌ソートのmode分岐はない。今回の確認済み順序違反は両方に共通。公開itch版のコード・SHA比較は未確認で、古い配布版との違いを原因から除外できない。
+Pagesとitchは同じ`table.ts`を実行する。mode/base、エントリ、PWA、Worker URL注入方式が異なるが、手牌ソートのmode分岐はない。今回の確認済み順序違反は両方に共通。`curl -I https://ak-sekine.itch.io/heibon-mahjong`は許可付き実行でもCONNECT 403 Forbiddenとなり、公開itch版のコード・SHA比較は未確認で、古い配布版との違いを原因から除外できない。
 
-ローカルZIP: `artifacts/itch/heibon-mahjong.zip`（git管理外）。コミット後に再ビルドしてSHAを一致させる。Deploy workflowもPagesと同じ公開Worker URLでitch ZIPを作成しartifactへ保存する。**itch.ioへの実際の再アップロードは行っていない。修正ZIPの手動再アップロードが必要で、公開済みitch版の修正済み宣言はしない。**
+ローカルZIP: `artifacts/itch/heibon-mahjong.zip`（git管理外）。修正コミット`4297b5bcb0a36c42267f1d9e0fa94acf35d501f6`で再ビルドし、JS内のSHA一致とZIP整合性を確認。91,915 bytes、SHA256 `9b5ea39b7423b340a315d49f2aa0c4ba75428348f943017d403b1975f573df59`。Deploy workflowもPagesと同じ公開Worker URLでitch ZIPを作成しartifactへ保存する。**itch.ioへの実際の再アップロードは行っていない。修正ZIPの手動再アップロードが必要で、公開済みitch版の修正済み宣言はしない。**
 
 ## Actions・受入条件・実機
 
-対象コミットのActionsとPages deploy結果はpush後に追記する。ローカル成功をActions成功と混同しない。
+修正SHA `4297b5bcb0a36c42267f1d9e0fa94acf35d501f6`を`HEAD:main`へpush成功。`git ls-remote`で同SHAを照合。対象[Actions run 42802702695](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42802702695)は**failure**。
+
+- `docs-check`、`detect-changes`、`verify`はsuccess。両エンジンのstandalone itch事前smokeもsuccess。
+- Chromium / WebKitはともに`Run Vite and browser regressions`でfailure。API注釈ではcreate-dialog、online-dialog、PWA、keyboard-help、app-idleまで成功を確認。次のmanifest項目はoffline-rulesだが、原因はログ未取得のため断定しない。今回追加したround-end試験は未到達で、DOM座標のブラウザ検証は未実施。
+- `browser-ui-matrix-audit`はfailure。`release-freshness`、`deploy-worker`、`production-test`、`pages-build`、`pages-deploy`はskip。**この修正のPages公開は行われていない。**
+- 正しいWebKit job ID `129784598609` のログとartifact `13756838900`を許可付きで取得しようとしたが、配信先`productionresultssa18.blob.core.windows.net`へのアクセスが403 Forbidden。ログ内容を取得できず、失敗原因は未確定。古いrunやローカル成功で代替しない。
+- ネットワーク設定で同ホストを許可した後、元runのログとtiming CSVを取得して原因を調査する。原因確認前の無根拠な再実行・コード変更はしない。追加コード修正・再公開は保留。
+- ローカル作成ZIPは利用可能だが、CIの本番Worker URLによる新しいリリースZIP生成と公開はゲートで止まっている。実機配布の前にブラウザ失敗を解消する。
 
 | Issue受入条件 | 判定 |
 | --- | --- |
-| 七対子ロンの整列・対子隣接 | ローカルDOMテスト成功、ブラウザはCI結果待ち |
-| その他ロン・ツモの一定順 | ローカルDOMテスト成功、ブラウザはCI結果待ち |
-| 通常手牌・ツモ・選択 | 既存ローカルテスト成功、CI結果待ち |
-| 副露・河・CPU・結果・次局・得点 | 既存ローカルテスト成功、CI結果待ち |
-| 描画自動テスト | 追加済み。Chromium/WebKitはCI結果待ち |
+| 七対子ロンの整列・対子隣接 | ローカルDOMテスト成功、ブラウザはCI停止により未到達 |
+| その他ロン・ツモの一定順 | ローカルDOMテスト成功、ブラウザはCI停止により未到達 |
+| 通常手牌・ツモ・選択 | 既存ローカルテスト成功、CI失敗、ブラウザ回帰未完了 |
+| 副露・河・CPU・結果・次局・得点 | 既存ローカルテスト成功、CI失敗、ブラウザ回帰未完了 |
+| 描画自動テスト | 追加済み。Chromium/WebKitはCI失敗、ブラウザ回帰未完了 |
 | itch/Pages差異・反映経路 | ソース/生成経路確認済み、公開itchビルド比較は未確認 |
 | iPhone Safari | **未確認** |
 
-Issue #53はOpenを維持しClose不可。修正ZIP再アップロード後、iPhone Safariで七対子ロン、通常ロン/ツモ、赤牌、卓下部と局の結果の両方、選択・打牌・リーチ・副露/カン・河・次局を確認する必要がある。機種/iOS、ビルドIDと結果を記録する。自動WebKit成功を実機成功とは扱わない。元の全体的な混在が残る場合は画像と診断ビルドID・局面を再取得して調査する。
+Issue #53はOpenを維持しClose不可。まずCI失敗の診断と解消、両エンジンの追加描画試験成功、Pages公開が必要。修正ZIP再アップロード後、iPhone Safariで七対子ロン、通常ロン/ツモ、赤牌、卓下部と局の結果の両方、選択・打牌・リーチ・副露/カン・河・次局を確認する必要がある。機種/iOS、ビルドIDと結果を記録する。自動WebKit成功を実機成功とは扱わない。元の全体的な混在が残る場合は画像と診断ビルドID・局面を再取得して調査する。

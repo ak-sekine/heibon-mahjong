@@ -1,6 +1,6 @@
 # 検証記録の目次
 
-- [和了後の手牌順 — Issue #53、2026-11-10](issue53-winning-hand-order-2026-11-10.md) — 和了牌を含む整列、DOM回帰、配布差異と未確定原因を記録。iPhone Safariとitch再アップロード未確認、Open維持。
+- [和了後の手牌順 — Issue #53、2026-11-10](issue53-winning-hand-order-2026-11-10.md) — 和了牌を含む整列、DOM回帰、配布差異と未確定原因を記録。修正main push済み、Actions両ブラウザ失敗・Pages公開停止。ログ配信先403、iPhone Safariとitch再アップロード未確認、Open維持。
 
 このディレクトリには過去の自動テスト、ビルド、Chromiumブラウザー確認などのログを保存しています。**iPhone Safari実機の確認結果は、確認者と報告範囲が分かる専用記録に分けます。** 各ログの数値や未完了事項は実施当時の結果です。
 
