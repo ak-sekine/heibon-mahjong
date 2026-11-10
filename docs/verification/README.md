@@ -1,6 +1,6 @@
 # 検証記録の目次
 
-- [和了後の手牌順 — Issue #53、2026-11-10](issue53-winning-hand-order-2026-11-10.md) — 回転席に適合しない座標assertを修正。run 42825786468でChromium45本・WebKit35本とPages公開成功（SHA `063926f`）。run 42828803806でも全80本成功。DOM矩形・computed transformで旧X比較の誤判定を確定し、重なり・順序変更の負例も検出。iPhone Safari未確認、itch再アップロード未実施、Open維持。
+- [和了後の手牌順 — Issue #53、2026-11-10](issue53-winning-hand-order-2026-11-10.md) — 受入条件7件達成、completedでClose可能。本人報告はPages版iPhone Safari 7項目・itch.io版6項目すべてOK。Chromium45本・WebKit35本を2回成功、Pages build/deploy・itch ZIP生成成功。公開itch ZIPの厳密なSHA一致・アップロード日時は未確認。過去の失敗と解消、最終判断を記録。
 
 このディレクトリには過去の自動テスト、ビルド、Chromiumブラウザー確認などのログを保存しています。**iPhone Safari実機の確認結果は、確認者と報告範囲が分かる専用記録に分けます。** 各ログの数値や未完了事項は実施当時の結果です。
 
