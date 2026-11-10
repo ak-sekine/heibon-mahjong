@@ -23,11 +23,13 @@ export function registerPwa(): void {
       notice.setAttribute('role', 'status');
       notice.setAttribute('aria-live', 'polite');
       noticeText = document.createElement('p');
+      noticeText.id = 'pwa-update-status';
       noticeText.textContent = '新しいバージョンがあります。対局の区切りで更新してください。';
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'ui-button ui-button--a';
-      button.textContent = '更新する';
+      button.textContent = '更新あり';
+      button.setAttribute('aria-describedby', 'pwa-update-status');
       button.addEventListener('click', () => {
         const waiting = registration.waiting;
         if (!waiting) return;
@@ -36,7 +38,7 @@ export function registerPwa(): void {
         waiting.postMessage({ type: 'ACTIVATE_UPDATE' });
       });
       notice.append(noticeText, button);
-      document.querySelector('main')?.prepend(notice);
+      document.querySelector('.app-header .main-menu-shell')?.before(notice);
     }
   };
 
@@ -56,7 +58,9 @@ export function registerPwa(): void {
     navigator.serviceWorker.addEventListener('message', event => {
       if (event.data?.type !== 'UPDATE_BLOCKED') return;
       reloadRequested = false;
-      if (noticeText) noticeText.textContent = '別のタブでも開かれています。ほかのタブを閉じてから更新してください。';
+      const message = '別のタブでも開かれています。ほかのタブを閉じてから更新してください。';
+      if (noticeText) noticeText.textContent = message;
+      window.alert(message);
     });
     const requestUpdate = (): void => { void registration.update().catch(() => { /* Offline. */ }); };
     window.addEventListener('online', requestUpdate);

@@ -79,6 +79,35 @@ def write_worker_version(path, source):
     os.utime(path, (modified, modified))
 
 
+VIEWPORTS = [(320, 568), (375, 560), (375, 635), (390, 844), (430, 844)]
+
+
+def geometry(page):
+    return page.evaluate("""() => {
+      const rect = selector => {
+        const r = document.querySelector(selector)?.getBoundingClientRect();
+        return r ? {x:r.x, y:r.y, width:r.width, height:r.height} : null;
+      };
+      return {header:rect('.app-header'), title:rect('.app-header h1'),
+        table:rect('#local-table'), controls:rect('#local-game-controls'),
+        update:rect('#pwa-update-notice button'), menu:rect('#main-menu-toggle'),
+        scroll:[scrollX,scrollY], overflow:document.documentElement.scrollWidth > innerWidth};
+    }""")
+
+
+def assert_layout(before, after):
+    assert before['header']['height'] == after['header']['height'] == 44, (before, after)
+    for key in ('table', 'controls', 'scroll'):
+        assert before[key] == after[key], (key, before, after)
+    assert not after['overflow'], after
+    update, menu, title = (after[key] for key in ('update', 'menu', 'title'))
+    assert title['x'] + title['width'] <= update['x'], after
+    assert update['x'] + update['width'] <= menu['x'], after
+    for button in (update, menu):
+        assert button['width'] >= 44 and button['height'] >= 44, after
+        assert button['x'] >= 0 and button['x'] + button['width'] <= after['header']['x'] + after['header']['width'], after
+
+
 with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
     PagesHandler.root = Path(tmp)
     shutil.copytree(DIST, PagesHandler.root, dirs_exist_ok=True)
@@ -144,6 +173,12 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         page.locator('#confirm-new-game').click()
         page.locator('#local-table').wait_for(state='visible')
 
+        baseline = {}
+        for width, height in VIEWPORTS:
+            page.set_viewport_size({'width': width, 'height': height})
+            baseline[(width, height)] = geometry(page)
+            assert page.locator('#pwa-update-notice').count() == 0
+
         # Change the served build while its previous HTML is fresh in HTTP cache.
         index_path = PagesHandler.root / 'index.html'
         old_html = index_path.read_text(encoding='utf-8')
@@ -195,11 +230,53 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         second_page = context.new_page()
         second_page.goto(base_url, wait_until='networkidle')
         second_page.wait_for_function('navigator.serviceWorker.controller !== null')
+        measurements = []
+        for width, height in VIEWPORTS:
+            page.set_viewport_size({'width': width, 'height': height})
+            before = baseline[(width, height)]
+            available = geometry(page)
+            assert_layout(before, available)
+            assert page.locator('.app-header #pwa-update-notice').count() == 1
+            assert page.get_by_role('button', name='更新あり').count() == 1
+            page.locator('#main-menu-toggle').click()
+            assert page.locator('#main-menu-toggle').get_attribute('aria-expanded') == 'true'
+            page.locator('#main-menu-toggle').click()
+            dialogs = []
+            def cancel(dialog):
+                dialogs.append(dialog.type)
+                dialog.dismiss()
+            page.on('dialog', cancel)
+            page.locator('#pwa-update-notice button').click()
+            page.remove_listener('dialog', cancel)
+            assert dialogs == ['confirm'], dialogs
+            cancelled = geometry(page)
+            assert_layout(before, cancelled)
+            assert page.evaluate('async () => !!(await navigator.serviceWorker.getRegistration()).waiting')
+            dialogs = []
+            def approve(dialog):
+                dialogs.append(dialog.type)
+                dialog.accept()
+            page.on('dialog', approve)
+            page.locator('#pwa-update-notice button').click()
+            page.wait_for_function("document.querySelector('#pwa-update-status').textContent.startsWith('別のタブ')")
+            page.wait_for_function("async () => !!(await navigator.serviceWorker.getRegistration()).waiting")
+            # The alert communicates the reason visually without another header row.
+            deadline = time.monotonic() + 10
+            while len(dialogs) < 2 and time.monotonic() < deadline:
+                page.wait_for_timeout(50)
+            page.remove_listener('dialog', approve)
+            assert dialogs == ['confirm', 'alert'], dialogs
+            blocked = geometry(page)
+            assert_layout(before, blocked)
+            assert page.locator('#local-table').is_visible()
+            assert page.evaluate("document.querySelector('main').dataset.pwaVersion || 'v1'") == 'v1'
+            measurements.append({'viewport':[width,height], 'none':before, 'available':available,
+                                 'cancelled':cancelled, 'blocked':blocked, 'confirmation':'native confirm opened and dismissed'})
+        output = Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
+        output.mkdir(parents=True, exist_ok=True)
+        (output / f'pwa-header-{os.environ.get("HEIBON_BROWSER", "chromium")}.json').write_text(json.dumps(measurements, indent=2))
+        print('PWA header measurements: ' + json.dumps(measurements), flush=True)
         page.on('dialog', lambda dialog: dialog.accept())
-        page.locator('#pwa-update-notice button').click()
-        page.get_by_text('別のタブでも開かれています。ほかのタブを閉じてから更新してください。').wait_for(timeout=10000)
-        assert page.evaluate("document.querySelector('main').dataset.pwaVersion || 'v1'") == 'v1'
-        assert page.locator('#local-table').is_visible(), 'blocked update interrupted the in-progress CPU game'
         second_page.close()
 
         page.locator('#pwa-update-notice button').click()
