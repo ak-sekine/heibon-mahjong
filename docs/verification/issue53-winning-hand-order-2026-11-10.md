@@ -1,5 +1,7 @@
 # 和了後の手牌順 — Issue #53
 
+最新結果: 回転席を考慮しない座標assertの誤判定を両ブラウザのDOM矩形・computed transformで確定し、修正済み。Chromium45本・WebKit35本は2回とも全体成功。Pages公開SHAは`063926f`、実測報告stepを含む検証SHAは`55e10f7`。詳細は末尾の追加調査・実測値を参照。iPhone Safari未確認・itch再アップロード未実施のためIssueはOpen。
+
 ## 開始時の確認
 
 - 2026-11-10、Issue本文とコメントをREST APIで再取得。Open、コメント0件。元画像はIssueに添付されていない。
@@ -112,3 +114,40 @@ iPhone Safari実機は引き続き未確認。Issue #53はOpenのまま維持す
 代表局面では新しい座標assertと負例のassertも成功した。ただし同じsuite step内の大量のnoticeにより、代表測定のnoticeはActions APIの注釈に保持されなかった（per-stepのnotice上限）。実測JSONは既存artifactの`round-end-ui.json`に保存している。配信先のネットワーク制限を回避せずに実測値を確認できるよう、`.github/workflows/browser-ui.yml`へ独立した`Report winning hand geometry` stepを追加する。保存済みJSONを読むだけで、テスト判定・アプリ・配布設定は変更しない。新しいCI変更を含む全体検証と実測値は、次の実行完了後に追記する。
 
 同SHAのローカルitch ZIPも再生成成功。`artifacts/itch/heibon-mahjong.zip`、SHA256 `a1fad53e5a2c9fb19f0950bf1aced7d26029d966790f6468369ac79ca99b0957`。CIも同SHAの本番Worker URLを注入したZIPを生成・artifact保存済み。実際のitch.io再アップロードは行っていない。
+
+
+### 実DOM矩形とcomputed styleによる確定原因
+
+実測報告stepを含むSHA `55e10f7e3527f863709bd3e8080fd4f049e292cf`の[run 42828803806](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42828803806)はsuccess。`verify`、Chromium全45本、WebKit全35本、独立診断step、matrix auditが成功。アプリ変更がなく既にPages公開済みなので、このvalidation-only実行のWorker/Pages公開skipは正常であり、初回失敗による公開停止とは異なる。
+
+320×568 / `yakuman-ron` / winnerId=1の実測値（単位CSS px）:
+
+| エンジン | flex方向 | 先頭2枚のleft | 先頭→次のtop | 矩形のwidth×height | 全13箇所の牌間隔 | 画面進行方向 |
+| --- | --- | --- | --- | --- | --- | --- |
+| chromium | row | 287.593262 / 287.593262 | 328.195740 → 314.055115 | 18.406250 × 13.140625 | 1〜1 | (0, -1)、下→上 |
+| webkit | row | 287.702637 / 287.702637 | 328.195740 → 314.055115 | 18.406250 × 13.140625 | 1〜1 | (0, -1)、下→上 |
+
+computed transformはChromiumで右席が`matrix(0, -1, 1, 0, -6.2036, -12.1094)`、WebKitは`matrix(0, -1, 1, 0, -6.203598, -12.109375)`。手牌コンテナは両方`matrix(1, 0, 0, 1, 13.148, 0)`、個別rotate/scaleはnone。親の270度回転により、rowの局所X方向は画面の負Y方向となる。
+
+旧条件はChromiumで`287.593262 >= 305.999512`、WebKitで`287.702637 >= 306.108887`を要求しfalseとなる。実際はY方向に1pxの隙間を持って進むため、これは描画上の重なり・順序違反ではなく、**親の回転を無視してviewportのXで比較したテスト側の誤判定**と確定した。
+
+両ブラウザともDOMラベル列はexpectedと一致、和了牌の印は1個、新geometry.valid=true、旧legacyMonotonic=false。重なりを加えた負例・CSS orderを変更した負例はどちらも拒否（overlapRejected=true、reorderRejected=true）。実測JSON全体は各browser artifactの`round-end-ui.json`、代表値は両ジョブの`Winning hand geometry`注釈から取得して照合した。これらはPlaywrightの自動検証であり、iPhone Safari実機の結果ではない。
+
+### 公開・変更範囲・最終判定
+
+- 今回の追加調査の変更は`tests/browser-round-end-ui.py`、`.github/workflows/browser-ui.yml`、この検証記録、`docs/verification/README.md`の4ファイル。`src/`の追加変更なし。テスト削除・skipなし。
+- Pages deployment ID `7683938802`の`sha=063926f18e113d5ed2b6568c7abd410aa239402a`、status=success、[公開URL](https://ak-sekine.github.io/heibon-mahjong/)をGitHub deployment APIでも照合。実装・描画テスト修正を含む公開runは42825786468。
+- 同SHAの[リリースitch ZIP artifact](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42825786468/artifacts/13769818206)を生成済み。ローカルZIPのSHA256は上記のとおり。itch.ioへの手動再アップロードは未実施・必要。
+- 原因が確定したのは今回のCI座標判定の失敗。元のiPhone Safari画像で報告された全体的な牌種混在まで同一原因と断定しない。
+
+| Issue #53受入条件 | 最新判定 |
+| --- | --- |
+| 七対子ロンの整列・対子隣接 | 自動検証成功（DOM順・表示位置・14枚/7対子） |
+| その他ロン・ツモの一定順 | 自動検証成功、CPU3席・赤牌を含む |
+| 通常手牌・ツモ独立・選択操作 | 既存単体・ブラウザ全回帰成功 |
+| 副露・河・CPU・結果・次局・点数 | 単体・統合・両ブラウザ全体成功。今回アプリ追加変更なし |
+| 描画自動テスト | 両エンジン全80本成功、実測値と負例を確認 |
+| itch/Pages差異・反映経路 | ビルド・ZIP生成・Pages公開を確認。公開itchの旧ビルド比較は未確認、再アップロード未実施 |
+| iPhone Safari実機 | 未確認 |
+
+Issue #53はOpen維持、Close不可。残作業は修正ZIPのitch.io再アップロード、iPhone Safariの卓下部と結果画面の七対子ロン・通常ロン/ツモ・赤牌・操作/副露/河/次局の確認。実機で全体的な混在が残る場合は画像・ビルドID・局面を再取得する。
