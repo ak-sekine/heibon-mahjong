@@ -56,6 +56,8 @@ Pagesとitchは同じ`table.ts`を実行する。mode/base、エントリ、PWA�
 
 ## Actions・受入条件・実機
 
+検証記録コミット`a4c86ce4cc946000f9bae8d1c36a376d04cd8f1a`のpushで[run 42804037115](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42804037115)も自動開始された（実装は同一）。`verify`/文書検査はsuccess、WebKitは同じ最終成功項目app-idleの後でfailure。記録時点でChromiumは実行中。元runの失敗を上書きせず、再検証も描画検証完了・公開成功とは扱わない。ログ配信先の許可追加をユーザーへ依頼済み、回答待ち。これ以上の再実行は行わない。
+
 修正SHA `4297b5bcb0a36c42267f1d9e0fa94acf35d501f6`を`HEAD:main`へpush成功。`git ls-remote`で同SHAを照合。対象[Actions run 42802702695](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42802702695)は**failure**。
 
 - `docs-check`、`detect-changes`、`verify`はsuccess。両エンジンのstandalone itch事前smokeもsuccess。
