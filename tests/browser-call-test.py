@@ -256,83 +256,88 @@ with sync_playwright() as p:
             controls_before = control_rects(page)
             assert_click_target(page, '#kan', f'{width}x{height} {mode} kan toggle', below_table=True)
             page.locator('#kan').click()
-            page.wait_for_function("()=>!document.querySelector('#candidate-controls').hidden && document.querySelectorAll('#candidate-options button').length>0")
-            assert_same_table(before, table_rect(page), f'{width}x{height} {mode} candidates open')
-            panel_geometry = page.evaluate('''()=>({
-              controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),
-              actions:document.querySelector('#local-game-controls .action-buttons').getBoundingClientRect().toJSON(),
-              panel:document.querySelector('#candidate-controls').getBoundingClientRect().toJSON(),
-              list:document.querySelector('#candidate-options').getBoundingClientRect().toJSON(),
-              listOverflow:getComputedStyle(document.querySelector('#candidate-options')).overflowY,
-              listMaxHeight:getComputedStyle(document.querySelector('#candidate-options')).maxHeight,
-              position:getComputedStyle(document.querySelector('#candidate-controls')).position,
-              normalHidden:document.querySelector('#normal-controls').hidden,
-              panelText:(()=>{const node=document.querySelector('#candidate-controls'),walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let text='';while(walker.nextNode()){if(!walker.currentNode.parentElement?.closest('svg'))text+=walker.currentNode.textContent;}return text.trim()})(),
-              visibleNormalButtons:[...document.querySelectorAll('#normal-controls button')].filter(button=>button.getClientRects().length>0).map(button=>button.id),
-              scrollY:document.scrollingElement.scrollTop
-            })''')
-            assert panel_geometry['scrollY'] <= 1, f'{width}x{height} {mode}: opening candidates scrolled the page: {panel_geometry}'
-            assert panel_geometry['position'] == 'fixed', f'{width}x{height} {mode}: shared candidate panel is not viewport anchored: {panel_geometry}'
-            assert panel_geometry['panel']['top'] < panel_geometry['panel']['bottom'] and panel_geometry['panel']['bottom'] <= height + 0.5, f'{width}x{height} {mode}: panel did not expand upward inside the viewport: {panel_geometry}'
-            anchor_bottom = controls_before['controls']['bottom']
-            assert abs(panel_geometry['panel']['bottom']-anchor_bottom) <= 2, f'{width}x{height} {mode}: panel bottom did not stay at the control-panel baseline: {panel_geometry}, before={controls_before}'
-            assert panel_geometry['panel']['top'] < controls_before['kanToggle']['top'], f'{width}x{height} {mode}: candidate panel did not expand above its original Kan trigger: {panel_geometry}, before={controls_before}'
-            assert panel_geometry['listOverflow'] == 'auto' and panel_geometry['listMaxHeight'] != 'none', f'{width}x{height} {mode}: candidate list is not internally scrollable: {panel_geometry}'
-            assert panel_geometry['normalHidden'] and panel_geometry['panelText'] == '戻る' and not panel_geometry['visibleNormalButtons'], f'{width}x{height} {mode}: candidate mode exposed ordinary operations: {panel_geometry}'
-            candidate_count = page.locator('#candidate-options button').count()
             if mode == 'opening':
-                assert candidate_count == 2, f'{width}x{height}: opening ankan must expose two candidates'
-            expected_operation = '加カン：' if mode == 'kakan' else '暗カン：'
-            assert page.locator('#candidate-options button').evaluate_all("(nodes,prefix)=>nodes.every(node=>node.getAttribute('aria-label')?.startsWith(prefix) && [...node.childNodes].every(child=>child.nodeType!==Node.TEXT_NODE || !child.textContent.trim()))", expected_operation), f'{width}x{height} {mode}: candidate must expose operation and tile names accessibly while displaying tile art only'
-            assert page.locator('#candidate-back').inner_text().strip() == '戻る'
-            assert_integrity(page)
-            for index in range(candidate_count):
-                assert_click_target(page, f'#candidate-options button:nth-child({index + 1})', f'{width}x{height} {mode} candidate {index + 1}')
-            if mode == 'opening':
-                page.locator('#candidate-back').focus()
-                page.keyboard.press('Shift+Tab')
-                candidate_focus = page.evaluate('''()=>{const e=document.activeElement,s=getComputedStyle(e);return {
-                  action:e.dataset.actionChoice,visible:e.matches(':focus-visible'),outlineStyle:s.outlineStyle,outlineWidth:parseFloat(s.outlineWidth)
-                }}''')
-                assert candidate_focus['action'] == 'kan' and candidate_focus['visible'] and candidate_focus['outlineStyle'] != 'none' and candidate_focus['outlineWidth'] >= 2, f'{width}x{height}: keyboard focus indicator is missing on a candidate: {candidate_focus}'
-                page.keyboard.press('Tab')
-                focus = page.evaluate('''()=>{const e=document.activeElement,s=getComputedStyle(e);return {
-                  id:e.id,visible:e.matches(':focus-visible'),outlineStyle:s.outlineStyle,outlineWidth:parseFloat(s.outlineWidth)
-                }}''')
-                assert focus['id'] == 'candidate-back' and focus['visible'] and focus['outlineStyle'] != 'none' and focus['outlineWidth'] >= 2, f'{width}x{height}: keyboard focus indicator is missing: {focus}'
-                scroll_metrics = page.evaluate('''()=>{
-                  const list=document.querySelector('#candidate-options'),template=list.querySelector('button');
-                  for(let i=0;i<100;i++){const clone=template.cloneNode(true);clone.dataset.overflowTest='true';list.append(clone);}
-                  list.scrollTop=list.scrollHeight;
-                  const last=list.querySelector('button[data-overflow-test="true"]:last-child');
-                  const r=last.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
-                  const result={clientHeight:list.clientHeight,scrollHeight:list.scrollHeight,scrollTop:list.scrollTop,
-                    lastVisible:r.top>=0&&r.bottom<=innerHeight,lastReceivesPointer:hit===last||last.contains(hit),
-                    pageScroll:document.scrollingElement.scrollTop,overflow:getComputedStyle(list).overflowY};
-                  list.querySelectorAll('[data-overflow-test="true"]').forEach(node=>node.remove());
-                  list.scrollTop=0;
-                  return result;
+                page.wait_for_function("()=>!document.querySelector('#candidate-controls').hidden && document.querySelectorAll('#candidate-options button').length>0")
+                assert_same_table(before, table_rect(page), f'{width}x{height} {mode} candidates open')
+                panel_geometry = page.evaluate('''()=>({
+                  controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON(),
+                  actions:document.querySelector('#local-game-controls .action-buttons').getBoundingClientRect().toJSON(),
+                  panel:document.querySelector('#candidate-controls').getBoundingClientRect().toJSON(),
+                  list:document.querySelector('#candidate-options').getBoundingClientRect().toJSON(),
+                  listOverflow:getComputedStyle(document.querySelector('#candidate-options')).overflowY,
+                  listMaxHeight:getComputedStyle(document.querySelector('#candidate-options')).maxHeight,
+                  position:getComputedStyle(document.querySelector('#candidate-controls')).position,
+                  normalHidden:document.querySelector('#normal-controls').hidden,
+                  panelText:(()=>{const node=document.querySelector('#candidate-controls'),walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT);let text='';while(walker.nextNode()){if(!walker.currentNode.parentElement?.closest('svg'))text+=walker.currentNode.textContent;}return text.trim()})(),
+                  visibleNormalButtons:[...document.querySelectorAll('#normal-controls button')].filter(button=>button.getClientRects().length>0).map(button=>button.id),
+                  scrollY:document.scrollingElement.scrollTop
+                })''')
+                assert panel_geometry['scrollY'] <= 1, f'{width}x{height} {mode}: opening candidates scrolled the page: {panel_geometry}'
+                assert panel_geometry['position'] == 'fixed', f'{width}x{height} {mode}: shared candidate panel is not viewport anchored: {panel_geometry}'
+                assert panel_geometry['panel']['top'] < panel_geometry['panel']['bottom'] and panel_geometry['panel']['bottom'] <= height + 0.5, f'{width}x{height} {mode}: panel did not expand upward inside the viewport: {panel_geometry}'
+                anchor_bottom = controls_before['controls']['bottom']
+                assert abs(panel_geometry['panel']['bottom']-anchor_bottom) <= 2, f'{width}x{height} {mode}: panel bottom did not stay at the control-panel baseline: {panel_geometry}, before={controls_before}'
+                assert panel_geometry['panel']['top'] < controls_before['kanToggle']['top'], f'{width}x{height} {mode}: candidate panel did not expand above its original Kan trigger: {panel_geometry}, before={controls_before}'
+                assert panel_geometry['listOverflow'] == 'auto' and panel_geometry['listMaxHeight'] != 'none', f'{width}x{height} {mode}: candidate list is not internally scrollable: {panel_geometry}'
+                assert panel_geometry['normalHidden'] and panel_geometry['panelText'] == '戻る' and not panel_geometry['visibleNormalButtons'], f'{width}x{height} {mode}: candidate mode exposed ordinary operations: {panel_geometry}'
+                candidate_count = page.locator('#candidate-options button').count()
+                if mode == 'opening':
+                    assert candidate_count == 2, f'{width}x{height}: opening ankan must expose two candidates'
+                expected_operation = '加カン：' if mode == 'kakan' else '暗カン：'
+                assert page.locator('#candidate-options button').evaluate_all("(nodes,prefix)=>nodes.every(node=>node.getAttribute('aria-label')?.startsWith(prefix) && [...node.childNodes].every(child=>child.nodeType!==Node.TEXT_NODE || !child.textContent.trim()))", expected_operation), f'{width}x{height} {mode}: candidate must expose operation and tile names accessibly while displaying tile art only'
+                assert page.locator('#candidate-back').inner_text().strip() == '戻る'
+                assert_integrity(page)
+                for index in range(candidate_count):
+                    assert_click_target(page, f'#candidate-options button:nth-child({index + 1})', f'{width}x{height} {mode} candidate {index + 1}')
+                if mode == 'opening':
+                    page.locator('#candidate-back').focus()
+                    page.keyboard.press('Shift+Tab')
+                    candidate_focus = page.evaluate('''()=>{const e=document.activeElement,s=getComputedStyle(e);return {
+                      action:e.dataset.actionChoice,visible:e.matches(':focus-visible'),outlineStyle:s.outlineStyle,outlineWidth:parseFloat(s.outlineWidth)
+                    }}''')
+                    assert candidate_focus['action'] == 'kan' and candidate_focus['visible'] and candidate_focus['outlineStyle'] != 'none' and candidate_focus['outlineWidth'] >= 2, f'{width}x{height}: keyboard focus indicator is missing on a candidate: {candidate_focus}'
+                    page.keyboard.press('Tab')
+                    focus = page.evaluate('''()=>{const e=document.activeElement,s=getComputedStyle(e);return {
+                      id:e.id,visible:e.matches(':focus-visible'),outlineStyle:s.outlineStyle,outlineWidth:parseFloat(s.outlineWidth)
+                    }}''')
+                    assert focus['id'] == 'candidate-back' and focus['visible'] and focus['outlineStyle'] != 'none' and focus['outlineWidth'] >= 2, f'{width}x{height}: keyboard focus indicator is missing: {focus}'
+                    scroll_metrics = page.evaluate('''()=>{
+                      const list=document.querySelector('#candidate-options'),template=list.querySelector('button');
+                      for(let i=0;i<100;i++){const clone=template.cloneNode(true);clone.dataset.overflowTest='true';list.append(clone);}
+                      list.scrollTop=list.scrollHeight;
+                      const last=list.querySelector('button[data-overflow-test="true"]:last-child');
+                      const r=last.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+                      const result={clientHeight:list.clientHeight,scrollHeight:list.scrollHeight,scrollTop:list.scrollTop,
+                        lastVisible:r.top>=0&&r.bottom<=innerHeight,lastReceivesPointer:hit===last||last.contains(hit),
+                        pageScroll:document.scrollingElement.scrollTop,overflow:getComputedStyle(list).overflowY};
+                      list.querySelectorAll('[data-overflow-test="true"]').forEach(node=>node.remove());
+                      list.scrollTop=0;
+                      return result;
+                    }''')
+                    assert scroll_metrics['overflow'] == 'auto' and scroll_metrics['scrollHeight'] > scroll_metrics['clientHeight'] and scroll_metrics['scrollTop'] > 0, f'{width}x{height}: many kan candidates did not scroll inside the list: {scroll_metrics}'
+                    assert scroll_metrics['lastVisible'] and scroll_metrics['lastReceivesPointer'] and scroll_metrics['pageScroll'] <= 1, f'{width}x{height}: last kan candidate was not reachable without page scrolling: {scroll_metrics}'
+                assert_click_target(page, '#candidate-back', f'{width}x{height} {mode} cancel')
+                page.locator('#candidate-back').click()
+                page.wait_for_function("()=>document.querySelector('#candidate-controls').hidden")
+                after_cancel = page.evaluate('''()=>{
+                  const g=readGame();return {kanCount:g.kanCount??0,liveWall:g.liveWall.length,
+                    hand:[...g.players[0].hand.map(t=>t.id),...(g.players[0].drawnTile?[g.players[0].drawnTile.id]:[])].sort(),
+                    melds:g.players[0].melds.map(m=>({type:m.type,ids:m.tiles.map(t=>t.id).sort()}))};
                 }''')
-                assert scroll_metrics['overflow'] == 'auto' and scroll_metrics['scrollHeight'] > scroll_metrics['clientHeight'] and scroll_metrics['scrollTop'] > 0, f'{width}x{height}: many kan candidates did not scroll inside the list: {scroll_metrics}'
-                assert scroll_metrics['lastVisible'] and scroll_metrics['lastReceivesPointer'] and scroll_metrics['pageScroll'] <= 1, f'{width}x{height}: last kan candidate was not reachable without page scrolling: {scroll_metrics}'
-            assert_click_target(page, '#candidate-back', f'{width}x{height} {mode} cancel')
-            page.locator('#candidate-back').click()
-            page.wait_for_function("()=>document.querySelector('#candidate-controls').hidden")
-            after_cancel = page.evaluate('''()=>{
-              const g=readGame();return {kanCount:g.kanCount??0,liveWall:g.liveWall.length,
-                hand:[...g.players[0].hand.map(t=>t.id),...(g.players[0].drawnTile?[g.players[0].drawnTile.id]:[])].sort(),
-                melds:g.players[0].melds.map(m=>({type:m.type,ids:m.tiles.map(t=>t.id).sort()}))};
-            }''')
-            assert after_cancel == original, f'{mode}: cancellation changed the game: {original} -> {after_cancel}'
-            assert_integrity(page)
-            assert_same_table(before, table_rect(page), f'{width}x{height} {mode} candidate cancel')
-            assert not page.locator('#normal-controls').evaluate('e=>e.hidden'), f'{width}x{height} {mode}: normal operation state did not return after Back'
+                assert after_cancel == original, f'{mode}: cancellation changed the game: {original} -> {after_cancel}'
+                assert_integrity(page)
+                assert_same_table(before, table_rect(page), f'{width}x{height} {mode} candidate cancel')
+                assert not page.locator('#normal-controls').evaluate('e=>e.hidden'), f'{width}x{height} {mode}: normal operation state did not return after Back'
 
-            page.locator('#kan').click()
-            page.wait_for_function("()=>!document.querySelector('#candidate-controls').hidden")
-            assert page.locator('#candidate-options button').count() >= 1
-            assert_click_target(page, '#candidate-options button', f'{width}x{height} {mode} candidate')
-            page.locator('#candidate-options button').first.click()
+                page.locator('#kan').click()
+                page.wait_for_function("()=>!document.querySelector('#candidate-controls').hidden")
+                assert page.locator('#candidate-options button').count() >= 1
+                assert_click_target(page, '#candidate-options button', f'{width}x{height} {mode} candidate')
+                page.locator('#candidate-options button').first.click()
+            else:
+                assert page.locator('#candidate-controls').is_hidden(), f'{mode}: single kan opened candidates'
+                assert page.locator('#candidate-back').is_hidden()
+                assert page.locator('#candidate-options button').count() == 0
             page.wait_for_function('''()=>!window.testController.progressing && window.readGame().kanCount===1''')
             completed = assert_integrity(page, {'type': meld_type, 'size': 4}, 1)
             assert completed['phase'] == 'awaiting-discard' and completed['turn'] == 0, f'{mode}: kan must return to the normal discard turn: {completed}'
@@ -363,7 +368,7 @@ with sync_playwright() as p:
     page.goto(BASE_URL + 'call-test.html')
     page.wait_for_selector('#scenario-help:not(:empty)')
     page.evaluate('window.readGame=()=>window.testController.game')
-    start_scenario(page, 'ankan')
+    start_scenario(page, 'opening')
     assert page.evaluate('document.documentElement.scrollHeight>innerHeight'), 'short window should allow page scrolling'
     page.locator('#kan').scroll_into_view_if_needed()
     scrolled = assert_click_target(page, '#kan', '1280x550 ankan toggle after scrolling', below_table=False, in_initial_view=False)

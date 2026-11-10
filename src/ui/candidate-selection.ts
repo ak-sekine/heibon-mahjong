@@ -53,7 +53,7 @@ export class CandidateSelection {
     this.busy = busy;
     if (!busy) this.selectionPending = false;
     if (singleCandidate === 'select' && options.length === 1 && options[0]!.enabled && !busy) {
-      this.commit(options[0]!, 0, null, operation);
+      this.commit(options[0]!, 0, null, operationFor(options[0]!) ?? operation);
       return;
     }
     this.renderButtons();

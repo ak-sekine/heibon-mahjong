@@ -37,7 +37,10 @@ with sync_playwright() as p:
    load_scenario(mode)
    if mode=='daiminkan':
     page.locator('#call-kan').click()
-   else:page.locator('#kan').click();page.locator('#candidate-options button').first.click()
+   else:
+    page.locator('#kan').click()
+    if mode=='multiple':page.locator('#candidate-options button').first.click()
+    else:assert page.locator('#candidate-controls').is_hidden()
    page.wait_for_timeout(200)
    assert page.locator('.dora-slot[data-tile-id]').count()==2
    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
@@ -69,7 +72,7 @@ with sync_playwright() as p:
     assert '嶺上開花 1翻' in page.locator('#win-result').inner_text()
     page.locator('#view-table').click()
     load_scenario('kakan')
-    page.locator('#kan').click();page.locator('#candidate-options button').first.click()
+    page.locator('#kan').click();assert page.locator('#candidate-controls').is_hidden()
     page.wait_for_timeout(200)
     assert page.locator('.dora-slot[data-tile-id]').count()==2
     page.locator('#player-hand .drawn-tile .tile-choice').click()

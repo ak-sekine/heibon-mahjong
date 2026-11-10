@@ -14,7 +14,7 @@ import { getRiichiDiscardOptions } from '../src/game/riichi.ts';
 import { discardTile } from '../src/game/discard.ts';
 import type { GameState } from '../src/model/game.ts';
 import type { PlayerGameView } from '../src/online/game-view.ts';
-import { ankanGame } from './kan-fixture.ts';
+import { ankanGame, kanGame } from './kan-fixture.ts';
 import { callStart } from './calls-fixture.ts';
 import { riichiStart } from './riichi-fixture.ts';
 import { ronGame } from './ron-fixture.ts';
@@ -180,6 +180,22 @@ test('kan options are shared and processing disables legal controls without hidi
   const localRunning = createLocalActionPanelState(match, match.game.players[0].drawnTile!.id, true, false);
   assert.equal(localRunning.buttons.discard.visible, true);
   assert.equal(localRunning.buttons.discard.enabled, false);
+});
+
+test('local and online state retain every distinct legal ankan and kakan option', () => {
+  const game = kanGame({ hands: { 0: ['1111m', '234p', '67s', '2z'] },
+    melds: { 0: [{ type: 'pon', group: '111z' }] }, draw: 'east', rinshan: ['south'] });
+  const legal = getKanOptions(game, 0);
+  assert.deepEqual(legal.map(option => option.meld.type).sort(), ['ankan', 'kakan']);
+  for (const opened of [false, true]) {
+    const local = createLocalActionPanelState(startMatch(game), null, false, opened);
+    const online = createOnlineActionPanelState(onlineViewFor(game), null, false, false, opened, null);
+    for (const panel of [local, online]) {
+      assert.equal(panel.kanGroup.visible, opened);
+      assert.deepEqual(panel.kanGroup.options.map(option => option.id), legal.map(option => option.id));
+      assert.deepEqual(panel.kanGroup.options.map(option => option.operationType), legal.map(option => option.meld.type));
+    }
+  }
 });
 
 test('dealer opening kan choices and ordinary discard are available in both action panels', () => {

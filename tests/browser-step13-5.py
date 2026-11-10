@@ -81,7 +81,7 @@ controller.match=startMatch(g);render();};
    page.evaluate('loadKan',mode)
    if mode=='daiminkan':
     page.locator('#call-kan').click()
-   else:page.locator('#kan').click();page.locator('#candidate-options button').click()
+   else:page.locator('#kan').click();assert page.locator('#candidate-controls').is_hidden()
    assert page.evaluate('kanCheck().game.players[0].melds[0].type')==kind
    assert page.evaluate('kanCheck().game.players[0].drawnTileSource')=='rinshan';check();shot(mode)
    assert page.locator('.dora-slot[data-tile-id]').count()==2

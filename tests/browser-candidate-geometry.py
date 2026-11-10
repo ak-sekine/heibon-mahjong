@@ -18,8 +18,9 @@ BASELINE_SHA = '274348dc941285401ac198c88072073078a5a1d0'
 VIEWPORTS = [(320, 568), (375, 634), (390, 844), (430, 932), (768, 1024),
              (1024, 768), (1280, 720), (1366, 768), (1440, 900), (1660, 825), (1920, 1080)]
 SCENARIOS = [('pon-multiple', 'call-pon', 2), ('chi', 'call-chi', 5),
-             ('daiminkan', 'call-kan', 0), ('ankan', 'kan-toggle', 1),
-             ('opening', 'kan-toggle', 2), ('kakan', 'kan-toggle', 1)]
+             ('daiminkan', 'call-kan', 0), ('ankan', 'kan-toggle', 0),
+             ('opening', 'kan-toggle', 2), ('kakan', 'kan-toggle', 0),
+             ('mixed-kan', 'kan-toggle', 2)]
 ROOT = Path.cwd()
 sys.path.insert(0, str(ROOT / 'tests'))
 from browser_main_fixtures import fixed_seat_fixture
@@ -69,6 +70,10 @@ window.issue32Geometry = { controller, online: onlineGameController, local: loca
     if (mode === 'chi') {
       const start=callStart(3,{0:['23m','444m','50m','6m','789p','12z']},'man-4');
       game=discardTile(start,3,start.players[3].drawnTile.id);
+    } else if (mode === 'mixed-kan') {
+      const {kanGame}=await import('/heibon-mahjong/src/verification/kan-fixture.ts');
+      game=kanGame({hands:{0:['1111m','234p','67s','2z']},
+        melds:{0:[{type:'pon',group:'111z'}]},draw:'east',rinshan:['south']});
     } else game=scenarioGame(mode);
     game={...game,players:game.players.map((player,seat)=>({...player,control:seat?'cpu':'human'}))};
     this.game=game; this.match=startMatch(game); this.sent=[];
@@ -185,16 +190,71 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
               before['callRect']['bottom'] <= before['root']['bottom'] + 1,
               'visible call operation area is outside the measured root baseline')
     fingerprint = page.evaluate('online=>issue32Geometry.fingerprint(online)', online)
+    if scenario in ('ankan', 'kakan', 'opening', 'mixed-kan'):
+        unchanged = page.evaluate('''online=>{
+          const t=issue32Geometry;
+          const signature=melds=>JSON.stringify(melds.map(m=>[m.type,m.tiles.map(t=>t?.id ?? null)]));
+          return signature(online ? t.online.view.seats[0].melds : t.controller.game.players[0].melds) ===
+            signature(t.game.players[0].melds);
+        }''', online)
+        check(record, unchanged, 'kan executed before button press')
+    if args.baseline and scenario in ('ankan', 'kakan'):
+        expected_count = 1
     click_part(page, online, trigger, record)
     record['open'] = after = snapshot(page, online)
     save()
     if expected_count == 0:
-        check(record, not after['panel'] and not after['candidates'], 'single daiminkan must execute without a candidate screen')
+        check(record, not after['panel'] and not after['candidates'], 'single candidate must execute without a candidate screen')
+        same_rect(record, before['table'], after['table'], 'table after immediate selection')
+        check(record, after['scrollY'] == before['scrollY'], 'immediate selection changed scrollY')
         record['immediateExecution'] = True
         if online:
-            check(record, len(page.evaluate('issue32Geometry.sent')) == 1, 'single daiminkan did not send exactly one action')
+            sent = page.evaluate('issue32Geometry.sent')
+            check(record, len(sent) == 1, 'single candidate did not send exactly one action')
+            expected_action = 'declare-call' if scenario == 'daiminkan' else 'declare-kan'
+            check(record, sent[0]['action']['type'] == expected_action, 'wrong immediate action')
+            legal_id = page.evaluate('''scenario=>{
+              const v=issue32Geometry.online.view;
+              return scenario==='daiminkan'?v.self.callOptions.find(o=>o.type===scenario)?.id:
+                v.self.kanOptions.find(o=>o.type===scenario)?.id;
+            }''', scenario)
+            check(record, sent[0]['action']['optionId'] == legal_id, 'immediate action lost the legal option ID')
+            root = '#online-game-controls'
+            page.locator(root + f' [data-panel-part="{trigger}"]').evaluate('node=>{node.click();node.click()}')
+            check(record, len(page.evaluate('issue32Geometry.sent')) == 1, 'pending immediate selection executed twice')
+            if scenario in ('ankan', 'kakan'):
+                # The waiting-room timeout path blocks input while synchronizing;
+                # state confirmation releases the same request without a retry.
+                page.evaluate("""()=>issue32Geometry.online.receive({type:'game-connection-state',ready:false,
+                  message:'対局状態を同期しています。操作結果を確認するまでお待ちください。'})""")
+                check(record, page.locator('#online-kan').is_disabled(), 'timeout synchronization allowed another kan')
+                page.evaluate("""()=>{
+                  const t=issue32Geometry;
+                  t.online.receive({type:'game-action-state-confirmed',requestId:t.sent[0].requestId});
+                  t.online.receive({type:'game-connection-state',ready:true});
+                }""")
+                check(record, len(page.evaluate('issue32Geometry.sent')) == 1, 'state confirmation retried automatically')
+                check(record, page.locator('#online-kan').is_enabled(), 'state confirmation did not restore Kan')
+                click_part(page, True, trigger, record)
+                page.evaluate("""()=>{
+                  const t=issue32Geometry;
+                  t.online.receive({type:'game-action-result',requestId:t.sent.at(-1).requestId,ok:false});
+                }""")
+                check(record, len(page.evaluate('issue32Geometry.sent')) == 2, 'rejection retried automatically')
+                check(record, page.locator('#online-kan').is_enabled(), 'rejection did not restore Kan')
+                # Failure to hand the action to the transport also recovers.
+                page.evaluate("""()=>issue32Geometry.online.setActionSender((action,revision,requestId)=>{
+                  issue32Geometry.sent.push({action,revision,requestId});return false;
+                })""")
+                click_part(page, True, trigger, record)
+                check(record, len(page.evaluate('issue32Geometry.sent')) == 3, 'send failure retried automatically')
+                check(record, page.locator('#online-kan').is_enabled(), 'send failure did not restore Kan')
+                check(record, snapshot(page, True)['panel'] is None, 'recovery opened a candidate panel')
+                record['recovery'] = ['pending-double-click', 'timeout-sync', 'state-confirmed', 'rejection', 'send-failed']
         else:
-            page.wait_for_function("()=>issue32Geometry.controller.game.players[0].melds.some(m=>m.type==='daiminkan')")
+            page.wait_for_function("""scenario=>issue32Geometry.controller.game.players[0].melds.some(m=>m.type===scenario)""", arg=scenario)
+            if scenario in ('ankan', 'kakan'):
+                check(record, page.evaluate('issue32Geometry.controller.game.kanCount') == 1, 'immediate kan did not execute exactly once')
         return
     check(record, len(after['candidates']) == expected_count, f'expected {expected_count} candidate buttons')
     verify_open(record, before, after)

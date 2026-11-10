@@ -424,7 +424,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         page.evaluate('''async()=>{
           const {scenarioGame}=await import('/heibon-mahjong/src/verification/scenarios.ts');
           const {startMatch}=await import('/heibon-mahjong/src/game/match.ts');
-          const match=startMatch(scenarioGame('ankan'));
+          const match=startMatch(scenarioGame('opening'));
           const session={...pcOnlineSession,gameRevision:6,match,status:'playing',decision:null};
           window.pcOnlineKanSession=session;
           window.pcOnlineSent=[];
@@ -439,7 +439,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
           toggle:document.querySelector('#online-kan').getBoundingClientRect().toJSON()
         })''')
         page.locator('#online-kan').click()
-        page.wait_for_function("!document.querySelector('#online-candidate-controls').hidden && document.querySelectorAll('#online-candidate-options button').length===1")
+        page.wait_for_function("!document.querySelector('#online-candidate-controls').hidden && document.querySelectorAll('#online-candidate-options button').length===2")
         online_kan_open = page.evaluate('''()=>({
           table:document.querySelector('#online-table').getBoundingClientRect().toJSON(),
           controls:document.querySelector('#online-game-controls').getBoundingClientRect().toJSON(),
@@ -465,7 +465,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         for key in ('top','left','width','height','bottom'):
             assert abs(online_kan_open['controls'][key]-online_kan_before['controls'][key]) < 1, f'{width}x{height}: online kan opening moved the operation panel: {online_kan_open}'
         assert online_kan_open['normalControlsHidden'] and not online_kan_open['actionButtons'], f'{width}x{height}: online normal actions remained visible during candidate selection: {online_kan_open}'
-        for selector in ('#online-candidate-options button','#online-candidate-back'):
+        for selector in ('#online-candidate-options button:first-child','#online-candidate-back'):
             box=page.locator(selector).evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {top:r.top,bottom:r.bottom,width:r.width,height:r.height,receivesPointer:hit===node||node.contains(hit)}}''')
             assert 0<=box['top'] and box['bottom']<=height and box['width']>=44 and box['height']>=44 and box['receivesPointer'], f'{width}x{height}: online kan target is not initially clickable: {selector} {box}'
         page.locator('#online-candidate-back').click()
@@ -483,7 +483,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
           const {scenarioGame}=await import('/heibon-mahjong/src/verification/scenarios.ts');
           const {getKanOptions,declareKan}=await import('/heibon-mahjong/src/game/kan.ts');
           const {startMatch}=await import('/heibon-mahjong/src/game/match.ts');
-          const game=scenarioGame('ankan');
+          const game=scenarioGame('opening');
           const option=getKanOptions(game,0).find(candidate=>candidate.id===optionId);
           if(!option)throw new Error('online kan option is not legal');
           const match=startMatch(declareKan(game,0,optionId));

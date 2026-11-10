@@ -141,7 +141,10 @@ with sync_playwright() as p:
           test.view.self.decision = null;
           test.view.turnPlayerId = 0;
           test.view.phase = 'awaiting-discard';
-          test.view.self.kanOptions = [{ id: 'server-kan-option', type: 'ankan', tiles: [test.tile] }];
+          test.view.self.kanOptions = [
+            { id: 'server-kan-option', type: 'ankan', tiles: [test.tile] },
+            { id: 'server-kan-other', type: 'kakan', tiles: [test.secondFive] },
+          ];
           test.update(test.tile.id, false, false, true);
         }""")
         assert page.locator('[data-browser-action-panel] [data-panel-part="candidate-controls"]').nth(1).is_visible()
@@ -157,7 +160,7 @@ with sync_playwright() as p:
         assert online_panel.locator('[data-panel-part="normal-controls"]').is_visible(), 'kan Back did not restore ordinary controls'
         page.evaluate("window.actionPanelBrowser.update(null, false, false, true)")
         assert online_panel.locator('[data-panel-part="candidate-controls"]').is_visible()
-        online_panel.locator('[data-panel-part="candidate-options"] button').click()
+        online_panel.locator('[data-panel-part="candidate-options"] button').first.click()
         online_events = page.evaluate("window.actionPanelBrowser.onlineEvents")
         assert online_events[-1] == {'type': 'select-kan', 'optionId': 'server-kan-option'}, online_events
 

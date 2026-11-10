@@ -60,10 +60,9 @@ with sync_playwright() as p:
             load(mode)
             if mode=='daiminkan':
                 page.locator('#call-kan').tap()
-                page.locator('#candidate-options button[data-action-choice="call"]').tap()
             else:
                 page.locator('#kan').tap()
-                page.locator('#candidate-options button').tap()
+                assert page.locator('#candidate-controls').is_hidden()
             page.wait_for_function('!testController.progressing')
             assert page.locator('.dora-slot[data-tile-id]').count()==2
             check()
@@ -118,7 +117,11 @@ with sync_playwright() as p:
         load('multiple')
         for i in range(2):
             page.locator('#kan').tap()
-            page.locator('#candidate-options button').first.tap()
+            if i == 0:
+                assert page.locator('#candidate-options button').count() == 2
+                page.locator('#candidate-options button').first.tap()
+            else:
+                assert page.locator('#candidate-controls').is_hidden()
             page.wait_for_function('!testController.progressing')
             check()
         assert page.locator('.dora-slot[data-tile-id]').count()==3
@@ -126,7 +129,7 @@ with sync_playwright() as p:
         page.locator(f'#player-hand button[data-tile-id="{tile}"]').tap()
         page.locator('#discard').tap()
         assert page.evaluate('readGame().players[0].drawnTile') is None
-        load('ankan')
+        load('opening')
         page.set_viewport_size({'width':width,'height':max(380,height-120)})
         page.locator('#kan').tap()
         page.locator('#candidate-back').tap()

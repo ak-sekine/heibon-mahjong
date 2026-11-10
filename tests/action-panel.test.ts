@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { TILE_KINDS, ordinaryTile } from '../src/model/tile.ts';
 import { tileSvgMarkup } from '../src/rendering/tile-svg.ts';
 import { diagnosticLog } from '../src/online/diagnostics.ts';
+import { CandidateSelection } from '../src/ui/candidate-selection.ts';
 import {
   ACTION_PANEL_TEMPLATE_PARTS,
   ActionPanel,
@@ -12,6 +13,7 @@ import {
   type ActionPanelEvent,
   type ActionPanelState,
   type ActionPanelPart,
+  type ActionPanelTrace,
 } from '../src/ui/action-panel.ts';
 
 class FakeClassList {
@@ -175,6 +177,101 @@ function state(overrides: Partial<ActionPanelState> = {}): ActionPanelState {
     ...overrides,
   };
 }
+
+test('immediate CandidateSelection uses the option operation when the group default differs', () => {
+  const fixture = panelFixture();
+  try {
+    const choices: unknown[] = [];
+    const selection = new CandidateSelection(fixture.parts.get('candidate-controls')! as unknown as HTMLElement,
+      fixture.parts.get('candidate-options')! as unknown as HTMLElement, choice => choices.push(choice));
+    selection.show([{ id: 'kakan-only', label: '加カン', operationType: 'kakan', tiles: [], enabled: true }],
+      'ankan', false, 'select');
+    assert.deepEqual(choices, [{ id: 'kakan-only', operationType: 'kakan', candidateId: 'kakan-1', button: null }]);
+  } finally { fixture.restore(); }
+});
+
+for (const operation of ['ankan', 'kakan'] as const) {
+  test(`single ${operation} commits only on Kan press, preserves input trace and recovers without automatic retry`, () => {
+    const events: ActionPanelEvent[] = [];
+    const traces: ActionPanelTrace[] = [];
+    const fixture = panelFixture((event, trace) => { events.push(event); traces.push(trace); });
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { scrollX: 0, scrollY: 0 } });
+    diagnosticLog.clear();
+    try {
+      const option: ActionChoiceOption = { id: 'private-kan-option', operationType: operation,
+        label: operation === 'ankan' ? '暗カン' : '加カン', tiles: [], enabled: true };
+      const ready = state({
+        buttons: { ...state().buttons, 'kan-toggle': { visible: true, enabled: true, label: 'カン' } },
+        kanGroup: { visible: false, status: '', options: [option] },
+      });
+      const toggle = fixture.parts.get('kan-toggle')!;
+      const click = () => fixture.root.listeners.get('click')!({ target: toggle, detail: 1 } as unknown as Event);
+      fixture.panel.update(ready);
+      fixture.panel.update(ready);
+      assert.deepEqual(events, [], 'rendering legal candidates must never declare kan');
+      fixture.root.listeners.get('pointerdown')!({ target: toggle } as unknown as Event);
+      click();
+      click();
+      assert.deepEqual(events, [{ type: 'select-kan', optionId: option.id }]);
+      assert.equal(fixture.parts.get('candidate-controls')!.hidden, true);
+      assert.equal(fixture.parts.get('candidate-back')!.hidden, true);
+      assert.equal(fixture.parts.get('candidate-options')!.children.length, 0);
+      assert.equal(fixture.root.classList.values.has('candidate-active'), false);
+      assert.equal(toggle.disabled, true);
+      const pointer = diagnosticLog.all().find(entry => entry.event === 'action_panel_pointer_received');
+      assert.equal(traces[0]!.operationId, pointer!.details.operationId);
+      assert.equal(traces[0]!.actionType, operation);
+      assert.equal(traces[0]!.candidateId, `${operation}-1`);
+      assert.equal(JSON.stringify(diagnosticLog.all()).includes(option.id), false);
+
+      fixture.panel.update({ ...ready, actionStatus: 'サーバーで操作を確認しています…',
+        buttons: { ...ready.buttons, 'kan-toggle': { visible: true, enabled: false, label: 'カン' } },
+        kanGroup: { ...ready.kanGroup, options: [{ ...option, enabled: false }] } });
+      click();
+      assert.equal(events.length, 1, 'pending render must not execute again');
+      for (const notice of ['操作が拒否されました。', '操作がタイムアウトしました。']) {
+        const before = events.length;
+        fixture.panel.update({ ...ready, actionStatus: notice });
+        assert.equal(events.length, before, 'recovery render must not retry automatically');
+        assert.equal(toggle.disabled, false);
+        assert.equal(toggle.attributes.has('aria-busy'), false);
+        click();
+        assert.equal(events.length, before + 1, 'retry requires another button press');
+      }
+    } finally {
+      if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+      else Reflect.deleteProperty(globalThis, 'window');
+      diagnosticLog.clear(); fixture.restore();
+    }
+  });
+}
+
+test('Kan press ignores zero executable options and preserves distinct mixed kan candidates', () => {
+  const events: ActionPanelEvent[] = [];
+  const fixture = panelFixture(event => events.push(event));
+  try {
+    const options: ActionChoiceOption[] = [
+      { id: 'ankan-a', operationType: 'ankan', label: '暗カン', tiles: [], enabled: true },
+      { id: 'kakan-b', operationType: 'kakan', label: '加カン', tiles: [], enabled: true },
+    ];
+    const ready = state({ buttons: { ...state().buttons, 'kan-toggle': { visible: true, enabled: true, label: 'カン' } } });
+    const click = (part: string) => fixture.root.listeners.get('click')!({ target: fixture.parts.get(part)! } as unknown as Event);
+    for (const unavailable of [[], options.map(option => ({ ...option, enabled: false }))]) {
+      fixture.panel.update({ ...ready, kanGroup: { visible: false, status: '', options: unavailable } });
+      click('kan-toggle');
+      assert.deepEqual(events, []);
+    }
+    fixture.panel.update({ ...ready, kanGroup: { visible: false, status: '', options } });
+    click('kan-toggle');
+    assert.deepEqual(events, [{ type: 'kan-toggle' }]);
+    fixture.panel.update({ ...ready, kanGroup: { visible: true, status: '', options } });
+    const buttons = fixture.parts.get('candidate-options')!.children as FakeElement[];
+    assert.deepEqual(buttons.map(button => button.dataset.candidateId), ['ankan-1', 'kakan-2']);
+    fixture.root.listeners.get('click')!({ target: buttons[1] } as unknown as Event);
+    assert.deepEqual(events.at(-1), { type: 'select-kan', optionId: 'kakan-b' });
+  } finally { fixture.restore(); }
+});
 
 test('ActionPanel applies visibility, availability, labels, groups, messages, and mode-independent classes', () => {
   const fixture = panelFixture();

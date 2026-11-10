@@ -199,17 +199,25 @@ export class ActionPanel {
     const candidateList = this.part('candidate-options');
     this.part('candidate-controls').tabIndex = -1;
     this.candidates = new CandidateSelection(this.part('candidate-controls'), candidateList, choice => {
-      const actionButton = choice.button ?? this.part(callButtonPart(choice.operationType as 'pon' | 'daiminkan' | 'chi')) as HTMLButtonElement;
-      const baseTrace = this.trace(actionButton, choice.operationType);
-      const trace = this.candidateClickTrace ?? { ...baseTrace, candidateId: choice.candidateId };
+      const isCall = choice.operationType === 'pon' || choice.operationType === 'chi' || choice.operationType === 'daiminkan';
+      const actionButton = choice.button ?? this.part(isCall
+        ? callButtonPart(choice.operationType as 'pon' | 'daiminkan' | 'chi') : 'kan-toggle') as HTMLButtonElement;
+      const trace = {
+        ...(this.candidateClickTrace ?? this.trace(actionButton, choice.operationType)),
+        actionType: choice.operationType,
+        candidateId: choice.candidateId,
+      };
       const candidateBack = this.part('candidate-back') as HTMLButtonElement;
       candidateBack.disabled = true;
       candidateBack.setAttribute('aria-busy', 'true');
-      if (choice.operationType === 'pon' || choice.operationType === 'chi' || choice.operationType === 'daiminkan') {
+      if (isCall) {
         this.callType = null;
         this.lockCallButtons();
         this.handler({ type: 'select-call', optionId: choice.id }, trace);
       } else {
+        const toggle = this.part('kan-toggle') as HTMLButtonElement;
+        toggle.disabled = true;
+        toggle.setAttribute('aria-busy', 'true');
         this.handler({ type: 'select-kan', optionId: choice.id }, trace);
       }
       if (this.part('candidate-controls').hidden) this.part('action-status').focus({ preventScroll: true });
@@ -428,8 +436,12 @@ export class ActionPanel {
     }
     if (action === 'call-pon' || action === 'call-kan' || action === 'call-chi') {
       const type = action === 'call-pon' ? 'pon' : action === 'call-kan' ? 'daiminkan' : 'chi';
-      this.chooseCallType(type);
+      this.chooseCallType(type, trace);
       return;
+    }
+    if (action === 'kan-toggle') {
+      const candidates = this.state?.kanGroup.options.filter(option => option.enabled) ?? [];
+      if (candidates.length === 0 || this.selectSingleCandidate(candidates, trace)) return;
     }
     if (action === 'pass-call') {
       this.callType = null;
@@ -442,20 +454,32 @@ export class ActionPanel {
     return this.root.contains(button);
   }
 
-  private chooseCallType(type: 'pon' | 'daiminkan' | 'chi'): void {
+  private chooseCallType(type: 'pon' | 'daiminkan' | 'chi', trace: ActionPanelTrace): void {
     if (this.callSelectionPending) return;
     const candidates = this.activeCallOptions.filter(option => callTypeForLabel(option.label) === type && option.enabled);
     if (candidates.length > 0) {
-      if (candidates.length === 1) {
+      if (this.selectSingleCandidate(candidates, trace)) {
         this.callType = null;
-        this.pendingCandidateScroll = null;
-        this.candidates.show(candidates, type, this.callSelectionPending, 'select');
-        this.part('action-status').focus({ preventScroll: true });
         return;
       }
       this.callType = type;
       if (this.state) this.update(this.state);
     }
+  }
+
+  /** Only an explicit type-button press may immediately commit a single choice. */
+  private selectSingleCandidate(options: readonly ActionChoiceOption[], trace: ActionPanelTrace): boolean {
+    if (options.length !== 1) return false;
+    const operation = operationFor(options[0]!);
+    if (!operation) return false;
+    this.pendingCandidateScroll = null;
+    this.candidateClickTrace = trace;
+    try {
+      this.candidates.show(options, operation, false, 'select');
+    } finally {
+      this.candidateClickTrace = null;
+    }
+    return true;
   }
 
   private focusFirstCandidate(): void {
