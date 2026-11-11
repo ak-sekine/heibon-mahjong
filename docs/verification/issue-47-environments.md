@@ -46,3 +46,18 @@ IssueはOpenを維持。公開/実機を含む未完了受入条件にはチェ�
 2026-11-11にGitHub Deploymentsを照合。`heibon-production-worker`（7709534462）、`github-pages`（7709559454）、`heibon-production-pages`（7709565599）はいずれもSHA `d50e8a6a5a67e8767de824bb80d2e83751cf474d`でsuccess。本番Pages runは[43012562746](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43012562746)。本番Worker URLは既存検証記録の`https://heibon-mahjong-online.ak-sekine.workers.dev`。現行公開bytesへの直接アクセスは未確認。今回のdevelop pushではこれらを変更していない。
 
 旧本番SWの広いclients.claimを模した追加更新fixtureから、開発controllerの再取得とoffline継続を確認するブラウザケースを追加する。実iPhoneでの移行確認の代わりにはしない。AGENTS.mdの通常作業先もdevelopへ変更し、将来の作業が旧main直push指示へ戻らないようにする。
+
+## 分離テストの成功記録
+
+[a02b31f / run 43110144307](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43110144307)でverify、Chromium/WebKitの環境分離smoke、local-onlineが成功。local-onlineは本番用/開発用の別ローカルDO storeを用い、相互のルーム404・token拒否を確認し、両方で既存の5シナリオ（2人対局とCPU引継ぎ再接続、切断再接続、ホスト引継ぎと1人+CPU3人、4人、3人+CPU1人）が成功した。公開済み本番Workerへは通信していない。
+
+[63ff388 / run 43110685013](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43110685013)には旧root SWのclients.claimを模した回帰ケースを追加。最終結果は追記する。保存先に台帳未登録のdevファイルがある場合も停止する試験を追加し、ローカル成功。これにより未準備側に未検証ファイルが混入していても公開しない。
+
+## 変更ファイル一覧
+
+- 運用: `AGENTS.md`、`README.md`、`docs/SPEC.md`、`docs/ROADMAP.md`、`docs/development/issue-47-environments.md`、`docs/operations/environments.md`、本検証記録。
+- build/PWA: `.gitignore`、`package.json`、`vite.config.ts`、`index.html`、`scripts/build-pwa.mjs`、`src/pwa/register.ts`。
+- 保存分離: `src/environment.ts`、`src/model/rules.ts`、`src/online/diagnostics.ts`、`src/online/waiting-room.ts`。
+- Worker: `wrangler.development.jsonc`、`worker/development.ts`、`worker/tsconfig.json`。
+- 公開: `scripts/environments/artifacts.mjs`、`.github/scripts/deploy-isolated-worker.mjs`、`.github/workflows/environments.yml`、`.github/workflows/publish-environments.yml`、`.github/workflows/deploy.yml`。
+- 検証: `tests/environment-artifacts.test.mjs`、`tests/environment-storage.test.ts`、`tests/environment-workflows.test.mjs`、`tests/online-environments.mjs`、`tests/browser-environments.py`、`tests/browser-pwa.py`、`tests/pwa.test.mjs`。

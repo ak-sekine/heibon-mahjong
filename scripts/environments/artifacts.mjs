@@ -82,6 +82,9 @@ export function stage(store, candidate, latestSha) {
   if (!state.current?.production && environment !== 'production') throw new Error('Production bootstrap required');
   const site = path.join(store, 'site');
   const previous = state.current ?? {};
+  if (Object.keys(previous).some(env => !Object.hasOwn(environments, env))) throw new Error('Unknown stored environment');
+  if (!previous.development && existsSync(path.join(site, 'dev'))) throw new Error('Untracked development snapshot');
+  if (!previous.production && existsSync(site) && readdirSync(site).length) throw new Error('Untracked bootstrap snapshot');
   if (previous[environment]?.sha === release.sha) throw new Error('Source SHA already published; reject rerun');
   for (const [env, record] of Object.entries(previous)) {
     const target = env === 'production' ? site : path.join(site, 'dev');

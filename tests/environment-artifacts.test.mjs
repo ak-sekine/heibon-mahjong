@@ -93,3 +93,12 @@ test('SW activation deletes only its own caches; production cannot claim develop
     if (env === 'production') assert.equal(intercepted, false);
   }
 });
+
+test('an unprepared environment cannot be published from untracked store files', () => {
+  const { root, store, prod } = setup();
+  try {
+    mkdirSync(path.join(store, 'site/dev'), { recursive: true });
+    writeFileSync(path.join(store, 'site/dev/index.html'), 'unverified');
+    assert.throws(() => stage(store, prod, prodSha), /Untracked development/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
