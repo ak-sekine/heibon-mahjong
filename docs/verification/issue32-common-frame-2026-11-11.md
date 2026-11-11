@@ -46,3 +46,7 @@ iPhone Safari：ツールバー表示・収納後の候補／戻る操作、低�
 - ローカルWebKit導入も試行したが、公式配布ホスト`cdn.playwright.dev`／`playwright.download.prss.microsoft.com`が環境のDomain forbiddenで拒否された。Actionsで検証を継続する。
 
 - 追加コミット`4d028f8f6f171bd8fa2f78a2cf8ce91ca15d0233`のpush前fetchで、別作業の`9294d21bb611d7d26a80b1b730323b6b60d1be3c`を検出。behind/ahead `1/1`、通常pushはnon-fast-forward拒否、force pushなし。差分は上記Issue #52のfocus／smokeテスト修正で製品ソースに競合なし。内容を確認してmergeし、helper競合はmainの診断・最小再現をそのまま保持して解決する。元のコミット履歴は維持。
+
+## 統合後のfocus検証
+
+Issue #52の検出器修正を含むmain `9294d21`の[run #43009718350](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43009718350)で、WebKitは前段smokeと11 viewportの鳴き表示を通過し、候補のTab移動でoutline clippingと候補下端の遮蔽を検出した。候補一覧はoverflow:autoだが内側余白がなく、候補ボタンの外側5pxのfocus ringが一覧境界で切れる。共通候補一覧に5pxのpaddingとscroll-paddingを追加し、focus ringを含む表示領域を確保する。外枠幅・下端・高さ予約・卓寸法は変更せず、既存のfocus／候補矩形検査も維持する。
