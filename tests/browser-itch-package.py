@@ -123,11 +123,13 @@ def wait_for_human_action(page, timeout_ms=TURN_TIMEOUT_MS):
         result_dialog = page.locator('#result-dialog')
         if result_dialog.evaluate('(dialog) => dialog.open'):
             page.locator('#view-table').click()
-            next_round = page.locator('#next-round')
-            if next_round.is_visible() and next_round.is_enabled():
-                next_round.click()
-                decisions['rounds_advanced'] += 1
-                continue
+        # Results are opened on request, including a CPU's first-turn nine
+        # terminals draw. Advancing must also work with the dialog closed.
+        next_round = page.locator('#next-round')
+        if next_round.is_visible() and next_round.is_enabled():
+            next_round.click()
+            decisions['rounds_advanced'] += 1
+            continue
 
         page.wait_for_timeout(100)
 
@@ -345,10 +347,11 @@ def run_iteration(browser, repetition):
         context.close()
 
 
-with sync_playwright() as playwright:
-    browser = getattr(playwright, BROWSER_NAME).launch()
-    try:
-        for iteration in range(1, REPETITIONS + 1):
-            run_iteration(browser, iteration)
-    finally:
-        browser.close()
+if __name__ == '__main__':
+    with sync_playwright() as playwright:
+        browser = getattr(playwright, BROWSER_NAME).launch()
+        try:
+            for iteration in range(1, REPETITIONS + 1):
+                run_iteration(browser, iteration)
+        finally:
+            browser.close()
