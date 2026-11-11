@@ -50,3 +50,5 @@ iPhone Safari：ツールバー表示・収納後の候補／戻る操作、低�
 ## 統合後のfocus検証
 
 Issue #52の検出器修正を含むmain `9294d21`の[run #43009718350](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43009718350)で、WebKitは前段smokeと11 viewportの鳴き表示を通過し、候補のTab移動でoutline clippingと候補下端の遮蔽を検出した。候補一覧はoverflow:autoだが内側余白がなく、候補ボタンの外側5pxのfocus ringが一覧境界で切れる。共通候補一覧に5pxのpaddingとscroll-paddingを追加し、focus ringを含む表示領域を確保する。外枠幅・下端・高さ予約・卓寸法は変更せず、既存のfocus／候補矩形検査も維持する。
+
+候補1行＋戻るを保証するSafari相当可視領域の最小高さ計算にも、実測の一覧padding上下を含める。Browser UIの最小高さ算定も同じ実要素寸法に合わせ、期待位置の許容差・scrollY条件は維持する。

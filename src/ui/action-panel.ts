@@ -595,8 +595,11 @@ export class ActionPanel {
     // Initial display uses the original bottom, without moving or scrolling it.
     // Only a changed visible viewport may require a smaller bottom coordinate.
     const style = getComputedStyle(panel);
-    const first = this.part('candidate-options').querySelector<HTMLElement>('button');
-    const minimumHeight = this.part('candidate-back').getBoundingClientRect().height + (first?.getBoundingClientRect().height ?? 0) +
+    const list = this.part('candidate-options');
+    const first = list.querySelector<HTMLElement>('button');
+    const listStyle = getComputedStyle(list);
+    const listPadding = (Number.parseFloat(listStyle.paddingTop) || 0) + (Number.parseFloat(listStyle.paddingBottom) || 0);
+    const minimumHeight = this.part('candidate-back').getBoundingClientRect().height + (first?.getBoundingClientRect().height ?? 0) + listPadding +
       ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth', 'rowGap'].reduce((sum, key) =>
         sum + (Number.parseFloat(style[key as keyof CSSStyleDeclaration] as string) || 0), 0);
     const minimumBottom = visualTop + 8 + Math.min(minimumHeight, Math.max(0, visualBottom - visualTop - 16));

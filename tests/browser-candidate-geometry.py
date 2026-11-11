@@ -346,7 +346,9 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     minimum_panel_height = page.locator(root_selector + ' [data-panel-part="candidate-controls"]').evaluate(r'''panel=>{
       const s=getComputedStyle(panel), candidate=panel.querySelector('[data-panel-part="candidate-options"] button'),
         back=panel.querySelector('[data-panel-part="candidate-back"]');
+      const listStyle=getComputedStyle(candidate.parentElement);
       return candidate.getBoundingClientRect().height + back.getBoundingClientRect().height +
+        parseFloat(listStyle.paddingTop) + parseFloat(listStyle.paddingBottom) +
         parseFloat(s.rowGap) + parseFloat(s.paddingTop) + parseFloat(s.paddingBottom) +
         parseFloat(s.borderTopWidth) + parseFloat(s.borderBottomWidth);
     }''')
