@@ -1,6 +1,6 @@
 # 実装状況と開発候補
 
-- [Issue #32 操作パネル共通外枠](verification/issue32-common-frame-2026-11-11.md)：PC本人報告の二重枠NGを記録。共通装飾・実測幅へ修正、修正後実機は未確認、IssueはOpen。
+- [Issue #32 操作パネル共通外枠](verification/issue32-common-frame-2026-11-11.md)：PC本人報告の二重枠NGを記録。共通装飾・実測幅へ修正し、Chromium／WebKit各182ケース、Deploy gate・Pages公開が成功（公開SHA `d50e8a6`）。修正後実機は未確認、IssueはOpen。
 
 この表は原則2026-11-07時点のソースと検証状況です。後続の個別更新は各行の日付・参照記録を確認してください（Issue #32は2026-11-10の実機報告まで反映）。候補は実装が確定した計画ではありません。現在の仕様は[SPEC.md](SPEC.md)、過去の判断・検証記録は[開発記録](development/README.md)を参照してください。
 

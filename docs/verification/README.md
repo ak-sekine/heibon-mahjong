@@ -1,6 +1,6 @@
 # 検証記録の目次
 
-- [Issue #32 操作パネル共通外枠](issue32-common-frame-2026-11-11.md)：PC本人報告の二重枠NGを記録。共通装飾・実測幅へ修正、修正後実機は未確認、IssueはOpen。
+- [Issue #32 操作パネル共通外枠](issue32-common-frame-2026-11-11.md)：PC本人報告の二重枠NGを記録。共通装飾・実測幅へ修正し、Chromium／WebKit各182ケース、Deploy gate・Pages公開が成功（公開SHA `d50e8a6`）。修正後実機は未確認、IssueはOpen。
 
 - [Issue #55 最終調査・本人実機報告（2026-11-11）](issue55-pwa-header.md#2026-11-11-最終調査本人実機報告) — PWA本人6 OK／0 NG／1未確認。CI比較状態を修正し、カン10件＋PWA7件すべて達成・Close可能（Closeはしない）。修正SHA `9598787`の両engine・全ゲート・Pages公開success。実機未確認は自動結果と区別。
 
