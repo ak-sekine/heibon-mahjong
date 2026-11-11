@@ -251,3 +251,50 @@ Chromiumの注釈ではcreate-dialog、online-dialog、PWA、keyboard-help、app
 このため、**今回のChromium／WebKit回帰・アクセシビリティ9項目は成功として記録しない**。追加したテストは未検証であり、CI成功と本人の縦画面確認の両方が必要。条件を緩和したり、原因未特定の再実行で失敗を消したり、UIを推測で修正したりしていない。機能・CSS変更はなし。Issue #52はOpenを維持する。
 
 再開時は、上記2ホストの正規のネットワーク許可後、runの失敗ログとbrowser-ui artifactを取得して切り分け、必要最小限の修正を行い、両エンジンで追加検査と既存回帰の成功を確認する。未確認の本人縦画面報告は別途必要。2026-11-07の実機報告・過去CI成功履歴は引き続き当時の結果として保持する。
+
+## 本人の縦画面確認とCI再調査 — 2026-11-11
+
+### 本人実機確認（自動検証とは別）
+
+確認者: ユーザー本人。確認日: 2026-11-11。端末: iPhone XS。ブラウザー: Safari。画面方向: 縦画面。確認先: GitHub Pages。iOS詳細バージョン・確認時刻・画面幅は未記録であり、推測で補完しない。
+
+| No. | 確認項目 | 結果 |
+|---|---|---|
+| 1 | 鳴き種類ボタンと「見送る」が横並びに表示され、操作できる | OK |
+| 2 | ポン・チーの単一候補が1回押下で即確定する | OK |
+| 3 | 複数候補が表示され、選択した候補で鳴ける | OK |
+| 4 | 「戻る」で未確定のまま種類選択へ戻れる | OK |
+| 5 | 「見送る」が正常動作し、候補画面には表示されない | OK |
+| 6 | 上方向展開、見切れ、スクロール、卓位置・寸法に問題がない | OK |
+| 7 | オンラインの鳴き、時間切れ、再接続後の操作が正常 | OK |
+
+合計: **OK 7件／NG 0件／未確認 0件**。縦画面の本人実機確認の受入条件は達成。2026-11-07の8項目OKは別の検証履歴として保持する。スマホ横画面は対象外の方針を維持し、再確認は求めない。上記より前の「縦画面未確認」は当時の状況であり、本報告で解消した。
+
+### 再調査の開始状態
+
+開始ブランチは `work`、作業ツリーはクリーン。開始HEADは `044824516446882d819bcdfae7b8c815b8345fa2`。通常sandboxの `git fetch origin` はproxy接続段階で失敗し、正規の許可付き再試行で成功。fetch後の `origin/main` は `3a6eda6542f025c7b2eadd820b6a332cf043610d`、behind/aheadは2/0、未pushコミットなし。同SHAへfast-forwardした。
+
+### 取得できた証拠と残る障害
+
+- 失敗run `43001505789`（SHA `fc8409a66c75ce1427173d3cf085a39344a6b7dd`）のjob・stepと注釈をAPIで再取得した。Chromiumは `Run Vite and browser regressions`、WebKitは `Run standalone itch smoke test before Browser UI suite` でfailure。WebKitの追加アクセシビリティ検査は未実行。matrix auditもfailure、verifyはsuccess。
+- Chromium注釈にはcreate-dialog、online-dialog、PWA、keyboard-help、app-idleの成功があるが、失敗したassertionやスクリプトを特定できる情報はない。WebKit注釈にもexit code 1以上の原因情報はない。実装・テスト・fixture・assertion・CI環境のどれが原因か、再現最小条件ともに未特定。
+- 許可付きのrunログ取得は `results-receiver.actions.githubusercontent.com`、個別WebKit jobログと正確な名前のChromium artifact取得は `productionresultssa6.blob.core.windows.net` でForbidden。ログを取得できないため推測による修正やassertionの削除・弱体化は行っていない。
+- Cloud Environmentの状態は通信制限が適用済み（enforced）。上記2ホストは許可リスト外。設定変更ツールは利用できないため、このチャットの作業環境設定で既存の許可を保持したまま2ホストを追加する必要がある。GitHub Actionsやリポジトリ設定の変更ではない。代替としてユーザーが取得した失敗ログ・診断artifactの提供でも調査可能。
+- 文書run `43002588846`（SHA `3a6eda6542f025c7b2eadd820b6a332cf043610d`）はsuccessだがBrowser UIはdocs-onlyによるskipであり、失敗解消の証拠にはしない。
+
+### 今回のローカル検証
+
+| 検証 | 結果 |
+|---|---|
+| `npm test` | 成功、86件、fail 0、skip 0 |
+| `npm run build` | 成功 |
+| `npm run typecheck:worker` | 成功 |
+| `git diff --check` | 成功 |
+| 関連Python 3ファイルの `py_compile` | 成功 |
+| `python tests/test_browser_regressions_selection.py` | 成功、9件 |
+
+Chromiumの既知起動制限はAGENTS.mdに従い再試行していない。WebKitの既定実行ファイル `webkit-2336/pw_run.sh` は存在しないことを確認した。公式 `python -m playwright install webkit` は通常sandboxでproxy接続失敗、許可付き再試行では公式配信先 `cdn.playwright.dev`／`playwright.download.prss.microsoft.com` が403 `Domain forbidden` で導入不能。ローカルWebKit／itch smokeは実行できず、ブラウザー検証成功とは扱わない。
+
+### 現時点のClose判定
+
+本人縦画面確認は完了した。一方、追加アクセシビリティ検査のChromium／WebKit成功、前回失敗の原因特定・解消、対象SHAでの関連回帰とmatrix audit成功は未確認。**Issue #52はOpenを維持する。** 自動検証の受入チェックは付けない。UI・CSS・テスト実装は変更していない。
