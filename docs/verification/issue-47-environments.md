@@ -40,3 +40,9 @@ IssueはOpenを維持。公開/実機を含む未完了受入条件にはチェ�
 ローカル全89テストファイル成功（workflow契約テスト追加後）。開発HTMLにはホーム画面用DEV名を追加。JSのimport/new URL参照も静的検査対象に含め、両実ビルドのseal成功。これらの変更後の関連3テストファイルも成功。
 
 初回CIの追加所見：既存itch smokeは`online-mock.invalid`を前提とするため、検証用itch buildを従来どおりmock URLに戻す。公開用ZIPは本番Worker検証後の独立buildに分ける。ローカル2Worker検証は開発側の起動待ちで失敗したため、同時起動のinspectorポートを分離し、起動失敗ログを出すようにする。SW更新fixtureのLast-ModifiedはHTTPサーバーの秒精度を考慮して変更する。
+
+## 既存本番の公開記録（読取のみ）
+
+2026-11-11にGitHub Deploymentsを照合。`heibon-production-worker`（7709534462）、`github-pages`（7709559454）、`heibon-production-pages`（7709565599）はいずれもSHA `d50e8a6a5a67e8767de824bb80d2e83751cf474d`でsuccess。本番Pages runは[43012562746](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43012562746)。本番Worker URLは既存検証記録の`https://heibon-mahjong-online.ak-sekine.workers.dev`。現行公開bytesへの直接アクセスは未確認。今回のdevelop pushではこれらを変更していない。
+
+旧本番SWの広いclients.claimを模した追加更新fixtureから、開発controllerの再取得とoffline継続を確認するブラウザケースを追加する。実iPhoneでの移行確認の代わりにはしない。AGENTS.mdの通常作業先もdevelopへ変更し、将来の作業が旧main直push指示へ戻らないようにする。

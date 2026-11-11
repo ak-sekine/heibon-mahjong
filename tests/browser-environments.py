@@ -21,6 +21,28 @@ def start_cpu(page):
     assert page.locator('#player-hand button').count() >= 13
 
 
+def activate_update(page):
+    page.evaluate("""async () => {
+          const r = await navigator.serviceWorker.getRegistration(location.href);
+          await r.update();
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('update did not reach waiting')), 15000);
+            const check = () => { if (r.waiting) { clearTimeout(timer); resolve(); } };
+            r.addEventListener('updatefound', () => r.installing?.addEventListener('statechange', check));
+            r.installing?.addEventListener('statechange', check);
+            check();
+          });
+          const waiting = r.waiting;
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('isolated update did not activate')), 15000);
+            waiting.addEventListener('statechange', () => {
+              if (waiting.state === 'activated') { clearTimeout(timer); resolve(); }
+            });
+            waiting.postMessage({type:'ACTIVATE_UPDATE'});
+          });
+        }""")
+
+
 with tempfile.TemporaryDirectory(prefix='heibon-environments-') as tmp:
     root = Path(tmp)
     site = root / 'heibon-mahjong'
@@ -72,27 +94,17 @@ with tempfile.TemporaryDirectory(prefix='heibon-environments-') as tmp:
         # The local HTTP server's Last-Modified validator has one-second precision.
         modified = max(time.time(), sw.stat().st_mtime) + 2
         os.utime(sw, (modified, modified))
-        production.evaluate("""async () => {
-          const r = await navigator.serviceWorker.getRegistration(location.href);
-          await r.update();
-          await new Promise((resolve, reject) => {
-            const timer = setTimeout(() => reject(new Error('update did not reach waiting')), 15000);
-            const check = () => { if (r.waiting) { clearTimeout(timer); resolve(); } };
-            r.addEventListener('updatefound', () => r.installing?.addEventListener('statechange', check));
-            r.installing?.addEventListener('statechange', check);
-            check();
-          });
-          const waiting = r.waiting;
-          await new Promise((resolve, reject) => {
-            const timer = setTimeout(() => reject(new Error('isolated update did not activate')), 15000);
-            waiting.addEventListener('statechange', () => {
-              if (waiting.state === 'activated') { clearTimeout(timer); resolve(); }
-            });
-            waiting.postMessage({type:'ACTIVATE_UPDATE'});
-          });
-        }""")
+        activate_update(production)
         assert dev.evaluate('navigator.serviceWorker.controller.scriptURL').endswith('/dev/sw.js')
         assert dev.evaluate('caches.keys()') == keys or set(dev.evaluate('caches.keys()')) == set(keys)
+        # Simulate the legacy root worker's broad claim after dev is already active.
+        # The dev page must reclaim its dedicated controller without reloading the game.
+        sw.write_text(sw.read_text() + "\nself.addEventListener('activate', event => event.waitUntil(self.clients.claim()));\n")
+        modified = max(time.time(), sw.stat().st_mtime) + 2
+        os.utime(sw, (modified, modified))
+        activate_update(production)
+        dev.wait_for_function("navigator.serviceWorker.controller?.scriptURL.endsWith('/dev/sw.js')")
+        assert dev.locator('#local-table').is_visible()
         context.set_offline(True)
         for page, suffix in [(production, ''), (dev, 'dev/')]:
             page.reload()
