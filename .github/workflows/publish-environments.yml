@@ -1,6 +1,11 @@
 name: Publish verified environment snapshots
 on:
   workflow_call:
+    inputs:
+      worker_url:
+        description: Actual Worker endpoint that passed the post-deployment online test.
+        required: true
+        type: string
 permissions:
   contents: read
 jobs:
@@ -33,11 +38,12 @@ jobs:
           path: candidate
       - name: Validate and stage exact verified bytes
         env:
+          DEPLOYED_WORKER_URL: ${{ inputs.worker_url }}
           GH_TOKEN: ${{ github.token }}
         run: |
           latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)"
           node source/scripts/environments/artifacts.mjs verify candidate
-          node source/scripts/environments/artifacts.mjs stage store candidate "$latest_sha"
+          node source/scripts/environments/artifacts.mjs stage store candidate "$latest_sha" "$DEPLOYED_WORKER_URL"
       - name: Persist pending journal and snapshot before Pages mutation
         working-directory: store
         run: |

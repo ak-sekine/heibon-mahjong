@@ -23,12 +23,12 @@
 
 | #47受入条件 | 状態 | 根拠・残件 |
 |---|---|---|
-| 検証済み本番/開発成果物と巻き戻り防止 | 一部実装 | hash inventory、合成・pending・freshness。実Pages移行未実施 |
-| 両URLのリソース、PC/iPhone CPU対局 | 一部実装 | build/static検査、ブラウザCIを追加。公開URL/実機未確認 |
-| PWAインストール・offline・更新の分離 | 一部実装 | SW/cache/storage、ブラウザCI追加。旧ユーザー移行とiPhone実機未確認 |
-| 対応Worker、ルーム/認証/状態分離 | 一部実装 | 別config/DO/entry/token経路。別アカウント設定・実通信未確認 |
-| 更新・並行・失敗・再実行の他環境保全 | 一部実装 | ローカル合成障害試験。実Actions/Pages障害・競合未確認 |
-| 本番ゲート・可用性・SHA追跡 | 一部実装 | 旧ゲート維持、新経路に同等検証と台帳。移行未実施 |
+| 検証済み本番/開発成果物と巻き戻り防止 | 一部実装 | hash inventory、合成・pending・freshness、ローカルGit競合試験成功。実Pages移行未実施 |
+| 両URLのリソース、PC/iPhone CPU対局 | 一部実装 | build/static検査とChromium/WebKitの両版CPU起動成功。公開URL/実機未確認 |
+| PWAインストール・offline・更新の分離 | 一部実装 | SW/cache/storage、両エンジンでoffline・更新・旧claim模擬成功。既存ユーザー/iPhone実機未確認 |
+| 対応Worker、ルーム/認証/状態分離 | 一部実装 | 別config/DO/entry/token経路、別ローカルWorkerで対局/再接続/分離成功。実Cloudflare設定・通信未確認 |
+| 更新・並行・失敗・再実行の他環境保全 | 一部実装 | ローカル合成障害・Git競合・URL変更拒否試験成功。実Actions/Pages障害・競合未確認 |
+| 本番ゲート・可用性・SHA追跡 | 一部実装 | 旧ゲート維持、新定義で両エンジンとaudit成功。既存公開SHA読取確認。移行未実施 |
 | 運用/rollback/未確認項目文書 | 実装 | 開発設計、運用、当記録。実行結果を継続追記 |
 
 IssueはOpenを維持。公開/実機を含む未完了受入条件にはチェックしない。
@@ -60,4 +60,38 @@ IssueはOpenを維持。公開/実機を含む未完了受入条件にはチェ�
 - 保存分離: `src/environment.ts`、`src/model/rules.ts`、`src/online/diagnostics.ts`、`src/online/waiting-room.ts`。
 - Worker: `wrangler.development.jsonc`、`worker/development.ts`、`worker/tsconfig.json`。
 - 公開: `scripts/environments/artifacts.mjs`、`.github/scripts/deploy-isolated-worker.mjs`、`.github/workflows/environments.yml`、`.github/workflows/publish-environments.yml`、`.github/workflows/deploy.yml`。
-- 検証: `tests/environment-artifacts.test.mjs`、`tests/environment-storage.test.ts`、`tests/environment-workflows.test.mjs`、`tests/online-environments.mjs`、`tests/browser-environments.py`、`tests/browser-pwa.py`、`tests/pwa.test.mjs`。
+- 検証: `tests/environment-artifacts.test.mjs`、`tests/environment-git-store.test.mjs`、`tests/environment-storage.test.ts`、`tests/environment-workflows.test.mjs`、`tests/online-environments.mjs`、`tests/browser-environments.py`、`tests/browser-pwa.py`、`tests/pwa.test.mjs`。
+
+
+## 公開保留と保存先初期化
+
+ユーザー回答原文：`未設定・未確認（公開を保留）`。Cloudflare Worker、Pages、新公開経路の有効化は実行しない。main pushは旧本番公開を起動し得るため保留する。
+
+成果物保存ブランチ`pages-verified`を既存ブランチの不在確認後に独立した一時Gitリポジトリから初期化し、`232205c5efc7f86df8d70432a62224e82b4fb0ed`をpush・リモート照合した。README.mdと空のstate.jsonだけで、site/や公開候補はない。Pagesへの操作ではなく、本番未登録時のdev bootstrap拒否も維持される。
+
+ローカルbare Gitと2つのcloneで同時書込みを再現し、一方のpending保存後にもう一方のpushがnon-fast-forwardで拒否されること、本番SHAが保持されること、pending中は再公開不能なことを確認。`tests/environment-git-store.test.mjs`として常設し単独実行成功。実GitHub concurrency/Pages障害注入の確認とは区別する。
+
+Storageの追加監査：src/public/workerにIndexedDB、Cookie Store/document.cookie、BroadcastChannel、SharedWorker、window.name、history状態、navigator.storageの使用はない。保存キーは調査済みのrules・session・diagnosticsだけ。ブラウザ自身のフォーム補完等はアプリの保存キー分離の保証範囲とは別である。
+
+
+検証済みartifactのWorker URLと、実デプロイ・オンライン検証後のjob output URLも合成時に一致を要求する。長いCI中にrepository variableが変更された場合、artifactだけ旧URLのまま公開する経路を閉じる。URL不一致でstoreの全hashが不変なことを単体検証した。公開CLIは実Worker URLの指定を必須とし、publisherへ直接job outputを渡す。
+
+B7候補のActions artifactはproduction ID 13896301838、development ID 13895987799で、SHA b7efd2dと対応。APIのexpires_atは2027-02-09（90日）を確認した。いずれも検証専用URLを含む未公開候補であり、実Worker設定なしで公開・bootstrapしない。
+
+
+## アプリ動作変更の最終CI
+
+[b7efd2d24f19f6f51bf608553d5fc82eca07f459 / run 43111116668](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43111116668)で以下がすべて成功した。
+
+- verify：npm test 1,528テスト、Worker型検査、TSを含む本番/開発build、itch build、両artifactのsealと保存。
+- Chromium / WebKitの環境分離smoke：両CPU対局、rules/session保存の分離、両cache保持、独立更新、旧root claimを模した更新、両offline起動。
+- local-online：別DO storeのルーム/認証分離と、両Workerそれぞれの既存5オンラインシナリオ。
+- 既存Browser UI全体：Chromium、WebKitとも成功。PWAの初回有効化、失敗インストール復旧、古いHTTP cacheからの更新検出、同環境複数タブの更新ブロック、承認更新・旧cache削除を含む。itch smokeの前後実行と失敗診断検査も成功。
+- Browser UI matrix audit成功。
+- worker-production / worker-development / online / publish：pushでの公開条件を満たさないためskip。公開成功とは扱わない。
+
+初回8c26065のCI失敗は前述の通り。dda2421 / a02b31f / 63ff388の中間runは成功した分離シナリオを確認後、最新runを優先するため重複実行を停止した。停止を成功とは扱わない。
+
+B7以後の追記は公開制御のWorker URL照合、Git競合回帰テスト、文書・コメントで、アプリ動作コードは不変。追加した公開制御は関連4テストファイルとGit競合試験で成功。実公開はユーザー指示により保留のまま。最新追記SHAに対するCI再実行と、B7で確認したアプリ全UI結果を混同しない。
+
+追記後のローカル`npm test`は90テストファイルすべて成功（42.6秒、失敗0）。`git diff --check`、workflow YAML読込、ブラウザ検証スクリプトのpy_compileも成功。

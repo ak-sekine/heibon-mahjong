@@ -106,7 +106,7 @@ export function serviceWorkerSource(cacheName, urls, environment = 'production')
     '  event.waitUntil((async () => {',
     '    const keys = await caches.keys();',
     '    await Promise.all(keys.filter(key => key.startsWith(' + JSON.stringify(prefix) + ') && key !== CACHE).map(key => caches.delete(key)));',
-    // A root claim would steal active dev clients; first production visit activates on next navigation.
+    // Avoid claiming dev pages before their dedicated registration is active; production uses the next navigation.
     ...(environment === 'development' ? ['    await self.clients.claim();'] : []),
     '  })());',
     '});',

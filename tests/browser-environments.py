@@ -98,7 +98,7 @@ with tempfile.TemporaryDirectory(prefix='heibon-environments-') as tmp:
         assert dev.evaluate('navigator.serviceWorker.controller.scriptURL').endswith('/dev/sw.js')
         assert dev.evaluate('caches.keys()') == keys or set(dev.evaluate('caches.keys()')) == set(keys)
         # Simulate the legacy root worker's broad claim after dev is already active.
-        # The dev page must reclaim its dedicated controller without reloading the game.
+        # The dev scope must keep its controller and game through this legacy-style activation.
         sw.write_text(sw.read_text() + "\nself.addEventListener('activate', event => event.waitUntil(self.clients.claim()));\n")
         modified = max(time.time(), sw.stat().st_mtime) + 2
         os.utime(sw, (modified, modified))

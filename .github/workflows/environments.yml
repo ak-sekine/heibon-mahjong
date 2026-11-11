@@ -176,6 +176,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_DEVELOPMENT_ACCOUNT_ID }}
           PRODUCTION_ACCOUNT_ID: ${{ vars.CLOUDFLARE_PRODUCTION_ACCOUNT_ID }}
   online:
+    outputs:
+      worker_url: ${{ needs.worker-production.outputs.url || needs.worker-development.outputs.url }}
     needs: [worker-production, worker-development]
     if: ${{ always() && (needs.worker-production.result == 'success' || needs.worker-development.result == 'success') }}
     runs-on: ubuntu-latest
@@ -211,3 +213,5 @@ jobs:
       id-token: write
     needs: [online]
     uses: ./.github/workflows/publish-environments.yml
+    with:
+      worker_url: ${{ needs.online.outputs.worker_url }}

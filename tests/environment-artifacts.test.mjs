@@ -102,3 +102,15 @@ test('an unprepared environment cannot be published from untracked store files',
     assert.throws(() => stage(store, prod, prodSha), /Untracked development/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('configuration drift cannot publish a candidate bound to a different Worker', () => {
+  const { root, store, prod } = setup();
+  try {
+    const before = digest(inventory(store));
+    assert.throws(() => stage(store, prod, prodSha, 'https://heibon-mahjong-online.other.workers.dev'), /endpoint changed/);
+    assert.equal(digest(inventory(store)), before, 'failed endpoint binding must not modify the store');
+    const actual = JSON.parse(readFileSync(path.join(prod, 'release.json'))).workerUrl;
+    stage(store, prod, prodSha, actual);
+    finalize(store);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

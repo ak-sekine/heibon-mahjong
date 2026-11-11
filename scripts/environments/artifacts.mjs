@@ -71,13 +71,14 @@ export function verifySealed(root) {
   return release;
 }
 /** Pure local staging. The caller MUST serialize, persist pending, deploy, then finalize. */
-export function stage(store, candidate, latestSha) {
+export function stage(store, candidate, latestSha, deployedWorkerUrl) {
   const stateFile = path.join(store, 'state.json');
   // Missing store is an error, never an implicit empty production.
   const state = JSON.parse(readFileSync(stateFile));
   if (state.version !== 1 || state.pending) throw new Error('Store unavailable or unresolved pending publication');
   const release = verifySealed(candidate);
   if (release.sha !== latestSha) throw new Error('Stale source SHA');
+  if (deployedWorkerUrl !== undefined && release.workerUrl !== deployedWorkerUrl) throw new Error('Worker endpoint changed after artifact verification');
   const environment = release.environment;
   if (!state.current?.production && environment !== 'production') throw new Error('Production bootstrap required');
   const site = path.join(store, 'site');
@@ -115,7 +116,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const [command, ...args] = process.argv.slice(2);
   if (command === 'seal') seal(...args);
   else if (command === 'verify') verifySealed(...args);
-  else if (command === 'stage') stage(...args);
+  else if (command === 'stage') {
+    if (args.length !== 4 || !args[3]) throw new Error('Stage requires the actual deployed Worker URL');
+    stage(...args);
+  }
   else if (command === 'finalize') finalize(...args);
   else throw new Error('Unknown artifact command');
 }

@@ -19,7 +19,7 @@
 2. GitHub Environment `worker-production`を作り、deployment branchesをmain限定にする。secret `CLOUDFLARE_PRODUCTION_API_TOKEN`を登録。本番用repository secret `CLOUDFLARE_API_TOKEN`は旧公開終了まで維持し、その後削除する。削除前はdevelop workflowから旧repository secretを参照できるため、権限分離未完了。
 3. `worker-development`はdevelop限定にし、別アカウントtokenを`CLOUDFLARE_DEVELOPMENT_API_TOKEN`へ登録。tokenをチャットやリポジトリへ貼らない。DO migrationsは各Workerに適用され、本番namespaceのscript_name/idをコピーしない。
 4. repository variables `CLOUDFLARE_PRODUCTION_ACCOUNT_ID`、`CLOUDFLARE_DEVELOPMENT_ACCOUNT_ID`（相異なる値）、`PRODUCTION_WORKER_URL`、`DEVELOPMENT_WORKER_URL`（実workers.dev URL）を登録。アカウントIDはsecretではないが、tokenはEnvironment secretのみ。URLを推測せずCloudflare出力で確認する。
-5. `github-pages` Environmentの許可branchとPages Actions設定を確認。新publisherのGITHUB_TOKENにはcontents:write、pages:write、id-token:writeが必要。保存ブランチ`pages-verified`を作成し、初期ファイル`state.json`を`{"version":1,"current":{},"pending":null}`とする。自動作成しない。main/developのソースファイルを混ぜず、Git履歴を保持する。削除・force pushを禁止する。
+5. `github-pages` Environmentの許可branchとPages Actions設定を確認。新publisherのGITHUB_TOKENにはcontents:write、pages:write、id-token:writeが必要。保存ブランチ`pages-verified`は2026-11-11に`232205c5efc7f86df8d70432a62224e82b4fb0ed`で初期化済み。`state.json`は`{"version":1,"current":{},"pending":null}`で、公開snapshotは未登録。再作成せず、まず現状を取得・検証する。別リポジトリで初期化する場合も取得失敗を空状態と判断せず、明示的に初期台帳を作る。main/developのソースファイルを混ぜず、Git履歴を保持する。削除・force pushを禁止する。
 6. 旧公開を進行中のまま切り替えない。旧production-deployを完了させ、本番SW移行版の公開・既存PWA更新を検証してから新経路を有効化する。移行中にdevelopを公開しない。
 7. main/develop両方に検証済みworkflowを配置後、`DUAL_PAGES_ENABLED=true`を登録。旧deploy.ymlのdetect-changesが停止する。新経路はさらに手動dispatch `publish=true`を要求する。初回はmainの公開を先に実行し、検証済み本番snapshotをbootstrapする。空の本番をdevで上書きすることはできない。
 
@@ -35,7 +35,7 @@
 
 ## 成果物とSHA
 
-ブラウザ検証したdistを再ビルドせず公開する。`release.json`はsource SHA、Worker URL、各ファイルSHA256を持つ。Pagesの`environments.json`が両公開版のSHAとdigestを記録する。ビルド情報にもgit SHAが入る。
+ブラウザ検証したdistを再ビルドせず公開する。artifact内のWorker URLは実デプロイ・オンライン検証を通ったjob outputと一致を要求し、実行中の設定変更でも接続先がずれた候補は公開しない。`release.json`はsource SHA、Worker URL、各ファイルSHA256を持つ。Pagesの`environments.json`が両公開版のSHAとdigestを記録する。ビルド情報にもgit SHAが入る。
 Actions artifactは90日。期限切れ/取得失敗時は停止し、ソースから勝手に再作成しない。新しい全検証runを実行する。公開snapshotは`pages-verified`のGit履歴に無期限保存する。履歴を削除・GCで切り捨てない。
 
 合成は共通concurrencyで直列化する。GitHub concurrencyはpending runの全件FIFOを保証しないため、対象runがキャンセルされた場合は最新branchで再実行する。古いSHAは公開しない。片方の更新は保持側を再ビルドせず、保存された同じbytesを使用する。取得失敗・破損・不明状態は空扱いせず停止する。
@@ -51,6 +51,8 @@ Actions artifactは90日。期限切れ/取得失敗時は停止し、ソース�
 
 ## PWA・保存状態とiPhone Safari実機確認
 
+ブラウザは最長一致のService Worker scopeを優先する。開発SWがまだない初回訪問や有効化前は本番の親controllerが付く場合があるため、開発専用controller取得後にオフライン準備完了を確認する。
+
 本番キーは旧値を維持しコピー/削除しない。devは専用キー。manifest id/start_url/scope、script URL、precache、cache名を分離する。本番SWはdev fetchと更新時のclient数判定からdevを除く。本番SWはclients.claimを使わず、初回訪問は有効化後に再読み込みしてからオフラインを確認する。開発SWは旧本番SWが一時的にclaimした場合に開発scopeを再claimする。未更新の本番SWによる親制御を完全に排除できると仮定しない。
 
 PWA更新は対局の区切りで行う。同環境の複数タブは更新をブロックし、他環境タブではブロックしない。全サイトデータ削除を通常の更新手順にしない。本番データを失うため、問題時も環境別キー/cache/registrationだけを確認する。
@@ -63,6 +65,6 @@ PWA更新は対局の区切りで行う。同環境の複数タブは更新を�
 4. 両版を一度オンラインで起動→完全終了→機内モードでホーム画面から起動しCPU対局。新規インストール直後の本番は再読み込み後にも確認する。
 5. 開発のみ更新/本番のみ更新し、反対側の更新通知・cache・オフライン起動・保存設定が変わらないこと。旧本番SWが残る状態からの移行も確認する。
 6. 同環境2タブで更新ブロック、反対環境タブだけなら更新可能なこと。
-7. 新規テストルームのみ使用し、各Workerで作成→参加→対局→再接続。同じコードやtokenを他環境に持ち込んでも参加/復帰しないこと。公開済みの他人のルームを変更しない。
+7. 新規テストルームのみ使用し、各Workerで作成→参加→対局→再接続。他環境のtokenで復帰できないこと、作成したルームが反対環境に現れないこと。6文字コードが偶然一致してもWorkerごとに独立した別ルームであり、コードだけでは環境を識別できない。公開済みの他人のルームを変更しない。
 
 未確認が残る間はIssue #47をCloseしない。
