@@ -6,6 +6,7 @@
 |---|---|---|
 | branch | main | develop |
 | URL | https://ak-sekine.github.io/heibon-mahjong/ | https://ak-sekine.github.io/heibon-mahjong/dev/ |
+| Cloudflareアカウント | 本番・開発で同一 | 本番と同一 |
 | Worker名 | heibon-mahjong-online | heibon-mahjong-online-dev |
 | API URL | PRODUCTION_WORKER_URLに実URLを登録 | DEVELOPMENT_WORKER_URLに実URLを登録 |
 | config | wrangler.jsonc | wrangler.development.jsonc |
@@ -15,13 +16,15 @@
 
 ## 外部設定（未設定を成功扱いしない）
 
-1. Cloudflareで本番と別の開発用アカウントを用意しworkers.devを初期化。WorkersとSQLite DOを有効化する。Workers編集tokenはアカウント全体へ権限を持つ場合があるため、本番アカウントのtokenを開発に渡さない。
-2. GitHub Environment `worker-production`を作り、deployment branchesをmain限定にする。secret `CLOUDFLARE_PRODUCTION_API_TOKEN`を登録。本番用repository secret `CLOUDFLARE_API_TOKEN`は旧公開終了まで維持し、その後削除する。削除前はdevelop workflowから旧repository secretを参照できるため、権限分離未完了。
-3. `worker-development`はdevelop限定にし、別アカウントtokenを`CLOUDFLARE_DEVELOPMENT_API_TOKEN`へ登録。tokenをチャットやリポジトリへ貼らない。DO migrationsは各Workerに適用され、本番namespaceのscript_name/idをコピーしない。
-4. repository variables `CLOUDFLARE_PRODUCTION_ACCOUNT_ID`、`CLOUDFLARE_DEVELOPMENT_ACCOUNT_ID`（相異なる値）、`PRODUCTION_WORKER_URL`、`DEVELOPMENT_WORKER_URL`（実workers.dev URL）を登録。アカウントIDはsecretではないが、tokenはEnvironment secretのみ。URLを推測せずCloudflare出力で確認する。
+1. 本番・開発で同一のCloudflareアカウントを使用し、workers.devを初期化。WorkersとSQLite DOを有効化する。Worker名は本番`heibon-mahjong-online`、開発`heibon-mahjong-online-dev`を維持する。
+2. GitHub Environment `worker-production`をmain限定にし、secret `CLOUDFLARE_PRODUCTION_API_TOKEN`を登録する。旧公開経路のrepository secretは旧公開終了まで維持し、切替後に削除する既存手順を維持する。
+3. `worker-development`はdevelop限定にし、同じCloudflareアカウント用のtokenをEnvironment secret `CLOUDFLARE_DEVELOPMENT_API_TOKEN`へ登録する。Secretsの登録先・名前は本番と区別する。tokenをチャットやリポジトリへ貼らない。DO migrationsは各Workerに適用され、ROOMS / RATE_LIMITERは各Worker自身のクラスへbindする。外部Workerのscript_nameやnamespace IDを指定しないため、クラス名・migration tagが同じでも状態は共有されない。
+4. repository variable `CLOUDFLARE_ACCOUNT_ID`に共通アカウントIDを登録する。新経路の両Worker jobはこの変数を参照する。旧`CLOUDFLARE_PRODUCTION_ACCOUNT_ID` / `CLOUDFLARE_DEVELOPMENT_ACCOUNT_ID`は新経路では不要。旧deploy.ymlの同名repository **secret** `CLOUDFLARE_ACCOUNT_ID`は旧公開経路用であり、variable登録とは別に既存値を維持する。`PRODUCTION_WORKER_URL` / `DEVELOPMENT_WORKER_URL`には同アカウントの各Workerの実workers.dev URLを登録する。URLはCloudflare出力で確認し、検証fixtureを登録しない。
 5. `github-pages` Environmentの許可branchとPages Actions設定を確認。新publisherのGITHUB_TOKENにはcontents:write、pages:write、id-token:writeが必要。保存ブランチ`pages-verified`は2026-11-11に`232205c5efc7f86df8d70432a62224e82b4fb0ed`で初期化済み。`state.json`は`{"version":1,"current":{},"pending":null}`で、公開snapshotは未登録。再作成せず、まず現状を取得・検証する。別リポジトリで初期化する場合も取得失敗を空状態と判断せず、明示的に初期台帳を作る。main/developのソースファイルを混ぜず、Git履歴を保持する。削除・force pushを禁止する。
 6. 旧公開を進行中のまま切り替えない。旧production-deployを完了させ、本番SW移行版の公開・既存PWA更新を検証してから新経路を有効化する。移行中にdevelopを公開しない。
 7. main/develop両方に検証済みworkflowを配置後、`DUAL_PAGES_ENABLED=true`を登録。旧deploy.ymlのdetect-changesが停止する。新経路はさらに手動dispatch `publish=true`を要求する。初回はmainの公開を先に実行し、検証済み本番snapshotをbootstrapする。空の本番をdevで上書きすることはできない。
+
+今回の変更はアカウント共有方式への切替に限定し、誤設定リスクへの追加対策や権限分離の強化は行わない。Workers編集tokenは同一アカウント内の他Workerへ権限を持つ場合があり、別EnvironmentをCloudflare権限の隔離とみなさない。
 
 外部設定はこの作業では未確認。API権限がない場合はSettingsでユーザーが登録・確認する。設定完了後も公開前のチェックは省略しない。
 

@@ -95,3 +95,26 @@ B7候補のActions artifactはproduction ID 13896301838、development ID 1389598
 B7以後の追記は公開制御のWorker URL照合、Git競合回帰テスト、文書・コメントで、アプリ動作コードは不変。追加した公開制御は関連4テストファイルとGit競合試験で成功。実公開はユーザー指示により保留のまま。最新追記SHAに対するCI再実行と、B7で確認したアプリ全UI結果を混同しない。
 
 追記後のローカル`npm test`は90テストファイルすべて成功（42.6秒、失敗0）。`git diff --check`、workflow YAML読込、ブラウザ検証スクリプトのpy_compileも成功。
+
+## 同一Cloudflareアカウント方式への変更（今回）
+
+前節までの結果は変更前の記録。今回の開始時HEADは`cb457bb0dfe00455adf66d5f8c51284d0d00081f`（work、clean）、fetch後origin/mainも同SHA。通常fetchはgithub.comへのproxy:8080接続で失敗し、許可付きfetchで成功。developは取得対象外だったため明示fetchし、最新`262fe879ad0bd7dfe133ba6474d68456114c8934`から開始した。mainに対してbehind/aheadは0/6、6件は既存develop履歴で、origin/developに対する未pushコミットはなし。
+
+既存結果の追加確認：変更前`262fe87`の[run 43115789427](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43115789427)は全体successで完了していることを今回APIで確認した。これは今回の変更に対する結果ではない。
+
+今回の変更ファイルは以下の6件。
+
+- `.github/scripts/deploy-isolated-worker.mjs`：開発の別アカウント必須チェックを削除。account ID必須、branch/SHA/Worker URL確認は維持。
+- `.github/workflows/environments.yml`：両Worker jobは共通repository variable `CLOUDFLARE_ACCOUNT_ID`を参照。Environment・Secrets・ブラウザ検証・公開ゲートは維持。
+- `tests/environment-workflows.test.mjs`：共通account IDと各configで両デプロイ経路が成功するモック試験、ID欠落時の停止、DO自己bindingを確認。
+- `docs/operations/environments.md`：共通アカウントとGitHub変数・環境別Secretsの設定手順を更新。
+- `docs/development/issue-47-environments.md`：現行設計を同一アカウント方式へ更新。
+- 本検証記録：過去と今回の検証結果・未確認項目を区別。
+
+`wrangler.jsonc` / `wrangler.development.jsonc`は変更不要。別Worker名、ROOMS / RATE_LIMITERの自己binding、各WorkerのSQLite migrationを維持する。同じクラス名・migration tagでもWorkerごとにDO namespaceが作られる。ビルド・PWA・Storage・Pages合成・itchの動作コードは変更していない。
+
+追加テストの初回はsandboxの子プロセス起動EPERMで失敗。CLIをVM内でモックする方式へ修正して再検証する。実Cloudflareへのデプロイ試験ではない。
+
+今回も外部設定変更・Worker/Pages公開は実施しない。実Cloudflare同一アカウント内でのルーム/token/状態分離、公開後E2E、iPhone Safari実機は未確認。別アカウント準備は残作業から外し、共通account ID、各Environment secretと実Worker URLの設定確認を残す。誤設定リスクへの追加対策・権限分離強化は対象外。IssueはOpenを維持する。
+
+今回のローカル結果：`npm test`全90テストファイル成功（失敗0、41.8秒）。`npm run typecheck:worker`成功。本番`npm run build`、開発`npm run build:dev`、`npm run build:itch`とZIP生成成功。両Pages成果物のseal / hash・参照検査成功。Pages用URLは各`.validation.workers.dev`、itchは`https://online-mock.invalid`で、実公開接続先ではない。`git diff --check`成功。今回のChromium/WebKit・ローカル2Worker検証はdevelop pushで起動する既存Actionsにて確認する。ローカルブラウザはAGENTS.md記載の既知の起動制限に従い再実行しない。

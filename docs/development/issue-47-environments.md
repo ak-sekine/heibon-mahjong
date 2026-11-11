@@ -18,13 +18,13 @@
 1. mainは既存URL、developは`/heibon-mahjong/dev/`。itch modeは独立のまま。
 2. 本番storageキーを維持して移行コピーを不要にし、developは専用接頭辞を使う。診断の旧キーfallbackも分離する。
 3. 開発SWキャッシュは旧本番SWの削除接頭辞`heibon-mahjong-shell-`の外に置く。本番SWはdev配下のfetchと更新対象clientを除外する。dev登録がactiveになる前の親controllerを更新通知の根拠にしない。旧本番SWのclients.claimによる一時的な親制御はブラウザ仕様上完全には防げないため、devのオフライン準備は専用controller取得後に確認する。既存本番SWの更新を先に公開し、実機確認後にdevを公開する。
-4. 開発Workerは別config・別名・独立DO・別GitHub Environmentと別Cloudflareアカウントのtokenを必須とする。Cloudflareの一般的なWorkers編集tokenはアカウント全体へ権限を持つため、別名だけでは本番変更権限を隔離できない。GitHubのproduction secretsはmain限定Environmentへ移し、repository secretsから除去するまで「権限分離完了」としない。
+4. 本番・開発は同一Cloudflareアカウントを共有する（今回の方針変更）。Workerは別config・別名・独立DOを維持し、GitHub EnvironmentとSecretsは本番・開発で区別する。Actionsのaccount IDは共通repository variable `CLOUDFLARE_ACCOUNT_ID`を参照する。従来の別アカウント必須チェックは削除する。DOはscript_nameのない自己bindingとWorkerごとのmigrationにより独立する。誤設定対策の追加・権限分離の強化は今回の対象外。過去の別アカウント前提の検証・Issueコメントは当時の記録であり、現行方針は本項と運用文書を正とする。
 5. 検証済み成果物の合成は専用の保存ブランチ`pages-verified`に完全な公開snapshotとSHA/hash台帳を保存する方式。Git履歴で無期限保持（手動削除禁止、通常artifactは90日）。公開直列化に加え、公開前にpending journalを保存し、成功後に確定。途中失敗・状態不明時はpendingを残して次回を停止。復旧時はPages成功記録とsnapshot digestを照合する。保存先取得失敗を空snapshot扱いしない。初回は検証済み本番が必須、dev未準備なら省略可能。devから初回bootstrap不可。
 6. publisherは検証成果物をそのままコピーし再ビルドしない。更新対象branch SHAは公開直前にも再確認し、保持側は公開済みSHAを使う（未検証最新branchを再ビルドしない）。古い再実行は拒否する。同時pushは共通concurrencyで直列化し、最新でない候補を拒否する。
 7. 本番ゲートを満たす最終ビルドそのものへのBrowser UI検証が必要。現行main公開を勝手に切り替えない。新しい公開経路は外部設定と初回成果物の確認まで無効。mainへの昇格前にdevelopのCIを確認する。
 
 ## 公開順序
 
-本番SW移行版の検証・公開 → 本番PWA既存ユーザー更新確認 → 開発アカウント/Worker設定 → 開発最終ビルド検証 → 本番検証成果物bootstrap → 合成publisherのdry runと障害試験 → legacy publisher停止と新経路の切替 → 各公開SHA確認 → iPhone両環境実機確認。
+本番SW移行版の検証・公開 → 本番PWA既存ユーザー更新確認 → 共通アカウント内の開発Worker設定 → 開発最終ビルド検証 → 本番検証成果物bootstrap → 合成publisherのdry runと障害試験 → legacy publisher停止と新経路の切替 → 各公開SHA確認 → iPhone両環境実機確認。
 
 公開ゲートを満たさない段階ではmain / 本番Worker / Pagesを変更しない。未実施の公開や実機検証は成功としない。

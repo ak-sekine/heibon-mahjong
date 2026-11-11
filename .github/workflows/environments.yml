@@ -149,7 +149,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_WORKER_URL: ${{ vars.PRODUCTION_WORKER_URL }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_PRODUCTION_ACCOUNT_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
   worker-development:
     needs: [verify, browser-ui, isolation-browser, audit]
     if: ${{ github.ref == 'refs/heads/develop' && github.event_name == 'workflow_dispatch' && inputs.publish == true && vars.DUAL_PAGES_ENABLED == 'true' }}
@@ -173,8 +173,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_WORKER_URL: ${{ vars.DEVELOPMENT_WORKER_URL }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_DEVELOPMENT_ACCOUNT_ID }}
-          PRODUCTION_ACCOUNT_ID: ${{ vars.CLOUDFLARE_PRODUCTION_ACCOUNT_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
   online:
     outputs:
       worker_url: ${{ needs.worker-production.outputs.url || needs.worker-development.outputs.url }}

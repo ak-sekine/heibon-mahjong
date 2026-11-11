@@ -7,7 +7,6 @@ if (process.env.GITHUB_REF !== 'refs/heads/' + branch) throw new Error('Wrong de
 const latest = execFileSync('gh', ['api', `repos/${process.env.GITHUB_REPOSITORY}/commits/${branch}`, '--jq', '.sha'], { encoding: 'utf8' }).trim();
 if (latest !== process.env.GITHUB_SHA) throw new Error('Stale source SHA');
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID || !process.env.EXPECTED_WORKER_URL) throw new Error('Missing explicit deployment configuration');
-if (env === 'development' && (!process.env.PRODUCTION_ACCOUNT_ID || process.env.PRODUCTION_ACCOUNT_ID === process.env.CLOUDFLARE_ACCOUNT_ID)) throw new Error('Development requires a separate Cloudflare account');
 const name = env === 'production' ? 'heibon-mahjong-online' : 'heibon-mahjong-online-dev';
 const expected = process.env.EXPECTED_WORKER_URL;
 if (!new RegExp('^https://' + name + '\\.[a-z0-9-]+\\.workers\\.dev$').test(expected)) throw new Error('Wrong configured Worker endpoint');
