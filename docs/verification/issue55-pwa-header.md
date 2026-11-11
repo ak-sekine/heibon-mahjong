@@ -22,10 +22,10 @@ itchの登録スキップ、相対パス、ビルド構成は変更なし。
 - npm test: 86件成功、失敗0。
 - npm run build: 成功。
 - npm run build:itch: Worker URL未設定では既存設定のエラー。CIと同じ
-  VITE_ONLINE_API_URL=https://online-mock.invalid指定で検証（本番公開用ZIPではない）。
+  VITE_ONLINE_API_URL=https://online-mock.invalid指定で成功（本番公開用ZIPではない）。
 - Python構文検査・git diff --checkを実施。
 - ブラウザーはAGENTS.mdの既知のCloud起動制限に従い既存Deploy内のBrowser UIを使用。
-  対象コミットのActions結果で成功・失敗を判定する。実行前時点では未確認。
+  対象コミットc536da35f0af099d4e28408177411dc38a749904の両エンジンとも成功。
 
 PWAテストは実際のService Worker更新を使用する。320×568、375×560、375×635、
 390×844、430×844で通知なし／あり／キャンセル後／ブロック後を実測する。
@@ -49,3 +49,62 @@ Safariとホーム画面PWAのそれぞれで、次をユーザー本人が確�
 7. 別タブがある場合は理由が通知され、閉じて再試行できる。
 
 自動WebKit検証は実機確認の代替ではない。Issue #55のCloseは行わない。
+
+## Actionsと実測結果（2026-11-11追記）
+
+[Deploy run 42925490208](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42925490208)
+でChromium／WebKitのPWA・Browser UI全件成功、両エンジン監査成功。
+itchスモークは両エンジンとも前後各3回成功。既存オンラインBrowser UIと本番オンライン検証も成功。
+測定JSONは[Chromium](issue55-pwa-header-chromium.json)／[WebKit](issue55-pwa-header-webkit.json)。
+artifact ZIPはダウンロード先ドメインがForbiddenのため取得できず、GitHubコネクターの
+各完了ジョブログに出力された測定JSONを取得・保存した。
+
+以下の卓・操作欄の値は両エンジン共通。単位CSS px。
+通知なし→あり→キャンセル→複数タブブロックで全て同一。
+旧実装自体の寸法は未実測で、変更前比較はソース上の通常フローの通知行との比較。
+
+| Viewport | ヘッダー高 | 卓 X,Y,幅,高さ | 操作欄Y | scroll X,Y | 横overflow |
+|---|---:|---|---:|---|---|
+|320×568|44|10,108,300,300|412|0,0|なし|
+|375×560|44|41.5,108,292,292|404|0,0|なし|
+|375×635|44|0,108,375,375|487|0,0|なし|
+|390×844|44|0,116,390,390|514|0,0|なし|
+|430×844|44|0,116,430,430|554|0,0|なし|
+
+更新ボタンのYは全て8、高さ44、幅はChromium 76／WebKit 76.65625。
+メニューは全てY=8、44×44。通知前後でメニュー座標も同一。
+
+| Viewport | 更新X Chromium | 更新X WebKit | メニューX（共通） |
+|---|---:|---:|---:|
+|320×568|190|189.34375|270|
+|375×560|237|236.34375|321|
+|375×635|237|236.34375|321|
+|390×844|252|251.34375|336|
+|430×844|292|291.34375|376|
+
+ボタン非重複、画面内、メニュー開閉、更新confirm・キャンセル・再試行、
+ブロックalert、承認後の再読み込み・キャッシュ切替に成功。
+全測定はスクロール先頭で実施。スクロール途中の通知発生は未実測。
+
+## 追加要件の受入判定
+
+1. ヘッダー44px・卓／操作欄Y不変: 自動検証OK。
+2. 幅320／375／390／430で非重複・操作・横スクロールなし: 自動検証OK。
+3. 更新承認・キャンセル・複数タブブロック・再読み込み: OK。
+4. Chromium／WebKitのPWA・Browser UI回帰: OK。標準confirm表示中の寸法は未実測。
+5. npm test・build・PWA検証: OK。itchビルド・スモークもOK。
+6. iPhone実機チェック項目の用意と区別: OK。実機結果自体は未確認。
+7. 変更・検証・コミット・公開状況の報告: 本記録と最終報告に記載。PR作成なし。
+
+暗カン・加カンUIのClose判断は今回行わず、IssueはOpenのままとする。
+
+## 公開状態
+
+実装コミット: c536da35f0af099d4e28408177411dc38a749904。
+mainへのfast-forward push成功、push後のgit ls-remoteも同SHA。
+Deploy全体、Pages build、Pages deployはすべてsuccess。
+公開先: https://ak-sekine.github.io/heibon-mahjong/ 。
+この環境から公開URLへのcurlは通常実行でproxy接続失敗、許可付き実行ではHTTP 403。
+したがって公開ページを直接取得しての反映確認は未確認。CIによるデプロイ成功とは区別する。
+Actions全体ログZIPも配信先Forbiddenのため、GitHubコネクターの個別ジョブログと
+GitHub APIの対象SHA・ジョブ結果で確認した。履歴改変・PR作成・Issue更新なし。
