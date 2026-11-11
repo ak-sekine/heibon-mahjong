@@ -34,6 +34,12 @@ export default defineConfig(({ mode }) => {
     : { main: 'index.html', kanTest: 'kan-test.html', test: 'test.html', callTest: 'call-test.html' };
   return {
     base: isItchBuild ? './' : isDevelopmentPages ? '/heibon-mahjong/dev/' : '/heibon-mahjong/',
+    plugins: [{
+      name: 'development-pages-identity',
+      transformIndexHtml: (html: string) => isDevelopmentPages
+        ? html.replace('<title>Heibon Mahjong</title>', '<meta name="apple-mobile-web-app-title" content="Heibon Mahjong DEV" /><title>Heibon Mahjong DEV</title>')
+        : html,
+    }],
     define: { __APP_BUILD_INFO__: JSON.stringify(buildInfo), __HEIBON_ENV__: JSON.stringify(isDevelopmentPages ? 'development' : 'production') },
     build: {
       rollupOptions: { input },

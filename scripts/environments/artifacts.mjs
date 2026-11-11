@@ -36,9 +36,11 @@ export function verifyBuild(root, environment) {
   for (const url of urls) if (!url.startsWith(base) || (url !== base && !files[url.slice(base.length)])) throw new Error('Invalid precache URL ' + url);
   if (environment === 'production' && urls.some(url => url.startsWith(environments.development))) throw new Error('Production precaches dev');
   for (const [name] of Object.entries(files)) {
-    if (!/\.(html|css)$/.test(name)) continue;
+    if (!/\.(html|css|js)$/.test(name)) continue;
     const source = readFileSync(path.join(root, name), 'utf8');
-    const patterns = name.endsWith('.html') ? [/(?:src|href)="([^"#]+)"/g] : [/url\(["']?([^"')]+)["']?\)/g];
+    const patterns = name.endsWith('.html') ? [/(?:src|href)="([^"#]+)"/g]
+      : name.endsWith('.css') ? [/url\(["']?([^"')]+)["']?\)/g]
+      : [/(?:from\s*|import\s*\(\s*|import\s*)["']([./][^"']+)["']/g, /new URL\(["']([./][^"']+)["'],\s*import\.meta\.url\)/g];
     for (const pattern of patterns) for (const match of source.matchAll(pattern)) {
       if (/^(data:|https?:|#)/.test(match[1])) continue;
       const url = new URL(match[1], 'https://build.invalid' + base + name);

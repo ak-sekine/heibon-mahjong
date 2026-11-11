@@ -32,3 +32,9 @@
 | 運用/rollback/未確認項目文書 | 実装 | 開発設計、運用、当記録。実行結果を継続追記 |
 
 IssueはOpenを維持。公開/実機を含む未完了受入条件にはチェックしない。
+
+## develop初回CI
+
+`8c260652ad65b33019a3f05d571863d78da7b56e` / [run 43109455700](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43109455700)：verify成功。新規Chromium分離テストでwaiting workerがnullのまま更新要求するテスト同期不備を検出。更新インストール・有効化のイベントを明示的にawaitする修正を追加する。実公開ジョブは未実行。
+
+ローカル全89テストファイル成功（workflow契約テスト追加後）。開発HTMLにはホーム画面用DEV名を追加。JSのimport/new URL参照も静的検査対象に含め、両実ビルドのseal成功。これらの変更後の関連3テストファイルも成功。

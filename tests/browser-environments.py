@@ -68,10 +68,25 @@ with tempfile.TemporaryDirectory(prefix='heibon-environments-') as tmp:
         # Production update may activate with a dev tab open, and cannot claim that tab.
         sw = site / 'sw.js'
         sw.write_text(sw.read_text() + '\n// isolated update test\n')
-        production.evaluate('async () => { const r = await navigator.serviceWorker.getRegistration(location.href); await r.update(); }')
-        production.wait_for_function('async () => Boolean((await navigator.serviceWorker.getRegistration(location.href)).waiting)')
-        production.evaluate("async () => { const r = await navigator.serviceWorker.getRegistration(location.href); r.waiting.postMessage({type:'ACTIVATE_UPDATE'}); }")
-        production.wait_for_function('async () => !(await navigator.serviceWorker.getRegistration(location.href)).waiting')
+        production.evaluate("""async () => {
+          const r = await navigator.serviceWorker.getRegistration(location.href);
+          await r.update();
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('update did not reach waiting')), 15000);
+            const check = () => { if (r.waiting) { clearTimeout(timer); resolve(); } };
+            r.addEventListener('updatefound', () => r.installing?.addEventListener('statechange', check));
+            r.installing?.addEventListener('statechange', check);
+            check();
+          });
+          const waiting = r.waiting;
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('isolated update did not activate')), 15000);
+            waiting.addEventListener('statechange', () => {
+              if (waiting.state === 'activated') { clearTimeout(timer); resolve(); }
+            });
+            waiting.postMessage({type:'ACTIVATE_UPDATE'});
+          });
+        }""")
         assert dev.evaluate('navigator.serviceWorker.controller.scriptURL').endswith('/dev/sw.js')
         assert dev.evaluate('caches.keys()') == keys or set(dev.evaluate('caches.keys()')) == set(keys)
         context.set_offline(True)
