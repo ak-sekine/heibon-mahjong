@@ -215,3 +215,39 @@ Browser UIの自動検証は320×568、375×634、375×844、844×390、667×375
 7. 各項目をOK／NG／未確認で報告する。局面を作れなかった項目は未確認とする。
 
 縦画面の本人報告が揃うまで、Issue #52はOpenのままとする。
+
+### ローカル検証
+
+追加テストcommit: `fc8409a66c75ce1427173d3cf085a39344a6b7dd`（mainへのpushとリモートSHA一致を確認）。
+
+| コマンド | 2026-11-11の結果 |
+|---|---|
+| `npm test` | 成功、86 test files、fail 0、skip 0 |
+| `npm run build` | 成功、TypeScript／Vite／PWA shell |
+| `npm run typecheck:worker` | 成功 |
+| `git diff --check` | 成功 |
+| 変更したBrowser UI Python 3ファイルの `py_compile` | 成功 |
+| `python tests/test_browser_regressions_selection.py` | 9件成功 |
+
+ローカルでのWebKit試行は実行ファイル `webkit-2336/pw_run.sh` 不在で起動前に失敗。Vite起動もsandbox内の `127.0.0.1:4173` listenがEPERMで失敗した。ページ検証結果ではなく環境上の実行不能として記録する。ChromiumはAGENTS.mdの既知制限に従ってローカル起動を繰り返さず、両エンジンの検証は既存Actionsを使う。
+
+### Actions最終結果と未完了事項
+
+[run 43001505789](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43001505789)、対象SHA `fc8409a66c75ce1427173d3cf085a39344a6b7dd`、status `completed`／conclusion `failure` をActions APIで確認した。
+
+| job | 最終結果 |
+|---|---|
+| docs-check / detect-changes / verify | success |
+| browser-ui / browser-ui (chromium) | failure、`Run Vite and browser regressions` ステップ |
+| browser-ui / browser-ui (webkit) | failure、`Run standalone itch smoke test before Browser UI suite` ステップ。後続Browser UIはskip |
+| browser-ui-matrix-audit | failure |
+| browser-ui / docs-check、detect-changes、verify-build | skipped（呼出元の検証・buildを再利用するjob） |
+| release-freshness / deploy-worker / production-test / pages-build / pages-deploy | skipped |
+
+Chromiumの注釈ではcreate-dialog、online-dialog、PWA、keyboard-help、app-idleの成功まで確認できたが、失敗したスクリプト名・assertion全文は未取得。WebKitは追加したキーボード検査を実行する前のsmoke失敗であり、鳴きUIの不具合と断定できない。追加検査が原因とも断定しない。
+
+詳細取得を通常sandbox内で試みたGitHubアクセスはproxy接続段階で失敗し、正規の許可付き実行ではGit fetch／pushと `api.github.com` のIssue・Actionsメタデータ取得が成功した。一方、許可付きでも個別jobログ・artifactのリダイレクト先 `productionresultssa6.blob.core.windows.net` と、runログ配信先 `results-receiver.actions.githubusercontent.com` はForbidden。ログと診断ZIPを取得できず、実装／fixture／assertion／実行環境の切り分けは未完了。ネットワーク制限を迂回せず、環境の許可ホスト追加を依頼した。
+
+このため、**今回のChromium／WebKit回帰・アクセシビリティ9項目は成功として記録しない**。追加したテストは未検証であり、CI成功と本人の縦画面確認の両方が必要。条件を緩和したり、原因未特定の再実行で失敗を消したり、UIを推測で修正したりしていない。機能・CSS変更はなし。Issue #52はOpenを維持する。
+
+再開時は、上記2ホストの正規のネットワーク許可後、runの失敗ログとbrowser-ui artifactを取得して切り分け、必要最小限の修正を行い、両エンジンで追加検査と既存回帰の成功を確認する。未確認の本人縦画面報告は別途必要。2026-11-07の実機報告・過去CI成功履歴は引き続き当時の結果として保持する。
