@@ -16,6 +16,9 @@ def assert_button_focus(page, button):
       const points=[[r.left+1,r.top+1],[r.right-1,r.top+1],[r.left+1,r.bottom-1],[r.right-1,r.bottom-1]];
       return {visible:node.matches(':focus-visible'),outline:s.outlineStyle,width:s.outlineWidth,color:s.outlineColor,
         clipped,covered:points.some(([x,y])=>{const hit=document.elementFromPoint(x,y);return hit!==node&&!node.contains(hit)}),
+        points:points.map(([x,y])=>{const hit=document.elementFromPoint(x,y);return {x,y,
+          hit:hit?.outerHTML.slice(0,200),ok:hit===node||node.contains(hit)}}),
+        rect:r.toJSON(),radius:s.borderRadius,button:node.id,
         hidden:!!node.closest('[hidden]'),disabled:node.disabled};
     }''')
     assert state['visible'] and state['outline'] != 'none' and float(state['width'][:-2]) >= 2, state

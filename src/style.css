@@ -56,7 +56,7 @@ ul { list-style:none; padding:0; margin:0; }
 .action-choice-group { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px; width:100%; }
 .action-group-status { flex:1 1 100%; min-width:0; margin:0; font-size:14px; overflow-wrap:anywhere; }
 .action-option-list { display:flex; flex-wrap:wrap; gap:4px; width:100%; }
-.call-controls { position:relative; z-index:10; box-sizing:border-box; grid-template-columns:repeat(auto-fit,minmax(min(100%,84px),1fr)); align-content:end; gap:6px; min-height:0; max-height:calc(100vh - 16px); padding:8px; border:0; border-radius:0; background:none; overflow:hidden; }
+.call-controls { position:relative; z-index:10; box-sizing:border-box; grid-template-columns:repeat(auto-fit,minmax(min(100%,84px),1fr)); align-content:end; gap:6px; min-height:0; max-height:calc(100vh - 16px); padding:8px; border:1px solid transparent; border-radius:8px; background:none; overflow:hidden; }
 .call-controls:not([hidden]) { display:grid; }
 /* The in-flow type panel already supplies the operation padding and gaps. */
 .discard-controls:has(.call-controls:not([hidden])) { padding:0; gap:0; }
