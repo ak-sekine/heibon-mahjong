@@ -191,5 +191,7 @@ Step 13.8までの役満10種類に、Step 13.11で天和・地和を加え、�
 PWAヘッダーの本人iPhone Safari報告は6 OK／0 NG／1未確認（複数タブ）。
 カン10件とPWA7件を[最終調査記録](verification/issue55-pwa-header.md#2026-11-11-最終調査本人実機報告)で個別評価する。
 最新CIの操作欄37→81pxは通知前後の比較状態を調査し、テストを入力待ち境界へ修正した。
-修正後CI・公開結果は同記録へ追記し、Issue #55はCloseしない。
+修正SHA `95987876a8f16aeddc4e734d3c69b75fe4bec4fe`のDeploy [#42952119677](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42952119677)は全ゲート・Chromium45本／WebKit35本・Pages公開success。
+17受入条件はすべて達成、完了・Close可能と判断する。依頼どおりIssue #55はCloseしない。
+カンの位置・ツールバー操作とPWA複数タブは実機未確認のまま記録し、実機OKとはしない。
 Issue #32のPC実機や#52の方向別実機・focusの残課題とは区別する。

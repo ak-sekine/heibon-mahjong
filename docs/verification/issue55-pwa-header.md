@@ -177,7 +177,7 @@ Safariとホーム画面PWAの個別実施状況も報告から特定できず�
 
 ### Issue #55受入条件17件の個別照合
 
-以下は既存証拠に基づく評価。今回の修正後CI完了までは最終判定を保留する。
+以下は既存証拠と修正後run #42952119677の成功を照合した最終評価。
 コードは`src/ui/action-panel.ts`、`candidate-selection.ts`、
 `src/rendering/local-action-panel-state.ts`、`src/online/action-panel-state.ts`、
 `src/style.css`、`src/pwa/register.ts`を照合した。仕様変更はなくSPEC変更は不要。
@@ -190,17 +190,17 @@ Safariとホーム画面PWAの個別実施状況も報告から特定できず�
 | K4 | 卓寸法・座標不変、意図しないscroll・タップ阻害なし | 達成 | 実controller両modeの卓矩形・scroll・hit testと予約高assert。実機の位置・復元までOKとはしない。 |
 | K5 | 多数候補は内部scroll、戻る操作を維持 | 達成 | 100候補でoverflow、内部scroll、戻るhit test。実機内部scrollは未確認。 |
 | K6 | 通常パネルを恒常的に高くせず、候補中だけ重ねる | 達成 | 表示前の実高さをcandidate-activeで予約、戻るで解除・復元する自動検査。 |
-| K7 | 合法性・成立後進行・鳴き・ロン等・同期の回帰なし | 一部達成 | 既存単体・両engine・オンライン成功。今回の全回帰結果は待機中。 |
-| K8 | 両engine、320／375／390／430と短viewportの実測 | 一部達成 | 既存11 viewport＋375×547検証あり。要求例375×560／635をmatrixに追加し、今回CI待機中。 |
+| K7 | 合法性・成立後進行・鳴き・ロン等・同期の回帰なし | 達成 | 単体・両engine全回帰・本番オンライン7シナリオが今回も成功。 |
+| K8 | 両engine、320／375／390／430と短viewportの実測 | 達成 | 既存11 viewport＋375×547検証、追加375×560／635を含む13 viewportの両engine matrixが今回成功。 |
 | K9 | Pages／itchビルド経路と実機チェック提示、結果の区別 | 達成 | 既存run #42725848081／#42925490208成功、チェックと本人報告を別記。今回ビルドもローカル成功。 |
 | K10 | 仕様・測定・検証・残課題の記録 | 達成 | SPEC、既存座標CSV、本記録と後続Actions結果。 |
 | P1 | header44px、卓・操作欄Y不変 | 達成 | 初回両engineの5 viewport実測、本人No.1〜3 OK。今回も矩形全体assertを維持。 |
 | P2 | 4幅で非重複・操作・横overflowなし | 達成 | 初回両engineの寸法・click・menu検査。本人No.4 OKは幅不明。 |
 | P3 | 承認・キャンセル・複数タブ・再読込 | 達成 | 実SWと2 clientの自動検証。本人No.5〜6 OK、複数タブ実機は未確認。 |
-| P4 | 両engineのPWA／Browser UI回帰 | 一部達成 | 初回成功、最新旧CI失敗。今回修正後CI待機中。 |
-| P5 | npm test・build・必要なPWA検証 | 一部達成 | ローカルtest 86ファイル・build成功。修正後PWAのCI待機中。 |
+| P4 | 両engineのPWA／Browser UI回帰 | 達成 | 旧失敗の原因を通知なしの手番遷移で再現。修正後両engine全回帰成功。 |
+| P5 | npm test・build・必要なPWA検証 | 達成 | ローカルtest 86ファイル・build、今回CI verify／両engine PWA成功。 |
 | P6 | iPhoneチェック項目を用意、自動と区別して記録 | 達成 | 本人6 OK／0 NG／1未確認を別記。実機7項目全成功という条件ではない。 |
-| P7 | 変更・CI・実機未確認・SHA報告、PRなし | 一部達成 | 本記録を更新。今回pushとActions結果、Issueコメントは後続記録で確定する。 |
+| P7 | 変更・CI・実機未確認・SHA報告、PRなし | 達成 | PRなしでmainへ直接push。対象SHAの全Actions成功と実機未確認を本記録・Issueコメント・完了報告で明記する。 |
 
 K3〜K6の位置・内部scrollは受入条件に実機指定がなく、実controllerの矩形・hit testを
 根拠に判定する。実機成功へ置き換えない。K9／P6はチェック提示と区別した記録を求めており、
@@ -211,7 +211,9 @@ Issue #32の必須PC実機・主要画面全体・Safari可変ツールバー、
 キーボードfocusは、それぞれのIssueの残課題であり、#55へ一括転記しない。
 #55の追加実機確認としては候補の展開方向・内部scroll・ツールバー変化後の操作、
 PWA複数タブブロックを推奨し、未確認を保持する。
-**現時点の暫定判定は一部完了・Open維持。修正後CIを確認して最終判定を追記する。**
+**最終判定：17条件すべて達成、完了・Close可能。ただし依頼どおりIssue #55はCloseしない。**
+実機未確認の項目を達成扱いにしたのではなく、各受入条件が要求する自動検証・チェック提示・
+区別した報告を満たした判定である。#55の文面上で未確認の必須条件は残らない。
 
 ### ローカル検証
 
@@ -220,3 +222,106 @@ PWA複数タブブロックを推奨し、未確認を保持する。
 Python構文検査、Browser UI選択テスト9件、`git diff --check`成功。
 CloudではAGENTS.mdの既知ブラウザー制限に従い、既存Actionsで両engine・itch smoke・
 オンライン・matrix audit・Deploy gateとPages／itch公開ビルドを実行する。
+
+
+### 修正後CIでの原因確定（WebKit）
+
+[run #42952119677](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42952119677)、
+対象SHA `95987876a8f16aeddc4e734d3c69b75fe4bec4fe`のWebKit job
+`130299113349`は35スクリプト成功。PWAは5.430秒で成功した。
+追加した開始状態ログで、**更新通知が存在しないまま**次の遷移を実測した。
+
+| 320×568の状態 | 状態文 | 操作可能な手牌 | 可視ボタン | 残り山 | 操作欄高さ |
+| --- | --- | ---: | --- | ---: | ---: |
+| 卓visible直後 | CPU2の手番です。 | 0 | なし | 69 | 37px |
+| 人間の入力待ち | あなたの手番：牌を選択して「打牌する」で確定 | 14 | 打牌する（未選択なのでdisabled） | 68 | 81px |
+
+両時点のheader高44px、卓(10,108,300,300)、操作欄(x=4,y=412,width=312)、
+scroll(0,0)は同一。通知は両方ともnull。
+したがって37→81pxは通知のレイアウト変化ではなく、**CPU手番と人間手番を比較した
+テスト不具合**と確定する。フォント待機後の採寸でも通知なしでこの差が再現した。
+入力待ち後の通知なし→あり→キャンセル→複数タブブロックは81→81→81→81pxで、
+状態文・enabled手牌14枚・山68枚・ボタン状態も同一だった。
+
+成功／失敗runのWebKit環境もUbuntu image `20261101.186.1`、Python 3.12.16、
+Playwright 1.65.0、revision 2388で一致した。今回WebKitも同条件である。
+ビルド時は`vite.config.ts`がSHA／時刻を埋め込むため生成物のbuild IDとSWキャッシュ名は
+実行ごとに変わるが、これは既存の更新識別で、手番別のボタン表示条件やCSSの変更ではない。
+旧失敗ログに座席・phaseがない制約は残すが、同じ寸法差を通知なしの手番遷移で観測できた。
+
+
+### 両engineの修正後測定と短画面カン検証
+
+同SHAのChromium job `130299113435`も45スクリプトすべて成功。
+PWA 6.662秒、WebKit 5.430秒で成功した（基準値にする性能測定ではない）。
+Chromiumも通知なしでCPU3手番（手牌enabled 0・山69・可視ボタンなし）37pxから、
+人間の打牌待ち（enabled 14・山67・打牌ボタンあり）81pxへ遷移した。
+両engineで通知とは独立した同じ寸法差を観測し、状態待機後は以下の全矩形が不変だった。
+
+| Viewport | 卓 x,y,幅,高さ | 操作欄 x,y,幅 | 高さ：なし／あり／キャンセル／ブロック |
+| --- | --- | --- | --- |
+| 320×568 | 10,108,300,300 | 4,412,312 | 81／81／81／81 |
+| 375×560 | 41.5,108,292,292 | 4,404,367 | 82／82／82／82 |
+| 375×635 | 0,108,375,375 | 4,487,367 | 82／82／82／82 |
+| 390×844 | 0,116,390,390 | 4,514,382 | 111／111／111／111 |
+| 430×844 | 0,116,430,430 | 4,554,422 | 111／111／111／111 |
+
+全状態のheader高44px、scroll(0,0)、横overflowなし、タイトル・ボタン非重複、
+更新／メニューの44px以上の領域と操作が成功。状態文・手牌enabled数・山・表示ボタンも
+各engine内で不変（独立した対局なのでengine間の山枚数自体を同一にはしない）。
+承認・キャンセル・複数タブブロック・再読み込み・旧cache削除・失敗install復旧も成功。
+測定JSONは同runの各engine artifactとジョブログに保存されている。
+
+カンの現行matrixは各engineで13 viewport × 2 mode × 7局面 = **182ケース**成功。
+WebKit artifact [13826182368](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42952119677/artifacts/13826182368)
+を今回ダウンロードし、`candidate-geometry-current-webkit.json`の`result=passed`と182件を確認した。
+候補表示の104ケースでは、元root下端対候補下端の最大差0px、卓x/y/幅/高さの最大差0px、
+scrollY最大差0px。多数候補・戻る・hit test・予約高・visualViewport変更／復元もassert成功。
+
+以下はWebKit現行artifactの複数暗カン（`opening`）の実測。暗カン＋加カン混在も同じ値。
+Chromiumは13 viewportの完走ログと成功exitを確認し、37MBのartifact全体は未取得。
+
+| Viewport | mode | 元操作欄 y／高さ／下端 | 候補 y／高さ／下端 | 卓 x,y,幅,高さ | scroll前後 |
+| --- | --- | --- | --- | --- | --- |
+| 375×560 | local | 404／82／486 | 360／126／486 | 41.5,108,292,292 | 0→0 |
+| 375×560 | online | 412／82／494 | 368／126／494 | 41.5,112,292,292 | 0→0 |
+| 375×635 | local | 487／82／569 | 443／126／569 | 0,108,375,375 | 0→0 |
+| 375×635 | online | 495／82／577 | 451／126／577 | 0,112,375,375 | 0→0 |
+
+両短画面の候補58px高・戻る44px高、画面内・hit test・enabledすべて成功。
+これは自動WebKitのCSS pxで、iPhone実機の採寸ではない。
+
+
+### 最終Actions・公開結果
+
+修正コミット **`95987876a8f16aeddc4e734d3c69b75fe4bec4fe`**、
+[Deploy run #42952119677](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42952119677)、
+attempt 1、main、**completed / success**。失敗・再実行なし。
+
+| 検証 | 結果 |
+| --- | --- |
+| npm test／Worker型チェック | ローカル・CI verifyともsuccess |
+| Pagesビルド／mock URL指定itchビルド | ローカル・CI verifyともsuccess |
+| Chromium PWA／Browser UI | success、45スクリプト（baseline観測を含む） |
+| WebKit PWA／Browser UI | success、35スクリプト（baseline観測を含む） |
+| PWAレイアウト・更新・キャンセル・複数タブ・再読み込み | 両engine、5 viewportでsuccess |
+| カン・鳴き・混在候補座標matrix | 両engine、13 viewport×2 mode×7局面、各182ケースsuccess |
+| itch standalone smoke | 両engine、前後各3回success。制御失敗の画像／trace／JSON採取検査もsuccess |
+| Browser UI matrix audit／release freshness（Deploy gate） | success |
+| 既存のゲーム操作・オンライン・再接続回帰 | 両engineと本番オンライン7シナリオsuccess |
+| Worker deploy | success |
+| Pages公開用build／本番Worker URL指定itch ZIP | success、itch ZIPは3ファイル。artifact `13826905154` |
+| Pages deploy | success |
+
+mainへの直接pushと直後の`git ls-remote origin refs/heads/main`の一致を確認した。
+Worker deployment `7701081714`、GitHub Pages `7701098632`、production Pages追跡
+`7701102907`はいずれも対象修正SHA。公開先は https://ak-sekine.github.io/heibon-mahjong/ 。
+itchは既存の相対パス・PWA登録スキップを維持し、ビルドと独立起動・打牌・オンライン導線を
+回帰検証した。itch.ioサイトへのZIPアップロードを実施したという記録ではない。
+ブラウザー・公開成功を実機確認に読み替えない。
+
+変更ファイルは`tests/browser-pwa.py`、`tests/browser-candidate-geometry.py`、本記録、
+`docs/verification/README.md`、`docs/ROADMAP.md`の5個のみ。
+製品コード・CSS・ゲームロジック・Worker・workflow・SPECの変更なし。
+最終結果の追記はMarkdownのみの記録コミットとしてmainへ直接反映する。
+記録コミットSHAと文書チェック結果、Issue #55への反映URLはIssueコメントと完了報告で示す。
