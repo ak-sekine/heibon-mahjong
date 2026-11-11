@@ -15,7 +15,7 @@ from playwright.sync_api import sync_playwright
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 BASE_URL = os.environ.get('HEIBON_BASE_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 BASELINE_SHA = '274348dc941285401ac198c88072073078a5a1d0'
-VIEWPORTS = [(320, 568), (375, 634), (390, 844), (430, 932), (768, 1024),
+VIEWPORTS = [(320, 568), (375, 560), (375, 635), (375, 634), (390, 844), (430, 932), (768, 1024),
              (1024, 768), (1280, 720), (1366, 768), (1440, 900), (1660, 825), (1920, 1080)]
 SCENARIOS = [('pon-multiple', 'call-pon', 2), ('chi', 'call-chi', 5),
              ('daiminkan', 'call-kan', 0), ('ankan', 'kan-toggle', 0),

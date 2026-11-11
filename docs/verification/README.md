@@ -1,5 +1,7 @@
 # 検証記録の目次
 
+- [Issue #55 最終調査・本人実機報告（2026-11-11）](issue55-pwa-header.md#2026-11-11-最終調査本人実機報告) — PWA本人6 OK／0 NG／1未確認。CI比較状態を修正し、カン10件＋PWA7件を個別照合。修正後Actionsの最終結果は同記録へ追記。
+
 - [和了後の手牌順 — Issue #53、2026-11-10](issue53-winning-hand-order-2026-11-10.md) — 受入条件7件達成、completedでClose可能。本人報告はPages版iPhone Safari 7項目・itch.io版6項目すべてOK。Chromium45本・WebKit35本を2回成功、Pages build/deploy・itch ZIP生成成功。公開itch ZIPの厳密なSHA一致・アップロード日時は未確認。過去の失敗と解消、最終判断を記録。
 
 このディレクトリには過去の自動テスト、ビルド、Chromiumブラウザー確認などのログを保存しています。**iPhone Safari実機の確認結果は、確認者と報告範囲が分かる専用記録に分けます。** 各ログの数値や未完了事項は実施当時の結果です。

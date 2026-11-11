@@ -82,8 +82,37 @@ def write_worker_version(path, source):
 VIEWPORTS = [(320, 568), (375, 560), (375, 635), (390, 844), (430, 844)]
 
 
+def wait_for_human_discard(page):
+    """A visible table can still be running the randomly seated CPU dealer.
+
+    Stop at a human input boundary, without selecting a tile or changing the
+    game during the notification comparisons. Pass intervening call/ron offers.
+    """
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        page.wait_for_function("""() => {
+          const visible = node => node && node.getClientRects().length > 0;
+          return document.querySelector('#player-hand button:enabled') ||
+            ['#pass-calls', '#pass-ron'].some(selector => {
+              const button = document.querySelector(selector);
+              return visible(button) && !button.disabled;
+            });
+        }""", timeout=max(1, int((deadline - time.monotonic()) * 1000)))
+        if page.locator('#player-hand button:enabled').count():
+            page.locator('#discard').wait_for(state='visible')
+            return
+        for selector in ('#pass-calls', '#pass-ron'):
+            button = page.locator(selector)
+            if button.is_visible() and button.is_enabled():
+                button.click()
+                break
+    raise AssertionError('CPU startup did not reach a human discard boundary')
+
+
 def geometry(page):
-    return page.evaluate("""() => {
+    return page.evaluate("""async () => {
+      await document.fonts.ready;
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const rect = selector => {
         const r = document.querySelector(selector)?.getBoundingClientRect();
         return r ? {x:r.x, y:r.y, width:r.width, height:r.height} : null;
@@ -91,11 +120,21 @@ def geometry(page):
       return {header:rect('.app-header'), title:rect('.app-header h1'),
         table:rect('#local-table'), controls:rect('#local-game-controls'),
         update:rect('#pwa-update-notice button'), menu:rect('#main-menu-toggle'),
-        scroll:[scrollX,scrollY], overflow:document.documentElement.scrollWidth > innerWidth};
+        scroll:[scrollX,scrollY], overflow:document.documentElement.scrollWidth > innerWidth,
+        gameState: {
+          status:document.querySelector('#local-game-controls [data-panel-part="action-status"]').textContent,
+          enabledHand:document.querySelectorAll('#player-hand button:enabled').length,
+          wall:document.querySelector('#wall-count').textContent,
+          buttons:Array.from(document.querySelectorAll('#local-game-controls button'))
+            .filter(button => button.getClientRects().length > 0)
+            .map(button => ({part:button.dataset.panelPart, text:button.textContent, disabled:button.disabled}))
+        }};
     }""")
 
 
 def assert_layout(before, after):
+    assert before['gameState'] == after['gameState'], ('different game states', before, after)
+    assert before['gameState']['enabledHand'] > 0, before
     assert before['header']['height'] == after['header']['height'] == 44, (before, after)
     for key in ('table', 'controls', 'scroll'):
         assert before[key] == after[key], (key, before, after)
@@ -168,11 +207,16 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         context.set_offline(False)
         page.reload(wait_until='networkidle')
         page.locator('#app-idle').wait_for(state='visible')
+        page.set_viewport_size({'width': 320, 'height': 568})
         page.locator('#main-menu-toggle').click()
         page.locator('#new-game').click()
         page.locator('#confirm-new-game').click()
         page.locator('#local-table').wait_for(state='visible')
 
+        startup = geometry(page)
+        wait_for_human_discard(page)
+        print('PWA startup before/after human input boundary: ' + json.dumps({
+            'initial': startup, 'ready': geometry(page)}), flush=True)
         baseline = {}
         for width, height in VIEWPORTS:
             page.set_viewport_size({'width': width, 'height': height})
