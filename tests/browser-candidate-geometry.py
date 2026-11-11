@@ -24,6 +24,7 @@ SCENARIOS = [('pon-multiple', 'call-pon', 2), ('chi', 'call-chi', 5),
 ROOT = Path.cwd()
 sys.path.insert(0, str(ROOT / 'tests'))
 from browser_main_fixtures import fixed_seat_fixture
+from browser_focus_assertions import tab_candidates
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--baseline', action='store_true', default=os.environ.get('HEIBON_CANDIDATE_BASELINE') == '1')
 args = parser.parse_args()
@@ -261,6 +262,13 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     if not after['panel']:
         return
     root_selector = '#online-game-controls' if online else '#local-game-controls'
+
+    if not args.baseline and (width, height) in ((320, 568), (390, 844), (1280, 720)):
+        tab_candidates(page, root_selector)
+        check(record, page.evaluate('online=>issue32Geometry.fingerprint(online)', online) == fingerprint,
+              'keyboard focus changed game state')
+        check(record, not page.evaluate('issue32Geometry.sent'), 'keyboard focus sent an action')
+        record['keyboardFocus'] = 'all candidates and Back: Tab order, name, focus-visible, clipping, no action'
 
     # Add visual rows without inventing selectable game actions. Real options
     # remain unchanged and confirmation below always clicks an actual button.

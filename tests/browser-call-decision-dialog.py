@@ -4,6 +4,7 @@ import shutil
 
 from playwright.sync_api import sync_playwright
 from browser_main_fixtures import fixed_seat_fixture
+from browser_focus_assertions import assert_button_focus, tab_candidates
 
 browser_name = os.environ.get('HEIBON_BROWSER', 'chromium')
 with sync_playwright() as p:
@@ -307,6 +308,51 @@ window.loadTurn=()=>{
         assert abs(normal_after['controls']['y'] - normal_action_position['controls']['y']) < 1, (normal_action_position, normal_after)
 
         print(f'{browser_name} call UI at {width}x{height}: {grid["columns"]} candidate columns')
+
+    # Issue #52: native keyboard activation, actual Tab order and visual focus.
+    for width, height in [(320, 568), (390, 844), (1280, 720)]:
+        page.set_viewport_size({'width': width, 'height': height})
+        for key in ('Enter', 'Space'):
+            page.evaluate('window.scrollTo(0,0);loadCalls("max")')
+            fingerprint = page.evaluate('JSON.stringify(callState())')
+            types = page.locator('#call-controls button:visible:enabled')
+            # Start immediately before the type row, then use real Tab navigation.
+            types.first.focus()
+            page.keyboard.press('Shift+Tab')
+            for index in range(types.count()):
+                page.keyboard.press('Tab')
+                assert_button_focus(page, types.nth(index))
+            assert page.evaluate('JSON.stringify(callState())') == fingerprint, 'Tab committed a call'
+            # Navigate backwards from Pass to Chi without clicking or changing state.
+            for _ in range(types.count()):
+                if page.locator('#call-chi').evaluate('node=>node===document.activeElement'):
+                    break
+                page.keyboard.press('Shift+Tab')
+            assert_button_focus(page, page.locator('#call-chi'))
+            page.keyboard.press(key)
+            tab_candidates(page, '#local-game-controls')
+            assert page.evaluate('JSON.stringify(callState())') == fingerprint, 'candidate focus committed a call'
+            page.keyboard.press(key)  # Back
+            assert page.locator('#call-chi').evaluate('node=>node===document.activeElement')
+            assert page.locator('#pass-calls').is_visible()
+            assert page.evaluate('JSON.stringify(callState())') == fingerprint, 'Back committed a call'
+            page.keyboard.press(key)
+            tab_candidates(page, '#local-game-controls')
+            page.keyboard.press('Shift+Tab')  # last candidate
+            page.keyboard.press(key)
+            page.wait_for_function("callState().phase!=='awaiting-call'")
+            for mode, selector in [('one', '#call-chi'), ('pon-one', '#call-pon')]:
+                page.evaluate(f'loadCalls("{mode}")')
+                button = page.locator(selector)
+                button.focus()
+                page.keyboard.press('Tab')
+                page.keyboard.press('Shift+Tab')
+                assert_button_focus(page, button)
+                assert page.evaluate('callState().phase') == 'awaiting-call'
+                page.keyboard.press(key)
+                page.wait_for_function("callState().phase!=='awaiting-call'")
+                assert page.locator('#candidate-options button').count() == 0
+        print(f'{browser_name} keyboard call focus {width}x{height}: Enter/Space, Tab order, Back, single/multiple OK')
 
     # Very low PC viewports may need page scrolling to reach the anchored
     # action area. The normal desktop matrix above must remain scroll-free.
