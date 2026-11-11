@@ -166,6 +166,7 @@ export class ActionPanel {
   private candidateClickTrace: ActionPanelTrace | null = null;
   private candidateAnchorDocumentBottom: number | null = null;
   private candidateAnchorViewport: string | null = null;
+  private candidateAnchorLayoutViewport: string | null = null;
   private state: ActionPanelState | null = null;
   private callType: 'pon' | 'daiminkan' | 'chi' | null = null;
   private activeCallOptions: readonly ActionChoiceOption[] = [];
@@ -569,6 +570,7 @@ export class ActionPanel {
     const bounds = this.root.getBoundingClientRect();
     this.candidateAnchorDocumentBottom = bounds.bottom + (typeof window === 'undefined' ? 0 : window.scrollY);
     this.candidateAnchorViewport = this.viewportSignature();
+    this.candidateAnchorLayoutViewport = typeof window === 'undefined' ? null : `${window.innerWidth}:${window.innerHeight}`;
     // Retain the measured border box exactly, including the operation area
     // occupied by call types. Hiding ordinary controls must not shrink the flow.
     this.root.style.setProperty('--candidate-anchor-height', `${bounds.height}px`);
@@ -578,6 +580,14 @@ export class ActionPanel {
   private repositionCandidatePanel(): void {
     const panel = this.part('candidate-controls');
     if (panel.hidden || this.candidateAnchorDocumentBottom === null || typeof window === 'undefined') return;
+    const bounds = this.root.getBoundingClientRect();
+    const layoutViewport = `${window.innerWidth}:${window.innerHeight}`;
+    if (layoutViewport !== this.candidateAnchorLayoutViewport) {
+      this.candidateAnchorDocumentBottom = bounds.bottom + window.scrollY;
+      this.candidateAnchorLayoutViewport = layoutViewport;
+    }
+    panel.style.setProperty('--candidate-panel-left', `${bounds.left}px`);
+    panel.style.setProperty('--candidate-panel-width', `${bounds.width}px`);
     const visual = window.visualViewport;
     const visualTop = visual?.offsetTop ?? 0;
     const visualBottom = Math.min(window.innerHeight, visualTop + (visual?.height ?? window.innerHeight));
@@ -599,10 +609,13 @@ export class ActionPanel {
   private clearCandidateAnchor(): void {
     const panel = this.part('candidate-controls');
     delete panel.dataset.mode;
+    panel.style.removeProperty('--candidate-panel-left');
+    panel.style.removeProperty('--candidate-panel-width');
     panel.style.removeProperty('--candidate-panel-bottom');
     panel.style.removeProperty('--candidate-panel-available-height');
     this.candidateAnchorDocumentBottom = null;
     this.candidateAnchorViewport = null;
+    this.candidateAnchorLayoutViewport = null;
     this.root.classList.remove('candidate-active');
     this.root.style.removeProperty('--candidate-anchor-height');
   }

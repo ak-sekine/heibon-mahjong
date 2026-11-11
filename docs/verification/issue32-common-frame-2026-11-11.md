@@ -1,0 +1,38 @@
+# Issue #32 操作パネル共通外枠（2026-11-11）
+
+## 本人のPC実機報告
+
+**NG**：チーの種類選択から複数候補選択に切り替えると候補パネルの幅が元の操作パネルと異なり、背後に通常操作パネルの枠が見える。異なるサイズのパネルが二重に表示されるように見える（今回のユーザー報告）。
+
+修正後のPC実機・iPhone Safari実機確認は**未確認**。過去のOK結果で今回のNGを相殺しない。Issue #32は**Open**を維持する。
+
+## 開始時の状態
+
+- 対象：`ak-sekine/heibon-mahjong`、`/workspace/heibon-mahjong`、ブランチ`work`。
+- 作業ツリーはclean、未pushコミットなし。fetch成功。
+- 開始HEAD：`044824516446882d819bcdfae7b8c815b8345fa2`。
+- fetch後origin/main：`5c93ece9fb726197a0ebe780b356031a82c97a33`、behind/ahead `3/0`。fast-forwardして同SHAを基準に実装。
+
+## 原因と修正
+
+通常操作領域は卓幅に従うが、候補は独立した620px上限とPC専用幅で中央固定されていた。候補中も高さ予約された通常操作領域の背景・枠線が描画され、候補より広い部分や下端に別の枠が見えた。鳴き種類領域も独自の背景・枠線を持っていた。
+
+- `src/style.css`：操作領域と候補領域の共通`::before`で外枠・背景を描画。予約領域の疑似要素は候補中`display:none`。種類選択の独自装飾と候補の固定幅・PC専用幅を撤去。レイアウト用border boxは保持。
+- `src/ui/action-panel.ts`：実操作領域の実測left／widthで候補を配置。ウィンドウ変更では基準下端も再測定し、visualViewportだけの変化は従来の保存下端と最小補正を維持。
+- 既存共通テンプレート、`candidate-selection.ts`、`call-viewport.ts`を調査し、変更不要と判断。オンライン／オフライン／call-test／kan-testは同じActionPanelとCSSを使用。
+- 通常操作は既存のhidden状態で操作対象から除外。候補の高さ予約、上方向展開、内部スクロール、戻る、単一候補即時実行、合法判定・通信仕様は維持。
+
+## 検証
+
+- `npm test`：1,518件成功。
+- `npm run build`、`npm run typecheck:worker`：成功。
+- `npm run build:itch`：最初は必須VITE_ONLINE_API_URL未指定により停止。本番Worker URLを指定した再実行は成功（ZIP 3ファイル）。
+- `tests/browser-candidate-geometry.py`：既存の厳密な高さ・下端・卓矩形・scrollY条件を維持。左右端／幅差1px以内、共通装飾一致、予約領域の外枠非描画、ウィンドウresize復帰を追加。13 viewport（指定11サイズと既存375×560／375×635）、local／online、7局面で測定。全局面の表示前後スクリーンショットをartifactへ保存する。
+- `getBoundingClientRect()`、`getComputedStyle()`、`elementFromPoint()`で矩形・装飾・ボタン到達性を検査。既存Tab・内部スクロール・Safari相当可視領域変更検査を維持。
+- ローカルChromiumの既知の起動制限はAGENTS.mdに従い繰り返さず、既存Actionsの両engineとDeploy gateで確認する。結果は対象実装SHAのrun完了後に追記する。
+
+## 実機再確認事項
+
+PC：通常操作→鳴き種類→チー複数候補→戻る、暗カン／加カン複数候補、ウィンドウサイズ変更時に左右・幅・下端が揃い、背後の別枠が見えないこと。
+
+iPhone Safari：ツールバー表示・収納後の候補／戻る操作、低い可視領域での内部スクロール、確定後の通常操作復元。オフライン／オンライン／call-test.html／kan-test.htmlを確認する。修正後はいずれも未確認。

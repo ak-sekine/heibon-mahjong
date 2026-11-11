@@ -122,6 +122,9 @@ def snapshot(page, online):
         scrollY,visual:{height:visualViewport.height,offsetTop:visualViewport.offsetTop},
         layoutViewport:{width:innerWidth,height:innerHeight},
         rootMinHeight:getComputedStyle(root).minHeight,
+        rootFrame:getComputedStyle(root,'::before').display,
+        frame: Object.fromEntries(['backgroundColor','borderTopColor','borderTopWidth','borderRadius'].map(key=>
+          [key,getComputedStyle(panel.hidden?root:panel,'::before')[key]])),
       };
     }''', online)
 
@@ -165,6 +168,11 @@ def verify_open(record, before, after):
     record['visibleCallBottomDelta'] = (after['panel']['bottom'] - before['callRect']['bottom']
                                         if before['callRect'] else None)
     check(record, abs(delta) <= 2, f'candidate bottom moved from original root bottom by {delta}px')
+    for key in ('left', 'right', 'width'):
+        check(record, abs(before['root'][key] - after['panel'][key]) <= 1,
+              f'candidate {key} differs from common operation frame')
+    check(record, after['rootFrame'] == 'none', 'reserved area still paints a frame')
+    check(record, before['frame'] == after['frame'], 'candidate frame decoration differs')
     same_rect(record, before['root'], after['root'], 'reserved operation area')
     same_rect(record, before['table'], after['table'], 'table')
     check(record, after['scrollY'] == before['scrollY'], 'opening candidates changed scrollY')
@@ -185,6 +193,7 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     page.evaluate('({scenario,online})=>issue32Geometry.load(scenario,online)', {'scenario': scenario, 'online': online})
     settle(page)
     record['before'] = before = snapshot(page, online)
+    page.screenshot(path=str(OUT / f'{ENGINE}-{width}x{height}-{record["mode"]}-{scenario}-before.png'))
     check(record, before['scrollY'] == 0, 'normal-size scenario started after page scrolling')
     if before['callRect']:
         check(record, before['callRect']['top'] >= before['root']['top'] and
@@ -203,6 +212,7 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
         expected_count = 1
     click_part(page, online, trigger, record)
     record['open'] = after = snapshot(page, online)
+    page.screenshot(path=str(OUT / f'{ENGINE}-{width}x{height}-{record["mode"]}-{scenario}-open.png'))
     save()
     if expected_count == 0:
         check(record, not after['panel'] and not after['candidates'], 'single candidate must execute without a candidate screen')
@@ -269,6 +279,21 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
               'keyboard focus changed game state')
         check(record, not page.evaluate('issue32Geometry.sent'), 'keyboard focus sent an action')
         record['keyboardFocus'] = 'all candidates and Back: Tab order, name, focus-visible, clipping, no action'
+
+    # Resize the layout viewport, then recover the original table and baseline.
+    page.set_viewport_size({'width': width + 24, 'height': height})
+    settle(page)
+    resized = snapshot(page, online)
+    record['windowResized'] = resized
+    for key in ('left', 'right', 'width'):
+        check(record, abs(resized['root'][key] - resized['panel'][key]) <= 1,
+              f'window resize lost common {key}')
+    page.set_viewport_size({'width': width, 'height': height})
+    settle(page)
+    recovered = snapshot(page, online)
+    check(record, abs(recovered['panel']['bottom'] - before['root']['bottom']) <= 2,
+          'window resize restoration lost bottom anchor')
+    same_rect(record, before['table'], recovered['table'], 'table after resize restoration')
 
     # Add visual rows without inventing selectable game actions. Real options
     # remain unchanged and confirmation below always clicks an actual button.
