@@ -302,6 +302,9 @@ window.loadTurn=()=>{
                 page.mouse.click(last_box['x'] + last_box['width'] / 2, last_box['y'] + last_box['height'] / 2)
                 page.wait_for_function("callState().phase!=='awaiting-call'")
 
+        # Undo the 1280px overflow fixture before the next viewport. A wider
+        # common frame may wrap differently; the forced 55px cap is test-only.
+        page.locator('#candidate-options').evaluate("node=>{node.style.removeProperty('max-height');node.scrollTop=0}")
         page.evaluate('loadTurn()')
         page.wait_for_function("document.querySelector('#ron-controls').hidden === false")
         normal_after = page.evaluate("()=>({table:document.querySelector('#local-table').getBoundingClientRect().toJSON(),controls:document.querySelector('#local-game-controls').getBoundingClientRect().toJSON()})")

@@ -54,3 +54,7 @@ Issue #52の検出器修正を含むmain `9294d21`の[run #43009718350](https://
 候補1行＋戻るを保証するSafari相当可視領域の最小高さ計算にも、実測の一覧padding上下を含める。Browser UIの最小高さ算定も同じ実要素寸法に合わせ、期待位置の許容差・scrollY条件は維持する。
 
 全スクリーンショットは従来のBrowser UI artifactへ保存し、目視確認用に矩形JSONと代表3サイズの前後画像を`candidate-frame-<engine>-<SHA>-<attempt>` artifactへ分けて保存する。既存CI gateとテスト実行内容は変更しない。
+
+## overflow fixtureの後始末
+
+`a0fbd6e`のrun #43010475450は両engineとも1280×720までの鳴き表示を通過し、次の1366×768で候補到達性検査に失敗した。調査すると、1280×720の内部スクロール試験が一覧へ設定するテスト専用`style.maxHeight=55px`を候補確定後に解除していなかった。従来の独立620px幅ではPCで1行に収まり潜在化していたが、実操作幅で折り返す状態では次viewportの通常候補まで55pxへ制限された。スクロール試験のassertionをすべて維持して、その試験後に注入したmax-heightとscrollTopだけを復元する。製品CSSへ幅補正や55px対策は追加しない。
