@@ -42,5 +42,7 @@ iPhone Safari：ツールバー表示・収納後の候補／戻る操作、低�
 実装SHA `c4cc7e51b985e326d0066bfcd8e0d9344988101b`、[run #43009007946](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43009007946) attempt 1：verify成功、公開はゲートで停止。
 
 - WebKit：itch前段smokeの1・2回目成功、3回目はCPU初手の九種九牌判定／解決後に`wall-exhausted`へ遷移し、人間の打牌状態待ちがtimeout（残り山69、局east1、humanSeat 3）。UI suiteには未到達。同jobだけを再実行依頼した。ゲームルール・CPU・smokeの条件は変更しない。
-- Chromium：11 viewportの鳴き表示検査を通過後、種類ボタンのキーボードfocus検査で`covered:true`。候補geometryには未到達。種類領域のborder boxを従来どおり1px保持し、外枠の描画だけを共通側へ移すよう修正した。focus検査の条件は変えず、失敗時のhit要素・矩形・角丸の診断情報を追加。
+- Chromium：11 viewportの鳴き表示検査を通過後、種類ボタンのキーボードfocus検査で`covered:true`。候補geometryには未到達。別作業のIssue #52修正`9294d21`で、角丸外側の点を検査していたことが原因と特定された。種類領域のborder boxを従来どおり1px保持し、外枠の描画だけを共通側へ移す変更も追加した。focus検出修正とその最小再現・smoke終了局面対応はmainから取り込む。候補位置・高さ・scrollY条件は緩和しない。
 - ローカルWebKit導入も試行したが、公式配布ホスト`cdn.playwright.dev`／`playwright.download.prss.microsoft.com`が環境のDomain forbiddenで拒否された。Actionsで検証を継続する。
+
+- 追加コミット`4d028f8f6f171bd8fa2f78a2cf8ce91ca15d0233`のpush前fetchで、別作業の`9294d21bb611d7d26a80b1b730323b6b60d1be3c`を検出。behind/ahead `1/1`、通常pushはnon-fast-forward拒否、force pushなし。差分は上記Issue #52のfocus／smokeテスト修正で製品ソースに競合なし。内容を確認してmergeし、helper競合はmainの診断・最小再現をそのまま保持して解決する。元のコミット履歴は維持。

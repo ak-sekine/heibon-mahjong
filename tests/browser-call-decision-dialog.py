@@ -4,7 +4,7 @@ import shutil
 
 from playwright.sync_api import sync_playwright
 from browser_main_fixtures import fixed_seat_fixture
-from browser_focus_assertions import assert_button_focus, tab_candidates
+from browser_focus_assertions import assert_button_focus, tab_candidates, check_focus_detector
 
 browser_name = os.environ.get('HEIBON_BROWSER', 'chromium')
 with sync_playwright() as p:
@@ -13,6 +13,7 @@ with sync_playwright() as p:
     if browser_name == 'chromium':
         launch['executable_path'] = os.environ.get('HEIBON_CHROMIUM') or shutil.which('chromium')
     browser = browser_type.launch(**launch)
+    check_focus_detector(browser)
     page = browser.new_page(viewport={'width': 375, 'height': 634}, has_touch=True, is_mobile=browser_name != 'webkit')
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))

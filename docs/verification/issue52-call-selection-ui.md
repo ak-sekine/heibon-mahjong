@@ -298,3 +298,32 @@ Chromiumの既知起動制限はAGENTS.mdに従い再試行していない。Web
 ### 現時点のClose判定
 
 本人縦画面確認は完了した。一方、追加アクセシビリティ検査のChromium／WebKit成功、前回失敗の原因特定・解消、対象SHAでの関連回帰とmatrix audit成功は未確認。**Issue #52はOpenを維持する。** 自動検証の受入チェックは付けない。UI・CSS・テスト実装は変更していない。
+
+
+## CI失敗原因の再調査 — 2026-11-11
+
+### 取得経路とForbiddenの切り分け
+
+- 作業開始時: branch `work`、HEAD `044824516446882d819bcdfae7b8c815b8345fa2`、作業ツリーclean、未push commitなし。fetch成功後のmainは `5c93ece9fb726197a0ebe780b356031a82c97a33`（behind 3 / ahead 0）。fast-forwardで同期した。
+- `gh run view 43001505789 --json headSha,jobs,conclusion`、`gh api`のrun/job/artifact一覧取得は成功。対象SHAは `fc8409a66c75ce1427173d3cf085a39344a6b7dd`、attempt 1。
+- `gh run view --log-failed` は `results-receiver.actions.githubusercontent.com` のログZIP取得でForbidden。jobログAPIをリダイレクト追従せずに確認すると `api.github.com` はHTTP 302で、配信先は `productionresultssa6.blob.core.windows.net`。新規取得URLの期限内（se 2026-11-11T11:15:14Z）にも後段HTTPS CONNECTが403 Forbidden。署名・トークンは記録しない。
+- 環境statusは observations_current=true / network_policy.state=enforced。上記2配信先は適用中allowlistに含まれず、APIは許可済み。今回のCLI失敗はGitHub API認証失敗ではなく、配信先へのプロキシCONNECT拒否と切り分けた。過去時点のプロキシ応答を取得したわけではない。
+- GitHubコネクタのjobログ取得は両エンジンとも成功し、Chromium artifact ID `13846442467`のダウンロードも成功（ZIP参照取得、内容未展開）。環境設定・許可ホストは変更していない。
+- 従来の成功経路は `docs/verification/codex-performance/ui-unification.md` の2026-10-20記録に明記されているGitHubコネクタ（jobログ取得とartifact download）。今回も同じ経路を使用できた。CLIとコネクタは取得経路が異なり、CLI配信先への制限を調査全体の停止理由にする必要はない。
+
+### A: CI内の失敗原因
+
+1. Chromium: `tests/browser-call-decision-dialog.py:324` → `browser_focus_assertions.py:23`。既存11 viewportの鳴きUI検証は通過し、新規keyboard検証で `covered=True`。focus-visible=true、outline=solid 3px、clipped=false、hidden=false、disabled=false。遮蔽検査は角丸8pxのボタン外接矩形の各隅から1px内側を検査していたが、そこは丸められた実ボタン形状の外側であり、背景にhitする。テスト検出器の誤り。
+2. WebKit: itch smoke 1/3・2/3成功、3/3で人間手番待ち20秒タイムアウト。診断ログはCPU seat 1の `kyuushu_resolution` 後、残68枚のまま `wall-exhausted`へ遷移しrunner idle。人間seat 2の手番前にCPUの九種九牌で正当に流局していた。結果ダイアログは要求時に開く実装だが、smokeの次局操作が `result-dialog.open` 条件内に入っており、閉じた結果ダイアログでは進めなかった。ゲーム停止・WebKit起動障害ではなくsmoke状態遷移の不備。
+3. matrix audit: 上記両エンジンの失敗を検出した正常なgate failure。独立したUI不具合ではない。
+
+### 修正と最小再現
+
+- focus検出: 角丸の曲線内側4点＋各辺中央4点＋中央の9点で実ボタンへのhitを検査。focus-visible、名前、outline、祖先overflow・viewportのclipping、hidden・disabledのassertionは維持。失敗時は遮蔽座標とhit先を追加。角丸button単独で旧座標が背景にhitする最小fixture、実overlayを拒否するfixture、outline clippingを拒否するfixtureを両エンジンの鳴きUIスクリプト冒頭に追加。条件削除・失敗ケース除外は行わない。
+- itch smoke: 結果ダイアログが開いていれば閉じた上で、開閉状態に関係なく表示・有効な次局ボタンを操作する。人間の実際の打牌と牌ID移動・エラー不在の既存assertionを維持。ダイアログ開閉両方の終了局面を模した状態遷移unit testを追加し、既存Browser UI workflowで実行する。
+- UI・CSS・ゲーム実装の変更なし。iPhone XS／Safari縦／GitHub Pagesの本人確認7項目OK、NG 0・未確認0は完了済みのまま維持し、再確認は要求しない。
+- Cloudローカルでは既知のChromium起動制限に関するAGENTS.mdの指示を守り、既存GitHub Actionsをブラウザ実行先とする。ネットワークやsandboxの変更は行わない。
+
+### 検証状況
+
+ローカル検証: `npm test` 1518 pass / fail 0 / skip 0、`npm run build`、`npm run typecheck:worker`、`git diff --check`、全 `tests/*.py` AST構文確認、Browser UI選択unit 9件、itch startup unit 1件（開閉2条件）が成功。調査中にmainへIssue #32 commit `c4cc7e51b985e326d0066bfcd8e0d9344988101b` が追加されたため、差分を確認しfast-forwardで保全して取り込んだ。上記npm検証はこの新HEADで実行した。最終CI対象SHAは再検証完了後に追記する。Issueは必須の両エンジン・アクセシビリティ検証成功までOpenを維持する。
