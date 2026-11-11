@@ -1,3 +1,4 @@
+import { environmentStorageKey } from '../environment.ts';
 export type DiagnosticLevel = 'INFO' | 'WARN' | 'ERROR';
 export type DiagnosticEntry = {
   timestamp: string;
@@ -6,10 +7,10 @@ export type DiagnosticEntry = {
   details: Record<string, string | number | boolean | null>;
 };
 
-const STORAGE_KEY = 'heibon-mahjong-diagnostics-v2';
-const LEGACY_STORAGE_KEY = 'heibon-mahjong-diagnostics-v1';
-const CHECKPOINT_KEY = 'heibon-mahjong-diagnostics-checkpoint-v1';
-const BUILD_INFO_KEY = 'heibon-mahjong-diagnostics-build-v1';
+const STORAGE_KEY = environmentStorageKey('heibon-mahjong-diagnostics-v2');
+const LEGACY_STORAGE_KEY = environmentStorageKey('heibon-mahjong-diagnostics-v1');
+const CHECKPOINT_KEY = environmentStorageKey('heibon-mahjong-diagnostics-checkpoint-v1');
+const BUILD_INFO_KEY = environmentStorageKey('heibon-mahjong-diagnostics-build-v1');
 const MAX_ENTRIES = 500;
 const allowedKeys = new Set([
   'actionType', 'requestId', 'gameRevision', 'revision', 'errorCode', 'result', 'durationMs',

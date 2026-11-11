@@ -1,3 +1,4 @@
+import { environmentStorageKey } from '../environment.ts';
 import type { MatchFormat, MatchState } from './match.ts';
 
 /** Immutable local rules selected for one match. */
@@ -37,7 +38,7 @@ export const DEFAULT_GAME_RULES: GameRules = Object.freeze({
   agariYame: false, tenpaiYame: false, renhou: 'off', pao: false, doubleYakuman: false,
   multipleRon: true, tripleRonAbortiveDraw: false,
 });
-export const GAME_RULES_STORAGE_KEY = 'heibon-mahjong-last-rules';
+export const GAME_RULES_STORAGE_KEY = environmentStorageKey('heibon-mahjong-last-rules');
 const STORAGE_VERSION = 6;
 
 export function rulesForFormat(format: MatchFormat): GameRules {

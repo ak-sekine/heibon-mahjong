@@ -21,6 +21,7 @@ concurrency:
 
 jobs:
   detect-changes:
+    if: ${{ vars.DUAL_PAGES_ENABLED != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

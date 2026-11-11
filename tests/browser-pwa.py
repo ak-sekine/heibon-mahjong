@@ -160,6 +160,8 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         context = browser.new_context(viewport={'width': 390, 'height': 750}, service_workers='allow')
         page = context.new_page()
         page.goto(base_url, wait_until='networkidle')
+        page.evaluate('async () => { await navigator.serviceWorker.ready; }')
+        page.reload()  # Root SW avoids clients.claim: it must not steal dev clients.
         page.wait_for_function('navigator.serviceWorker.controller !== null', timeout=20000)
         assert page.evaluate('async () => { await navigator.serviceWorker.ready; return true; }')
 

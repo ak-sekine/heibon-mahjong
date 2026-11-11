@@ -197,3 +197,7 @@ PWAヘッダーの本人iPhone Safari報告は6 OK／0 NG／1未確認（複数�
 17受入条件はすべて達成、完了・Close可能と判断する。依頼どおりIssue #55はCloseしない。
 カンの位置・ツールバー操作とPWA複数タブは実機未確認のまま記録し、実機OKとはしない。
 Issue #32のPC実機や#52の方向別実機・focusの残課題とは区別する。
+
+## Issue #47 環境分離
+
+一部実装：環境別build・PWA/Storage・Worker設定・検証成果物合成と公開ゲートを追加。外部設定、公開移行、実Worker分離とiPhone Safari確認は未完了。[設計](development/issue-47-environments.md) / [運用](operations/environments.md) / [検証](verification/issue-47-environments.md)。

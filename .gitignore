@@ -153,3 +153,5 @@ vite.config.ts.timestamp-*
 # Python bytecode cache
 __pycache__/
 *.py[cod]
+
+dist-dev/

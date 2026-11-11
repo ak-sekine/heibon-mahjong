@@ -1,0 +1,198 @@
+name: Verify isolated environments
+run-name: Environments ${{ github.ref_name }} @ ${{ github.sha }}
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish after external isolation and bootstrap have been verified.
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck:worker
+      - name: Build the exact candidates (fallback URLs are test fixtures only)
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_WORKER_URL || 'https://heibon-mahjong-online.validation.workers.dev' }}
+          DEVELOPMENT_URL: ${{ vars.DEVELOPMENT_WORKER_URL || 'https://heibon-mahjong-online-dev.validation.workers.dev' }}
+        run: |
+          VITE_ONLINE_API_URL="$PRODUCTION_URL" npm run build
+          VITE_ONLINE_API_URL="$DEVELOPMENT_URL" npm run build:dev
+          VITE_ONLINE_API_URL="$PRODUCTION_URL" npm run build:itch
+          node scripts/environments/artifacts.mjs seal dist production "$GITHUB_SHA" "$PRODUCTION_URL"
+          node scripts/environments/artifacts.mjs seal dist-dev development "$GITHUB_SHA" "$DEVELOPMENT_URL"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 90
+      - uses: actions/upload-artifact@v4
+        with:
+          name: development-dist-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist-dev
+          if-no-files-found: error
+          retention-days: 90
+      - uses: actions/upload-artifact@v4
+        with:
+          name: itch-dist-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist-itch
+          if-no-files-found: error
+          retention-days: 90
+  browser-ui:
+    needs: verify
+    uses: ./.github/workflows/browser-ui.yml
+    with:
+      reuse_build: true
+  isolation-browser:
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: development-dist-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist-dev
+      - run: python -m pip install playwright
+      - run: python -m playwright install --with-deps ${{ matrix.browser }}
+      - run: python tests/browser-environments.py
+        env:
+          HEIBON_BROWSER: ${{ matrix.browser }}
+  local-online:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Verify separate local Worker stores and full online scenarios
+        run: |
+          npx wrangler dev --local --config wrangler.jsonc --port 8787 --persist-to "$RUNNER_TEMP/production-do" > "$RUNNER_TEMP/prod-worker.log" 2>&1 &
+          prod_pid=$!
+          npx wrangler dev --local --config wrangler.development.jsonc --port 8788 --persist-to "$RUNNER_TEMP/development-do" > "$RUNNER_TEMP/dev-worker.log" 2>&1 &
+          dev_pid=$!
+          trap 'kill "$prod_pid" "$dev_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..60}; do
+            if curl -fsS -H 'Origin: http://localhost:5173' http://127.0.0.1:8787/health > /dev/null && curl -fsS -H 'Origin: http://localhost:5173' http://127.0.0.1:8788/health > /dev/null; then break; fi
+            sleep 1
+          done
+          PRODUCTION_API_URL=http://127.0.0.1:8787 DEVELOPMENT_API_URL=http://127.0.0.1:8788 node tests/online-environments.mjs
+          ONLINE_API_URL=http://127.0.0.1:8787 ONLINE_TEST_ORIGIN=http://localhost:5173 npm run test:online:production
+          ONLINE_API_URL=http://127.0.0.1:8788 ONLINE_TEST_ORIGIN=http://localhost:5173 npm run test:online:production
+  audit:
+    needs: [browser-ui, isolation-browser, local-online]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit exact browser matrix jobs for this attempt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" > "$RUNNER_TEMP/jobs.json"
+          node .github/scripts/check-browser-ui-matrix.mjs "$RUNNER_TEMP/jobs.json"
+  # Publication remains disabled until external isolation and bootstrap are complete.
+  worker-production:
+    needs: [verify, browser-ui, isolation-browser, audit]
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.publish == true && vars.DUAL_PAGES_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: worker-production
+      cancel-in-progress: false
+    environment: worker-production
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - id: deploy
+        run: node .github/scripts/deploy-isolated-worker.mjs production
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_WORKER_URL: ${{ vars.PRODUCTION_WORKER_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_PRODUCTION_ACCOUNT_ID }}
+  worker-development:
+    needs: [verify, browser-ui, isolation-browser, audit]
+    if: ${{ github.ref == 'refs/heads/develop' && github.event_name == 'workflow_dispatch' && inputs.publish == true && vars.DUAL_PAGES_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: worker-development
+      cancel-in-progress: false
+    environment: worker-development
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - id: deploy
+        run: node .github/scripts/deploy-isolated-worker.mjs development
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_WORKER_URL: ${{ vars.DEVELOPMENT_WORKER_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_DEVELOPMENT_ACCOUNT_ID }}
+          PRODUCTION_ACCOUNT_ID: ${{ vars.CLOUDFLARE_PRODUCTION_ACCOUNT_ID }}
+  online:
+    needs: [worker-production, worker-development]
+    if: ${{ always() && (needs.worker-production.result == 'success' || needs.worker-development.result == 'success') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:online:production
+        env:
+          ONLINE_API_URL: ${{ needs.worker-production.outputs.url || needs.worker-development.outputs.url }}
+          ONLINE_TEST_ORIGIN: https://ak-sekine.github.io
+          ONLINE_SECONDARY_TEST_ORIGIN: ${{ github.ref_name == 'main' && 'https://html-classic.itch.zone' || '' }}
+      - name: Verify the original sealed candidate, without rebuilding
+        run: echo 'Candidate bytes were browser-tested before Worker deployment; publisher verifies the SHA256 inventory again.'
+  publish:
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    needs: [online]
+    uses: ./.github/workflows/publish-environments.yml

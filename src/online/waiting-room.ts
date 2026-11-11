@@ -1,3 +1,4 @@
+import { environmentStorageKey } from '../environment.ts';
 import {
   ONLINE_WS_PROTOCOL,
   type OnlineRoomSeat,
@@ -44,7 +45,7 @@ type PendingGameAction = {
 type SocketActionResult = RoomActionResult;
 type SocketError = RoomSocketError;
 
-const SESSION_KEY = 'heibon-mahjong-online-session';
+const SESSION_KEY = environmentStorageKey('heibon-mahjong-online-session');
 // Worker sends the action result immediately before its game-state broadcast.
 // Allow the following WebSocket frame to arrive before asking for a snapshot.
 const GAME_STATE_CONFIRMATION_GRACE_MS = 250;

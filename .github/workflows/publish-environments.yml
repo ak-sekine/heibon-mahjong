@@ -1,0 +1,66 @@
+name: Publish verified environment snapshots
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  publish:
+    if: ${{ vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages-publication
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+      - name: Fetch durable store (missing or unreadable must fail closed)
+        uses: actions/checkout@v4
+        with:
+          ref: pages-verified
+          path: store
+          fetch-depth: 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.ref_name == 'main' && 'pages-dist' || 'development-dist' }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: candidate
+      - name: Validate and stage exact verified bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)"
+          node source/scripts/environments/artifacts.mjs verify candidate
+          node source/scripts/environments/artifacts.mjs stage store candidate "$latest_sha"
+      - name: Persist pending journal and snapshot before Pages mutation
+        working-directory: store
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add state.json site
+          git commit -m "Stage $GITHUB_REF_NAME $GITHUB_SHA for Pages (pending)"
+          git push origin HEAD:pages-verified
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: store/site
+      - name: Recheck branch freshness immediately before publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)"
+          test "$latest_sha" = "$GITHUB_SHA"
+      - uses: actions/deploy-pages@v4
+        id: deploy
+      - name: Confirm snapshot after successful Pages deployment
+        run: |
+          node source/scripts/environments/artifacts.mjs finalize store
+          git -C store add state.json
+          git -C store commit -m "Confirm Pages $GITHUB_REF_NAME $GITHUB_SHA"
+          git -C store push origin HEAD:pages-verified

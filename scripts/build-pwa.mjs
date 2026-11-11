@@ -7,6 +7,9 @@ import { deflateSync } from 'node:zlib';
 
 export const PWA_BASE = '/heibon-mahjong/';
 const CACHE_PREFIX = 'heibon-mahjong-shell-';
+export const DEV_PWA_BASE = '/heibon-mahjong/dev/';
+// Outside the legacy production prefix: old installed workers cannot delete this cache.
+export const DEV_CACHE_PREFIX = 'heibon-mahjong-dev-shell-';
 
 function crc32(bytes) {
   let crc = 0xffffffff;
@@ -86,29 +89,37 @@ function filesUnder(folder, prefix = '') {
 }
 
 /** Service Worker handles only this site's immutable build assets and its app shell. */
-export function serviceWorkerSource(cacheName, urls) {
+export function serviceWorkerSource(cacheName, urls, environment = 'production') {
+  const root = environment === 'development' ? DEV_PWA_BASE : PWA_BASE;
+  const prefix = environment === 'development' ? DEV_CACHE_PREFIX : CACHE_PREFIX;
   return [
     "'use strict';",
-    'const ROOT = ' + JSON.stringify(PWA_BASE) + ';',
+    'const ROOT = ' + JSON.stringify(root) + ';',
     'const CACHE = ' + JSON.stringify(cacheName) + ';',
     'const PRECACHE = ' + JSON.stringify(urls) + ';',
     'const PATHS = new Set(PRECACHE);',
+    'const owns = pathname => pathname.startsWith(ROOT) && ' + (environment === 'development' ? 'true' : '!pathname.startsWith(' + JSON.stringify(DEV_PWA_BASE) + ')') + ';',
     "self.addEventListener('install', event => {",
     "  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(PRECACHE.map(url => new Request(url, { cache: 'reload' })))));",
     '});',
     "self.addEventListener('activate', event => {",
     '  event.waitUntil((async () => {',
     '    const keys = await caches.keys();',
-    '    await Promise.all(keys.filter(key => key.startsWith(' + JSON.stringify(CACHE_PREFIX) + ') && key !== CACHE).map(key => caches.delete(key)));',
-    '    await self.clients.claim();',
+    '    await Promise.all(keys.filter(key => key.startsWith(' + JSON.stringify(prefix) + ') && key !== CACHE).map(key => caches.delete(key)));',
+    // A root claim would steal active dev clients; first production visit activates on next navigation.
+    ...(environment === 'development' ? ['    await self.clients.claim();'] : []),
     '  })());',
     '});',
     "self.addEventListener('message', event => {",
+    '  if (!event.source || !owns(new URL(event.source.url).pathname)) return;',
+    ...(environment === 'development' ? [
+      "  if (event.data?.type === 'CLAIM_DEVELOPMENT_CLIENTS') { event.waitUntil(self.clients.claim()); return; }",
+    ] : []),
     "  if (!event.data || event.data.type !== 'ACTIVATE_UPDATE') return;",
     '  event.waitUntil((async () => {',
     "    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });",
     '    const scoped = clients.filter(client => {',
-    '      try { const url = new URL(client.url); return url.origin === self.location.origin && url.pathname.startsWith(ROOT); }',
+    '      try { const url = new URL(client.url); return url.origin === self.location.origin && owns(url.pathname); }',
     '      catch { return false; }',
     '    });',
     '    if (scoped.length > 1) {',
@@ -122,7 +133,7 @@ export function serviceWorkerSource(cacheName, urls) {
     '  const request = event.request;',
     "  if (request.method !== 'GET') return;",
     '  const url = new URL(request.url);',
-    '  if (url.origin !== self.location.origin || !url.pathname.startsWith(ROOT)) return;',
+    '  if (url.origin !== self.location.origin || !url.pathname.startsWith(ROOT) || !owns(url.pathname)) return;',
     "  if (request.mode === 'navigate') {",
     "    if (url.pathname !== ROOT && url.pathname !== ROOT + 'index.html') return;",
     '    event.respondWith((async () => {',
@@ -142,10 +153,18 @@ export function serviceWorkerSource(cacheName, urls) {
   ].join('\n');
 }
 
-export function buildPwa(distDir) {
+export function buildPwa(distDir, environment = 'production') {
+  if (!['production', 'development'].includes(environment)) throw new Error('Unknown PWA environment');
+  const root = environment === 'development' ? DEV_PWA_BASE : PWA_BASE;
+  const prefix = environment === 'development' ? DEV_CACHE_PREFIX : CACHE_PREFIX;
   for (const name of ['index.html', 'manifest.webmanifest']) {
     if (!existsSync(path.join(distDir, name))) throw new Error('Missing build asset: ' + name);
   }
+  const manifestPath = path.join(distDir, 'manifest.webmanifest');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  Object.assign(manifest, { id: root, start_url: root, scope: root });
+  if (environment === 'development') Object.assign(manifest, { name: 'Heibon Mahjong DEV', short_name: 'Heibon DEV' });
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
   const assets = filesUnder(path.join(distDir, 'assets'))
     .filter(name => /\.(?:js|css|svg|png|webp|woff2?)$/i.test(name))
     .map(name => 'assets/' + name);
@@ -174,13 +193,14 @@ export function buildPwa(distDir) {
     digest.update(name);
     digest.update(readFileSync(path.join(distDir, name)));
   }
-  const cacheName = CACHE_PREFIX + digest.digest('hex').slice(0, 20);
-  const urls = [PWA_BASE, ...paths.map(name => PWA_BASE + name)];
-  writeFileSync(path.join(distDir, 'sw.js'), serviceWorkerSource(cacheName, urls), 'utf8');
+  const cacheName = prefix + digest.digest('hex').slice(0, 20);
+  const urls = [root, ...paths.map(name => root + name)];
+  writeFileSync(path.join(distDir, 'sw.js'), serviceWorkerSource(cacheName, urls, environment), 'utf8');
   return { cacheName, urls };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const result = buildPwa(path.resolve('dist'));
+  const environment = process.argv[2] ?? 'production';
+  const result = buildPwa(path.resolve(environment === 'development' ? 'dist-dev' : 'dist'), environment);
   process.stdout.write('PWA shell: ' + result.cacheName + ', precached URLs: ' + result.urls.length + '\n');
 }

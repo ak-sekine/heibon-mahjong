@@ -14,6 +14,13 @@ export default defineConfig(({ mode }) => {
   const buildTimeUtc = new Date().toISOString();
   const buildInfo = { gitSha, buildTimeUtc, appVersion, mode, schemaVersion: 2, buildId: `${gitSha}@${buildTimeUtc}` };
   const isItchBuild = mode === 'itch';
+  const isDevelopmentPages = mode === 'development-pages';
+  if (isDevelopmentPages) {
+    const api = process.env.VITE_ONLINE_API_URL;
+    if (!api || !/^https:\/\/heibon-mahjong-online-dev\.[a-z0-9-]+\.workers\.dev$/.test(api)) {
+      throw new Error('Development Pages requires the explicit HTTPS development Worker URL.');
+    }
+  }
   if (isItchBuild) {
     const onlineApiUrl = process.env.VITE_ONLINE_API_URL;
     if (!onlineApiUrl) throw new Error('Set VITE_ONLINE_API_URL to the deployed HTTPS Worker URL before building the itch.io package.');
@@ -26,8 +33,8 @@ export default defineConfig(({ mode }) => {
     ? { main: 'index.html' }
     : { main: 'index.html', kanTest: 'kan-test.html', test: 'test.html', callTest: 'call-test.html' };
   return {
-    base: isItchBuild ? './' : '/heibon-mahjong/',
-    define: { __APP_BUILD_INFO__: JSON.stringify(buildInfo) },
+    base: isItchBuild ? './' : isDevelopmentPages ? '/heibon-mahjong/dev/' : '/heibon-mahjong/',
+    define: { __APP_BUILD_INFO__: JSON.stringify(buildInfo), __HEIBON_ENV__: JSON.stringify(isDevelopmentPages ? 'development' : 'production') },
     build: {
       rollupOptions: { input },
     },

@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "types": []
   },
-  "include": ["platform.d.ts", "index.ts", "room.ts"]
+  "include": ["platform.d.ts", "index.ts", "development.ts", "room.ts"]
 }

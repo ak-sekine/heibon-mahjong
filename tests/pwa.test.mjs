@@ -18,7 +18,7 @@ test('manifest is scoped to GitHub Pages and has all Android icon purposes', () 
     ['icons/icon-maskable-512.png', '512x512', 'maskable'],
   ]);
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /rel="apple-touch-icon" sizes="180x180" href="\/heibon-mahjong\/icons\/icon-180\.png"/);
+  assert.match(html, /rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%icons\/icon-180\.png"/);
 });
 
 test('PWA registration is explicitly disabled in the itch.io build mode', () => {

@@ -10,12 +10,13 @@ export function registerPwa(): void {
   const root = import.meta.env.BASE_URL;
   if (location.pathname !== root && location.pathname !== root + 'index.html') return;
 
+  const ownsWorker = (worker: ServiceWorker | null): boolean => worker?.scriptURL === new URL(root + 'sw.js', location.origin).href;
   let reloadRequested = false;
   let notice: HTMLElement | null = null;
   let noticeText: HTMLParagraphElement | null = null;
 
   const showUpdate = (registration: ServiceWorkerRegistration): void => {
-    if (!navigator.serviceWorker.controller || !registration.waiting) return;
+    if (!ownsWorker(navigator.serviceWorker.controller) || !registration.waiting) return;
     if (!notice) {
       notice = document.createElement('section');
       notice.id = 'pwa-update-notice';
@@ -52,11 +53,18 @@ export function registerPwa(): void {
     registration.addEventListener('updatefound', () => {
       registration.installing?.addEventListener('statechange', checkUpdate);
     });
+    const reclaimDevelopment = (): void => {
+      if (root.endsWith('/dev/') && registration.active && !ownsWorker(navigator.serviceWorker.controller)) {
+        registration.active.postMessage({ type: 'CLAIM_DEVELOPMENT_CLIENTS' });
+      }
+    };
+    reclaimDevelopment();
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (reloadRequested) window.location.reload();
+      reclaimDevelopment();
+      if (reloadRequested && ownsWorker(navigator.serviceWorker.controller)) window.location.reload();
     });
     navigator.serviceWorker.addEventListener('message', event => {
-      if (event.data?.type !== 'UPDATE_BLOCKED') return;
+      if (event.source !== registration.waiting || event.data?.type !== 'UPDATE_BLOCKED') return;
       reloadRequested = false;
       const message = '別のタブでも開かれています。ほかのタブを閉じてから更新してください。';
       if (noticeText) noticeText.textContent = message;
