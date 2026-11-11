@@ -58,3 +58,7 @@ Issue #52の検出器修正を含むmain `9294d21`の[run #43009718350](https://
 ## overflow fixtureの後始末
 
 `a0fbd6e`のrun #43010475450は両engineとも1280×720までの鳴き表示を通過し、次の1366×768で候補到達性検査に失敗した。調査すると、1280×720の内部スクロール試験が一覧へ設定するテスト専用`style.maxHeight=55px`を候補確定後に解除していなかった。従来の独立620px幅ではPCで1行に収まり潜在化していたが、実操作幅で折り返す状態では次viewportの通常候補まで55pxへ制限された。スクロール試験のassertionをすべて維持して、その試験後に注入したmax-heightとscrollTopだけを復元する。製品CSSへ幅補正や55px対策は追加しない。
+
+## 広い実操作幅でのoverflow試験
+
+`674a2d0`のrun #43011576265で、WebKitの種類選択／候補Tab検査は成功し、call-testの10 viewportも通過。1920×1080の大量カン候補試験で、ダミー100件が新しい広い実操作幅にすべて収まり（clientHeight=scrollHeight=964、最終候補は表示・クリック可能、scrollY=0）、スクロールの前提を満たさなかった。call-testと共通geometryのダミー候補を200件に増やす。overflow:auto、scrollHeight>clientHeight、scrollTop>0、最終候補／戻るの到達、卓矩形・ページscrollYのassertionはすべて維持する。製品の高さ・幅へ専用上限は追加しない。

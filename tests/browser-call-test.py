@@ -303,7 +303,7 @@ with sync_playwright() as p:
                     assert focus['id'] == 'candidate-back' and focus['visible'] and focus['outlineStyle'] != 'none' and focus['outlineWidth'] >= 2, f'{width}x{height}: keyboard focus indicator is missing: {focus}'
                     scroll_metrics = page.evaluate('''()=>{
                       const list=document.querySelector('#candidate-options'),template=list.querySelector('button');
-                      for(let i=0;i<100;i++){const clone=template.cloneNode(true);clone.dataset.overflowTest='true';list.append(clone);}
+                      for(let i=0;i<200;i++){const clone=template.cloneNode(true);clone.dataset.overflowTest='true';list.append(clone);}
                       list.scrollTop=list.scrollHeight;
                       const last=list.querySelector('button[data-overflow-test="true"]:last-child');
                       const r=last.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);

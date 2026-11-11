@@ -299,7 +299,7 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     # remain unchanged and confirmation below always clicks an actual button.
     page.locator(root_selector + ' [data-panel-part="candidate-options"]').evaluate(r'''list=>{
       const template=list.querySelector('button');
-      for(let i=0;i<100;i++){const clone=template.cloneNode(true);clone.dataset.geometryOverflow='true';list.append(clone);}
+      for(let i=0;i<200;i++){const clone=template.cloneNode(true);clone.dataset.geometryOverflow='true';list.append(clone);}
     }''')
     settle(page)
     record['grown'] = grown = snapshot(page, online)
