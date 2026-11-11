@@ -343,6 +343,17 @@ jobs:
             /tmp/heibon-itch-smoke-before
             /tmp/heibon-itch-smoke-controlled
             docs/verification/step13.5.5
+      - name: Save candidate frame review screenshots and measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-frame-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          path: |
+            /tmp/heibon-table-ui/candidate-geometry/*.json
+            /tmp/heibon-table-ui/candidate-geometry/*-320x568-*-chi-*.png
+            /tmp/heibon-table-ui/candidate-geometry/*-1280x720-*-chi-*.png
+            /tmp/heibon-table-ui/candidate-geometry/*-1920x1080-*-mixed-kan-*.png
       - name: Save center round display screenshots and measurements
         if: always()
         uses: actions/upload-artifact@v4
