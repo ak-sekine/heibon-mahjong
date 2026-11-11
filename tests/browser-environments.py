@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import shutil
 import tempfile
+import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from playwright.sync_api import sync_playwright
@@ -68,6 +69,9 @@ with tempfile.TemporaryDirectory(prefix='heibon-environments-') as tmp:
         # Production update may activate with a dev tab open, and cannot claim that tab.
         sw = site / 'sw.js'
         sw.write_text(sw.read_text() + '\n// isolated update test\n')
+        # The local HTTP server's Last-Modified validator has one-second precision.
+        modified = max(time.time(), sw.stat().st_mtime) + 2
+        os.utime(sw, (modified, modified))
         production.evaluate("""async () => {
           const r = await navigator.serviceWorker.getRegistration(location.href);
           await r.update();

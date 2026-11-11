@@ -32,7 +32,7 @@ jobs:
         run: |
           VITE_ONLINE_API_URL="$PRODUCTION_URL" npm run build
           VITE_ONLINE_API_URL="$DEVELOPMENT_URL" npm run build:dev
-          VITE_ONLINE_API_URL="$PRODUCTION_URL" npm run build:itch
+          VITE_ONLINE_API_URL=https://online-mock.invalid npm run build:itch
           node scripts/environments/artifacts.mjs seal dist production "$GITHUB_SHA" "$PRODUCTION_URL"
           node scripts/environments/artifacts.mjs seal dist-dev development "$GITHUB_SHA" "$DEVELOPMENT_URL"
       - uses: actions/upload-artifact@v4
@@ -95,15 +95,19 @@ jobs:
       - run: npm ci
       - name: Verify separate local Worker stores and full online scenarios
         run: |
-          npx wrangler dev --local --config wrangler.jsonc --port 8787 --persist-to "$RUNNER_TEMP/production-do" > "$RUNNER_TEMP/prod-worker.log" 2>&1 &
+          npx wrangler dev --local --config wrangler.jsonc --port 8787 --inspector-port 9230 --persist-to "$RUNNER_TEMP/production-do" > "$RUNNER_TEMP/prod-worker.log" 2>&1 &
           prod_pid=$!
-          npx wrangler dev --local --config wrangler.development.jsonc --port 8788 --persist-to "$RUNNER_TEMP/development-do" > "$RUNNER_TEMP/dev-worker.log" 2>&1 &
+          npx wrangler dev --local --config wrangler.development.jsonc --port 8788 --inspector-port 9231 --persist-to "$RUNNER_TEMP/development-do" > "$RUNNER_TEMP/dev-worker.log" 2>&1 &
           dev_pid=$!
           trap 'kill "$prod_pid" "$dev_pid" 2>/dev/null || true' EXIT
           for attempt in {1..60}; do
             if curl -fsS -H 'Origin: http://localhost:5173' http://127.0.0.1:8787/health > /dev/null && curl -fsS -H 'Origin: http://localhost:5173' http://127.0.0.1:8788/health > /dev/null; then break; fi
             sleep 1
           done
+          if ! curl -fsS -H 'Origin: http://localhost:5173' http://127.0.0.1:8787/health > /dev/null || ! curl -fsS -H 'Origin: http://localhost:5173' http://127.0.0.1:8788/health > /dev/null; then
+            tail -n 100 "$RUNNER_TEMP/prod-worker.log" "$RUNNER_TEMP/dev-worker.log"
+            exit 1
+          fi
           PRODUCTION_API_URL=http://127.0.0.1:8787 DEVELOPMENT_API_URL=http://127.0.0.1:8788 node tests/online-environments.mjs
           ONLINE_API_URL=http://127.0.0.1:8787 ONLINE_TEST_ORIGIN=http://localhost:5173 npm run test:online:production
           ONLINE_API_URL=http://127.0.0.1:8788 ONLINE_TEST_ORIGIN=http://localhost:5173 npm run test:online:production
@@ -187,8 +191,19 @@ jobs:
           ONLINE_API_URL: ${{ needs.worker-production.outputs.url || needs.worker-development.outputs.url }}
           ONLINE_TEST_ORIGIN: https://ak-sekine.github.io
           ONLINE_SECONDARY_TEST_ORIGIN: ${{ github.ref_name == 'main' && 'https://html-classic.itch.zone' || '' }}
-      - name: Verify the original sealed candidate, without rebuilding
-        run: echo 'Candidate bytes were browser-tested before Worker deployment; publisher verifies the SHA256 inventory again.'
+      - name: Build independent production itch ZIP with the deployed endpoint
+        if: github.ref_name == 'main'
+        run: npm run build:itch
+        env:
+          VITE_ONLINE_API_URL: ${{ vars.PRODUCTION_WORKER_URL }}
+      - name: Save production itch ZIP
+        if: github.ref_name == 'main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: itch-html5-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/itch/heibon-mahjong.zip
+          if-no-files-found: error
+          retention-days: 90
   publish:
     permissions:
       contents: write
