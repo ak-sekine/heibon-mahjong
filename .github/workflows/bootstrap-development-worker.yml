@@ -57,3 +57,23 @@ jobs:
           ACTUAL_URL: ${{ steps.create.outputs.url }}
         run: |
           printf '\nAll bootstrap checks passed. Register repository variable DEVELOPMENT_WORKER_URL=%s\n' "$ACTUAL_URL" >> "$GITHUB_STEP_SUMMARY"
+  inspect:
+    if: >-
+      ${{ github.repository == 'ak-sekine/heibon-mahjong' && github.event.head_commit.message == 'bootstrap: inspect development Worker (Issue #47)' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: worker-development
+    concurrency:
+      group: worker-development
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Inspect existing Worker settings without deploying
+        run: node .github/scripts/inspect-development-worker.mjs
+        env:
+          INSPECTION_REQUEST: ${{ github.event.head_commit.message }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}

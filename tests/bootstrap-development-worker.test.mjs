@@ -105,3 +105,21 @@ test('rate probe cannot mutate a room and requires actual quota enforcement', as
   await assert.rejects(verifyRateLimiter(url, async () => Response.json({ error: 'invalid_display_name' }, { status: 400 })), /did not enforce/);
   await assert.rejects(verifyRateLimiter(url, async () => Response.json({ error: 'rate_limit_unavailable' }, { status: 503 })));
 });
+test('deployment errors expose only fixed categories and numeric API codes', async () => {
+  const f = fixture(); const cli = f.cli;
+  f.cli = (command, args, options) => {
+    if (command === 'gh') return cli(command, args, options);
+    throw Object.assign(new Error('secret-fixture'), { stderr: 'Authentication error [code: 10000] secret-fixture' });
+  };
+  await assert.rejects(bootstrap(f), error => {
+    assert.match(error.message, /category=authorization; Cloudflare codes=10000/);
+    assert(!error.message.includes('secret-fixture'));
+    return true;
+  });
+});
+test('inspection entry uses only read requests and emits selected metadata', () => {
+  const script = readFileSync('.github/scripts/inspect-development-worker.mjs', 'utf8');
+  assert(!script.includes("method: 'POST'"));
+  assert(!script.includes('wrangler'));
+  assert(script.includes("filter(b => b.type === 'durable_object_namespace')"));
+});

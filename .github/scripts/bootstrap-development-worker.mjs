@@ -67,7 +67,12 @@ export async function bootstrap({ env = process.env, cli = execFileSync, request
   let output;
   try {
     output = cli('node_modules/.bin/wrangler', ['deploy', '--config', 'wrangler.development.jsonc'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  } catch { throw new Error('Development deployment failed; output suppressed. Inspect Cloudflare before retrying.'); }
+  } catch (error) {
+    const diagnostic = String(error.stderr ?? '');
+    const codes = [...new Set([...diagnostic.matchAll(/\[code:\s*(\d+)\]/g)].map(match => match[1]))];
+    const category = /authenticat|authoriz|permission/i.test(diagnostic) ? 'authorization' : /migration|durable object/i.test(diagnostic) ? 'durable-object' : 'unclassified';
+    throw new Error(`Development deployment failed; category=${category}; Cloudflare codes=${codes.join(',') || 'none'}; raw output suppressed. Inspect Cloudflare before retrying.`);
+  }
   const url = actualUrl(output);
   // Preserve the actual endpoint even if subsequent verification fails. Never register it automatically.
   append(env.GITHUB_STEP_SUMMARY, `\nDevelopment Worker returned by Wrangler: ${url}\nSource: ${env.GITHUB_SHA}\nVerification pending. Do not register until all checks pass.\n`);
