@@ -36,7 +36,7 @@ jobs:
           cache: npm
       - run: npm ci
       - id: create
-        name: Create absent development Worker and verify actual URL and DO bindings
+        name: Create or complete development Worker and verify actual URL and DO bindings
         run: node .github/scripts/bootstrap-development-worker.mjs "$BOOTSTRAP_OPERATION"
         env:
           GH_TOKEN: ${{ github.token }}

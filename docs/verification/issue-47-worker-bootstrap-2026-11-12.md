@@ -73,3 +73,67 @@ npm test 1,539件とWorker型検査に成功したが、`PRODUCTION_WORKER_URL`�
 sealの厳密なURL検査で失敗していた。ブラウザ以降はskip。作成はまだ実施していない。
 既存公開ゲートと本番設定を維持し、environments.ymlの検証用ビルド入力だけ末尾`/`を正規化する。
 ローカルで本番/開発buildとsealを再検証。公開用URLの厳密な照合は変更しない。
+
+## 実行完了記録（ユーザーの明示的許可後）
+
+### 結果
+
+- 実Worker URL: **https://heibon-mahjong-online-dev.ak-sekine.workers.dev**。
+  Wranglerの公開トリガー適用出力から取得し、同じURLでhealthとオンライン検証を通した。
+- 作成対象: `heibon-mahjong-online-dev`、config: `wrangler.development.jsonc`。
+- GitHub Environment: `worker-development`（deployment branch policyのdevelop許可をAPIで確認）。
+- `DEVELOPMENT_WORKER_URL`は作成時に不要。値の自動登録はしていない。
+  [運用文書](../operations/bootstrap-development-worker.md)に確認済み実値の登録コマンドを記載。
+- 本番Workerのsettings前後完全一致を自動確認。本番DOへのテスト要求・変更APIは呼んでいない。
+  main / Pages / DUAL_PAGES_ENABLEDは変更せず、PR未作成、Issue #47はAPIでもOpenを確認。
+
+### 実DO分離
+
+2026-11-12 13:28 UTCの読み取り診断でCloudflare APIが返した識別子。
+完了処理でも両環境のID非共有・各class・自己bindingを再検証して成功した。
+
+| binding | 本番namespace ID（読取のみ） | 開発namespace ID |
+|---|---|---|
+| ROOMS | `bb2855728c5b42beba5771655a131f8d` | `5d60a68fe93b40958b974e973ddb7eed` |
+| RATE_LIMITER | `7aef4eef34c14bf594b0d8b2070a8f52` | `f1a5e3c6ba1e40dc8eb60578409b1371` |
+
+本番settingsの診断時SHA256: `254420624fc69761b80aeb61e4becdd5f805f214c198f86934cbd33de0a01c43`。
+開発settingsの診断時SHA256: `750d7549649787febbaa88e8b5eac688ee19b29c724be559ae6e991e8850934d`。
+完了処理はこの開発SHA256との一致を要求し、既存コード/DOの再アップロード/migrationを実行しなかった。
+
+### 実行と検証の対応
+
+- `358f844185af4c17457df45271fab7a5aa4b2926`: CI入力正規化。
+  [run 43222182844](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43222182844)は全体success。
+  npm test、Worker型検査、両Pages/itch build、成果物seal、Chromium/WebKit環境分離、
+  両エンジンの既存UI全体、local-online、matrix auditがすべて成功。公開jobはskip。
+- `3d6b3a0cec462b292346b2b18dfec7af37c58332`: 許可後の空commit。
+  [初回run 43226991277](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43226991277)のprepareはsuccess。
+  Wrangler deployが失敗終了し、URLは未取得、後続オンライン検証はskip。
+  エラー生出力は保存・表示していないため元の詳細原因は未確定。失敗を成功扱いしていない。
+- `86b92ebb7c97ebfbc5044829c7341cc3afb1a5f8`: 読取専用診断と秘密を出さないエラーcode分類を追加。
+  [診断run 43227573328](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43227573328)はsuccess。
+  実APIで本番/開発settingsとも200、開発Workerと独立DOは作成済みと確認。
+  初回作成を再実行せず、公開トリガーだけを完了する判断とした。
+- `e0252da8a182eec9553921e6e0b29172e4700dad`: settings SHA一致を要求する公開トリガー完了経路。
+  [完了run 43227915964](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43227915964)は全体success。
+  prepareのnpm test・Worker型検査・dry-run成功。開発設定だけでtriggers deploy成功。
+  Wrangler返却の実URL取得、実DO ID比較、本番settings前後一致、実health（200/期待JSON）が成功。
+  同じ開発URLのオンライン5シナリオとRATE_LIMITERの429/正のretryAfterMsが成功。
+- 追加した診断/完了経路の関連テスト11件、actionlint全workflow、git diff --check成功。
+  アプリ/Worker本体は準備基準a18d210以降変更なし。
+  診断・完了commitの既存フルCIはそれぞれ別runで進行するため、358f844の全CI成功と混同しない。
+
+### 追加変更と残件
+
+今回の追加変更は`.github/workflows/environments.yml`のCI入力正規化、
+bootstrap workflow/script/testの診断・完了経路、読取専用`inspect-development-worker.mjs`、
+運用・検証文書。初回作成の専用経路を通常の本番公開処理へ混ぜていない。
+
+開発Workerの実作成・health・DO分離・オンライン検証は今回完了。
+GitHub変数の登録作業、実環境間の同コード/token拒否E2E、Pages移行、iPhone実機検証は未実施。
+Secret一覧APIは403で名前の確認不可だったが、Actions内で開発Environment Secretを利用した実処理は成功。
+Issue #47全体の受入完了とは扱わず、Openを維持する。
+
+開始HEAD `46b9f6be6681daa14c19996310d41d5c22ce0eba`、fetch後mainは引き続き
+`cb457bb0dfe00455adf66d5f8c51284d0d00081f`。各push後のremote照合成功。

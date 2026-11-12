@@ -92,3 +92,29 @@ gh variable set DEVELOPMENT_WORKER_URL --repo ak-sekine/heibon-mahjong --body "$
 Worker/DOは自動削除・rollbackしない。run再実行は既存Worker検出で停止する。
 実状態・返却URL・失敗箇所を確認し、修正や既存開発Worker更新は別途判断する。
 本番config・本番migration・本番tokenに切り替えて再試行しない。Issue #47はOpenを維持する。
+
+## 2026-11-12 初回作成の完了結果
+
+ユーザーの明示的許可後に実行し、開発Workerを作成済み。
+確認済みの実URLは **https://heibon-mahjong-online-dev.ak-sekine.workers.dev**。
+[完了run 43227915964](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43227915964)はsuccess。
+今後は初回作成を再実行せず、通常の開発Worker更新を別途判断する。
+この作業では`DEVELOPMENT_WORKER_URL`を自動登録していない。登録する値は上記の確認済み実URL。
+
+```bash
+gh variable set DEVELOPMENT_WORKER_URL --repo ak-sekine/heibon-mahjong --body 'https://heibon-mahjong-online-dev.ak-sekine.workers.dev'
+```
+
+初回runではWranglerがエラー終了したが、読み取り診断により開発WorkerとDOは作成済みと判明した。
+コードを再アップロードせず、`wrangler triggers deploy --config wrangler.development.jsonc`で公開トリガーだけを完了し、
+Wranglerの返却URLを取得して全検証に成功した。初回エラーの生出力は抑制済みのため、元の詳細原因は未確定。
+
+診断が必要な場合は、専用メッセージ`bootstrap: inspect development Worker (Issue #47)`のdevelop pushで
+`inspect` jobだけを起動できる。Secret値やsettings全体は出さず、HTTP状態・APIエラーコード・
+settingsのSHA256とDO bindingの識別子だけを出力する。Cloudflare APIはGETのみ。
+
+今回追加した完了経路は`bootstrap: complete development Worker (Issue #47)`で起動する。
+これは既存開発Workerのsettingsが診断時の固定SHA256と一致し、DO分離を確認できた場合だけ
+公開トリガーを適用する一回限りの復旧経路。通常更新には使用しない。
+ハッシュ不一致時に値を機械的に差し替えず、実状態を再確認する。
+エラー表示は固定category・数値API code・終了status/signalに限定し、生のCLI出力を表示しない。
