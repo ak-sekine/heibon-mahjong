@@ -65,3 +65,11 @@ Cloudflareが返す開発URLは未取得であり、推測値を登録してい�
 成功runのSummaryに実URL・SHA・namespace IDを残し、全step成功を確認して実URLを報告する。
 その確認済みURLだけをRepository Variable `DEVELOPMENT_WORKER_URL`へ登録する。
 失敗しても自動削除・本番への切替・無条件再deployはしない。手順は[運用文書](../operations/bootstrap-development-worker.md)。
+
+## 明示的許可後のCI確認（2026-11-12）
+
+ユーザーから初回作成の明示的な許可を受領。準備commit `46b9f6b`のrun `43220966634`は
+npm test 1,539件とWorker型検査に成功したが、`PRODUCTION_WORKER_URL`の登録値末尾に`/`があり、
+sealの厳密なURL検査で失敗していた。ブラウザ以降はskip。作成はまだ実施していない。
+既存公開ゲートと本番設定を維持し、environments.ymlの検証用ビルド入力だけ末尾`/`を正規化する。
+ローカルで本番/開発buildとsealを再検証。公開用URLの厳密な照合は変更しない。

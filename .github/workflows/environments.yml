@@ -30,6 +30,8 @@ jobs:
           PRODUCTION_URL: ${{ vars.PRODUCTION_WORKER_URL || 'https://heibon-mahjong-online.validation.workers.dev' }}
           DEVELOPMENT_URL: ${{ vars.DEVELOPMENT_WORKER_URL || 'https://heibon-mahjong-online-dev.validation.workers.dev' }}
         run: |
+          PRODUCTION_URL="${PRODUCTION_URL%/}"
+          DEVELOPMENT_URL="${DEVELOPMENT_URL%/}"
           VITE_ONLINE_API_URL="$PRODUCTION_URL" npm run build
           VITE_ONLINE_API_URL="$DEVELOPMENT_URL" npm run build:dev
           VITE_ONLINE_API_URL=https://online-mock.invalid npm run build:itch
