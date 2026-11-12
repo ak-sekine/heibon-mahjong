@@ -28,6 +28,11 @@
 
 外部設定はこの作業では未確認。API権限がない場合はSettingsでユーザーが登録・確認する。設定完了後も公開前のチェックは省略しない。
 
+## 開発Workerの初回作成
+
+main未変更・開発URL未登録での作成は[専用手順](bootstrap-development-worker.md)を使用する。
+通常公開経路とは独立し、ユーザーの明示的な許可後に専用メッセージ付きdevelop pushで実行する。
+
 ## 通常開発と昇格
 
 - 通常はdevelopで実装し、テスト・型検査・両ビルド・itch・Chromium/WebKitとmatrix auditを通す。Codexがcommit/push。通常PRなし。force pushしない。
