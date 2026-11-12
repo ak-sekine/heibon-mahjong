@@ -252,12 +252,14 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         assert page.evaluate('navigator.serviceWorker.controller.scriptURL') == f'{base_url}sw.js'
         assert page.locator('#local-table').is_visible(), 'failed update interrupted the in-progress CPU game'
         assert old_cache_name in page.evaluate('caches.keys()'), 'failed update removed the active version cache'
-        PagesHandler.failure_path = None
         worker = sw_path.read_text(encoding='utf-8').replace('-v2";', '-v2-retry";')
         retry_cache = re.search(r'const CACHE = "([^"]+)";', worker)
         assert retry_cache, 'retry cache declaration missing'
         new_cache_name = retry_cache.group(1)
         write_worker_version(sw_path, worker)
+        # Publish the retry script before restoring asset delivery. Otherwise an
+        # overlapping browser update can install v2 in the recovery window.
+        PagesHandler.failure_path = None
 
         page.evaluate('async () => { const registration = await navigator.serviceWorker.getRegistration(); await registration.update(); }')
         page.locator('#pwa-update-notice').wait_for(state='visible', timeout=20000)
