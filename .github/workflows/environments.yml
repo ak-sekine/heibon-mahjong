@@ -18,6 +18,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate raw publication variables without exposing values
+        env:
+          PRODUCTION_WORKER_URL: ${{ vars.PRODUCTION_WORKER_URL }}
+          DEVELOPMENT_WORKER_URL: ${{ vars.DEVELOPMENT_WORKER_URL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          DUAL_PAGES_ENABLED: ${{ vars.DUAL_PAGES_ENABLED }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$PRODUCTION_WORKER_URL" != "https://heibon-mahjong-online.ak-sekine.workers.dev" || "$PRODUCTION_WORKER_URL" == */ ]]; then
+            echo '::error::PRODUCTION_WORKER_URL must exactly match the production Worker URL without a trailing slash.'
+            exit 1
+          fi
+          if [[ "$DEVELOPMENT_WORKER_URL" != "https://heibon-mahjong-online-dev.ak-sekine.workers.dev" || "$DEVELOPMENT_WORKER_URL" == */ ]]; then
+            echo '::error::DEVELOPMENT_WORKER_URL must exactly match the development Worker URL without a trailing slash.'
+            exit 1
+          fi
+          if [[ ! "$CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9a-fA-F]{32}$ ]]; then
+            echo '::error::CLOUDFLARE_ACCOUNT_ID must be set to a 32-character hexadecimal account ID.'
+            exit 1
+          fi
+          if [[ "$DUAL_PAGES_ENABLED" != "" && "$DUAL_PAGES_ENABLED" != "false" ]]; then
+            echo '::error::DUAL_PAGES_ENABLED must be unset or false during final CI verification.'
+            exit 1
+          fi
+          {
+            echo 'Raw production and development Worker URLs exactly match the expected values and have no trailing slash.'
+            echo 'The shared Cloudflare account ID is present and has the expected format.'
+            echo 'DUAL_PAGES_ENABLED is unset or false.'
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
