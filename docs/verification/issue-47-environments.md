@@ -118,3 +118,7 @@ B7以後の追記は公開制御のWorker URL照合、Git競合回帰テスト�
 今回も外部設定変更・Worker/Pages公開は実施しない。実Cloudflare同一アカウント内でのルーム/token/状態分離、公開後E2E、iPhone Safari実機は未確認。別アカウント準備は残作業から外し、共通account ID、各Environment secretと実Worker URLの設定確認を残す。誤設定リスクへの追加対策・権限分離強化は対象外。IssueはOpenを維持する。
 
 今回のローカル結果：`npm test`全90テストファイル成功（失敗0、41.8秒）。`npm run typecheck:worker`成功。本番`npm run build`、開発`npm run build:dev`、`npm run build:itch`とZIP生成成功。両Pages成果物のseal / hash・参照検査成功。Pages用URLは各`.validation.workers.dev`、itchは`https://online-mock.invalid`で、実公開接続先ではない。`git diff --check`成功。今回のChromium/WebKit・ローカル2Worker検証はdevelop pushで起動する既存Actionsにて確認する。ローカルブラウザはAGENTS.md記載の既知の起動制限に従い再実行しない。
+
+## 2026-11-12 公開移行前チェック
+
+[今回の取得証跡・検証結果](issue-47-preflight-2026-11-12.md)と[確定したPhase別切替手順](../operations/issue-47-cutover.md)を追加。過去の成功記録と今回の再確認を区別する。公開は未実施、IssueはOpen。

@@ -1,6 +1,6 @@
 # 本番・開発運用（Issue #47）
 
-現状は段階導入。実装追加と公開完了を混同しない。[設計](../development/issue-47-environments.md) / [検証・未確認一覧](../verification/issue-47-environments.md)。
+現状は段階導入。実装追加と公開完了を混同しない。公開移行は[確定したPhase別手順](issue-47-cutover.md)に従う。今回の[移行前チェック](../verification/issue-47-preflight-2026-11-12.md)で確認済み・未確認を区別する。[設計](../development/issue-47-environments.md) / [検証・未確認一覧](../verification/issue-47-environments.md)。
 
 | 項目 | 本番 | 開発 |
 |---|---|---|
@@ -22,11 +22,11 @@
 4. repository variable `CLOUDFLARE_ACCOUNT_ID`に共通アカウントIDを登録する。新経路の両Worker jobはこの変数を参照する。旧`CLOUDFLARE_PRODUCTION_ACCOUNT_ID` / `CLOUDFLARE_DEVELOPMENT_ACCOUNT_ID`は新経路では不要。旧deploy.ymlの同名repository **secret** `CLOUDFLARE_ACCOUNT_ID`は旧公開経路用であり、variable登録とは別に既存値を維持する。`PRODUCTION_WORKER_URL` / `DEVELOPMENT_WORKER_URL`には同アカウントの各Workerの実workers.dev URLを登録する。URLはCloudflare出力で確認し、検証fixtureを登録しない。
 5. `github-pages` Environmentの許可branchとPages Actions設定を確認。新publisherのGITHUB_TOKENにはcontents:write、pages:write、id-token:writeが必要。保存ブランチ`pages-verified`は2026-11-11に`232205c5efc7f86df8d70432a62224e82b4fb0ed`で初期化済み。`state.json`は`{"version":1,"current":{},"pending":null}`で、公開snapshotは未登録。再作成せず、まず現状を取得・検証する。別リポジトリで初期化する場合も取得失敗を空状態と判断せず、明示的に初期台帳を作る。main/developのソースファイルを混ぜず、Git履歴を保持する。削除・force pushを禁止する。
 6. 旧公開を進行中のまま切り替えない。旧production-deployを完了させ、本番SW移行版の公開・既存PWA更新を検証してから新経路を有効化する。移行中にdevelopを公開しない。
-7. main/develop両方に検証済みworkflowを配置後、`DUAL_PAGES_ENABLED=true`を登録。旧deploy.ymlのdetect-changesが停止する。新経路はさらに手動dispatch `publish=true`を要求する。初回はmainの公開を先に実行し、検証済み本番snapshotをbootstrapする。空の本番をdevで上書きすることはできない。
+7. 今回採用する初期登録は[切替手順Phase 2〜5](issue-47-cutover.md)：旧経路で本番PWAを先行移行・実機確認し、その実公開artifactを再ビルドせず保存branchへ登録する。旧run終了・旧workflow Disable後にフラグを有効化し、最初の新経路公開をdevelopで行う。登録済みと同じmain SHAの再publishは拒否される。空の本番をdevで上書きすることはできない。フラグだけでは現在mainの旧workflowや開始済みrunを停止できない。
 
 今回の変更はアカウント共有方式への切替に限定し、誤設定リスクへの追加対策や権限分離の強化は行わない。Workers編集tokenは同一アカウント内の他Workerへ権限を持つ場合があり、別EnvironmentをCloudflare権限の隔離とみなさない。
 
-外部設定はこの作業では未確認。API権限がない場合はSettingsでユーザーが登録・確認する。設定完了後も公開前のチェックは省略しない。
+外部設定の最新確認範囲は[2026-11-12移行前記録](../verification/issue-47-preflight-2026-11-12.md)を参照。Variables/Secrets一覧APIは403。Pagesとbranch制限は確認済み。Actions入力の両URLには末尾slashがあり、新公開前にユーザーが修正する。設定完了後も公開前のチェックは省略しない。
 
 ## 開発Workerの初回作成
 
