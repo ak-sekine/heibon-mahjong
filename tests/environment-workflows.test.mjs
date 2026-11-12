@@ -20,6 +20,9 @@ test('production and development configs bind their own DO namespace, with no ex
 });
 test('development worker job never references production token, and push cannot publish during migration', () => {
   const workflow = read('.github/workflows/environments.yml');
+  assert(workflow.includes('test -s artifacts/itch/heibon-mahjong.zip'));
+  assert(workflow.includes('node scripts/environments/artifacts.mjs verify dist'));
+  assert(workflow.includes('node scripts/environments/artifacts.mjs verify dist-dev'));
   const dev = workflow.split('  worker-development:')[1].split('  online:')[0];
   assert(!dev.includes('CLOUDFLARE_PRODUCTION_API_TOKEN'));
   assert(!dev.includes('wrangler.jsonc'));

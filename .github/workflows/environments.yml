@@ -66,8 +66,11 @@ jobs:
           VITE_ONLINE_API_URL="$PRODUCTION_URL" npm run build
           VITE_ONLINE_API_URL="$DEVELOPMENT_URL" npm run build:dev
           VITE_ONLINE_API_URL=https://online-mock.invalid npm run build:itch
+          test -s artifacts/itch/heibon-mahjong.zip
           node scripts/environments/artifacts.mjs seal dist production "$GITHUB_SHA" "$PRODUCTION_URL"
           node scripts/environments/artifacts.mjs seal dist-dev development "$GITHUB_SHA" "$DEVELOPMENT_URL"
+          node scripts/environments/artifacts.mjs verify dist
+          node scripts/environments/artifacts.mjs verify dist-dev
       - uses: actions/upload-artifact@v4
         with:
           name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
