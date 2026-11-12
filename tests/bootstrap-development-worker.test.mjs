@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { bootstrap, actualUrl, validateConfig, verifyNamespaces, verifyRateLimiter, requestMessage } from '../.github/scripts/bootstrap-development-worker.mjs';
 const config = JSON.parse(readFileSync('wrangler.development.jsonc'));
@@ -122,4 +123,20 @@ test('inspection entry uses only read requests and emits selected metadata', () 
   assert(!script.includes("method: 'POST'"));
   assert(!script.includes('wrangler'));
   assert(script.includes("filter(b => b.type === 'durable_object_namespace')"));
+});
+
+test('completion only deploys triggers for the inspected existing dev settings', async () => {
+  const f = fixture({ BOOTSTRAP_REQUEST: 'bootstrap: complete development Worker (Issue #47)' });
+  const original = f.request;
+  f.operation = 'complete';
+  f.env.EXPECTED_DEVELOPMENT_SETTINGS_SHA256 = createHash('sha256').update(JSON.stringify(settings('dev'))).digest('hex');
+  f.request = async (target, options) => target.includes('online-dev/settings') ? Response.json({ success: true, result: settings('dev') }) : original(target, options);
+  f.cli = (command, args) => {
+    if (command === 'gh') return f.env.GITHUB_SHA;
+    assert.deepEqual(args, ['triggers', 'deploy', '--config', 'wrangler.development.jsonc']);
+    return url;
+  };
+  assert.equal(await bootstrap(f), url);
+  f.env.EXPECTED_DEVELOPMENT_SETTINGS_SHA256 = 'wrong';
+  await assert.rejects(bootstrap(f), /settings changed/);
 });

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, appendFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
 export const requestMessage = 'bootstrap: create development Worker (Issue #47)';
@@ -39,11 +40,12 @@ export function verifyNamespaces(prod, dev) {
   assert.notEqual(development[0].namespace_id, development[1].namespace_id);
   return development.map(({ name, class_name, namespace_id }) => ({ name, class_name, namespace_id }));
 }
-export async function bootstrap({ env = process.env, cli = execFileSync, request = fetch, append = appendFileSync } = {}) {
+export async function bootstrap({ operation = 'create', env = process.env, cli = execFileSync, request = fetch, append = appendFileSync } = {}) {
   assert.equal(env.GITHUB_REPOSITORY, 'ak-sekine/heibon-mahjong');
   assert.equal(env.GITHUB_EVENT_NAME, 'push');
   assert.equal(env.GITHUB_REF, 'refs/heads/develop');
-  assert.equal(env.BOOTSTRAP_REQUEST, requestMessage);
+  assert(['create', 'complete'].includes(operation));
+  assert.equal(env.BOOTSTRAP_REQUEST, operation === 'create' ? requestMessage : 'bootstrap: complete development Worker (Issue #47)');
   assert.match(env.GITHUB_SHA ?? '', /^[a-f0-9]{40}$/);
   assert(env.CLOUDFLARE_API_TOKEN && /^[a-f0-9]{32}$/.test(env.CLOUDFLARE_ACCOUNT_ID ?? ''), 'Missing Cloudflare configuration');
   validateConfig(JSON.parse(readFileSync('wrangler.development.jsonc', 'utf8')));
@@ -62,16 +64,22 @@ export async function bootstrap({ env = process.env, cli = execFileSync, request
     return data.result;
   };
   const prodBefore = await api('heibon-mahjong-online/settings');
-  assert.equal(await api('heibon-mahjong-online-dev/settings', true), null, 'Development Worker already exists; bootstrap refuses to update it');
+  const existing = await api('heibon-mahjong-online-dev/settings', true);
+  if (operation === 'create') assert.equal(existing, null, 'Development Worker already exists; bootstrap refuses to update it');
+  else {
+    assert(existing, 'Incomplete Worker must already exist');
+    assert.equal(createHash('sha256').update(JSON.stringify(existing)).digest('hex'), env.EXPECTED_DEVELOPMENT_SETTINGS_SHA256, 'Inspected development settings changed');
+    verifyNamespaces(prodBefore, existing);
+  }
   fresh();
   let output;
   try {
-    output = cli('node_modules/.bin/wrangler', ['deploy', '--config', 'wrangler.development.jsonc'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    output = cli('node_modules/.bin/wrangler', operation === 'create' ? ['deploy', '--config', 'wrangler.development.jsonc'] : ['triggers', 'deploy', '--config', 'wrangler.development.jsonc'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   } catch (error) {
     const diagnostic = String(error.stderr ?? '');
     const codes = [...new Set([...diagnostic.matchAll(/\[code:\s*(\d+)\]/g)].map(match => match[1]))];
     const category = /authenticat|authoriz|permission/i.test(diagnostic) ? 'authorization' : /migration|durable object/i.test(diagnostic) ? 'durable-object' : 'unclassified';
-    throw new Error(`Development deployment failed; category=${category}; Cloudflare codes=${codes.join(',') || 'none'}; raw output suppressed. Inspect Cloudflare before retrying.`);
+    throw new Error(`Development deployment failed; category=${category}; Cloudflare codes=${codes.join(',') || 'none'}; exit=${Number.isInteger(error.status) ? error.status : 'unknown'}; signal=${['SIGTERM', 'SIGKILL'].includes(error.signal) ? error.signal : 'none'}; raw output suppressed. Inspect Cloudflare before retrying.`);
   }
   const url = actualUrl(output);
   // Preserve the actual endpoint even if subsequent verification fails. Never register it automatically.
@@ -107,6 +115,6 @@ export async function verifyRateLimiter(url, request = fetch) {
   throw new Error('Development RATE_LIMITER did not enforce its quota');
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  try { if (process.argv[2] === 'rate-limit') await verifyRateLimiter(process.env.ONLINE_API_URL); else await bootstrap(); }
+  try { if (process.argv[2] === 'rate-limit') await verifyRateLimiter(process.env.ONLINE_API_URL); else await bootstrap({ operation: process.argv[2] ?? 'create' }); }
   catch (error) { console.error(error.message.includes('Cloudflare') || error.message.includes('deployment failed') ? error.message : 'Bootstrap verification failed. Inspect configuration and safe summary; no automatic retry.'); process.exitCode = 1; }
 }

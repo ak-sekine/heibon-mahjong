@@ -8,7 +8,7 @@ permissions:
 jobs:
   prepare:
     if: >-
-      ${{ github.repository == 'ak-sekine/heibon-mahjong' && github.event.head_commit.message == 'bootstrap: create development Worker (Issue #47)' }}
+      ${{ github.repository == 'ak-sekine/heibon-mahjong' && (github.event.head_commit.message == 'bootstrap: create development Worker (Issue #47)' || github.event.head_commit.message == 'bootstrap: complete development Worker (Issue #47)') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,9 +37,12 @@ jobs:
       - run: npm ci
       - id: create
         name: Create absent development Worker and verify actual URL and DO bindings
-        run: node .github/scripts/bootstrap-development-worker.mjs
+        run: node .github/scripts/bootstrap-development-worker.mjs "$BOOTSTRAP_OPERATION"
         env:
           GH_TOKEN: ${{ github.token }}
+          BOOTSTRAP_OPERATION: >-
+            ${{ github.event.head_commit.message == 'bootstrap: complete development Worker (Issue #47)' && 'complete' || 'create' }}
+          EXPECTED_DEVELOPMENT_SETTINGS_SHA256: 750d7549649787febbaa88e8b5eac688ee19b29c724be559ae6e991e8850934d
           BOOTSTRAP_REQUEST: ${{ github.event.head_commit.message }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
