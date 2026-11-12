@@ -78,3 +78,9 @@ stageは欠落/破損/未登録本番/URL変化/古いSHA/同SHA再実行/pendin
 5. 実公開後の両URL/E2E/実機/PWA分離と全hashは未実施。全ユーザーの長期offline旧SW消滅は保証しない。共通origin/共通accountはセキュリティ境界ではない。
 
 Issue #47の公開・実機を含む受入条件は未完。Openを維持し、今回の準備完了とIssue全体の完了を区別する。
+
+## 記録保存と最終照合先
+
+テスト修正`e5829ad5839bc5dba3be4264d93131f131b57b03`、手順・証跡文書`daeeba1fc42fa0d5f5d5ae31e2a366537213b5a8`をdevelopへpushし、各push後のremote SHAを取得して一致を確認。文書commit後もmainは`cb457bb0dfe00455adf66d5f8c51284d0d00081f`、pages-verifiedは`232205c5efc7f86df8d70432a62224e82b4fb0ed`のまま。
+
+この記録のCI状態は文書保存時点のスナップショット。最終develop SHA、終了時3branch照合、CI全UI/auditの確定結果、公開job skip、作業ツリー・Issue Openの最終確認は[Issue #47の当作業検証コメント](https://github.com/ak-sekine/heibon-mahjong/issues/47#issuecomment-6826156964)へ同じコメントの追記として記録する。進行中を成功とみなさず、全ゲート結果を確認してから作業を終了する。最終文書pushで自動起動したrunもそこで照合する。

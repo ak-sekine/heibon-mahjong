@@ -17,7 +17,7 @@
 ## 外部設定（未設定を成功扱いしない）
 
 1. 本番・開発で同一のCloudflareアカウントを使用し、workers.devを初期化。WorkersとSQLite DOを有効化する。Worker名は本番`heibon-mahjong-online`、開発`heibon-mahjong-online-dev`を維持する。
-2. GitHub Environment `worker-production`をmain限定にし、secret `CLOUDFLARE_PRODUCTION_API_TOKEN`を登録する。旧公開経路のrepository secretは旧公開終了まで維持し、切替後に削除する既存手順を維持する。
+2. GitHub Environment `worker-production`をmain限定にし、secret `CLOUDFLARE_PRODUCTION_API_TOKEN`を登録する。旧公開経路のrepository secretは維持する。削除は今回の切替作業に含めず、別途ユーザーの明示的許可を得る。
 3. `worker-development`はdevelop限定にし、同じCloudflareアカウント用のtokenをEnvironment secret `CLOUDFLARE_DEVELOPMENT_API_TOKEN`へ登録する。Secretsの登録先・名前は本番と区別する。tokenをチャットやリポジトリへ貼らない。DO migrationsは各Workerに適用され、ROOMS / RATE_LIMITERは各Worker自身のクラスへbindする。外部Workerのscript_nameやnamespace IDを指定しないため、クラス名・migration tagが同じでも状態は共有されない。
 4. repository variable `CLOUDFLARE_ACCOUNT_ID`に共通アカウントIDを登録する。新経路の両Worker jobはこの変数を参照する。旧`CLOUDFLARE_PRODUCTION_ACCOUNT_ID` / `CLOUDFLARE_DEVELOPMENT_ACCOUNT_ID`は新経路では不要。旧deploy.ymlの同名repository **secret** `CLOUDFLARE_ACCOUNT_ID`は旧公開経路用であり、variable登録とは別に既存値を維持する。`PRODUCTION_WORKER_URL` / `DEVELOPMENT_WORKER_URL`には同アカウントの各Workerの実workers.dev URLを登録する。URLはCloudflare出力で確認し、検証fixtureを登録しない。
 5. `github-pages` Environmentの許可branchとPages Actions設定を確認。新publisherのGITHUB_TOKENにはcontents:write、pages:write、id-token:writeが必要。保存ブランチ`pages-verified`は2026-11-11に`232205c5efc7f86df8d70432a62224e82b4fb0ed`で初期化済み。`state.json`は`{"version":1,"current":{},"pending":null}`で、公開snapshotは未登録。再作成せず、まず現状を取得・検証する。別リポジトリで初期化する場合も取得失敗を空状態と判断せず、明示的に初期台帳を作る。main/developのソースファイルを混ぜず、Git履歴を保持する。削除・force pushを禁止する。
