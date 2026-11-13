@@ -5,7 +5,7 @@
 Phase 2開始前の読み取り専用ライブ確認は成功しました。GitHub-hosted runnerから本番WorkerとGitHub PagesへHTTPSで到達し、Worker health、公開SHA、Worker/Pages deployment、Pages公開ファイルのSHA-256を照合しました。
 
 - ライブ確認workflow: [run 43409062362](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43409062362)、develop `a61dd0cdca1d9fb389642e4cb9aaedff4b1f3d2f`、completed/success。
-- develop CI: [run 43409062345](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43409062345)。verify、local-online、Chromium/WebKit分離検証はsuccess。Browser UIとmatrix auditは記録作成時点で進行中。直前の全CI完了successは[run 43327587018](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43327587018)（`a6e0561`）。各runの状態を混同しない。
+- develop CI: [run 43409062345](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43409062345)、`a61dd0c`、completed/success。verify、local-online、Chromium/WebKit環境分離、Browser UI両engine、matrix auditがすべてsuccess。Worker production/development、online、publishはskip。文書commit `9ef84cf`でもverify/local-online/環境分離はsuccessし、Browser UIは別runで継続中のため、runを区別して記録する。
 - Issue #47はOpenのまま。Phase 2公開は開始していない。
 
 ## 接続とhealth
@@ -18,7 +18,7 @@ Phase 2開始前の読み取り専用ライブ確認は成功しました。GitH
 | CORS | `access-control-allow-origin: https://ak-sekine.github.io` |
 | Pages HTTPS | `https://ak-sekine.github.io/heibon-mahjong/`と全公開ファイルへのHTTP GET成功 |
 
-接続エラー、HTTPエラー、認証エラーは発生しませんでした。初回2回の診断runは確認スクリプトの応答形式／artifact前提の誤りで失敗し、成功扱いしていません。最終runはCloudflare APIのページング形式も反映して再実行しました。
+接続エラー、HTTPエラー、認証エラーは発生しませんでした。初期診断runは確認スクリプトのCloudflare応答形式／Pages artifact前提の誤りで3回失敗し、成功扱いしていません。最終runはCloudflare APIのページング形式も反映して再実行しました。
 
 ## SHAとdeploymentの照合
 
@@ -63,7 +63,7 @@ manifestの`id`、`start_url`、`scope`はいずれも`/heibon-mahjong/`でし�
 
 ## CIとライブ確認を分けた判定
 
-- **CI:** run `43409062345`。verify（npm test、TypeScript/Worker型検査、本番/開発/itch buildとseal）、local-online、Chromium/WebKit分離テストはsuccess。Browser UIとmatrix auditは記録作成時点で進行中。比較用の直前全CI successはrun `43327587018`であり、このライブ確認用commitのCI完了結果としては扱わない。
+- **CI:** run `43409062345` on `a61dd0c`はcompleted/success。verify（npm test、TypeScript/Worker型検査、本番/開発/itch buildとseal）、local-online、Chromium/WebKit分離テスト、Browser UI両engine、matrix auditがsuccess。worker-production、worker-development、online、publishはskip。文書commit `9ef84cf`のrun `43409994632`ではverify/local-online/環境分離がsuccessし、Browser UIが実行中の状態を別記録として維持する。
 - **ライブ確認:** run `43409062362` success。Worker health/CORS、Cloudflare deployment/version、Pages 16ファイルのHTTP/hash照合すべて成功。
 - **未確認:** iPhone Safariでのインストール済みPWA更新、保存状態維持、offline CPU、オンライン対局と再接続。今回はGETのみで対局・ルーム作成を行っていない。実Pages artifactそのものとの直接比較はartifact保持制約により未実施で、SHA固定の再現buildを比較元に使用。
 
