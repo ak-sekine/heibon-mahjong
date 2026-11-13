@@ -1,0 +1,27 @@
+name: Issue 47 production live audit
+run-name: Issue 47 live audit @ ${{ github.sha }}
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/production-live-audit.yml'
+      - 'scripts/environments/production-live-audit.mjs'
+
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read-only production Worker and Pages audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/environments/production-live-audit.mjs
