@@ -7,6 +7,10 @@ on:
     paths:
       - '.github/workflows/production-live-audit.yml'
       - 'scripts/environments/production-live-audit.mjs'
+  workflow_run:
+    workflows: [Deploy to GitHub Pages and Cloudflare Workers]
+    branches: [main]
+    types: [completed]
 
 permissions:
   contents: read
@@ -15,9 +19,24 @@ permissions:
 
 jobs:
   audit:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Verify legacy account secret without exposing its value
+        env:
+          LEGACY_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCOUNT_ID_VARIABLE: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$LEGACY_CLOUDFLARE_ACCOUNT_ID" || "$LEGACY_CLOUDFLARE_ACCOUNT_ID" != "$CLOUDFLARE_ACCOUNT_ID_VARIABLE" ]]; then
+            echo '::error::Legacy Cloudflare account ID secret is missing or does not match the repository variable.'
+            exit 1
+          fi
+          echo 'Legacy production Cloudflare account secret is present and matches the repository variable.'
       - name: Read-only production Worker and Pages audit
         env:
           GH_TOKEN: ${{ github.token }}

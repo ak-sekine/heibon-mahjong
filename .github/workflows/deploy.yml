@@ -316,6 +316,13 @@ jobs:
         env:
           VITE_ONLINE_API_URL: ${{ needs.deploy-worker.outputs.worker_url }}
         run: npm run build:itch
+      - name: Preserve the exact Pages publication source
+        uses: actions/upload-artifact@v4
+        with:
+          name: published-pages-${{ github.sha }}-${{ github.run_attempt }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 90
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

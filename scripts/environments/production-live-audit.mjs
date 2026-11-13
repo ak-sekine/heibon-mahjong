@@ -9,11 +9,12 @@ const ghToken = process.env.GH_TOKEN;
 const cfToken = process.env.CLOUDFLARE_API_TOKEN;
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 const pagesUrl = 'https://ak-sekine.github.io/heibon-mahjong/';
+const developmentPagesUrl = 'https://ak-sekine.github.io/heibon-mahjong/dev/';
 const workerUrl = 'https://heibon-mahjong-online.ak-sekine.workers.dev';
 const approvedOrigin = 'https://ak-sekine.github.io';
 const api = 'https://api.github.com';
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'issue47-live-'));
-const report = { outcome: 'FAIL', pagesUrl, workerUrl, approvedOrigin, files: [] };
+const report = { outcome: 'FAIL', pagesUrl, developmentPagesUrl, workerUrl, approvedOrigin, files: [] };
 const liveBytesByPath = new Map();
 
 function fail(kind, label, detail = '') {
@@ -80,7 +81,8 @@ async function getPagesArtifact(pagesSha) {
     const pageJob = (jobs.jobs || []).find((job) => job.name === 'pages-deploy' && job.conclusion === 'success');
     if (!pageJob) continue;
     const artifacts = await ghJson(`${base}/actions/runs/${run.id}/artifacts?per_page=100`, `Pages source run ${run.id} artifacts`);
-    const artifact = (artifacts.artifacts || []).find((item) => item.name === 'github-pages' && !item.expired);
+    const artifact = (artifacts.artifacts || []).find((item) => item.name === `published-pages-${pagesSha}-${run.run_attempt}` && !item.expired)
+      || (artifacts.artifacts || []).find((item) => item.name === 'github-pages' && !item.expired);
     if (!artifact) {
       const sourceInfo = await getPublicBuildInfo(pagesSha);
       const sourceDir = path.join(tmp, 'source');
@@ -110,16 +112,21 @@ async function getPagesArtifact(pagesSha) {
     }
     const response = await get(artifact.archive_download_url, `Pages artifact ${artifact.id}`, ghHeaders(), 'AUTH_ERROR');
     const zip = Buffer.from(await response.arrayBuffer());
-    const zipPath = path.join(tmp, 'github-pages.zip');
+    report.pagesArtifactZipSha256 = sha256(zip);
+    const zipPath = path.join(tmp, 'pages-source.zip');
     const tarPath = path.join(tmp, 'artifact.tar');
     const distPath = path.join(tmp, 'dist');
     writeFileSync(zipPath, zip);
     try {
-      writeFileSync(tarPath, execFileSync('unzip', ['-p', zipPath, 'artifact.tar'], { maxBuffer: 256 * 1024 * 1024 }));
       execFileSync('mkdir', ['-p', distPath]);
-      execFileSync('tar', ['-xf', tarPath, '-C', distPath]);
+      if (artifact.name.startsWith('published-pages-')) {
+        execFileSync('unzip', ['-q', zipPath, '-d', distPath]);
+      } else {
+        writeFileSync(tarPath, execFileSync('unzip', ['-p', zipPath, 'artifact.tar'], { maxBuffer: 256 * 1024 * 1024 }));
+        execFileSync('tar', ['-xf', tarPath, '-C', distPath]);
+      }
     } catch {
-      fail('DATA_ERROR', `Pages artifact ${artifact.id}`, 'unable to extract github-pages artifact.tar');
+      fail('DATA_ERROR', `Pages artifact ${artifact.id}`, 'unable to extract Pages source archive');
     }
     let root = distPath;
     const locateIndex = (folder) => {
@@ -135,7 +142,7 @@ async function getPagesArtifact(pagesSha) {
     const foundRoot = locateIndex(distPath);
     if (!foundRoot) fail('DATA_ERROR', `Pages artifact ${artifact.id}`, 'index.html missing');
     root = foundRoot;
-    report.pagesArtifactKind = 'github-pages';
+    report.pagesArtifactKind = artifact.name.startsWith('published-pages-') ? 'published-pages' : 'github-pages';
     return { runId: run.id, artifactId: artifact.id, root };
   }
   fail('DATA_ERROR', 'Pages source artifact', `no retained successful artifact for SHA ${pagesSha}`);
@@ -178,6 +185,18 @@ async function main() {
   report.pagesDeployment = pagesDeployment;
   report.workerGitHubDeployment = workerRecord;
   report.pagesDeploymentMatchesWorkerRecord = pagesDeployment.sha === workerRecord.sha;
+
+  let developmentPagesResponse;
+  try {
+    developmentPagesResponse = await fetch(developmentPagesUrl, { cache: 'no-store', redirect: 'follow', signal: AbortSignal.timeout(30000) });
+  } catch (error) {
+    const code = error?.cause?.code || error?.name || 'network failure';
+    fail('CONNECTION_ERROR', 'development GitHub Pages URL', code);
+  }
+  if (developmentPagesResponse.status !== 404) {
+    fail('LIVE_CHECK_FAILED', 'development GitHub Pages URL', `expected HTTP 404, got ${developmentPagesResponse.status}`);
+  }
+  report.developmentPagesStatus = developmentPagesResponse.status;
 
   const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/heibon-mahjong-online/deployments`;
   try {
@@ -283,6 +302,7 @@ try {
     '',
     `- Outcome: **${report.outcome}**`,
     `- Main HEAD SHA: ${report.mainHeadSha || 'unavailable'}`,
+    `- Development Pages unpublished: ${report.developmentPagesStatus === 404 ? 'HTTP 404' : 'unavailable'}`,
     `- GitHub Pages deployment: ${report.pagesDeployment ? `${report.pagesDeployment.id} / ${report.pagesDeployment.sha}` : 'unavailable'}`,
     `- GitHub Worker deployment record: ${report.workerGitHubDeployment ? `${report.workerGitHubDeployment.id} / ${report.workerGitHubDeployment.sha}` : 'unavailable'}`,
     `- Pages/Worker recorded SHA match: ${report.pagesDeploymentMatchesWorkerRecord ?? 'unavailable'}`,
@@ -290,6 +310,7 @@ try {
     `- Cloudflare version IDs: ${report.cloudflareWorkerDeployment?.versionIds?.join(', ') || 'unavailable'}`,
     `- Worker health: ${report.workerHealth ? `HTTP ${report.workerHealth.status}; ${JSON.stringify(report.workerHealth.body)}; allow-origin=${report.workerHealth.allowOrigin}` : 'unavailable'}`,
     `- Pages artifact: run ${report.pagesSourceRunId || 'unavailable'}, artifact ${report.pagesArtifactId || 'unavailable'}`,
+    `- Pages artifact ZIP SHA-256: ${report.pagesArtifactZipSha256 || 'unavailable'}`,
     `- Pages comparison source: ${report.pagesArtifactKind || 'unavailable'}${report.pagesBuildInfo ? ` (${report.pagesBuildInfo.sha}, build ${report.pagesBuildInfo.buildTimeUtc})` : ''}`,
     `- Static files compared: ${report.fileCount ?? report.files.length}`,
     '',
