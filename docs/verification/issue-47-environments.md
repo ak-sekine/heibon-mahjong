@@ -175,3 +175,31 @@ B7以後の追記は公開制御のWorker URL照合、Git競合回帰テスト�
 以上を既存の公開移行手順に照らし、**Phase 2：完了**と判定する。この判定はIssue #47全体の受入条件達成を意味しない。全体の残件として、更新前後のオンライン参加・再接続情報の保持、iPhone実機でのオンライン対局・再接続、iOS/Safariバージョン詳細を維持する。
 
 Phase 3以降は未着手。[Issue #47のPhase 2完了報告](https://github.com/ak-sekine/heibon-mahjong/issues/47#issuecomment-6855362022)を追記した。Issue #47はOpen。Phase 3の初期登録、旧workflow停止、公開フラグ変更、新workflow publishは今回行っていない。
+
+## 2026-11-13 Chromium PWA CI recovery
+
+### 原因と修正
+
+対象だった[失敗run 43440434724](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43440434724)はdevelop SHA `e026828a2de6f4a9b594cd8e9f3e47e6e9c704c3`で、Chromiumの`tests/browser-pwa.py:273`が`-v2-retry` cacheを見つけられず失敗した。ログのcache一覧は旧cacheと`-v2`で、期待した`-v2-retry`はなかった。
+
+コード調査で、`registration.update()`の完了後に行う`!registration.installing && !registration.waiting`確認は、どのinstall eventが終了したかを示さず、別のupdate checkが進行・待機していないことも保証しないと分かった。テストは失敗対象assetへの503を確認していたが、最初の`-v2` installが`redundant`になるまでのstate transitionを記録せず、復旧後に実際に配信されたworker scriptが`-v2-retry`であることも確認していなかった。そのため、test serverの失敗経路を戻しscriptを書き換えた後、まだ重なっていたupdate checkが古い`-v2`をinstallしても、テストはretryと区別できなかった。これはテスト同期と観測不足であり、`src/pwa/register.ts`のユーザー承認・複数タブ制御や`build-pwa.mjs`のinstall/activate処理の不具合を示す結果ではない。
+
+失敗runはworker state transitionと配信script bodyを記録していなかったため、個別のChromiumがどのupdate requestから`-v2`をinstallしたか、retry script取得前にassertionへ到達したかまでは過去ログだけでは区別できない。確定した原因はテストが失敗installの終了とretryのscript/cache対応を保証していなかったことであり、上記の古いworkerが重なった経路はその競合で可能な説明として扱う。
+
+`tests/browser-pwa.py`のみを変更した。最初の更新で`updatefound`とworker state changeを追跡し、失敗workerが`redundant`になりregistrationがinstalling/waitingなしへ落ち着いてから配信経路を戻す。HTTP handlerは応答したworker scriptのcache名とSHA-256を記録する。再試行では実際に`-v2-retry` scriptが配信されたこと、`installed` workerが`waiting`に残ること、その名前のCache Storage entryがあることを確認する。旧cache保持、CPU対局継続、ユーザー承認前にreloadしないこと、複数タブ制御、オフラインCPU起動の既存assertは維持した。cache名assert、skip、固定sleepは追加・緩和していない。アプリ実装は変更していない。
+
+BrokenPipeは元runでHTTP handlerがレスポンスを書いている最中に接続が閉じた記録である。修正後のChromium PWAテストでも`do_GET`から`BrokenPipeError`が記録されたが、同じPWAケースはsuccessした。HTTP writeの副次エラーであり、cache assertionの原因ではないことを確認した。どのbrowser-side actionがその個別接続を閉じたかまではログにない。
+
+### 修正後検証
+
+| 検証 | 結果 |
+|---|---|
+| [develop CI run 43523795023](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43523795023)、SHA `f2952c7eaeac189a249fa5e8e9523eccbe4f30e2` | verify、local-online、Chromium/WebKit環境分離、Chromium/WebKit Browser UI、matrix auditがすべてsuccess。worker-development、worker-production、online、publishはすべてskip。 |
+| Chromium `tests/browser-pwa.py` | success、5.825秒。precache失敗後の旧PWA/cache保持、`-v2-retry`再取得とwaiting cache、更新通知、複数タブ制御、承認後更新、オフラインCPUを含むPWA suiteが通過。CPU対局は承認前にreloadしなかった。 |
+| WebKit `tests/browser-pwa.py` | success、5.899秒。同じPWA受入項目が通過。 |
+| local `npm test` | 91/91 success。 |
+| local型検査 | `npm run typecheck`、`npm run typecheck:worker` success。 |
+| local build | production Pages、development Pages、itch.io build/ZIPがsuccess。Pages用Worker URLは`.validation.workers.dev`の検証fixture、itchは`https://online-mock.invalid`。公開先ではない。 |
+| `git diff --check` / Python compile | success。 |
+
+独立した2回目の全体runは、検証記録を含む次のdevelop commitで確認する。Phase 2完了判定を維持し、Issue #47はOpen。Phase 3の初期登録は未開始。production Pages、Worker、Durable Objects、`pages-verified`、`DUAL_PAGES_ENABLED`はいずれも今回変更していない。main `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`、pages-verified `232205c5efc7f86df8d70432a62224e82b4fb0ed`。
