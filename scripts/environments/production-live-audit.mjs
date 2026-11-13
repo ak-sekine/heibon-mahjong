@@ -14,6 +14,7 @@ const approvedOrigin = 'https://ak-sekine.github.io';
 const api = 'https://api.github.com';
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'issue47-live-'));
 const report = { outcome: 'FAIL', pagesUrl, workerUrl, approvedOrigin, files: [] };
+const liveBytesByPath = new Map();
 
 function fail(kind, label, detail = '') {
   throw new Error(`${kind}: ${label}${detail ? ` (${detail})` : ''}`);
@@ -80,7 +81,33 @@ async function getPagesArtifact(pagesSha) {
     if (!pageJob) continue;
     const artifacts = await ghJson(`${base}/actions/runs/${run.id}/artifacts?per_page=100`, `Pages source run ${run.id} artifacts`);
     const artifact = (artifacts.artifacts || []).find((item) => item.name === 'github-pages' && !item.expired);
-    if (!artifact) continue;
+    if (!artifact) {
+      const sourceInfo = await getPublicBuildInfo(pagesSha);
+      const sourceDir = path.join(tmp, 'source');
+      try {
+        execFileSync('git', ['fetch', '--depth=1', 'origin', pagesSha], { stdio: 'pipe' });
+        execFileSync('git', ['worktree', 'add', '--detach', sourceDir, pagesSha], { stdio: 'pipe' });
+        const configPath = path.join(sourceDir, 'vite.config.ts');
+        const config = readFileSync(configPath, 'utf8');
+        const original = 'const buildTimeUtc = new Date().toISOString();';
+        if (!config.includes(original)) fail('DATA_ERROR', 'Pages source build', 'build timestamp expression changed');
+        writeFileSync(configPath, config.replace(original, 'const buildTimeUtc = new Date(process.env.REPRODUCED_BUILD_TIME).toISOString();'));
+        const buildEnv = { PATH: process.env.PATH, HOME: process.env.HOME, CI: 'true' };
+        execFileSync('npm', ['ci'], { cwd: sourceDir, env: buildEnv, stdio: 'pipe', maxBuffer: 16 * 1024 * 1024 });
+        execFileSync('npm', ['run', 'build'], {
+          cwd: sourceDir,
+          env: { ...buildEnv, REPRODUCED_BUILD_TIME: sourceInfo.buildTimeUtc, VITE_ONLINE_API_URL: workerUrl },
+          stdio: 'pipe',
+          maxBuffer: 16 * 1024 * 1024,
+        });
+      } catch (error) {
+        if (error?.message?.startsWith('DATA_ERROR:')) throw error;
+        fail('REPRODUCTION_ERROR', 'Pages source build', error?.status ? `command exit ${error.status}` : 'build could not be reproduced');
+      }
+      report.pagesArtifactKind = 'reproducible-build';
+      report.pagesBuildInfo = sourceInfo;
+      return { runId: run.id, artifactId: null, root: path.join(sourceDir, 'dist') };
+    }
     const response = await get(artifact.archive_download_url, `Pages artifact ${artifact.id}`, ghHeaders(), 'AUTH_ERROR');
     const zip = Buffer.from(await response.arrayBuffer());
     const zipPath = path.join(tmp, 'github-pages.zip');
@@ -108,9 +135,33 @@ async function getPagesArtifact(pagesSha) {
     const foundRoot = locateIndex(distPath);
     if (!foundRoot) fail('DATA_ERROR', `Pages artifact ${artifact.id}`, 'index.html missing');
     root = foundRoot;
+    report.pagesArtifactKind = 'github-pages';
     return { runId: run.id, artifactId: artifact.id, root };
   }
   fail('DATA_ERROR', 'Pages source artifact', `no retained successful artifact for SHA ${pagesSha}`);
+}
+
+async function getPublicBuildInfo(expectedSha) {
+  const htmlResponse = await get(pagesUrl, 'GitHub Pages index.html');
+  const htmlBytes = Buffer.from(await htmlResponse.arrayBuffer());
+  const html = htmlBytes.toString('utf8');
+  liveBytesByPath.set('index.html', htmlBytes);
+  const scriptRef = [...html.matchAll(/(?:src|href)=["']([^"']+\.js(?:\?[^"']*)?)["']/gi)]
+    .map((match) => match[1])
+    .find((value) => value.includes('/assets/'));
+  if (!scriptRef) fail('DATA_ERROR', 'GitHub Pages index.html', 'bundled JavaScript reference missing');
+  const scriptUrl = new URL(scriptRef, pagesUrl);
+  const scriptPath = scriptUrl.pathname.replace(/^\/heibon-mahjong\//, '');
+  const scriptResponse = await get(scriptUrl.href, `GitHub Pages ${scriptPath}`);
+  const scriptBytes = Buffer.from(await scriptResponse.arrayBuffer());
+  liveBytesByPath.set(scriptPath, scriptBytes);
+  const bundle = scriptBytes.toString('utf8');
+  const sha = bundle.match(/["']?gitSha["']?\s*:\s*["']([0-9a-f]{40})["']/i)?.[1]?.toLowerCase();
+  const buildTimeUtc = bundle.match(/["']?buildTimeUtc["']?\s*:\s*["']([^"']+)["']/)?.[1];
+  if (sha !== expectedSha.toLowerCase() || !buildTimeUtc || !Number.isFinite(Date.parse(buildTimeUtc))) {
+    fail('LIVE_CHECK_FAILED', 'deployed Pages build metadata', `git SHA match=${sha === expectedSha.toLowerCase()} build timestamp=${Boolean(buildTimeUtc)}`);
+  }
+  return { sha, buildTimeUtc, scriptPath };
 }
 
 async function main() {
@@ -197,12 +248,16 @@ async function main() {
   for (const rel of relativeFiles) {
     const bytes = expectedFiles.get(rel);
     const url = new URL(rel.split('/').map(encodeURIComponent).join('/'), pagesUrl).href;
-    const response = await get(url, `GitHub Pages ${rel}`);
-    const liveBytes = Buffer.from(await response.arrayBuffer());
+    let response = null;
+    let liveBytes = liveBytesByPath.get(rel);
+    if (!liveBytes) {
+      response = await get(url, `GitHub Pages ${rel}`);
+      liveBytes = Buffer.from(await response.arrayBuffer());
+    }
     const expectedHash = sha256(bytes);
     const liveHash = sha256(liveBytes);
     const matches = expectedHash === liveHash;
-    report.files.push({ path: rel, status: response.status, artifactSha256: expectedHash, liveSha256: liveHash, matches });
+    report.files.push({ path: rel, status: response?.status ?? 200, artifactSha256: expectedHash, liveSha256: liveHash, matches });
     if (!matches) fail('LIVE_CHECK_FAILED', `GitHub Pages ${rel}`, `SHA-256 mismatch expected=${expectedHash} live=${liveHash}`);
   }
   report.fileCount = report.files.length;
@@ -233,6 +288,7 @@ try {
     `- Cloudflare version IDs: ${report.cloudflareWorkerDeployment?.versionIds?.join(', ') || 'unavailable'}`,
     `- Worker health: ${report.workerHealth ? `HTTP ${report.workerHealth.status}; ${JSON.stringify(report.workerHealth.body)}; allow-origin=${report.workerHealth.allowOrigin}` : 'unavailable'}`,
     `- Pages artifact: run ${report.pagesSourceRunId || 'unavailable'}, artifact ${report.pagesArtifactId || 'unavailable'}`,
+    `- Pages comparison source: ${report.pagesArtifactKind || 'unavailable'}${report.pagesBuildInfo ? ` (${report.pagesBuildInfo.sha}, build ${report.pagesBuildInfo.buildTimeUtc})` : ''}`,
     `- Static files compared: ${report.fileCount ?? report.files.length}`,
     '',
   ];
