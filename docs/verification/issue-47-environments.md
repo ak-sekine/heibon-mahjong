@@ -1,5 +1,7 @@
 # Issue #47 検証記録（2026-11-11）
 
+> **最新状態（2026-11-13）：Phase 2完了。** 下記は2026-11-11時点までの記録であり、その後の本番移行と本人実機報告を末尾の[Phase 2完了記録](#2026-11-13-phase-2完了記録)に追記した。Issue #47全体の受入条件が完了したという意味ではなく、IssueはOpenを維持する。
+
 ## 自動検証
 
 - 開始時HEAD / fetch後origin/main: `cb457bb0dfe00455adf66d5f8c51284d0d00081f`。ブランチwork、clean、behind/ahead 0/0。最新mainからdevelop作成。
@@ -122,3 +124,54 @@ B7以後の追記は公開制御のWorker URL照合、Git競合回帰テスト�
 ## 2026-11-12 公開移行前チェック
 
 [今回の取得証跡・検証結果](issue-47-preflight-2026-11-12.md)と[確定したPhase別切替手順](../operations/issue-47-cutover.md)を追加。過去の成功記録と今回の再確認を区別する。公開は未実施、IssueはOpen。
+
+## 2026-11-13 Phase 2完了記録
+
+### 本番公開と自動検証
+
+今回の記録はGitHub Actionsの取得結果、既存の公開後ライブ監査記録、Issue #47の公開コメントと照合した。自動検証と本人の実機確認は別の結果として扱う。
+
+| 証跡 | 結果 |
+|---|---|
+| 統合後CI [run 43426274255](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43426274255) | success。verify、local-online、Chromium/WebKit環境分離、Browser UI両engine、auditがsuccess。worker-development、worker-production、online、publishはskip。 |
+| 本番公開workflow [run 43430225160](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43430225160) | success。release-freshness、verify、Chromium/WebKit、matrix audit、Worker deploy、production-test、Pages build/deployがsuccess。 |
+| 公開後ライブ監査 [run 43434482360](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43434482360) | success。既存記録では公開SHA、Worker状態、公開URLと実公開artifactの16ファイルを照合し、すべてSHA-256 MATCH。 |
+| Worker診断 [run 43434482361](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43434482361) | production-test success。 |
+
+- 公開元SHA: `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`。
+- Worker: deployment `3b6587ac-79fd-49a8-b6d1-2f77a9022331`、version `85e9510f-3f21-45c1-b0ff-4a4de66e7749`。
+- Pages deployment: `7766490026`。
+- 公開artifact: `published-pages-c3b84944daaa8fbba3b4b603c0d3f8430e9afb58-1`、artifact ID `14043735340`、ZIP SHA-256 `fe5744e7b7178a92db884c8926d1e637c9668eb79b7cc4c0da4fb4d1b0813aff`。Actions artifact API上の名前・ID・digestを再照合した。公開後監査記録はこの実artifactの16ファイルと本番公開URLの各SHA-256一致を報告している。
+
+### ユーザー本人によるiPhone Safari実機確認
+
+確認日：2026-11-13。端末：iPhone Safari、既存ホーム画面PWA。iOS/Safariバージョン詳細は未記録。以下は本人が報告した判定のみを転記し、自動テスト結果とは分ける。
+
+| No. | 確認項目 | 結果 |
+|---:|---|---|
+| 1 | 既存ホーム画面PWAが起動する | OK |
+| 2 | 更新通知があれば更新でき、再起動後も正常動作する | OK |
+| 3 | 既存ルール設定が保持されている | OK |
+| 4 | 既存オンライン参加・再接続情報が保持されている | 未検証 |
+| 5 | CPU対局を開始し、ツモ・打牌ができる | OK |
+| 6 | 鳴きなどの操作が正常にできる | OK |
+| 7 | 機内モード・Wi-Fi OFFでPWAを再起動し、CPU対局できる | OK |
+| 8 | 通常Safariから本番URLを開き、正常に起動できる | OK |
+
+集計はOK 7件、NG 0件、未検証1件。本人の補足は「オンライン対局していませんでした。」であり、更新前後のオンライン参加・再接続情報を比較できなかったことが未検証の理由。保存データの内部状態を調査していないため、保存キーや再接続情報が存在しなかったとは断定しない。iPhone実機でオンライン対局・再接続した結果もない。更新通知が実際に表示されたか、Service Worker内部でどのversionを照合したかは補足しない。
+
+### Phase 2判定とIssue全体の残件
+
+1. 本番Workerデプロイ: workflowの`deploy-worker` success。公開後のdeployment/versionは上記のとおり。
+2. 本番Pagesデプロイ: workflowの`pages-deploy` success、Pages deployment ID `7766490026`。
+3. 公開SHA: workflow記録と公開後監査により`c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`で一致。
+4. 公開artifact: API上のID・ZIP digestを照合。公開後監査が16ファイルすべてのSHA-256 MATCHを記録。
+5. 既存PWA: 本人報告で削除せず起動できた。
+6. 既存ルール設定: 本人報告で保持。
+7. CPU対局・操作: 本人報告でツモ・打牌と鳴き等が正常。
+8. オフラインPWA: 本人報告で機内モード・Wi-Fi OFFからの再起動後にCPU対局可能。
+9. オンライン再接続情報保持: 未検証のまま残す。
+
+以上を既存の公開移行手順に照らし、**Phase 2：完了**と判定する。この判定はIssue #47全体の受入条件達成を意味しない。全体の残件として、更新前後のオンライン参加・再接続情報の保持、iPhone実機でのオンライン対局・再接続、iOS/Safariバージョン詳細を維持する。
+
+Phase 3以降は未着手。[Issue #47のPhase 2完了報告](https://github.com/ak-sekine/heibon-mahjong/issues/47#issuecomment-6855362022)を追記した。Issue #47はOpen。Phase 3の初期登録、旧workflow停止、公開フラグ変更、新workflow publishは今回行っていない。

@@ -2,6 +2,16 @@
 
 これは実行記録ではない。今回はmain、Worker、DO、Pages、公開snapshot、公開フラグを変更しない。実行開始にはユーザーの明示的許可が必要。[今回の確認結果](../verification/issue-47-preflight-2026-11-12.md) / [通常運用・障害復旧](environments.md)。
 
+## 実施状況（2026-11-13）
+
+**Phase 2「本番PWAの先行移行」：完了。** Phase 2の公開・自動検証記録と、ユーザー本人によるiPhone Safari実機報告を照合した。公開結果は[Phase 2完了検証記録](../verification/issue-47-environments.md#2026-11-13-phase-2完了記録)と[公開後ライブ監査](../verification/issue-47-live-audit-2026-11-13.md#2026-11-13-phase-2実機報告と完了判定)を参照。
+
+実機報告は8項目中、OK 7・NG 0・未検証1。未検証は「既存オンライン参加・再接続情報の保持」で、本人から「オンライン対局していませんでした」と報告されたため更新前後を比較できていない。保存データ内部を調査した結果ではなく、オンライン参加・再接続情報が確実に存在しなかったとも断定しない。iPhone実機でのオンライン対局・再接続も成功扱いしない。iOS/Safariバージョン詳細は未記録。個別に報告されていない更新通知の表示有無やService Worker内部のversion照合は記録しない。
+
+本番公開run `43430225160` は成功し、Worker deployment `3b6587ac-79fd-49a8-b6d1-2f77a9022331` / version `85e9510f-3f21-45c1-b0ff-4a4de66e7749`、Pages deployment `7766490026`、公開元SHA `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`。公開artifact `published-pages-c3b84944daaa8fbba3b4b603c0d3f8430e9afb58-1`（ID `14043735340`、ZIP SHA-256 `fe5744e7b7178a92db884c8926d1e637c9668eb79b7cc4c0da4fb4d1b0813aff`）と公開URLの16ファイルのSHA-256はすべて一致した。統合後CI `43426274255`、公開後ライブ監査 `43434482360`、Worker診断 `43434482361` もsuccess。
+
+Issue #47全体はOpenのまま。更新前後のオンライン参加・再接続情報保持、iPhone Safari実機でのオンライン対局・再接続、iOS/Safariバージョン詳細は残件である。Phase 3以降は未着手で、この記録の更新では開始しない。Phase 3の初期登録、旧workflow Disable、`DUAL_PAGES_ENABLED`変更等は各Phaseの開始条件・許可を満たしてから扱う。
+
 ## 採用する経路と競合条件
 
 既存本番PWAの移行を**旧経路で本番だけ先に公開**し、既存インストールで更新・保存値・オフラインCPUを確認する。その後、その公開に実際に使った成果物のbytesをpages-verifiedに初期登録し、旧経路を停止して新経路へ切り替える。現在のd50e8a6の旧SWをそのまま初期登録して開発版を公開する案は採らない。新しいSWの実機確認前に/devを公開しない。

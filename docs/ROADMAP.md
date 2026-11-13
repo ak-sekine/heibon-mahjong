@@ -200,4 +200,4 @@ Issue #32のPC実機や#52の方向別実機・focusの残課題とは区別す�
 
 ## Issue #47 環境分離
 
-一部実装：環境別build・PWA/Storage・Worker設定・検証成果物合成と公開ゲートを追加。外部設定、公開移行、実Worker分離とiPhone Safari確認は未完了。[設計](development/issue-47-environments.md) / [運用](operations/environments.md) / [検証](verification/issue-47-environments.md)。
+Phase 2完了／Issue #47全体はOpen：2026-11-13に本番Worker・PagesをSHA `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`で公開し、artifactと本番URLの16ファイル照合が一致。本人のiPhone Safari実機報告はOK 7件、NG 0件、未検証1件。既存PWA起動、ルール保持、CPU対局・鳴き、オフライン起動、通常Safari起動を確認。オンライン参加・再接続情報の更新前後保持は本人がオンライン対局していなかったため未検証。iPhone実機でのオンライン対局・再接続とiOS/Safariバージョン詳細も残件。Phase 3以降は未着手。Issue全体の受入条件は未達項目が残るためチェックせずOpenを維持する。[Phase 2検証記録](verification/issue-47-environments.md#2026-11-13-phase-2完了記録) / [公開移行手順](operations/issue-47-cutover.md#実施状況2026-11-13)。

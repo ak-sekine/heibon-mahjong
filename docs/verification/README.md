@@ -1,5 +1,7 @@
 # 検証記録の目次
 
+- [Issue #47 Phase 2本番PWA先行移行 — 2026-11-13](issue-47-environments.md#2026-11-13-phase-2完了記録) — 本番Worker/Pages公開SHA・deployment・公開artifact ID/SHA-256と全16ファイル照合、統合後CI／公開workflow／ライブ監査／Worker診断の結果、本人報告のiPhone Safari実機OK 7件・NG 0件・未検証1件を区別して記録。Phase 2完了、Issue全体はOpen。オンライン情報保持・iPhone実機オンライン対局／再接続・iOS/Safari詳細は残件、Phase 3以降未着手。
+
 - [Issue #32 操作パネル共通外枠](issue32-common-frame-2026-11-11.md#pc実機による修正後の確認結果-2026-11-13)：2026-11-13の本人PC実機報告で修正対象はOK、修正前の二重枠NGは対象範囲で解消確認済み。Chromium／WebKit各182 geometryケースとDeploy gate・Pages公開の成功は自動検証として区別。iPhone Safariでの同修正再確認と他のPC必須項目は未確認、IssueはOpen。
 
 - [Issue #55 最終調査・本人実機報告（2026-11-11）](issue55-pwa-header.md#2026-11-11-最終調査本人実機報告) — PWA本人6 OK／0 NG／1未確認。CI比較状態を修正し、カン10件＋PWA7件すべて達成・Close可能（Closeはしない）。修正SHA `9598787`の両engine・全ゲート・Pages公開success。実機未確認は自動結果と区別。
