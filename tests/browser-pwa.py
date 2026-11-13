@@ -1,6 +1,7 @@
 """Install, offline-play, stale-cache update and multi-client PWA checks."""
 import os
 import json
+import hashlib
 from pathlib import Path
 import re
 import shutil
@@ -34,6 +35,8 @@ class PagesHandler(SimpleHTTPRequestHandler):
     root = DIST
     failure_path = None
     failed_requests = 0
+    failed_request_paths = []
+    worker_script_responses = []
 
     def guess_type(self, path):
         if path.endswith('.webmanifest'):
@@ -54,8 +57,18 @@ class PagesHandler(SimpleHTTPRequestHandler):
         path = unquote(urlsplit(self.path).path)
         if path == self.failure_path:
             type(self).failed_requests += 1
+            type(self).failed_request_paths.append(path)
             self.send_error(503, 'Simulated temporary asset failure')
             return
+        if path == BASE_PATH + 'sw.js':
+            # Record the actual worker body present when each request is served.
+            # This distinguishes the failed v2 response from the recovery script.
+            body = Path(self.translate_path(self.path)).read_bytes()
+            match = re.search(rb'const CACHE = "([^"]+)";', body)
+            type(self).worker_script_responses.append({
+                'cache': match.group(1).decode('utf-8') if match else None,
+                'sha256': hashlib.sha256(body).hexdigest(),
+            })
         return super().do_GET()
 
     def end_headers(self):
@@ -77,6 +90,43 @@ def write_worker_version(path, source):
     # every simulated release a distinct Last-Modified value when updating twice.
     modified = max(time.time(), path.stat().st_mtime) + 2
     os.utime(path, (modified, modified))
+
+
+def attach_worker_update_trace(page):
+    page.evaluate("""async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      window.__pwaWorkerUpdates = [];
+      registration.addEventListener('updatefound', () => {
+        const worker = registration.installing;
+        const record = () => {
+          window.__pwaWorkerUpdates.push({
+            state: worker?.state ?? null,
+            scriptURL: worker?.scriptURL ?? null,
+            time: performance.now()
+          });
+        };
+        record();
+        worker?.addEventListener('statechange', record);
+      });
+    }""")
+
+
+def print_worker_diagnostics(page, stage):
+    browser_state = page.evaluate("""async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      const describe = worker => worker ? {state: worker.state, scriptURL: worker.scriptURL} : null;
+      return {
+        installing: describe(registration.installing), waiting: describe(registration.waiting),
+        active: describe(registration.active), controller: describe(navigator.serviceWorker.controller),
+        updates: window.__pwaWorkerUpdates ?? [], cacheNames: await caches.keys()
+      };
+    }""")
+    print('PWA update diagnostic ' + stage + ': ' + json.dumps({
+        'browser': browser_state,
+        'failedRequests': PagesHandler.failed_requests,
+        'failedRequestPaths': PagesHandler.failed_request_paths,
+        'servedWorkerScripts': PagesHandler.worker_script_responses,
+    }), flush=True)
 
 
 VIEWPORTS = [(320, 568), (375, 560), (375, 635), (390, 844), (430, 844)]
@@ -241,14 +291,39 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         write_worker_version(sw_path, worker)
 
         # A failed precache install must leave the old active worker and app
-        # usable. After delivery recovers, a changed worker script can retry.
+        # usable. Track the worker state transition: registration.update() only
+        # resolves the update check, not the later install event's completion.
+        PagesHandler.failed_requests = 0
+        PagesHandler.failed_request_paths = []
+        PagesHandler.worker_script_responses = []
+        attach_worker_update_trace(page)
+        first_worker_response = len(PagesHandler.worker_script_responses)
         PagesHandler.failure_path = failed_asset
         page.evaluate('async () => { const registration = await navigator.serviceWorker.getRegistration(); await registration.update(); }')
         deadline = time.monotonic() + 20
         while PagesHandler.failed_requests == 0 and time.monotonic() < deadline:
             time.sleep(0.05)
         assert PagesHandler.failed_requests > 0, 'the simulated install asset failure was not requested'
-        page.wait_for_function("async () => { const registration = await navigator.serviceWorker.getRegistration(); return !registration.installing && !registration.waiting; }")
+        try:
+            page.wait_for_function("""async () => {
+              const registration = await navigator.serviceWorker.getRegistration();
+              const updates = window.__pwaWorkerUpdates ?? [];
+              return updates.some(update => update.state === 'redundant') &&
+                !registration.installing && !registration.waiting;
+            }""", timeout=20000)
+        except Exception:
+            print_worker_diagnostics(page, 'failed precache install did not settle')
+            raise
+        first_update_state = page.evaluate("""async () => {
+          const registration = await navigator.serviceWorker.getRegistration();
+          return {active: registration.active?.state, waiting: registration.waiting,
+            updates: window.__pwaWorkerUpdates};
+        }""")
+        assert first_update_state['active'] == 'activated' and first_update_state['waiting'] is None, first_update_state
+        served_v2 = PagesHandler.worker_script_responses[first_worker_response:]
+        assert any(item['cache'] == match.group(1) + '-v2' for item in served_v2), (
+            'the v2 worker script was not served for the failed install', served_v2)
+        assert set(PagesHandler.failed_request_paths) == {failed_asset}, PagesHandler.failed_request_paths
         assert page.evaluate('navigator.serviceWorker.controller.scriptURL') == f'{base_url}sw.js'
         assert page.locator('#local-table').is_visible(), 'failed update interrupted the in-progress CPU game'
         assert old_cache_name in page.evaluate('caches.keys()'), 'failed update removed the active version cache'
@@ -257,17 +332,33 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         assert retry_cache, 'retry cache declaration missing'
         new_cache_name = retry_cache.group(1)
         write_worker_version(sw_path, worker)
-        # Publish the retry script before restoring asset delivery. Otherwise an
-        # overlapping browser update can install v2 in the recovery window.
+        # The failed install is now confirmed redundant, so no -v2 install can
+        # remain in flight while the recovery script and asset delivery change.
         PagesHandler.failure_path = None
 
+        second_worker_response = len(PagesHandler.worker_script_responses)
         page.evaluate('async () => { const registration = await navigator.serviceWorker.getRegistration(); await registration.update(); }')
+        try:
+            page.wait_for_function("""async cacheName => {
+              const registration = await navigator.serviceWorker.getRegistration();
+              const updates = window.__pwaWorkerUpdates ?? [];
+              return updates.some(update => update.state === 'installed') &&
+                registration.waiting?.state === 'installed' &&
+                (await caches.keys()).includes(cacheName);
+            }""", arg=new_cache_name, timeout=20000)
+        except Exception:
+            print_worker_diagnostics(page, 'retry install did not reach waiting state')
+            raise
         page.locator('#pwa-update-notice').wait_for(state='visible', timeout=20000)
+        served_retry = PagesHandler.worker_script_responses[second_worker_response:]
+        assert any(item['cache'] == new_cache_name for item in served_retry), (
+            'the -v2-retry worker script was not served before its cache was expected', served_retry)
         waiting_state = page.evaluate("""async () => {
           const registration = await navigator.serviceWorker.getRegistration();
-          return {waiting: registration.waiting !== null, state: registration.waiting?.state};
+          return {waiting: registration.waiting !== null, state: registration.waiting?.state,
+            updates: window.__pwaWorkerUpdates};
         }""")
-        assert waiting_state == {'waiting': True, 'state': 'installed'}, waiting_state
+        assert waiting_state['waiting'] is True and waiting_state['state'] == 'installed', waiting_state
         cache_names = page.evaluate('caches.keys()')
         assert old_cache_name in cache_names, f'active cache was removed before user approval: {cache_names}'
         assert new_cache_name in cache_names, f'new waiting cache {new_cache_name} is missing: {cache_names}'
