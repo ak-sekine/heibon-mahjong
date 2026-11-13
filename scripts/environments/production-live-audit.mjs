@@ -13,6 +13,10 @@ const developmentPagesUrl = 'https://ak-sekine.github.io/heibon-mahjong/dev/';
 const workerUrl = 'https://heibon-mahjong-online.ak-sekine.workers.dev';
 const approvedOrigin = 'https://ak-sekine.github.io';
 const api = 'https://api.github.com';
+const expectedProductionBindings = [
+  { name: 'ROOMS', class_name: 'RoomDurableObject', namespace_id: 'bb2855728c5b42beba5771655a131f8d' },
+  { name: 'RATE_LIMITER', class_name: 'RateLimitDurableObject', namespace_id: '7aef4eef34c14bf594b0d8b2070a8f52' },
+];
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'issue47-live-'));
 const report = { outcome: 'FAIL', pagesUrl, developmentPagesUrl, workerUrl, approvedOrigin, files: [] };
 const liveBytesByPath = new Map();
@@ -200,6 +204,25 @@ async function main() {
 
   const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/heibon-mahjong-online/deployments`;
   try {
+    const settingsResponse = await get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/heibon-mahjong-online/settings`, 'Cloudflare Worker settings', { authorization: `Bearer ${cfToken}`, accept: 'application/json' }, 'AUTH_ERROR');
+    let settingsJson;
+    try { settingsJson = await settingsResponse.json(); } catch { fail('DATA_ERROR', 'Cloudflare Worker settings', 'invalid JSON'); }
+    if (settingsJson.success !== true || !Array.isArray(settingsJson.result?.bindings)) {
+      fail('API_ERROR', 'Cloudflare Worker settings', `success=${String(settingsJson.success)} bindings=${Array.isArray(settingsJson.result?.bindings)}`);
+    }
+    const durableBindings = settingsJson.result.bindings
+      .filter((binding) => binding.type === 'durable_object_namespace')
+      .map(({ name, class_name, script_name, namespace_id }) => ({ name, class_name, ...(script_name ? { script_name } : {}), namespace_id }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const expectedBindings = [...expectedProductionBindings].sort((a, b) => a.name.localeCompare(b.name));
+    if (JSON.stringify(durableBindings.map(({ name, class_name, namespace_id }) => ({ name, class_name, namespace_id }))) !== JSON.stringify(expectedBindings)) {
+      fail('LIVE_CHECK_FAILED', 'production Durable Objects bindings', 'namespace or class differs from the recorded production configuration');
+    }
+    if (durableBindings.some((binding) => binding.script_name && binding.script_name !== 'heibon-mahjong-online')) {
+      fail('LIVE_CHECK_FAILED', 'production Durable Objects bindings', 'binding points to an unexpected Worker script');
+    }
+    report.workerDurableObjectBindings = durableBindings;
+
     const cfResponse = await get(cfUrl, 'Cloudflare Worker deployment list', { authorization: `Bearer ${cfToken}`, accept: 'application/json' }, 'AUTH_ERROR');
     let cfJson;
     try { cfJson = await cfResponse.json(); } catch { fail('DATA_ERROR', 'Cloudflare Worker deployment list', 'invalid JSON'); }
@@ -308,6 +331,7 @@ try {
     `- Pages/Worker recorded SHA match: ${report.pagesDeploymentMatchesWorkerRecord ?? 'unavailable'}`,
     `- Cloudflare Worker deployment: ${report.cloudflareWorkerDeployment ? report.cloudflareWorkerDeployment.id : 'unavailable'}`,
     `- Cloudflare version IDs: ${report.cloudflareWorkerDeployment?.versionIds?.join(', ') || 'unavailable'}`,
+    `- Production Durable Objects namespaces: ${report.workerDurableObjectBindings?.map(({ name, namespace_id }) => `${name}=${namespace_id}`).join(', ') || 'unavailable'}`,
     `- Worker health: ${report.workerHealth ? `HTTP ${report.workerHealth.status}; ${JSON.stringify(report.workerHealth.body)}; allow-origin=${report.workerHealth.allowOrigin}` : 'unavailable'}`,
     `- Pages artifact: run ${report.pagesSourceRunId || 'unavailable'}, artifact ${report.pagesArtifactId || 'unavailable'}`,
     `- Pages artifact ZIP SHA-256: ${report.pagesArtifactZipSha256 || 'unavailable'}`,
