@@ -129,14 +129,26 @@ async function main() {
   report.pagesDeploymentMatchesWorkerRecord = pagesDeployment.sha === workerRecord.sha;
 
   const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/heibon-mahjong-online/deployments`;
-  const cfResponse = await get(cfUrl, 'Cloudflare Worker deployment list', { authorization: `Bearer ${cfToken}`, accept: 'application/json' }, 'AUTH_ERROR');
-  let cfJson;
-  try { cfJson = await cfResponse.json(); } catch { fail('DATA_ERROR', 'Cloudflare Worker deployment list', 'invalid JSON'); }
-  if (cfJson.success !== true || !Array.isArray(cfJson.result) || !cfJson.result.length) fail('DATA_ERROR', 'Cloudflare Worker deployment list', 'no successful deployment data');
-  const cfDeployment = cfJson.result[0];
-  const versionIds = (cfDeployment.versions || []).map((version) => version.version_id).filter(Boolean);
-  if (!cfDeployment.id || !versionIds.length) fail('DATA_ERROR', 'Cloudflare Worker deployment list', 'deployment or version ID missing');
-  report.cloudflareWorkerDeployment = { id: cfDeployment.id, createdOn: cfDeployment.created_on, versionIds };
+  try {
+    const cfResponse = await get(cfUrl, 'Cloudflare Worker deployment list', { authorization: `Bearer ${cfToken}`, accept: 'application/json' }, 'AUTH_ERROR');
+    let cfJson;
+    try { cfJson = await cfResponse.json(); } catch { fail('DATA_ERROR', 'Cloudflare Worker deployment list', 'invalid JSON'); }
+    if (cfJson.success !== true) {
+      const errors = Array.isArray(cfJson.errors) ? cfJson.errors : [];
+      const codes = errors.map((entry) => entry?.code).filter(Number.isInteger);
+      const kind = codes.includes(10000) ? 'AUTHENTICATION_ERROR' : 'API_ERROR';
+      fail(kind, 'Cloudflare Worker deployment list', `success=${String(cfJson.success)} error_codes=${codes.join(',') || 'none'}`);
+    }
+    if (!Array.isArray(cfJson.result) || !cfJson.result.length) {
+      fail('DATA_ERROR', 'Cloudflare Worker deployment list', `success=true result_type=${Array.isArray(cfJson.result) ? 'empty array' : typeof cfJson.result}`);
+    }
+    const cfDeployment = cfJson.result[0];
+    const versionIds = (cfDeployment.versions || []).map((version) => version.version_id).filter(Boolean);
+    if (!cfDeployment.id || !versionIds.length) fail('DATA_ERROR', 'Cloudflare Worker deployment list', 'deployment or version ID missing');
+    report.cloudflareWorkerDeployment = { id: cfDeployment.id, createdOn: cfDeployment.created_on, versionIds };
+  } catch (error) {
+    report.cloudflareError = error.message;
+  }
 
   const healthResponse = await get(`${workerUrl}/health`, 'production Worker /health', { Origin: approvedOrigin }, 'HTTP_ERROR');
   const healthText = await healthResponse.text();
@@ -198,6 +210,7 @@ async function main() {
   if (!report.pagesDeploymentMatchesWorkerRecord) {
     fail('LIVE_CHECK_FAILED', 'Pages/Worker deployment SHA alignment', `Pages=${pagesDeployment.sha} Worker=${workerRecord.sha}`);
   }
+  if (report.cloudflareError) fail('CLOUDFLARE_READ_FAILED', report.cloudflareError);
   report.outcome = 'SUCCESS';
 }
 
@@ -225,6 +238,7 @@ try {
   ];
   for (const file of report.files) lines.push(`- ${file.matches ? 'MATCH' : 'MISMATCH'} ${file.path}: ${file.liveSha256} (artifact ${file.artifactSha256})`);
   if (report.failure) lines.push('', `Failure classification: ${report.failure}`);
+  if (report.cloudflareError && !report.failure) lines.push('', `Cloudflare API classification: ${report.cloudflareError}`);
   if (process.env.GITHUB_STEP_SUMMARY) writeFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
   rmSync(tmp, { recursive: true, force: true });
 }
