@@ -6,7 +6,7 @@
 
 - [Issue #32 操作パネル共通外枠](issue32-common-frame-2026-11-11.md#pc実機による修正後の確認結果-2026-11-13)：2026-11-13の本人PC実機報告で修正対象はOK、修正前の二重枠NGは対象範囲で解消確認済み。Chromium／WebKit各182 geometryケースとDeploy gate・Pages公開の成功は自動検証として区別。iPhone Safariでの同修正再確認と他のPC必須項目は未確認、IssueはOpen。
 
-- [Issue #32 3ダイアログの共通スクロール — 2026-11-14](issue32-responsive-layout-2026-11-03.md#2026-11-14-pc実機1111完了と3ダイアログの共通スクロール修正)：ルール確認・局結果詳細・最終順位に既存共通インジケーターを適用。Browser UI Chromium／WebKit、ローカル検証、push SHAとActions結果、Safari／PCの修正後本人チェックリストを同記録に追記する。PC実機11/11 OKは追加スクロール確認とは区別し、iPhone Safari修正後確認は未確認、IssueはOpen。
+- [Issue #32 3ダイアログの共通スクロール — 2026-11-14](issue32-responsive-layout-2026-11-03.md#2026-11-14-pc実機1111完了と3ダイアログの共通スクロール修正)：develop SHA `60e7511`、Browser UI run [#43586831933](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831933)とenvironment run [#43586831954](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831954)でChromium／WebKit全suiteがsuccess。ローカル91/91、build、Worker型検査もsuccess。修正後PCの追加スクロール確認とiPhone Safari実機確認は未確認で、IssueはOpen。
 
 - [Issue #55 最終調査・本人実機報告（2026-11-11）](issue55-pwa-header.md#2026-11-11-最終調査本人実機報告) — PWA本人6 OK／0 NG／1未確認。CI比較状態を修正し、カン10件＋PWA7件すべて達成・Close可能（Closeはしない）。修正SHA `9598787`の両engine・全ゲート・Pages公開success。実機未確認は自動結果と区別。
 

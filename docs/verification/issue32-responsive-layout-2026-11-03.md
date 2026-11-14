@@ -594,3 +594,28 @@ Android・タブレット実機は未確認のまま記録し、viewport自動�
 
 - SHA `24cfdb80668bd1b921d3f297ae4b068dd5307950` のrun [#43585321942](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43585321942) はverify-buildが成功。WebKitはPC高さを含む1280×800と1280×420で3 dialogのスクロール操作を完了し、390px幅のmobile WebKit viewportではPlaywrightの `page.mouse.wheel` が未対応として例外になった。これはブラウザー操作APIの制約で、アプリのスクロール失敗ではありません。
 - wheel入力はデスクトップChromium／WebKitとChromiumスマホviewportで続け、mobile WebKitでは未対応wheel呼び出しを行わない。WebKitモバイル幅のキーボード・トラック・pointer条件は維持し、ChromiumではCDPネイティブタッチスワイプを維持する。iPhone Safari実機の実タッチはチェックリストに残す。
+
+### 最終Browser UI実行（2026-11-14）
+
+- コード検証対象SHAは `60e7511da3a6eaa4df6c47c3d0e5df496a5402a6`（develop）。[Browser UI verification run #43586831933](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831933) はdetect-changes、docs-check、verify-build、Chromium、WebKitの全jobがsuccess。[Environments run #43586831954](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831954) もverify、local-online、Chromium／WebKitのenvironment isolationとBrowser UI、auditがsuccess。Worker、publish、online deploy jobはskipで、本番昇格・公開は行っていない。
+- `tests/browser-dialog-scroll.py` はChromium／WebKitそれぞれで `1280×800`、低高さ `1280×420`、スマホ `390×844`、狭い画面 `320×480` を実行し、3ダイアログすべてpass。長短本文、共通トラック・つまみの表示と矩形・色、標準スクロールバー非表示、最終行到達、ホイール（mobile WebKitを除く）、トラッククリック、つまみドラッグ、キーボード、タッチ相当、開閉・本文更新後の再計測、固定ヘッダー／フッター、横overflowなしを実画面とスクロール状態で確認した。
+- `tests/browser-call-test.py` は両engineで全viewport suiteがsuccessし、5候補チーの内部スクロール、最後の候補選択、戻る、ポン複数候補、暗カン・加カン等を検証した。鳴きパネルの通常表示・下端位置、上方向展開と卓寸法維持も既存検査でpass。
+- `tests/browser-round-end-ui.py` は両engineで8 viewport suitesがpass。オフラインのロン・ツモ・流局、役・翻・符・ドラ・点数・和了手牌、局結果詳細の「卓を見る」、対局終了順位・持ち点、閉じる・再表示・次対局の操作を含む。既存のオンライン結果・待機室suiteも両engineでpassした。
+- ローカル検証は `npm test` 91/91、`npm run build`、`npm run typecheck:worker`、Browser UI選択テスト9件、2つの変更Browser UIスクリプトのPython構文検査、`git diff --check` がsuccess。Codex Cloudではブラウザーを起動せず、Chromium／WebKitの実エンジンは上記Actionsで確認した。
+
+#### 追加受け入れ条件の判定
+
+| 条件 | 状態 | 根拠・残件 |
+| --- | --- | --- |
+| 1. 対象3ダイアログを既存の共通部品へ統一 | 自動検証済み | 共通panel/content/indicatorと`mountDialogScrollIndicators()`を使用。 |
+| 2. 標準白スクロールバーの重複なし | 自動検証済み | Chromium／WebKitで標準バー非表示と共通indicatorの実表示を確認。 |
+| 3. 長短本文に応じたindicator表示、末尾到達 | 自動検証済み | 3ダイアログ×4 viewportで長文・短文・最下端を検証。 |
+| 4. マウス・キーボード・タッチ操作 | 自動検証済み／Safari実機待ち | wheel、track、drag、PageUp／PageDown、Chromium実タッチ相当、WebKitタッチ入力経路を確認。iPhone Safariの実タッチは本人確認待ち。 |
+| 5. 固定ヘッダー／フッターとボタン | 自動検証済み | 低いPC・スマホを含む各viewportで固定位置と操作可能状態を確認。 |
+| 6. 結果本文の動的更新への追従 | 自動検証済み | mutation、表示／非表示、dialog open、resize後の再計測を確認。 |
+| 7. 新規対局など既存の共通スクロールUI | 自動検証済み | 新規対局・オンラインルーム・候補パネル・通常卓の既存suite成功。 |
+| 8. Chromium／WebKit回帰 | 自動検証済み | run #43586831933/#43586831954の両engine成功。 |
+| 9. ゲームロジック・点数・CPU・通信仕様を維持 | 自動検証済み | 変更範囲はHTML/CSS/共通スクロールUIとBrowser UIテスト。`npm test`とlocal-onlineを含む検証成功。 |
+| 10. iPhone Safari実機用チェックリスト | 作成済み／本人確認待ち | 上記「Safari本人確認手順」の項目はすべて未確認のまま。本人の実機報告を受領するまでIssueをOpenで維持。 |
+
+以前のBrowser UI失敗は履歴として残す。最終成功は上記の対象SHAとrunに限って記録する。既存PC実機11/11 OK、2026-11-10のiPhone Safari報告、PC修正後の追加スクロール確認、今回の自動viewport検証はそれぞれ別の結果として扱う。今回のiPhone Safari実機確認と修正後PCスクロール確認は未実施。Issue本文は変更せずOpenを維持する。
