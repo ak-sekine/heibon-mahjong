@@ -7,12 +7,6 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      targeted_browser:
-        description: Browser engine for a targeted candidate geometry run.
-        required: false
-        type: choice
-        options: [both, chromium, webkit]
-        default: both
       targeted_candidate_geometry:
         description: Run only a selected candidate geometry case.
         required: false
@@ -130,7 +124,6 @@ jobs:
     if: >-
       ${{
         always() &&
-        (github.event_name != 'workflow_dispatch' || inputs.targeted_browser == 'both' || inputs.targeted_browser == matrix.browser) &&
         (inputs.reuse_build || (
           needs.detect-changes.result == 'success' &&
           needs.detect-changes.outputs.run_full_suite == 'true' &&
