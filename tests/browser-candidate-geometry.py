@@ -88,7 +88,7 @@ VISUAL_VIEWPORT = r'''(() => {
   window.addEventListener('resize', () => {
     issue32ResizeTraceActive = true;
     issue32ResizeTrace.push({phase:'capture', innerWidth});
-    queueMicrotask(() => issue32ResizeTrace.push({phase:'after-event-listeners', ...geometry(
+    setTimeout(() => issue32ResizeTrace.push({phase:'after-event-listeners', ...geometry(
       Boolean(document.querySelector('#online-game-controls [data-panel-part="candidate-controls"]:not([hidden])')))}));
     requestAnimationFrame(() => {
       issue32ResizeTrace.push({phase:'animation-frame-1', ...geometry(
@@ -185,8 +185,34 @@ def check(record, condition, message):
     record.setdefault('violations', []).append(message)
     save()
     if not args.baseline:
-        print('::error title=Issue 32 geometry evidence::' + json.dumps(record, ensure_ascii=False, separators=(',', ':')))
+        print('::error title=Issue 32 geometry evidence::' + json.dumps(resize_evidence(record), ensure_ascii=False, separators=(',', ':')))
         raise AssertionError(f'{record["viewport"]} {record["mode"]} {record["scenario"]}: {message}; measurements={record}')
+
+
+def resize_evidence(record):
+    def concise(snapshot):
+        if not snapshot:
+            return None
+        return {key: snapshot.get(key) for key in ('root', 'panel', 'panelVariables', 'table') if key in snapshot}
+    def compact_trace(events):
+        trace = []
+        for event in events:
+            if event.get('phase') not in ('capture', 'action-panel-root-read', 'after-event-listeners',
+                                          'animation-frame-1', 'animation-frame-2'):
+                continue
+            item = {key: event[key] for key in ('phase', 'innerWidth', 'root', 'panel', 'variables') if key in event}
+            if event.get('phase') == 'action-panel-root-read':
+                item['stack'] = event.get('stack', [])
+            trace.append(item)
+        return trace
+    return {
+        'browser':ENGINE,'viewport':record.get('viewport'),'mode':record.get('mode'),'scenario':record.get('scenario'),
+        'before':concise(record.get('before')),'immediate':concise(record.get('windowResizeImmediately')),
+        'stable':concise(record.get('windowResized')),'trace':compact_trace(record.get('windowResizeTrace', [])),
+        'restoredImmediately':concise(record.get('windowRestoreImmediately')),
+        'restored':concise(record.get('windowResizeRestored')),
+        'restoreTrace':compact_trace(record.get('windowRestoreTrace', [])),
+    }
 
 
 def same_rect(record, before, after, label, tolerance=1):
@@ -362,6 +388,7 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     record['windowRestoreImmediately'] = snapshot(page, online)
     settle(page)
     recovered = snapshot(page, online)
+    record['windowResizeRestored'] = recovered
     record['windowRestoreTrace'] = page.evaluate('issue32ResizeTrace.splice(0)')
     page.evaluate('issue32ResizeTraceActive=false')
     for key, actual in [('left', 'x'), ('width', 'width')]:
@@ -378,16 +405,8 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     check(record, abs(recovered['panel']['bottom'] - before['root']['bottom']) <= 2,
           'window resize restoration lost bottom anchor')
     same_rect(record, before['table'], recovered['table'], 'table after resize restoration')
-    print('::notice title=Issue 32 resize evidence::' + json.dumps({
-      'browser':ENGINE,'viewport':record['viewport'],'mode':record['mode'],'scenario':record['scenario'],
-      'before':{'root':before['root'],'panel':before['panel'],'variables':before['panelVariables'],'table':before['table']},
-      'immediate':{'root':record['windowResizeImmediately']['root'],'panel':record['windowResizeImmediately']['panel'],
-        'variables':record['windowResizeImmediately']['panelVariables']},
-      'stable':{'root':resized['root'],'panel':resized['panel'],'variables':resized['panelVariables'],
-        'trace':record['windowResizeTrace'],'actionPanelRootReads':record['windowResizeActionPanelReads']},
-      'restored':{'root':recovered['root'],'panel':recovered['panel'],'variables':recovered['panelVariables'],
-        'table':recovered['table'],'trace':record['windowRestoreTrace']},
-    },ensure_ascii=False,separators=(',',':')))
+    print('::notice title=Issue 32 resize evidence::' + json.dumps(resize_evidence(record),
+      ensure_ascii=False,separators=(',',':')))
 
     # Add visual rows without inventing selectable game actions. Real options
     # remain unchanged and confirmation below always clicks an actual button.
