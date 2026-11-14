@@ -27,15 +27,17 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
         webkit = select_scenarios(browser='webkit')
         all_engines = select_scenarios(browser='both')
 
-        self.assertEqual(len(SUITE), 80)
-        self.assertEqual(len(chromium), 45)
-        self.assertEqual(len(webkit), 35)
+        self.assertEqual(len(SUITE), 82)
+        self.assertEqual(len(chromium), 46)
+        self.assertEqual(len(webkit), 36)
         self.assertEqual(set(chromium).intersection(webkit), set())
         self.assertEqual(set(chromium).union(webkit), set(all_engines))
         self.assertEqual(all_engines, list(range(len(SUITE))))
         self.assertEqual(default, all_engines)
         dialog_layout = next(item for item in SUITE if item['script'] == 'tests/browser-online-dialog-layout.py')
         self.assertEqual({item['browser'] for item in SUITE if item['script'] == dialog_layout['script']}, {'chromium', 'webkit'})
+        dialog_scroll = next(item for item in SUITE if item['script'] == 'tests/browser-dialog-scroll.py')
+        self.assertEqual({item['browser'] for item in SUITE if item['script'] == dialog_scroll['script']}, {'chromium', 'webkit'})
 
     def test_engine_runs_write_only_the_selected_engine_to_csv(self):
         class SuccessfulProcess:
@@ -47,7 +49,7 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
             def poll(self):
                 return None
 
-        for engine, expected_count in [('chromium', 45), ('webkit', 35)]:
+        for engine, expected_count in [('chromium', 46), ('webkit', 36)]:
             with self.subTest(engine=engine), tempfile.TemporaryDirectory() as directory:
                 report = Path(directory) / 'timings.csv'
                 argv = [str(RUNNER), '--browser', engine, '--timings-file', str(report)]

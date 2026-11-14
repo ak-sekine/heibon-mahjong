@@ -3,7 +3,7 @@ name: Browser UI verification
 on:
   # main is verified through Deploy, which calls this workflow exactly once.
   push:
-    branches: [fix-mobile-table-layout, ui-river-spacing, fix-riichi-discard-layout]
+    branches: [develop, fix-mobile-table-layout, ui-river-spacing, fix-riichi-discard-layout]
   pull_request:
   workflow_dispatch:
   workflow_call:
