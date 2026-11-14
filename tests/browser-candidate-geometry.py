@@ -85,9 +85,13 @@ VISUAL_VIEWPORT = r'''(() => {
     const bounds = nativeGetBounds.apply(this, args);
     if (issue32ResizeTraceActive && ['online-game-controls','local-game-controls'].includes(this.id)) {
       const stack = new Error().stack ?? '';
+      const panel = this.querySelector('[data-panel-part="candidate-controls"]');
+      const variables = Object.fromEntries(['--candidate-panel-left','--candidate-panel-width',
+        '--candidate-panel-bottom','--candidate-panel-available-height'].map(name=>[name,
+          panel?.style.getPropertyValue(name) ?? '']));
       issue32ResizeTrace.push({phase:stack.includes('repositionCandidatePanel') ? 'action-panel-root-read' : 'root-read',
         id:this.id, innerWidth, root:{x:bounds.x,left:bounds.left,right:bounds.right,width:bounds.width,bottom:bounds.bottom},
-        stack:stack.split('\n').slice(0,5)});
+        variables, stack:stack.split('\n').slice(0,5)});
     }
     return bounds;
   };
@@ -213,9 +217,8 @@ def resize_evidence(record):
         return trace
     return {
         'browser':ENGINE,'viewport':record.get('viewport'),'mode':record.get('mode'),'scenario':record.get('scenario'),
-        'before':concise(record.get('before')),'immediate':concise(record.get('windowResizeImmediately')),
+        'before':concise(record.get('before')),
         'stable':concise(record.get('windowResized')),'trace':compact_trace(record.get('windowResizeTrace', [])),
-        'restoredImmediately':concise(record.get('windowRestoreImmediately')),
         'restored':concise(record.get('windowResizeRestored')),
         'restoreTrace':compact_trace(record.get('windowRestoreTrace', [])),
         'nativeVisualViewportTrace':record.get('nativeVisualViewportTrace', []),
@@ -368,7 +371,6 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     # Resize the layout viewport, then recover the original table and baseline.
     page.evaluate('issue32ResizeTrace.splice(0); issue32NativeVisualViewportTrace.splice(0); issue32ResizeTraceActive=false')
     page.set_viewport_size({'width': width + 24, 'height': height})
-    record['windowResizeImmediately'] = snapshot(page, online)
     settle(page)
     resized = snapshot(page, online)
     record['windowResized'] = resized
@@ -378,11 +380,11 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
           'window resize event was not observed')
     check(record, any(item['phase'] == 'after-event-listeners' for item in record['windowResizeTrace']),
           'window resize listeners did not complete')
+    record['windowResizeActionPanelReads'] = [item for item in record['windowResizeTrace']
+      if item['phase'] == 'action-panel-root-read']
     for key in ('left', 'right', 'width'):
         check(record, abs(resized['root'][key] - resized['panel'][key]) <= 1,
               f'window resize lost common {key}')
-    record['windowResizeActionPanelReads'] = [item for item in record['windowResizeTrace']
-      if item['phase'] == 'action-panel-root-read']
     for key, actual in [('left', 'x'), ('width', 'width')]:
       value = resized['panelVariables']['--candidate-panel-' + key]['inline']
       try:
@@ -394,7 +396,6 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     check(record, abs(resized['panel']['bottom'] - before['root']['bottom']) <= 2,
           'window resize lost candidate bottom anchor')
     page.set_viewport_size({'width': width, 'height': height})
-    record['windowRestoreImmediately'] = snapshot(page, online)
     settle(page)
     recovered = snapshot(page, online)
     record['windowResizeRestored'] = recovered
