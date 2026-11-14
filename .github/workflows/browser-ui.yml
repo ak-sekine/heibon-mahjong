@@ -282,6 +282,7 @@ jobs:
             python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
           fi
       - name: Report winning hand geometry
+        if: ${{ !inputs.targeted_candidate_geometry }}
         env:
           BROWSER: ${{ matrix.browser }}
         run: |
