@@ -3,7 +3,9 @@ from pathlib import Path
 import runpy
 import unittest
 
-wait_for_human_action = runpy.run_path(str(Path(__file__).with_name('browser-itch-package.py')))['wait_for_human_action']
+smoke_helpers = runpy.run_path(str(Path(__file__).with_name('browser-itch-package.py')))
+wait_for_human_action = smoke_helpers['wait_for_human_action']
+validate_discard_witness = smoke_helpers['validate_discard_witness']
 
 
 class StartupPage:
@@ -51,6 +53,32 @@ class ItchStartupTests(unittest.TestCase):
                 decisions = wait_for_human_action(page)
                 self.assertEqual(decisions['rounds_advanced'], 1)
                 self.assertEqual(page.actions, (['#view-table'] if opened else []) + ['#next-round'])
+
+    def test_discard_witness_requires_current_accepted_transition_and_physical_move(self):
+        valid = {
+            'operation': {'fresh': True},
+            'action': {
+                'accepted': True, 'stateUpdateResult': 'accepted',
+                'previousPhase': 'awaiting-discard', 'nextPhase': 'awaiting-draw',
+            },
+            'transition': {
+                'source': 'GameController.confirm',
+                'previousPhase': 'awaiting-discard', 'nextPhase': 'awaiting-draw',
+            },
+            'tile': {'inHand': False, 'riverOccurrences': 1, 'calledMeldOccurrences': 0},
+        }
+        validate_discard_witness(valid)
+
+        invalid_witnesses = (
+            {**valid, 'operation': {'fresh': False}},
+            {**valid, 'transition': {**valid['transition'], 'source': 'AutomaticTurnRunner'}},
+            {**valid, 'transition': {**valid['transition'], 'nextPhase': 'awaiting-call'}},
+            {**valid, 'tile': {'inHand': True, 'riverOccurrences': 0, 'calledMeldOccurrences': 0}},
+            {**valid, 'tile': {'inHand': False, 'riverOccurrences': 1, 'calledMeldOccurrences': 1}},
+        )
+        for witness in invalid_witnesses:
+            with self.subTest(witness=witness), self.assertRaises(AssertionError):
+                validate_discard_witness(witness)
 
 
 if __name__ == '__main__':
