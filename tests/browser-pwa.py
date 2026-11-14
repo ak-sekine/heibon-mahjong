@@ -331,12 +331,15 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         retry_cache = re.search(r'const CACHE = "([^"]+)";', worker)
         assert retry_cache, 'retry cache declaration missing'
         new_cache_name = retry_cache.group(1)
-        write_worker_version(sw_path, worker)
         # The failed install is now confirmed redundant, so no -v2 install can
         # remain in flight while the recovery script and asset delivery change.
         PagesHandler.failure_path = None
 
+        # A browser may schedule its own update check immediately after the
+        # failed install settles. Start recording before replacing the file so
+        # an early fetch of the retry bytes cannot fall just before this index.
         second_worker_response = len(PagesHandler.worker_script_responses)
+        write_worker_version(sw_path, worker)
         page.evaluate('async () => { const registration = await navigator.serviceWorker.getRegistration(); await registration.update(); }')
         try:
             page.wait_for_function("""async cacheName => {
