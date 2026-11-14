@@ -378,6 +378,16 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     check(record, abs(recovered['panel']['bottom'] - before['root']['bottom']) <= 2,
           'window resize restoration lost bottom anchor')
     same_rect(record, before['table'], recovered['table'], 'table after resize restoration')
+    print('::notice title=Issue 32 resize evidence::' + json.dumps({
+      'browser':ENGINE,'viewport':record['viewport'],'mode':record['mode'],'scenario':record['scenario'],
+      'before':{'root':before['root'],'panel':before['panel'],'variables':before['panelVariables'],'table':before['table']},
+      'immediate':{'root':record['windowResizeImmediately']['root'],'panel':record['windowResizeImmediately']['panel'],
+        'variables':record['windowResizeImmediately']['panelVariables']},
+      'stable':{'root':resized['root'],'panel':resized['panel'],'variables':resized['panelVariables'],
+        'trace':record['windowResizeTrace'],'actionPanelRootReads':record['windowResizeActionPanelReads']},
+      'restored':{'root':recovered['root'],'panel':recovered['panel'],'variables':recovered['panelVariables'],
+        'table':recovered['table'],'trace':record['windowRestoreTrace']},
+    },ensure_ascii=False,separators=(',',':')))
 
     # Add visual rows without inventing selectable game actions. Real options
     # remain unchanged and confirmation below always clicks an actual button.
