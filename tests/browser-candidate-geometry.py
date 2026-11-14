@@ -27,7 +27,19 @@ from browser_main_fixtures import fixed_seat_fixture
 from browser_focus_assertions import tab_candidates
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--baseline', action='store_true', default=os.environ.get('HEIBON_CANDIDATE_BASELINE') == '1')
+parser.add_argument('--viewport', action='append', help='Limit to one or more WxH viewport sizes.')
+parser.add_argument('--mode', choices=['online', 'local'], help='Limit to one game mode.')
+parser.add_argument('--scenario', choices=[scenario[0] for scenario in SCENARIOS], help='Limit to one candidate scenario.')
 args = parser.parse_args()
+if not args.viewport:
+    args.viewport = [os.environ['HEIBON_CANDIDATE_VIEWPORT']] if os.environ.get('HEIBON_CANDIDATE_VIEWPORT') else None
+if not args.mode:
+    args.mode = os.environ.get('HEIBON_CANDIDATE_MODE')
+if not args.scenario:
+    args.scenario = os.environ.get('HEIBON_CANDIDATE_SCENARIO')
+selected_viewports = VIEWPORTS if not args.viewport else [tuple(map(int, value.lower().split('x'))) for value in args.viewport]
+selected_modes = (False, True) if not args.mode else (args.mode == 'online',)
+selected_scenarios = SCENARIOS if not args.scenario else [item for item in SCENARIOS if item[0] == args.scenario]
 OUT = Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui')) / 'candidate-geometry'
 OUT.mkdir(parents=True, exist_ok=True)
 report = {'browser': ENGINE, 'pass': 'baseline' if args.baseline else 'current',
@@ -35,8 +47,11 @@ report = {'browser': ENGINE, 'pass': 'baseline' if args.baseline else 'current',
 REPORT_PATH = OUT / f'candidate-geometry-{report["pass"]}-{ENGINE}.json'
 
 # Install before ActionPanel attaches listeners. This simulates Safari chrome /
-# keyboard changes without resizing the layout viewport or altering the table.
+# keyboard changes without resizing layout, while forwarding native viewport resizes.
 VISUAL_VIEWPORT = r'''(() => {
+  const nativeVisualViewport = window.visualViewport;
+  window.issue32NativeResizeCount = 0;
+  window.issue32ResizeEvents = [];
   const viewport = new EventTarget();
   let height = null, offsetTop = 0;
   Object.defineProperties(viewport, {
@@ -45,6 +60,12 @@ VISUAL_VIEWPORT = r'''(() => {
     pageTop: {get: () => scrollY + offsetTop}, pageLeft: {get: () => scrollX},
   });
   Object.defineProperty(window, 'visualViewport', {configurable: true, get: () => viewport});
+  nativeVisualViewport?.addEventListener('resize', () => {
+    window.issue32NativeResizeCount++;
+    issue32ResizeEvents.push('visualViewport.resize');
+    viewport.dispatchEvent(new Event('resize'));
+  });
+  window.addEventListener('resize', () => issue32ResizeEvents.push('window.resize'), {capture:true});
   window.issue32SetVisualViewport = (nextHeight = null, nextOffset = 0) => {
     height = nextHeight; offsetTop = nextOffset;
     viewport.dispatchEvent(new Event('resize'));
@@ -119,6 +140,8 @@ def snapshot(page, online):
         visibleNormalButtons:[...part('normal-controls').querySelectorAll('button')].filter(visible).length,
         list:{clientHeight:list.clientHeight,scrollHeight:list.scrollHeight,scrollTop:list.scrollTop,
           overflow:getComputedStyle(list).overflowY},
+        panelVariables:Object.fromEntries(['--candidate-panel-left','--candidate-panel-width',
+          '--candidate-panel-bottom'].map(name=>[name,panel.style.getPropertyValue(name)])),
         scrollY,visual:{height:visualViewport.height,offsetTop:visualViewport.offsetTop},
         layoutViewport:{width:innerWidth,height:innerHeight},
         rootMinHeight:getComputedStyle(root).minHeight,
@@ -281,16 +304,44 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
         record['keyboardFocus'] = 'all candidates and Back: Tab order, name, focus-visible, clipping, no action'
 
     # Resize the layout viewport, then recover the original table and baseline.
+    page.evaluate('window.issue32NativeResizeCount=0; window.issue32ResizeEvents.length=0')
     page.set_viewport_size({'width': width + 24, 'height': height})
     settle(page)
     resized = snapshot(page, online)
     record['windowResized'] = resized
+    record['nativeVisualViewportResizeCount'] = page.evaluate('window.issue32NativeResizeCount')
+    record['windowResizeEventOrder'] = page.evaluate('window.issue32ResizeEvents.slice()')
+    check(record, 'window.resize' in record['windowResizeEventOrder'], 'window resize event was not observed')
+    if record['nativeVisualViewportResizeCount']:
+      check(record, 'visualViewport.resize' in record['windowResizeEventOrder'],
+            'native visualViewport resize was not forwarded into the test viewport')
     for key in ('left', 'right', 'width'):
         check(record, abs(resized['root'][key] - resized['panel'][key]) <= 1,
               f'window resize lost common {key}')
+    for name, value in [('--candidate-panel-left', resized['root']['x']),
+                        ('--candidate-panel-width', resized['root']['width'])]:
+      try:
+        measured = float(resized['panelVariables'][name].removesuffix('px'))
+      except ValueError:
+        measured = float('inf')
+      check(record, abs(measured - value) <= .5, f'window resize left stale {name}: {measured} != {value}')
+    check(record, abs(resized['panel']['bottom'] - before['root']['bottom']) <= 2,
+          'window resize lost candidate bottom anchor')
     page.set_viewport_size({'width': width, 'height': height})
     settle(page)
     recovered = snapshot(page, online)
+    record['windowResizeRestored'] = recovered
+    same_rect(record, before['root'], recovered['root'], 'operation area after viewport restoration')
+    for key in ('left', 'right', 'width'):
+      check(record, abs(recovered['root'][key] - recovered['panel'][key]) <= 1,
+            f'window resize restoration lost common {key}')
+    for name, value in [('--candidate-panel-left', recovered['root']['x']),
+                        ('--candidate-panel-width', recovered['root']['width'])]:
+      try:
+        measured = float(recovered['panelVariables'][name].removesuffix('px'))
+      except ValueError:
+        measured = float('inf')
+      check(record, abs(measured - value) <= .5, f'viewport restoration left stale {name}: {measured} != {value}')
     check(record, abs(recovered['panel']['bottom'] - before['root']['bottom']) <= 2,
           'window resize restoration lost bottom anchor')
     same_rect(record, before['table'], recovered['table'], 'table after resize restoration')
@@ -411,7 +462,7 @@ try:
     with sync_playwright() as p:
         browser = getattr(p, ENGINE).launch()
         try:
-            for width, height in VIEWPORTS:
+            for width, height in selected_viewports:
                 page = browser.new_page(viewport={'width': width, 'height': height})
                 errors = []
                 page.on('pageerror', lambda error: errors.append(str(error)))
@@ -436,8 +487,8 @@ try:
                       });
                     }''')
                     page.add_style_tag(content=old_css)
-                for online in (False, True):
-                    for scenario, trigger, count in SCENARIOS:
+                for online in selected_modes:
+                    for scenario, trigger, count in selected_scenarios:
                         exercise(page, width, height, scenario, trigger, count, online)
                 if errors:
                     raise AssertionError(f'{width}x{height}: page errors: {errors}')
