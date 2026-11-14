@@ -27,7 +27,19 @@ from browser_main_fixtures import fixed_seat_fixture
 from browser_focus_assertions import tab_candidates
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--baseline', action='store_true', default=os.environ.get('HEIBON_CANDIDATE_BASELINE') == '1')
+parser.add_argument('--viewport', action='append', help='Limit to one or more WxH viewport sizes.')
+parser.add_argument('--mode', choices=['online', 'local'], help='Limit to one game mode.')
+parser.add_argument('--scenario', choices=[scenario[0] for scenario in SCENARIOS], help='Limit to one candidate scenario.')
 args = parser.parse_args()
+if not args.viewport:
+    args.viewport = [os.environ['HEIBON_CANDIDATE_VIEWPORT']] if os.environ.get('HEIBON_CANDIDATE_VIEWPORT') else None
+if not args.mode:
+    args.mode = os.environ.get('HEIBON_CANDIDATE_MODE')
+if not args.scenario:
+    args.scenario = os.environ.get('HEIBON_CANDIDATE_SCENARIO')
+selected_viewports = VIEWPORTS if not args.viewport else [tuple(map(int, value.lower().split('x'))) for value in args.viewport]
+selected_modes = (False, True) if not args.mode else (args.mode == 'online',)
+selected_scenarios = SCENARIOS if not args.scenario else [item for item in SCENARIOS if item[0] == args.scenario]
 OUT = Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui')) / 'candidate-geometry'
 OUT.mkdir(parents=True, exist_ok=True)
 report = {'browser': ENGINE, 'pass': 'baseline' if args.baseline else 'current',
@@ -50,6 +62,41 @@ VISUAL_VIEWPORT = r'''(() => {
     viewport.dispatchEvent(new Event('resize'));
     viewport.dispatchEvent(new Event('scroll'));
   };
+  const geometry = online => {
+    const root = document.querySelector(online ? '#online-game-controls' : '#local-game-controls');
+    const panel = root?.querySelector('[data-panel-part="candidate-controls"]');
+    const rect = node => node?.getBoundingClientRect().toJSON() ?? null;
+    const vars = node => Object.fromEntries(['--candidate-panel-left','--candidate-panel-width',
+      '--candidate-panel-bottom','--candidate-panel-available-height'].map(name => [name, {
+        inline: node?.style.getPropertyValue(name) ?? '', computed: node ? getComputedStyle(node).getPropertyValue(name).trim() : '',
+      }]));
+    return {innerWidth, innerHeight, root: rect(root), panel: rect(panel), variables: vars(panel)};
+  };
+  window.issue32ResizeTrace = [];
+  window.issue32ResizeTraceActive = false;
+  const nativeGetBounds = Element.prototype.getBoundingClientRect;
+  Element.prototype.getBoundingClientRect = function(...args) {
+    const bounds = nativeGetBounds.apply(this, args);
+    if (issue32ResizeTraceActive && ['online-game-controls','local-game-controls'].includes(this.id)) {
+      const stack = new Error().stack ?? '';
+      issue32ResizeTrace.push({phase:stack.includes('repositionCandidatePanel') ? 'action-panel-root-read' : 'root-read',
+        id:this.id, innerWidth, root:{x:bounds.x,left:bounds.left,right:bounds.right,width:bounds.width,bottom:bounds.bottom},
+        stack:stack.split('\n').slice(0,5)});
+    }
+    return bounds;
+  };
+  window.addEventListener('resize', () => {
+    issue32ResizeTraceActive = true;
+    issue32ResizeTrace.push({phase:'capture', innerWidth});
+    queueMicrotask(() => issue32ResizeTrace.push({phase:'after-event-listeners', ...geometry(
+      Boolean(document.querySelector('#online-game-controls [data-panel-part="candidate-controls"]:not([hidden])')))}));
+    requestAnimationFrame(() => {
+      issue32ResizeTrace.push({phase:'animation-frame-1', ...geometry(
+        Boolean(document.querySelector('#online-game-controls [data-panel-part="candidate-controls"]:not([hidden])')))});
+      requestAnimationFrame(() => issue32ResizeTrace.push({phase:'animation-frame-2', ...geometry(
+        Boolean(document.querySelector('#online-game-controls [data-panel-part="candidate-controls"]:not([hidden])')))}));
+    });
+  }, {capture:true});
 })();'''
 
 # Main's real renderers/controllers provide the production DOM, fonts, state
@@ -119,6 +166,9 @@ def snapshot(page, online):
         visibleNormalButtons:[...part('normal-controls').querySelectorAll('button')].filter(visible).length,
         list:{clientHeight:list.clientHeight,scrollHeight:list.scrollHeight,scrollTop:list.scrollTop,
           overflow:getComputedStyle(list).overflowY},
+        panelVariables:Object.fromEntries(['--candidate-panel-left','--candidate-panel-width',
+          '--candidate-panel-bottom','--candidate-panel-available-height'].map(name=>[name,{
+            inline:panel.style.getPropertyValue(name), computed:getComputedStyle(panel).getPropertyValue(name).trim()}])),
         scrollY,visual:{height:visualViewport.height,offsetTop:visualViewport.offsetTop},
         layoutViewport:{width:innerWidth,height:innerHeight},
         rootMinHeight:getComputedStyle(root).minHeight,
@@ -135,6 +185,7 @@ def check(record, condition, message):
     record.setdefault('violations', []).append(message)
     save()
     if not args.baseline:
+        print('::error title=Issue 32 geometry evidence::' + json.dumps(record, ensure_ascii=False, separators=(',', ':')))
         raise AssertionError(f'{record["viewport"]} {record["mode"]} {record["scenario"]}: {message}; measurements={record}')
 
 
@@ -281,16 +332,49 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
         record['keyboardFocus'] = 'all candidates and Back: Tab order, name, focus-visible, clipping, no action'
 
     # Resize the layout viewport, then recover the original table and baseline.
+    page.evaluate('issue32ResizeTrace.splice(0); issue32ResizeTraceActive=false')
     page.set_viewport_size({'width': width + 24, 'height': height})
+    record['windowResizeImmediately'] = snapshot(page, online)
     settle(page)
     resized = snapshot(page, online)
     record['windowResized'] = resized
+    record['windowResizeTrace'] = page.evaluate('issue32ResizeTrace.splice(0)')
+    check(record, any(item['phase'] == 'capture' for item in record['windowResizeTrace']),
+          'window resize event was not observed')
+    check(record, any(item['phase'] == 'after-event-listeners' for item in record['windowResizeTrace']),
+          'window resize listeners did not complete')
     for key in ('left', 'right', 'width'):
         check(record, abs(resized['root'][key] - resized['panel'][key]) <= 1,
               f'window resize lost common {key}')
+    record['windowResizeActionPanelReads'] = [item for item in record['windowResizeTrace']
+      if item['phase'] == 'action-panel-root-read']
+    for key, actual in [('left', 'x'), ('width', 'width')]:
+      value = resized['panelVariables']['--candidate-panel-' + key]['inline']
+      try:
+        measured = float(value.removesuffix('px'))
+      except ValueError:
+        measured = float('inf')
+      check(record, abs(measured - resized['root'][actual]) <= 0.5,
+            f'window resize left stale --candidate-panel-{key}: {value}; root {actual}={resized["root"][actual]}')
+    check(record, abs(resized['panel']['bottom'] - before['root']['bottom']) <= 2,
+          'window resize lost candidate bottom anchor')
     page.set_viewport_size({'width': width, 'height': height})
+    record['windowRestoreImmediately'] = snapshot(page, online)
     settle(page)
     recovered = snapshot(page, online)
+    record['windowRestoreTrace'] = page.evaluate('issue32ResizeTrace.splice(0)')
+    page.evaluate('issue32ResizeTraceActive=false')
+    for key, actual in [('left', 'x'), ('width', 'width')]:
+      value = recovered['panelVariables']['--candidate-panel-' + key]['inline']
+      try:
+        measured = float(value.removesuffix('px'))
+      except ValueError:
+        measured = float('inf')
+      check(record, abs(measured - recovered['root'][actual]) <= 0.5,
+            f'viewport restoration left stale --candidate-panel-{key}: {value}; root {actual}={recovered["root"][actual]}')
+    for key in ('left', 'right', 'width'):
+      check(record, abs(recovered['root'][key] - recovered['panel'][key]) <= 1,
+            f'viewport restoration lost common {key}')
     check(record, abs(recovered['panel']['bottom'] - before['root']['bottom']) <= 2,
           'window resize restoration lost bottom anchor')
     same_rect(record, before['table'], recovered['table'], 'table after resize restoration')
@@ -411,7 +495,7 @@ try:
     with sync_playwright() as p:
         browser = getattr(p, ENGINE).launch()
         try:
-            for width, height in VIEWPORTS:
+            for width, height in selected_viewports:
                 page = browser.new_page(viewport={'width': width, 'height': height})
                 errors = []
                 page.on('pageerror', lambda error: errors.append(str(error)))
@@ -436,8 +520,8 @@ try:
                       });
                     }''')
                     page.add_style_tag(content=old_css)
-                for online in (False, True):
-                    for scenario, trigger, count in SCENARIOS:
+                for online in selected_modes:
+                    for scenario, trigger, count in selected_scenarios:
                         exercise(page, width, height, scenario, trigger, count, online)
                 if errors:
                     raise AssertionError(f'{width}x{height}: page errors: {errors}')

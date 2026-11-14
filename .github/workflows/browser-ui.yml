@@ -6,6 +6,35 @@ on:
     branches: [develop, fix-mobile-table-layout, ui-river-spacing, fix-riichi-discard-layout]
   pull_request:
   workflow_dispatch:
+    inputs:
+      targeted_browser:
+        description: Browser engine for a targeted candidate geometry run.
+        required: false
+        type: choice
+        options: [both, chromium, webkit]
+        default: both
+      targeted_candidate_geometry:
+        description: Run only a selected candidate geometry case.
+        required: false
+        type: boolean
+        default: false
+      candidate_geometry_viewport:
+        description: Candidate geometry viewport (WxH).
+        required: false
+        type: string
+        default: 375x560
+      candidate_geometry_mode:
+        description: Candidate geometry game mode.
+        required: false
+        type: choice
+        options: [online, local]
+        default: online
+      candidate_geometry_scenario:
+        description: Candidate geometry scenario.
+        required: false
+        type: choice
+        options: [mixed-kan, pon-multiple, chi, daiminkan, ankan, opening, kakan]
+        default: mixed-kan
   workflow_call:
     inputs:
       reuse_build:
@@ -101,6 +130,7 @@ jobs:
     if: >-
       ${{
         always() &&
+        (github.event_name != 'workflow_dispatch' || inputs.targeted_browser == 'both' || inputs.targeted_browser == matrix.browser) &&
         (inputs.reuse_build || (
           needs.detect-changes.result == 'success' &&
           needs.detect-changes.outputs.run_full_suite == 'true' &&
@@ -230,6 +260,10 @@ jobs:
         shell: bash
         env:
           HEIBON_BROWSER_TIMINGS: /tmp/heibon-browser-ui-timings.csv
+          HEIBON_TARGETED_CANDIDATE_GEOMETRY: ${{ github.event_name == 'workflow_dispatch' && inputs.targeted_candidate_geometry }}
+          HEIBON_CANDIDATE_VIEWPORT: ${{ inputs.candidate_geometry_viewport }}
+          HEIBON_CANDIDATE_MODE: ${{ inputs.candidate_geometry_mode }}
+          HEIBON_CANDIDATE_SCENARIO: ${{ inputs.candidate_geometry_scenario }}
         run: |
           VITE_ONLINE_API_URL=https://online-mock.invalid npm run dev -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/heibon-vite.log 2>&1 &
           vite_pid=$!
@@ -249,7 +283,11 @@ jobs:
           fi
           export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
           set -o pipefail
-          python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
+          if [[ "$HEIBON_TARGETED_CANDIDATE_GEOMETRY" == "true" ]]; then
+            python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" --script browser-candidate-geometry.py 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
+          else
+            python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
+          fi
       - name: Report winning hand geometry
         env:
           BROWSER: ${{ matrix.browser }}
