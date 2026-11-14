@@ -153,16 +153,19 @@ window.dialogScrollTest = {
             before_header = geometry['headerRect']['y']
             before_action = geometry['actionRect']['y']
             content.scroll_into_view_if_needed()
-            page.mouse.move(geometry['trackRect']['x'] - 20, geometry['trackRect']['y'] + 20)
-            page.mouse.wheel(0, 360)
-            page.wait_for_function('selector => document.querySelector(selector).scrollTop > 0', arg=content_selector)
-            after_wheel = content.evaluate('(node) => node.scrollTop')
+            wheel_supported = not (mobile and ENGINE == 'webkit')
+            after_wheel = 0
+            if wheel_supported:
+                page.mouse.move(geometry['trackRect']['x'] - 20, geometry['trackRect']['y'] + 20)
+                page.mouse.wheel(0, 360)
+                page.wait_for_function('selector => document.querySelector(selector).scrollTop > 0', arg=content_selector)
+                after_wheel = content.evaluate('(node) => node.scrollTop')
 
             content.evaluate('(node) => { node.focus(); node.scrollTop = 0; }')
             page.keyboard.press('PageDown')
             page.wait_for_function('selector => document.querySelector(selector).scrollTop > 0', arg=content_selector)
             after_keyboard = content.evaluate('(node) => node.scrollTop')
-            assert after_keyboard > 0 and after_wheel > 0, (width, height, name, after_wheel, after_keyboard)
+            assert after_keyboard > 0 and (not wheel_supported or after_wheel > 0), (width, height, name, after_wheel, after_keyboard)
             page.keyboard.press('PageUp')
             page.wait_for_function('({selector,before}) => document.querySelector(selector).scrollTop < before', arg={'selector': content_selector, 'before': after_keyboard})
 

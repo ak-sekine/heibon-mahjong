@@ -580,3 +580,8 @@ Android・タブレット実機は未確認のまま記録し、viewport自動�
 
 - SHA `76172899d50e9109de607ae63e0a82e90e2a1d32` のrun [#43584712654](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43584712654) はverify-buildが成功。WebKitの新規検証は本文へフォーカス後のPageDownでスクロールしましたが、その後のPageUpでは位置が戻らずタイムアウトしました。実機Safari確認とは区別し、Browser UIは成功扱いしません。
 - 共通スクロール本文自身にフォーカスがある場合だけ、mount処理でPageUp／PageDownを本文高分ぶん上下へ移動し、スクロール範囲内に制限する処理を追加。本文内のボタン等がフォーカス中のキー操作はそのまま通します。次のdevelop SHAでChromium／WebKitを再実行します。
+
+### 5回目のBrowser UI実行で見つかったmobile WebKit入力API制約
+
+- SHA `24cfdb80668bd1b921d3f297ae4b068dd5307950` のrun [#43585321942](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43585321942) はverify-buildが成功。WebKitはPC高さを含む1280×800と1280×420で3 dialogのスクロール操作を完了し、390px幅のmobile WebKit viewportではPlaywrightの `page.mouse.wheel` が未対応として例外になった。これはブラウザー操作APIの制約で、アプリのスクロール失敗ではありません。
+- wheel入力はデスクトップChromium／WebKitとChromiumスマホviewportで続け、mobile WebKitでは未対応wheel呼び出しを行わない。WebKitモバイル幅のキーボード・トラック・pointer条件は維持し、ChromiumではCDPネイティブタッチスワイプを維持する。iPhone Safari実機の実タッチはチェックリストに残す。
