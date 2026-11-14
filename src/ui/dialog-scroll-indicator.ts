@@ -83,18 +83,26 @@ export function mountDialogScrollIndicators(root: ParentNode = document): void {
     window.addEventListener('orientationchange', update, { passive: true });
     window.visualViewport?.addEventListener('resize', update, { passive: true });
 
+    let resizeObserver: ResizeObserver | undefined;
     if (typeof ResizeObserver !== 'undefined') {
-      const resizeObserver = new ResizeObserver(update);
-      resizeObserver.observe(panel);
-      resizeObserver.observe(content);
-      resizeObserver.observe(track);
-      content.querySelectorAll<HTMLElement>(':scope > *').forEach(child => resizeObserver.observe(child));
-      const mutationObserver = new MutationObserver(() => {
-        content.querySelectorAll<HTMLElement>(':scope > *').forEach(child => resizeObserver.observe(child));
-        update();
-      });
-      mutationObserver.observe(content, { childList: true, subtree: true, characterData: true, attributes: true });
+      const observer = new ResizeObserver(update);
+      resizeObserver = observer;
+      observer.observe(panel);
+      observer.observe(content);
+      observer.observe(track);
+      content.querySelectorAll<HTMLElement>(':scope > *').forEach(child => observer.observe(child));
     }
+
+    // Re-measure when result rows are rendered or a dialog is opened after its
+    // first hidden measurement. ResizeObserver covers geometry changes; this
+    // observer also covers content changes that do not change the panel box.
+    const mutationObserver = new MutationObserver(() => {
+      if (resizeObserver) content.querySelectorAll<HTMLElement>(':scope > *').forEach(child => resizeObserver!.observe(child));
+      update();
+    });
+    mutationObserver.observe(content, { childList: true, subtree: true, characterData: true, attributes: true });
+    const dialog = panel.closest<HTMLDialogElement>('dialog');
+    if (dialog) mutationObserver.observe(dialog, { attributes: true, attributeFilter: ['open'] });
 
     update();
   });

@@ -1,7 +1,7 @@
 """Common scroll controls for rules, round-result, and match-result dialogs."""
 import os
 import shutil
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 VIEWPORTS = [(1280, 800), (1280, 420), (390, 844), (320, 480)]
@@ -91,7 +91,20 @@ window.dialogScrollTest = {
                 host.append(row);
               }
             }''', {'contentSelector': content_selector, 'name': name})
-            page.wait_for_function('selector => !document.querySelector(selector).querySelector(".dialog-scroll-indicator").hidden', arg=dialog_selector)
+            page.wait_for_timeout(100)
+            initial_scroll = content.evaluate('(node) => ({scrollHeight:node.scrollHeight,clientHeight:node.clientHeight})')
+            assert initial_scroll['scrollHeight'] > initial_scroll['clientHeight'], (width, height, name, 'long fixture did not create a scroll range', initial_scroll)
+            try:
+                page.wait_for_function('selector => !document.querySelector(selector).querySelector(".dialog-scroll-indicator").hidden', arg=dialog_selector, timeout=3000)
+            except PlaywrightTimeoutError:
+                print('dialog scroll indicator diagnostics', ENGINE, width, height, name, page.evaluate('''({dialogSelector,contentSelector}) => {
+                  const dialog = document.querySelector(dialogSelector), content = document.querySelector(contentSelector);
+                  const panel = dialog.querySelector('.dialog-scroll-panel'), track = dialog.querySelector('.dialog-scroll-indicator');
+                  const rect = node => {const r=node.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};};
+                  return {open:dialog.open,dialogRect:rect(dialog),panelRect:rect(panel),contentRect:rect(content),
+                    scrollHeight:content.scrollHeight,clientHeight:content.clientHeight,trackHidden:track.hidden,trackRect:rect(track)};
+                }''', {'dialogSelector':dialog_selector,'contentSelector':content_selector}))
+                raise
 
             geometry = page.evaluate('''({dialogSelector,contentSelector,headerSelector,actionSelector}) => {
               const dialog = document.querySelector(dialogSelector);

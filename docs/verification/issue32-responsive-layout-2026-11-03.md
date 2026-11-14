@@ -557,3 +557,8 @@ Android・タブレット実機は未確認のまま記録し、viewport自動�
 - `tests/browser-dialog-scroll.py`のPython構文検査、`git diff --check`: **成功**。
 - Browser実エンジンのChromium／WebKit 82 scenarioはCodex Cloudでは起動せず、develop pushによりGitHub Actions `Browser UI verification` で実行する。対象SHA・run URL・Chromium／WebKitの結果はpush後に記録する。
 - Safari／PCの修正後本人実機確認: **未確認**。従来のPC実機11/11 OKはこの追加スクロールUI確認に読み替えない。
+
+### 初回Browser UI実行の失敗記録
+
+- push対象SHA `e3f1f59678925d21464c25328570b9534a9f89c6` のBrowser UI run [#43583062970](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43583062970) はverify-build・差分検出・docs-checkがsuccessした。Chromium／WebKitの既存 `browser-create-dialog-layout.py` はsuccessしたが、新規 `browser-dialog-scroll.py` の最初のルール確認ケースで、長文fixture後にインジケーターがvisibleにならず両engineとも30秒timeoutした。これはBrowser UI成功とは扱わない。
+- そのログを受け、共通mount処理が内容更新に加えて親dialogのopen属性変化でも再計測するようにした。新しいテストでは長文の実scroll rangeと、失敗時の本文・panel・track矩形を出力する。修正後のローカル `npm test` 91/91、build、Worker型検査、Browser UI選択9件、Python構文・差分検査はsuccess。Browser UI再試行は次のdevelop SHAのActionsで実施し、結果が出るまで未確認とする。
