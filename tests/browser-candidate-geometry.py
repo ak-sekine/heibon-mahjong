@@ -49,6 +49,12 @@ REPORT_PATH = OUT / f'candidate-geometry-{report["pass"]}-{ENGINE}.json'
 # Install before ActionPanel attaches listeners. This simulates Safari chrome /
 # keyboard changes without resizing the layout viewport or altering the table.
 VISUAL_VIEWPORT = r'''(() => {
+  const nativeVisualViewport = window.visualViewport;
+  window.issue32NativeVisualViewportTrace = [];
+  nativeVisualViewport?.addEventListener('resize', () => issue32NativeVisualViewportTrace.push({
+    phase:'native-visual-viewport-resize', innerWidth, width:nativeVisualViewport.width,
+    height:nativeVisualViewport.height, offsetTop:nativeVisualViewport.offsetTop,
+  }));
   const viewport = new EventTarget();
   let height = null, offsetTop = 0;
   Object.defineProperties(viewport, {
@@ -212,6 +218,8 @@ def resize_evidence(record):
         'restoredImmediately':concise(record.get('windowRestoreImmediately')),
         'restored':concise(record.get('windowResizeRestored')),
         'restoreTrace':compact_trace(record.get('windowRestoreTrace', [])),
+        'nativeVisualViewportTrace':record.get('nativeVisualViewportTrace', []),
+        'nativeVisualViewportRestoreTrace':record.get('nativeVisualViewportRestoreTrace', []),
     }
 
 
@@ -358,13 +366,14 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
         record['keyboardFocus'] = 'all candidates and Back: Tab order, name, focus-visible, clipping, no action'
 
     # Resize the layout viewport, then recover the original table and baseline.
-    page.evaluate('issue32ResizeTrace.splice(0); issue32ResizeTraceActive=false')
+    page.evaluate('issue32ResizeTrace.splice(0); issue32NativeVisualViewportTrace.splice(0); issue32ResizeTraceActive=false')
     page.set_viewport_size({'width': width + 24, 'height': height})
     record['windowResizeImmediately'] = snapshot(page, online)
     settle(page)
     resized = snapshot(page, online)
     record['windowResized'] = resized
     record['windowResizeTrace'] = page.evaluate('issue32ResizeTrace.splice(0)')
+    record['nativeVisualViewportTrace'] = page.evaluate('issue32NativeVisualViewportTrace.splice(0)')
     check(record, any(item['phase'] == 'capture' for item in record['windowResizeTrace']),
           'window resize event was not observed')
     check(record, any(item['phase'] == 'after-event-listeners' for item in record['windowResizeTrace']),
@@ -390,6 +399,7 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     recovered = snapshot(page, online)
     record['windowResizeRestored'] = recovered
     record['windowRestoreTrace'] = page.evaluate('issue32ResizeTrace.splice(0)')
+    record['nativeVisualViewportRestoreTrace'] = page.evaluate('issue32NativeVisualViewportTrace.splice(0)')
     page.evaluate('issue32ResizeTraceActive=false')
     for key, actual in [('left', 'x'), ('width', 'width')]:
       value = recovered['panelVariables']['--candidate-panel-' + key]['inline']
