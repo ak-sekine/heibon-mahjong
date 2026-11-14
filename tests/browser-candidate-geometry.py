@@ -200,23 +200,38 @@ def check(record, condition, message):
 
 
 def resize_evidence(record):
+    def rect_summary(value):
+        if not value:
+            return None
+        return {key:value[key] for key in ('x','y','width','height','right','bottom') if key in value}
+
+    def vars_summary(value):
+        if not value:
+            return None
+        return {key:value.get(key, {}) for key in ('--candidate-panel-left','--candidate-panel-width',
+          '--candidate-panel-bottom')}
+
     def concise(snapshot):
         if not snapshot:
             return None
-        return {key: snapshot.get(key) for key in ('root', 'panel', 'panelVariables', 'table') if key in snapshot}
+        return {'root':rect_summary(snapshot.get('root')),'panel':rect_summary(snapshot.get('panel')),
+          'variables':vars_summary(snapshot.get('panelVariables')),'table':rect_summary(snapshot.get('table'))}
     def compact_trace(events):
         trace = []
         for event in events:
             if event.get('phase') not in ('capture', 'action-panel-root-read', 'after-event-listeners',
                                           'animation-frame-1', 'animation-frame-2'):
                 continue
-            item = {key: event[key] for key in ('phase', 'innerWidth', 'root', 'panel', 'variables') if key in event}
+            item = {'phase':event.get('phase'),'innerWidth':event.get('innerWidth'),
+              'root':rect_summary(event.get('root')),'panel':rect_summary(event.get('panel')),
+              'variables':vars_summary(event.get('variables'))}
             if event.get('phase') == 'action-panel-root-read':
                 item['stack'] = event.get('stack', [])
             trace.append(item)
         return trace
     return {
-        'browser':ENGINE,'viewport':record.get('viewport'),'mode':record.get('mode'),'scenario':record.get('scenario'),
+        'browser':ENGINE,'pass':report['pass'],'viewport':record.get('viewport'),
+        'mode':record.get('mode'),'scenario':record.get('scenario'),
         'before':concise(record.get('before')),
         'stable':concise(record.get('windowResized')),'trace':compact_trace(record.get('windowResizeTrace', [])),
         'restored':concise(record.get('windowResizeRestored')),
