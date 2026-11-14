@@ -14,7 +14,7 @@ def discard_witness_errors(witness):
         errors.append('the discard click did not reach GameController.confirm exactly once')
     if not any(event['event'] == 'confirm-accepted' for event in events):
         errors.append('GameController.confirm did not accept the discard')
-    if not any(event['event'] == 'GameController.confirm' for event in transitions):
+    if not any(event['source'] == 'GameController.confirm' for event in transitions):
         errors.append('the accepted discard did not record its GameController.confirm state transition')
     if not witness['stateChanged']:
         errors.append('the game state did not change after the accepted discard')

@@ -11,7 +11,7 @@ def witness(destination):
             'canConfirm': True, 'selectedTileOwned': True,
         },
         'events': [{'event': 'confirm-started'}, {'event': 'confirm-accepted'}],
-        'transitions': [{'event': 'GameController.confirm'}],
+        'transitions': [{'source': 'GameController.confirm'}],
         'stateChanged': True,
         'transitionedFromHumanDiscard': True,
         'selectedTileOwnedAfter': False,
@@ -40,7 +40,7 @@ class MobileDiscardWitnessTest(unittest.TestCase):
 
     def test_missing_controller_transition_fails(self):
         observed = witness({'river': True, 'openMeld': False, 'winningTile': False})
-        observed['transitions'] = [{'event': 'AutomaticTurnRunner'}]
+        observed['transitions'] = [{'source': 'AutomaticTurnRunner'}]
         observed['transitionedFromHumanDiscard'] = False
         errors = discard_witness_errors(observed)
         self.assertTrue(any('did not record its GameController.confirm' in error for error in errors))
