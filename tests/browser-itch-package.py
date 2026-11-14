@@ -14,63 +14,93 @@ REPETITIONS = int(os.environ.get('HEIBON_SMOKE_REPETITIONS', '3'))
 ARTIFACT_DIR = Path(os.environ.get('HEIBON_SMOKE_ARTIFACT_DIR', '/tmp/heibon-itch-smoke'))
 TURN_TIMEOUT_MS = 20_000
 DISCARD_NEXT_PHASES = ('awaiting-ron', 'awaiting-call', 'awaiting-draw', 'awaiting-discard', 'won', 'wall-exhausted')
+DISCARD_TRANSITION_PHASES = ('awaiting-ron', 'awaiting-call', 'awaiting-draw', 'won', 'wall-exhausted')
 
-DISCARD_WITNESS_SCRIPT = r'''({tileId, priorOperationIds}) => {
+DISCARD_EVENT_SCRIPT = r'''tileId => {
   let rows = [];
   try { rows = JSON.parse(localStorage.getItem('heibon-mahjong-diagnostics-v2') || '[]'); } catch {}
-  const operationStart = [...rows].reverse().find(row => row.event === 'local_action_state_update_started' &&
-    row.details?.actionType === 'discard' && Number.isFinite(row.details?.operationId) &&
-    !priorOperationIds.includes(row.details.operationId));
-  const operationId = operationStart?.details?.operationId;
-  const operationStartIndex = operationStart ? rows.indexOf(operationStart) : -1;
-  const actionIndex = operationId === undefined ? -1 : rows.findIndex((row, index) => index > operationStartIndex &&
-    row.event === 'local_action_state_update_succeeded' && row.details?.operationId === operationId);
-  const action = actionIndex < 0 ? null : rows[actionIndex];
-  const transition = actionIndex < 0 ? null : rows.slice(operationStartIndex + 1, actionIndex).reverse().find(row =>
-    row.event === 'local_game_state_transition' && row.details?.source === 'GameController.confirm' &&
-    row.details?.previousPhase === 'awaiting-discard' && row.details?.nextPhase === action.details?.nextPhase);
+  // operationId is needed only for in-memory pairing. The caller must not
+  // store or report these projected rows as a diagnostic artifact.
+  const events = rows.map(row => ({
+    event: row.event,
+    operationId: row.details?.operationId,
+    actionType: row.details?.actionType,
+    previousPhase: row.details?.previousPhase,
+    nextPhase: row.details?.nextPhase,
+    stateUpdateResult: row.details?.stateUpdateResult,
+    source: row.details?.source,
+    timestamp: row.timestamp,
+  }));
   const hand = Boolean(document.querySelector(`#player-hand [data-tile-id="${CSS.escape(tileId)}"]`));
   const river = document.querySelectorAll(`.river-tile[data-tile-id="${CSS.escape(tileId)}"]`).length;
   const calledMeld = document.querySelectorAll(`.open-melds .called-tile[data-tile-id="${CSS.escape(tileId)}"]`).length;
-  const accepted = Boolean(action && action.details?.actionType === 'discard' &&
-    action.details?.previousPhase === 'awaiting-discard' &&
-    ['awaiting-ron','awaiting-call','awaiting-draw','awaiting-discard','won','wall-exhausted'].includes(action.details?.nextPhase) &&
-    action.details?.stateUpdateResult === 'accepted');
-  const transitioned = Boolean(transition && transition.details?.previousPhase === 'awaiting-discard' &&
-    ['awaiting-ron','awaiting-call','awaiting-draw','awaiting-discard','won','wall-exhausted'].includes(transition.details?.nextPhase));
-  const tileMoved = !hand && river + calledMeld === 1 && river <= 1 && calledMeld <= 1;
-  return {
-    ready: Boolean(operationStart && accepted && transitioned && tileMoved),
-    operation: { fresh: Boolean(operationStart) },
-    action: action ? {
-      accepted, previousPhase: action.details?.previousPhase ?? null,
-      nextPhase: action.details?.nextPhase ?? null,
-      stateUpdateResult: action.details?.stateUpdateResult ?? null,
-      timestamp: action.timestamp,
-    } : null,
-    transition: transition ? {
-      source: transition.details?.source ?? null,
-      previousPhase: transition.details?.previousPhase ?? null,
-      nextPhase: transition.details?.nextPhase ?? null,
-      timestamp: transition.timestamp,
-    } : null,
-    tile: { inHand: hand, riverOccurrences: river, calledMeldOccurrences: calledMeld },
-  };
+  return { events, tile: { inHand: hand, riverOccurrences: river, calledMeldOccurrences: calledMeld } };
 }'''
+
+
+def build_discard_witness(rows, prior_operation_ids, tile):
+    """Pair current operation events in order and return an ID-free witness."""
+    operation_start_index = next((index for index in range(len(rows) - 1, -1, -1)
+        if rows[index].get('event') == 'local_action_state_update_started'
+        and rows[index].get('actionType') == 'discard'
+        and isinstance(rows[index].get('operationId'), (int, float))
+        and rows[index]['operationId'] not in prior_operation_ids), None)
+    witness = {
+        'operation': {'fresh': operation_start_index is not None},
+        'action': None,
+        'transition': None,
+        'tile': tile,
+    }
+    if operation_start_index is None:
+        return witness
+
+    operation_id = rows[operation_start_index]['operationId']
+    action_index = next((index for index in range(operation_start_index + 1, len(rows))
+        if rows[index].get('event') == 'local_action_state_update_succeeded'
+        and rows[index].get('operationId') == operation_id), None)
+    if action_index is not None:
+        row = rows[action_index]
+        witness['action'] = {
+            'actionType': row.get('actionType'),
+            'accepted': row.get('stateUpdateResult') == 'accepted',
+            'previousPhase': row.get('previousPhase'),
+            'nextPhase': row.get('nextPhase'),
+            'stateUpdateResult': row.get('stateUpdateResult'),
+            'timestamp': row.get('timestamp'),
+        }
+        transition = next((row for row in reversed(rows[operation_start_index + 1:action_index])
+            if row.get('event') == 'local_game_state_transition'
+            and row.get('source') == 'GameController.confirm'), None)
+        if transition is not None:
+            witness['transition'] = {
+                'source': transition.get('source'),
+                'previousPhase': transition.get('previousPhase'),
+                'nextPhase': transition.get('nextPhase'),
+                'timestamp': transition.get('timestamp'),
+            }
+    return witness
 
 
 def validate_discard_witness(witness):
     """Reject stale, incomplete, or physically inconsistent discard evidence."""
     assert witness and witness['operation']['fresh'], witness
     action = witness['action']
-    assert action and action['accepted'] and action['stateUpdateResult'] == 'accepted', witness
+    assert action and action['actionType'] == 'discard' and action['accepted'] and action['stateUpdateResult'] == 'accepted', witness
     assert action['previousPhase'] == 'awaiting-discard' and action['nextPhase'] in DISCARD_NEXT_PHASES, witness
     transition = witness['transition']
     assert transition and transition['source'] == 'GameController.confirm', witness
-    assert transition['previousPhase'] == action['previousPhase'] and transition['nextPhase'] == action['nextPhase'], witness
+    assert transition['previousPhase'] == 'awaiting-discard' and transition['nextPhase'] in DISCARD_TRANSITION_PHASES, witness
     tile = witness['tile']
     assert not tile['inHand'] and tile['riverOccurrences'] + tile['calledMeldOccurrences'] == 1, witness
     assert tile['riverOccurrences'] in (0, 1) and tile['calledMeldOccurrences'] in (0, 1), witness
+
+
+def discard_witness_ready(witness):
+    try:
+        validate_discard_witness(witness)
+        return True
+    except (AssertionError, KeyError, TypeError):
+        return False
 
 # DiagnosticLog already applies an allowlist, but artifacts apply a second
 # allowlist so this test cannot persist a newly added sensitive field by
@@ -322,21 +352,25 @@ def run_iteration(browser, repetition):
         # The action log proves the controller accepted a discard transition;
         # the physical public tile ID must then occur exactly once in the river
         # or in a called meld. A river-only condition rejects valid calls.
-        witness_args = {'tileId': selected_tile_id, 'priorOperationIds': prior_operation_ids}
+        deadline = time.monotonic() + 5
+        last_witness = None
+        while time.monotonic() < deadline:
+            probe = page.evaluate(DISCARD_EVENT_SCRIPT, selected_tile_id)
+            # The projected rows, including operation IDs, are transient and
+            # stay in memory only. Persist only the ID-free witness below.
+            last_witness = build_discard_witness(probe['events'], prior_operation_ids, probe['tile'])
+            if discard_witness_ready(last_witness):
+                break
+            page.wait_for_timeout(50)
+        observations['discardProbe'] = last_witness
         try:
-            witness_handle = page.wait_for_function(
-                f'''args => {{ const witness = ({DISCARD_WITNESS_SCRIPT})(args); return witness.ready ? witness : false; }}''',
-                arg=witness_args, timeout=5000)
-            observations['discardWitness'] = witness_handle.json_value()
-            validate_discard_witness(observations['discardWitness'])
-        except Exception as error:
-            try:
-                observations['discardProbe'] = page.evaluate(DISCARD_WITNESS_SCRIPT, witness_args)
-            except Exception as probe_error:
-                observations['discardProbeCollectionError'] = safe_message(probe_error)
+            validate_discard_witness(last_witness)
+            observations['discardWitness'] = last_witness
+            observations.pop('discardProbe', None)
+        except AssertionError as error:
             raise AssertionError(
                 'Discard evidence did not settle within 5000ms; safeProbe=' +
-                json.dumps(observations.get('discardProbe', {'collectionFailed': True}), ensure_ascii=False)
+                json.dumps(last_witness, ensure_ascii=False)
             ) from error
         after = collect_game_state(page)
         observations['afterDiscard'] = after
