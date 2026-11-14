@@ -1,22 +1,42 @@
 """Responsive table geometry across phone, tablet, desktop, and rotation viewports."""
-import json, os, pathlib
+import json, os, pathlib, re
 from playwright.sync_api import sync_playwright
+from browser_mobile_table_layout_witness import discard_witness_errors
 
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 VIEWPORTS = [(320, 568), (375, 667), (390, 844), (430, 932),
              (667, 375), (844, 390), (768, 1024), (1024, 768),
              (1280, 800), (1440, 900)]
 reports = []
+diagnostics = []
 out = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 out.mkdir(parents=True, exist_ok=True)
+report = {'browser': ENGINE, 'viewports': reports, 'diagnostics': diagnostics, 'result': 'running'}
+
+
+def save_report():
+    (out / f'responsive-table-{ENGINE}.json').write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+
+def safe_page_error(error):
+    message = str(error).splitlines()[0][:240]
+    message = re.sub(r'\b(?:man|pin|sou)-\d+(?:-\d+)?\b', '[redacted-tile-id]', message)
+    message = re.sub(r'(?i)\b(token|authorization|secret|credential|api[_ -]?key)([=: ]+)\S+', r'\1\2[redacted]', message)
+    return {'name': type(error).__name__, 'message': message}
+
+
 with sync_playwright() as p:
     browser = getattr(p, ENGINE).launch()
     for width, height in VIEWPORTS:
         page = browser.new_page(viewport={'width': width, 'height': height})
+        page_errors = []
+        page.on('pageerror', lambda error: page_errors.append(safe_page_error(error)))
         page.goto('http://localhost:4173/heibon-mahjong/')
         page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => { app.controller.random = () => .999999; app.controller.newGame(); })")
         page.wait_for_selector('#player-hand svg')
         page.evaluate("import('/heibon-mahjong/src/main.ts').then(app => window.responsiveApp = app)")
+        page.evaluate("import('/heibon-mahjong/src/game/automatic-turns.ts').then(module => window.mobileAutomaticTurns = module)")
         page.evaluate('''async()=>{
           window.renderer=await import('/heibon-mahjong/src/rendering/table.ts');
           window.base=(await import('/heibon-mahjong/src/game/start.ts')).startGame();
@@ -135,7 +155,6 @@ with sync_playwright() as p:
         page.locator('#player-hand button:enabled').first.wait_for(state='visible', timeout=10000)
         selectable_tiles = page.locator('#player-hand button:enabled').count()
         assert 13 <= selectable_tiles <= 14, f'the current hand should be selectable at {width}x{height}: {selectable_tiles}'
-        previous_river_count = page.evaluate('''()=>responsiveApp.controller.game.players[responsiveApp.controller.playerSeat].river.length''')
         page.locator('#player-hand button:enabled').first.click()
         discard = page.locator('#discard')
         discard.scroll_into_view_if_needed()
@@ -143,8 +162,70 @@ with sync_playwright() as p:
         assert action_target['enabled'] and action_target['receivesPointer'], f'discard action is not operable at {width}x{height}: {action_target}'
         assert action_target['top'] >= 0 and action_target['bottom'] <= height, f'discard action did not scroll into the viewport at {width}x{height}: {action_target}'
         assert action_target['width'] >= 44 and action_target['height'] >= 44, f'discard action target is undersized at {width}x{height}: {action_target}'
+        before = page.evaluate('''()=>{
+          const c=responsiveApp.controller,game=c.game,seat=c.playerSeat,player=game.players[seat];
+          const tileId=player.riichi?player.drawnTile?.id:c.selectedTileId;
+          const owns=()=>Boolean(tileId&&[...player.hand,player.drawnTile].some(tile=>tile?.id===tileId));
+          const probe={operationId:`mobile-discard-${Date.now()}`,events:[],transitions:[],
+            before:{phase:game.phase,humanSeat:seat,turn:game.turnPlayerId,canConfirm:c.canConfirm,
+              selectedTileOwned:owns(),riverCount:player.river.length,cpu:c.diagnosticSnapshot(),
+              matchStatus:c.match.status},tileId};
+          const originalConfirm=c.confirm;
+          c.confirm=function(...args){
+            const previous=this.game,accepted=this.canConfirm;
+            probe.events.push({event:'confirm-started',phase:previous.phase,seat:this.playerSeat,
+              turn:previous.turnPlayerId,accepted});
+            const result=originalConfirm.apply(this,args),next=this.game;
+            probe.stateChanged=next!==previous;
+            probe.events.push({event:accepted&&probe.stateChanged?'confirm-accepted':'confirm-rejected',
+              phase:next.phase,turn:next.turnPlayerId,runnerState:this.progressing?'running':'idle'});
+            return result;
+          };
+          const originalChange=c.onChange;
+          c.onChange=function(){
+            const state=c.game;
+            const transition=mobileAutomaticTurns.getLastLocalGameTransition();
+            probe.transitions.push({phase:state.phase,turn:state.turnPlayerId,
+              source:transition?.endsWith(':GameController.confirm')?'GameController.confirm':
+                transition?.endsWith(':AutomaticTurnRunner')?'AutomaticTurnRunner':'other'});
+            return originalChange();
+          };
+          window.mobileDiscardProbe=probe;
+          return {operationId:probe.operationId,...probe.before};
+        }''')
+        diagnostics.append({'viewport': f'{width}x{height}', 'event': 'discard-started', **before})
+        save_report()
         discard.click()
-        page.wait_for_function('''previous=>responsiveApp.controller.game.players[responsiveApp.controller.playerSeat].river.length>previous''',arg=previous_river_count)
+        witness = page.evaluate('''()=>{
+          const c=responsiveApp.controller,probe=mobileDiscardProbe,game=c.game,seat=c.playerSeat;
+          const player=game.players[seat],tileId=probe.tileId;
+          const contains=tiles=>Boolean(tileId&&tiles?.some(tile=>tile?.id===tileId));
+          const selectedTileOwnedAfter=Boolean(tileId&&[...player.hand,player.drawnTile].some(tile=>tile?.id===tileId));
+          const river=game.players.some(candidate=>contains(candidate.river));
+          const openMeld=game.players.some(candidate=>candidate.melds
+            .filter(meld=>meld.type!=='ankan').some(meld=>contains(meld.tiles)));
+          const winningTile=game.winResult?.winningTile?.id===tileId;
+          const first=probe.transitions[0];
+          return {operationId:probe.operationId,before:probe.before,events:probe.events,transitions:probe.transitions,
+            stateChanged:probe.stateChanged,transitionedFromHumanDiscard:Boolean(first&&
+              (first.phase!=='awaiting-discard'||first.turn!==probe.before.humanSeat)),
+            selectedTileOwnedAfter,destination:{river,openMeld,winningTile},
+            after:{phase:game.phase,humanSeat:seat,turn:game.turnPlayerId,riverCount:player.river.length,
+              cpu:c.diagnosticSnapshot(),matchStatus:c.match.status,
+              publicMeldCounts:game.players.map(p=>p.melds.filter(meld=>meld.type!=='ankan').length),
+              publicMeldTypes:game.players.map(p=>p.melds.filter(meld=>meld.type!=='ankan').map(meld=>meld.type)),
+              ronWindow:game.ronWindow?{present:true,discarderSeat:game.ronWindow.discarderId,kind:game.ronWindow.kind??null}:null,
+              winPhase:game.phase==='won',endPhase:game.phase==='wall-exhausted'},pageErrors:[]};
+        }''')
+        witness['pageErrors'] = page_errors
+        diagnostics.append({'viewport': f'{width}x{height}', 'event': 'discard-finished', **witness})
+        save_report()
+        print(f'{ENGINE} {width}x{height} discard observation: {json.dumps(witness, ensure_ascii=False)}')
+        errors = discard_witness_errors(witness)
+        if errors:
+            report['result'] = 'failed'
+            save_report()
+            raise AssertionError(f'discard witness failed: {errors}; diagnostics={json.dumps(witness, ensure_ascii=False)}')
         if (width, height) in [(667, 375), (844, 390), (768, 1024), (1024, 768)]:
             rotated = {'width': height, 'height': width}
             page.set_viewport_size(rotated)
@@ -164,6 +245,6 @@ with sync_playwright() as p:
         print(f'{ENGINE} {width}x{height} responsive table passed: rivers={river_metrics}')
         page.close()
     browser.close()
-report = {'browser': ENGINE, 'viewports': reports, 'result': 'passed'}
-(out / f'responsive-table-{ENGINE}.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+report['result'] = 'passed'
+save_report()
 print(json.dumps(report, ensure_ascii=False))

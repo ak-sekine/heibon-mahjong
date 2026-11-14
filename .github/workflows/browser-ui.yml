@@ -12,6 +12,11 @@ on:
         required: false
         type: boolean
         default: false
+      targeted_mobile_table_layout:
+        description: Run only the responsive table scenarios.
+        required: false
+        type: boolean
+        default: false
       candidate_geometry_viewport:
         description: Candidate geometry viewport (WxH).
         required: false
@@ -158,7 +163,9 @@ jobs:
           python-version: '3.12'
       - name: Test Browser UI engine selection
         if: ${{ matrix.browser == 'chromium' }}
-        run: python tests/test_browser_regressions_selection.py
+        run: |
+          python tests/test_browser_regressions_selection.py
+          python tests/test_browser_mobile_table_layout_witness.py
       - run: npm ci
       - name: Download verified build from Deploy workflow
         if: ${{ inputs.reuse_build }}
@@ -254,6 +261,7 @@ jobs:
         env:
           HEIBON_BROWSER_TIMINGS: /tmp/heibon-browser-ui-timings.csv
           HEIBON_TARGETED_CANDIDATE_GEOMETRY: ${{ github.event_name == 'workflow_dispatch' && inputs.targeted_candidate_geometry }}
+          HEIBON_TARGETED_MOBILE_TABLE_LAYOUT: ${{ github.event_name == 'workflow_dispatch' && inputs.targeted_mobile_table_layout }}
           HEIBON_CANDIDATE_VIEWPORT: ${{ inputs.candidate_geometry_viewport }}
           HEIBON_CANDIDATE_MODE: ${{ inputs.candidate_geometry_mode }}
           HEIBON_CANDIDATE_SCENARIO: ${{ inputs.candidate_geometry_scenario }}
@@ -276,13 +284,19 @@ jobs:
           fi
           export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
           set -o pipefail
+          if [[ "$HEIBON_TARGETED_CANDIDATE_GEOMETRY" == "true" && "$HEIBON_TARGETED_MOBILE_TABLE_LAYOUT" == "true" ]]; then
+            echo "Select one targeted Browser UI regression at a time"
+            exit 2
+          fi
           if [[ "$HEIBON_TARGETED_CANDIDATE_GEOMETRY" == "true" ]]; then
             python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" --script browser-candidate-geometry.py 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
+          elif [[ "$HEIBON_TARGETED_MOBILE_TABLE_LAYOUT" == "true" ]]; then
+            python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" --script browser-mobile-table-layout.py 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
           else
             python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
           fi
       - name: Report winning hand geometry
-        if: ${{ !inputs.targeted_candidate_geometry }}
+        if: ${{ !inputs.targeted_candidate_geometry && !inputs.targeted_mobile_table_layout }}
         env:
           BROWSER: ${{ matrix.browser }}
         run: |
