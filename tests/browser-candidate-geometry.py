@@ -51,10 +51,6 @@ REPORT_PATH = OUT / f'candidate-geometry-{report["pass"]}-{ENGINE}.json'
 VISUAL_VIEWPORT = r'''(() => {
   const nativeVisualViewport = window.visualViewport;
   window.issue32NativeVisualViewportTrace = [];
-  nativeVisualViewport?.addEventListener('resize', () => issue32NativeVisualViewportTrace.push({
-    phase:'native-visual-viewport-resize', innerWidth, width:nativeVisualViewport.width,
-    height:nativeVisualViewport.height, offsetTop:nativeVisualViewport.offsetTop,
-  }));
   const viewport = new EventTarget();
   let height = null, offsetTop = 0;
   Object.defineProperties(viewport, {
@@ -63,6 +59,15 @@ VISUAL_VIEWPORT = r'''(() => {
     pageTop: {get: () => scrollY + offsetTop}, pageLeft: {get: () => scrollX},
   });
   Object.defineProperty(window, 'visualViewport', {configurable: true, get: () => viewport});
+  window.issue32ResizeTrace = [];
+  window.issue32ResizeTraceActive = false;
+  // Replacing the real VisualViewport must preserve layout-driven resize events.
+  nativeVisualViewport?.addEventListener('resize', () => {
+    issue32NativeVisualViewportTrace.push({phase:'native-visual-viewport-resize', innerWidth,
+      width:nativeVisualViewport.width,height:nativeVisualViewport.height,offsetTop:nativeVisualViewport.offsetTop});
+    issue32ResizeTrace.push({phase:'native-visual-viewport-forwarded',innerWidth});
+    viewport.dispatchEvent(new Event('resize'));
+  });
   window.issue32SetVisualViewport = (nextHeight = null, nextOffset = 0) => {
     height = nextHeight; offsetTop = nextOffset;
     viewport.dispatchEvent(new Event('resize'));
@@ -78,8 +83,6 @@ VISUAL_VIEWPORT = r'''(() => {
       }]));
     return {innerWidth, innerHeight, root: rect(root), panel: rect(panel), variables: vars(panel)};
   };
-  window.issue32ResizeTrace = [];
-  window.issue32ResizeTraceActive = false;
   const nativeGetBounds = Element.prototype.getBoundingClientRect;
   Element.prototype.getBoundingClientRect = function(...args) {
     const bounds = nativeGetBounds.apply(this, args);
@@ -219,7 +222,7 @@ def resize_evidence(record):
     def compact_trace(events):
         trace = []
         for event in events:
-            if event.get('phase') not in ('capture', 'action-panel-root-read', 'after-event-listeners',
+            if event.get('phase') not in ('capture', 'native-visual-viewport-forwarded', 'action-panel-root-read', 'after-event-listeners',
                                           'animation-frame-1', 'animation-frame-2'):
                 continue
             item = {'phase':event.get('phase'),'innerWidth':event.get('innerWidth'),
@@ -395,6 +398,14 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
           'window resize event was not observed')
     check(record, any(item['phase'] == 'after-event-listeners' for item in record['windowResizeTrace']),
           'window resize listeners did not complete')
+    if record['nativeVisualViewportTrace']:
+      check(record, any(item['phase'] == 'native-visual-viewport-forwarded' for item in record['windowResizeTrace']),
+            'native visualViewport resize was not forwarded into the test viewport')
+      forwarded_at = next(i for i, item in enumerate(record['windowResizeTrace'])
+                          if item['phase'] == 'native-visual-viewport-forwarded')
+      check(record, any(item['phase'] == 'action-panel-root-read'
+                        for item in record['windowResizeTrace'][forwarded_at + 1:]),
+            'forwarded visualViewport resize did not reposition the candidate panel')
     record['windowResizeActionPanelReads'] = [item for item in record['windowResizeTrace']
       if item['phase'] == 'action-panel-root-read']
     for key in ('left', 'right', 'width'):
