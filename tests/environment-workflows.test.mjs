@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
+import { publicationMode } from '../.github/scripts/validate-publication-mode.mjs';
 const read = name => readFileSync(new URL('../' + name, import.meta.url), 'utf8');
 test('production and development configs bind their own DO namespace, with no external script binding', () => {
   const prod = JSON.parse(read('wrangler.jsonc'));
@@ -41,6 +42,42 @@ test('development worker job never references production token, and push cannot 
   assert(publish.includes('cancel-in-progress: false'));
   assert(publish.indexOf('git push origin HEAD:pages-verified') < publish.indexOf('uses: actions/deploy-pages@v4'));
   assert(publish.indexOf('artifacts.mjs finalize') > publish.indexOf('uses: actions/deploy-pages@v4'));
+});
+
+test('publication mode accepts unset, false, and true, rejects other values, and logs no raw value', () => {
+  const workflow = read('.github/workflows/environments.yml');
+  assert.equal(publicationMode(undefined), 'disabled (unset)');
+  assert.equal(publicationMode(''), 'disabled (unset)');
+  assert.equal(publicationMode('false'), 'disabled (false)');
+  assert.equal(publicationMode('true'), 'enabled (true; manual publish=true dispatch still required)');
+  for (const invalid of ['TRUE', 'False', 'yes', '1', ' true', 'false ']) {
+    assert.throws(() => publicationMode(invalid), /must be unset, false, or true/);
+  }
+  assert(workflow.includes('node .github/scripts/validate-publication-mode.mjs'));
+  assert.doesNotMatch(workflow, /echo .*DUAL_PAGES_ENABLED/);
+  assert.match(read('.github/scripts/validate-publication-mode.mjs'), /Publication mode:/);
+});
+
+test('new publication remains manual and branch scoped; legacy production gate is unchanged', () => {
+  const workflow = read('.github/workflows/environments.yml');
+  assert.match(workflow, /workflow_dispatch:[\s\S]*?publish:[\s\S]*?type: boolean[\s\S]*?default: false/);
+  for (const [name, expectedBranch] of [['worker-production', 'main'], ['worker-development', 'develop']]) {
+    const stopJob = name === 'worker-production' ? 'worker-development' : 'online';
+    const job = workflow.split(`  ${name}:`)[1].split(`\n  ${stopJob}:`)[0];
+    assert(job.includes(`github.ref == 'refs/heads/${expectedBranch}'`));
+    assert(job.includes("github.event_name == 'workflow_dispatch' && inputs.publish == true"));
+    assert(job.includes("vars.DUAL_PAGES_ENABLED == 'true'"));
+  }
+  const legacy = read('.github/workflows/deploy.yml');
+  assert.match(legacy, /group: production-deploy[\s\S]*?cancel-in-progress: false/);
+  assert.match(legacy, /if: \$\{\{ vars\.DUAL_PAGES_ENABLED != 'true' \}\}/);
+  assert.match(legacy, /deploy_to_production:[\s\S]*?type: boolean[\s\S]*?default: false/);
+  assert.match(legacy, /needs\.detect-changes\.outputs\.deploy_required == 'true'[\s\S]*?needs\.verify\.result == 'success'[\s\S]*?needs\.browser-ui\.result == 'success'[\s\S]*?needs\.browser-ui-matrix-audit\.result == 'success'[\s\S]*?needs\.release-freshness\.result == 'success'[\s\S]*?inputs\.deploy_to_production == true/);
+  const publisher = read('.github/workflows/publish-environments.yml');
+  assert.match(publisher, /vars\.DUAL_PAGES_ENABLED == 'true'[\s\S]*?github\.ref == 'refs\/heads\/main' \|\| github\.ref == 'refs\/heads\/develop'/);
+  const freshJobGuards = workflow.match(/if: \$\{\{[^\n]+\}\}/g) ?? [];
+  assert(freshJobGuards.some(guard => guard.includes("github.event_name == 'workflow_dispatch'") && guard.includes('inputs.publish == true')));
+  assert(!freshJobGuards.some(guard => guard.includes("github.event_name == 'push'") && guard.includes('inputs.publish')));
 });
 
 test('both deployment paths accept one account and use their own config (mocked CLI, no deployment)', () => {
