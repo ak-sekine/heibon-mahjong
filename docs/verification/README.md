@@ -1,6 +1,7 @@
 # 検証記録の目次
 
-- [Issue #32 操作パネル共通外枠](issue32-common-frame-2026-11-11.md#pc実機による修正後の確認結果-2026-11-13)：2026-11-13の本人PC実機報告で修正対象はOK、修正前の二重枠NGは対象範囲で解消確認済み。Chromium／WebKit各182 geometryケースとDeploy gate・Pages公開の成功は自動検証として区別。iPhone Safariでの同修正再確認と他のPC必須項目は未確認、IssueはOpen。
+- [Issue #32 PC実機確認11項目・最新評価（2026-11-14）](issue32-responsive-layout-2026-11-03.md#2026-11-14-pc実機確認11項目の結果と受け入れ条件の再評価)：本人報告はOK 7／NG 0／未確認 4。No.8〜11、iPhone Safari修正後確認、ルール確認ダイアログの追加スクロールバー条件は未完了。過去のPC・iPhone Safari OK／NGとChromium／WebKit自動検証を区別し、Issue #32はOpenを維持。
+- [Issue #32 操作パネル共通外枠](issue32-common-frame-2026-11-11.md#pc実機による修正後の確認結果-2026-11-13)：2026-11-13の本人PC実機報告で修正対象はOK、修正前の二重枠NGは対象範囲で解消確認済み。Chromium／WebKit各182 geometryケースとDeploy gate・Pages公開の成功は自動検証として区別。iPhone Safariでの同修正再確認は未確認。
 
 - [Issue #55 最終調査・本人実機報告（2026-11-11）](issue55-pwa-header.md#2026-11-11-最終調査本人実機報告) — PWA本人6 OK／0 NG／1未確認。CI比較状態を修正し、カン10件＋PWA7件すべて達成・Close可能（Closeはしない）。修正SHA `9598787`の両engine・全ゲート・Pages公開success。実機未確認は自動結果と区別。
 
@@ -65,7 +66,7 @@
 
 ## 自動・ブラウザー検証
 
-- [レスポンシブレイアウト — Issue #32、2026-11-03〜11-08](issue32-responsive-layout-2026-11-03.md) — Deploy run [#42494902364 attempt 3](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42494902364/attempts/3)はSHA `3a3d894b8a734e9af1b050e79ebfae48566ca9c2`でverify、Chromium／WebKit、matrix audit、release freshness、Worker／production-test 7シナリオ、Pages build／deployがsuccess。ポン単一候補と、表示上異なる2候補を持つポン固定局面を追加。カン候補の上方向展開、卓矩形、候補・キャンセルのviewport内クリック、5種類のPC viewportおよび短い画面を検証。Browser UI前のstandalone itch smokeがattempt 1 Chromiumでwall-exhaustedとなったため同条件の全workflow attempt 3を実行し、事前／事後smoke各3回を含む全jobがsuccess。mixed-Origin reconnectのproduction-test不安定は発生していない。自動テスト成功はPC本人実機OKと扱わず、Issue #32はOpenで再確認待ち。過去のiPhone Safari／PWA報告、PC NG／OK、未確認範囲は[検証記録](issue32-responsive-layout-2026-11-03.md)を参照。
+- [レスポンシブレイアウト — Issue #32、2026-11-03〜11-14](issue32-responsive-layout-2026-11-03.md) — 2026-11-14のPC本人報告11項目はOK 7／NG 0／未確認 4。No.8〜11とiPhone Safari修正後確認を自動検証で埋めず、ルール確認ダイアログに追加されたスクロールバー統一条件も未完了と記録。既存のChromium／WebKit Browser UI・Deploy run [#42494902364 attempt 3](https://github.com/ak-sekine/heibon-mahjong/actions/runs/42494902364/attempts/3)（SHA `3a3d894b8a734e9af1b050e79ebfae48566ca9c2`）は全ゲート・両engine・Worker／Pages公開がsuccess。過去のPC／iPhone Safari OK・NG履歴と自動検証の詳細は[検証記録](issue32-responsive-layout-2026-11-03.md)を参照。
 - [人和・固定満貫 — Issue #38、2026-11-02〜11-03](issue38-renhou-2026-11-02.md) — 実装SHA `6c7a84ac0f38e791c7847270f04d455f659ed125`、固定局面テストとActions run `41546258846`のverify・Chromium／WebKit・Worker／Pages公開成功を照合。公開SHAは実装SHAと一致。2026-11-03のiPhone Safari実機確認はOK 5件、NG 0件、未確認3件。人和成立局面・高点法・不成立条件の実機再現は未確認で、自動検証と区別して記録。自動検証で受け入れ条件を確認できたためIssue #38はcompletedでClose。
 - [特殊形ダブル役満・GameRules v5 — Issue #37、2026-11-02](issue37-double-yakuman-2026-11-02.md) — 4形の判定・倍率、v1〜v4移行とv5保存、オフライン／オンライン／Worker同期、iPhone Safari実機OK 7件（表示・点数）、その他の実機未報告項目は自動検証と区別して記録。completedでClose。結果詳細の合計ラベル統一を含む公開SHA `87d5bf0`、Actions run [#41439154842](https://github.com/ak-sekine/heibon-mahjong/actions/runs/41439154842)はverify・Chromium／WebKit・Worker／Pages gate成功。
 - [喰いタンON/OFF — Issue #17](issue17-local-rules-2026-11-01.md) — `GameRules` v3、ON/OFFの役・翻数・点数、CPU鳴き、保存・オンライン同期、自動テスト・GitHub Actions結果を記録します。2026-11-02のユーザー本人によるiPhone Safari実機確認はOK 4件、NG 0件、未確認2件。CPU判断は自動テスト根拠あり。片和了の一方のみ役成立する専用ケースは自動テスト未確認で、その範囲を記録してIssue #17をcompletedとしてClose。
