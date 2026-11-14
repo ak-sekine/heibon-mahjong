@@ -151,7 +151,23 @@ with sync_playwright() as p:
             assert (target['outlineWidth'],target['outlineStyle'],target['outlineColor'],target['outlineOffset'])==('3px','solid','rgb(255, 215, 0)','0px'), f'wrong target outline at {width}px: {target}'
             assert target['pointerEvents']=='none' and target['noHorizontalScroll'], f'target outline must not affect input or mobile width at {width}px: {target}'
             assert target['cleared'], f'target outline must clear after the decision closes for seat {seat}: {target}'
-        page.evaluate('''()=>{responsiveApp.controller.random=()=>.999999;responsiveApp.controller.newGame()}''')
+        page.evaluate('''async()=>{
+          const c=responsiveApp.controller;
+          c.random=()=>.999999;
+          if(innerWidth===390){
+            const [{callStart},{startMatch}]=await Promise.all([
+              import('/heibon-mahjong/tests/calls-fixture.ts'),
+              import('/heibon-mahjong/src/game/match.ts')
+            ]);
+            const game=callStart(0,{
+              0:['22z','33z','44z','55z','6z','7777z'],
+              1:['11z','22z','33z','44z','55z','666z']
+            },'man-1');
+            c.match=startMatch(game);
+            c.selectedTileId=null;
+            responsiveApp.render();
+          }else c.newGame();
+        }''')
         page.locator('#player-hand button:enabled').first.wait_for(state='visible', timeout=10000)
         selectable_tiles = page.locator('#player-hand button:enabled').count()
         assert 13 <= selectable_tiles <= 14, f'the current hand should be selectable at {width}x{height}: {selectable_tiles}'
@@ -167,7 +183,8 @@ with sync_playwright() as p:
           const tileId=player.riichi?player.drawnTile?.id:c.selectedTileId;
           const owns=()=>Boolean(tileId&&[...player.hand,player.drawnTile].some(tile=>tile?.id===tileId));
           const probe={operationId:`mobile-discard-${Date.now()}`,events:[],transitions:[],
-            before:{phase:game.phase,humanSeat:seat,turn:game.turnPlayerId,canConfirm:c.canConfirm,
+            before:{scenario:innerWidth===390?'cpu-open-meld':'normal-discard',phase:game.phase,
+              humanSeat:seat,turn:game.turnPlayerId,canConfirm:c.canConfirm,
               selectedTileOwned:owns(),riverCount:player.river.length,cpu:c.diagnosticSnapshot(),
               matchStatus:c.match.status},tileId};
           const originalConfirm=c.confirm;
