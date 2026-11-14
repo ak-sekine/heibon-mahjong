@@ -76,6 +76,12 @@ class ItchStartupTests(unittest.TestCase):
         validate_discard_witness(witness)
         self.assertNotIn('operationId', repr(witness))
 
+    def test_discard_witness_accepts_same_phase_transition_when_cpu_calls_tile(self):
+        witness = self.make_witness(
+            action_phase='awaiting-discard', transition_phase='awaiting-discard',
+            tile=self.tile(river=0, called_meld=1))
+        validate_discard_witness(witness)
+
     def test_discard_witness_accepts_river_move(self):
         validate_discard_witness(self.make_witness())
 
@@ -108,7 +114,6 @@ class ItchStartupTests(unittest.TestCase):
     def test_discard_witness_rejects_invalid_transition_origin_and_phase_pair(self):
         for transition in (
             self.transition(previous_phase='awaiting-ron'),
-            self.transition(next_phase='awaiting-discard'),
             self.transition(next_phase='not-a-phase'),
             self.cpu_transition(),
         ):

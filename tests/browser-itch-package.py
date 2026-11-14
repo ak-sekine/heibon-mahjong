@@ -14,7 +14,7 @@ REPETITIONS = int(os.environ.get('HEIBON_SMOKE_REPETITIONS', '3'))
 ARTIFACT_DIR = Path(os.environ.get('HEIBON_SMOKE_ARTIFACT_DIR', '/tmp/heibon-itch-smoke'))
 TURN_TIMEOUT_MS = 20_000
 DISCARD_NEXT_PHASES = ('awaiting-ron', 'awaiting-call', 'awaiting-draw', 'awaiting-discard', 'won', 'wall-exhausted')
-DISCARD_TRANSITION_PHASES = ('awaiting-ron', 'awaiting-call', 'awaiting-draw', 'won', 'wall-exhausted')
+DISCARD_TRANSITION_PHASES = ('awaiting-ron', 'awaiting-call', 'awaiting-draw', 'awaiting-discard', 'won', 'wall-exhausted')
 
 DISCARD_EVENT_SCRIPT = r'''tileId => {
   let rows = [];
