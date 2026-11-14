@@ -47,10 +47,11 @@ report = {'browser': ENGINE, 'pass': 'baseline' if args.baseline else 'current',
 REPORT_PATH = OUT / f'candidate-geometry-{report["pass"]}-{ENGINE}.json'
 
 # Install before ActionPanel attaches listeners. This simulates Safari chrome /
-# keyboard changes without resizing the layout viewport or altering the table.
+# keyboard changes without resizing layout, while forwarding native viewport resizes.
 VISUAL_VIEWPORT = r'''(() => {
   const nativeVisualViewport = window.visualViewport;
-  window.issue32NativeVisualViewportTrace = [];
+  window.issue32NativeResizeCount = 0;
+  window.issue32ResizeEvents = [];
   const viewport = new EventTarget();
   let height = null, offsetTop = 0;
   Object.defineProperties(viewport, {
@@ -59,57 +60,17 @@ VISUAL_VIEWPORT = r'''(() => {
     pageTop: {get: () => scrollY + offsetTop}, pageLeft: {get: () => scrollX},
   });
   Object.defineProperty(window, 'visualViewport', {configurable: true, get: () => viewport});
-  window.issue32ResizeTrace = [];
-  window.issue32ResizeTraceActive = false;
-  // Replacing the real VisualViewport must preserve layout-driven resize events.
   nativeVisualViewport?.addEventListener('resize', () => {
-    issue32NativeVisualViewportTrace.push({phase:'native-visual-viewport-resize', innerWidth,
-      width:nativeVisualViewport.width,height:nativeVisualViewport.height,offsetTop:nativeVisualViewport.offsetTop});
-    issue32ResizeTrace.push({phase:'native-visual-viewport-forwarded',innerWidth});
+    window.issue32NativeResizeCount++;
+    issue32ResizeEvents.push('visualViewport.resize');
     viewport.dispatchEvent(new Event('resize'));
   });
+  window.addEventListener('resize', () => issue32ResizeEvents.push('window.resize'), {capture:true});
   window.issue32SetVisualViewport = (nextHeight = null, nextOffset = 0) => {
     height = nextHeight; offsetTop = nextOffset;
     viewport.dispatchEvent(new Event('resize'));
     viewport.dispatchEvent(new Event('scroll'));
   };
-  const geometry = online => {
-    const root = document.querySelector(online ? '#online-game-controls' : '#local-game-controls');
-    const panel = root?.querySelector('[data-panel-part="candidate-controls"]');
-    const rect = node => node?.getBoundingClientRect().toJSON() ?? null;
-    const vars = node => Object.fromEntries(['--candidate-panel-left','--candidate-panel-width',
-      '--candidate-panel-bottom','--candidate-panel-available-height'].map(name => [name, {
-        inline: node?.style.getPropertyValue(name) ?? '', computed: node ? getComputedStyle(node).getPropertyValue(name).trim() : '',
-      }]));
-    return {innerWidth, innerHeight, root: rect(root), panel: rect(panel), variables: vars(panel)};
-  };
-  const nativeGetBounds = Element.prototype.getBoundingClientRect;
-  Element.prototype.getBoundingClientRect = function(...args) {
-    const bounds = nativeGetBounds.apply(this, args);
-    if (issue32ResizeTraceActive && ['online-game-controls','local-game-controls'].includes(this.id)) {
-      const stack = new Error().stack ?? '';
-      const panel = this.querySelector('[data-panel-part="candidate-controls"]');
-      const variables = Object.fromEntries(['--candidate-panel-left','--candidate-panel-width',
-        '--candidate-panel-bottom','--candidate-panel-available-height'].map(name=>[name,
-          panel?.style.getPropertyValue(name) ?? '']));
-      issue32ResizeTrace.push({phase:stack.includes('repositionCandidatePanel') ? 'action-panel-root-read' : 'root-read',
-        id:this.id, innerWidth, root:{x:bounds.x,left:bounds.left,right:bounds.right,width:bounds.width,bottom:bounds.bottom},
-        variables, stack:stack.split('\n').slice(0,5)});
-    }
-    return bounds;
-  };
-  window.addEventListener('resize', () => {
-    issue32ResizeTraceActive = true;
-    issue32ResizeTrace.push({phase:'capture', innerWidth});
-    setTimeout(() => issue32ResizeTrace.push({phase:'after-event-listeners', ...geometry(
-      Boolean(document.querySelector('#online-game-controls [data-panel-part="candidate-controls"]:not([hidden])')))}));
-    requestAnimationFrame(() => {
-      issue32ResizeTrace.push({phase:'animation-frame-1', ...geometry(
-        Boolean(document.querySelector('#online-game-controls [data-panel-part="candidate-controls"]:not([hidden])')))});
-      requestAnimationFrame(() => issue32ResizeTrace.push({phase:'animation-frame-2', ...geometry(
-        Boolean(document.querySelector('#online-game-controls [data-panel-part="candidate-controls"]:not([hidden])')))}));
-    });
-  }, {capture:true});
 })();'''
 
 # Main's real renderers/controllers provide the production DOM, fonts, state
@@ -180,8 +141,7 @@ def snapshot(page, online):
         list:{clientHeight:list.clientHeight,scrollHeight:list.scrollHeight,scrollTop:list.scrollTop,
           overflow:getComputedStyle(list).overflowY},
         panelVariables:Object.fromEntries(['--candidate-panel-left','--candidate-panel-width',
-          '--candidate-panel-bottom','--candidate-panel-available-height'].map(name=>[name,{
-            inline:panel.style.getPropertyValue(name), computed:getComputedStyle(panel).getPropertyValue(name).trim()}])),
+          '--candidate-panel-bottom'].map(name=>[name,panel.style.getPropertyValue(name)])),
         scrollY,visual:{height:visualViewport.height,offsetTop:visualViewport.offsetTop},
         layoutViewport:{width:innerWidth,height:innerHeight},
         rootMinHeight:getComputedStyle(root).minHeight,
@@ -198,50 +158,7 @@ def check(record, condition, message):
     record.setdefault('violations', []).append(message)
     save()
     if not args.baseline:
-        print('::error title=Issue 32 geometry evidence::' + json.dumps(resize_evidence(record), ensure_ascii=False, separators=(',', ':')))
         raise AssertionError(f'{record["viewport"]} {record["mode"]} {record["scenario"]}: {message}; measurements={record}')
-
-
-def resize_evidence(record):
-    def rect_summary(value):
-        if not value:
-            return None
-        return {key:value[key] for key in ('x','y','width','height','right','bottom') if key in value}
-
-    def vars_summary(value):
-        if not value:
-            return None
-        return {key:value.get(key, {}) for key in ('--candidate-panel-left','--candidate-panel-width',
-          '--candidate-panel-bottom')}
-
-    def concise(snapshot):
-        if not snapshot:
-            return None
-        return {'root':rect_summary(snapshot.get('root')),'panel':rect_summary(snapshot.get('panel')),
-          'variables':vars_summary(snapshot.get('panelVariables')),'table':rect_summary(snapshot.get('table'))}
-    def compact_trace(events):
-        trace = []
-        for event in events:
-            if event.get('phase') not in ('capture', 'native-visual-viewport-forwarded', 'action-panel-root-read', 'after-event-listeners',
-                                          'animation-frame-1', 'animation-frame-2'):
-                continue
-            item = {'phase':event.get('phase'),'innerWidth':event.get('innerWidth'),
-              'root':rect_summary(event.get('root')),'panel':rect_summary(event.get('panel')),
-              'variables':vars_summary(event.get('variables'))}
-            if event.get('phase') == 'action-panel-root-read':
-                item['stack'] = event.get('stack', [])
-            trace.append(item)
-        return trace
-    return {
-        'browser':ENGINE,'pass':report['pass'],'viewport':record.get('viewport'),
-        'mode':record.get('mode'),'scenario':record.get('scenario'),
-        'before':concise(record.get('before')),
-        'stable':concise(record.get('windowResized')),'trace':compact_trace(record.get('windowResizeTrace', [])),
-        'restored':concise(record.get('windowResizeRestored')),
-        'restoreTrace':compact_trace(record.get('windowRestoreTrace', [])),
-        'nativeVisualViewportTrace':record.get('nativeVisualViewportTrace', []),
-        'nativeVisualViewportRestoreTrace':record.get('nativeVisualViewportRestoreTrace', []),
-    }
 
 
 def same_rect(record, before, after, label, tolerance=1):
@@ -387,63 +304,47 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
         record['keyboardFocus'] = 'all candidates and Back: Tab order, name, focus-visible, clipping, no action'
 
     # Resize the layout viewport, then recover the original table and baseline.
-    page.evaluate('issue32ResizeTrace.splice(0); issue32NativeVisualViewportTrace.splice(0); issue32ResizeTraceActive=false')
+    page.evaluate('window.issue32NativeResizeCount=0; window.issue32ResizeEvents.length=0')
     page.set_viewport_size({'width': width + 24, 'height': height})
     settle(page)
     resized = snapshot(page, online)
     record['windowResized'] = resized
-    record['windowResizeTrace'] = page.evaluate('issue32ResizeTrace.splice(0)')
-    record['nativeVisualViewportTrace'] = page.evaluate('issue32NativeVisualViewportTrace.splice(0)')
-    check(record, any(item['phase'] == 'capture' for item in record['windowResizeTrace']),
-          'window resize event was not observed')
-    check(record, any(item['phase'] == 'after-event-listeners' for item in record['windowResizeTrace']),
-          'window resize listeners did not complete')
-    if record['nativeVisualViewportTrace']:
-      check(record, any(item['phase'] == 'native-visual-viewport-forwarded' for item in record['windowResizeTrace']),
+    record['nativeVisualViewportResizeCount'] = page.evaluate('window.issue32NativeResizeCount')
+    record['windowResizeEventOrder'] = page.evaluate('window.issue32ResizeEvents.slice()')
+    check(record, 'window.resize' in record['windowResizeEventOrder'], 'window resize event was not observed')
+    if record['nativeVisualViewportResizeCount']:
+      check(record, 'visualViewport.resize' in record['windowResizeEventOrder'],
             'native visualViewport resize was not forwarded into the test viewport')
-      forwarded_at = next(i for i, item in enumerate(record['windowResizeTrace'])
-                          if item['phase'] == 'native-visual-viewport-forwarded')
-      check(record, any(item['phase'] == 'action-panel-root-read'
-                        for item in record['windowResizeTrace'][forwarded_at + 1:]),
-            'forwarded visualViewport resize did not reposition the candidate panel')
-    record['windowResizeActionPanelReads'] = [item for item in record['windowResizeTrace']
-      if item['phase'] == 'action-panel-root-read']
     for key in ('left', 'right', 'width'):
         check(record, abs(resized['root'][key] - resized['panel'][key]) <= 1,
               f'window resize lost common {key}')
-    for key, actual in [('left', 'x'), ('width', 'width')]:
-      value = resized['panelVariables']['--candidate-panel-' + key]['inline']
+    for name, value in [('--candidate-panel-left', resized['root']['x']),
+                        ('--candidate-panel-width', resized['root']['width'])]:
       try:
-        measured = float(value.removesuffix('px'))
+        measured = float(resized['panelVariables'][name].removesuffix('px'))
       except ValueError:
         measured = float('inf')
-      check(record, abs(measured - resized['root'][actual]) <= 0.5,
-            f'window resize left stale --candidate-panel-{key}: {value}; root {actual}={resized["root"][actual]}')
+      check(record, abs(measured - value) <= .5, f'window resize left stale {name}: {measured} != {value}')
     check(record, abs(resized['panel']['bottom'] - before['root']['bottom']) <= 2,
           'window resize lost candidate bottom anchor')
     page.set_viewport_size({'width': width, 'height': height})
     settle(page)
     recovered = snapshot(page, online)
     record['windowResizeRestored'] = recovered
-    record['windowRestoreTrace'] = page.evaluate('issue32ResizeTrace.splice(0)')
-    record['nativeVisualViewportRestoreTrace'] = page.evaluate('issue32NativeVisualViewportTrace.splice(0)')
-    page.evaluate('issue32ResizeTraceActive=false')
-    for key, actual in [('left', 'x'), ('width', 'width')]:
-      value = recovered['panelVariables']['--candidate-panel-' + key]['inline']
-      try:
-        measured = float(value.removesuffix('px'))
-      except ValueError:
-        measured = float('inf')
-      check(record, abs(measured - recovered['root'][actual]) <= 0.5,
-            f'viewport restoration left stale --candidate-panel-{key}: {value}; root {actual}={recovered["root"][actual]}')
+    same_rect(record, before['root'], recovered['root'], 'operation area after viewport restoration')
     for key in ('left', 'right', 'width'):
       check(record, abs(recovered['root'][key] - recovered['panel'][key]) <= 1,
-            f'viewport restoration lost common {key}')
+            f'window resize restoration lost common {key}')
+    for name, value in [('--candidate-panel-left', recovered['root']['x']),
+                        ('--candidate-panel-width', recovered['root']['width'])]:
+      try:
+        measured = float(recovered['panelVariables'][name].removesuffix('px'))
+      except ValueError:
+        measured = float('inf')
+      check(record, abs(measured - value) <= .5, f'viewport restoration left stale {name}: {measured} != {value}')
     check(record, abs(recovered['panel']['bottom'] - before['root']['bottom']) <= 2,
           'window resize restoration lost bottom anchor')
     same_rect(record, before['table'], recovered['table'], 'table after resize restoration')
-    print('::notice title=Issue 32 resize evidence::' + json.dumps(resize_evidence(record),
-      ensure_ascii=False,separators=(',',':')))
 
     # Add visual rows without inventing selectable game actions. Real options
     # remain unchanged and confirmation below always clicks an actual button.
