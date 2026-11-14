@@ -1,0 +1,33 @@
+{
+  "name": "Heibon Mahjong",
+  "short_name": "Heibon Mahjong",
+  "description": "オフライン・オンラインで遊べる四人打ちリーチ麻雀",
+  "lang": "ja",
+  "id": "/heibon-mahjong/",
+  "start_url": "/heibon-mahjong/",
+  "scope": "/heibon-mahjong/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#185640",
+  "theme_color": "#185640",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

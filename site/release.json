@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "environment": "production",
+  "sha": "c3b84944daaa8fbba3b4b603c0d3f8430e9afb58",
+  "workerUrl": "https://heibon-mahjong-online.ak-sekine.workers.dev",
+  "files": {
+    "assets/main-BnCr6sqk.js": "acecac089072e93c5e453ce4a23a0e543675e374b1ee57a0b1f001ce37c88568",
+    "assets/main-CaJFw03I.css": "2a7a79c0788b04dc0844d1ee84e09c16e20a488f75fb4567f6386d30ad5dd6c8",
+    "assets/page-CtV1FWQl.js": "acad7c77f0f885695e63dd8df3bc3b6da7f4814357557ea8e63609a27d336853",
+    "assets/style-B3aHcN8H.js": "d6bfacf17b204f2d0b3380fc44981d090bd7b43ddbd86a9cdbff410791dc39ed",
+    "assets/style-Dxl6LO0b.css": "a4ae0da958ab40c7aebce047a6b07dd7314421ca044b19b75fca780211074fdb",
+    "assets/test-Brjrl7Ov.js": "8d292d77f12dba8c213f5165126d5f66dc2204cc6012bb97bf8b3d9faf06b850",
+    "call-test.html": "ec17d73263b69eb7d193455885e93e7264b2f435f8b7e315f5528841c1d8710f",
+    "icons/icon-180.png": "9a58f7f37981373eb144bbf5857f0598e1307224d29ce8cc626ec8bdffdafb90",
+    "icons/icon-192.png": "e93570632d88d79a0899d87620bf9b633a8b92cfd73511d0dcae2e567fed444d",
+    "icons/icon-512.png": "7a085a12c12882b1e00bf1fca5d1d3d95086b5a7f070648acae930f1b698eb42",
+    "icons/icon-maskable-512.png": "703c1d5b452996a1671efb5c246acbcd5c2a35d8815c414be49b511bf30b96c9",
+    "index.html": "0bd018b532191ae5d4f69a2c856518b10f0474d6f362ba517e3b7cb1f2969339",
+    "kan-test.html": "363a1789acfa6f8222e6338e74652aee3cc6567c331990350383a392f556ac39",
+    "manifest.webmanifest": "9298c553712a5ebda07fcc8adc7cd08cae88c210a4e8f52d902d022b3a8e401c",
+    "sw.js": "1d5e4bece1d59d90e8d461c11c8768abb1fbdec5eaa152d9aa7f52f4e2f28622",
+    "test.html": "e58b6e36dc9f4dd5a3bd3e6d89cf82321dc0b491e0b861d40dc4491bd251e41d"
+  },
+  "digest": "2e6766ce7229fd4a96de431e01a4ddac26288c7b96af75dacfbd96dbbbf8408e"
+}
