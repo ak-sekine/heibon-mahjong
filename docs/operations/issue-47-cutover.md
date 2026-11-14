@@ -92,6 +92,14 @@ git -C "$STORE" push origin HEAD:pages-verified
 
 **許可**：旧workflow Disable、フラグtrue設定、新公開経路の使用開始。
 
+### 2026-11-14 再確認（Phase 4未完了）
+
+develop `7e6046e12da21c8440f352598a9f46e3eda26ff9`から開始し、main `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`、pages-verified `61d911d490ffabf5052aa190201ada1c0ab7d955`をremote APIで再取得した。保存stateはproduction SHA/digest/snapshotDigestがPhase 3記録と一致し、`pending=null`、development snapshotなし。Phase 3完了コメントとIssue Openも確認した。
+
+フラグ検証修正後の初回run `43552298626`ではverify、isolation-browser両engine、local-onlineがsuccessしたが、Chromium Browser UIのService Worker再試行記録に同期競合があり失敗した。計測開始をService Worker再試行より前へ移し、develop `a7113b6fb7f029585c93bfd7f975a360b3e48f35`の全体run `43552735013`で再検証した結果、verify、Chromium/WebKit Browser UI、Chromium/WebKit環境分離、local-online、matrix auditがすべてsuccess。worker-production、worker-development、online、publishはすべてskipped。イベントはpushで、実行時の`DUAL_PAGES_ENABLED`は未設定。公開jobは起動していない。
+
+GitHubの接続APIではRepository Variables、Environment/Secret登録状態、Pages設定、Deployment一覧を取得できず、ローカルGitHub CLIにも有効なAPI認証がない。したがってEnvironmentのbranch制限とSecrets存在、Pages Source、旧Repository Secrets、deployment IDの現在値を確認済みとは扱わない。旧deploy workflowのDisable、`DUAL_PAGES_ENABLED`変更、workflow_dispatchは未実施。必要なSettings確認と操作ができるまでPhase 4を完了扱いしない。
+
 ## Phase 5：開発版の初公開
 
 **前提**：Phase 4成功、本番Sの全hash/保存remoteを再確認。最新develop Dの全CI成功、未解決pendingなし、URLが末尾slashなし。

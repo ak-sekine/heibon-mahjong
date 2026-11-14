@@ -203,3 +203,32 @@ BrokenPipeは元runでHTTP handlerがレスポンスを書いている最中に�
 | `git diff --check` / Python compile | success。 |
 
 独立した2回目の全体runは、検証記録を含む次のdevelop commitで確認する。Phase 2完了判定を維持し、Issue #47はOpen。Phase 3の初期登録は未開始。production Pages、Worker、Durable Objects、`pages-verified`、`DUAL_PAGES_ENABLED`はいずれも今回変更していない。main `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`、pages-verified `232205c5efc7f86df8d70432a62224e82b4fb0ed`。
+
+## 2026-11-14 Phase 4 preflight and CI
+
+### Remote state at start
+
+| Item | Rechecked value |
+|---|---|
+| `main` | `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58` |
+| `develop` before changes | `7e6046e12da21c8440f352598a9f46e3eda26ff9` |
+| `pages-verified` | `61d911d490ffabf5052aa190201ada1c0ab7d955` |
+| Production snapshot | SHA `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`; digest `2e6766ce7229fd4a96de431e01a4ddac26288c7b96af75dacfbd96dbbbf8408e`; snapshotDigest `62e514bb5d03e1347c1f67911b759ff29192abe3f300a4e37da7b58cdea332c7` |
+| `state.json` | `pending=null`; development snapshot absent |
+| Issue #47 | Open; Phase 3 completion comment present |
+| `DUAL_PAGES_ENABLED` in CI verify | Unset at run time; no value or secret was printed |
+
+### Workflow flag validation correction
+
+`.github/workflows/environments.yml` previously rejected every value except unset/false, which made the post-cutover `true` state fail verify. A dedicated validator now accepts unset, `false`, and `true`, rejects all other values, and writes only a safe publication-mode label. Deployment job conditions remain unchanged: worker jobs require a matching branch, `workflow_dispatch`, `publish=true`, and `DUAL_PAGES_ENABLED=true`; they still require verify, Chromium/WebKit UI, environment separation, and matrix audit. The reusable Pages publisher remains downstream of successful online validation.
+
+Regression tests cover all accepted and rejected flag values, new workflow push and publish-false behavior, exact Worker branch constraints, mandatory job dependencies, and unchanged legacy deployment gates.
+
+### CI attempts
+
+- `e2bf2b6eb637fe63f0286c7d751c1ba25d4a8e00`, run [43552298626](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43552298626): verify, npm tests, TypeScript/Worker typechecks, production/development/itch builds, artifacts, environment isolation, and local-online passed. Chromium Browser UI exposed a test race: an automatic Service Worker update could fetch the retry script before the test began counting responses. The run is not an acceptance pass.
+- `a7113b6fb7f029585c93bfd7f975a360b3e48f35`, run [43552735013](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43552735013): moving the response counter before replacing the retry script resolved the Browser UI failure. `npm test` (1544 tests), TypeScript typecheck, Worker typecheck, production/development/itch builds, artifact seal/verify, Chromium/WebKit Browser UI, Chromium/WebKit environment separation, local-online, and matrix audit all passed. `worker-production`, `worker-development`, `online`, and `publish` were skipped. The run was a `push`; the verify job observed `DUAL_PAGES_ENABLED` unset. No publication job ran.
+
+### Phase 4 status and stop reason
+
+No workflow was disabled, no repository variable was changed, and no workflow dispatch or publication was started. The connected GitHub API did not expose Repository Variables, Environment/Secret registrations, Pages settings, or deployment records. Local `gh` has no valid GitHub API token, and this execution has no browser interaction tool for the Settings UI. Treat environment protections, secret presence, Pages source, old repository secrets, and latest live deployment identifiers as unconfirmed. Do not proceed with workflow Disable or flag activation until these are verified. Issue #47 remains Open; Phase 4 is incomplete.

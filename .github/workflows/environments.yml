@@ -42,8 +42,8 @@ jobs:
           {
             echo 'Raw production and development Worker URLs exactly match the expected values and have no trailing slash.'
             echo 'The shared Cloudflare account ID is present and has the expected format.'
-            node .github/scripts/validate-publication-mode.mjs
           } >> "$GITHUB_STEP_SUMMARY"
+          node .github/scripts/validate-publication-mode.mjs | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

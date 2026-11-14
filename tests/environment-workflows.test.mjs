@@ -54,6 +54,7 @@ test('publication mode accepts unset, false, and true, rejects other values, and
     assert.throws(() => publicationMode(invalid), /must be unset, false, or true/);
   }
   assert(workflow.includes('node .github/scripts/validate-publication-mode.mjs'));
+  assert(workflow.includes('node .github/scripts/validate-publication-mode.mjs | tee -a "$GITHUB_STEP_SUMMARY"'));
   assert.doesNotMatch(workflow, /echo .*DUAL_PAGES_ENABLED/);
   assert.match(read('.github/scripts/validate-publication-mode.mjs'), /Publication mode:/);
 });
@@ -67,7 +68,15 @@ test('new publication remains manual and branch scoped; legacy production gate i
     assert(job.includes(`github.ref == 'refs/heads/${expectedBranch}'`));
     assert(job.includes("github.event_name == 'workflow_dispatch' && inputs.publish == true"));
     assert(job.includes("vars.DUAL_PAGES_ENABLED == 'true'"));
+    assert(job.includes('needs: [verify, browser-ui, isolation-browser, audit]'));
   }
+  const online = workflow.split('  online:')[1].split('\n  publish:')[0];
+  assert(online.includes('needs: [worker-production, worker-development]'));
+  assert(online.includes('needs.worker-production.result == \'success\' || needs.worker-development.result == \'success\''));
+  const publishCaller = workflow.split('\n  publish:')[1];
+  assert(publishCaller.includes('needs: [online]'));
+  assert(publishCaller.includes('uses: ./.github/workflows/publish-environments.yml'));
+  assert(!/\n    if:/.test(publishCaller), 'publish caller must use the default success condition from its online dependency');
   const legacy = read('.github/workflows/deploy.yml');
   assert.match(legacy, /group: production-deploy[\s\S]*?cancel-in-progress: false/);
   assert.match(legacy, /if: \$\{\{ vars\.DUAL_PAGES_ENABLED != 'true' \}\}/);
