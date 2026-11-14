@@ -79,6 +79,14 @@ export function mountDialogScrollIndicators(root: ParentNode = document): void {
     window.addEventListener('blur', endDrag);
 
     content.addEventListener('scroll', update, { passive: true });
+    content.addEventListener('keydown', event => {
+      if (event.target !== content || (event.key !== 'PageDown' && event.key !== 'PageUp')) return;
+      if (content.scrollHeight - content.clientHeight <= 1) return;
+      event.preventDefault();
+      const direction = event.key === 'PageDown' ? 1 : -1;
+      content.scrollTop = Math.max(0, Math.min(content.scrollHeight - content.clientHeight,
+        content.scrollTop + direction * content.clientHeight));
+    });
     window.addEventListener('resize', update, { passive: true });
     window.addEventListener('orientationchange', update, { passive: true });
     window.visualViewport?.addEventListener('resize', update, { passive: true });

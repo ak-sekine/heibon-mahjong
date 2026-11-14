@@ -575,3 +575,8 @@ Android・タブレット実機は未確認のまま記録し、viewport自動�
 - SHA `2ed1fe6543a1f01b64e87c19fab3629e872347bf` のrun [#43584387902](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43584387902) はverify-build、差分検出、docs-checkに成功。Chromium／WebKitの新しいテストは、長文ルール本文のスクロール範囲、tabindex、overflow、スクロールバー非表示、touch-actionを確認した後、`getComputedStyle(...).webkitOverflowScrolling` が両engineで `null` となり停止した。
 - `-webkit-overflow-scrolling` は実機Safari向けにCSSへ残し、Browser UIでは両engine共通の `overflow-y:auto` と `touch-action:auto`、touch pointerをキャンセルしないことを検査する。Chromiumでは別途CDPの実タッチスワイプを確認する。headless WebKitのcomputed style値をSafari実機動作の代用にしない。
 - 上記engine別assertionへ変更後、Chromium／WebKit Browser UIを次のdevelop SHAで再実行する。run #43584387902 のChromium／WebKitは成功扱いしない。
+
+### 4回目のBrowser UI実行で見つかったWebKitのキーボード差
+
+- SHA `76172899d50e9109de607ae63e0a82e90e2a1d32` のrun [#43584712654](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43584712654) はverify-buildが成功。WebKitの新規検証は本文へフォーカス後のPageDownでスクロールしましたが、その後のPageUpでは位置が戻らずタイムアウトしました。実機Safari確認とは区別し、Browser UIは成功扱いしません。
+- 共通スクロール本文自身にフォーカスがある場合だけ、mount処理でPageUp／PageDownを本文高分ぶん上下へ移動し、スクロール範囲内に制限する処理を追加。本文内のボタン等がフォーカス中のキー操作はそのまま通します。次のdevelop SHAでChromium／WebKitを再実行します。
