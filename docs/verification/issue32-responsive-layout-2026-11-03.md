@@ -562,3 +562,10 @@ Android・タブレット実機は未確認のまま記録し、viewport自動�
 
 - push対象SHA `e3f1f59678925d21464c25328570b9534a9f89c6` のBrowser UI run [#43583062970](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43583062970) はverify-build・差分検出・docs-checkがsuccessした。Chromium／WebKitの既存 `browser-create-dialog-layout.py` はsuccessしたが、新規 `browser-dialog-scroll.py` の最初のルール確認ケースで、長文fixture後にインジケーターがvisibleにならず両engineとも30秒timeoutした。これはBrowser UI成功とは扱わない。
 - そのログを受け、共通mount処理が内容更新に加えて親dialogのopen属性変化でも再計測するようにした。新しいテストでは長文の実scroll rangeと、失敗時の本文・panel・track矩形を出力する。修正後のローカル `npm test` 91/91、build、Worker型検査、Browser UI選択9件、Python構文・差分検査はsuccess。Browser UI再試行は次のdevelop SHAのActionsで実施し、結果が出るまで未確認とする。
+
+### 2回目のBrowser UI実行とCSS修正
+
+- SHA `6427ecc834936cd5760a3b9839586cd7ce218357` のBrowser UI run [#43583783072](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43583783072) はverify-build、docs-check、差分検出に成功し、両engineの既存 `browser-create-dialog-layout.py` も成功した。追加した `browser-dialog-scroll.py` はChromium／WebKitともルールdialogの長文fixtureで失敗した。実測値は本文の `scrollHeight` と `clientHeight` が共に7780pxで、実際のスクロール範囲がなかった。
+- 原因はJavaScriptの再計測ではなく、共通パネルへ移す際に、従来本文自身に指定していた `max-height:min(68dvh,620px)` をパネルへ移したことで、ルール本文のグリッド項目が長文の高さまで伸びたこと。本文要素にも同じviewport上限を戻し、本文だけがoverflowするよう修正した。標準スクロールバーを含む各ダイアログの操作は引き続き共通部品を使う。
+- このCSS修正後のローカル `npm test` 91/91、`npm run build`、`npm run typecheck:worker`、`git diff --check` は成功。新しいdevelop SHAのChromium／WebKit Browser UI再実行待ち。今回と前回のBrowser UI失敗は成功扱いしない。
+- PC／iPhone Safariの修正後本人実機確認は未確認。Issue本文は編集せずOpenを維持する。

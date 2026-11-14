@@ -263,7 +263,7 @@ header > div { min-width:0; }
 .confirmed-rule-row { display:grid; grid-template-columns:minmax(76px,32%) minmax(0,1fr); gap:8px; padding:8px 2px; border-bottom:1px solid #63947a; }
 .confirmed-rule-row dt { font-weight:700; overflow-wrap:anywhere; }
 .confirmed-rule-row dd { margin:0; overflow-wrap:anywhere; }
-#online-rules-list { min-height:0; }
+#online-rules-list { min-height:0; max-height:min(68vh,620px); max-height:min(68dvh,620px); }
 .readonly-rules-dialog[open] { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
 .readonly-rules-dialog > .dialog-scroll-panel { flex:1 1 auto; max-height:min(68vh,620px); max-height:min(68dvh,620px); }
 .readonly-rules-dialog #online-rules-list { padding:0 8px 4px 0; }
