@@ -4,6 +4,7 @@ import { discardTile } from '../game/discard.ts';
 export const scenarioHelp = {
   pon: 'CPU3が東を打牌した直後の局面です。東を2枚持った状態で「ポン」または「見送る」を選び、河・副露・通常の手番進行を確認します。',
   'pon-multiple': 'CPU1が通常の五萬を打牌した直後の局面です。赤五萬を含む五萬3枚から「ポン」を選ぶと、表示の異なる2候補が表示されます。戻る・再選択・確定を確認します。「カン」から大明カンも確認できます。',
+  'chi-scroll': 'CPUが四萬を打牌した直後に「チー」を選ぶと5候補を表示します。このページでは内部スクロールを確認できるよう候補一覧を短くします。候補一覧を上下にスクロールし、最後の候補を選択してください。',
   opening: '親の配牌直後に暗カン候補が2つあります。「カン」から選択するか、「戻る」で通常打牌へ戻れます。',
   ankan: '暗カン候補は1つです。「カン」を押すと即時確定します。嶺上牌を選んで「打牌する」、または「ツモ和了」で結果を確認。',
   daiminkan: 'CPUの打牌に対して「大明カン」を選択。嶺上牌を打牌するか「ツモ和了」。見送る操作も可能です。',
@@ -31,6 +32,10 @@ export function scenarioGame(mode: Scenario) {
       draw: 'man-5',
     });
     return discardTile(game, 1, game.players[1].drawnTile!.id);
+  }
+  if (mode === 'chi-scroll') {
+    const game = kanGame({ hands: { 0: ['23m', '444m', '50m', '6m', '789p', '12z'] }, turn: 3, draw: 'man-4' });
+    return discardTile(game, 3, game.players[3].drawnTile!.id);
   }
   if (mode === 'opening') return openingAnkanGame();
   if (mode === 'ankan' || mode === 'rinshan') return ankanGame();
