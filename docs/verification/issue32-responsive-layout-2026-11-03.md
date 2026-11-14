@@ -573,3 +573,7 @@ Issue本文のチェックボックスは変更していない。既存の受け
 | 設計方針・検証結果を記録 | 本記録、[検証README](README.md)、[ロードマップ](../ROADMAP.md)に反映する。 |
 
 **Issue #32はClose不可・Open維持。** PCのNo.8〜11、iPhone Safariの修正後確認、追加されたスクロールバー統一の受け入れ条件が未完了である。今回の本人OK 7件を進捗として記録しながら、未確認4件とその他の必須条件を維持する。
+
+### 文書のみ変更のActions確認
+
+検証記録・README・ROADMAPのみのcommit `00c4342ffb1e9cb3f008c3bcb1df6401ae5eb555`について、[Actions run #43575525436](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43575525436) はcompleted / success。両方の`docs-check`と変更分類はsuccessし、ゲームのverify、Browser UI build／実行、matrix audit、Worker／Pagesのbuild・deploy、本番通信検証は文書のみの変更としてskipされた。ローカルでもゲームテスト・ビルドは再実行していない。
