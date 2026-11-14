@@ -115,10 +115,10 @@ window.dialogScrollTest = {
               return {
                 overflow: content.scrollHeight > content.clientHeight,
                 tabIndex: content.tabIndex,
+                overflowY: getComputedStyle(content).overflowY,
                 scrollbarWidth: getComputedStyle(content).scrollbarWidth,
                 webkitScrollbarDisplay: getComputedStyle(content, '::-webkit-scrollbar').display,
                 touchAction: getComputedStyle(content).touchAction,
-                webkitOverflowScrolling: getComputedStyle(content).webkitOverflowScrolling,
                 trackWidth: rect(track).width,
                 trackRect: rect(track), thumbRect: rect(thumb),
                 panelRect: rect(dialog.querySelector('.dialog-scroll-panel')),
@@ -133,10 +133,10 @@ window.dialogScrollTest = {
                     'headerSelector': header_selector, 'actionSelector': action_selector})
             assert geometry['overflow'], (width, height, name, 'long fixture did not overflow')
             assert geometry['tabIndex'] == 0, (width, height, name, 'scroll body is not keyboard reachable')
+            assert geometry['overflowY'] == 'auto', (ENGINE, name, geometry)
             assert geometry['scrollbarWidth'] == 'none', (ENGINE, name, geometry)
             assert geometry['webkitScrollbarDisplay'] == 'none', (ENGINE, name, geometry)
             assert geometry['touchAction'] == 'auto', (ENGINE, name, geometry)
-            assert geometry['webkitOverflowScrolling'] == 'touch', (ENGINE, name, geometry)
             assert abs(geometry['trackWidth'] - 6) < 1, (ENGINE, name, geometry)
             assert abs(geometry['trackRect']['y'] - geometry['panelRect']['y']) < 1, (ENGINE, name, geometry)
             assert abs(geometry['trackRect']['height'] - geometry['panelRect']['height']) < 1, (ENGINE, name, geometry)

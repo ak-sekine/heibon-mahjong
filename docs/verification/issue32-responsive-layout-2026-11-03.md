@@ -569,3 +569,9 @@ Android・タブレット実機は未確認のまま記録し、viewport自動�
 - 原因はJavaScriptの再計測ではなく、共通パネルへ移す際に、従来本文自身に指定していた `max-height:min(68dvh,620px)` をパネルへ移したことで、ルール本文のグリッド項目が長文の高さまで伸びたこと。本文要素にも同じviewport上限を戻し、本文だけがoverflowするよう修正した。標準スクロールバーを含む各ダイアログの操作は引き続き共通部品を使う。
 - このCSS修正後のローカル `npm test` 91/91、`npm run build`、`npm run typecheck:worker`、`git diff --check` は成功。新しいdevelop SHAのChromium／WebKit Browser UI再実行待ち。今回と前回のBrowser UI失敗は成功扱いしない。
 - PC／iPhone Safariの修正後本人実機確認は未確認。Issue本文は編集せずOpenを維持する。
+
+### 3回目のBrowser UI実行とengine別検査
+
+- SHA `2ed1fe6543a1f01b64e87c19fab3629e872347bf` のrun [#43584387902](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43584387902) はverify-build、差分検出、docs-checkに成功。Chromium／WebKitの新しいテストは、長文ルール本文のスクロール範囲、tabindex、overflow、スクロールバー非表示、touch-actionを確認した後、`getComputedStyle(...).webkitOverflowScrolling` が両engineで `null` となり停止した。
+- `-webkit-overflow-scrolling` は実機Safari向けにCSSへ残し、Browser UIでは両engine共通の `overflow-y:auto` と `touch-action:auto`、touch pointerをキャンセルしないことを検査する。Chromiumでは別途CDPの実タッチスワイプを確認する。headless WebKitのcomputed style値をSafari実機動作の代用にしない。
+- 上記engine別assertionへ変更後、Chromium／WebKit Browser UIを次のdevelop SHAで再実行する。run #43584387902 のChromium／WebKitは成功扱いしない。
