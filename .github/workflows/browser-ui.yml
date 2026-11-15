@@ -154,29 +154,24 @@ jobs:
           needs.detect-changes.result == 'success' &&
           needs.detect-changes.outputs.run_full_suite == 'true' &&
           needs.verify-build.result == 'success'
-        )) &&
-        (
-          github.event_name != 'workflow_dispatch' ||
-          inputs.diagnostic_mode != 'scenarios' || matrix.group == 1
-        ) &&
-        (
-          github.event_name != 'workflow_dispatch' ||
-          (inputs.diagnostic_mode != 'scenarios' && !inputs.targeted_candidate_geometry && !inputs.targeted_mobile_table_layout) ||
-          matrix.group == 1
-        ) &&
-        (
-          github.event_name != 'workflow_dispatch' ||
-          inputs.diagnostic_mode != 'scenarios' || inputs.diagnostic_browser == 'both' ||
-          inputs.diagnostic_browser == matrix.browser
-        )
+        ))
       }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: 4
       matrix:
-        browser: [chromium, webkit]
-        group: [1, 2]
+        browser: >-
+          ${{ fromJSON(
+            (github.event_name == 'workflow_dispatch' && inputs.diagnostic_mode == 'scenarios' && inputs.diagnostic_browser == 'chromium' && '["chromium"]') ||
+            (github.event_name == 'workflow_dispatch' && inputs.diagnostic_mode == 'scenarios' && inputs.diagnostic_browser == 'webkit' && '["webkit"]') ||
+            '["chromium","webkit"]'
+          ) }}
+        group: >-
+          ${{ fromJSON(
+            (github.event_name == 'workflow_dispatch' && (inputs.diagnostic_mode == 'scenarios' || inputs.targeted_candidate_geometry || inputs.targeted_mobile_table_layout) && '[1]') ||
+            '[1,2]'
+          ) }}
     name: ${{ github.event_name == 'workflow_dispatch' && (inputs.diagnostic_mode == 'scenarios' || inputs.targeted_candidate_geometry || inputs.targeted_mobile_table_layout) && format('browser-ui diagnostic ({0})', matrix.browser) || format('browser-ui ({0}, group {1})', matrix.browser, matrix.group) }}
     steps:
       - uses: actions/checkout@v4

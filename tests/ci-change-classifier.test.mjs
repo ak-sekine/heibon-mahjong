@@ -179,10 +179,15 @@ test('production deployment requires successful full verification and Browser UI
 test('Browser UI engine matrix keeps scenarios independent and avoids duplicate test/build work', () => {
   const buildJob = browserWorkflow.match(/  verify-build:\n([\s\S]*?)\n  browser-ui:/)?.[1] ?? '';
   const browserJob = browserWorkflow.match(/  browser-ui:\n([\s\S]*)$/)?.[1] ?? '';
+  const browserJobIf = browserJob.match(/if: >-\n([\s\S]*?)\n    runs-on:/)?.[1] ?? '';
   assert.match(browserJob, /fail-fast: false/);
   assert.match(browserJob, /max-parallel: 4/);
-  assert.match(browserJob, /browser: \[chromium, webkit\]/);
-  assert.match(browserJob, /group: \[1, 2\]/);
+  assert.match(browserJob, /browser: >-\s*\$\{\{ fromJSON\(/);
+  assert.match(browserJob, /inputs\.diagnostic_browser == 'chromium'/);
+  assert.match(browserJob, /inputs\.diagnostic_browser == 'webkit'/);
+  assert.match(browserJob, /group: >-\s*\$\{\{ fromJSON\(/);
+  assert.match(browserJob, /'\[1,2\]'/);
+  assert.doesNotMatch(browserJobIf, /matrix\./, 'job-level if must not reference matrix values');
   assert.match(browserJob, /scenario-ids/);
   assert.match(browserJob, /run-browser-regressions\.py --browser/);
   assert.match(browserJob, /Install OS dependencies \(\$\{\{ matrix\.browser \}\}\)/);
