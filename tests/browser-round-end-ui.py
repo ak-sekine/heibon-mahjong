@@ -49,7 +49,9 @@ with sync_playwright() as p:
                                 device_scale_factor=2 if mobile else 1,
                                 is_mobile=mobile, has_touch=mobile)
         errors = []
+        console_errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
+        page.on('console', lambda message: console_errors.append(message.text) if message.type == 'error' else None)
 
         def expose_app(route):
             response = route.fetch()
@@ -844,6 +846,35 @@ with sync_playwright() as p:
         page.locator('#match-result-close').click()
         page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
         page.set_viewport_size({'width': width, 'height': height})
+        page.evaluate('''async () => {
+          const { ResultDialog } = await import('/heibon-mahjong/src/ui/result-dialog.ts');
+          const originalOpen = ResultDialog.prototype.open;
+          const debug = window.resultReopenDebug = { buttonClicks: 0, panelClicks: 0, openAttempts: [] };
+          const snapshot = instance => ({
+            resultAvailable: instance.resultAvailable,
+            mode: instance.mode,
+            hasResult: Boolean(instance.result),
+            resultOpen: instance.dialog.open,
+            newGameOpen: document.querySelector('#new-game-dialog').open,
+          });
+          ResultDialog.prototype.open = function (...args) {
+            const attempt = { before: snapshot(this) };
+            debug.openAttempts.push(attempt);
+            try {
+              const value = originalOpen.apply(this, args);
+              attempt.after = snapshot(this);
+              return value;
+            } catch (error) {
+              attempt.error = String(error);
+              attempt.after = snapshot(this);
+              throw error;
+            }
+          };
+          document.querySelector('#show-result').addEventListener('click', () => debug.buttonClicks++, true);
+          document.querySelector('#local-game-controls').addEventListener('click', event => {
+            if (event.target.closest('#show-result')) debug.panelClicks++;
+          }, true);
+        }''')
         page.locator('#show-result').click()
         assert page.locator('#result-title').inner_text() == '東風戦終了'
         assert not page.locator('#next-round').is_visible()
@@ -861,8 +892,19 @@ with sync_playwright() as p:
             status:window.roundEndTest.controller.match.status,hasSettlement:Boolean(window.roundEndTest.controller.match.lastSettlement),
             activeElement:document.activeElement?.id,openDialogs:[...document.querySelectorAll('dialog[open]')].map(dialog=>dialog.id)};
             }''')
+            debug['resultReopen'] = page.evaluate('window.resultReopenDebug')
+            debug['pageErrors'] = errors
+            debug['consoleErrors'] = console_errors
             page.screenshot(path=str(OUT / f'{ENGINE}-{width}x{height}-result-reopen-failure.png'), full_page=True)
             raise AssertionError(f'result dialog did not reopen after closing match results at {width}x{height}: {debug}')
+        result_reopen = page.evaluate('window.resultReopenDebug')
+        assert result_reopen['buttonClicks'] == 1 and result_reopen['panelClicks'] == 1, (width, result_reopen)
+        assert len(result_reopen['openAttempts']) == 1, (width, result_reopen)
+        assert result_reopen['openAttempts'][0]['before'] == {
+            'resultAvailable': True, 'mode': 'local', 'hasResult': True,
+            'resultOpen': False, 'newGameOpen': False,
+        }, (width, result_reopen)
+        assert result_reopen['openAttempts'][0]['after']['resultOpen'], (width, result_reopen)
         assert page.locator('#view-table').is_visible(), page.evaluate('''() => {
           const button=document.querySelector('#view-table'),r=button.getBoundingClientRect();
           return {display:getComputedStyle(button).display,rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
@@ -881,7 +923,8 @@ with sync_playwright() as p:
         assert reset == {'status':'playing','summaryHidden':True,'showHidden':True,'dialogOpen':False,'faces':0,'privateIds':True}, (width, reset)
         assert not errors, errors
         reports.append({'viewport': [width, height], 'squareTable': True, 'meldLayouts': meld_cases,
-            'roundVariants': variant_reports, 'nextRoundOnce': True, 'eastEndAndReset': True})
+            'roundVariants': variant_reports, 'nextRoundOnce': True, 'eastEndAndReset': True,
+            'resultReopen': result_reopen})
         page.screenshot(path=str(OUT / f'{ENGINE}-{width}x{height}-round-end.png'), full_page=True)
         page.close()
     browser.close()
