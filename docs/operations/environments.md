@@ -36,10 +36,13 @@ main未変更・開発URL未登録での作成は[専用手順](bootstrap-develo
 ## 通常開発と昇格
 
 - 通常はdevelopで実装し、テスト・型検査・両ビルド・itch・Chromium/WebKitとmatrix auditを通す。Codexがcommit/push。通常PRなし。force pushしない。
-- 移行期間はpushで検証だけ行う。設定と公開安全性を確認後、`Verify isolated environments`をdevelopで手動実行しpublish=trueを指定すると開発Worker→実オンライン検証→保持済み本番との合成Pages公開を行う。
+- developの開発WorkerとPagesの通常公開・再デプロイは継続許可されており、品質ゲートと公開前確認の成功後、Codexは個別承認を求めず実行できる。技術上は既存の`Verify isolated environments`をdevelopで手動dispatchし、`publish=true`を指定する。publish入力、branch制限、`DUAL_PAGES_ENABLED=true`、必須CI、開発Worker online検証、本番snapshot/hash照合、`pending=null`確認を維持する。
+- developへのpushは検証のみで、push時自動公開へ変更しない。失敗時はrun・Worker・Pages・保存台帳を照合して原因と公開状態を確定し、修正後に全ゲートを通す。状態確定後の安全な通常公開は個別承認なしで再実行できるが、結果不明の状態でdispatch/rerunを重ねない。
 - mainへは確認済みdevelopの内容だけをfast-forwardで昇格する。main独自の更新や競合があれば差分を精査する。未検証内容を一括mergeしない。mainで全ゲートを再実行してから本番公開を手動実行する。
 - 公開前に元SHAがbranch先端、対応Environment・アカウント・URL、CI両エンジン成功、未解決pendingなし、保持版SHA/hash、itch成果物が独立していることを確認する。
 - 移行後のpush自動公開化は、外部障害試験・実機確認後の別判断とする。現在の手動ゲートを推測で外さない。
+
+この継続許可はdevelopの通常Worker・Pages公開だけに適用する。本番公開、Cloudflare/GitHub設定やSecrets変更、初回Worker作成、DOの削除・逆migration、保存snapshotや履歴を破壊する操作、公開結果不明時の復旧公開には適用しない。既存の停止・追加承認条件を維持する。
 
 ## 成果物とSHA
 

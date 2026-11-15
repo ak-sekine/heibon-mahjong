@@ -70,6 +70,9 @@
 
 ## 検証と公開
 
+- **developの通常公開は継続許可済み。** Issue #47の開発Worker・開発版Pagesは、必要な品質ゲートと公開前確認が成功すれば、Codexがユーザーへの個別確認なしに通常の作業として公開・再デプロイできる。既存の手動`workflow_dispatch`と`publish=true`を使い、developへのpushだけで自動公開する変更はしない。公開前CI、Chromium/WebKit、環境分離、online検証、snapshot/hash整合性、競合とpendingの確認を維持する。
+- この継続許可はdevelopの通常公開に限る。本番`main`、初回Worker作成、Cloudflare/GitHub Settings・Secrets変更、DO削除や逆migration、`pages-verified`の削除・再初期化・履歴改変、結果不明や一部公開からの復旧公開、本番Worker復旧には適用しない。既存の本番承認条件と例外操作の停止・承認条件を維持する。
+- 開発公開失敗時はrun・deployment・Pages bytes・保存台帳を調べて実状態を確定し、原因を修正して全ゲートを通す。安全な通常の再公開は個別承認なしでよいが、結果不明の再dispatch/rerun、無条件の繰り返し、失敗を隠す再試行はしない。危険な復旧が必要なら停止して別途承認を得る。
 - 変更前に関連コードと既存テストを確認する。必要に応じて自動テストを追加・更新し、既存のテスト・ビルド・CI手順を維持する。変更がオンライン対局・オフライン対局の双方へ与える影響を確認する。
 - コード変更では内容に応じた検証を行う。基本コマンドは `npm test`、`npm run build`、`git diff --check`。
 - UI変更ではまず関連局面を確認し、既存のGitHub Actions `Browser UI verification` を利用する。麻雀卓の配置、河、副露、カン、非公開牌ID保護などの既存確認を優先し、ChromiumとWebKitの検証を含む既存Deploy gateを維持する。

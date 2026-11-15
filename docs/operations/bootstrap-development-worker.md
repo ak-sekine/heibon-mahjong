@@ -2,6 +2,8 @@
 
 ## 実行経路と承認
 
+この手順は開発Workerの**初回リソース作成**専用であり、ここに記載する明示的な作成許可は維持する。既存開発Workerの通常再デプロイと開発版Pages公開は[通常運用](environments.md#通常開発と昇格)に従い、必須ゲート通過後の個別承認は不要。通常公開の継続許可は初回作成、Settings/Secrets変更、破壊的操作、結果不明の復旧には適用しない。
+
 mainに新しいworkflowを置かず、developのpushイベントで独立した
 `Bootstrap development Worker only`を実行する。workflow_dispatchは使用しない。
 GitHubはpush先のworkflowを評価するため、デフォルトブランチへの追加は不要。
@@ -98,7 +100,7 @@ Worker/DOは自動削除・rollbackしない。run再実行は既存Worker検出
 ユーザーの明示的許可後に実行し、開発Workerを作成済み。
 確認済みの実URLは **https://heibon-mahjong-online-dev.ak-sekine.workers.dev**。
 [完了run 43227915964](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43227915964)はsuccess。
-今後は初回作成を再実行せず、通常の開発Worker更新を別途判断する。
+当時の運用では初回作成を再実行せず、通常の開発Worker更新を別途判断する方針だった。2026-11-15以降の通常更新は上記の継続許可に従う。
 この作業では`DEVELOPMENT_WORKER_URL`を自動登録していない。登録する値は上記の確認済み実URL。
 
 ```bash

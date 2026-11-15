@@ -1,6 +1,12 @@
 # Issue #47 公開移行手順（2026-11-12）
 
-これは実行記録ではない。今回はmain、Worker、DO、Pages、公開snapshot、公開フラグを変更しない。実行開始にはユーザーの明示的許可が必要。[今回の確認結果](../verification/issue-47-preflight-2026-11-12.md) / [通常運用・障害復旧](environments.md)。
+これはPhase別の手順書であり、単独では実行記録ではない。2026-11-12の移行計画ではPhase開始前の個別許可を前提としていたが、2026-11-15以降のdevelop通常公開は下記の継続許可に従い毎回の承認を要しない。本番・外部設定・危険な復旧操作の許可条件は変わらない。[移行前記録](../verification/issue-47-preflight-2026-11-12.md) / [通常運用・障害復旧](environments.md)。
+
+## 現行の開発版公開許可（2026-11-15）
+
+Issue #47のdevelop開発Workerと開発版Pagesの通常公開・再デプロイは、必要なCI、Chromium/WebKit、online検証、公開前snapshot/hash確認に成功すればCodexが実行できる継続許可の対象であり、毎回の個別承認は不要。既存の手動`workflow_dispatch`と`publish=true`は維持し、develop pushで自動公開しない。失敗時はrun・deployment・公開bytes・保存台帳を照合し、安全な通常再公開は状態確定と原因修正後に限る。結果不明のまま再dispatch/rerunを重ねない。
+
+この許可はmain本番公開、初回Worker作成、Settings/Secrets変更、DO削除・逆migration、`pages-verified`の削除・再初期化・履歴改変、結果不明や一部公開からの復旧公開、本番Worker復旧には適用しない。これらの操作に関する停止・個別承認条件は維持する。Phase 1〜4の記載は当時の移行作業の前提・実施記録であり、この現行運用方針で過去の事実を変更しない。
 
 ## 実施状況（2026-11-13）
 
@@ -104,7 +110,7 @@ GitHubの接続APIではRepository Variables、Environment/Secret登録状態、
 
 **前提**：Phase 4成功、本番Sの全hash/保存remoteを再確認。最新develop Dの全CI成功、未解決pendingなし、URLが末尾slashなし。
 
-**操作**：新`environments.yml`をdevelopで`publish=true`として一度だけdispatch。開発Worker→実online→candidate検証→stage→pendingのGit push→合成Pages公開→finalizeの順に待つ。開発Worker再デプロイを伴うことも許可範囲に含める。
+**操作**：新`environments.yml`をdevelopで`publish=true`としてdispatchする。初回公開・通常更新とも、上記の継続許可により個別承認は不要。開発Worker→実online→candidate検証→stage→pendingのGit push→合成Pages公開→finalizeの順に待つ。各試行は一度だけ行い、失敗時は状態を調査して停止する。原因を修正し公開状態を確定した後の安全な通常再公開は、最新developの全ゲートとsnapshot確認をやり直して実行する。開発Worker再デプロイを伴うことも許可範囲に含める。
 
 **期待・判定**：本番側を再ビルドせず保存bytesを保持し、devだけDへ更新。environments.jsonとstateのprod=S/dev=D、release.json全SHA256一致、pending=null、remote確定commit、Pages成功を確認。worker-productionはskip。本番URLの既存ファイルhashは不変（台帳metadata追加は別に比較）。
 
@@ -127,7 +133,7 @@ GitHubの接続APIではRepository Variables、Environment/Secret登録状態、
 5. Pages結果不明・一部公開・hash不一致：pendingを消さず停止。公開成功/未公開を確定できなければ、直前の両版snapshotから検証済み合成artifactを作る明示承認付き復旧公開で一致状態を作ってから台帳を確定。古いworkflow再実行、単純フラグfalse、rootだけ旧公開での復旧は禁止。
 6. 通常の機能rollbackは新しいrevert commitを対象branchに作り全ゲートを通す。保持側snapshotは同じbytes。Worker互換性/既知versionへの復旧は別途確認し、DO削除/逆migrationはしない。
 
-**許可**：実online試験、復旧公開/Worker version復旧、pending解消commit。今回は実環境への障害注入なし。
+**許可・停止条件**：実online試験と、公開状態が確定したpendingの整合commitを行う。Pages結果不明・一部公開からの復旧公開やWorker version復旧は通常公開の継続許可に含めず、状態を確定して別途許可を得る。実環境への障害注入は行わない。
 
 ## Phase 7：Issue完了判定
 
@@ -137,6 +143,6 @@ GitHubの接続APIではRepository Variables、Environment/Secret登録状態、
 
 **期待・判定**：本番/開発URL、独立更新/保存、PWA、online、失敗時保全、SHA追跡が実証できる。自動WebKitをiPhone実機成功と扱わない。長期間offlineだった全利用者の旧SW消滅は保証できず、再訪時の更新とdev専用controller再取得を継続確認する。
 
-**停止・復旧**：未確認/NGは未チェックでOpen維持。再現条件を記録しdevelopで修正・検証、必要な公開は別承認を得る。
+**停止・復旧**：未確認/NGは未チェックでOpen維持。再現条件を記録しdevelopで修正・検証する。必要な通常の開発版公開は継続許可の範囲で行い、main本番公開や危険な復旧公開は別途承認を得る。
 
 **許可**：実機操作はユーザー。Issue Closeは別の明示指示後のみ。今回Openのまま終了する。
