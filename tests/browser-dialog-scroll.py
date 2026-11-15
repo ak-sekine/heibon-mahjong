@@ -1,6 +1,8 @@
 """Common scroll controls for rules, round-result, and match-result dialogs."""
+import json
 import os
 import shutil
+from pathlib import Path
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
@@ -10,6 +12,39 @@ DIALOGS = [
     ('round-result', '#result-dialog', '#result-body', '.result-header', '#view-table'),
     ('match-result', '#match-result-dialog', '#match-result-body', '.result-header', '#match-result-close'),
 ]
+
+
+def collect_scroll_state(page, dialog_selector, content_selector, point=None):
+    return page.evaluate('''({dialogSelector,contentSelector,point}) => {
+      const dialog = document.querySelector(dialogSelector);
+      const content = document.querySelector(contentSelector);
+      const track = dialog.querySelector('.dialog-scroll-indicator');
+      const thumb = track.querySelector('span');
+      const rect = node => { const r = node.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height}; };
+      const describe = node => node instanceof Element
+        ? {tag:node.tagName.toLowerCase(),id:node.id || '',className:typeof node.className === 'string' ? node.className : ''}
+        : {tag:String(node),id:'',className:''};
+      const trackRect = rect(track), thumbRect = rect(thumb);
+      const travel = track.clientHeight - thumbRect.height;
+      const range = content.scrollHeight - content.clientHeight;
+      const ratio = point && travel > 0 ? Math.min(1, Math.max(0,
+        (point.y - trackRect.y - thumbRect.height / 2) / travel)) : null;
+      return {
+        viewport:{width:innerWidth,height:innerHeight,devicePixelRatio},
+        dialog:{open:dialog.open,rect:rect(dialog)},
+        content:{rect:rect(content),scrollTop:content.scrollTop,scrollHeight:content.scrollHeight,
+          clientHeight:content.clientHeight,scrollRange:range,overflowY:getComputedStyle(content).overflowY},
+        track:{hidden:track.hidden,display:getComputedStyle(track).display,visibility:getComputedStyle(track).visibility,
+          pointerEvents:getComputedStyle(track).pointerEvents,clientWidth:track.clientWidth,clientHeight:track.clientHeight,
+          rect:trackRect},
+        thumb:{rect:thumbRect,travel},clickPoint:point,
+        expectedScrollTop:ratio === null ? null : ratio * range,
+        frontElements:point ? document.elementsFromPoint(point.x,point.y).slice(0,5).map(describe) : [],
+        activeElement:describe(document.activeElement),phase:window.__dialogScrollTrace.phase,
+        events:window.__dialogScrollTrace.events.slice(-120)
+      };
+    }''', {'dialogSelector':dialog_selector,'contentSelector':content_selector,'point':point})
+
 
 with sync_playwright() as playwright:
     browser_type = getattr(playwright, ENGINE)
@@ -23,7 +58,9 @@ with sync_playwright() as playwright:
         page = browser.new_page(viewport={'width': width, 'height': height}, is_mobile=mobile,
                                 has_touch=mobile, device_scale_factor=2 if mobile else 1)
         errors = []
+        console_errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
+        page.on('console', lambda message: console_errors.append(message.text) if message.type == 'error' else None)
 
         def expose_app(route):
             response = route.fetch()
@@ -169,6 +206,34 @@ window.dialogScrollTest = {
             page.keyboard.press('PageUp')
             page.wait_for_function('({selector,before}) => document.querySelector(selector).scrollTop < before', arg={'selector': content_selector, 'before': after_keyboard})
 
+            page.evaluate('''({dialogSelector,contentSelector}) => {
+              const dialog = document.querySelector(dialogSelector);
+              const content = document.querySelector(contentSelector);
+              const track = dialog.querySelector('.dialog-scroll-indicator');
+              const trace = window.__dialogScrollTrace = {phase: 'before-touch', events: []};
+              const describe = node => node instanceof Element
+                ? {tag: node.tagName.toLowerCase(), id: node.id || '', className: typeof node.className === 'string' ? node.className : ''}
+                : {tag: String(node), id: '', className: ''};
+              const record = (scope, event) => {
+                if (!event.composedPath().includes(track) && !event.composedPath().includes(content)) return;
+                trace.events.push({scope, type: event.type, phase: trace.phase, time: Number(performance.now().toFixed(2)),
+                  target: describe(event.target), trusted: event.isTrusted, pointerType: event.pointerType || '',
+                  button: Number.isInteger(event.button) ? event.button : null,
+                  clientX: Number.isFinite(event.clientX) ? event.clientX : null,
+                  clientY: Number.isFinite(event.clientY) ? event.clientY : null,
+                  defaultPrevented: event.defaultPrevented, scrollTop: content.scrollTop});
+              };
+              for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'click']) {
+                document.addEventListener(type, event => record('document-capture', event), true);
+                track.addEventListener(type, event => record('track-bubble', event));
+              }
+              content.addEventListener('scroll', event => {
+                trace.events.push({scope: 'content', type: event.type, phase: trace.phase,
+                  time: Number(performance.now().toFixed(2)), trusted: event.isTrusted, scrollTop: content.scrollTop});
+              }, {passive: true});
+            }''', {'dialogSelector': dialog_selector, 'contentSelector': content_selector})
+
+            touch_scroll = None
             if mobile:
                 for target in [content, track]:
                     assert target.evaluate("""node => {
@@ -181,19 +246,43 @@ window.dialogScrollTest = {
                     box = content.bounding_box()
                     session = page.context.new_cdp_session(page)
                     start_x, start_y = box['x'] + box['width'] / 2, box['y'] + box['height'] * .8
+                    page.evaluate("window.__dialogScrollTrace.phase = 'touch-dispatch'")
                     session.send('Input.dispatchTouchEvent', {'type':'touchStart','touchPoints':[{'x':start_x,'y':start_y}]})
                     for step in range(1, 9):
                         session.send('Input.dispatchTouchEvent', {'type':'touchMove','touchPoints':[{'x':start_x,'y':start_y - box['height'] * .6 * step / 8}]})
                         page.wait_for_timeout(20)
                     session.send('Input.dispatchTouchEvent', {'type':'touchEnd','touchPoints':[]})
                     page.wait_for_function('selector => document.querySelector(selector).scrollTop > 0', arg=content_selector)
+                    page.evaluate("window.__dialogScrollTrace.phase = 'touch-complete'")
+                    touch_scroll = content.evaluate('(node) => node.scrollTop')
                     session.detach()
 
             track_box = track.bounding_box()
-            page.mouse.click(track_box['x'] + track_box['width'] / 2,
-                             track_box['y'] + track_box['height'] * .85)
-            page.wait_for_function('selector => document.querySelector(selector).scrollTop > 0', arg=content_selector)
+            click_point = {'x': track_box['x'] + track_box['width'] / 2,
+                           'y': track_box['y'] + track_box['height'] * .85}
+            before_track = collect_scroll_state(page, dialog_selector, content_selector, click_point)
+            page.evaluate("window.__dialogScrollTrace.phase = 'track-click'")
+            page.mouse.click(click_point['x'], click_point['y'])
+            try:
+                page.wait_for_function('selector => document.querySelector(selector).scrollTop > 0', arg=content_selector)
+            except PlaywrightTimeoutError:
+                after_timeout = collect_scroll_state(page, dialog_selector, content_selector, click_point)
+                diagnostic = {
+                    'browser': ENGINE, 'viewport': [width, height], 'dialog': name,
+                    'selectors': {'dialog': dialog_selector, 'content': content_selector, 'track': '.dialog-scroll-indicator'},
+                    'touchScrollTopAfterCompletion': touch_scroll,
+                    'beforeTrackClick': before_track,
+                    'afterTrackClickTimeout': after_timeout,
+                    'pageErrors': errors, 'consoleErrors': console_errors,
+                }
+                output = Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui')) / 'dialog-scroll'
+                output.mkdir(parents=True, exist_ok=True)
+                filename = f'{ENGINE}-{width}x{height}-{name}-track-click-failure.json'
+                (output / filename).write_text(json.dumps(diagnostic, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+                print('dialog scroll track-click timeout ' + json.dumps(diagnostic, ensure_ascii=False))
+                raise
             after_track = content.evaluate('(node) => node.scrollTop')
+            print(f'{ENGINE} {width}x{height} {name} track click: scrollTop {before_track["content"]["scrollTop"]:.2f} -> {after_track:.2f} of {before_track["content"]["scrollRange"]:.2f}; touch={touch_scroll}')
             thumb_box = track.locator('span').bounding_box()
             page.mouse.move(thumb_box['x'] + thumb_box['width'] / 2, thumb_box['y'] + thumb_box['height'] / 2)
             page.mouse.down()
