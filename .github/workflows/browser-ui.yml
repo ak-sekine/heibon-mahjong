@@ -1,4 +1,5 @@
 name: Browser UI verification
+run-name: ${{ github.event_name == 'workflow_dispatch' && (inputs.diagnostic_mode == 'scenarios' || inputs.targeted_candidate_geometry || inputs.targeted_mobile_table_layout) && 'Browser UI diagnostic' || 'Browser UI verification' }}
 
 on:
   # main is verified through Deploy, which calls this workflow exactly once.
@@ -34,6 +35,23 @@ on:
         type: choice
         options: [mixed-kan, pon-multiple, chi, daiminkan, ankan, opening, kakan]
         default: mixed-kan
+      diagnostic_mode:
+        description: Run the full suite or exact manifest scenario IDs for diagnosis.
+        required: false
+        type: choice
+        options: [full, scenarios]
+        default: full
+      diagnostic_browser:
+        description: Browser for exact scenario-ID diagnostics.
+        required: false
+        type: choice
+        options: [chromium, webkit, both]
+        default: both
+      diagnostic_scenarios:
+        description: Comma-separated exact scenario IDs from tests/run-browser-regressions.py.
+        required: false
+        type: string
+        default: ''
   workflow_call:
     inputs:
       reuse_build:
@@ -104,10 +122,12 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Run all unit and integration tests
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.diagnostic_mode != 'scenarios' }}
         run: npm test
       - name: Build the browser test site
         run: npm run build
       - name: Build the standalone itch browser test site
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.diagnostic_mode != 'scenarios' }}
         env:
           VITE_ONLINE_API_URL: https://online-mock.invalid
         run: npm run build:itch
@@ -118,6 +138,7 @@ jobs:
           path: dist
           if-no-files-found: error
       - name: Save the verified itch browser build
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.diagnostic_mode != 'scenarios' }}
         uses: actions/upload-artifact@v4
         with:
           name: itch-dist-${{ github.sha }}-${{ github.run_attempt }}
@@ -133,14 +154,30 @@ jobs:
           needs.detect-changes.result == 'success' &&
           needs.detect-changes.outputs.run_full_suite == 'true' &&
           needs.verify-build.result == 'success'
-        ))
+        )) &&
+        (
+          github.event_name != 'workflow_dispatch' ||
+          inputs.diagnostic_mode != 'scenarios' || matrix.group == 1
+        ) &&
+        (
+          github.event_name != 'workflow_dispatch' ||
+          (inputs.diagnostic_mode != 'scenarios' && !inputs.targeted_candidate_geometry && !inputs.targeted_mobile_table_layout) ||
+          matrix.group == 1
+        ) &&
+        (
+          github.event_name != 'workflow_dispatch' ||
+          inputs.diagnostic_mode != 'scenarios' || inputs.diagnostic_browser == 'both' ||
+          inputs.diagnostic_browser == matrix.browser
+        )
       }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 4
       matrix:
         browser: [chromium, webkit]
+        group: [1, 2]
+    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.diagnostic_mode == 'scenarios' || inputs.targeted_candidate_geometry || inputs.targeted_mobile_table_layout) && format('browser-ui diagnostic ({0})', matrix.browser) || format('browser-ui ({0}, group {1})', matrix.browser, matrix.group) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -148,10 +185,11 @@ jobs:
       - name: Prepare engine-specific diagnostics
         env:
           BROWSER: ${{ matrix.browser }}
+          GROUP: ${{ matrix.group }}
         run: |
           mkdir -p /tmp/heibon-table-ui
-          printf 'script,browser,start_utc,end_utc,duration_seconds,status,timed_out\n' > "/tmp/heibon-browser-ui-timings.csv"
-          : > "/tmp/heibon-browser-ui-${BROWSER}.log"
+          printf 'scenario_id,script,browser,start_utc,end_utc,duration_seconds,status,timed_out\n' > "/tmp/heibon-browser-ui-${BROWSER}-group-${GROUP}-timings.csv"
+          : > "/tmp/heibon-browser-ui-${BROWSER}-group-${GROUP}.log"
           : > /tmp/heibon-vite.log
           : > /tmp/heibon-preview.log
       - uses: actions/setup-node@v4
@@ -161,8 +199,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Validate exact diagnostic scenario selection
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.diagnostic_mode == 'scenarios' || inputs.diagnostic_scenarios != '' || inputs.targeted_candidate_geometry || inputs.targeted_mobile_table_layout) }}
+        env:
+          BROWSER: ${{ matrix.browser }}
+          SCENARIOS: ${{ inputs.diagnostic_scenarios }}
+          DIAGNOSTIC_MODE: ${{ inputs.diagnostic_mode }}
+          TARGET_CANDIDATE: ${{ inputs.targeted_candidate_geometry }}
+          TARGET_MOBILE: ${{ inputs.targeted_mobile_table_layout }}
+        run: |
+          if [[ "$DIAGNOSTIC_MODE" == scenarios ]]; then
+            if [[ -z "$SCENARIOS" || "$TARGET_CANDIDATE" == true || "$TARGET_MOBILE" == true ]]; then
+              echo "Scenario-ID diagnostics require one or more IDs and cannot be combined with legacy targeted inputs"
+              exit 2
+            fi
+            python tests/run-browser-regressions.py --browser "$BROWSER" --scenario-ids "$SCENARIOS" --list-only
+          elif [[ -n "$SCENARIOS" ]]; then
+            echo "Set diagnostic_mode=scenarios when supplying diagnostic_scenarios"
+            exit 2
+          fi
       - name: Test Browser UI engine selection
-        if: ${{ matrix.browser == 'chromium' }}
+        if: ${{ matrix.browser == 'chromium' && matrix.group == 2 }}
         run: |
           python tests/test_browser_regressions_selection.py
           python tests/test_browser_mobile_table_layout_witness.py
@@ -180,12 +237,14 @@ jobs:
           name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
           path: dist
       - name: Download verified itch build
+        if: ${{ inputs.diagnostic_mode != 'scenarios' }}
         uses: actions/download-artifact@v4
         with:
           name: itch-dist-${{ github.sha }}-${{ github.run_attempt }}
           path: dist-itch
       - run: python -m pip install playwright
       - name: Test itch smoke startup transitions
+        if: ${{ matrix.group == 2 }}
         run: python tests/test_itch_smoke_startup.py
       - name: Record Playwright install environment
         env:
@@ -241,6 +300,7 @@ jobs:
         shell: bash
         run: python .github/scripts/timed-playwright-install.py install "${{ matrix.browser }}"
       - name: Run standalone itch smoke test before Browser UI suite
+        if: ${{ matrix.group == 2 }}
         shell: bash
         env:
           BROWSER: ${{ matrix.browser }}
@@ -259,9 +319,13 @@ jobs:
       - name: Run Vite and browser regressions
         shell: bash
         env:
-          HEIBON_BROWSER_TIMINGS: /tmp/heibon-browser-ui-timings.csv
+          BROWSER: ${{ matrix.browser }}
+          GROUP: ${{ matrix.group }}
+          HEIBON_BROWSER_TIMINGS: /tmp/heibon-browser-ui-${{ matrix.browser }}-group-${{ matrix.group }}-timings.csv
           HEIBON_TARGETED_CANDIDATE_GEOMETRY: ${{ github.event_name == 'workflow_dispatch' && inputs.targeted_candidate_geometry }}
           HEIBON_TARGETED_MOBILE_TABLE_LAYOUT: ${{ github.event_name == 'workflow_dispatch' && inputs.targeted_mobile_table_layout }}
+          HEIBON_DIAGNOSTIC_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic_mode }}
+          HEIBON_DIAGNOSTIC_SCENARIOS: ${{ inputs.diagnostic_scenarios }}
           HEIBON_CANDIDATE_VIEWPORT: ${{ inputs.candidate_geometry_viewport }}
           HEIBON_CANDIDATE_MODE: ${{ inputs.candidate_geometry_mode }}
           HEIBON_CANDIDATE_SCENARIO: ${{ inputs.candidate_geometry_scenario }}
@@ -282,30 +346,34 @@ jobs:
           if [[ "${{ matrix.browser }}" == chromium ]]; then
             export HEIBON_CHROMIUM="$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
           fi
-          export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
+          export HEIBON_SCREENSHOTS="/tmp/heibon-table-ui/${BROWSER}-group-${GROUP}"
+          mkdir -p "$HEIBON_SCREENSHOTS"
           set -o pipefail
           if [[ "$HEIBON_TARGETED_CANDIDATE_GEOMETRY" == "true" && "$HEIBON_TARGETED_MOBILE_TABLE_LAYOUT" == "true" ]]; then
             echo "Select one targeted Browser UI regression at a time"
             exit 2
-          fi
-          if [[ "$HEIBON_TARGETED_CANDIDATE_GEOMETRY" == "true" ]]; then
-            python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" --script browser-candidate-geometry.py 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
+          elif [[ "$HEIBON_DIAGNOSTIC_MODE" == "scenarios" ]]; then
+            python tests/run-browser-regressions.py --browser "$BROWSER" --scenario-ids "$HEIBON_DIAGNOSTIC_SCENARIOS" 2>&1 | tee "/tmp/heibon-browser-ui-${BROWSER}-group-${GROUP}.log"
+          elif [[ "$HEIBON_TARGETED_CANDIDATE_GEOMETRY" == "true" ]]; then
+            python tests/run-browser-regressions.py --browser "$BROWSER" --script browser-candidate-geometry.py 2>&1 | tee "/tmp/heibon-browser-ui-${BROWSER}-group-${GROUP}.log"
           elif [[ "$HEIBON_TARGETED_MOBILE_TABLE_LAYOUT" == "true" ]]; then
-            python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" --script browser-mobile-table-layout.py 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
+            python tests/run-browser-regressions.py --browser "$BROWSER" --script browser-mobile-table-layout.py 2>&1 | tee "/tmp/heibon-browser-ui-${BROWSER}-group-${GROUP}.log"
           else
-            python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
+            python tests/run-browser-regressions.py --browser "$BROWSER" --group "$GROUP" 2>&1 | tee "/tmp/heibon-browser-ui-${BROWSER}-group-${GROUP}.log"
           fi
       - name: Report winning hand geometry
-        if: ${{ !inputs.targeted_candidate_geometry && !inputs.targeted_mobile_table_layout }}
+        if: ${{ matrix.group == 2 && inputs.diagnostic_mode != 'scenarios' && !inputs.targeted_candidate_geometry && !inputs.targeted_mobile_table_layout }}
         env:
           BROWSER: ${{ matrix.browser }}
+          GROUP: ${{ matrix.group }}
+          HEIBON_SCREENSHOTS: /tmp/heibon-table-ui/${{ matrix.browser }}-group-${{ matrix.group }}
         run: |
           python - <<'PY_GEOMETRY'
           import json
           import os
           from pathlib import Path
 
-          reports = json.loads(Path('/tmp/heibon-table-ui/round-end-ui.json').read_text(encoding='utf-8'))
+          reports = json.loads((Path(os.environ['HEIBON_SCREENSHOTS']) / 'round-end-ui.json').read_text(encoding='utf-8'))
           viewport = next(report for report in reports if report['viewport'] == [320, 568])
           variant = next(case for case in viewport['roundVariants'] if case['scenario'] == 'yakuman-ron')
           hand = next(hand for hand in variant['handOrder'] if hand['id'] == 1)
@@ -317,6 +385,7 @@ jobs:
           }))
           PY_GEOMETRY
       - name: Run standalone itch smoke test after Browser UI suite
+        if: ${{ matrix.group == 2 }}
         shell: bash
         env:
           BROWSER: ${{ matrix.browser }}
@@ -333,6 +402,7 @@ jobs:
           set -o pipefail
           HEIBON_BROWSER="$BROWSER" HEIBON_SMOKE_ARTIFACT_DIR=/tmp/heibon-itch-smoke HEIBON_SMOKE_REPETITIONS=3 python tests/browser-itch-package.py 2>&1 | tee /tmp/heibon-itch-smoke-after.log
       - name: Verify standalone itch smoke failure diagnostics
+        if: ${{ matrix.group == 2 }}
         shell: bash
         env:
           BROWSER: ${{ matrix.browser }}
@@ -371,11 +441,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: browser-ui-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: browser-ui-${{ matrix.browser }}-group-${{ matrix.group }}-${{ github.sha }}-${{ github.run_attempt }}
           if-no-files-found: error
           path: |
-            /tmp/heibon-browser-ui-timings.csv
-            /tmp/heibon-browser-ui-${{ matrix.browser }}.log
+            /tmp/heibon-browser-ui-${{ matrix.browser }}-group-${{ matrix.group }}-timings.csv
+            /tmp/heibon-browser-ui-${{ matrix.browser }}-group-${{ matrix.group }}.log
             /tmp/heibon-table-ui
             /tmp/heibon-vite.log
             /tmp/heibon-preview.log
@@ -393,26 +463,26 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: candidate-frame-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: candidate-frame-${{ matrix.browser }}-group-${{ matrix.group }}-${{ github.sha }}-${{ github.run_attempt }}
           if-no-files-found: warn
           path: |
-            /tmp/heibon-table-ui/candidate-geometry/*.json
-            /tmp/heibon-table-ui/candidate-geometry/*-320x568-*-chi-*.png
-            /tmp/heibon-table-ui/candidate-geometry/*-1280x720-*-chi-*.png
-            /tmp/heibon-table-ui/candidate-geometry/*-1920x1080-*-mixed-kan-*.png
+            /tmp/heibon-table-ui/*/candidate-geometry/*.json
+            /tmp/heibon-table-ui/*/candidate-geometry/*-320x568-*-chi-*.png
+            /tmp/heibon-table-ui/*/candidate-geometry/*-1280x720-*-chi-*.png
+            /tmp/heibon-table-ui/*/candidate-geometry/*-1920x1080-*-mixed-kan-*.png
       - name: Save center round display screenshots and measurements
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: center-round-display-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: center-round-display-${{ matrix.browser }}-group-${{ matrix.group }}-${{ github.sha }}-${{ github.run_attempt }}
           if-no-files-found: warn
-          path: /tmp/heibon-table-ui/center-round-display
+          path: /tmp/heibon-table-ui/*/center-round-display
       - name: Save river spacing failure diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: river-spacing-diagnostics-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: river-spacing-diagnostics-${{ matrix.browser }}-group-${{ matrix.group }}-${{ github.sha }}-${{ github.run_attempt }}
           if-no-files-found: ignore
           path: |
-            /tmp/heibon-table-ui/river-spacing-failure-*.png
-            /tmp/heibon-table-ui/river-spacing-failure-*.json
+            /tmp/heibon-table-ui/*/river-spacing-failure-*.png
+            /tmp/heibon-table-ui/*/river-spacing-failure-*.json

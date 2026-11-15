@@ -180,8 +180,10 @@ test('Browser UI engine matrix keeps scenarios independent and avoids duplicate 
   const buildJob = browserWorkflow.match(/  verify-build:\n([\s\S]*?)\n  browser-ui:/)?.[1] ?? '';
   const browserJob = browserWorkflow.match(/  browser-ui:\n([\s\S]*)$/)?.[1] ?? '';
   assert.match(browserJob, /fail-fast: false/);
-  assert.match(browserJob, /max-parallel: 2/);
+  assert.match(browserJob, /max-parallel: 4/);
   assert.match(browserJob, /browser: \[chromium, webkit\]/);
+  assert.match(browserJob, /group: \[1, 2\]/);
+  assert.match(browserJob, /scenario-ids/);
   assert.match(browserJob, /run-browser-regressions\.py --browser/);
   assert.match(browserJob, /Install OS dependencies \(\$\{\{ matrix\.browser \}\}\)/);
   assert.match(browserJob, /timed-playwright-install\.py install-deps "\$\{\{ matrix\.browser \}\}"/);
@@ -197,10 +199,11 @@ test('Browser UI engine matrix keeps scenarios independent and avoids duplicate 
 
   const resultArtifactNames = [...browserJob.matchAll(/^\s+name: (.+)$/gm)]
     .map((match) => match[1])
-    .filter((name) => /browser-ui-|center-round-display-|river-spacing-diagnostics-/.test(name));
-  assert.equal(resultArtifactNames.length, 3);
+    .filter((name) => /browser-ui-|candidate-frame-|center-round-display-|river-spacing-diagnostics-/.test(name));
+  assert.equal(resultArtifactNames.length, 4);
   for (const name of resultArtifactNames) {
     assert.match(name, /\$\{\{ matrix\.browser \}\}/);
+    assert.match(name, /group-\$\{\{ matrix\.group \}\}/);
     assert.match(name, /\$\{\{ github\.sha \}\}/);
     assert.match(name, /\$\{\{ github\.run_attempt \}\}/);
   }

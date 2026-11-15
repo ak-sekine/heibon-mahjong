@@ -15,9 +15,11 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / 'tests' / 'run-browser-regressions.py'
+WORKFLOW = ROOT / '.github' / 'workflows' / 'browser-ui.yml'
 RUNNER_MODULE = runpy.run_path(str(RUNNER))
 SUITE = RUNNER_MODULE['SUITE']
 select_scenarios = RUNNER_MODULE['select_scenarios']
+parse_scenario_ids = RUNNER_MODULE['parse_scenario_ids']
 
 
 class BrowserRegressionSelectionTests(unittest.TestCase):
@@ -28,6 +30,7 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
         all_engines = select_scenarios(browser='both')
 
         self.assertEqual(len(SUITE), 82)
+        self.assertEqual(len({item['id'] for item in SUITE}), len(SUITE))
         self.assertEqual(len(chromium), 46)
         self.assertEqual(len(webkit), 36)
         self.assertEqual(set(chromium).intersection(webkit), set())
@@ -39,6 +42,49 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
         dialog_scroll = next(item for item in SUITE if item['script'] == 'tests/browser-dialog-scroll.py')
         self.assertEqual({item['browser'] for item in SUITE if item['script'] == dialog_scroll['script']}, {'chromium', 'webkit'})
 
+    def test_full_suite_groups_keep_geometry_current_alone(self):
+        groups = {
+            (browser, group): select_scenarios(browser=browser, group=group)
+            for browser in ('chromium', 'webkit') for group in (1, 2)
+        }
+        self.assertEqual([len(groups[('chromium', 1)]), len(groups[('chromium', 2)])], [1, 45])
+        self.assertEqual([len(groups[('webkit', 1)]), len(groups[('webkit', 2)])], [1, 35])
+        for browser in ('chromium', 'webkit'):
+            first, second = groups[(browser, 1)], groups[(browser, 2)]
+            self.assertFalse(set(first) & set(second))
+            self.assertEqual(set(first) | set(second), set(select_scenarios(browser=browser)))
+            current = [SUITE[index] for index in first]
+            self.assertEqual([item['script'] for item in current], ['tests/browser-candidate-geometry.py'])
+            self.assertNotIn('HEIBON_CANDIDATE_BASELINE', current[0]['env'])
+            baseline = [SUITE[index] for index in second if SUITE[index]['env'].get('HEIBON_CANDIDATE_BASELINE')]
+            self.assertEqual(len(baseline), 1)
+            self.assertEqual(baseline[0]['script'], 'tests/browser-candidate-geometry.py')
+
+    def test_exact_scenario_id_selection_is_unique_and_browser_scoped(self):
+        chosen = SUITE[0]['id']
+        self.assertEqual(select_scenarios(browser=SUITE[0]['browser'], scenario_ids=[chosen]), [0])
+        other_browser = 'webkit' if SUITE[0]['browser'] == 'chromium' else 'chromium'
+        with self.assertRaisesRegex(ValueError, 'zero manifest entries'):
+            select_scenarios(browser=other_browser, scenario_ids=[chosen])
+        with self.assertRaisesRegex(ValueError, 'unknown scenario ID'):
+            select_scenarios(scenario_ids=['not-in-the-manifest'])
+        with self.assertRaisesRegex(ValueError, 'empty entries'):
+            parse_scenario_ids('known-id,')
+        with self.assertRaisesRegex(ValueError, 'duplicates'):
+            parse_scenario_ids('known-id, known-id')
+
+    def test_workflow_artifact_names_include_browser_and_group(self):
+        workflow = WORKFLOW.read_text(encoding='utf-8')
+        self.assertIn('max-parallel: 4', workflow)
+        for artifact in ('browser-ui', 'candidate-frame', 'center-round-display', 'river-spacing-diagnostics'):
+            self.assertRegex(
+                workflow,
+                rf'name: {artifact}-\$\{{\{{ matrix\.browser \}}\}}-group-\$\{{\{{ matrix\.group \}}\}}-',
+            )
+        self.assertIn('/tmp/heibon-browser-ui-${{ matrix.browser }}-group-${{ matrix.group }}-timings.csv', workflow)
+        self.assertIn("options: [chromium, webkit, both]", workflow)
+        self.assertIn('diagnostic_scenarios:', workflow)
+
     def test_engine_runs_write_only_the_selected_engine_to_csv(self):
         class SuccessfulProcess:
             returncode = 0
@@ -49,10 +95,10 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
             def poll(self):
                 return None
 
-        for engine, expected_count in [('chromium', 46), ('webkit', 36)]:
+        for engine, expected_count in [('chromium', 45), ('webkit', 35)]:
             with self.subTest(engine=engine), tempfile.TemporaryDirectory() as directory:
                 report = Path(directory) / 'timings.csv'
-                argv = [str(RUNNER), '--browser', engine, '--timings-file', str(report)]
+                argv = [str(RUNNER), '--browser', engine, '--group', '2', '--timings-file', str(report)]
                 with (
                     patch.object(RUNNER_MODULE['sys'], 'argv', argv),
                     patch.object(RUNNER_MODULE['signal'], 'signal'),
@@ -109,6 +155,28 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn('invalid choice', result.stderr)
+
+    def test_empty_unknown_and_zero_match_id_inputs_fail_before_execution(self):
+        for browser, scenario_ids, expected in [
+            ('chromium', '', 'empty entries'),
+            ('chromium', 'unknown-id', 'unknown scenario ID'),
+            ('webkit', SUITE[0]['id'], 'zero manifest entries'),
+        ]:
+            result = subprocess.run(
+                [sys.executable, str(RUNNER), '--browser', browser, '--scenario-ids', scenario_ids, '--list-only'],
+                capture_output=True, text=True, check=False,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(expected, result.stderr)
+
+    def test_list_only_reports_exact_manifest_ids_without_starting_browser_scripts(self):
+        expected = [SUITE[index]['id'] for index in select_scenarios(browser='chromium', scenario_ids=[SUITE[0]['id']])]
+        result = subprocess.run(
+            [sys.executable, str(RUNNER), '--browser', 'chromium', '--scenario-ids', ','.join(expected), '--list-only'],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), expected)
 
 
 if __name__ == '__main__':

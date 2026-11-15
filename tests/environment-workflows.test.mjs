@@ -21,6 +21,9 @@ test('production and development configs bind their own DO namespace, with no ex
 });
 test('development worker job never references production token, and push cannot publish during migration', () => {
   const workflow = read('.github/workflows/environments.yml');
+  const audit = workflow.split('  audit:')[1].split('  worker-production:')[0];
+  assert.match(audit, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(audit, /Audit all four Browser UI groups/);
   assert(workflow.includes('test -s artifacts/itch/heibon-mahjong.zip'));
   assert(workflow.includes('node scripts/environments/artifacts.mjs verify dist'));
   assert(workflow.includes('node scripts/environments/artifacts.mjs verify dist-dev'));

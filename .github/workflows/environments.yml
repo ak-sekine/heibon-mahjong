@@ -145,13 +145,14 @@ jobs:
           ONLINE_API_URL=http://127.0.0.1:8788 ONLINE_TEST_ORIGIN=http://localhost:5173 npm run test:online:production
   audit:
     needs: [browser-ui, isolation-browser, local-online]
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       actions: read
     steps:
       - uses: actions/checkout@v4
-      - name: Audit exact browser matrix jobs for this attempt
+      - name: Audit all four Browser UI groups for this attempt
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

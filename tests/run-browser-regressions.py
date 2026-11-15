@@ -5,6 +5,7 @@ import argparse
 import csv
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import sys
@@ -13,7 +14,13 @@ from datetime import datetime, timezone
 
 def run(script, browser='chromium', **extra_env):
     env = {'HEIBON_BROWSER': browser, **extra_env}
-    return {'script': script, 'browser': browser, 'env': env}
+    parts = [Path(script).stem, browser]
+    for key, value in sorted(extra_env.items()):
+        key = re.sub(r'^HEIBON_', '', key).lower().replace('_', '-')
+        value = re.sub(r'[^a-zA-Z0-9]+', '-', str(value)).strip('-').lower()
+        parts.append(f'{key}-{value}')
+    scenario_id = '-'.join(parts)
+    return {'id': scenario_id, 'script': script, 'browser': browser, 'env': env}
 
 
 SUITE = [
@@ -103,9 +110,36 @@ SUITE = [
 ]
 
 
-def select_scenarios(script_names=None, browser=None):
-    """Return manifest indexes selected by script name and engine."""
+def scenario_group(item):
+    """Return the full-suite shard for a manifest entry."""
+    is_geometry_current = (
+        Path(item['script']).name == 'browser-candidate-geometry.py'
+        and 'HEIBON_CANDIDATE_BASELINE' not in item['env']
+    )
+    return 1 if is_geometry_current else 2
+
+
+def parse_scenario_ids(value):
+    """Parse comma-separated manifest IDs without silently accepting blanks or duplicates."""
+    if value is None:
+        return None
+    ids = [scenario_id.strip() for scenario_id in value.split(',')]
+    if not ids or any(not scenario_id for scenario_id in ids):
+        raise ValueError('scenario IDs must be a comma-separated list with no empty entries')
+    if len(ids) != len(set(ids)):
+        raise ValueError('scenario IDs must not contain duplicates')
+    return ids
+
+
+def select_scenarios(script_names=None, browser=None, group=None, scenario_ids=None):
+    """Return manifest indexes selected by script, engine, shard, or exact IDs."""
     selected = list(range(len(SUITE)))
+    if script_names and scenario_ids is not None:
+        raise ValueError('script names cannot be combined with exact scenario IDs')
+    if group is not None and scenario_ids is not None:
+        raise ValueError('scenario IDs cannot be combined with a full-suite group')
+    if group is not None and group not in (1, 2):
+        raise ValueError(f'unknown full-suite group: {group}')
     if script_names:
         names = {Path(name).name for name in script_names}
         known = {Path(item['script']).name for item in SUITE}
@@ -113,6 +147,16 @@ def select_scenarios(script_names=None, browser=None):
         if unknown:
             raise ValueError(f"unknown script(s): {', '.join(sorted(unknown))}")
         selected = [i for i, item in enumerate(SUITE) if Path(item['script']).name in names]
+
+    if scenario_ids is not None:
+        known = {item['id'] for item in SUITE}
+        unknown = set(scenario_ids) - known
+        if unknown:
+            raise ValueError(f"unknown scenario ID(s): {', '.join(sorted(unknown))}")
+        selected = [i for i, item in enumerate(SUITE) if item['id'] in scenario_ids]
+
+    if group is not None:
+        selected = [i for i in selected if scenario_group(SUITE[i]) == group]
 
     if browser:
         engines = {'chromium', 'webkit'} if browser == 'both' else {browser}
@@ -122,6 +166,8 @@ def select_scenarios(script_names=None, browser=None):
             missing = engines - found
             if missing:
                 raise ValueError(f"selected script has no manifest entry for: {', '.join(sorted(missing))}")
+    if scenario_ids is not None and not selected:
+        raise ValueError('scenario selection matched zero manifest entries for the requested browser')
     return selected
 
 
@@ -133,7 +179,7 @@ def save_report(path, rows):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('w', newline='', encoding='utf-8') as report:
         writer = csv.DictWriter(report, fieldnames=[
-            'script', 'browser', 'start_utc', 'end_utc', 'duration_seconds', 'status', 'timed_out',
+            'scenario_id', 'script', 'browser', 'start_utc', 'end_utc', 'duration_seconds', 'status', 'timed_out',
         ])
         writer.writeheader()
         writer.writerows(rows)
@@ -143,19 +189,28 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--script', action='append', help='Run a named script from the full-suite manifest; repeat to select more scripts.')
     parser.add_argument('--browser', choices=['chromium', 'webkit', 'both'], help='Select all scenarios for one engine, or filter --script; defaults to every manifest variant.')
+    parser.add_argument('--group', type=int, choices=[1, 2], help='Select one of the two full-suite shards.')
+    parser.add_argument('--scenario-ids', help='Run exact comma-separated manifest scenario IDs (diagnostic selection).')
+    parser.add_argument('--list-only', action='store_true', help='Validate selection and print selected scenario IDs without running them.')
     parser.add_argument('--timings-file', type=Path, default=Path(os.environ.get('HEIBON_BROWSER_TIMINGS', '/tmp/heibon-browser-ui-timings.csv')))
     args = parser.parse_args()
 
     try:
-        selected = select_scenarios(args.script, args.browser)
+        scenario_ids = parse_scenario_ids(args.scenario_ids)
+        selected = select_scenarios(args.script, args.browser, args.group, scenario_ids)
     except ValueError as error:
         parser.error(str(error))
 
-    report_indexes = selected if args.browser and not args.script else range(len(SUITE))
+    if args.list_only:
+        for index in selected:
+            print(SUITE[index]['id'])
+        return 0
+
+    report_indexes = selected if (args.browser and not args.script) or args.group or scenario_ids is not None else range(len(SUITE))
     report_rows = {}
     rows = [
         {
-            'script': item['script'], 'browser': item['browser'], 'start_utc': '', 'end_utc': '',
+            'scenario_id': item['id'], 'script': item['script'], 'browser': item['browser'], 'start_utc': '', 'end_utc': '',
             'duration_seconds': '', 'status': 'skipped', 'timed_out': 'no',
         }
         for index, item in enumerate(SUITE) if index in report_indexes
@@ -181,8 +236,8 @@ def main():
         start_clock = datetime.now(timezone.utc)
         env = os.environ.copy()
         env.update(item['env'])
-        print(f"::group::Browser UI {item['browser']} {item['script']}", flush=True)
-        print(f"::notice title=Browser UI started::browser={item['browser']} script={item['script']} start={start}", flush=True)
+        print(f"::group::Browser UI {item['id']} {item['script']}", flush=True)
+        print(f"::notice title=Browser UI started::scenario_id={item['id']} browser={item['browser']} script={item['script']} start={start}", flush=True)
         try:
             current_process = subprocess.Popen(
                 [sys.executable, item['script']], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -207,13 +262,14 @@ def main():
         end = timestamp()
         elapsed = (datetime.now(timezone.utc) - start_clock).total_seconds()
         report_rows[index].update({
+            'scenario_id': item['id'],
             'start_utc': start, 'end_utc': end, 'duration_seconds': f'{elapsed:.3f}',
             'status': status, 'timed_out': timed_out,
         })
         current_process = None
         save_report(args.timings_file, rows)
         print(
-            f"::notice title=Browser UI timing::{status} browser={item['browser']} script={item['script']} "
+            f"::notice title=Browser UI timing::{status} scenario_id={item['id']} browser={item['browser']} script={item['script']} "
             f"start={start} end={end} duration_seconds={elapsed:.3f} timed_out={timed_out}",
             flush=True,
         )

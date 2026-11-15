@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 
 export const REQUIRED_BROWSER_UI_JOBS = [
-  'browser-ui / browser-ui (chromium)',
-  'browser-ui / browser-ui (webkit)',
+  'browser-ui / browser-ui (chromium, group 1)',
+  'browser-ui / browser-ui (chromium, group 2)',
+  'browser-ui / browser-ui (webkit, group 1)',
+  'browser-ui / browser-ui (webkit, group 2)',
 ];
 
 export function checkBrowserUiMatrix(jobs) {
@@ -33,7 +35,7 @@ function main() {
     process.exitCode = 1;
     return;
   }
-  console.log('Verified one successful Chromium job and one successful WebKit job.');
+  console.log('Verified one successful job for each of the four Chromium/WebKit full-suite groups.');
 }
 
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) main();
