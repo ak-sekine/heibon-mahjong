@@ -6,33 +6,13 @@
       "digest": "2e6766ce7229fd4a96de431e01a4ddac26288c7b96af75dacfbd96dbbbf8408e",
       "workerUrl": "https://heibon-mahjong-online.ak-sekine.workers.dev",
       "snapshotDigest": "62e514bb5d03e1347c1f67911b759ff29192abe3f300a4e37da7b58cdea332c7"
+    },
+    "development": {
+      "sha": "ada7f2a528a6e67d7fedcb43c3e7cfa2cd975375",
+      "digest": "0ac714a4805e3c1c61e7c25dc1726e676a4eed1b267e896f92e540abd5768c06",
+      "workerUrl": "https://heibon-mahjong-online-dev.ak-sekine.workers.dev",
+      "snapshotDigest": "735c4c34420f2be778934c6c51aa864c40a65e65612ea4612e775437317ffba9"
     }
   },
-  "pending": {
-    "environment": "development",
-    "sha": "ada7f2a528a6e67d7fedcb43c3e7cfa2cd975375",
-    "previous": {
-      "production": {
-        "sha": "c3b84944daaa8fbba3b4b603c0d3f8430e9afb58",
-        "digest": "2e6766ce7229fd4a96de431e01a4ddac26288c7b96af75dacfbd96dbbbf8408e",
-        "workerUrl": "https://heibon-mahjong-online.ak-sekine.workers.dev",
-        "snapshotDigest": "62e514bb5d03e1347c1f67911b759ff29192abe3f300a4e37da7b58cdea332c7"
-      }
-    },
-    "current": {
-      "production": {
-        "sha": "c3b84944daaa8fbba3b4b603c0d3f8430e9afb58",
-        "digest": "2e6766ce7229fd4a96de431e01a4ddac26288c7b96af75dacfbd96dbbbf8408e",
-        "workerUrl": "https://heibon-mahjong-online.ak-sekine.workers.dev",
-        "snapshotDigest": "62e514bb5d03e1347c1f67911b759ff29192abe3f300a4e37da7b58cdea332c7"
-      },
-      "development": {
-        "sha": "ada7f2a528a6e67d7fedcb43c3e7cfa2cd975375",
-        "digest": "0ac714a4805e3c1c61e7c25dc1726e676a4eed1b267e896f92e540abd5768c06",
-        "workerUrl": "https://heibon-mahjong-online-dev.ak-sekine.workers.dev",
-        "snapshotDigest": "735c4c34420f2be778934c6c51aa864c40a65e65612ea4612e775437317ffba9"
-      }
-    },
-    "siteDigest": "cd0b16753c241b4df767a538791cbcdec468f8bee5ec28f7ec783e5bb58cc017"
-  }
+  "pending": null
 }
