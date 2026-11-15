@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Unit checks for engine and script selection in the Browser UI runner."""
 
-import runpy
+import ast
 import csv
-from contextlib import redirect_stdout
+import fnmatch
 import io
+import runpy
+from contextlib import redirect_stdout
 from pathlib import Path
 import subprocess
 import sys
@@ -15,6 +17,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / 'tests' / 'run-browser-regressions.py'
+GEOMETRY = ROOT / 'tests' / 'browser-candidate-geometry.py'
 WORKFLOW = ROOT / '.github' / 'workflows' / 'browser-ui.yml'
 RUNNER_MODULE = runpy.run_path(str(RUNNER))
 SUITE = RUNNER_MODULE['SUITE']
@@ -166,6 +169,27 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
         self.assertIn('/tmp/heibon-browser-ui-${{ matrix.browser }}-group-${{ matrix.group }}-timings.csv', workflow)
         self.assertIn("options: [chromium, webkit, both]", workflow)
         self.assertIn('diagnostic_scenarios:', workflow)
+
+    def test_geometry_baseline_screenshots_do_not_overwrite_current_artifacts(self):
+        tree = ast.parse(GEOMETRY.read_text(encoding='utf-8'))
+        filename_function = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == 'screenshot_filename'
+        )
+        namespace = {}
+        exec(
+            compile(ast.Module(body=[filename_function], type_ignores=[]), str(GEOMETRY), 'exec'),
+            namespace,
+        )
+        filename = namespace['screenshot_filename']
+
+        current = filename('chromium', 320, 568, 'online', 'chi', 'before', 'current')
+        baseline = filename('chromium', 320, 568, 'online', 'chi', 'before', 'baseline')
+
+        self.assertEqual(current, 'chromium-320x568-online-chi-before.png')
+        self.assertEqual(baseline, 'chromium-320x568-online-chi-before-baseline.png')
+        self.assertNotEqual(current, baseline)
+        self.assertTrue(fnmatch.fnmatch(baseline, '*-320x568-*-chi-*.png'))
 
     def test_engine_runs_write_only_the_selected_engine_to_csv(self):
         class SuccessfulProcess:

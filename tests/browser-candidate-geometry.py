@@ -46,6 +46,12 @@ report = {'browser': ENGINE, 'pass': 'baseline' if args.baseline else 'current',
           'baselineSHA': BASELINE_SHA, 'measurements': [], 'result': 'running'}
 REPORT_PATH = OUT / f'candidate-geometry-{report["pass"]}-{ENGINE}.json'
 
+
+def screenshot_filename(engine, width, height, mode, scenario, stage, pass_name):
+    pass_suffix = '-baseline' if pass_name == 'baseline' else ''
+    return f'{engine}-{width}x{height}-{mode}-{scenario}-{stage}{pass_suffix}.png'
+
+
 # Install before ActionPanel attaches listeners. This simulates Safari chrome /
 # keyboard changes without resizing layout, while forwarding native viewport resizes.
 VISUAL_VIEWPORT = r'''(() => {
@@ -216,7 +222,9 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     page.evaluate('({scenario,online})=>issue32Geometry.load(scenario,online)', {'scenario': scenario, 'online': online})
     settle(page)
     record['before'] = before = snapshot(page, online)
-    page.screenshot(path=str(OUT / f'{ENGINE}-{width}x{height}-{record["mode"]}-{scenario}-before.png'))
+    page.screenshot(path=str(OUT / screenshot_filename(
+        ENGINE, width, height, record['mode'], scenario, 'before', report['pass'],
+    )))
     check(record, before['scrollY'] == 0, 'normal-size scenario started after page scrolling')
     if before['callRect']:
         check(record, before['callRect']['top'] >= before['root']['top'] and
@@ -235,7 +243,9 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
         expected_count = 1
     click_part(page, online, trigger, record)
     record['open'] = after = snapshot(page, online)
-    page.screenshot(path=str(OUT / f'{ENGINE}-{width}x{height}-{record["mode"]}-{scenario}-open.png'))
+    page.screenshot(path=str(OUT / screenshot_filename(
+        ENGINE, width, height, record['mode'], scenario, 'open', report['pass'],
+    )))
     save()
     if expected_count == 0:
         check(record, not after['panel'] and not after['candidates'], 'single candidate must execute without a candidate screen')
