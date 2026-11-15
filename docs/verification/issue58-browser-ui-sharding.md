@@ -169,4 +169,51 @@ Local verification after the policy and manifest changes:
 - `npm test`: 91/91 passed; `npm run typecheck`, `npm run typecheck:worker`, `npm run build`, and `VITE_ONLINE_API_URL=https://online-mock.invalid npm run build:itch` passed.
 - All seven workflow YAML files parsed successfully; `git diff --check` passed. `--list-only` showed that the legacy geometry script selector returns the two current-geometry IDs only, while the explicit two-baseline ID selection returns exactly the two baseline IDs. No browser was launched in Codex Cloud.
 
-The revised full Browser UI workflow, its 80-entry matrix audit, the Environment CI wrapper, artifact uploads, and either baseline diagnostic have **not yet run** on the revised implementation. Current `gh auth status` reports that the injected `GH_TOKEN` is invalid, and with that variable omitted the CLI has no saved GitHub login. GitHub read APIs work, but this environment has no authenticated Actions-dispatch client. The previous 82-entry run links above remain historical evidence only; they do not satisfy the revised 80-entry acceptance criteria. Issue #58 remains open pending a successful push-triggered 80-entry run and explicit baseline diagnostics.
+The implementation was committed as db195b540da4f03b780e3b30d36a4ca151997f59 and pushed fast-forward to develop.
+
+### Required full CI on the implementation SHA
+
+- [Browser UI verification run 43693680482](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43693680482), SHA db195b540da4f03b780e3b30d36a4ca151997f59: success, 9m16s workflow wall time. Chromium Group 1 and 2, and WebKit Group 1 and 2 all succeeded.
+- [Environment CI run 43693680455](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43693680455), same SHA: success, 9m29s workflow wall time. Its audit job succeeded and logged “Verified one successful job for each of the four Chromium/WebKit full-suite groups.” Verify, isolation-browser Chromium/WebKit, and local-online succeeded. Worker, online, and publish jobs were skipped; no deployment was performed.
+
+Runner logs for the four required groups matched the manifest exactly: 80 unique IDs, with no missing, extra, or duplicate ID. The two candidate-baseline IDs were absent. Per-group counts and measured scenario totals:
+
+| Browser | Group 1 | Group 2 | Required total |
+| --- | ---: | ---: | ---: |
+| Chromium | 15 IDs, 6m31.617s | 30 IDs, 6m28.387s | 45 IDs, 13m00.004s |
+| WebKit | 9 IDs, 5m13.584s | 26 IDs, 5m40.236s | 35 IDs, 10m53.820s |
+
+All 80 scenario rows succeeded with timed_out=no. The existing standalone itch smoke checks ran in Group 2 for each browser; Group 1 skipped them. The deliberate controlled-failure smoke fixture emitted its expected failure text, and the “Verify standalone itch smoke failure diagnostics” step passed in both Group 2 jobs.
+
+All four SHA/browser/group-specific browser-ui artifacts were registered by both full runs. I downloaded and expanded the Chromium Group 2 and both WebKit group artifacts; their timing CSVs contained 30, 9, and 26 successful rows respectively, with no baseline row. The Chromium Group 1 browser-ui artifact was registered at 70,169,033 bytes, above the local artifact-transfer tool’s 32 MiB limit, so that ZIP was not expanded locally. Its 15 successful scenario rows and timings were verified from the runner log, and its separately downloadable candidate-frame artifact contained the Geometry current JSON and screenshots. The diagnostic artifacts were also downloaded and their one-row timing CSVs inspected.
+
+### Codex-triggered Geometry baseline diagnostics
+
+The runs are named “Browser UI diagnostic” and use workflow_dispatch, so their success is separate from full CI and Deploy gates.
+
+- [Both browsers, run 43693797217](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43693797217), SHA db195b540da4f03b780e3b30d36a4ca151997f59: success. Input was diagnostic_mode=scenarios, diagnostic_browser=both, and diagnostic_scenarios=browser-candidate-geometry-chromium-candidate-baseline-1,browser-candidate-geometry-webkit-candidate-baseline-1. Chromium ran only its baseline ID (1.872s); WebKit ran only its baseline ID (13.199s).
+- [Chromium only, run 43694269377](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43694269377), same SHA: success. Input selected only browser-candidate-geometry-chromium-candidate-baseline-1 (1.574s).
+- [WebKit only, run 43694267444](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43694267444), same SHA: success. Input selected only browser-candidate-geometry-webkit-candidate-baseline-1 (9.823s).
+
+The logs and timing artifacts show no selected-out scenario ran. Local selection tests reject unknown IDs, duplicates, empty IDs, browser mismatch, and zero matches. No malformed dispatch was needed to verify those runner validation paths.
+
+In the ordinary restricted shell, the initial GitHub API request was blocked by the proxy and gh auth status reported the injected GH_TOKEN as invalid. Under the approved network execution path, gh auth status succeeded for ak-sekine and all three workflow_dispatch requests were accepted. No token was displayed, issued, or changed.
+
+### Performance comparison
+
+The closest pre-revision 82-entry references are [Browser UI run 43682888254](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43682888254) and the later [Environment CI run 43685891092](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43685891092). The new full CI covers 80 required entries, while the old runs included both baselines.
+
+| Workflow | Old 82-entry wall | New 80-entry wall | Wall change | Old summed job wall | New summed job wall | Summed job wall change |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Browser UI | 32m20s | 9m16s | −23m04s (−71.3%) | 66m34s | 31m01s | −35m33s (−53.4%) |
+| Environment CI | 35m01s | 9m29s | −25m32s (−72.9%) | 72m58s | 32m41s | −40m17s (−55.2%) |
+
+The 80 required scenario IDs existed in the old run as well. Their old logged sums were Chromium 15m01.590s and WebKit 11m45.955s, compared with 13m00.004s and 10m53.820s now. These per-scenario totals exclude setup and smoke. Runtime varied substantially between runs, so the reductions are observations, not a guarantee of per-scenario speedup.
+
+The old 82-entry run’s baseline IDs took 20m30.996s (Chromium) and 17m16.050s (WebKit). The new combined manual diagnostic measured 1.872s and 13.199s for those same IDs. This large variation means the old baseline timings are an observed slow run, not a stable estimate; the revised CI no longer depends on that variable historical probe.
+
+The former assignment left Chromium’s required Group 2 at 11m48.275s of scenarios and WebKit’s at 7m31.368s after subtracting the old baseline rows. The new groups are nearly balanced: the larger group scenario sum is 6m31.617s for Chromium and 5m40.236s for WebKit. Actual Browser UI group job wall times were Chromium 7m49s / 7m42s and WebKit 6m38s / 7m26s. Browser download/install and other setup ran in each shard; standalone itch smoke and its failure-capture check remained only in Group 2. The measured non-scenario group-job overhead totaled about 5m41s across the four jobs, versus about 5m07s in the old 82-entry run.
+
+Runner time is the sum of GitHub job elapsed wall times, not GitHub billing time. Browser UI used seven executed jobs and Environment CI used nine executed jobs, matching the old runs’ job counts. The full workflow wall reductions include both removal of the slow baseline rows from normal CI and the new balanced allocation; they should not be attributed to sharding alone.
+
+Issue #58 remains open. No issue fields were edited and no deployment or publication occurred.
