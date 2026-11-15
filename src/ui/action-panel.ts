@@ -605,7 +605,8 @@ export class ActionPanel {
       ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth', 'rowGap'].reduce((sum, key) =>
         sum + (Number.parseFloat(style[key as keyof CSSStyleDeclaration] as string) || 0), 0);
     const minimumBottom = visualTop + 8 + Math.min(minimumHeight, Math.max(0, visualBottom - visualTop - 16));
-    const bottom = this.candidateAnchorViewport === this.viewportSignature()
+    const anchorFitsViewport = rootBottom >= minimumBottom && rootBottom <= visualBottom - 2;
+    const bottom = this.candidateAnchorViewport === this.viewportSignature() || anchorFitsViewport
       ? rootBottom : Math.min(Math.max(rootBottom, minimumBottom), visualBottom - 8);
     panel.style.setProperty('--candidate-panel-bottom', `${window.innerHeight - bottom}px`);
     panel.style.setProperty('--candidate-panel-available-height', `${Math.max(0, bottom - visualTop - 8)}px`);

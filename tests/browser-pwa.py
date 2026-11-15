@@ -13,7 +13,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from urllib.parse import unquote, urlsplit
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
 BASE_PATH = '/heibon-mahjong/'
 DIST = Path('dist').resolve()
@@ -140,14 +140,39 @@ def wait_for_human_discard(page):
     """
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
-        page.wait_for_function("""() => {
-          const visible = node => node && node.getClientRects().length > 0;
-          return document.querySelector('#player-hand button:enabled') ||
-            ['#pass-calls', '#pass-ron'].some(selector => {
-              const button = document.querySelector(selector);
-              return visible(button) && !button.disabled;
-            });
-        }""", timeout=max(1, int((deadline - time.monotonic()) * 1000)))
+        try:
+            page.wait_for_function("""() => {
+              const visible = node => node && node.getClientRects().length > 0;
+              return document.querySelector('#player-hand button:enabled') ||
+                ['#pass-calls', '#pass-ron'].some(selector => {
+                  const button = document.querySelector(selector);
+                  return visible(button) && !button.disabled;
+                });
+            }""", timeout=max(1, int((deadline - time.monotonic()) * 1000)))
+        except PlaywrightTimeoutError as error:
+            state = page.evaluate("""() => {
+              const visible = node => Boolean(node && node.getClientRects().length);
+              const selectors = ['#discard', '#pass-calls', '#pass-ron', '#ron',
+                '#candidate-controls', '#round-result-summary', '#result-dialog', '#match-result-dialog'];
+              return {
+                status: document.querySelector('#local-game-controls [data-panel-part="action-status"]')?.textContent?.trim() ?? null,
+                callStatus: document.querySelector('#local-game-controls [data-panel-part="call-status"]')?.textContent?.trim() ?? null,
+                ronStatus: document.querySelector('#local-game-controls [data-panel-part="ron-status"]')?.textContent?.trim() ?? null,
+                handButtonCount: document.querySelectorAll('#player-hand button').length,
+                enabledHandButtonCount: document.querySelectorAll('#player-hand button:enabled').length,
+                wall: document.querySelector('#wall-count')?.textContent?.trim() ?? null,
+                visibleControls: Array.from(document.querySelectorAll('#local-game-controls button'))
+                  .filter(visible).map(button => ({part: button.dataset.panelPart,
+                    text: button.textContent?.trim(), disabled: button.disabled})),
+                states: Object.fromEntries(selectors.map(selector => {
+                  const node = document.querySelector(selector);
+                  return [selector, {exists: Boolean(node), visible: visible(node),
+                    disabled: node instanceof HTMLButtonElement ? node.disabled : null}];
+                })),
+              };
+            }""")
+            print('PWA human-input wait timed out: ' + json.dumps(state, ensure_ascii=False), flush=True)
+            raise error
         if page.locator('#player-hand button:enabled').count():
             page.locator('#discard').wait_for(state='visible')
             return
