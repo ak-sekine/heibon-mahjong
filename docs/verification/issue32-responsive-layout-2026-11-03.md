@@ -619,3 +619,56 @@ Android・タブレット実機は未確認のまま記録し、viewport自動�
 | 10. iPhone Safari実機用チェックリスト | 作成済み／本人確認待ち | 上記「Safari本人確認手順」の項目はすべて未確認のまま。本人の実機報告を受領するまでIssueをOpenで維持。 |
 
 以前のBrowser UI失敗は履歴として残す。最終成功は上記の対象SHAとrunに限って記録する。既存PC実機11/11 OK、2026-11-10のiPhone Safari報告、PC修正後の追加スクロール確認、今回の自動viewport検証はそれぞれ別の結果として扱う。今回のiPhone Safari実機確認と修正後PCスクロール確認は未実施。Issue本文は変更せずOpenを維持する。
+
+## 2026-11-15: Browser UI失敗の調査と品質ゲート復旧
+
+### 作業開始・終了SHA
+
+- 作業開始時はcleanな `work` / `a97e8550e87f198ba11205be877ccf5302f2c0a6`。開始前のローカル `origin/main` は古い `405128d` でしたが、`git fetch origin` 成功後に最新 `origin/main`=`cbf406b0d0112a2e5e0e055e6502dcf289df8fbb`、`origin/develop`=`efd937e955b1e699291e65c2b58976cdca112dce` を確認しました。workはdevelopの先祖で、未コミット変更はありません。
+- コード変更 `07e26e14ad8c8fb72dd7908fc77eefa3e67910d9` を `develop` へfast-forward pushしました。修正・記録後は `main`=`cbf406b0d0112a2e5e0e055e6502dcf289df8fbb` のまま、コード検証対象developは上記SHAです。Issue #32はOpenのままで、Issue本文は変更していません。
+
+### 原因と対応
+
+- 失敗run [Browser UI #43624478134](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43624478134)（SHA `d6ee5320ccbf56cc6076007e9aa27959b7b1f62c`）のChromiumは `tests/browser-pwa.py:269` の `wait_for_human_discard()` で29,999ms timeoutしました。同じrunのWebKitはPWAテストを5.943秒で通過し、その後、候補geometryの別ケースで失敗しました。元ログはPWAタイムアウト時の局面診断を保存しておらず、CPUがその一局で何をしていたかは後から特定できません。
+- ソース上で確定できたテスト側の原因は、PWAレイアウト比較に無作為座席・CPU先行進行を持ち込んでいたことです。`GameController`は通常対局の座席を乱数で決め、ユーザーが親でなければCPUの初期手番を進めます。一方、このPWAテストの目的は更新中の表示比較で、CPU手番やランダム配牌ではありません。Chromiumだけで人間入力待ちが期限切れになったことも、対局ロジック不具合を示す再現証拠ではありません。
+- `tests/browser-pwa.py`ではページ初期化時の乱数をテスト内で固定し、座席shuffleが順序を維持して人間の親・初手打牌待ちになるようにしました。待機期限は延ばしていません。打牌を受け付ける条件、CPU判断、PWA更新処理は変更していません。タイムアウト時の診断は、アクション状態、鳴き・ロン状態、牌山枚数、表示中の操作、結果・ダイアログ状態に限定し、牌姿や非公開牌IDを出しません。
+- オンラインチーのgeometry失敗は、375×635で候補を開いた後、同じ高さのまま幅を375→399pxに変えたケースです。失敗記録では変更前の基準下端と候補下端は `633px`、リサイズ後のviewport高は `635px`のままなのに、候補下端が`627px`へ6px移動していました。操作領域自体は下へ移動しており、元の下端アンカーはまだviewport内でした。
+- 原因となった再アンカー条件は現行developに既に含まれている `5bc86318c5a5ade930c49cc864218e9ef84ee9c3` で修正済みです。viewport signatureが変わっても保存済み下端が可視範囲に収まる間はそのアンカーを維持し、収まらない場合だけ画面内へ補正します。今回の作業では候補UIソースを重複変更せず、限定検証と全件検証で現在の修正を再確認しました。
+- CPUポンで打牌が河ではなく公開面子へ移動するケースを追跡する `tests/browser-mobile-table-layout.py` とwitness検証は変更していません。
+
+### 限定検証
+
+- [候補geometry限定run #43705851525](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43705851525)、SHA `efd937e955b1e699291e65c2b58976cdca112dce`：375×635・online chiをChromium／WebKitでsuccess。現行の下端固定、上方向展開、リサイズ後の復元、卓矩形維持、候補操作を含む。
+- [修正後PWA限定run #43706448132](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43706448132)、SHA `07e26e14ad8c8fb72dd7908fc77eefa3e67910d9`：Chromium／WebKit success。ログは両engineで初期画面が人間の手番、手牌ボタン14件有効、牌山69枚、ページoverflowなしであることを示し、CPU進行待ちなしで更新UI比較に進みました。
+- `PYTHONPYCACHEPREFIX=/tmp/heibon-pycache python -m py_compile tests/browser-pwa.py` と `git diff --check` はsuccess。
+
+### 最終必須CI
+
+- [Browser UI run #43706416066](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43706416066)、SHA `07e26e14ad8c8fb72dd7908fc77eefa3e67910d9`：workflow success。verify-build、差分検出、docs-checkとChromium／WebKit両engineのGroup 1・2がすべてsuccess。80件の必須Browser UIシナリオを分割実行し、PWA、候補geometry、3ダイアログ、打牌後のCPUポンを含む回帰群を確認しました。
+- [Environment CI run #43706416094](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43706416094)、同SHA：workflow success。verify、local-online、Chromium／WebKitの環境分離、4つのBrowser UI child group、auditがsuccess。auditログは4つの必須browser/groupすべてに成功jobが1件あることを確認しました。
+- `worker-production`、`worker-development`、`online`、`publish`はすべてSkippedです。GitHub Pages、Cloudflare Worker、公開workflow、`publish=true`は実行していません。Issue #47のCI品質ゲートは監査まで成功し技術的に復旧しましたが、Phase 5公開は今回実施していません。
+- verify-build／Environment verifyでnpm test、型検査、Pages/itch buildが成功しました。Browser UIはCodex Cloud内では起動せずGitHub ActionsのChromium／WebKitで実行しています。
+
+### 本人による未実施確認
+
+既存のPC実機11/11 OKは以前の本人報告として維持し、今回再確認済みとは扱いません。次の追加項目はすべて未確認です。
+
+**iPhone XS / Safari**
+
+- [ ] 鳴き候補が上方向へ展開し、下端が固定される。
+- [ ] 候補が多いとき一覧の内部スクロールで最後まで到達できる。
+- [ ] 二重枠、候補の位置ずれがない。
+- [ ] Safariツールバーを表示・収納した後も候補と戻るを操作できる。
+- [ ] 候補確定・戻るの後に通常操作へ復帰できる。
+- [ ] ルール確認、局結果詳細、最終順位をそれぞれ最後までスクロールできる。
+- [ ] 共通バーと白い標準スクロールバーが重複しない。
+- [ ] ダイアログを閉じて卓へ戻り、通常操作を続けられる。
+
+**PCブラウザー（修正後の追加確認）**
+
+- [ ] ルール確認・局結果詳細・最終順位の3ダイアログが共通スクロール表示になる。
+- [ ] ホイール、トラッククリック、つまみドラッグでスクロールできる。
+- [ ] キーボードでスクロールできる。
+- [ ] ヘッダー・フッターが固定され、各ボタンを操作できる。
+
+自動検証は上記の本人実機確認を代替しません。Safari／PCの追加確認が報告されるまでIssue #32はOpenのままにします。
