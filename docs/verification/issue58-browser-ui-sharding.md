@@ -1,5 +1,41 @@
 # Issue 58: Browser UI sharding and targeted diagnostics
 
+## Current policy: 80 required scenarios, two manual-only baselines
+
+The revised Issue #58 acceptance criteria dated 2026-11-15 keep all 82 manifest entries but classify the two `HEIBON_CANDIDATE_BASELINE=1` entries as manual-only. They compare the historical UI at a fixed revision and report observations; they do not decide whether the current UI is correct. The current Geometry scenario remains a required regression.
+
+| Browser | Required Group 1 | Required Group 2 | Required total | Manual-only baseline |
+| --- | ---: | ---: | ---: | ---: |
+| Chromium | 15 | 30 | 45 | 1 |
+| WebKit | 9 | 26 | 35 | 1 |
+| Total | 24 | 56 | 80 | 2 |
+
+`tests/run-browser-regressions.py` is the source of truth. Each manifest entry now declares `classification` (`required` or `manual`) and a group for required entries. An entry with missing classification or group fails the selection tests. The groups are disjoint and their union is exactly the 80 required entries; baseline entries have no full-suite group.
+
+Group 1 contains Geometry current in both browsers plus measured work moved from the former Group 2. Chromium Group 1 additionally contains dialog creation, dialog scroll, production URL dialog layout, PWA, keyboard help, app idle, offline rules, online next-round, online rematch multi-client, riichi discard layout, action controls, call decision dialog, table UI, and river capacity. WebKit Group 1 additionally contains dialog scroll, production URL dialog layout, keyboard help, online exit notice, online rules, call test, riichi claimed discard, and river capacity. Group 2 contains the remaining required entries. `browser-round-end-ui` stays in Group 2 because the existing geometry report step reads its screenshot there. The group 2-only itch smoke and setup checks remain once per browser.
+
+The current manifest IDs for manual baseline runs are:
+
+| Browser | Explicit diagnostic ID |
+| --- | --- |
+| Chromium | `browser-candidate-geometry-chromium-candidate-baseline-1` |
+| WebKit | `browser-candidate-geometry-webkit-candidate-baseline-1` |
+
+Use `diagnostic_mode=scenarios` and supply the exact ID. To run both baselines concurrently in one dispatch, use `diagnostic_browser=both` and comma-separate both IDs. The workflow filters the list per browser; each runner validates and runs only its matching baseline. Normal default selection, `--browser`, `--group`, and `--script browser-candidate-geometry.py` select required entries only. The legacy `targeted_candidate_geometry=true` input continues to select Geometry current through `--script`; it no longer implicitly includes either baseline.
+
+The latest pre-revision run [Environment CI #43685891092](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43685891092), SHA `957b0f5ac68a48dcd1cabba5cd6ddbad6923c813`, still used the old 82-entry assignment. Its per-scenario logs provide the workload data used for this reallocation. After excluding the baseline durations, the previous assignment put Chromium current at 3m13.315s against the other 44 required entries at 11m48.275s; WebKit current was 4m14.587s against the other 34 at 7m31.368s.
+
+| Browser | Required scenario total after baseline removal | New Group 1 | New Group 2 | Estimated max job time including observed setup/smoke overhead |
+| --- | ---: | ---: | ---: | ---: |
+| Chromium | 15m01.590s | 7m41.111s (15 entries) | 7m20.479s (30 entries) | about 8m31s per group |
+| WebKit | 11m45.955s | 6m04.684s (9 entries) | 5m41.271s (26 entries) | about 7m19s per group |
+
+These are estimates from the prior run's scenario timings and group overhead, not results from the revised workflow. The two baseline scenarios measured 20m30.996s (Chromium) and 17m16.050s (WebKit) in that run. The revised full suite and baseline dispatch still require GitHub Actions verification.
+
+## Historical initial implementation: all 82 entries were required
+
+The following records describe the successful initial implementation before the revised acceptance criteria moved the baselines to manual-only. Keep them as historical verification; they do not establish success of the new 80-entry policy.
+
 ## Implemented on `develop` from `0a889f38b05a0f60c31be61a6a5be04033e5ddbb`
 
 The sharding and diagnostic change was committed as `6942eb4c582abea99b88ec39150e41c386744929`. GitHub rejected that workflow revision because its job-level `if` used the unavailable `matrix` context, and the push-triggered Browser UI and Environment CI runs failed before creating jobs. Commit `5ab20448833b7f051b69d405a09d948de070bd26` removes matrix references from the job condition and computes diagnostic matrix values from dispatch inputs. The corrected workflow was accepted by GitHub and exercised by the runs recorded below.
@@ -94,7 +130,7 @@ The values previously supplied as “Geometry current” (Chromium 17m22s, WebKi
 
 Baseline whole-job wall clock values are Chromium 32m02s and WebKit 26m38s. Runner time, summed across non-skipped jobs, is approximately 60m03s for the Browser UI run and 73m54s for Environment CI. The two workflows overlapped in time and are reported separately.
 
-## Post-change GitHub Actions results
+## Historical 82-entry GitHub Actions results
 
 The corrected full-suite runs target `5ab20448833b7f051b69d405a09d948de070bd26`.
 
@@ -121,3 +157,16 @@ The Browser UI group job durations were Chrome 3m55s + 31m07s and WebKit 4m32s +
 Runner-time totals are sums of GitHub job elapsed wall times, not billing measurements. The two workflows overlapped and are reported separately. Scenario times varied between successful runs; the post-change direct Browser UI regression job totals were slower than the old per-browser scenario totals even though the full workflow wall time was 66 seconds shorter. This makes the modest Browser UI wall-clock gain a run-specific measurement rather than evidence that every individual scenario became faster.
 
 The current Codex Cloud network policy is enforced and does not include the GitHub artifact redirect host `productionresultssa0.blob.core.windows.net`. The GitHub artifact connector returned ZIP file references and artifact metadata; the runner logs expose the scenario IDs/timings, but the ZIP payloads could not be expanded locally. No network setting was changed. Local ZIP inspection requires an approved Cloud allowlist change for the redirect destination.
+
+## Revised-policy verification status
+
+The revised implementation is based on `develop` SHA `957b0f5ac68a48dcd1cabba5cd6ddbad6923c813`. GitHub API and an explicit fetch of `refs/heads/develop` both confirmed that SHA. The repository's default fetch refspec tracks only `main`; the explicit develop refspec was therefore used to update `origin/develop` safely.
+
+Local verification after the policy and manifest changes:
+
+- `python tests/test_browser_regressions_selection.py`: 18 tests passed. Coverage includes 82 entries, 80 required plus two manual-only baselines, exact group memberships/counts, default/browser/group/script baseline exclusion, exact-ID baseline selection, mixed-browser selection, and malformed or mismatched selection rejection.
+- `node --test tests/ci-change-classifier.test.mjs tests/deploy-gate-matrix.test.mjs tests/environment-workflows.test.mjs`: passed. The audit still requires all four exact group jobs to conclude `success`; failure, cancellation, skip, absence, and duplication remain failures.
+- `npm test`: 91/91 passed; `npm run typecheck`, `npm run typecheck:worker`, `npm run build`, and `VITE_ONLINE_API_URL=https://online-mock.invalid npm run build:itch` passed.
+- All seven workflow YAML files parsed successfully; `git diff --check` passed. `--list-only` showed that the legacy geometry script selector returns the two current-geometry IDs only, while the explicit two-baseline ID selection returns exactly the two baseline IDs. No browser was launched in Codex Cloud.
+
+The revised full Browser UI workflow, its 80-entry matrix audit, the Environment CI wrapper, artifact uploads, and either baseline diagnostic have **not yet run** on the revised implementation. Current `gh auth status` reports that the injected `GH_TOKEN` is invalid, and with that variable omitted the CLI has no saved GitHub login. GitHub read APIs work, but this environment has no authenticated Actions-dispatch client. The previous 82-entry run links above remain historical evidence only; they do not satisfy the revised 80-entry acceptance criteria. Issue #58 remains open pending a successful push-triggered 80-entry run and explicit baseline diagnostics.

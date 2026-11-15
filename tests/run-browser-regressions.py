@@ -12,7 +12,7 @@ import sys
 from datetime import datetime, timezone
 
 
-def run(script, browser='chromium', **extra_env):
+def run(script, browser='chromium', *, classification=None, group=None, **extra_env):
     env = {'HEIBON_BROWSER': browser, **extra_env}
     parts = [Path(script).stem, browser]
     for key, value in sorted(extra_env.items()):
@@ -20,103 +20,106 @@ def run(script, browser='chromium', **extra_env):
         value = re.sub(r'[^a-zA-Z0-9]+', '-', str(value)).strip('-').lower()
         parts.append(f'{key}-{value}')
     scenario_id = '-'.join(parts)
-    return {'id': scenario_id, 'script': script, 'browser': browser, 'env': env}
+    return {
+        'id': scenario_id,
+        'script': script,
+        'browser': browser,
+        'env': env,
+        'classification': classification,
+        'group': group,
+    }
 
 
 SUITE = [
-    run('tests/browser-create-dialog-layout.py'),
-    run('tests/browser-create-dialog-layout.py', 'webkit'),
-    run('tests/browser-dialog-scroll.py'),
-    run('tests/browser-dialog-scroll.py', 'webkit'),
-    run('tests/browser-online-dialog-layout.py', HEIBON_PRODUCTION_URL='http://127.0.0.1:4174/heibon-mahjong/'),
-    run('tests/browser-online-dialog-layout.py', 'webkit', HEIBON_PRODUCTION_URL='http://127.0.0.1:4174/heibon-mahjong/'),
-    run('tests/browser-pwa.py'),
-    run('tests/browser-pwa.py', 'webkit'),
-    run('tests/browser-keyboard-help.py'),
-    run('tests/browser-keyboard-help.py', 'webkit'),
-    run('tests/browser-app-idle.py'),
-    run('tests/browser-app-idle.py', 'webkit'),
-    run('tests/browser-offline-rules.py'),
-    run('tests/browser-offline-rules.py', 'webkit'),
-    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_NEXT_ROUND_ONLY='1'),
-    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_NEXT_ROUND_ONLY='1'),
-    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_RESULT_BUTTON_FONTS_ONLY='1'),
-    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_RESULT_BUTTON_FONTS_ONLY='1'),
-    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_REMATCH_MULTI_CLIENT_ONLY='1'),
-    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_REMATCH_MULTI_CLIENT_ONLY='1'),
-    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_EXIT_NOTICE_ONLY='1'),
-    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_EXIT_NOTICE_ONLY='1'),
-    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_RULES_ONLY='1'),
-    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_ACTION_SYNC_ONLY='1'),
-    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_ACTION_SYNC_ONLY='1'),
-    run('tests/browser-riichi-discard-layout.py'),
-    run('tests/browser-action-controls.py'),
-    run('tests/browser-action-panel.py'),
-    run('tests/browser-action-panel.py', 'webkit'),
-    run('tests/browser-call-decision-dialog.py'),
-    run('tests/browser-call-decision-dialog.py', 'webkit'),
-    run('tests/browser-call-test.py'),
-    run('tests/browser-call-test.py', 'webkit'),
-    run('tests/browser-table-ui.py'),
-    run('tests/browser-random-seating.py'),
-    run('tests/browser-random-seating.py', 'webkit'),
-    run('tests/browser-riichi-claimed-discard.py'),
-    run('tests/browser-riichi-claimed-discard.py', 'webkit'),
-    run('tests/browser-river-capacity.py'),
-    run('tests/browser-river-capacity.py', 'webkit'),
-    run('tests/browser-declaration-bubbles.py'),
-    run('tests/browser-declaration-gameplay.py'),
-    run('tests/browser-declaration-gameplay.py', 'webkit'),
-    run('tests/browser-round-end-ui.py'),
-    run('tests/browser-round-end-ui.py', 'webkit'),
-    run('tests/browser-result-hand-layout.py'),
-    run('tests/browser-result-hand-layout.py', 'webkit'),
-    run('tests/browser-dora-rows.py'),
-    run('tests/browser-center-round-display.py'),
-    run('tests/browser-center-round-display.py', 'webkit'),
-    run('tests/browser-dora-rows.py', 'webkit'),
-    run('tests/browser-mobile-table-layout.py'),
-    run('tests/browser-mobile-table-layout.py', 'webkit'),
-    run('tests/browser-pc-table-layout.py'),
-    run('tests/browser-pc-table-layout.py', 'webkit'),
-    run('tests/browser-seat-kan-overlap.py'),
-    run('tests/browser-step13-5-5.py'),
-    run('tests/browser-step13-5-5-kan.py'),
-    run('tests/browser-step13-6.py'),
-    run('tests/browser-step13-7.py'),
-    run('tests/browser-step13-8.py'),
-    run('tests/browser-step13-8.py', 'webkit'),
-    run('tests/browser-step13-9.py'),
-    run('tests/browser-step13-10.py'),
-    run('tests/browser-step13-10.py', 'webkit'),
-    run('tests/browser-step13-11.py'),
-    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_RIVER_SPACING_ONLY='1'),
-    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_RIVER_SPACING_ONLY='1'),
-    run('tests/browser-online-waiting-room.py'),
-    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_PUBLIC_HAND_ONLY='1'),
-    run('tests/browser-test-page.py'),
-    run('tests/browser-test-page.py', 'webkit'),
-    run('tests/browser-river-test-mode.py'),
-    run('tests/browser-river-test-mode.py', 'webkit'),
-    run('tests/browser-diagnostics.py'),
-    run('tests/browser-diagnostics.py', 'webkit'),
-    run('tests/browser-button-roles.py'),
-    run('tests/browser-button-roles.py', 'webkit'),
-    # Run existing regressions before the larger before/after measurement matrix.
-    run('tests/browser-candidate-geometry.py', HEIBON_CANDIDATE_BASELINE='1'),
-    run('tests/browser-candidate-geometry.py', 'webkit', HEIBON_CANDIDATE_BASELINE='1'),
-    run('tests/browser-candidate-geometry.py'),
-    run('tests/browser-candidate-geometry.py', 'webkit'),
+    run('tests/browser-create-dialog-layout.py', classification='required', group=1),
+    run('tests/browser-create-dialog-layout.py', 'webkit', classification='required', group=2),
+    run('tests/browser-dialog-scroll.py', classification='required', group=1),
+    run('tests/browser-dialog-scroll.py', 'webkit', classification='required', group=1),
+    run('tests/browser-online-dialog-layout.py', HEIBON_PRODUCTION_URL='http://127.0.0.1:4174/heibon-mahjong/', classification='required', group=1),
+    run('tests/browser-online-dialog-layout.py', 'webkit', HEIBON_PRODUCTION_URL='http://127.0.0.1:4174/heibon-mahjong/', classification='required', group=1),
+    run('tests/browser-pwa.py', classification='required', group=1),
+    run('tests/browser-pwa.py', 'webkit', classification='required', group=2),
+    run('tests/browser-keyboard-help.py', classification='required', group=1),
+    run('tests/browser-keyboard-help.py', 'webkit', classification='required', group=1),
+    run('tests/browser-app-idle.py', classification='required', group=1),
+    run('tests/browser-app-idle.py', 'webkit', classification='required', group=2),
+    run('tests/browser-offline-rules.py', classification='required', group=1),
+    run('tests/browser-offline-rules.py', 'webkit', classification='required', group=2),
+    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_NEXT_ROUND_ONLY='1', classification='required', group=1),
+    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_NEXT_ROUND_ONLY='1', classification='required', group=2),
+    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_RESULT_BUTTON_FONTS_ONLY='1', classification='required', group=2),
+    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_RESULT_BUTTON_FONTS_ONLY='1', classification='required', group=2),
+    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_REMATCH_MULTI_CLIENT_ONLY='1', classification='required', group=1),
+    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_REMATCH_MULTI_CLIENT_ONLY='1', classification='required', group=2),
+    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_EXIT_NOTICE_ONLY='1', classification='required', group=2),
+    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_EXIT_NOTICE_ONLY='1', classification='required', group=1),
+    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_RULES_ONLY='1', classification='required', group=1),
+    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_ACTION_SYNC_ONLY='1', classification='required', group=2),
+    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_ACTION_SYNC_ONLY='1', classification='required', group=2),
+    run('tests/browser-riichi-discard-layout.py', classification='required', group=1),
+    run('tests/browser-action-controls.py', classification='required', group=1),
+    run('tests/browser-action-panel.py', classification='required', group=2),
+    run('tests/browser-action-panel.py', 'webkit', classification='required', group=2),
+    run('tests/browser-call-decision-dialog.py', classification='required', group=1),
+    run('tests/browser-call-decision-dialog.py', 'webkit', classification='required', group=2),
+    run('tests/browser-call-test.py', classification='required', group=2),
+    run('tests/browser-call-test.py', 'webkit', classification='required', group=1),
+    run('tests/browser-table-ui.py', classification='required', group=1),
+    run('tests/browser-random-seating.py', classification='required', group=2),
+    run('tests/browser-random-seating.py', 'webkit', classification='required', group=2),
+    run('tests/browser-riichi-claimed-discard.py', classification='required', group=2),
+    run('tests/browser-riichi-claimed-discard.py', 'webkit', classification='required', group=1),
+    run('tests/browser-river-capacity.py', classification='required', group=1),
+    run('tests/browser-river-capacity.py', 'webkit', classification='required', group=1),
+    run('tests/browser-declaration-bubbles.py', classification='required', group=2),
+    run('tests/browser-declaration-gameplay.py', classification='required', group=2),
+    run('tests/browser-declaration-gameplay.py', 'webkit', classification='required', group=2),
+    run('tests/browser-round-end-ui.py', classification='required', group=2),
+    run('tests/browser-round-end-ui.py', 'webkit', classification='required', group=2),
+    run('tests/browser-result-hand-layout.py', classification='required', group=2),
+    run('tests/browser-result-hand-layout.py', 'webkit', classification='required', group=2),
+    run('tests/browser-dora-rows.py', classification='required', group=2),
+    run('tests/browser-center-round-display.py', classification='required', group=2),
+    run('tests/browser-center-round-display.py', 'webkit', classification='required', group=2),
+    run('tests/browser-dora-rows.py', 'webkit', classification='required', group=2),
+    run('tests/browser-mobile-table-layout.py', classification='required', group=2),
+    run('tests/browser-mobile-table-layout.py', 'webkit', classification='required', group=2),
+    run('tests/browser-pc-table-layout.py', classification='required', group=2),
+    run('tests/browser-pc-table-layout.py', 'webkit', classification='required', group=2),
+    run('tests/browser-seat-kan-overlap.py', classification='required', group=2),
+    run('tests/browser-step13-5-5.py', classification='required', group=2),
+    run('tests/browser-step13-5-5-kan.py', classification='required', group=2),
+    run('tests/browser-step13-6.py', classification='required', group=2),
+    run('tests/browser-step13-7.py', classification='required', group=2),
+    run('tests/browser-step13-8.py', classification='required', group=2),
+    run('tests/browser-step13-8.py', 'webkit', classification='required', group=2),
+    run('tests/browser-step13-9.py', classification='required', group=2),
+    run('tests/browser-step13-10.py', classification='required', group=2),
+    run('tests/browser-step13-10.py', 'webkit', classification='required', group=2),
+    run('tests/browser-step13-11.py', classification='required', group=2),
+    run('tests/browser-online-waiting-room.py', HEIBON_ONLINE_RIVER_SPACING_ONLY='1', classification='required', group=2),
+    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_RIVER_SPACING_ONLY='1', classification='required', group=2),
+    run('tests/browser-online-waiting-room.py', classification='required', group=2),
+    run('tests/browser-online-waiting-room.py', 'webkit', HEIBON_ONLINE_PUBLIC_HAND_ONLY='1', classification='required', group=2),
+    run('tests/browser-test-page.py', classification='required', group=2),
+    run('tests/browser-test-page.py', 'webkit', classification='required', group=2),
+    run('tests/browser-river-test-mode.py', classification='required', group=2),
+    run('tests/browser-river-test-mode.py', 'webkit', classification='required', group=2),
+    run('tests/browser-diagnostics.py', classification='required', group=2),
+    run('tests/browser-diagnostics.py', 'webkit', classification='required', group=2),
+    run('tests/browser-button-roles.py', classification='required', group=2),
+    run('tests/browser-button-roles.py', 'webkit', classification='required', group=2),
+    # Geometry baselines are opt-in historical probes, not mandatory UI regressions.
+    run('tests/browser-candidate-geometry.py', HEIBON_CANDIDATE_BASELINE='1', classification='manual', group=None),
+    run('tests/browser-candidate-geometry.py', 'webkit', HEIBON_CANDIDATE_BASELINE='1', classification='manual', group=None),
+    run('tests/browser-candidate-geometry.py', classification='required', group=1),
+    run('tests/browser-candidate-geometry.py', 'webkit', classification='required', group=1),
 ]
 
 
 def scenario_group(item):
-    """Return the full-suite shard for a manifest entry."""
-    is_geometry_current = (
-        Path(item['script']).name == 'browser-candidate-geometry.py'
-        and 'HEIBON_CANDIDATE_BASELINE' not in item['env']
-    )
-    return 1 if is_geometry_current else 2
+    """Return the assigned full-suite shard, or None for diagnostic-only entries."""
+    return item['group'] if item['classification'] == 'required' else None
 
 
 def parse_scenario_ids(value):
@@ -133,7 +136,10 @@ def parse_scenario_ids(value):
 
 def select_scenarios(script_names=None, browser=None, group=None, scenario_ids=None):
     """Return manifest indexes selected by script, engine, shard, or exact IDs."""
-    selected = list(range(len(SUITE)))
+    selected = [
+        index for index, item in enumerate(SUITE)
+        if item['classification'] == 'required'
+    ]
     if script_names and scenario_ids is not None:
         raise ValueError('script names cannot be combined with exact scenario IDs')
     if group is not None and scenario_ids is not None:
@@ -146,7 +152,10 @@ def select_scenarios(script_names=None, browser=None, group=None, scenario_ids=N
         unknown = names - known
         if unknown:
             raise ValueError(f"unknown script(s): {', '.join(sorted(unknown))}")
-        selected = [i for i, item in enumerate(SUITE) if Path(item['script']).name in names]
+        selected = [
+            i for i, item in enumerate(SUITE)
+            if item['classification'] == 'required' and Path(item['script']).name in names
+        ]
 
     if scenario_ids is not None:
         known = {item['id'] for item in SUITE}
@@ -188,9 +197,9 @@ def save_report(path, rows):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--script', action='append', help='Run a named script from the full-suite manifest; repeat to select more scripts.')
-    parser.add_argument('--browser', choices=['chromium', 'webkit', 'both'], help='Select all scenarios for one engine, or filter --script; defaults to every manifest variant.')
-    parser.add_argument('--group', type=int, choices=[1, 2], help='Select one of the two full-suite shards.')
-    parser.add_argument('--scenario-ids', help='Run exact comma-separated manifest scenario IDs (diagnostic selection).')
+    parser.add_argument('--browser', choices=['chromium', 'webkit', 'both'], help='Select required scenarios for one or both engines, or filter --script.')
+    parser.add_argument('--group', type=int, choices=[1, 2], help='Select one required full-suite shard.')
+    parser.add_argument('--scenario-ids', help='Run exact comma-separated manifest IDs, including explicit manual-only diagnostics.')
     parser.add_argument('--list-only', action='store_true', help='Validate selection and print selected scenario IDs without running them.')
     parser.add_argument('--timings-file', type=Path, default=Path(os.environ.get('HEIBON_BROWSER_TIMINGS', '/tmp/heibon-browser-ui-timings.csv')))
     args = parser.parse_args()
@@ -206,7 +215,7 @@ def main():
             print(SUITE[index]['id'])
         return 0
 
-    report_indexes = selected if (args.browser and not args.script) or args.group or scenario_ids is not None else range(len(SUITE))
+    report_indexes = selected
     report_rows = {}
     rows = [
         {

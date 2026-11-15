@@ -36,7 +36,7 @@ on:
         options: [mixed-kan, pon-multiple, chi, daiminkan, ankan, opening, kakan]
         default: mixed-kan
       diagnostic_mode:
-        description: Run the full suite or exact manifest scenario IDs for diagnosis.
+        description: Run the required suite (Geometry baseline excluded) or exact manifest IDs for diagnosis.
         required: false
         type: choice
         options: [full, scenarios]
@@ -48,7 +48,7 @@ on:
         options: [chromium, webkit, both]
         default: both
       diagnostic_scenarios:
-        description: Comma-separated exact scenario IDs from tests/run-browser-regressions.py.
+        description: Exact manifest IDs; Geometry baselines are manual-only and require an explicit ID.
         required: false
         type: string
         default: ''
@@ -161,6 +161,7 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
+        # tests/run-browser-regressions.py owns required/manual classification and the scenario-to-group map.
         browser: >-
           ${{ fromJSON(
             (github.event_name == 'workflow_dispatch' && inputs.diagnostic_mode == 'scenarios' && inputs.diagnostic_browser == 'chromium' && '["chromium"]') ||

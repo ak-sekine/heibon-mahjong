@@ -21,44 +21,126 @@ SUITE = RUNNER_MODULE['SUITE']
 select_scenarios = RUNNER_MODULE['select_scenarios']
 parse_scenario_ids = RUNNER_MODULE['parse_scenario_ids']
 
+EXPECTED_GROUP_ONE_IDS = {
+    'chromium': {
+        'browser-create-dialog-layout-chromium',
+        'browser-dialog-scroll-chromium',
+        'browser-online-dialog-layout-chromium-production-url-http-127-0-0-1-4174-heibon-mahjong',
+        'browser-pwa-chromium',
+        'browser-keyboard-help-chromium',
+        'browser-app-idle-chromium',
+        'browser-offline-rules-chromium',
+        'browser-online-waiting-room-chromium-online-next-round-only-1',
+        'browser-online-waiting-room-chromium-online-rematch-multi-client-only-1',
+        'browser-riichi-discard-layout-chromium',
+        'browser-action-controls-chromium',
+        'browser-call-decision-dialog-chromium',
+        'browser-table-ui-chromium',
+        'browser-river-capacity-chromium',
+        'browser-candidate-geometry-chromium',
+    },
+    'webkit': {
+        'browser-dialog-scroll-webkit',
+        'browser-online-dialog-layout-webkit-production-url-http-127-0-0-1-4174-heibon-mahjong',
+        'browser-keyboard-help-webkit',
+        'browser-online-waiting-room-webkit-online-exit-notice-only-1',
+        'browser-online-waiting-room-webkit-online-rules-only-1',
+        'browser-call-test-webkit',
+        'browser-riichi-claimed-discard-webkit',
+        'browser-river-capacity-webkit',
+        'browser-candidate-geometry-webkit',
+    },
+}
+
 
 class BrowserRegressionSelectionTests(unittest.TestCase):
-    def test_engine_selection_covers_all_manifest_entries(self):
+    def test_manifest_classifies_80_required_and_two_manual_geometry_baselines(self):
+        required = [item for item in SUITE if item['classification'] == 'required']
+        manual = [item for item in SUITE if item['classification'] == 'manual']
+
+        self.assertEqual(len(SUITE), 82)
+        self.assertEqual(len({item['id'] for item in SUITE}), 82)
+        self.assertEqual(len(required), 80)
+        self.assertEqual(len(manual), 2)
+        self.assertTrue(all(item['group'] in (1, 2) for item in required))
+        self.assertTrue(all(item['group'] is None for item in manual))
+        self.assertEqual(
+            {item['id'] for item in manual},
+            {
+                'browser-candidate-geometry-chromium-candidate-baseline-1',
+                'browser-candidate-geometry-webkit-candidate-baseline-1',
+            },
+        )
+        self.assertEqual(
+            {item['browser'] for item in manual},
+            {'chromium', 'webkit'},
+        )
+
+    def test_normal_selection_paths_exclude_manual_baselines(self):
         default = select_scenarios()
         chromium = select_scenarios(browser='chromium')
         webkit = select_scenarios(browser='webkit')
         all_engines = select_scenarios(browser='both')
+        geometry_script = select_scenarios(['browser-candidate-geometry.py'], 'both')
+        required_indexes = {index for index, item in enumerate(SUITE) if item['classification'] == 'required'}
 
-        self.assertEqual(len(SUITE), 82)
-        self.assertEqual(len({item['id'] for item in SUITE}), len(SUITE))
-        self.assertEqual(len(chromium), 46)
-        self.assertEqual(len(webkit), 36)
+        self.assertEqual(len(chromium), 45)
+        self.assertEqual(len(webkit), 35)
         self.assertEqual(set(chromium).intersection(webkit), set())
         self.assertEqual(set(chromium).union(webkit), set(all_engines))
-        self.assertEqual(all_engines, list(range(len(SUITE))))
+        self.assertEqual(set(all_engines), required_indexes)
         self.assertEqual(default, all_engines)
+        self.assertEqual(
+            {SUITE[index]['id'] for index in geometry_script},
+            {'browser-candidate-geometry-chromium', 'browser-candidate-geometry-webkit'},
+        )
+        self.assertFalse(any('HEIBON_CANDIDATE_BASELINE' in SUITE[index]['env'] for index in geometry_script))
         dialog_layout = next(item for item in SUITE if item['script'] == 'tests/browser-online-dialog-layout.py')
         self.assertEqual({item['browser'] for item in SUITE if item['script'] == dialog_layout['script']}, {'chromium', 'webkit'})
         dialog_scroll = next(item for item in SUITE if item['script'] == 'tests/browser-dialog-scroll.py')
         self.assertEqual({item['browser'] for item in SUITE if item['script'] == dialog_scroll['script']}, {'chromium', 'webkit'})
 
-    def test_full_suite_groups_keep_geometry_current_alone(self):
+    def test_required_groups_are_disjoint_complete_and_match_manifest_assignments(self):
         groups = {
             (browser, group): select_scenarios(browser=browser, group=group)
             for browser in ('chromium', 'webkit') for group in (1, 2)
         }
-        self.assertEqual([len(groups[('chromium', 1)]), len(groups[('chromium', 2)])], [1, 45])
-        self.assertEqual([len(groups[('webkit', 1)]), len(groups[('webkit', 2)])], [1, 35])
+        self.assertEqual([len(groups[('chromium', 1)]), len(groups[('chromium', 2)])], [15, 30])
+        self.assertEqual([len(groups[('webkit', 1)]), len(groups[('webkit', 2)])], [9, 26])
         for browser in ('chromium', 'webkit'):
             first, second = groups[(browser, 1)], groups[(browser, 2)]
             self.assertFalse(set(first) & set(second))
             self.assertEqual(set(first) | set(second), set(select_scenarios(browser=browser)))
-            current = [SUITE[index] for index in first]
-            self.assertEqual([item['script'] for item in current], ['tests/browser-candidate-geometry.py'])
-            self.assertNotIn('HEIBON_CANDIDATE_BASELINE', current[0]['env'])
-            baseline = [SUITE[index] for index in second if SUITE[index]['env'].get('HEIBON_CANDIDATE_BASELINE')]
-            self.assertEqual(len(baseline), 1)
-            self.assertEqual(baseline[0]['script'], 'tests/browser-candidate-geometry.py')
+            self.assertEqual(
+                {SUITE[index]['id'] for index in first},
+                EXPECTED_GROUP_ONE_IDS[browser],
+            )
+            self.assertTrue(all(SUITE[index]['classification'] == 'required' for index in first + second))
+            self.assertTrue(all(SUITE[index]['group'] == 2 for index in second))
+            self.assertEqual(
+                [SUITE[index]['id'] for index in first if SUITE[index]['script'] == 'tests/browser-candidate-geometry.py'],
+                [f'browser-candidate-geometry-{browser}'],
+            )
+            self.assertIn(f'browser-round-end-ui-{browser}', {SUITE[index]['id'] for index in second})
+            self.assertFalse(any('HEIBON_CANDIDATE_BASELINE' in SUITE[index]['env'] for index in first + second))
+
+    def test_baseline_can_only_be_selected_by_explicit_manifest_ids(self):
+        baseline = [item for item in SUITE if item['classification'] == 'manual']
+        for item in baseline:
+            selected = select_scenarios(browser=item['browser'], scenario_ids=[item['id']])
+            self.assertEqual([SUITE[index]['id'] for index in selected], [item['id']])
+
+        chromium_baseline = next(item for item in baseline if item['browser'] == 'chromium')
+        with self.assertRaisesRegex(ValueError, 'zero manifest entries'):
+            select_scenarios(browser='webkit', scenario_ids=[chromium_baseline['id']])
+
+        both_ids = [item['id'] for item in baseline]
+        selected = select_scenarios(browser='both', scenario_ids=both_ids)
+        self.assertEqual({SUITE[index]['id'] for index in selected}, set(both_ids))
+
+        workflow = WORKFLOW.read_text(encoding='utf-8')
+        self.assertIn('elif [[ "$HEIBON_TARGETED_CANDIDATE_GEOMETRY" == "true" ]]; then', workflow)
+        self.assertIn('--script browser-candidate-geometry.py', workflow)
 
     def test_exact_scenario_id_selection_is_unique_and_browser_scoped(self):
         chosen = SUITE[0]['id']
@@ -95,10 +177,13 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
             def poll(self):
                 return None
 
-        for engine, expected_count in [('chromium', 45), ('webkit', 35)]:
-            with self.subTest(engine=engine), tempfile.TemporaryDirectory() as directory:
+        for engine, group, expected_count in [
+            ('chromium', 1, 15), ('chromium', 2, 30),
+            ('webkit', 1, 9), ('webkit', 2, 26),
+        ]:
+            with self.subTest(engine=engine, group=group), tempfile.TemporaryDirectory() as directory:
                 report = Path(directory) / 'timings.csv'
-                argv = [str(RUNNER), '--browser', engine, '--group', '2', '--timings-file', str(report)]
+                argv = [str(RUNNER), '--browser', engine, '--group', str(group), '--timings-file', str(report)]
                 with (
                     patch.object(RUNNER_MODULE['sys'], 'argv', argv),
                     patch.object(RUNNER_MODULE['signal'], 'signal'),
@@ -177,6 +262,38 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.splitlines(), expected)
+
+    def test_cli_normal_full_suite_and_script_selection_omit_baseline(self):
+        full = subprocess.run(
+            [sys.executable, str(RUNNER), '--list-only'],
+            capture_output=True, text=True, check=False,
+        )
+        geometry = subprocess.run(
+            [sys.executable, str(RUNNER), '--browser', 'both', '--script', 'browser-candidate-geometry.py', '--list-only'],
+            capture_output=True, text=True, check=False,
+        )
+
+        self.assertEqual(full.returncode, 0, full.stderr)
+        self.assertEqual(len(full.stdout.splitlines()), 80)
+        self.assertNotIn('candidate-baseline', full.stdout)
+        self.assertEqual(geometry.returncode, 0, geometry.stderr)
+        self.assertEqual(
+            set(geometry.stdout.splitlines()),
+            {'browser-candidate-geometry-chromium', 'browser-candidate-geometry-webkit'},
+        )
+
+    def test_cli_selects_both_manual_baselines_only_by_explicit_id(self):
+        baseline_ids = [item['id'] for item in SUITE if item['classification'] == 'manual']
+        result = subprocess.run(
+            [
+                sys.executable, str(RUNNER), '--browser', 'both',
+                '--scenario-ids', ','.join(baseline_ids), '--list-only',
+            ],
+            capture_output=True, text=True, check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(set(result.stdout.splitlines()), set(baseline_ids))
 
 
 if __name__ == '__main__':
