@@ -124,6 +124,12 @@ GitHubの接続APIではRepository Variables、Environment/Secret登録状態、
 
 **操作・判定**：両URLでHTML/CSS/JS/icon/manifest、CPU対局、対応Workerへのonline対局/切断再接続、ルール/参加session/cacheの環境分離を確認。各PWAの更新・独立起動・offline CPU、同環境複数タブ更新停止/反対環境だけなら更新可能を確認。公開release.json/environments.json、保存state、runの元SHA・digestを照合し、全成果物hashを比較する。第三者ルームやtokenを使用しない。
 
+**Phase 6-A 静的公開監査**：`.github/workflows/issue47-phase6a-live-audit.yml`を`develop`上で手動実行する。監査は固定された本番・開発Pages URLだけへGETし、`pages-verified`をread-only checkoutして、pending、release/state/environments metadata、各16 payloadファイルのSHA-256、HTML/CSS/JavaScriptの同一環境内参照、manifest、Service Worker登録、Actions runとDeployment記録を照合する。GitHub tokenはcontents/actions/deploymentsのread権限のみで、Worker・Pagesのdeploy jobやsnapshot書き込みを持たない。結果はStep Summaryとrun artifact `issue47-phase6a-live-audit-<run>-<attempt>`に保存する。runがSuccessでも、両URLと全payloadの実取得結果を確認する。
+
+GitHubの`workflow_dispatch`は、そのworkflow定義がrepositoryのdefault branchに存在する必要がある。現在のdefault branchは`main`であり、このPhase 6-A workflowをmainへ追加する操作は別途許可が必要なため、developにファイルがあるだけでは手動実行できない場合がある。mainを変更せず実行できる既存の正規dispatch経路が確認できなければ、runを作ったことにせず停止して報告する。
+
+**Phase 6-B 実環境E2E**：Phase 6-Aの実URL/hash監査が成功した後に、両版のCPU・オンライン対局・再接続・PWA・offline・設定/room/token/cache分離を検証する。Phase 6-Aはブラウザー操作やWorker通信のE2Eを代替しない。
+
 **停止・復旧**：
 
 1. pendingがremoteにない：Pages前で停止したことをrunで確認して最新全検証からやり直す。Workerだけ更新済みの可能性は別確認。

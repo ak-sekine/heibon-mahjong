@@ -1,0 +1,56 @@
+name: Issue 47 Phase 6-A live Pages audit
+run-name: Issue 47 Phase 6-A audit @ ${{ github.sha }}
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+concurrency:
+  group: issue47-phase6a-live-audit
+  cancel-in-progress: false
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Initialize audit diagnostics
+        run: |
+          mkdir -p artifacts
+          printf '%s\n' '{"schemaVersion":1,"outcome":"NOT_STARTED"}' > artifacts/phase6a-live-audit.json
+      - name: Checkout audit code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Checkout read-only pages-verified snapshot
+        uses: actions/checkout@v4
+        with:
+          ref: pages-verified
+          path: pages-verified
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Record snapshot branch SHA
+        id: snapshot
+        run: echo "sha=$(git -C pages-verified rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Audit public Pages URLs and saved snapshot
+        env:
+          AUDIT_REPORT_PATH: artifacts/phase6a-live-audit.json
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GH_TOKEN: ${{ github.token }}
+          SNAPSHOT_ROOT: pages-verified
+          SNAPSHOT_SHA: ${{ steps.snapshot.outputs.sha }}
+        run: node scripts/environments/pages-live-audit.mjs
+      - name: Upload audit diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue47-phase6a-live-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/phase6a-live-audit.json
+          if-no-files-found: warn
+          retention-days: 90
