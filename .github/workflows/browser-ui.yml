@@ -500,11 +500,11 @@ jobs:
       }}
     needs: [verify-build, browser-ui]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: read
     strategy:
-      fail-fast: false
+      fail-fast: true
       max-parallel: 1
       matrix:
         browser: [chromium, webkit]
@@ -512,7 +512,7 @@ jobs:
       - name: Initialize live E2E report
         run: |
           mkdir -p "$RUNNER_TEMP/heibon-live-e2e"
-          printf '%s\n' '{"schemaVersion":1,"phase":"B1","outcome":"NOT_STARTED"}' > "$RUNNER_TEMP/heibon-live-e2e/${{ matrix.browser }}.json"
+          printf '%s\n' '{"schemaVersion":1,"phase":"B1-B7","outcome":"NOT_STARTED"}' > "$RUNNER_TEMP/heibon-live-e2e/${{ matrix.browser }}.json"
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
@@ -536,7 +536,7 @@ jobs:
         run: python .github/scripts/timed-playwright-install.py install-deps "${{ matrix.browser }}"
       - name: Install browser (${{ matrix.browser }})
         run: python .github/scripts/timed-playwright-install.py install "${{ matrix.browser }}"
-      - name: Run live public Pages B1 E2E
+      - name: Run live public Pages B1-B7 E2E
         env:
           HEIBON_BROWSER: ${{ matrix.browser }}
           GITHUB_SHA: ${{ github.sha }}
@@ -558,9 +558,9 @@ jobs:
 
           path = Path(os.environ['REPORT'])
           report = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {
-              'phase': 'B1', 'outcome': 'REPORT_MISSING'}
+              'phase': 'B1-B7', 'outcome': 'REPORT_MISSING'}
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
-              summary.write('## Phase 6-B live E2E (B1)\n\n')
+              summary.write('## Phase 6-B live E2E (B1-B7)\n\n')
               summary.write('```json\n')
               summary.write(json.dumps(report, ensure_ascii=False, indent=2))
               summary.write('\n```\n')
@@ -569,7 +569,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase6b-live-e2e-b1-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: phase6b-live-e2e-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/heibon-live-e2e/${{ matrix.browser }}.json
           if-no-files-found: warn
           retention-days: 30
