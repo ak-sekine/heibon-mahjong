@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import platform
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -56,6 +57,172 @@ def write_report(report):
 def origin(value):
     parsed = urlsplit(value)
     return f"{parsed.scheme}://{parsed.hostname}" if parsed.scheme and parsed.hostname else "invalid-origin"
+
+
+MAX_ONLINE_DIAGNOSTIC_EVENTS = 256
+
+
+def record_online_communication(trace, started_at, active_action, client, event_type, **details):
+    environment = details.get("environment")
+    action_id = active_action.get("id")
+    if event_type in {"websocket-frame-sent", "websocket-frame-received"}:
+        counts = trace.setdefault("websocketFrameCounts", {})
+        count_key = ":".join((str(environment), client, str(action_id), event_type))
+        counts[count_key] = counts.get(count_key, 0) + 1
+        recorded = trace.setdefault("websocketFrameFirstObserved", [])
+        if count_key in recorded:
+            return
+        if len(recorded) < 128:
+            recorded.append(count_key)
+        else:
+            trace["websocketFrameFirstObservedTruncated"] = True
+        event_type = event_type.replace("websocket-frame-", "websocket-first-frame-")
+
+    events = trace.setdefault("communicationEvents", [])
+    if len(events) >= MAX_ONLINE_DIAGNOSTIC_EVENTS:
+        trace["communicationEventsTruncated"] = True
+        return
+    event = {
+        "sequence": len(events) + 1,
+        "offsetMs": round(max(0.0, time.monotonic() - started_at) * 1000),
+        "client": client,
+        "type": event_type,
+    }
+    if action_id:
+        event["actionId"] = action_id
+    # Persist only allowlisted, non-secret network metadata. Never retain a URL,
+    # request body, WebSocket frame, room code, or token.
+    for key in ("origin", "resourceType", "method", "status", "closeCode", "environment"):
+        value = details.get(key)
+        if isinstance(value, (str, int)) and not isinstance(value, bool):
+            event[key] = value
+    events.append(event)
+
+
+def run_traced_action(trace, started_at, active_action, action_id, operation):
+    actions = trace.setdefault("actions", [])
+    action = {
+        "id": action_id,
+        "status": "STARTED",
+        "startedAfterMs": round(max(0.0, time.monotonic() - started_at) * 1000),
+    }
+    if len(actions) < 128:
+        actions.append(action)
+    else:
+        trace["actionsTruncated"] = True
+    active_action["id"] = action_id
+    action_started = time.monotonic()
+    try:
+        result = operation()
+    except Exception as error:
+        action["status"] = "FAILED"
+        action["exceptionType"] = type(error).__name__
+        action["durationMs"] = round(max(0.0, time.monotonic() - action_started) * 1000)
+        trace["failedActionId"] = action_id
+        raise
+    else:
+        action["status"] = "PASSED"
+        action["durationMs"] = round(max(0.0, time.monotonic() - action_started) * 1000)
+        trace["lastSuccessfulActionId"] = action_id
+        return result
+    finally:
+        active_action["id"] = None
+
+
+def capture_online_ui_state(page, page_report):
+    try:
+        state = page.evaluate("""() => {
+          const visible = element => {
+            if (!element || element.hidden) return false;
+            const style = getComputedStyle(element);
+            const rect = element.getBoundingClientRect();
+            return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+          };
+          const elementState = selector => {
+            const element = document.querySelector(selector);
+            return {
+              exists: Boolean(element),
+              isConnected: element ? element.isConnected : null,
+              hidden: element ? Boolean(element.hidden) : null,
+              visible: visible(element),
+              open: element && 'open' in element ? Boolean(element.open) : null
+            };
+          };
+          const buttonState = selector => {
+            const element = document.querySelector(selector);
+            if (!element) return {exists: false, isConnected: null, hidden: null, visible: false, disabled: null, busy: false};
+            return {
+              exists: true,
+              isConnected: element.isConnected,
+              hidden: Boolean(element.hidden),
+              visible: visible(element),
+              disabled: Boolean(element.disabled),
+              busy: element.getAttribute('aria-busy') === 'true'
+            };
+          };
+          const connection = document.querySelector('#online-connection');
+          const connectionText = connection?.textContent?.trim() ?? '';
+          let connectionState = 'hidden';
+          if (visible(connection)) {
+            if (connectionText.startsWith('接続しています')) connectionState = 'connecting';
+            else if (connectionText === '接続中') connectionState = 'connected';
+            else if (connectionText.startsWith('接続しました')) connectionState = 'connected-syncing';
+            else if (connectionText.includes('再接続')) connectionState = 'reconnecting';
+            else if (connectionText.includes('切れました')) connectionState = 'disconnected';
+            else if (connectionText.includes('問題')) connectionState = 'connection-error';
+            else connectionState = 'visible-other';
+          }
+          const seats = Array.from(document.querySelectorAll('#online-seats > li')).map((item, index) => {
+            const roleText = item.querySelector('.online-seat-role')?.textContent ?? '';
+            const statusText = item.querySelector('.online-seat-status')?.textContent?.trim() ?? '';
+            return {
+              index,
+              kind: ['human', 'cpu', 'empty'].includes(item.dataset.kind) ? item.dataset.kind : 'unknown',
+              isSelf: roleText.includes('自分'),
+              isHost: roleText.includes('ホスト'),
+              connected: statusText ? statusText.includes('接続中') : null,
+              ready: statusText ? statusText.includes('準備完了') : null
+            };
+          });
+          const screenSelectors = {
+            idle: '#app-idle',
+            localGame: '#local-game-layout',
+            onlineWaitingRoom: '#online-room',
+            onlineMatch: '#online-match',
+            onlineTable: '#online-table'
+          };
+          const currentScreens = Object.entries(screenSelectors)
+            .filter(([, selector]) => visible(document.querySelector(selector)))
+            .map(([name]) => name);
+          const mode = document.body.dataset.gameMode;
+          return {
+            currentScreens,
+            gameMode: mode === 'online' || mode === 'offline' ? mode : null,
+            onlineDialog: elementState('#online-dialog'),
+            waitingRoom: elementState('#online-room'),
+            onlineMatch: elementState('#online-match'),
+            onlineTable: elementState('#online-table'),
+            connection: {visible: visible(connection), state: connectionState},
+            statusVisible: visible(document.querySelector('#online-status')),
+            errorVisible: visible(document.querySelector('#online-error')),
+            buttons: {
+              ready: buttonState('#online-ready'),
+              finalizeSeats: buttonState('#online-finalize'),
+              startGame: buttonState('#online-start-game')
+            },
+            humanSeats: seats.filter(seat => seat.kind === 'human'),
+            seatCount: seats.length
+          };
+        }""")
+        state["snapshotStatus"] = "captured"
+    except Exception as error:
+        state = {"snapshotStatus": "failed", "snapshotErrorType": type(error).__name__}
+    state["javascript"] = {
+        "pageErrorTypes": list(page_report.get("pageErrorTypes", []))[:20],
+        "consoleErrorCount": int(page_report.get("consoleErrorCount", 0)),
+    }
+    state["blockedExternalHostCount"] = len(page_report.get("blockedExternalHosts", []))
+    return state
 
 
 def configure_page(page, environment, page_report, allowed_worker_urls=None):
@@ -206,20 +373,35 @@ def join_room(page, display_name, room_code):
     require(display_name in page.locator("#online-seats").inner_text(), "guest-room-not-visible")
 
 
-def start_online_game(host_page, guest_page, guest_name):
-    host_page.locator("#online-ready").click()
-    guest_page.locator("#online-ready").click()
-    host_page.wait_for_function(
-        "!document.querySelector('#online-finalize').disabled && !document.querySelector('#online-finalize').hidden",
-        timeout=20_000,
+def start_online_game(host_page, guest_page, guest_name, trace_step):
+    trace_step("host-ready-click", lambda: host_page.locator("#online-ready").click())
+    trace_step("guest-ready-click", lambda: guest_page.locator("#online-ready").click())
+    trace_step(
+        "seat-confirm-enabled-wait",
+        lambda: host_page.wait_for_function(
+            "!document.querySelector('#online-finalize').disabled && !document.querySelector('#online-finalize').hidden",
+            timeout=20_000,
+        ),
     )
-    host_page.locator("#online-finalize").click()
-    host_page.wait_for_function("!document.querySelector('#online-start-game').hidden", timeout=20_000)
-    host_page.locator("#online-start-game").click()
-    for page in (host_page, guest_page):
-        page.locator("#online-match").wait_for(state="visible", timeout=30_000)
-    host_page.locator("#online-player-hand button[data-tile-id]:not([disabled])").first.wait_for(timeout=30_000)
-    require(guest_name in guest_page.locator("#online-score-strip").inner_text(), "guest-name-not-in-match")
+    trace_step("seat-confirm-click", lambda: host_page.locator("#online-finalize").click())
+    trace_step(
+        "game-start-visible-wait",
+        lambda: host_page.wait_for_function("!document.querySelector('#online-start-game').hidden", timeout=20_000),
+    )
+    trace_step("game-start-click", lambda: host_page.locator("#online-start-game").click())
+    for client, page in (("host", host_page), ("guest", guest_page)):
+        trace_step(
+            f"{client}-game-screen-wait",
+            lambda page=page: page.locator("#online-match").wait_for(state="visible", timeout=30_000),
+        )
+    trace_step(
+        "host-actionable-hand-wait",
+        lambda: host_page.locator("#online-player-hand button[data-tile-id]:not([disabled])").first.wait_for(timeout=30_000),
+    )
+    trace_step(
+        "guest-name-visible-in-match-check",
+        lambda: require(guest_name in guest_page.locator("#online-score-strip").inner_text(), "guest-name-not-in-match"),
+    )
 
 
 def online_discard_and_sync(host_page, guest_page, guest_name, page_report):
@@ -244,35 +426,51 @@ def online_discard_and_sync(host_page, guest_page, guest_name, page_report):
     page_report["synchronizedRiverTileCount"] = host_count
 
 
-def disconnect_reconnect_guest(guest_context, guest_page, host_page, guest_report, environment, *, previous_count=0):
+def disconnect_reconnect_guest(guest_context, guest_page, host_page, guest_report, environment, *, previous_count=0, trace_step=None):
+    run_step = trace_step or (lambda _action_id, operation: operation())
     guest_report["websocketCountBeforeReconnect"] = len(guest_report["websocketOrigins"])
-    guest_context.set_offline(True)
-    guest_page.wait_for_function(
-        """() => {
-          const status = document.querySelector('#online-connection');
-          return status && (!status.hidden || !document.querySelector('#online-reconnect').hidden);
-        }""",
-        timeout=20_000,
+    run_step("guest-network-offline-toggle", lambda: guest_context.set_offline(True))
+    run_step(
+        "guest-disconnected-state-wait",
+        lambda: guest_page.wait_for_function(
+            """() => {
+              const status = document.querySelector('#online-connection');
+              return status && (!status.hidden || !document.querySelector('#online-reconnect').hidden);
+            }""",
+            timeout=20_000,
+        ),
     )
-    guest_context.set_offline(False)
+    run_step("guest-network-online-toggle", lambda: guest_context.set_offline(False))
     if not guest_page.locator("#online-reconnect").is_hidden():
-        guest_page.locator("#online-reconnect").click()
-    guest_page.wait_for_function(
-        """() => document.querySelector('#online-match') && !document.querySelector('#online-match').hidden &&
-          document.querySelector('#online-connection').hidden""",
-        timeout=30_000,
+        run_step("guest-reconnect-click", lambda: guest_page.locator("#online-reconnect").click())
+    run_step(
+        "guest-restored-state-wait",
+        lambda: guest_page.wait_for_function(
+            """() => document.querySelector('#online-match') && !document.querySelector('#online-match').hidden &&
+              document.querySelector('#online-connection').hidden""",
+            timeout=30_000,
+        ),
     )
-    require(
-        total_online_river_tiles(guest_page) == total_online_river_tiles(host_page),
-        "reconnected-game-state-not-restored",
+    run_step(
+        "guest-restored-game-state-check",
+        lambda: require(
+            total_online_river_tiles(guest_page) == total_online_river_tiles(host_page),
+            "reconnected-game-state-not-restored",
+        ),
     )
     guest_report["reconnectRestoredGameState"] = True
     guest_report["websocketCountAfterReconnect"] = len(guest_report["websocketOrigins"])
-    require(
-        guest_report["websocketCountAfterReconnect"] > guest_report["websocketCountBeforeReconnect"],
-        f"websocket-not-reopened-{environment['name']}",
+    run_step(
+        "guest-websocket-reopened-check",
+        lambda: require(
+            guest_report["websocketCountAfterReconnect"] > guest_report["websocketCountBeforeReconnect"],
+            f"websocket-not-reopened-{environment['name']}",
+        ),
     )
-    require_worker_origins(guest_report, environment, previous_count=previous_count)
+    run_step(
+        "guest-worker-origin-check",
+        lambda: require_worker_origins(guest_report, environment, previous_count=previous_count),
+    )
 
 
 def load_service_worker(page, environment):
@@ -378,19 +576,48 @@ def run_online_checks(browser, browser_name, report, save_report):
     browser_letter = "C" if browser_name == "chromium" else "W"
     tag = os.environ.get("GITHUB_RUN_ID", os.environ.get("GITHUB_SHA", "local")[:7])[-10:]
     online_results = {environment["name"]: {} for environment in ENVIRONMENTS}
+    trace_started = time.monotonic()
+    active_action = {"id": None}
+    active_environment = {"name": None}
+    trace = {
+        "schemaVersion": 1,
+        "actions": [],
+        "communicationEvents": [],
+        "websocketFrameCounts": {},
+    }
+
+    def emit_communication(client, event_type, **details):
+        try:
+            record_online_communication(
+                trace,
+                trace_started,
+                active_action,
+                client,
+                event_type,
+                environment=active_environment["name"],
+                **details,
+            )
+        except Exception as error:
+            errors = trace.setdefault("diagnosticCallbackErrorTypes", [])
+            if len(errors) < 8:
+                errors.append(type(error).__name__)
+
     observer = {
         "host": {
             "blockedExternalHosts": [], "httpOrigins": [], "websocketOrigins": [],
             "pageErrorTypes": [], "consoleErrorCount": 0,
+            "diagnosticCallbackErrorTypes": [],
             "allowedWorkerHost": urlsplit(ENVIRONMENTS[0]["worker_url"]).hostname,
         },
         "guest": {
             "blockedExternalHosts": [], "httpOrigins": [], "websocketOrigins": [],
             "pageErrorTypes": [], "consoleErrorCount": 0,
+            "diagnosticCallbackErrorTypes": [],
             "allowedWorkerHost": urlsplit(ENVIRONMENTS[0]["worker_url"]).hostname,
         },
     }
     report["online"] = online_results
+    report["onlineDiagnostics"] = trace
     save_report()
     host_context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="allow")
     guest_context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="allow")
@@ -417,13 +644,46 @@ def run_online_checks(browser, browser_name, report, save_report):
                 route.continue_()
 
             page.route("**/*", guard_host)
-            def record_request(request, *, page_report=page_report):
-                target = "websocketOrigins" if urlsplit(request.url).scheme == "wss" else "httpOrigins"
+            def record_request(request, *, page_report=page_report, label=label):
+                scheme = urlsplit(request.url).scheme
+                is_websocket = scheme in {"ws", "wss"}
+                target = "websocketOrigins" if is_websocket else "httpOrigins"
                 request_origin = origin(request.url)
                 if request_origin not in page_report[target]:
                     page_report[target].append(request_origin)
+                if is_websocket or urlsplit(request_origin).hostname == page_report["allowedWorkerHost"]:
+                    emit_communication(
+                        label,
+                        "websocket-request" if is_websocket else "http-request",
+                        origin=request_origin,
+                        resourceType=request.resource_type,
+                        method=request.method,
+                    )
+
+            def record_request_failed(request, *, label=label):
+                is_websocket = urlsplit(request.url).scheme in {"ws", "wss"}
+                emit_communication(
+                    label,
+                    "websocket-request-failed" if is_websocket else "http-request-failed",
+                    origin=origin(request.url),
+                    resourceType=request.resource_type,
+                )
+
+            def record_response(response, *, label=label, page_report=page_report):
+                request_origin = origin(response.url)
+                if response.status >= 400:
+                    emit_communication(
+                        label,
+                        "http-response-error",
+                        origin=request_origin,
+                        resourceType=response.request.resource_type,
+                        method=response.request.method,
+                        status=response.status,
+                    )
 
             page.on("request", record_request)
+            page.on("requestfailed", record_request_failed)
+            page.on("response", record_response)
             page.on("pageerror", lambda error, page_report=page_report: page_report["pageErrorTypes"].append(type(error).__name__))
             page.on(
                 "console",
@@ -431,14 +691,36 @@ def run_online_checks(browser, browser_name, report, save_report):
                     "consoleErrorCount", page_report["consoleErrorCount"] + 1
                 ) if message.type == "error" else None,
             )
-            page.on("websocket", lambda socket, page_report=page_report: page_report["websocketOrigins"].append(origin(socket.url)))
+            def record_websocket(socket, *, label=label, page_report=page_report):
+                socket_origin = origin(socket.url)
+                page_report["websocketOrigins"].append(socket_origin)
+                emit_communication(label, "websocket-created", origin=socket_origin)
+                try:
+                    socket.on("framesent", lambda *_: emit_communication(label, "websocket-frame-sent", origin=socket_origin))
+                    socket.on("framereceived", lambda *_: emit_communication(label, "websocket-frame-received", origin=socket_origin))
+                    socket.on("close", lambda *_: emit_communication(label, "websocket-closed", origin=socket_origin))
+                    socket.on("socketerror", lambda *_: emit_communication(label, "websocket-error", origin=socket_origin))
+                except Exception as error:
+                    errors = page_report["diagnosticCallbackErrorTypes"]
+                    if len(errors) < 8:
+                        errors.append(type(error).__name__)
+
+            page.on("websocket", record_websocket)
 
         for index, environment in enumerate(ENVIRONMENTS):
             key = environment["name"]
+            active_environment["name"] = key
+            action_start = len(trace["actions"])
+
+            def trace_step(action_suffix, operation, *, environment_name=key):
+                action_id = f"{environment_name}.{action_suffix}"
+                return run_traced_action(trace, trace_started, active_action, action_id, operation)
+
             stage_report = {
                 "status": "NOT_STARTED",
                 "pagesUrl": environment["pages_url"],
                 "configuredWorkerOrigin": origin(environment["worker_url"]),
+                "diagnosticActionStartIndex": action_start,
                 "roomCreated": False,
                 "guestJoined": False,
                 "gameStarted": False,
@@ -479,7 +761,7 @@ def run_online_checks(browser, browser_name, report, save_report):
             suffix = "P" if key == "production" else "D"
             host_name = f"P6B-{browser_letter}-{suffix}-H-{tag}"
             guest_name = f"P6B-{browser_letter}-{suffix}-G-{tag}"
-            room_code = create_room(host_page, host_name)
+            room_code = trace_step("room-create", lambda: create_room(host_page, host_name))
             stage_report["roomCreated"] = True
             host_keys = session_key_presence(host_page)
             expected_session_key = PRODUCTION_SESSION_KEY if key == "production" else DEVELOPMENT_SESSION_KEY
@@ -491,18 +773,33 @@ def run_online_checks(browser, browser_name, report, save_report):
             require(not guest_keys_before_join[expected_session_key], f"guest-session-existed-before-join-{key}")
             if index == 1:
                 require(guest_keys_before_join[opposite_session_key], f"guest-prior-session-missing-{key}")
-            join_room(guest_page, guest_name, room_code)
+            trace_step("room-join", lambda: join_room(guest_page, guest_name, room_code))
             stage_report["guestJoined"] = True
-            start_online_game(host_page, guest_page, guest_name)
+            start_online_game(
+                host_page,
+                guest_page,
+                guest_name,
+                lambda action_id, operation: trace_step(action_id, operation),
+            )
             stage_report["gameStarted"] = True
-            online_discard_and_sync(host_page, guest_page, guest_name, stage_report)
+            trace_step(
+                "discard-and-sync",
+                lambda: online_discard_and_sync(host_page, guest_page, guest_name, stage_report),
+            )
             stage_report["discardSynchronized"] = True
 
-            require_worker_origins(observer["host"], environment, previous_count=host_socket_start)
-            require_worker_origins(observer["guest"], environment, previous_count=guest_socket_start)
+            trace_step(
+                "host-worker-origin-check",
+                lambda: require_worker_origins(observer["host"], environment, previous_count=host_socket_start),
+            )
+            trace_step(
+                "guest-worker-origin-check",
+                lambda: require_worker_origins(observer["guest"], environment, previous_count=guest_socket_start),
+            )
             disconnect_reconnect_guest(
                 guest_context, guest_page, host_page, observer["guest"], environment,
                 previous_count=guest_socket_start,
+                trace_step=lambda action_id, operation: trace_step(action_id, operation),
             )
             stage_report["guestDisconnected"] = True
             stage_report["guestReconnected"] = True
@@ -521,6 +818,7 @@ def run_online_checks(browser, browser_name, report, save_report):
                     + observer["guest"]["httpOrigins"][guest_http_start:]
                 )
             )
+            stage_report["diagnosticActionEndIndex"] = len(trace["actions"])
             stage_report["status"] = "PASSED"
             save_report()
 
@@ -561,6 +859,24 @@ def run_online_checks(browser, browser_name, report, save_report):
             for key, environment in ((environment["name"], environment) for environment in ENVIRONMENTS)
         }
         save_report()
+    except Exception:
+        trace["failureEnvironment"] = active_environment["name"]
+        failed_stage = online_results.get(active_environment["name"])
+        if isinstance(failed_stage, dict):
+            failed_stage["status"] = "FAILED"
+            failed_stage["failedActionId"] = trace.get("failedActionId")
+            failed_stage["lastSuccessfulActionId"] = trace.get("lastSuccessfulActionId")
+            failed_stage["failureUiSnapshots"] = {
+                "host": capture_online_ui_state(host_page, observer["host"]) if host_page else {"snapshotStatus": "page-unavailable"},
+                "guest": capture_online_ui_state(guest_page, observer["guest"]) if guest_page else {"snapshotStatus": "page-unavailable"},
+            }
+        try:
+            save_report()
+        except Exception as diagnostic_error:
+            errors = trace.setdefault("reportWriteErrorTypes", [])
+            if len(errors) < 8:
+                errors.append(type(diagnostic_error).__name__)
+        raise
     finally:
         guest_context.close()
         host_context.close()
@@ -1070,6 +1386,11 @@ def main():
     except Exception as error:
         report["outcome"] = "FAILURE"
         report["failure"] = {"stage": stage, "type": type(error).__name__}
+        online_diagnostics = report.get("onlineDiagnostics", {})
+        if online_diagnostics.get("failedActionId"):
+            report["failure"]["actionId"] = online_diagnostics["failedActionId"]
+        if online_diagnostics.get("lastSuccessfulActionId"):
+            report["failure"]["lastSuccessfulActionId"] = online_diagnostics["lastSuccessfulActionId"]
         if isinstance(error, LiveE2EFailure) and error.args:
             report["failure"]["code"] = error.args[0]
         for check in report["checks"].values():
