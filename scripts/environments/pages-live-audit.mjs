@@ -23,6 +23,14 @@ const HASH_RE = /^[a-f0-9]{64}$/;
 const EXPECTED_PAYLOAD_FILES = 16;
 const API_BASE = 'https://api.github.com';
 const API_VERSION = '2022-11-28';
+const WORKFLOW_PATHS = Object.freeze({
+  legacyProduction: '.github/workflows/deploy.yml',
+  environments: '.github/workflows/environments.yml',
+});
+const PRODUCTION_WORKER_DEPLOYMENT_ENVIRONMENTS = Object.freeze({
+  [WORKFLOW_PATHS.legacyProduction]: 'heibon-production-worker',
+  [WORKFLOW_PATHS.environments]: 'worker-production',
+});
 
 export class AuditError extends Error {
   constructor(kind, message, details = {}) {
@@ -210,7 +218,18 @@ async function request(url, { fetchImpl, headers = {}, timeoutMs, report, label,
   }
   if (response.status !== 200) {
     const via = `${cacheHeaders.via || ''} ${cacheHeaders.server || ''}`.toLowerCase();
-    entry.outcome = response.status === 403 && /proxy|squid|envoy|gateway/.test(via) ? 'HTTP_403_PROXY_SUSPECTED' : `HTTP_STATUS_${response.status}`;
+    const proxy403 = response.status === 403 && /proxy|squid|envoy|gateway/.test(via);
+    if (proxy403) {
+      entry.outcome = 'HTTP_403_PROXY_SUSPECTED';
+    } else if (api) {
+      entry.outcome = response.status === 401
+        ? 'GITHUB_API_UNAUTHORIZED'
+        : response.status === 403
+          ? 'GITHUB_API_FORBIDDEN'
+          : `GITHUB_API_HTTP_${response.status}`;
+    } else {
+      entry.outcome = `HTTP_STATUS_${response.status}`;
+    }
     throw new AuditError(entry.outcome, `${label}: HTTP ${response.status} response`, { status: response.status, proxyHeaders: via.trim() || null });
   }
   entry.outcome = 'HTTP_200';
@@ -235,6 +254,11 @@ async function deploymentRecord(environment, expectedSha, { apiBase, repository,
   if (!candidate || !Number.isInteger(candidate.id)) {
     throw new AuditError('DEPLOYMENT_NOT_FOUND', `no ${environment} deployment exists for ${expectedSha}`);
   }
+  if (candidate.environment !== environment) {
+    throw new AuditError('DEPLOYMENT_ENVIRONMENT_MISMATCH', `deployment ${candidate.id} belongs to ${candidate.environment || 'an unknown environment'}, expected ${environment}`, {
+      actualEnvironment: candidate.environment || null, expectedEnvironment: environment,
+    });
+  }
   if (String(candidate.sha || '').toLowerCase() !== expectedSha) {
     throw new AuditError('DEPLOYMENT_SHA_MISMATCH', `latest ${environment} deployment does not match the saved source SHA`, { latestSha: candidate.sha || null, expectedSha });
   }
@@ -247,21 +271,32 @@ async function deploymentRecord(environment, expectedSha, { apiBase, repository,
   return { id: candidate.id, environment, sha: candidate.sha.toLowerCase(), createdAt: candidate.created_at, status: statuses[0].state, statusUrl: statuses[0].url || null };
 }
 
-const EXPECTED_DEVELOPMENT_JOBS = [
+const EXPECTED_ENVIRONMENT_JOBS = [
   'verify', 'local-online', 'isolation-browser (chromium)', 'isolation-browser (webkit)',
   'browser-ui / browser-ui (chromium, group 1)', 'browser-ui / browser-ui (chromium, group 2)',
   'browser-ui / browser-ui (webkit, group 1)', 'browser-ui / browser-ui (webkit, group 2)',
-  'audit', 'worker-development', 'online', 'publish / publish',
+  'audit', 'online', 'publish / publish',
 ];
+
+function workflowPathMatches(runPath, expectedPath) {
+  return typeof runPath === 'string' && (runPath === expectedPath || runPath.startsWith(`${expectedPath}@`));
+}
 
 async function releaseRun(environment, sourceSha, context) {
   const branch = environment === 'development' ? 'develop' : 'main';
-  const workflowPattern = environment === 'development' ? /\.github\/workflows\/environments\.yml$/ : /\.github\/workflows\/deploy\.yml$/;
   const query = new URLSearchParams({ branch, head_sha: sourceSha, per_page: '100' });
   const response = await apiJson(`${context.apiBase}/repos/${context.repository}/actions/runs?${query}`, {
     ...context, label: `${environment} publication workflow runs`,
   });
-  const runs = (response?.workflow_runs || []).filter(run => run.head_sha === sourceSha && run.head_branch === branch && run.conclusion === 'success' && workflowPattern.test(run.path || '') && (environment !== 'development' || run.event === 'workflow_dispatch'));
+  const runs = (response?.workflow_runs || []).filter(run => {
+    const shared = run.head_sha === sourceSha && run.head_branch === branch && run.conclusion === 'success';
+    if (!shared) return false;
+    if (environment === 'development') {
+      return workflowPathMatches(run.path, WORKFLOW_PATHS.environments) && run.event === 'workflow_dispatch';
+    }
+    if (workflowPathMatches(run.path, WORKFLOW_PATHS.legacyProduction)) return true;
+    return workflowPathMatches(run.path, WORKFLOW_PATHS.environments) && run.event === 'workflow_dispatch';
+  });
   const run = runs.sort((a, b) => Date.parse(b.updated_at || b.created_at) - Date.parse(a.updated_at || a.created_at))[0];
   if (!run) throw new AuditError('PUBLICATION_RUN_NOT_FOUND', `successful ${branch} publication run not found for ${sourceSha}`);
   const jobsResponse = await apiJson(`${context.apiBase}/repos/${context.repository}/actions/runs/${run.id}/jobs?per_page=100`, {
@@ -271,19 +306,32 @@ async function releaseRun(environment, sourceSha, context) {
   if (!Array.isArray(jobs)) throw new AuditError('GITHUB_API_INVALID_DATA', `publication run ${run.id} jobs response is invalid`);
   const byName = new Map(jobs.map(job => [job.name, job.conclusion]));
   if (environment === 'development') {
-    const missing = EXPECTED_DEVELOPMENT_JOBS.filter(name => byName.get(name) !== 'success');
+    const missing = [...EXPECTED_ENVIRONMENT_JOBS, 'worker-development'].filter(name => byName.get(name) !== 'success');
     if (byName.get('worker-production') !== 'skipped') missing.push('worker-production (expected skipped)');
     if (missing.length) throw new AuditError('PUBLICATION_RUN_JOBS_FAILED', `development publication run ${run.id} has incomplete jobs`, { missing });
-  } else {
-    for (const name of ['deploy-worker', 'pages-deploy']) {
+  } else if (workflowPathMatches(run.path, WORKFLOW_PATHS.legacyProduction)) {
+    for (const name of ['deploy-worker', 'production-test', 'pages-deploy']) {
       if (byName.get(name) !== 'success') throw new AuditError('PUBLICATION_RUN_JOBS_FAILED', `production run ${run.id} job ${name} is not successful`, { job: name, conclusion: byName.get(name) || null });
     }
+  } else {
+    const missing = [...EXPECTED_ENVIRONMENT_JOBS, 'worker-production'].filter(name => byName.get(name) !== 'success');
+    if (byName.get('worker-development') !== 'skipped') missing.push('worker-development (expected skipped)');
+    if (missing.length) throw new AuditError('PUBLICATION_RUN_JOBS_FAILED', `production run ${run.id} has incomplete jobs`, { missing });
   }
   return {
     id: run.id, url: run.html_url, branch, sha: run.head_sha, event: run.event,
     conclusion: run.conclusion, attempt: run.run_attempt, createdAt: run.created_at, updatedAt: run.updated_at,
     workflowPath: run.path, jobs: Object.fromEntries([...byName.entries()].sort(([a], [b]) => a.localeCompare(b))),
   };
+}
+
+function productionWorkerDeploymentEnvironment(run) {
+  for (const [workflowPath, environment] of Object.entries(PRODUCTION_WORKER_DEPLOYMENT_ENVIRONMENTS)) {
+    if (workflowPathMatches(run?.workflowPath, workflowPath)) return environment;
+  }
+  throw new AuditError('PUBLICATION_WORKFLOW_UNSUPPORTED', 'cannot determine the production Worker deployment environment from the publication workflow', {
+    workflowPath: run?.workflowPath || null,
+  });
 }
 
 function ensureRunWindow(deployment, run) {
@@ -535,17 +583,15 @@ async function branchHeads(context) {
 }
 
 async function verifyProvenance(snapshot, context) {
-  const result = { outcome: 'FAIL', runs: {}, deployments: {}, branchHeads: {} };
+  const result = {
+    outcome: 'FAIL', runs: {}, deployments: {}, branchHeads: {},
+    deploymentEnvironments: { productionWorker: null, developmentWorker: 'worker-development', pages: 'github-pages' },
+  };
   const productionSha = snapshot.records.production.release.sha;
   const developmentSha = snapshot.records.development.release.sha;
   const runChecks = [
     ['production', () => releaseRun('production', productionSha, context)],
     ['development', () => releaseRun('development', developmentSha, context)],
-  ];
-  const deploymentChecks = [
-    ['productionWorker', () => deploymentRecord('worker-production', productionSha, context)],
-    ['developmentWorker', () => deploymentRecord('worker-development', developmentSha, context)],
-    ['pages', () => deploymentRecord('github-pages', developmentSha, context)],
   ];
   async function capture(collection, name, check) {
     try { result[collection][name] = await check(); }
@@ -569,6 +615,24 @@ async function verifyProvenance(snapshot, context) {
     context.failures.push(failure);
   }
   for (const [name, check] of runChecks) await capture('runs', name, check);
+  if (result.runs.production) {
+    try { result.deploymentEnvironments.productionWorker = productionWorkerDeploymentEnvironment(result.runs.production); }
+    catch (error) {
+      const failure = { kind: error.kind || 'PROVENANCE_ERROR', message: error.message, details: error.details || null };
+      (result.failures ||= []).push({ collection: 'deployments', name: 'productionWorker', ...failure });
+      context.failures.push({ collection: 'deployments', name: 'productionWorker', ...failure });
+    }
+  }
+  const deploymentChecks = [
+    ['productionWorker', () => {
+      if (!result.deploymentEnvironments.productionWorker) {
+        throw new AuditError('PUBLICATION_WORKFLOW_UNSUPPORTED', 'production Worker deployment environment is unavailable');
+      }
+      return deploymentRecord(result.deploymentEnvironments.productionWorker, productionSha, context);
+    }],
+    ['developmentWorker', () => deploymentRecord(result.deploymentEnvironments.developmentWorker, developmentSha, context)],
+    ['pages', () => deploymentRecord(result.deploymentEnvironments.pages, developmentSha, context)],
+  ];
   for (const [name, check] of deploymentChecks) await capture('deployments', name, check);
   if (result.deployments.pages && result.runs.development) {
     try { ensureRunWindow(result.deployments.pages, result.runs.development); }
@@ -688,6 +752,10 @@ export function renderSummary(report) {
   }
   if (report.provenance?.deployments) {
     for (const [key, deployment] of Object.entries(report.provenance.deployments)) lines.push(`- ${key} deployment: ${deployment.id} (${deployment.sha}, ${deployment.status})`);
+  }
+  if (report.provenance?.deploymentEnvironments) {
+    const environments = report.provenance.deploymentEnvironments;
+    lines.push(`- Deployment environment lookups: productionWorker ${environments.productionWorker || 'unresolved'}; developmentWorker ${environments.developmentWorker}; pages ${environments.pages}`);
   }
   if (report.failures?.length) {
     lines.push('', '## Failures');

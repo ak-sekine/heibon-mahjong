@@ -3,11 +3,13 @@ import test from 'node:test';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { digest, inventory, runAudit, sha256, classifyTransportError } from '../scripts/environments/pages-live-audit.mjs';
+import { digest, inventory, renderSummary, runAudit, sha256, classifyTransportError } from '../scripts/environments/pages-live-audit.mjs';
 
 const repo = 'ak-sekine/heibon-mahjong';
 const devSha = 'a'.repeat(40);
 const prodSha = 'b'.repeat(40);
+const LEGACY_PRODUCTION_WORKFLOW = '.github/workflows/deploy.yml';
+const ENVIRONMENTS_WORKFLOW = '.github/workflows/environments.yml';
 const dates = {
   production: { created: '2026-11-13T13:02:33Z', updated: '2026-11-13T13:32:06Z', deployment: '2026-11-13T13:10:00Z' },
   development: { created: '2026-11-15T22:09:45Z', updated: '2026-11-15T22:20:11Z', deployment: '2026-11-15T22:10:00Z' },
@@ -69,21 +71,38 @@ function createSnapshot(root) {
   return { current };
 }
 
-function jobNames(environment) {
-  if (environment === 'production') return ['deploy-worker', 'production-test', 'pages-deploy'];
-  return [
+const environmentGateJobs = [
     'verify', 'local-online', 'isolation-browser (chromium)', 'isolation-browser (webkit)',
     'browser-ui / browser-ui (chromium, group 1)', 'browser-ui / browser-ui (chromium, group 2)',
     'browser-ui / browser-ui (webkit, group 1)', 'browser-ui / browser-ui (webkit, group 2)',
-    'audit', 'worker-development', 'online', 'publish / publish',
-  ];
+    'audit', 'online', 'publish / publish',
+];
+
+function jobNames(environment, productionWorkflowPath) {
+  if (environment === 'development') return [...environmentGateJobs, 'worker-development'];
+  if (productionWorkflowPath === LEGACY_PRODUCTION_WORKFLOW) return ['deploy-worker', 'production-test', 'pages-deploy'];
+  return [...environmentGateJobs, 'worker-production'];
 }
 
-function mockFetch(snapshotRoot, { statusOverrides = new Map(), corrupt = new Map() } = {}) {
-  const expectedDeployments = {
-    'worker-production': { id: 1, sha: prodSha, created_at: dates.production.deployment },
-    'worker-development': { id: 2, sha: devSha, created_at: dates.development.deployment },
-    'github-pages': { id: 3, sha: devSha, created_at: dates.development.deployment },
+function mockFetch(snapshotRoot, {
+  statusOverrides = new Map(),
+  corrupt = new Map(),
+  productionWorkflowPath = LEGACY_PRODUCTION_WORKFLOW,
+  productionDeploymentEnvironment = productionWorkflowPath === LEGACY_PRODUCTION_WORKFLOW ? 'heibon-production-worker' : 'worker-production',
+  productionDeploymentSha = prodSha,
+  productionDeploymentStatus = 'success',
+  productionDeploymentCreatedAt = dates.production.deployment,
+  missingProductionDeployment = false,
+  productionDeploymentApiStatus = null,
+  additionalDeploymentsByEnvironment = {},
+} = {}) {
+  const deploymentsByEnvironment = {
+    [productionDeploymentEnvironment]: missingProductionDeployment ? [] : [{
+      id: 1, environment: productionDeploymentEnvironment, sha: productionDeploymentSha, created_at: productionDeploymentCreatedAt,
+    }],
+    'worker-development': [{ id: 2, environment: 'worker-development', sha: devSha, created_at: dates.development.deployment }],
+    'github-pages': [{ id: 3, environment: 'github-pages', sha: devSha, created_at: dates.development.deployment }],
+    ...additionalDeploymentsByEnvironment,
   };
   return async (input) => {
     const url = new URL(input);
@@ -100,24 +119,32 @@ function mockFetch(snapshotRoot, { statusOverrides = new Map(), corrupt = new Ma
         const sha = env === 'development' ? devSha : prodSha;
         return new Response(JSON.stringify({ workflow_runs: [{
           id: env === 'development' ? 200 : 100,
-          head_branch: branch, head_sha: sha, path: env === 'development' ? '.github/workflows/environments.yml' : '.github/workflows/deploy.yml',
-          conclusion: 'success', event: env === 'development' ? 'workflow_dispatch' : 'push',
+          head_branch: branch, head_sha: sha, path: env === 'development' ? ENVIRONMENTS_WORKFLOW : productionWorkflowPath,
+          conclusion: 'success', event: env === 'development' || productionWorkflowPath === ENVIRONMENTS_WORKFLOW ? 'workflow_dispatch' : 'push',
           run_attempt: 1, html_url: `https://github.com/${repo}/actions/runs/${env === 'development' ? 200 : 100}`,
           created_at: dates[env].created, updated_at: dates[env].updated,
         }] }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
       if (/\/actions\/runs\/(100|200)\/jobs$/.test(apiPath)) {
         const env = apiPath.includes('/200/') ? 'development' : 'production';
-        const jobs = jobNames(env).map(name => ({ name, conclusion: 'success' }));
+        const jobs = jobNames(env, productionWorkflowPath).map(name => ({ name, conclusion: 'success' }));
         if (env === 'development') jobs.push({ name: 'worker-production', conclusion: 'skipped' });
+        if (env === 'production' && productionWorkflowPath === ENVIRONMENTS_WORKFLOW) jobs.push({ name: 'worker-development', conclusion: 'skipped' });
         return new Response(JSON.stringify({ jobs }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
       if (apiPath.endsWith('/deployments')) {
         const environment = url.searchParams.get('environment');
-        return new Response(JSON.stringify([expectedDeployments[environment]]), { status: 200, headers: { 'content-type': 'application/json' } });
+        if (environment === productionDeploymentEnvironment && productionDeploymentApiStatus) {
+          return new Response('API access denied', { status: productionDeploymentApiStatus, headers: { 'content-type': 'text/plain' } });
+        }
+        return new Response(JSON.stringify(deploymentsByEnvironment[environment] || []), { status: 200, headers: { 'content-type': 'application/json' } });
       }
       const statusMatch = apiPath.match(/\/deployments\/(\d+)\/statuses$/);
-      if (statusMatch) return new Response(JSON.stringify([{ state: 'success', url: `https://api.test/deployments/${statusMatch[1]}` }]), { status: 200, headers: { 'content-type': 'application/json' } });
+      if (statusMatch) {
+        const deploymentId = Number(statusMatch[1]);
+        const state = deploymentId === 1 ? productionDeploymentStatus : 'success';
+        return new Response(JSON.stringify([{ state, url: `https://api.test/deployments/${deploymentId}` }]), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
       return new Response('not found', { status: 404 });
     }
     const override = statusOverrides.get(url.pathname);
@@ -178,6 +205,71 @@ test('matches both live Pages environments, metadata, deployment records, and al
       assert.equal(report.targets[environment].files.filter(file => file.category === 'release-file').length, 16);
     }
     assert.equal(report.targets.production.environmentsMetadata, 'MATCH');
+    assert.equal(report.provenance.runs.production.workflowPath, LEGACY_PRODUCTION_WORKFLOW);
+    assert.equal(report.provenance.deploymentEnvironments.productionWorker, 'heibon-production-worker');
+    assert.equal(report.provenance.deployments.productionWorker.environment, 'heibon-production-worker');
+    assert.equal(report.provenance.deployments.productionWorker.sha, prodSha);
+    assert.match(renderSummary(report), /productionWorker heibon-production-worker/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('production releases through environments.yml use the worker-production deployment environment', async () => {
+  const root = setup();
+  try {
+    const report = await runAudit(args(root, mockFetch(root, { productionWorkflowPath: ENVIRONMENTS_WORKFLOW })));
+    assert.equal(report.outcome, 'SUCCESS', JSON.stringify({ failures: report.failures, provenance: report.provenance }));
+    assert.equal(report.provenance.runs.production.workflowPath, ENVIRONMENTS_WORKFLOW);
+    assert.equal(report.provenance.deploymentEnvironments.productionWorker, 'worker-production');
+    assert.equal(report.provenance.deployments.productionWorker.environment, 'worker-production');
+    assert.equal(report.provenance.deployments.productionWorker.sha, prodSha);
+    assert.match(renderSummary(report), /productionWorker worker-production/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a different SHA in the selected production environment fails without borrowing a matching deployment from another environment', async () => {
+  const root = setup();
+  try {
+    const unrelated = [{ id: 4, environment: 'worker-production', sha: prodSha, created_at: dates.production.deployment }];
+    const report = await runAudit(args(root, mockFetch(root, {
+      productionDeploymentSha: 'f'.repeat(40),
+      additionalDeploymentsByEnvironment: { 'worker-production': unrelated },
+    })));
+    assert.equal(report.outcome, 'FAIL');
+    assert.equal(report.provenance.deploymentEnvironments.productionWorker, 'heibon-production-worker');
+    assert.equal(report.provenance.failures.find(failure => failure.name === 'productionWorker')?.kind, 'DEPLOYMENT_SHA_MISMATCH');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a missing deployment in the workflow-selected production environment fails closed', async () => {
+  const root = setup();
+  try {
+    const report = await runAudit(args(root, mockFetch(root, { missingProductionDeployment: true })));
+    assert.equal(report.outcome, 'FAIL');
+    assert.equal(report.provenance.failures.find(failure => failure.name === 'productionWorker')?.kind, 'DEPLOYMENT_NOT_FOUND');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a production deployment must have a success status and fall within the publication run window', async () => {
+  const root = setup();
+  try {
+    const failedStatus = await runAudit(args(root, mockFetch(root, { productionDeploymentStatus: 'failure' })));
+    assert.equal(failedStatus.outcome, 'FAIL');
+    assert.equal(failedStatus.provenance.failures.find(failure => failure.name === 'productionWorker')?.kind, 'DEPLOYMENT_NOT_SUCCESS');
+
+    const wrongWindow = await runAudit(args(root, mockFetch(root, { productionDeploymentCreatedAt: '2026-11-14T13:10:00Z' })));
+    assert.equal(wrongWindow.outcome, 'FAIL');
+    assert.equal(wrongWindow.provenance.failures.find(failure => failure.kind === 'DEPLOYMENT_RUN_MISMATCH')?.kind, 'DEPLOYMENT_RUN_MISMATCH');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('GitHub API 403 is reported as API access failure, not as a missing deployment', async () => {
+  const root = setup();
+  try {
+    const report = await runAudit(args(root, mockFetch(root, { productionDeploymentApiStatus: 403 })));
+    assert.equal(report.outcome, 'FAIL');
+    assert.equal(report.provenance.failures.find(failure => failure.name === 'productionWorker')?.kind, 'GITHUB_API_FORBIDDEN');
+    assert.notEqual(report.provenance.failures.find(failure => failure.name === 'productionWorker')?.kind, 'DEPLOYMENT_NOT_FOUND');
+    assert.equal(report.requests.find(request => request.label === 'heibon-production-worker deployments')?.outcome, 'GITHUB_API_FORBIDDEN');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
