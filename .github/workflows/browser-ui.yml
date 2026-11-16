@@ -52,6 +52,11 @@ on:
         required: false
         type: string
         default: ''
+      live_environment_e2e:
+        description: Run the explicit read-only Phase 6-B E2E against fixed production and development Pages URLs (develop only).
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       reuse_build:
@@ -482,3 +487,89 @@ jobs:
           path: |
             /tmp/heibon-table-ui/*/river-spacing-failure-*.png
             /tmp/heibon-table-ui/*/river-spacing-failure-*.json
+
+  live-environment-e2e:
+    name: live-environment-e2e (${{ matrix.browser }})
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' &&
+        inputs.live_environment_e2e == true &&
+        github.ref == 'refs/heads/develop' &&
+        needs.verify-build.result == 'success' &&
+        needs.browser-ui.result == 'success'
+      }}
+    needs: [verify-build, browser-ui]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        browser: [chromium, webkit]
+    steps:
+      - name: Initialize live E2E report
+        run: |
+          mkdir -p "$RUNNER_TEMP/heibon-live-e2e"
+          printf '%s\n' '{"schemaVersion":1,"phase":"B1","outcome":"NOT_STARTED"}' > "$RUNNER_TEMP/heibon-live-e2e/${{ matrix.browser }}.json"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/checkout@v4
+        with:
+          ref: pages-verified
+          path: pages-verified
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Record snapshot branch SHA
+        id: snapshot
+        run: echo "sha=$(git -C pages-verified rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Playwright
+        run: python -m pip install playwright
+      - name: Install browser dependencies (${{ matrix.browser }})
+        run: python .github/scripts/timed-playwright-install.py install-deps "${{ matrix.browser }}"
+      - name: Install browser (${{ matrix.browser }})
+        run: python .github/scripts/timed-playwright-install.py install "${{ matrix.browser }}"
+      - name: Run live public Pages B1 E2E
+        env:
+          HEIBON_BROWSER: ${{ matrix.browser }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          SNAPSHOT_ROOT: pages-verified
+          SNAPSHOT_SHA: ${{ steps.snapshot.outputs.sha }}
+          LIVE_E2E_REPORT: ${{ runner.temp }}/heibon-live-e2e/${{ matrix.browser }}.json
+        run: python tests/browser-live-environment-e2e.py
+      - name: Add sanitized E2E report to Step Summary
+        if: always()
+        env:
+          REPORT: ${{ runner.temp }}/heibon-live-e2e/${{ matrix.browser }}.json
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ['REPORT'])
+          report = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {
+              'phase': 'B1', 'outcome': 'REPORT_MISSING'}
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write('## Phase 6-B live E2E (B1)\n\n')
+              summary.write('```json\n')
+              summary.write(json.dumps(report, ensure_ascii=False, indent=2))
+              summary.write('\n```\n')
+          PY
+      - name: Upload sanitized live E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase6b-live-e2e-b1-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/heibon-live-e2e/${{ matrix.browser }}.json
+          if-no-files-found: warn
+          retention-days: 30
