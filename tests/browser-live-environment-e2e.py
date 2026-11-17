@@ -60,6 +60,156 @@ def origin(value):
 
 
 MAX_ONLINE_DIAGNOSTIC_EVENTS = 256
+ROOM_ACTION_ERROR_CODES = frozenset({
+    "invalid_message", "invalid_json", "message_too_large", "rate_limited",
+    "request_id_reused", "revision_conflict", "not_host", "room_finalized",
+    "game_not_ended", "already_finalized", "no_participants", "player_disconnected",
+    "players_not_ready", "stale_connection", "room_closed", "unauthorized",
+    "already_started", "game_not_started", "game_not_playing", "round_not_ended",
+    "round_not_available", "not_your_turn", "invalid_action", "invalid_option",
+    "invalid_riichi", "invalid_tsumo", "invalid_kyuushu_kyuuhai", "decision_pending",
+    "stale_decision", "already_responded", "not_eligible", "game_in_progress",
+})
+
+
+def capture_room_action_diagnostics(page, trace_started_wall_ms):
+    """Read only sanitized room-action entries from the app's existing diagnostic buffer."""
+    try:
+        return page.evaluate("""({traceStartedWallMs, knownErrorCodes}) => {
+          const suffix = 'heibon-mahjong-diagnostics-v2';
+          const eventNames = new Set([
+            'room_state_updated', 'room_state_sync_requested', 'room_state_sync_response_received',
+            'room_action_accepted', 'action_sent', 'server_action_result_received',
+            'server_rejected_operation', 'room_action_completed', 'room_action_rejected',
+            'operation_wait_released', 'action_response_timeout', 'action_send_failed'
+          ]);
+          const requestOperations = new Map();
+          const selected = [];
+          const safeInteger = value => Number.isSafeInteger(value) ? value : null;
+          const known = new Set(knownErrorCodes);
+          const classifyCode = (code, result) => {
+            if (typeof code !== 'string') return {errorClass: result === 'accepted' ? 'none' : 'no_code', errorCode: null};
+            if (!known.has(code)) return {errorClass: 'unknown', errorCode: 'unknown'};
+            if (['revision_conflict', 'stale_connection', 'rate_limited'].includes(code)) {
+              return {errorClass: code, errorCode: code};
+            }
+            return {errorClass: result === 'rejected' ? 'known_other' : 'none', errorCode: code};
+          };
+          const keys = [];
+          for (let index = 0; index < localStorage.length; index++) {
+            const key = localStorage.key(index);
+            if (key === suffix || key === `heibon-mahjong-dev:${suffix}`) keys.push(key);
+          }
+          if (!keys.length) return {status: 'not_found', events: []};
+
+          for (const key of keys) {
+            const environment = key.startsWith('heibon-mahjong-dev:') ? 'development' : 'production';
+            let entries;
+            try {
+              entries = JSON.parse(localStorage.getItem(key) || 'null');
+            } catch {
+              selected.push({environment, invalidBuffer: true});
+              continue;
+            }
+            if (!Array.isArray(entries)) {
+              selected.push({environment, invalidBuffer: true});
+              continue;
+            }
+            for (const entry of entries) {
+              if (!entry || !eventNames.has(entry.event) || !entry.details || typeof entry.details !== 'object') continue;
+              const details = entry.details;
+              if (details.actionType === 'set-ready' && typeof details.requestId === 'string') {
+                if (!requestOperations.has(details.requestId)) requestOperations.set(details.requestId, requestOperations.size + 1);
+              }
+              const operationIndex = typeof details.requestId === 'string'
+                ? requestOperations.get(details.requestId) ?? null
+                : null;
+              const stateEvent = ['room_state_updated', 'room_state_sync_requested', 'room_state_sync_response_received'].includes(entry.event);
+              const setReadyEvent = details.actionType === 'set-ready' && [
+                'room_action_accepted', 'action_sent', 'room_action_completed', 'room_action_rejected',
+                'operation_wait_released', 'action_response_timeout', 'action_send_failed'
+              ].includes(entry.event);
+              const correlatedResponse = [
+                'server_action_result_received', 'server_rejected_operation'
+              ].includes(entry.event) && operationIndex !== null;
+              if (!stateEvent && !setReadyEvent && !correlatedResponse) continue;
+              const timestamp = Date.parse(entry.timestamp);
+              const offsetMs = Number.isFinite(timestamp)
+                ? Math.max(0, Math.round(timestamp - traceStartedWallMs)) : null;
+              const detailsOut = {
+                environment,
+                offsetMs,
+                event: entry.event,
+              };
+              if (setReadyEvent || correlatedResponse) {
+                detailsOut.operationType = 'set-ready';
+                detailsOut.operationIndex = operationIndex;
+              }
+              if (entry.event === 'room_action_accepted' || entry.event === 'action_sent') {
+                detailsOut.expectedRevision = safeInteger(details.revision);
+              }
+              if (stateEvent) {
+                if (entry.event !== 'room_state_sync_requested') detailsOut.revision = safeInteger(details.revision);
+                if (entry.event === 'room_state_sync_requested' && details.source === 'revision_conflict') {
+                  detailsOut.source = 'revision_conflict';
+                }
+              }
+              if (entry.event === 'server_action_result_received' ||
+                  entry.event === 'server_rejected_operation' || entry.event === 'room_action_completed' ||
+                  entry.event === 'room_action_rejected' || entry.event === 'operation_wait_released') {
+                detailsOut.result = ['accepted', 'rejected'].includes(details.result)
+                  ? details.result : entry.event === 'server_rejected_operation' ? 'rejected' : null;
+                detailsOut.responseRevision = safeInteger(details.revision);
+                Object.assign(detailsOut, classifyCode(details.errorCode, detailsOut.result));
+              }
+              if (entry.event === 'action_response_timeout' || entry.event === 'action_send_failed') {
+                detailsOut.outcome = entry.event === 'action_response_timeout' ? 'response_unobserved' : 'send_failed';
+                detailsOut.expectedRevision = safeInteger(details.revision);
+              }
+              if (typeof details.durationMs === 'number' && Number.isFinite(details.durationMs)) {
+                detailsOut.durationMs = Math.max(0, Math.round(details.durationMs));
+              }
+              selected.push(detailsOut);
+            }
+          }
+          const invalidBuffer = selected.filter(value => value.invalidBuffer);
+          const events = selected.filter(value => !value.invalidBuffer);
+          const responseEvents = new Set([
+            'server_action_result_received', 'server_rejected_operation',
+            'room_action_completed', 'room_action_rejected', 'operation_wait_released'
+          ]);
+          const sentOperations = events.filter(value => value.event === 'action_sent' && value.operationIndex !== null);
+          for (const sent of sentOperations) {
+            const responseObserved = events.some(value => value.environment === sent.environment &&
+              value.operationIndex === sent.operationIndex && responseEvents.has(value.event));
+            if (!responseObserved) {
+              events.push({
+                environment: sent.environment,
+                offsetMs: null,
+                event: 'worker_response_unobserved',
+                operationType: 'set-ready',
+                operationIndex: sent.operationIndex,
+                result: 'unobserved',
+              });
+            }
+          }
+          events.sort((left, right) => (left.offsetMs ?? 0) - (right.offsetMs ?? 0));
+          return {status: invalidBuffer.length ? 'partially_unavailable' : 'captured', events};
+        }""", {
+            "traceStartedWallMs": trace_started_wall_ms,
+            "knownErrorCodes": sorted(ROOM_ACTION_ERROR_CODES),
+        })
+    except Exception as error:
+        return {"status": "capture_failed", "errorType": type(error).__name__, "events": []}
+
+
+def collect_room_action_diagnostics(trace, trace_started_wall_ms, clients):
+    results = trace.setdefault("roomActionDiagnostics", {})
+    for client, page in clients.items():
+        if page is None:
+            results[client] = {"status": "page_unavailable", "events": []}
+        else:
+            results[client] = capture_room_action_diagnostics(page, trace_started_wall_ms)
 
 
 def record_online_communication(trace, started_at, active_action, client, event_type, **details):
@@ -577,6 +727,7 @@ def run_online_checks(browser, browser_name, report, save_report):
     tag = os.environ.get("GITHUB_RUN_ID", os.environ.get("GITHUB_SHA", "local")[:7])[-10:]
     online_results = {environment["name"]: {} for environment in ENVIRONMENTS}
     trace_started = time.monotonic()
+    trace_started_wall_ms = round(time.time() * 1000)
     active_action = {"id": None}
     active_environment = {"name": None}
     trace = {
@@ -849,6 +1000,11 @@ def run_online_checks(browser, browser_name, report, save_report):
             require(not observer[label]["blockedExternalHosts"], f"online-external-host-request-{label}")
             require(not observer[label]["pageErrorTypes"], f"online-page-error-{label}")
             require(not observer[label]["consoleErrorCount"], f"online-console-error-{label}")
+        collect_room_action_diagnostics(
+            trace,
+            trace_started_wall_ms,
+            {"host": host_page, "guest": guest_page},
+        )
         report["online"] = online_results
         report["workerEnvironmentSeparation"] = {
             key: {
@@ -870,6 +1026,16 @@ def run_online_checks(browser, browser_name, report, save_report):
                 "host": capture_online_ui_state(host_page, observer["host"]) if host_page else {"snapshotStatus": "page-unavailable"},
                 "guest": capture_online_ui_state(guest_page, observer["guest"]) if guest_page else {"snapshotStatus": "page-unavailable"},
             }
+        try:
+            collect_room_action_diagnostics(
+                trace,
+                trace_started_wall_ms,
+                {"host": host_page, "guest": guest_page},
+            )
+        except Exception as diagnostic_error:
+            errors = trace.setdefault("roomActionDiagnosticErrorTypes", [])
+            if len(errors) < 8:
+                errors.append(type(diagnostic_error).__name__)
         try:
             save_report()
         except Exception as diagnostic_error:
