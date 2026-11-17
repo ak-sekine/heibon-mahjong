@@ -569,6 +569,31 @@ def wait_for_online_players_ready(page, host_name, guest_name):
     )
 
 
+def wait_for_active_online_human(page, host_name, guest_name, timeout_ms):
+    page.wait_for_function(
+        """names => {
+          const activeRows = Array.from(document.querySelectorAll(
+            '#online-score-strip .seat-label[data-active="true"]'
+          ));
+          if (activeRows.length !== 1) return false;
+          const activeName = activeRows[0].querySelector('.seat-name')?.textContent?.trim() ?? '';
+          return names.includes(activeName);
+        }""",
+        arg=[host_name, guest_name],
+        timeout=timeout_ms,
+    )
+    active_name = page.evaluate(
+        """() => document.querySelector(
+          '#online-score-strip .seat-label[data-active="true"] .seat-name'
+        )?.textContent?.trim() ?? null"""
+    )
+    if active_name == host_name:
+        return "host"
+    if active_name == guest_name:
+        return "guest"
+    raise LiveE2EFailure("active-human-turn-name-not-recognized")
+
+
 def start_online_game(host_page, guest_page, host_name, guest_name, trace_step):
     trace_step("host-ready-click", lambda: host_page.locator("#online-ready").click())
     trace_step(
@@ -598,36 +623,52 @@ def start_online_game(host_page, guest_page, host_name, guest_name, trace_step):
             f"{client}-game-screen-wait",
             lambda page=page: page.locator("#online-match").wait_for(state="visible", timeout=30_000),
         )
+    hand_deadline = time.monotonic() + 30
+
+    def remaining_hand_timeout_ms():
+        remaining = int((hand_deadline - time.monotonic()) * 1000)
+        if remaining <= 0:
+            raise TimeoutError("The 30-second human-turn wait expired.")
+        return remaining
+
+    first_actor = trace_step(
+        "first-human-turn-visible-wait",
+        lambda: wait_for_active_online_human(
+            host_page, host_name, guest_name, remaining_hand_timeout_ms(),
+        ),
+    )
+    actor_page = host_page if first_actor == "host" else guest_page
     trace_step(
-        "host-actionable-hand-wait",
-        lambda: host_page.locator("#online-player-hand button[data-tile-id]:not([disabled])").first.wait_for(timeout=30_000),
+        f"{first_actor}-actionable-hand-wait",
+        lambda: actor_page.locator("#online-player-hand button[data-tile-id]:not([disabled])")
+        .first.wait_for(timeout=remaining_hand_timeout_ms()),
     )
     trace_step(
         "guest-name-visible-in-match-check",
         lambda: require(guest_name in guest_page.locator("#online-score-strip").inner_text(), "guest-name-not-in-match"),
     )
+    return first_actor
 
 
-def online_discard_and_sync(host_page, guest_page, guest_name, page_report):
-    before = total_online_river_tiles(host_page)
-    host_page.locator("#online-player-hand button[data-tile-id]:not([disabled])").first.click()
-    host_page.locator("#online-discard").wait_for(state="visible", timeout=5_000)
-    host_page.wait_for_function("!document.querySelector('#online-discard').disabled", timeout=5_000)
-    host_page.locator("#online-discard").click()
-    guest_page.wait_for_function(
-        "name => document.querySelector('#online-game-action-status').textContent.includes(name)",
-        arg=guest_name,
-        timeout=30_000,
-    )
-    host_page.wait_for_function(
-        "expected => document.querySelector('#online-game-action-status').textContent === expected",
-        arg=guest_page.locator("#online-game-action-status").inner_text(),
-        timeout=10_000,
-    )
-    host_count = total_online_river_tiles(host_page)
-    guest_count = total_online_river_tiles(guest_page)
-    require(host_count > before and host_count == guest_count, "online-discard-state-not-synchronized")
-    page_report["synchronizedRiverTileCount"] = host_count
+def online_discard_and_sync(actor_page, peer_page, actor_role, page_report):
+    before_actor = total_online_river_tiles(actor_page)
+    before_peer = total_online_river_tiles(peer_page)
+    require(before_actor == before_peer, "online-river-state-diverged-before-discard")
+    actor_page.locator("#online-player-hand button[data-tile-id]:not([disabled])").first.click()
+    actor_page.locator("#online-discard").wait_for(state="visible", timeout=5_000)
+    actor_page.wait_for_function("!document.querySelector('#online-discard').disabled", timeout=5_000)
+    actor_page.locator("#online-discard").click()
+    for page in (actor_page, peer_page):
+        page.wait_for_function(
+            "before => document.querySelectorAll('#online-table [data-online-river] .river-tile').length > before",
+            arg=before_actor,
+            timeout=30_000,
+        )
+    actor_count = total_online_river_tiles(actor_page)
+    peer_count = total_online_river_tiles(peer_page)
+    require(actor_count > before_actor and actor_count == peer_count, "online-discard-state-not-synchronized")
+    page_report["firstDiscardActor"] = actor_role
+    page_report["synchronizedRiverTileCount"] = actor_count
 
 
 def disconnect_reconnect_guest(guest_context, guest_page, host_page, guest_report, environment, *, previous_count=0, trace_step=None):
@@ -930,6 +971,7 @@ def run_online_checks(browser, browser_name, report, save_report):
                 "guestJoined": False,
                 "gameStarted": False,
                 "discardSynchronized": False,
+                "firstDiscardActor": None,
                 "guestDisconnected": False,
                 "guestReconnected": False,
                 "sessionKeys": {},
@@ -980,17 +1022,20 @@ def run_online_checks(browser, browser_name, report, save_report):
                 require(guest_keys_before_join[opposite_session_key], f"guest-prior-session-missing-{key}")
             trace_step("room-join", lambda: join_room(guest_page, guest_name, room_code))
             stage_report["guestJoined"] = True
-            start_online_game(
+            first_discard_actor = start_online_game(
                 host_page,
                 guest_page,
                 host_name,
                 guest_name,
                 lambda action_id, operation: trace_step(action_id, operation),
             )
+            stage_report["firstDiscardActor"] = first_discard_actor
             stage_report["gameStarted"] = True
+            actor_page = host_page if first_discard_actor == "host" else guest_page
+            peer_page = guest_page if first_discard_actor == "host" else host_page
             trace_step(
                 "discard-and-sync",
-                lambda: online_discard_and_sync(host_page, guest_page, guest_name, stage_report),
+                lambda: online_discard_and_sync(actor_page, peer_page, first_discard_actor, stage_report),
             )
             stage_report["discardSynchronized"] = True
 
