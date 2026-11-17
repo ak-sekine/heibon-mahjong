@@ -523,9 +523,63 @@ def join_room(page, display_name, room_code):
     require(display_name in page.locator("#online-seats").inner_text(), "guest-room-not-visible")
 
 
-def start_online_game(host_page, guest_page, guest_name, trace_step):
+ONLINE_SEAT_READY_EXPRESSION = """({displayName, requireHost}) => {
+  const matches = Array.from(document.querySelectorAll('#online-seats > li')).filter(row =>
+    row.dataset.kind === 'human' &&
+    row.querySelector('.online-seat-name')?.textContent?.trim() === displayName
+  );
+  if (matches.length !== 1) return false;
+  const row = matches[0];
+  const role = row.querySelector('.online-seat-role')?.textContent ?? '';
+  const status = row.querySelector('.online-seat-status')?.textContent ?? '';
+  return (!requireHost || role.includes('ホスト')) && status.includes('準備完了');
+}"""
+
+ONLINE_PLAYERS_READY_EXPRESSION = """({hostName, guestName}) => {
+  const rows = Array.from(document.querySelectorAll('#online-seats > li'));
+  const matchingRows = name => rows.filter(row =>
+    row.dataset.kind === 'human' &&
+    row.querySelector('.online-seat-name')?.textContent?.trim() === name
+  );
+  const hosts = matchingRows(hostName);
+  const guests = matchingRows(guestName);
+  if (hosts.length !== 1 || guests.length !== 1) return false;
+  const hostRole = hosts[0].querySelector('.online-seat-role')?.textContent ?? '';
+  const guestRole = guests[0].querySelector('.online-seat-role')?.textContent ?? '';
+  const hostStatus = hosts[0].querySelector('.online-seat-status')?.textContent ?? '';
+  const guestStatus = guests[0].querySelector('.online-seat-status')?.textContent ?? '';
+  return hostRole.includes('ホスト') && !guestRole.includes('ホスト') &&
+    hostStatus.includes('準備完了') && guestStatus.includes('準備完了');
+}"""
+
+
+def wait_for_online_seat_ready(page, display_name, *, require_host=False):
+    page.wait_for_function(
+        ONLINE_SEAT_READY_EXPRESSION,
+        arg={"displayName": display_name, "requireHost": require_host},
+        timeout=20_000,
+    )
+
+
+def wait_for_online_players_ready(page, host_name, guest_name):
+    page.wait_for_function(
+        ONLINE_PLAYERS_READY_EXPRESSION,
+        arg={"hostName": host_name, "guestName": guest_name},
+        timeout=20_000,
+    )
+
+
+def start_online_game(host_page, guest_page, host_name, guest_name, trace_step):
     trace_step("host-ready-click", lambda: host_page.locator("#online-ready").click())
+    trace_step(
+        "host-ready-sync-on-guest-wait",
+        lambda: wait_for_online_seat_ready(guest_page, host_name, require_host=True),
+    )
     trace_step("guest-ready-click", lambda: guest_page.locator("#online-ready").click())
+    trace_step(
+        "both-ready-on-host-wait",
+        lambda: wait_for_online_players_ready(host_page, host_name, guest_name),
+    )
     trace_step(
         "seat-confirm-enabled-wait",
         lambda: host_page.wait_for_function(
@@ -929,6 +983,7 @@ def run_online_checks(browser, browser_name, report, save_report):
             start_online_game(
                 host_page,
                 guest_page,
+                host_name,
                 guest_name,
                 lambda action_id, operation: trace_step(action_id, operation),
             )
