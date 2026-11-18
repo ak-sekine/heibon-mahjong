@@ -180,24 +180,30 @@ class IsolationContractTests(unittest.TestCase):
                       'development': {'host': 'dev-host', 'guest': 'dev-guest'}}
         self.calls = []
 
-    def request(self, *, status=401, room_override=None, cross_room_status=404, socket_status=401):
+    def request(self, *, status=401, room_override=None, socket_status=401, unavailable_room=None):
         outer = self
         class Request:
             def get(self, url, **kwargs):
                 key = 'development' if '-dev.' in url else 'production'
                 outer.calls.append(('get', key, url))
+                own_url = live.ENVIRONMENTS[1 if key == 'development' else 0]['worker_url'] + '/api/rooms/' + outer.sessions[key]['host']['roomCode']
+                assert url in (own_url, own_url + '/socket'), 'request must target a test-owned room'
                 if url.endswith('/socket'):
                     assert '/api/rooms/' + outer.sessions[key]['host']['roomCode'] + '/socket' in url
                     assert kwargs['headers']['Sec-WebSocket-Protocol'] == 'heibon-mahjong.v1, ticket.' + 'e' * 64
                     return Response(socket_status, {'error': 'invalid_ticket'})
-                if not url.endswith('/' + outer.sessions[key]['host']['roomCode']):
-                    return Response(cross_room_status, {'mustNotBeInspected': True})
-                names = room_override if room_override is not None else outer.names[key].values()
+                if key == unavailable_room:
+                    return Response(404, {'error': 'room_not_found'})
+                names = (room_override.get(key, outer.names[key].values())
+                         if isinstance(room_override, dict) else
+                         room_override if room_override is not None else outer.names[key].values())
                 return Response(200, {'roomCode': outer.sessions[key]['host']['roomCode'], 'status': 'finalized',
                                       'gameRevision': 2, 'seats': [{'kind': 'human', 'name': n} for n in names]})
             def post(self, url, **kwargs):
                 key = 'development' if '-dev.' in url else 'production'
                 outer.calls.append(('post', key, url))
+                own_url = live.ENVIRONMENTS[1 if key == 'development' else 0]['worker_url'] + '/api/rooms/' + outer.sessions[key]['host']['roomCode'] + '/ticket'
+                assert url == own_url, 'request must target a test-owned room'
                 other = 'production' if key == 'development' else 'development'
                 authorization = kwargs['headers']['Authorization']
                 foreign = {'Bearer ' + outer.sessions[other][role]['participantToken'] for role in ('host', 'guest')}
@@ -210,11 +216,12 @@ class IsolationContractTests(unittest.TestCase):
 
     def test_cross_credentials_are_rejected_against_own_rooms_only(self):
         result = live.verify_environment_isolation(self.request(), self.sessions, self.names)
-        self.assertEqual(len(self.calls), 16)
+        self.assertEqual(len(self.calls), 14)
         for method, key, url in self.calls:
-            if method == 'post':
-                self.assertIn('/api/rooms/' + self.sessions[key]['host']['roomCode'], url)
+            self.assertIn('/api/rooms/' + self.sessions[key]['host']['roomCode'], url)
         self.assertTrue(all(value['foreignCredentialsRejected'] for value in result.values()))
+        self.assertTrue(all(value['ownRoomStatesDistinct'] for value in result.values()))
+        self.assertTrue(all('foreignRoomStateNotShared' not in value for value in result.values()))
         self.assertTrue(all(value['foreignTicketSocketRejectionStatuses'] == [401, 401] for value in result.values()))
         encoded = json.dumps(result)
         for environment in self.sessions.values():
@@ -228,9 +235,14 @@ class IsolationContractTests(unittest.TestCase):
             live.verify_environment_isolation(self.request(status=200), self.sessions, self.names)
         self.assertEqual(len(self.calls), 3)
 
-    def test_occupied_or_shared_cross_room_stops_without_authenticating(self):
+    def test_unverified_second_room_stops_before_any_authentication(self):
         with self.assertRaises(live.UnsafeLiveEnvironment):
-            live.verify_environment_isolation(self.request(cross_room_status=200), self.sessions, self.names)
+            live.verify_environment_isolation(self.request(room_override={'development': ['unexpected']}), self.sessions, self.names)
+        self.assertEqual([call[0] for call in self.calls], ['get', 'get'])
+
+    def test_unavailable_second_room_is_safety_stop_before_authentication(self):
+        with self.assertRaises(live.UnsafeLiveEnvironment):
+            live.verify_environment_isolation(self.request(unavailable_room='development'), self.sessions, self.names)
         self.assertEqual([call[0] for call in self.calls], ['get', 'get'])
 
     def test_foreign_ticket_upgrade_is_a_safety_stop_if_accepted(self):
@@ -242,7 +254,7 @@ class IsolationContractTests(unittest.TestCase):
             self.sessions['development'][role]['roomCode'] = 'AAAAAA'
         result = live.verify_environment_isolation(self.request(), self.sessions, self.names)
         self.assertEqual(len(self.calls), 14)
-        self.assertTrue(all(value['foreignRoomStateNotShared'] for value in result.values()))
+        self.assertTrue(all(value['ownRoomStatesDistinct'] for value in result.values()))
 
     def test_missing_room_and_other_failures_are_not_rejections(self):
         with self.assertRaises(live.LiveE2EFailure):
@@ -255,6 +267,23 @@ class IsolationContractTests(unittest.TestCase):
 
     def test_mismatched_own_session_does_not_contact_any_room(self):
         self.sessions['production']['guest']['roomCode'] = 'CCCCCC'
+        with self.assertRaises(live.UnsafeLiveEnvironment):
+            live.verify_environment_isolation(self.request(), self.sessions, self.names)
+        self.assertEqual(self.calls, [])
+
+    def test_mismatched_source_session_stops_before_any_request(self):
+        self.sessions['development']['guest']['roomCode'] = 'CCCCCC'
+        with self.assertRaises(live.UnsafeLiveEnvironment) as caught:
+            live.verify_environment_isolation(self.request(), self.sessions, self.names)
+        self.assertEqual(self.calls, [])
+        message = str(caught.exception)
+        for environment in self.sessions.values():
+            for session in environment.values():
+                self.assertNotIn(session['participantToken'], message)
+                self.assertNotIn(session['roomCode'], message)
+
+    def test_duplicate_names_stop_before_any_request(self):
+        self.names['development']['host'] = self.names['production']['host']
         with self.assertRaises(live.UnsafeLiveEnvironment):
             live.verify_environment_isolation(self.request(), self.sessions, self.names)
         self.assertEqual(self.calls, [])

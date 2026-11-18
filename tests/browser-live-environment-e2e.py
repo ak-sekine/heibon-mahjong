@@ -775,12 +775,10 @@ def capture_test_session(page, storage_key, room_code, display_name):
 def verify_environment_isolation(request, sessions, names):
     """Probe credentials only against our two known target rooms.
 
-    A room code may coincide across Workers. Each target is a room created by
-    this run in that Worker, and only the other Worker's participant tokens are
-    used for negative ticket requests. A status-only cross-Worker GET detects
-    sharing; if that code is occupied elsewhere, stop without inspecting the
-    response body or attempting to authenticate to that potentially foreign
-    room. Tokens and codes stay in memory.
+    A room code may coincide across Workers. Every requested room is created by
+    this run on its target Worker. Verify both rooms' identities before sending
+    any credential probes; never look up the other Worker's code on a target.
+    Tokens, tickets and codes stay in memory.
     """
     results = {}
     for environment in ENVIRONMENTS:
@@ -794,35 +792,42 @@ def verify_environment_isolation(request, sessions, names):
               for environment in ENVIRONMENTS for role in ("host", "guest")]
     if len(set(tokens)) != len(tokens):
         raise UnsafeLiveEnvironment("test-participant-credentials-not-distinct")
+    expected_names = [names[environment["name"]][role]
+                      for environment in ENVIRONMENTS for role in ("host", "guest")]
+    if (any(not isinstance(name, str) or not name for name in expected_names) or
+            len(set(expected_names)) != len(expected_names)):
+        raise UnsafeLiveEnvironment("test-participant-names-not-distinct")
+    for environment in ENVIRONMENTS:
+        owned = sessions[environment["name"]]
+        if owned["host"]["roomCode"] != owned["guest"]["roomCode"]:
+            raise UnsafeLiveEnvironment("test-room-session-mismatch")
+    # Verify both test-created rooms before issuing any credential or ticket
+    # request, so a failed ownership check cannot lead to a negative probe.
     for index, environment in enumerate(ENVIRONMENTS):
         target = environment["name"]
         other = ENVIRONMENTS[1 - index]["name"]
         host = sessions[target]["host"]
-        guest = sessions[target]["guest"]
-        foreign = sessions[other]
-        if host["roomCode"] != guest["roomCode"]:
-            raise UnsafeLiveEnvironment("test-room-session-mismatch")
         url = environment["worker_url"] + "/api/rooms/" + host["roomCode"]
         headers = {"Origin": "https://ak-sekine.github.io"}
         state_response = request.get(url, headers=headers, timeout=20_000, max_redirects=0)
-        require(state_response.status == 200, f"own-room-state-unavailable-{target}")
+        if state_response.status != 200:
+            raise UnsafeLiveEnvironment("test-room-ownership-unverified")
         state = state_response.json()
         seats = state.get("seats") if isinstance(state, dict) else None
         if not isinstance(seats, list) or state.get("roomCode") != host["roomCode"]:
             raise UnsafeLiveEnvironment("test-room-state-identity-mismatch")
-        require(state.get("status") == "finalized" and isinstance(state.get("gameRevision"), int)
-                and state["gameRevision"] >= 1, f"own-room-game-state-unavailable-{target}")
         actual_names = {seat.get("name") for seat in seats if isinstance(seat, dict) and seat.get("kind") == "human"}
         if actual_names != set(names[target].values()) or actual_names & set(names[other].values()):
             raise UnsafeLiveEnvironment("cross-environment-room-state-mismatch")
-        other_code = foreign["host"]["roomCode"]
-        if other_code != host["roomCode"]:
-            other_url = environment["worker_url"] + "/api/rooms/" + other_code
-            cross_state = request.get(other_url, headers=headers, timeout=20_000, max_redirects=0)
-            if cross_state.status != 404:
-                # Could be a third-party code collision or a shared store.
-                # Do not inspect or attempt an action against that room.
-                raise UnsafeLiveEnvironment("cross-environment-room-code-occupied-or-shared")
+        require(state.get("status") == "finalized" and isinstance(state.get("gameRevision"), int)
+                and state["gameRevision"] >= 1, f"own-room-game-state-unavailable-{target}")
+    for index, environment in enumerate(ENVIRONMENTS):
+        target = environment["name"]
+        other = ENVIRONMENTS[1 - index]["name"]
+        host = sessions[target]["host"]
+        foreign = sessions[other]
+        url = environment["worker_url"] + "/api/rooms/" + host["roomCode"]
+        headers = {"Origin": "https://ak-sekine.github.io"}
         statuses = []
         socket_statuses = []
         for role in ("host", "guest"):
@@ -862,7 +867,7 @@ def verify_environment_isolation(request, sessions, names):
             require(isinstance(rejection_body, dict) and rejection_body.get("error") == "invalid_ticket",
                     f"cross-environment-ticket-rejection-code-{target}-{role}")
             socket_statuses.append(rejected.status)
-        results[target] = {"ownRoomParticipantsMatch": True, "foreignRoomStateNotShared": True,
+        results[target] = {"ownRoomParticipantsMatch": True, "ownRoomStatesDistinct": True,
                            "foreignCredentialsRejected": True,
                            "rejectionStatuses": statuses, "foreignTicketSocketRejectionStatuses": socket_statuses}
     return results
