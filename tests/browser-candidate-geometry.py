@@ -15,6 +15,7 @@ from playwright.sync_api import sync_playwright
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 BASE_URL = os.environ.get('HEIBON_BASE_URL', 'http://127.0.0.1:4173/heibon-mahjong/')
 BASELINE_SHA = '274348dc941285401ac198c88072073078a5a1d0'
+RESIZE_DIAGNOSTIC_WAIT_MS = 100
 VIEWPORTS = [(320, 568), (375, 560), (375, 635), (375, 634), (390, 844), (430, 932), (768, 1024),
              (1024, 768), (1280, 720), (1366, 768), (1440, 900), (1660, 825), (1920, 1080)]
 SCENARIOS = [('pon-multiple', 'call-pon', 2), ('chi', 'call-chi', 5),
@@ -56,22 +57,84 @@ def screenshot_filename(engine, width, height, mode, scenario, stage, pass_name)
 # keyboard changes without resizing layout, while forwarding native viewport resizes.
 VISUAL_VIEWPORT = r'''(() => {
   const nativeVisualViewport = window.visualViewport;
+  const eventLimit = 32;
+  const rounded = value => Number.isFinite(value) ? Number(value.toFixed(3)) : null;
+  window.issue32NativeVisualViewport = nativeVisualViewport;
   window.issue32NativeResizeCount = 0;
   window.issue32ResizeEvents = [];
+  window.issue32ResizeEventDiagnostics = [];
+  window.issue32ResizeEventDiagnosticsTruncated = false;
   const viewport = new EventTarget();
   let height = null, offsetTop = 0;
+  const recordResizeEvent = (type, event) => {
+    if (window.issue32ResizeEventDiagnostics.length >= eventLimit) {
+      window.issue32ResizeEventDiagnosticsTruncated = true;
+      return;
+    }
+    const native = window.issue32NativeVisualViewport;
+    const test = window.visualViewport;
+    window.issue32ResizeEventDiagnostics.push({
+      type,
+      performanceNowMs: rounded(performance.now()),
+      eventTimeStampMs: rounded(event.timeStamp),
+      innerWidth,
+      innerHeight,
+      documentClientWidth: document.documentElement?.clientWidth ?? null,
+      nativeVisualViewport: {
+        width: native ? rounded(native.width) : null,
+        height: native ? rounded(native.height) : null,
+      },
+      testVisualViewport: {
+        width: test ? rounded(test.width) : null,
+        height: test ? rounded(test.height) : null,
+      },
+    });
+  };
   Object.defineProperties(viewport, {
     width: {get: () => innerWidth}, height: {get: () => height ?? innerHeight},
     offsetTop: {get: () => offsetTop}, offsetLeft: {get: () => 0}, scale: {get: () => 1},
     pageTop: {get: () => scrollY + offsetTop}, pageLeft: {get: () => scrollX},
   });
   Object.defineProperty(window, 'visualViewport', {configurable: true, get: () => viewport});
-  nativeVisualViewport?.addEventListener('resize', () => {
+  nativeVisualViewport?.addEventListener('resize', event => {
     window.issue32NativeResizeCount++;
     issue32ResizeEvents.push('visualViewport.resize');
+    recordResizeEvent('native-visualViewport.resize', event);
     viewport.dispatchEvent(new Event('resize'));
   });
-  window.addEventListener('resize', () => issue32ResizeEvents.push('window.resize'), {capture:true});
+  viewport.addEventListener('resize', event => recordResizeEvent('test-visualViewport.resize', event));
+  window.addEventListener('resize', event => {
+    issue32ResizeEvents.push('window.resize');
+    recordResizeEvent('window.resize', event);
+  }, {capture:true});
+  window.issue32ReadResizeDiagnostics = stage => {
+    const native = window.issue32NativeVisualViewport;
+    const test = window.visualViewport;
+    const events = window.issue32ResizeEventDiagnostics.slice();
+    return {
+      state: {
+        stage,
+        performanceNowMs: rounded(performance.now()),
+        innerWidth,
+        innerHeight,
+        documentClientWidth: document.documentElement?.clientWidth ?? null,
+        nativeVisualViewport: {
+          width: native ? rounded(native.width) : null,
+          height: native ? rounded(native.height) : null,
+        },
+        testVisualViewport: {
+          width: test ? rounded(test.width) : null,
+          height: test ? rounded(test.height) : null,
+        },
+        nativeVisualViewportResizeCount: window.issue32NativeResizeCount,
+        windowResizeEventCount: events.filter(item => item.type === 'window.resize').length,
+        eventCount: events.length,
+      },
+      events,
+      windowResizeEventOrder: window.issue32ResizeEvents.slice(),
+      eventsTruncated: window.issue32ResizeEventDiagnosticsTruncated,
+    };
+  };
   window.issue32SetVisualViewport = (nextHeight = null, nextOffset = 0) => {
     height = nextHeight; offsetTop = nextOffset;
     viewport.dispatchEvent(new Event('resize'));
@@ -128,8 +191,9 @@ def settle(page):
     page.evaluate('()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
 
 
-def snapshot(page, online):
-    return page.evaluate(r'''online=>{
+def snapshot(page, online, resize_stage=None):
+    return page.evaluate(r'''args=>{
+      const {online, resizeStage} = args;
       const root=document.querySelector(online?'#online-game-controls':'#local-game-controls');
       const part=name=>root.querySelector(`[data-panel-part="${name}"]`);
       const rect=node=>node.getBoundingClientRect().toJSON();
@@ -138,7 +202,7 @@ def snapshot(page, online):
         return {...r,enabled:!node.disabled,hit:hit===node||node.contains(hit),
           inViewport:r.top>=visualViewport.offsetTop-.5&&r.bottom<=visualViewport.offsetTop+visualViewport.height+.5};};
       const panel=part('candidate-controls'), list=part('candidate-options');
-      return {root:rect(root),callRect:visible(part('call-controls'))?rect(part('call-controls')):null,
+      const result = {root:rect(root),callRect:visible(part('call-controls'))?rect(part('call-controls')):null,
         table:rect(document.querySelector(online?'#online-table':'#local-table')),
         panel:visible(panel)?rect(panel):null,back:visible(panel)?target(part('candidate-back')):null,
         candidates:[...list.querySelectorAll('button')].map(target),
@@ -155,7 +219,132 @@ def snapshot(page, online):
         frame: Object.fromEntries(['backgroundColor','borderTopColor','borderTopWidth','borderRadius'].map(key=>
           [key,getComputedStyle(panel.hidden?root:panel,'::before')[key]])),
       };
-    }''', online)
+      if (resizeStage) result.resizeDiagnostic = window.issue32ReadResizeDiagnostics(resizeStage);
+      return result;
+    }''', {'online': online, 'resizeStage': resize_stage})
+
+
+def store_resize_diagnostic_sample(record, sample):
+    diagnostics = record.setdefault('resizeDiagnostics', {'stages': [], 'events': [], 'eventsTruncated': False})
+    if sample.get('state') and len(diagnostics['stages']) < 16:
+        diagnostics['stages'].append(sample['state'])
+    diagnostics['events'] = sample.get('events', [])
+    diagnostics['eventsTruncated'] = sample.get('eventsTruncated', False)
+
+
+def capture_resize_diagnostic_stage(page, record, stage):
+    sample = page.evaluate('stage => window.issue32ReadResizeDiagnostics(stage)', stage)
+    store_resize_diagnostic_sample(record, sample)
+    return sample
+
+
+def compact_resize_snapshot(snapshot_value):
+    if not isinstance(snapshot_value, dict):
+        return None
+    def rect(value):
+        if not isinstance(value, dict):
+            return None
+        return {key: value.get(key) for key in ('x', 'y', 'width', 'height', 'left', 'top', 'right', 'bottom')}
+    back = snapshot_value.get('back')
+    return {
+        'layoutViewport': snapshot_value.get('layoutViewport'),
+        'root': rect(snapshot_value.get('root')),
+        'panel': rect(snapshot_value.get('panel')),
+        'table': rect(snapshot_value.get('table')),
+        'back': ({key: back.get(key) for key in ('enabled', 'hit', 'inViewport')} if isinstance(back, dict) else None),
+        'candidateCount': len(snapshot_value.get('candidates', [])),
+        'candidateTargets': [
+            {key: item.get(key) for key in ('enabled', 'hit', 'inViewport')}
+            for item in snapshot_value.get('candidates', [])
+        ],
+        'scrollY': snapshot_value.get('scrollY'),
+        'candidateList': snapshot_value.get('list'),
+    }
+
+
+def print_resize_failure_summary(record):
+    diagnostics = record.get('resizeDiagnostics', {})
+    observation = diagnostics.get('postAssertionObservation', {})
+    summary = {
+        'viewport': record.get('viewport'),
+        'mode': record.get('mode'),
+        'scenario': record.get('scenario'),
+        'assertion': diagnostics.get('assertion'),
+        'postAssertionObservation': observation,
+        'events': [
+            {key: event.get(key) for key in (
+                'type', 'performanceNowMs', 'eventTimeStampMs', 'innerWidth', 'innerHeight',
+                'documentClientWidth', 'nativeVisualViewport', 'testVisualViewport',
+            )}
+            for event in diagnostics.get('events', [])
+        ],
+        'eventsTruncated': diagnostics.get('eventsTruncated', False),
+        'stages': diagnostics.get('stages', []),
+        'layout': {
+            'before': compact_resize_snapshot(record.get('before')),
+            'opened': compact_resize_snapshot(record.get('open')),
+            'windowResized': compact_resize_snapshot(record.get('windowResized')),
+            'restoredAfterFailure': compact_resize_snapshot(record.get('windowResizeRestoredAfterAssertionFailure')),
+        },
+    }
+    print('candidate-geometry-resize-diagnostic ' + json.dumps(summary, ensure_ascii=False, separators=(',', ':')), flush=True)
+
+
+def diagnose_failed_window_resize_assertion(page, record, width, height, online, assertion_time_ms):
+    diagnostics = record.setdefault('resizeDiagnostics', {'stages': [], 'events': [], 'eventsTruncated': False})
+    observation = {
+        'waitLimitMs': RESIZE_DIAGNOSTIC_WAIT_MS,
+        'windowResizeObservedWithinLimit': False,
+        'windowResizeObservedAtAssertionMarker': False,
+        'windowResizeArrivedAfterAssertionMarker': False,
+        'arrivalAfterAssertionMs': None,
+    }
+    diagnostics['postAssertionObservation'] = observation
+    try:
+        capture_resize_diagnostic_stage(page, record, 'window-resize-assertion-failed')
+        observation['windowResizeObservedAtAssertionMarker'] = bool(
+            diagnostics.get('assertion', {}).get('windowResizeEventCountAtAssertionMarker', 0)
+        )
+        started_at_ms = page.evaluate('performance.now()')
+        try:
+            page.wait_for_function(
+                "(window.issue32ResizeEventDiagnostics || []).some(event => event.type === 'window.resize')",
+                timeout=RESIZE_DIAGNOSTIC_WAIT_MS,
+            )
+            observation['windowResizeObservedWithinLimit'] = True
+        except Exception as diagnostic_wait_error:
+            observation['waitErrorType'] = type(diagnostic_wait_error).__name__
+        completed_at_ms = page.evaluate('performance.now()')
+        observation['waitedMs'] = round(completed_at_ms - started_at_ms, 3)
+        sample = capture_resize_diagnostic_stage(page, record, 'post-assertion-diagnostic-observation')
+        delayed_event = next((
+            event for event in sample.get('events', [])
+            if event.get('type') == 'window.resize'
+            and isinstance(assertion_time_ms, (int, float))
+            and event.get('performanceNowMs', -1) > assertion_time_ms
+        ), None)
+        if delayed_event is not None:
+            observation['arrivalAfterAssertionMs'] = round(
+                delayed_event['performanceNowMs'] - assertion_time_ms, 3
+            )
+        observation['windowResizeArrivedAfterAssertionMarker'] = delayed_event is not None
+        observation['windowResizeArrivedAfterAssertion'] = delayed_event is not None
+        save()
+
+        try:
+            page.set_viewport_size({'width': width, 'height': height})
+            settle(page)
+            restored = snapshot(page, online, resize_stage='viewport-restored-after-assertion-failure')
+            restored_diagnostics = restored.pop('resizeDiagnostic', None)
+            if restored_diagnostics:
+                store_resize_diagnostic_sample(record, restored_diagnostics)
+            record['windowResizeRestoredAfterAssertionFailure'] = restored
+            diagnostics['viewportRestorationAfterFailure'] = 'completed'
+        except Exception as restore_error:
+            diagnostics['viewportRestorationErrorType'] = type(restore_error).__name__
+    except Exception as diagnostic_error:
+        diagnostics['diagnosticErrorType'] = type(diagnostic_error).__name__
+    save()
 
 
 def check(record, condition, message):
@@ -314,14 +503,47 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
         record['keyboardFocus'] = 'all candidates and Back: Tab order, name, focus-visible, clipping, no action'
 
     # Resize the layout viewport, then recover the original table and baseline.
-    page.evaluate('window.issue32NativeResizeCount=0; window.issue32ResizeEvents.length=0')
+    page.evaluate('''()=>{
+      window.issue32NativeResizeCount=0;
+      window.issue32ResizeEvents.length=0;
+      window.issue32ResizeEventDiagnostics.length=0;
+      window.issue32ResizeEventDiagnosticsTruncated=false;
+    }''')
+    capture_resize_diagnostic_stage(page, record, 'before-viewport-change')
     page.set_viewport_size({'width': width + 24, 'height': height})
+    capture_resize_diagnostic_stage(page, record, 'after-set-viewport-size')
     settle(page)
-    resized = snapshot(page, online)
+    capture_resize_diagnostic_stage(page, record, 'after-settle')
+    resized = snapshot(page, online, resize_stage='after-snapshot')
+    snapshot_diagnostics = resized.pop('resizeDiagnostic', None)
+    if snapshot_diagnostics:
+        store_resize_diagnostic_sample(record, snapshot_diagnostics)
     record['windowResized'] = resized
     record['nativeVisualViewportResizeCount'] = page.evaluate('window.issue32NativeResizeCount')
     record['windowResizeEventOrder'] = page.evaluate('window.issue32ResizeEvents.slice()')
-    check(record, 'window.resize' in record['windowResizeEventOrder'], 'window resize event was not observed')
+    assertion_sample = capture_resize_diagnostic_stage(page, record, 'assertion-evaluation')
+    assertion_time_ms = assertion_sample.get('state', {}).get('performanceNowMs')
+    resize_diagnostics = record.setdefault('resizeDiagnostics', {})
+    resize_diagnostics['assertion'] = {
+        'message': 'window resize event was not observed',
+        'legacyEventOrder': record['windowResizeEventOrder'],
+        'windowResizeEventCountAtAssertionMarker': assertion_sample.get('state', {}).get('windowResizeEventCount'),
+        'windowResizeObservedAtAssertionMarker': bool(
+            assertion_sample.get('state', {}).get('windowResizeEventCount')
+        ),
+        'assertionMarkerPerformanceNowMs': assertion_time_ms,
+    }
+    assertion_passed = 'window.resize' in record['windowResizeEventOrder']
+    try:
+        check(record, 'window.resize' in record['windowResizeEventOrder'], 'window resize event was not observed')
+        resize_diagnostics['assertion']['passed'] = assertion_passed
+    except AssertionError:
+        resize_diagnostics['assertion']['passed'] = False
+        diagnose_failed_window_resize_assertion(
+            page, record, width, height, online, assertion_time_ms,
+        )
+        print_resize_failure_summary(record)
+        raise
     if record['nativeVisualViewportResizeCount']:
       check(record, 'visualViewport.resize' in record['windowResizeEventOrder'],
             'native visualViewport resize was not forwarded into the test viewport')
@@ -339,7 +561,10 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
           'window resize lost candidate bottom anchor')
     page.set_viewport_size({'width': width, 'height': height})
     settle(page)
-    recovered = snapshot(page, online)
+    recovered = snapshot(page, online, resize_stage='viewport-restored')
+    restored_diagnostics = recovered.pop('resizeDiagnostic', None)
+    if restored_diagnostics:
+        store_resize_diagnostic_sample(record, restored_diagnostics)
     record['windowResizeRestored'] = recovered
     same_rect(record, before['root'], recovered['root'], 'operation area after viewport restoration')
     for key in ('left', 'right', 'width'):
