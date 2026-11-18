@@ -224,6 +224,7 @@ jobs:
         run: |
           python tests/test_browser_regressions_selection.py
           python tests/test_browser_mobile_table_layout_witness.py
+          python tests/test_live_environment_e2e.py
       - run: npm ci
       - name: Download verified build from Deploy workflow
         if: ${{ inputs.reuse_build }}

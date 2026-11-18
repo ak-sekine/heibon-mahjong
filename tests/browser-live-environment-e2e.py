@@ -1,13 +1,16 @@
 """Explicit Phase 6-B E2E against the published production and development Pages."""
+import base64
 import hashlib
 import json
 import os
 import platform
+import re
+import secrets
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
 
 ENVIRONMENTS = (
@@ -39,8 +42,24 @@ class LiveE2EFailure(RuntimeError):
     pass
 
 
+class UnsafeLiveEnvironment(LiveE2EFailure):
+    """Do not continue other stages when the target or isolation is unsafe."""
+
+
 def require(condition, code):
     if not condition:
+        if any(part in code for part in (
+            "worker-config-mismatch", "worker-websocket-origin-mismatch",
+            "external-host-request", "cross-environment-session",
+            "entry-redirect-", "cross-path-redirect", "session-restore-redirect",
+            "host-opposite-session-key-present", "guest-session-existed-before-join",
+            "guest-prior-session-missing", "session-key-coexistence",
+            "cache-content-cross-environment", "production-cache-contains-development",
+            "cache-namespaces-overlap", "public-environments-json-state-mismatch",
+            "public-environments-json-hash-mismatch", "public-release-hash-mismatch",
+            "snapshot-", "public-environments-changed", "public-release-changed",
+        )):
+            raise UnsafeLiveEnvironment(code)
         raise LiveE2EFailure(code)
 
 
@@ -56,9 +75,15 @@ def write_report(report):
 
 def origin(value):
     parsed = urlsplit(value)
-    return f"{parsed.scheme}://{parsed.hostname}" if parsed.scheme and parsed.hostname else "invalid-origin"
+    allowed = {urlsplit(env["worker_url"]).hostname for env in ENVIRONMENTS}
+    allowed.add(urlsplit(ENVIRONMENTS[0]["pages_url"]).hostname)
+    return (f"{parsed.scheme}://{parsed.hostname}"
+            if (parsed.scheme in {"https", "wss"} and parsed.hostname in allowed and
+                parsed.port in (None, 443) and not parsed.username and not parsed.password)
+            else "blocked-origin")
 
 
+BLOCKED_EXTERNAL_REQUESTS = []
 MAX_ONLINE_DIAGNOSTIC_EVENTS = 256
 ROOM_ACTION_ERROR_CODES = frozenset({
     "invalid_message", "invalid_json", "message_too_large", "rate_limited",
@@ -250,6 +275,8 @@ def record_online_communication(trace, started_at, active_action, client, event_
 
 
 def run_traced_action(trace, started_at, active_action, action_id, operation):
+    if BLOCKED_EXTERNAL_REQUESTS:
+        raise UnsafeLiveEnvironment("unexpected-external-request")
     actions = trace.setdefault("actions", [])
     action = {
         "id": action_id,
@@ -264,6 +291,8 @@ def run_traced_action(trace, started_at, active_action, action_id, operation):
     action_started = time.monotonic()
     try:
         result = operation()
+        if BLOCKED_EXTERNAL_REQUESTS:
+            raise UnsafeLiveEnvironment("unexpected-external-request")
     except Exception as error:
         action["status"] = "FAILED"
         action["exceptionType"] = type(error).__name__
@@ -389,8 +418,9 @@ def configure_page(page, environment, page_report, allowed_worker_urls=None):
     def guard_host(route):
         parsed = urlsplit(route.request.url)
         allowed_scheme = parsed.scheme == "https" or (parsed.scheme == "wss" and parsed.hostname in worker_hosts)
-        if not allowed_scheme or parsed.hostname not in expected_hosts:
-            page_report["blockedExternalHosts"].append(parsed.hostname or "invalid-url")
+        if not allowed_scheme or parsed.hostname not in expected_hosts or origin(route.request.url) == "blocked-origin":
+            page_report["blockedExternalHosts"].append("blocked")
+            BLOCKED_EXTERNAL_REQUESTS.append("blocked-external-request")
             route.abort("blockedbyclient")
             return
         route.continue_()
@@ -410,7 +440,12 @@ def configure_page(page, environment, page_report, allowed_worker_urls=None):
             "consoleErrorCount", page_report["consoleErrorCount"] + 1
         ) if message.type == "error" else None,
     )
-    page.on("websocket", lambda socket: page_report["websocketOrigins"].append(origin(socket.url)))
+    def record_socket(socket):
+        socket_origin = origin(socket.url)
+        if socket_origin != "wss://" + urlsplit(environment["worker_url"]).hostname:
+            BLOCKED_EXTERNAL_REQUESTS.append("unexpected-websocket-origin")
+        page_report["websocketOrigins"].append(socket_origin)
+    page.on("websocket", record_socket)
     return page
 
 
@@ -466,16 +501,45 @@ def session_key_presence(page):
     )
 
 
+def wait_for_cpu_discard_boundary(page):
+    """Pass optional offers while the randomly seated CPUs reach a human turn."""
+    deadline = time.monotonic() + 30
+    while True:
+        remaining = int((deadline - time.monotonic()) * 1000)
+        if remaining <= 0:
+            raise LiveE2EFailure("cpu-human-discard-boundary-timeout")
+        page.wait_for_function("""() => {
+          const available = selector => {
+            const button = document.querySelector(selector);
+            return button && button.getClientRects().length > 0 && !button.disabled;
+          };
+          return available('#pass-calls') || available('#pass-ron') ||
+            (document.body.dataset.gameMode === 'offline' &&
+             document.querySelectorAll('#player-hand button:enabled').length >= 13);
+        }""", timeout=remaining)
+        passed_offer = False
+        for selector in ("#pass-calls", "#pass-ron"):
+            button = page.locator(selector)
+            if button.is_visible() and button.is_enabled():
+                button.click()
+                remaining = max(1, int((deadline - time.monotonic()) * 1000))
+                page.wait_for_function("""selector => {
+                  const button = document.querySelector(selector);
+                  return !button || !button.getClientRects().length || button.disabled;
+                }""", arg=selector, timeout=remaining)
+                passed_offer = True
+                break
+        if not passed_offer:
+            return
+
+
 def start_cpu_and_discard(page, report, suffix):
     page.locator("#main-menu-toggle").click()
     page.locator("#new-game").click()
     require(page.locator("#new-game-dialog").evaluate("dialog => dialog.open"), f"new-game-dialog-{suffix}")
     page.locator("#confirm-new-game").click()
     page.locator("#local-table").wait_for(state="visible", timeout=15_000)
-    page.wait_for_function(
-        "document.body.dataset.gameMode === 'offline' && document.querySelectorAll('#player-hand button:enabled').length >= 13",
-        timeout=20_000,
-    )
+    wait_for_cpu_discard_boundary(page)
     report["cpuGameStarted"] = True
     river = page.locator('.river[data-player-id="0"] svg')
     before_discard = river.count()
@@ -533,6 +597,17 @@ ONLINE_SEAT_READY_EXPRESSION = """({displayName, requireHost}) => {
   const role = row.querySelector('.online-seat-role')?.textContent ?? '';
   const status = row.querySelector('.online-seat-status')?.textContent ?? '';
   return (!requireHost || role.includes('ホスト')) && status.includes('準備完了');
+}"""
+
+ONLINE_GUEST_CONNECTED_EXPRESSION = """displayName => {
+  const rows = Array.from(document.querySelectorAll('#online-seats > li')).filter(row =>
+    row.dataset.kind === 'human' &&
+    row.querySelector('.online-seat-name')?.textContent?.trim() === displayName
+  );
+  if (rows.length !== 1) return false;
+  const role = rows[0].querySelector('.online-seat-role')?.textContent ?? '';
+  const status = rows[0].querySelector('.online-seat-status')?.textContent ?? '';
+  return !role.includes('ホスト') && status.includes('接続中') && status.includes('未準備');
 }"""
 
 ONLINE_PLAYERS_READY_EXPRESSION = """({hostName, guestName}) => {
@@ -595,6 +670,10 @@ def wait_for_active_online_human(page, host_name, guest_name, timeout_ms):
 
 
 def start_online_game(host_page, guest_page, host_name, guest_name, trace_step):
+    trace_step(
+        "guest-connected-on-host-wait",
+        lambda: host_page.wait_for_function(ONLINE_GUEST_CONNECTED_EXPRESSION, arg=guest_name, timeout=20_000),
+    )
     trace_step("host-ready-click", lambda: host_page.locator("#online-ready").click())
     trace_step(
         "host-ready-sync-on-guest-wait",
@@ -654,7 +733,12 @@ def online_discard_and_sync(actor_page, peer_page, actor_role, page_report):
     before_actor = total_online_river_tiles(actor_page)
     before_peer = total_online_river_tiles(peer_page)
     require(before_actor == before_peer, "online-river-state-diverged-before-discard")
-    actor_page.locator("#online-player-hand button[data-tile-id]:not([disabled])").first.click()
+    tile = actor_page.locator("#online-player-hand button[data-tile-id]:not([disabled])").first
+    # This ID is retained only in memory. It must become a public river tile in
+    # both clients before it is used as evidence of the discard.
+    tile_id = tile.get_attribute("data-tile-id")
+    require(bool(tile_id), "online-selected-tile-id-missing")
+    tile.click()
     actor_page.locator("#online-discard").wait_for(state="visible", timeout=5_000)
     actor_page.wait_for_function("!document.querySelector('#online-discard').disabled", timeout=5_000)
     actor_page.locator("#online-discard").click()
@@ -664,6 +748,9 @@ def online_discard_and_sync(actor_page, peer_page, actor_role, page_report):
             arg=before_actor,
             timeout=30_000,
         )
+        page.wait_for_function("""tileId => Array.from(
+          document.querySelectorAll('#online-table [data-online-river] .river-tile')
+        ).some(tile => tile.dataset.tileId === tileId)""", arg=tile_id, timeout=30_000)
     actor_count = total_online_river_tiles(actor_page)
     peer_count = total_online_river_tiles(peer_page)
     require(actor_count > before_actor and actor_count == peer_count, "online-discard-state-not-synchronized")
@@ -671,51 +758,114 @@ def online_discard_and_sync(actor_page, peer_page, actor_role, page_report):
     page_report["synchronizedRiverTileCount"] = actor_count
 
 
-def disconnect_reconnect_guest(guest_context, guest_page, host_page, guest_report, environment, *, previous_count=0, trace_step=None):
-    run_step = trace_step or (lambda _action_id, operation: operation())
-    guest_report["websocketCountBeforeReconnect"] = len(guest_report["websocketOrigins"])
-    run_step("guest-network-offline-toggle", lambda: guest_context.set_offline(True))
-    run_step(
-        "guest-disconnected-state-wait",
-        lambda: guest_page.wait_for_function(
-            """() => {
-              const status = document.querySelector('#online-connection');
-              return status && (!status.hidden || !document.querySelector('#online-reconnect').hidden);
-            }""",
-            timeout=20_000,
-        ),
-    )
-    run_step("guest-network-online-toggle", lambda: guest_context.set_offline(False))
-    if not guest_page.locator("#online-reconnect").is_hidden():
-        run_step("guest-reconnect-click", lambda: guest_page.locator("#online-reconnect").click())
-    run_step(
-        "guest-restored-state-wait",
-        lambda: guest_page.wait_for_function(
-            """() => document.querySelector('#online-match') && !document.querySelector('#online-match').hidden &&
-              document.querySelector('#online-connection').hidden""",
-            timeout=30_000,
-        ),
-    )
-    run_step(
-        "guest-restored-game-state-check",
-        lambda: require(
-            total_online_river_tiles(guest_page) == total_online_river_tiles(host_page),
-            "reconnected-game-state-not-restored",
-        ),
-    )
-    guest_report["reconnectRestoredGameState"] = True
-    guest_report["websocketCountAfterReconnect"] = len(guest_report["websocketOrigins"])
-    run_step(
-        "guest-websocket-reopened-check",
-        lambda: require(
-            guest_report["websocketCountAfterReconnect"] > guest_report["websocketCountBeforeReconnect"],
-            f"websocket-not-reopened-{environment['name']}",
-        ),
-    )
-    run_step(
-        "guest-worker-origin-check",
-        lambda: require_worker_origins(guest_report, environment, previous_count=previous_count),
-    )
+def capture_test_session(page, storage_key, room_code, display_name):
+    """Keep credentials in memory only; never put them in the report or exception."""
+    session = page.evaluate("key => JSON.parse(sessionStorage.getItem(key) || 'null')", storage_key)
+    if not isinstance(session, dict):
+        raise UnsafeLiveEnvironment("test-session-unavailable")
+    code = session.get("roomCode")
+    token = session.get("participantToken")
+    if (code != room_code or session.get("displayName") != display_name or
+            not isinstance(code, str) or not re.fullmatch(r"[A-HJ-NP-Z2-9]{6}", code) or
+            not isinstance(token, str) or not re.fullmatch(r"[a-f0-9]{64}", token)):
+        raise UnsafeLiveEnvironment("test-session-identity-mismatch")
+    return {"roomCode": code, "participantToken": token}
+
+
+def verify_environment_isolation(request, sessions, names):
+    """Probe credentials only against our two known target rooms.
+
+    A room code may coincide across Workers. Each target is a room created by
+    this run in that Worker, and only the other Worker's participant tokens are
+    used for negative ticket requests. A status-only cross-Worker GET detects
+    sharing; if that code is occupied elsewhere, stop without inspecting the
+    response body or attempting to authenticate to that potentially foreign
+    room. Tokens and codes stay in memory.
+    """
+    results = {}
+    for environment in ENVIRONMENTS:
+        for role in ("host", "guest"):
+            session = sessions[environment["name"]][role]
+            code, token = session.get("roomCode"), session.get("participantToken")
+            if (not isinstance(code, str) or not re.fullmatch(r"[A-HJ-NP-Z2-9]{6}", code) or
+                    not isinstance(token, str) or not re.fullmatch(r"[a-f0-9]{64}", token)):
+                raise UnsafeLiveEnvironment("invalid-test-session")
+    tokens = [sessions[environment["name"]][role]["participantToken"]
+              for environment in ENVIRONMENTS for role in ("host", "guest")]
+    if len(set(tokens)) != len(tokens):
+        raise UnsafeLiveEnvironment("test-participant-credentials-not-distinct")
+    for index, environment in enumerate(ENVIRONMENTS):
+        target = environment["name"]
+        other = ENVIRONMENTS[1 - index]["name"]
+        host = sessions[target]["host"]
+        guest = sessions[target]["guest"]
+        foreign = sessions[other]
+        if host["roomCode"] != guest["roomCode"]:
+            raise UnsafeLiveEnvironment("test-room-session-mismatch")
+        url = environment["worker_url"] + "/api/rooms/" + host["roomCode"]
+        headers = {"Origin": "https://ak-sekine.github.io"}
+        state_response = request.get(url, headers=headers, timeout=20_000, max_redirects=0)
+        require(state_response.status == 200, f"own-room-state-unavailable-{target}")
+        state = state_response.json()
+        seats = state.get("seats") if isinstance(state, dict) else None
+        if not isinstance(seats, list) or state.get("roomCode") != host["roomCode"]:
+            raise UnsafeLiveEnvironment("test-room-state-identity-mismatch")
+        require(state.get("status") == "finalized" and isinstance(state.get("gameRevision"), int)
+                and state["gameRevision"] >= 1, f"own-room-game-state-unavailable-{target}")
+        actual_names = {seat.get("name") for seat in seats if isinstance(seat, dict) and seat.get("kind") == "human"}
+        if actual_names != set(names[target].values()) or actual_names & set(names[other].values()):
+            raise UnsafeLiveEnvironment("cross-environment-room-state-mismatch")
+        other_code = foreign["host"]["roomCode"]
+        if other_code != host["roomCode"]:
+            other_url = environment["worker_url"] + "/api/rooms/" + other_code
+            cross_state = request.get(other_url, headers=headers, timeout=20_000, max_redirects=0)
+            if cross_state.status != 404:
+                # Could be a third-party code collision or a shared store.
+                # Do not inspect or attempt an action against that room.
+                raise UnsafeLiveEnvironment("cross-environment-room-code-occupied-or-shared")
+        statuses = []
+        socket_statuses = []
+        for role in ("host", "guest"):
+            response = request.post(url + "/ticket", headers={
+                **headers, "Authorization": "Bearer " + foreign[role]["participantToken"],
+            }, timeout=20_000, max_redirects=0)
+            if 200 <= response.status < 300:
+                raise UnsafeLiveEnvironment("cross-environment-token-accepted")
+            require(response.status == 401, f"cross-environment-token-rejection-status-{target}-{role}")
+            body = response.json()
+            require(isinstance(body, dict) and body.get("error") == "unauthorized",
+                    f"cross-environment-token-rejection-code-{target}-{role}")
+            statuses.append(response.status)
+            # Request a valid, single-use ticket only for our source room, then
+            # verify that it cannot upgrade a socket for our target room. The
+            # token, ticket, room code and handshake headers are never reported.
+            source = ENVIRONMENTS[1 - index]
+            source_url = source["worker_url"] + "/api/rooms/" + foreign[role]["roomCode"]
+            issued = request.post(source_url + "/ticket", headers={
+                **headers, "Authorization": "Bearer " + foreign[role]["participantToken"],
+            }, timeout=20_000, max_redirects=0)
+            require(issued.status == 200, f"source-test-ticket-unavailable-{other}-{role}")
+            ticket_body = issued.json()
+            ticket = ticket_body.get("ticket") if isinstance(ticket_body, dict) else None
+            if not isinstance(ticket, str) or not re.fullmatch(r"[a-f0-9]{64}", ticket):
+                raise UnsafeLiveEnvironment("invalid-source-test-ticket")
+            nonce = base64.b64encode(secrets.token_bytes(16)).decode("ascii")
+            rejected = request.get(url + "/socket", headers={
+                **headers, "Upgrade": "websocket", "Connection": "Upgrade",
+                "Sec-WebSocket-Version": "13", "Sec-WebSocket-Key": nonce,
+                "Sec-WebSocket-Protocol": "heibon-mahjong.v1, ticket." + ticket,
+            }, timeout=20_000, max_redirects=0)
+            if rejected.status == 101 or 200 <= rejected.status < 300:
+                raise UnsafeLiveEnvironment("cross-environment-ticket-accepted")
+            require(rejected.status == 401, f"cross-environment-ticket-rejection-status-{target}-{role}")
+            rejection_body = rejected.json()
+            require(isinstance(rejection_body, dict) and rejection_body.get("error") == "invalid_ticket",
+                    f"cross-environment-ticket-rejection-code-{target}-{role}")
+            socket_statuses.append(rejected.status)
+        results[target] = {"ownRoomParticipantsMatch": True, "foreignRoomStateNotShared": True,
+                           "foreignCredentialsRejected": True,
+                           "rejectionStatuses": statuses, "foreignTicketSocketRejectionStatuses": socket_statuses}
+    return results
 
 
 def load_service_worker(page, environment):
@@ -821,6 +971,9 @@ def run_online_checks(browser, browser_name, report, save_report):
     browser_letter = "C" if browser_name == "chromium" else "W"
     tag = os.environ.get("GITHUB_RUN_ID", os.environ.get("GITHUB_SHA", "local")[:7])[-10:]
     online_results = {environment["name"]: {} for environment in ENVIRONMENTS}
+    test_sessions = {}
+    test_names = {}
+    online_phase = "B2"
     trace_started = time.monotonic()
     trace_started_wall_ms = round(time.time() * 1000)
     active_action = {"id": None}
@@ -866,10 +1019,11 @@ def run_online_checks(browser, browser_name, report, save_report):
     report["onlineDiagnostics"] = trace
     save_report()
     host_context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="allow")
-    guest_context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="allow")
+    guest_context = None
     host_page = None
     guest_page = None
     try:
+        guest_context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="allow")
         host_page = host_context.new_page()
         guest_page = guest_context.new_page()
         # The same tabs cross between the two fixed Pages paths to prove that
@@ -883,8 +1037,10 @@ def run_online_checks(browser, browser_name, report, save_report):
                 allowed_scheme = parsed.scheme == "https" or (
                     parsed.scheme == "wss" and parsed.hostname == page_report["allowedWorkerHost"]
                 )
-                if not allowed_scheme or (parsed.hostname != pages_host and parsed.hostname != page_report["allowedWorkerHost"]):
-                    page_report["blockedExternalHosts"].append(parsed.hostname or "invalid-url")
+                if (not allowed_scheme or origin(route.request.url) == "blocked-origin" or
+                        (parsed.hostname != pages_host and parsed.hostname != page_report["allowedWorkerHost"])):
+                    page_report["blockedExternalHosts"].append("blocked")
+                    BLOCKED_EXTERNAL_REQUESTS.append("blocked-external-request")
                     route.abort("blockedbyclient")
                     return
                 route.continue_()
@@ -939,6 +1095,8 @@ def run_online_checks(browser, browser_name, report, save_report):
             )
             def record_websocket(socket, *, label=label, page_report=page_report):
                 socket_origin = origin(socket.url)
+                if socket_origin != "wss://" + page_report["allowedWorkerHost"]:
+                    BLOCKED_EXTERNAL_REQUESTS.append("unexpected-websocket-origin")
                 page_report["websocketOrigins"].append(socket_origin)
                 emit_communication(label, "websocket-created", origin=socket_origin)
                 try:
@@ -963,7 +1121,7 @@ def run_online_checks(browser, browser_name, report, save_report):
                 return run_traced_action(trace, trace_started, active_action, action_id, operation)
 
             stage_report = {
-                "status": "NOT_STARTED",
+                "status": "RUNNING",
                 "pagesUrl": environment["pages_url"],
                 "configuredWorkerOrigin": origin(environment["worker_url"]),
                 "diagnosticActionStartIndex": action_start,
@@ -972,13 +1130,12 @@ def run_online_checks(browser, browser_name, report, save_report):
                 "gameStarted": False,
                 "discardSynchronized": False,
                 "firstDiscardActor": None,
-                "guestDisconnected": False,
-                "guestReconnected": False,
                 "sessionKeys": {},
                 "websocketOrigins": [],
                 "httpOrigins": [],
             }
             online_results[key] = stage_report
+            report["checks"]["B2"][key] = "RUNNING"
             save_report()
             for label in ("host", "guest"):
                 observer[label]["allowedWorkerHost"] = urlsplit(environment["worker_url"]).hostname
@@ -1022,6 +1179,11 @@ def run_online_checks(browser, browser_name, report, save_report):
                 require(guest_keys_before_join[opposite_session_key], f"guest-prior-session-missing-{key}")
             trace_step("room-join", lambda: join_room(guest_page, guest_name, room_code))
             stage_report["guestJoined"] = True
+            test_sessions[key] = {
+                "host": capture_test_session(host_page, expected_session_key, room_code, host_name),
+                "guest": capture_test_session(guest_page, expected_session_key, room_code, guest_name),
+            }
+            test_names[key] = {"host": host_name, "guest": guest_name}
             first_discard_actor = start_online_game(
                 host_page,
                 guest_page,
@@ -1047,13 +1209,6 @@ def run_online_checks(browser, browser_name, report, save_report):
                 "guest-worker-origin-check",
                 lambda: require_worker_origins(observer["guest"], environment, previous_count=guest_socket_start),
             )
-            disconnect_reconnect_guest(
-                guest_context, guest_page, host_page, observer["guest"], environment,
-                previous_count=guest_socket_start,
-                trace_step=lambda action_id, operation: trace_step(action_id, operation),
-            )
-            stage_report["guestDisconnected"] = True
-            stage_report["guestReconnected"] = True
             stage_report["sessionKeys"] = {
                 "expectedEnvironmentKeyPresent": True,
                 "oppositeEnvironmentKeyPresent": bool(session_key_presence(host_page)[opposite_session_key]),
@@ -1071,7 +1226,23 @@ def run_online_checks(browser, browser_name, report, save_report):
             )
             stage_report["diagnosticActionEndIndex"] = len(trace["actions"])
             stage_report["status"] = "PASSED"
+            report["checks"]["B2"][key] = "PASSED"
             save_report()
+
+        report["checks"]["B2"] = {
+            "status": "PASSED", "production": "PASSED", "development": "PASSED",
+            "scope": "normal-online-play-and-discard-sync",
+        }
+        online_phase = "B3"
+        report["checks"]["B3"] = {"status": "RUNNING", "sessionKeys": "NOT_TESTED"}
+        save_report()
+        if BLOCKED_EXTERNAL_REQUESTS:
+            raise UnsafeLiveEnvironment("unexpected-external-request")
+        # The request context has no page route or diagnostic callback that can
+        # expose credentials. Each target code belongs to our own test room.
+        isolation = verify_environment_isolation(host_context.request, test_sessions, test_names)
+        report["workerEnvironmentSeparation"] = isolation
+        save_report()
 
         # Both same-origin session keys should now coexist in the same tab
         # storage area. Navigate back through both URLs and prove each page
@@ -1092,9 +1263,20 @@ def run_online_checks(browser, browser_name, report, save_report):
                 keys = session_key_presence(page)
                 require(keys[PRODUCTION_SESSION_KEY] and keys[DEVELOPMENT_SESSION_KEY], f"session-key-coexistence-{label}")
                 require_worker_origins(observer[label], environment, previous_count=previous_count)
+                score = page.locator("#online-score-strip").inner_text()
+                other = ENVIRONMENTS[1 if key == "production" else 0]["name"]
+                if (not all(name in score for name in test_names[key].values()) or
+                        any(name in score for name in test_names[other].values())):
+                    raise UnsafeLiveEnvironment("cross-environment-game-state-mismatch")
             online_results[key]["crossPathSessionRestore"] = True
-            online_results[key]["status"] = "PASSED"
             save_report()
+
+        report["checks"]["B3"] = {
+            "status": "PASSED", "productionToProductionWorker": True,
+            "developmentToDevelopmentWorker": True, "crossPathSessionRestore": True,
+            "sessionKeys": "PASSED", "foreignCredentialsRejected": True,
+            "ownRoomStatesSeparated": True,
+        }
 
         for label in ("host", "guest"):
             require(not observer[label]["blockedExternalHosts"], f"online-external-host-request-{label}")
@@ -1106,19 +1288,19 @@ def run_online_checks(browser, browser_name, report, save_report):
             {"host": host_page, "guest": guest_page},
         )
         report["online"] = online_results
-        report["workerEnvironmentSeparation"] = {
-            key: {
+        for environment in ENVIRONMENTS:
+            key = environment["name"]
+            report["workerEnvironmentSeparation"][key].update({
                 "expectedWorkerOrigin": origin(environment["worker_url"]),
                 "observedWebSocketOrigins": online_results[key]["websocketOrigins"],
                 "observedHttpOrigins": online_results[key]["httpOrigins"],
-            }
-            for key, environment in ((environment["name"], environment) for environment in ENVIRONMENTS)
-        }
+            })
         save_report()
     except Exception:
         trace["failureEnvironment"] = active_environment["name"]
+        trace["failurePhase"] = online_phase
         failed_stage = online_results.get(active_environment["name"])
-        if isinstance(failed_stage, dict):
+        if online_phase == "B2" and isinstance(failed_stage, dict):
             failed_stage["status"] = "FAILED"
             failed_stage["failedActionId"] = trace.get("failedActionId")
             failed_stage["lastSuccessfulActionId"] = trace.get("lastSuccessfulActionId")
@@ -1144,8 +1326,17 @@ def run_online_checks(browser, browser_name, report, save_report):
                 errors.append(type(diagnostic_error).__name__)
         raise
     finally:
-        guest_context.close()
-        host_context.close()
+        cleanup_errors = []
+        for context in (guest_context, host_context):
+            if context is not None:
+                try:
+                    context.close()
+                except Exception as error:
+                    cleanup_errors.append(type(error).__name__)
+        if cleanup_errors:
+            trace["cleanupErrorTypes"] = cleanup_errors
+            save_report()
+            raise UnsafeLiveEnvironment("online-context-cleanup-failed") from None
 
 
 def run_storage_partition_check(browser, report, save_report):
@@ -1190,6 +1381,11 @@ def run_storage_partition_check(browser, report, save_report):
         require(saved[DEVELOPMENT_RULES_KEY] == {"matchFormat": "tonpu", "doubleYakuman": False}, "development-rules-not-isolated")
         reopen_and_check_rules(production, "tonnan", True, "production")
         reopen_and_check_rules(development, "tonpu", False, "development")
+        # Change production again after both keys exist and verify development
+        # still restores its own settings in the same browser context.
+        set_and_save_rules(production, "tonpu", True, PRODUCTION_RULES_KEY)
+        reopen_and_check_rules(production, "tonpu", True, "production-after-change")
+        reopen_and_check_rules(development, "tonpu", False, "development-after-production-change")
 
         for key in ("production", "development"):
             require(not observers[key]["blockedExternalHosts"], f"storage-external-host-request-{key}")
@@ -1203,7 +1399,7 @@ def run_storage_partition_check(browser, report, save_report):
             "productionValuePreserved": True,
             "developmentValuePreserved": True,
             "crossTabLocalStorage": True,
-            "sessionStorageKeysCheckedInOnlineFlow": True,
+            "bothDirectionsChecked": True,
         }
         require(report["storageSeparation"]["sameOrigin"], "pages-not-same-origin")
         save_report()
@@ -1271,6 +1467,21 @@ def run_pwa_and_multitab_check(browser, report, save_report):
         production_cache_names = expected_cache_inventory(inventory, ENVIRONMENTS[0])
         development_cache_names = expected_cache_inventory(inventory, ENVIRONMENTS[1])
         require(set(production_cache_names).isdisjoint(development_cache_names), "cache-namespaces-overlap")
+        for key, observer in observers.items():
+            require(not observer["blockedExternalHosts"], f"pwa-external-host-request-{key}")
+            require(not observer["pageErrorTypes"], f"pwa-page-error-{key}")
+            require(not observer["consoleErrorCount"], f"pwa-console-error-{key}")
+        report["pwa"] = {
+            "production": {"scope": ENVIRONMENTS[0]["pages_url"], "script": ENVIRONMENTS[0]["pages_url"] + "sw.js", "cacheNames": production_cache_names},
+            "development": {"scope": ENVIRONMENTS[1]["pages_url"], "script": ENVIRONMENTS[1]["pages_url"] + "sw.js", "cacheNames": development_cache_names},
+            "registrations": registrations,
+        }
+        report["checks"]["B5"] = {
+            "status": "PASSED", "production": "PASSED", "development": "PASSED",
+            "distinctScopesAndCacheNamespaces": True,
+        }
+        report["checks"]["B7"] = {"status": "RUNNING"}
+        save_report()
 
         # Open a second tab for each scope, then reload one tab per environment.
         second_tabs = {}
@@ -1286,7 +1497,8 @@ def run_pwa_and_multitab_check(browser, report, save_report):
             second_tabs[key] = page
             observers[f"{key}SecondTab"] = observer
 
-        before_reload = {name: sorted(paths) for name, paths in inventory.items()}
+        # Take the baseline after both second tabs and their workers are ready.
+        before_reload = {name: sorted(paths) for name, paths in cache_inventory(development).items()}
         for key in ("production", "development"):
             second_tabs[key].reload(wait_until="networkidle", timeout=30_000)
             second_tabs[key].wait_for_function(
@@ -1312,18 +1524,13 @@ def run_pwa_and_multitab_check(browser, report, save_report):
             require(not observer["pageErrorTypes"], f"pwa-page-error-{key}")
             require(not observer["consoleErrorCount"], f"pwa-console-error-{key}")
 
-        report["pwa"] = {
-            "production": {"scope": ENVIRONMENTS[0]["pages_url"], "script": ENVIRONMENTS[0]["pages_url"] + "sw.js", "cacheNames": production_cache_names},
-            "development": {"scope": ENVIRONMENTS[1]["pages_url"], "script": ENVIRONMENTS[1]["pages_url"] + "sw.js", "cacheNames": development_cache_names},
-            "registrations": registrations,
-        }
         report["multiTab"] = {
             "tabsPerEnvironment": 2,
             "productionAndDevelopmentControllersRemainDistinct": True,
             "crossEnvironmentReloadPreservedOtherController": True,
             "cacheNamesBefore": sorted(before_reload),
             "cacheNamesAfter": sorted(after_reload),
-            "cacheContentsUnchanged": True,
+            "cacheUrlInventoryUnchanged": True,
             "waitingUpdateBehavior": "NOT_TESTED_NO_PUBLICATION_PERMITTED",
         }
         save_report()
@@ -1334,13 +1541,14 @@ def run_pwa_and_multitab_check(browser, report, save_report):
 def run_offline_cpu_check(browser, environment, report, save_report):
     key = environment["name"]
     check = {
-        "status": "NOT_STARTED",
+        "status": "RUNNING",
         "pagesUrl": environment["pages_url"],
         "serviceWorkerControlledBeforeOffline": False,
         "offlineEntryStatus": None,
         "cpuGameStarted": False,
         "discardCount": 0,
-        "networkRestored": False,
+        "offlineEmulationDisabled": False,
+        "networkRecoveryVerified": False,
     }
     observer = {"blockedExternalHosts": [], "httpOrigins": [], "websocketOrigins": [], "pageErrorTypes": []}
     context, page = make_page(browser, environment, observer)
@@ -1365,13 +1573,197 @@ def run_offline_cpu_check(browser, environment, report, save_report):
         require(not observer["pageErrorTypes"], f"offline-page-error-{key}")
         require(not observer["blockedExternalHosts"], f"offline-external-host-request-{key}")
         require(not observer["consoleErrorCount"], f"offline-console-error-{key}")
-        check["status"] = "PASSED"
-    finally:
         context.set_offline(False)
-        check["networkRestored"] = True
-        context.close()
+        check["offlineEmulationDisabled"] = True
+        page.wait_for_function("navigator.onLine", timeout=20_000)
+        release_url = environment["pages_url"] + "release.json"
+        with page.expect_response(lambda response: response.url == release_url and response.request.method == "GET", timeout=20_000) as observed:
+            status = page.evaluate("""async url => {
+              const response = await fetch(url, {cache: 'no-store'});
+              return response.status;
+            }""", release_url)
+        response = observed.value
+        require(status == 200 and response.status == 200 and not response.from_service_worker,
+                f"offline-network-recovery-failed-{key}")
+        check["networkRecoveryVerified"] = True
+        check["status"] = "PASSED"
+    except Exception as error:
+        check["status"] = "FAILED"
+        check["failureType"] = type(error).__name__
+        raise
+    finally:
+        cleanup_errors = []
+        try:
+            context.set_offline(False)
+            check["offlineEmulationDisabled"] = True
+        except Exception as error:
+            cleanup_errors.append(type(error).__name__)
+        try:
+            context.close()
+        except Exception as error:
+            cleanup_errors.append(type(error).__name__)
+        if cleanup_errors:
+            check["status"] = "FAILED"
+            check["cleanupErrorTypes"] = cleanup_errors
         report.setdefault("offline", {})[key] = check
         save_report()
+        if cleanup_errors:
+            raise UnsafeLiveEnvironment("offline-context-cleanup-failed") from None
+
+
+def run_b1_check(browser, environment, expected_release, report, save_report):
+    key = environment["name"]
+    page_report = {
+        "environment": key, "pagesUrl": environment["pages_url"],
+        "configuredWorkerOrigin": origin(environment["worker_url"]),
+        "releaseSha": expected_release["sha"], "releaseDigest": expected_release["digest"],
+        "entryStatus": None, "title": None, "criticalResourceFailures": [],
+        "blockedExternalHosts": [], "httpOrigins": [], "consoleErrorCount": 0,
+        "pageErrorTypes": [], "cpuGameStarted": False, "discardCount": 0,
+    }
+    context, page = make_page(browser, environment, page_report, viewport={"width": 1280, "height": 900})
+    try:
+        def on_response(response):
+            request_info = response.request
+            if request_info.resource_type in RESOURCE_TYPES and response.status >= 400:
+                if not response.url.endswith("/favicon.ico"):
+                    page_report["criticalResourceFailures"].append(
+                        {"resourceType": request_info.resource_type, "status": response.status}
+                    )
+
+        def on_request_failed(request):
+            if request.resource_type in RESOURCE_TYPES and not request.url.endswith("/favicon.ico"):
+                page_report["criticalResourceFailures"].append(
+                    {"resourceType": request.resource_type, "failure": "network"}
+                )
+
+        page.on("response", on_response)
+        page.on("requestfailed", on_request_failed)
+        response = open_public_page(page, environment)
+        page_report["entryStatus"] = response.status
+        page_report["title"] = page.title()
+        require(page_report["title"] == environment["title"], f"B1-page-title-{key}")
+        require(page.locator("#main-menu-toggle").is_visible(), f"B1-main-menu-missing-{key}")
+        start_cpu_and_discard(page, page_report, key)
+        require(not page_report["criticalResourceFailures"], f"B1-critical-resource-failure-{key}")
+        require(not page_report["blockedExternalHosts"], f"B1-external-host-request-{key}")
+        require(not page_report["consoleErrorCount"], f"B1-console-error-{key}")
+        require(not page_report["pageErrorTypes"], f"B1-page-error-{key}")
+        page_report["status"] = "PASSED"
+    except Exception:
+        page_report["status"] = "FAILED"
+        raise
+    finally:
+        context.close()
+        report["environments"].append(page_report)
+        save_report()
+
+
+def execute_stage(report, stage, operation, save_report):
+    """Continue independent stages after expected test failures; fail closed on unknown errors."""
+    try:
+        operation()
+        if BLOCKED_EXTERNAL_REQUESTS:
+            raise UnsafeLiveEnvironment("unexpected-external-request")
+        save_report()
+        return True
+    except UnsafeLiveEnvironment:
+        raise
+    except (LiveE2EFailure, PlaywrightTimeoutError, TimeoutError) as error:
+        if BLOCKED_EXTERNAL_REQUESTS:
+            raise UnsafeLiveEnvironment("unexpected-external-request") from None
+        failure = {"stage": stage, "type": type(error).__name__}
+        if isinstance(error, LiveE2EFailure) and error.args:
+            failure["code"] = error.args[0]
+        trace = report.get("onlineDiagnostics", {})
+        if stage == "B2-B3":
+            failure["stage"] = trace.get("failurePhase") or (
+                "B2" if report["checks"]["B2"]["status"] == "RUNNING" else "B3")
+        elif stage == "B5-B7":
+            failure["stage"] = "B5" if report["checks"]["B5"]["status"] == "RUNNING" else "B7"
+        if stage == "B2-B3" and trace.get("failedActionId"):
+            failure["actionId"] = trace["failedActionId"]
+            failure["lastSuccessfulActionId"] = trace.get("lastSuccessfulActionId")
+        report.setdefault("failures", []).append(failure)
+        report.setdefault("failure", failure)
+        save_report()
+        return False
+    except Exception as error:
+        # Do not persist arbitrary exception messages, which can contain URLs,
+        # session data or other secrets. Unknown failures stop further work.
+        raise UnsafeLiveEnvironment("unexpected-" + type(error).__name__) from None
+
+
+def run_phase_checks(browser, browser_name, expected_releases, report, save_report):
+    checks = report["checks"]
+    checks["B1"] = {"status": "RUNNING", "production": "NOT_TESTED", "development": "NOT_TESTED"}
+    for environment in ENVIRONMENTS:
+        key = environment["name"]
+        checks["B1"][key] = "RUNNING"
+        ok = execute_stage(report, "B1-" + key,
+                           lambda env=environment, name=key: run_b1_check(
+                               browser, env, expected_releases[name][0], report, save_report), save_report)
+        checks["B1"][key] = "PASSED" if ok else "FAILED"
+    checks["B1"]["status"] = "PASSED" if all(checks["B1"][env["name"]] == "PASSED" for env in ENVIRONMENTS) else "FAILED"
+    save_report()
+
+    checks["B2"] = {"status": "RUNNING", "production": "NOT_TESTED", "development": "NOT_TESTED"}
+    checks["B3"] = {"status": "BLOCKED", "reason": "B2-not-completed", "sessionKeys": "NOT_TESTED"}
+    if not execute_stage(report, "B2-B3", lambda: run_online_checks(browser, browser_name, report, save_report), save_report):
+        if checks["B2"]["status"] == "RUNNING":
+            checks["B2"]["status"] = "FAILED"
+            for environment in ENVIRONMENTS:
+                name = environment["name"]
+                checks["B2"][name] = report.get("online", {}).get(name, {}).get("status", "BLOCKED")
+            checks["B3"] = {"status": "BLOCKED", "reason": "B2-not-completed", "sessionKeys": "NOT_TESTED"}
+        else:
+            checks["B3"]["status"] = "FAILED"
+    save_report()
+
+    checks["B4"] = {"status": "RUNNING"}
+    if execute_stage(report, "B4-settings", lambda: run_storage_partition_check(browser, report, save_report), save_report):
+        session_verified = checks["B3"].get("sessionKeys") == "PASSED"
+        checks["B4"] = {
+            "status": "PASSED" if session_verified else "PARTIAL",
+            "settings": "PASSED", "onlineSessionKeys": "PASSED" if session_verified else "BLOCKED",
+            "sameBrowserContextAndOrigin": report["storageSeparation"]["sameOrigin"],
+        }
+    else:
+        checks["B4"] = {"status": "FAILED", "settings": "FAILED", "onlineSessionKeys": checks["B3"].get("sessionKeys", "NOT_TESTED")}
+    save_report()
+
+    checks["B5"] = {"status": "RUNNING"}
+    checks["B7"] = {"status": "BLOCKED", "reason": "B5-not-completed",
+                    "waitingUpdateBehavior": "NOT_TESTED_NO_PUBLICATION_PERMITTED"}
+    if execute_stage(report, "B5-B7", lambda: run_pwa_and_multitab_check(browser, report, save_report), save_report):
+        checks["B7"] = {"status": "PARTIAL", "crossEnvironmentTabsAndReload": "PASSED",
+                        "cacheUrlInventoryUnchanged": "PASSED",
+                        "waitingUpdateBehavior": "NOT_TESTED_NO_PUBLICATION_PERMITTED"}
+    elif checks["B5"]["status"] == "RUNNING":
+        checks["B5"]["status"] = "FAILED"
+    else:
+        checks["B7"] = {"status": "FAILED", "waitingUpdateBehavior": "NOT_TESTED_NO_PUBLICATION_PERMITTED"}
+    save_report()
+
+    checks["B6"] = {"status": "RUNNING", "production": "NOT_TESTED", "development": "NOT_TESTED"}
+    for environment in ENVIRONMENTS:
+        key = environment["name"]
+        checks["B6"][key] = "RUNNING"
+        ok = execute_stage(report, "B6-" + key,
+                           lambda env=environment: run_offline_cpu_check(browser, env, report, save_report), save_report)
+        checks["B6"][key] = "PASSED" if ok else "FAILED"
+    checks["B6"]["status"] = "PASSED" if all(checks["B6"][env["name"]] == "PASSED" for env in ENVIRONMENTS) else "FAILED"
+    save_report()
+
+
+def required_checks_passed(report):
+    checks = report["checks"]
+    return (not report.get("failures") and
+            all(checks[key]["status"] == "PASSED" for key in ("B1", "B2", "B3", "B4", "B5", "B6")) and
+            checks["B7"]["status"] == "PARTIAL" and
+            checks["B7"].get("crossEnvironmentTabsAndReload") == "PASSED" and
+            checks["B7"].get("cacheUrlInventoryUnchanged") == "PASSED" and
+            checks["B7"].get("publicMetadataUnchanged") is True)
 
 
 
@@ -1483,135 +1875,8 @@ def main():
                             "matchesSnapshot": True,
                         }
 
-                    report["checks"]["B1"]["status"] = "RUNNING"
-                    save_report()
-                    for environment in ENVIRONMENTS:
-                        key = environment["name"]
-                        stage = f"B1-page-load-{key}"
-                        page_report = {
-                            "environment": key,
-                            "pagesUrl": environment["pages_url"],
-                            "configuredWorkerOrigin": origin(environment["worker_url"]),
-                            "releaseSha": expected_releases[key][0]["sha"],
-                            "releaseDigest": expected_releases[key][0]["digest"],
-                            "entryStatus": None,
-                            "title": None,
-                            "criticalResourceFailures": [],
-                            "blockedExternalHosts": [],
-                            "httpOrigins": [],
-                            "consoleErrorCount": 0,
-                            "pageErrorTypes": [],
-                            "cpuGameStarted": False,
-                            "discardCount": 0,
-                        }
-                        context, page = make_page(
-                            browser,
-                            environment,
-                            page_report,
-                            viewport={"width": 1280, "height": 900},
-                        )
-                        try:
-                            def on_response(response):
-                                request_info = response.request
-                                if request_info.resource_type in RESOURCE_TYPES and response.status >= 400:
-                                    if not response.url.endswith("/favicon.ico"):
-                                        page_report["criticalResourceFailures"].append(
-                                            {"resourceType": request_info.resource_type, "status": response.status}
-                                        )
-
-                            page.on("response", on_response)
-
-                            def on_request_failed(request):
-                                if request.resource_type in RESOURCE_TYPES and not request.url.endswith("/favicon.ico"):
-                                    page_report["criticalResourceFailures"].append(
-                                        {"resourceType": request.resource_type, "failure": "network"}
-                                    )
-
-                            page.on("requestfailed", on_request_failed)
-                            response = open_public_page(page, environment)
-                            page_report["entryStatus"] = response.status
-                            page_report["title"] = page.title()
-                            require(page_report["title"] == environment["title"], f"B1-page-title-{key}")
-                            require(page.locator("#main-menu-toggle").is_visible(), f"B1-main-menu-missing-{key}")
-                            require(not page_report["criticalResourceFailures"], f"B1-critical-resource-failure-{key}")
-                            stage = f"B1-cpu-{key}"
-                            start_cpu_and_discard(page, page_report, key)
-                            require(not page_report["blockedExternalHosts"], f"B1-external-host-request-{key}")
-                            require(not page_report["consoleErrorCount"], f"B1-console-error-{key}")
-                            require(not page_report["pageErrorTypes"], f"B1-page-error-{key}")
-                            page_report["status"] = "PASSED"
-                            report["environments"].append(page_report)
-                            save_report()
-                        finally:
-                            context.close()
-
-                    report["checks"]["B1"] = {
-                        "status": "PASSED",
-                        "production": "PASSED",
-                        "development": "PASSED",
-                    }
-                    save_report()
-
-                    stage = "B2-online-and-reconnect"
-                    report["checks"]["B2"]["status"] = "RUNNING"
-                    report["checks"]["B3"]["status"] = "RUNNING"
-                    save_report()
-                    run_online_checks(browser, browser_name, report, save_report)
-                    report["checks"]["B2"] = {
-                        "status": "PASSED",
-                        "production": report["online"]["production"]["status"],
-                        "development": report["online"]["development"]["status"],
-                    }
-                    report["checks"]["B3"] = {
-                        "status": "PASSED",
-                        "productionToProductionWorker": True,
-                        "developmentToDevelopmentWorker": True,
-                        "crossPathSessionRestoration": True,
-                    }
-                    save_report()
-
-                    stage = "B4-storage-separation"
-                    report["checks"]["B4"]["status"] = "RUNNING"
-                    save_report()
-                    run_storage_partition_check(browser, report, save_report)
-                    report["checks"]["B4"] = {
-                        "status": "PASSED",
-                        "sameBrowserContextAndOrigin": report["storageSeparation"]["sameOrigin"],
-                        "productionAndDevelopmentRulesRemainDistinct": True,
-                        "onlineSessionKeysRemainDistinct": True,
-                    }
-                    save_report()
-
-                    stage = "B5-and-B7-pwa-multitab"
-                    report["checks"]["B5"]["status"] = "RUNNING"
-                    report["checks"]["B7"]["status"] = "RUNNING"
-                    save_report()
-                    run_pwa_and_multitab_check(browser, report, save_report)
-                    report["checks"]["B5"] = {
-                        "status": "PASSED",
-                        "production": "PASSED",
-                        "development": "PASSED",
-                        "distinctScopesAndCacheNamespaces": True,
-                    }
-                    report["checks"]["B7"] = {
-                        "status": "PARTIAL",
-                        "crossEnvironmentTabsAndReload": "PASSED",
-                        "cacheNamespaceUnchanged": "PASSED",
-                        "waitingUpdateBehavior": "NOT_TESTED_NO_PUBLICATION_PERMITTED",
-                    }
-                    save_report()
-
-                    stage = "B6-offline-cpu"
-                    report["checks"]["B6"]["status"] = "RUNNING"
-                    save_report()
-                    for environment in ENVIRONMENTS:
-                        run_offline_cpu_check(browser, environment, report, save_report)
-                    report["checks"]["B6"] = {
-                        "status": "PASSED",
-                        "production": report["offline"]["production"]["status"],
-                        "development": report["offline"]["development"]["status"],
-                    }
-                    save_report()
+                    stage = "phase-checks"
+                    run_phase_checks(browser, browser_name, expected_releases, report, save_report)
 
                     stage = "public-metadata-stability"
                     final_environments = request.get(
@@ -1643,25 +1908,39 @@ def main():
             finally:
                 browser.close()
 
-        report["checks"]["B7"]["status"] = "PARTIAL"
-        report["checks"]["B7"]["reason"] = (
-            "Waiting Service Worker update behavior requires a published version change, "
-            "which this verification is not authorized to trigger."
-        )
+        if report["checks"]["B7"]["status"] == "PARTIAL":
+            report["checks"]["B7"]["reason"] = (
+                "Waiting Service Worker update behavior requires a published version change, "
+                "which this verification is not authorized to trigger."
+            )
+        if not required_checks_passed(report):
+            report["outcome"] = "FAILURE"
+            write_report(report)
+            print(json.dumps(report, ensure_ascii=False, sort_keys=True), flush=True)
+            raise SystemExit("live public Pages E2E has failed or blocked required checks")
         report["outcome"] = "PARTIAL"
     except Exception as error:
         report["outcome"] = "FAILURE"
-        report["failure"] = {"stage": stage, "type": type(error).__name__}
+        fatal = {"stage": stage, "type": type(error).__name__}
         online_diagnostics = report.get("onlineDiagnostics", {})
         if online_diagnostics.get("failedActionId"):
-            report["failure"]["actionId"] = online_diagnostics["failedActionId"]
+            fatal["actionId"] = online_diagnostics["failedActionId"]
         if online_diagnostics.get("lastSuccessfulActionId"):
-            report["failure"]["lastSuccessfulActionId"] = online_diagnostics["lastSuccessfulActionId"]
+            fatal["lastSuccessfulActionId"] = online_diagnostics["lastSuccessfulActionId"]
         if isinstance(error, LiveE2EFailure) and error.args:
-            report["failure"]["code"] = error.args[0]
+            fatal["code"] = error.args[0]
+        report.setdefault("failure", fatal)
+        report["fatalFailure"] = fatal
         for check in report["checks"].values():
             if check["status"] == "RUNNING":
                 check["status"] = "FAILED"
+                for environment in ("production", "development"):
+                    if check.get(environment) == "RUNNING":
+                        check[environment] = "FAILED"
+                    elif check.get(environment) == "NOT_TESTED":
+                        check[environment] = "BLOCKED"
+            elif check["status"] == "NOT_STARTED":
+                check.update({"status": "BLOCKED", "reason": "preflight-or-safety-stop"})
         write_report(report)
         print(json.dumps(report, ensure_ascii=False, sort_keys=True), flush=True)
         raise SystemExit(f"live public Pages E2E failed at {stage}: {type(error).__name__}") from None
