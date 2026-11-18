@@ -110,6 +110,8 @@ SUITE = [
     run('tests/browser-button-roles.py', classification='required', group=2),
     run('tests/browser-button-roles.py', 'webkit', classification='required', group=2),
     # Geometry baselines are opt-in historical probes, not mandatory UI regressions.
+    run('tests/browser-local-websocket-offline-probe.py', classification='manual', group=None),
+    run('tests/browser-local-websocket-offline-probe.py', 'webkit', classification='manual', group=None),
     run('tests/browser-candidate-geometry.py', HEIBON_CANDIDATE_BASELINE='1', classification='manual', group=None),
     run('tests/browser-candidate-geometry.py', 'webkit', HEIBON_CANDIDATE_BASELINE='1', classification='manual', group=None),
     run('tests/browser-candidate-geometry.py', classification='required', group=1),
