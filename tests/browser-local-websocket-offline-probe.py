@@ -77,19 +77,29 @@ def main():
                 offline_http = fresh_http(page, port)
                 offline_fresh_socket = fresh_websocket(page, port)
                 offline = state(page)
+                close_requested_at = page.evaluate("""() => {
+                  window.probe.socket.close(); return Math.round(performance.now());
+                }""")
+                try:
+                    page.wait_for_function("window.probe.events.some(event => event.type === 'close')", timeout=5000)
+                    close_observed = True
+                except PlaywrightTimeoutError:
+                    close_observed = False
+                after_close = state(page)
                 context.set_offline(False)
                 page.wait_for_function('navigator.onLine', timeout=5000)
-                restored_echo = observe_echo(page)
                 restored_http = fresh_http(page, port)
                 restored_fresh_socket = fresh_websocket(page, port)
                 restored = state(page)
                 print(json.dumps({'browser': browser_name, 'browserVersion': browser.version,
                     'offlineSwitchAtMs': switched_at, 'before': initial, 'offline': offline,
                     'offlineExistingSocketEcho': offline_echo, 'offlineHttp': offline_http,
-                    'offlineFreshSocket': offline_fresh_socket, 'afterOnline': restored,
-                    'onlineExistingSocketEcho': restored_echo, 'onlineHttp': restored_http,
+                    'offlineFreshSocket': offline_fresh_socket, 'closeRequestedAtMs': close_requested_at,
+                    'closeObserved': close_observed, 'afterClose': after_close, 'afterOnline': restored,
+                    'onlineHttp': restored_http,
                     'onlineFreshSocket': restored_fresh_socket}, sort_keys=True), flush=True)
                 assert initial['online'] and not offline['online'] and restored['online']
+                assert close_observed and after_close['readyState'] == 3
                 assert restored_http == 200 and restored_fresh_socket == 'open'
             finally:
                 context.set_offline(False)
