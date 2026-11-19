@@ -6,9 +6,9 @@
     "snapshotDigest": "62e514bb5d03e1347c1f67911b759ff29192abe3f300a4e37da7b58cdea332c7"
   },
   "development": {
-    "sha": "ada7f2a528a6e67d7fedcb43c3e7cfa2cd975375",
-    "digest": "0ac714a4805e3c1c61e7c25dc1726e676a4eed1b267e896f92e540abd5768c06",
+    "sha": "c3a6b6c4eeb72c82b8152ea299511df26e49c435",
+    "digest": "e52f6cf6f99fb5bab8b25f9b6ac5d5c094ff83ba675a0aebfb97e63d579d58e0",
     "workerUrl": "https://heibon-mahjong-online-dev.ak-sekine.workers.dev",
-    "snapshotDigest": "735c4c34420f2be778934c6c51aa864c40a65e65612ea4612e775437317ffba9"
+    "snapshotDigest": "7eae7099af8ff2dc6f4cae831d1bb83f36a6577f3dd6fccaafdbd70bc9a64da0"
   }
 }
