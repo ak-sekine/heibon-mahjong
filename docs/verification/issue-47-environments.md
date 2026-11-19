@@ -1,6 +1,6 @@
 # Issue #47 検証記録（2026-11-11）
 
-> **最新状態（2026-11-13）：Phase 2完了。** 下記は2026-11-11時点までの記録であり、その後の本番移行と本人実機報告を末尾の[Phase 2完了記録](#2026-11-13-phase-2完了記録)に追記した。Issue #47全体の受入条件が完了したという意味ではなく、IssueはOpenを維持する。
+> **最新状態（2026-11-19）：Phase 7の本人実機確認10項目はすべてOK。** [Phase 7実機確認](#2026-11-19-phase-7実機確認)と[2026-11-13のPhase 2完了記録](#2026-11-13-phase-2完了記録)を参照。Issue #47全体はOpen。
 
 ## 自動検証
 
@@ -232,3 +232,26 @@ Regression tests cover all accepted and rejected flag values, new workflow push 
 ### Phase 4 status and stop reason
 
 No workflow was disabled, no repository variable was changed, and no workflow dispatch or publication was started. The connected GitHub API did not expose Repository Variables, Environment/Secret registrations, Pages settings, or deployment records. Local `gh` has no valid GitHub API token, and this execution has no browser interaction tool for the Settings UI. Treat environment protections, secret presence, Pages source, old repository secrets, and latest live deployment identifiers as unconfirmed. Do not proceed with workflow Disable or flag activation until these are verified. Issue #47 remains Open; Phase 4 is incomplete.
+
+## 2026-11-19 Phase 7実機確認
+
+2026-11-19にユーザー本人がiPhone XSのSafariで、本番系・開発系を確認した。最終回答は「すべてOKです」。iOSバージョン、確認時刻、操作の詳細は未報告。
+
+| No. | 確認内容 | 対象 | 結果 |
+| --- | --- | --- | --- |
+| 1 | Safariで正常に起動する | 本番・開発 | OK |
+| 2 | CPU対局を開始して打牌できる | 本番・開発 | OK |
+| 3 | ホーム画面にPWAとして追加できる | 本番・開発 | OK |
+| 4 | ホーム画面からPWAを起動できる | 本番・開発 | OK |
+| 5 | 機内モードでPWAを起動しCPU対局できる | 本番・開発 | OK |
+| 6 | オンラインルームを作成・参加できる | 本番・開発 | OK |
+| 7 | オンライン対局を開始し、打牌が相手に反映される | 本番・開発 | OK |
+| 8 | 本番で変更したルール設定が開発版に反映されない | 本番 → 開発 | OK |
+| 9 | 開発版で変更したルール設定が本番に反映されない | 開発 → 本番 | OK |
+| 10 | 本番・開発それぞれのPWAを起動しても、相手側の起動・オフライン動作に問題がない | 環境間の非干渉 | OK |
+
+**本人報告の集計はOK 10項目、NG 0項目、未確認0項目。** No.1〜7は両環境で確認し、集計は各項目を1回だけ数えた。No.8〜10は環境間の非干渉の確認。
+
+自動検証は別記録とする。[実公開E2E #44425690247](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44425690247)ではChromium／WebKitの本番・開発でB1〜B6がPASSED、B7はPARTIAL。複数タブ、cacheのURL一覧、公開metadataの安定性を確認した。
+
+Issue #47はOpen。実際の公開更新に伴うService Workerのwaiting/update、公開更新前後のキャッシュ内容の完全一致、Cloudflare Durable Objectsの実namespaceの直接確認、公開成果物の更新・競合・ロールバックに関する未達の受入条件は残る。WebSocket切断・自動再接続・通信異常からの復旧は[Issue #61](https://github.com/ak-sekine/heibon-mahjong/issues/61)の対象。

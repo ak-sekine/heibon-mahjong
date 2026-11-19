@@ -1,5 +1,7 @@
 # 検証記録の目次
 
+- [Issue #47 Phase 7 iPhone Safari実機確認 — 2026-11-19](issue-47-environments.md#2026-11-19-phase-7実機確認) — 本人がiPhone XSで本番・開発を確認し、OK 10項目・NG 0項目・未確認0項目。Issue全体はOpen。
+
 - [Issue #47 Chromium PWA CI recovery — 2026-11-13](issue-47-environments.md#2026-11-13-chromium-pwa-ci-recovery) — `registration.installing`/`waiting`の未同期によるretry testの競合と修正を記録。develop run `43523795023`はverify、両engine Browser UI・環境分離、local-online、matrix auditがsuccess、Worker／Pages公開jobはskip。Phase 2完了を維持、Phase 3未開始、IssueはOpen。
 
 - [Issue #47 Phase 2本番PWA先行移行 — 2026-11-13](issue-47-environments.md#2026-11-13-phase-2完了記録) — 本番Worker/Pages公開SHA・deployment・公開artifact ID/SHA-256と全16ファイル照合、統合後CI／公開workflow／ライブ監査／Worker診断の結果、本人報告のiPhone Safari実機OK 7件・NG 0件・未検証1件を区別して記録。Phase 2完了、Issue全体はOpen。オンライン情報保持・iPhone実機オンライン対局／再接続・iOS/Safari詳細は残件、Phase 3以降未着手。
