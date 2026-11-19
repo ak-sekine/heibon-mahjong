@@ -911,6 +911,137 @@ def cache_inventory(page):
     )
 
 
+def snapshot_cache_expectation(snapshot_root, environment, release):
+    key = environment["name"]
+    root = urlsplit(environment["pages_url"]).path
+    folder = (snapshot_root / environment["release_path"]).parent
+    files = release["files"]
+    worker = (folder / "sw.js").read_bytes()
+    require(sha256(worker) == files.get("sw.js"), f"snapshot-worker-hash-{key}")
+
+    def declaration(name):
+        matches = re.findall(rf"^const {name} = (.+);$", worker.decode("utf-8"), re.MULTILINE)
+        require(len(matches) == 1, f"snapshot-worker-{name.lower()}-{key}")
+        return json.loads(matches[0])
+
+    cache_name = declaration("CACHE")
+    prefix = PRODUCTION_CACHE_PREFIX if key == "production" else DEVELOPMENT_CACHE_PREFIX
+    require(declaration("ROOT") == root, f"snapshot-worker-root-{key}")
+    require(isinstance(cache_name, str) and re.fullmatch(re.escape(prefix) + r"[a-f0-9]{20}", cache_name),
+            f"snapshot-worker-cache-{key}")
+    paths = declaration("PRECACHE")
+    require(isinstance(paths, list) and paths, f"snapshot-worker-precache-{key}")
+    expected = {}
+    for path in paths:
+        require(isinstance(path, str) and path.startswith(root) and
+                (key != "production" or not path.startswith("/heibon-mahjong/dev/")),
+                f"snapshot-cache-environment-path-{key}")
+        relative = path[len(root):] or "index.html"
+        require(re.fullmatch(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*", relative) and
+                not {".", ".."}.intersection(relative.split("/")) and relative in files,
+                f"snapshot-cache-file-mapping-{key}")
+        url = origin(environment["pages_url"]) + path
+        require(url not in expected, f"snapshot-cache-url-duplicate-{key}")
+        expected[url] = sha256((folder / relative).read_bytes())
+        require(expected[url] == files[relative], f"snapshot-cache-file-hash-{key}")
+    require(environment["pages_url"] in expected and environment["pages_url"] + "index.html" in expected,
+            f"snapshot-cache-index-mapping-{key}")
+    return {"cacheName": cache_name, "urls": expected}
+
+
+CACHE_BODY_OBSERVATION = """async ({cacheName, urls}) => {
+  const names = await caches.keys();
+  if (!names.includes(cacheName)) return {names, entries: []};
+  const cache = await caches.open(cacheName);
+  const entries = [];
+  for (const request of await cache.keys()) {
+    if (!Object.hasOwn(urls, request.url)) {
+      // Keep arbitrary URLs out of artifacts, including any query credentials.
+      entries.push({url: null, outcome: 'UNEXPECTED_URL'});
+      continue;
+    }
+    const entry = {url: request.url, actualSha256: null, status: null};
+    try {
+      const response = await cache.match(request);
+      if (!response) entry.outcome = 'RESPONSE_MISSING';
+      else {
+        entry.status = response.status;
+        if (response.type === 'opaque' || response.type === 'opaqueredirect') entry.outcome = 'OPAQUE';
+        else if (response.status !== 200) entry.outcome = 'HTTP_STATUS';
+        else {
+          const digest = await crypto.subtle.digest('SHA-256', await response.arrayBuffer());
+          entry.actualSha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+          entry.outcome = 'READ';
+        }
+      }
+    } catch {
+      entry.outcome = 'RESPONSE_READ_FAILED';
+    }
+    entries.push(entry);
+  }
+  return {names, entries};
+}"""
+
+
+def compare_cached_bodies(expectation, observation, known_names):
+    expected = expectation["urls"]
+    name = expectation["cacheName"]
+    actual_names = observation["names"]
+    entries = observation["entries"]
+    seen = set()
+    duplicate_count = 0
+    unexpected_count = 0
+    results = []
+    for entry in entries:
+        url = entry["url"]
+        if url not in expected:
+            unexpected_count += 1
+            continue
+        if url in seen:
+            duplicate_count += 1
+        seen.add(url)
+        outcome = entry["outcome"]
+        if outcome == "READ":
+            outcome = "MATCH" if entry["actualSha256"] == expected[url] else "HASH_MISMATCH"
+        results.append({**entry, "expectedSha256": expected[url], "outcome": outcome})
+    missing = sorted(set(expected) - seen)
+    results.extend({"url": url, "expectedSha256": expected[url], "actualSha256": None,
+                    "outcome": "URL_MISSING"} for url in missing)
+    cache_present = name in actual_names
+    matched = sum(item["outcome"] == "MATCH" for item in results)
+    return {
+        "expectedCacheName": name,
+        "actualCacheNames": sorted(set(actual_names) & known_names),
+        "otherCacheCount": len(set(actual_names) - known_names),
+        "cachePresent": cache_present,
+        "expectedUrlCount": len(expected),
+        "missingUrlCount": len(missing),
+        "unexpectedUrlCount": unexpected_count,
+        "duplicateUrlCount": duplicate_count,
+        "matchedBodyCount": matched,
+        "mismatchedBodyCount": sum(item["outcome"] == "HASH_MISMATCH" for item in results),
+        "unreadableBodyCount": sum(item["outcome"] not in {"MATCH", "HASH_MISMATCH", "URL_MISSING"}
+                                   for item in results),
+        "outcome": ("CACHE_MISSING" if not cache_present else
+                    "PASSED" if matched == len(expected) and not unexpected_count and not duplicate_count
+                    else "FAILED"),
+        "entries": sorted(results, key=lambda item: item["url"]),
+    }
+
+
+def verify_cache_bodies(page, expectations, report, phase, save_report):
+    known_names = {item["cacheName"] for item in expectations.values()}
+    require(len(known_names) == len(expectations), "cache-namespaces-overlap")
+    results = {}
+    report.setdefault("cacheBodies", {})[phase] = results
+    for key, expectation in expectations.items():
+        observed = page.evaluate(CACHE_BODY_OBSERVATION, expectation)
+        results[key] = compare_cached_bodies(expectation, observed, known_names)
+        save_report()
+    if any(item["outcome"] != "PASSED" for item in results.values()):
+        raise UnsafeLiveEnvironment(f"cache-body-verification-{phase}")
+
+
 def expected_cache_inventory(inventory, environment):
     prefix = DEVELOPMENT_CACHE_PREFIX if environment["name"] == "development" else PRODUCTION_CACHE_PREFIX
     own_names = [name for name in inventory if name.startswith(prefix)]
@@ -1412,7 +1543,7 @@ def run_storage_partition_check(browser, report, save_report):
         context.close()
 
 
-def run_pwa_and_multitab_check(browser, report, save_report):
+def run_pwa_and_multitab_check(browser, cache_expectations, report, save_report):
     context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="allow")
     pages = {}
     observers = {}
@@ -1503,6 +1634,7 @@ def run_pwa_and_multitab_check(browser, report, save_report):
             observers[f"{key}SecondTab"] = observer
 
         # Take the baseline after both second tabs and their workers are ready.
+        verify_cache_bodies(development, cache_expectations, report, "beforeReload", save_report)
         before_reload = {name: sorted(paths) for name, paths in cache_inventory(development).items()}
         for key in ("production", "development"):
             second_tabs[key].reload(wait_until="networkidle", timeout=30_000)
@@ -1519,6 +1651,7 @@ def run_pwa_and_multitab_check(browser, report, save_report):
             development.evaluate("navigator.serviceWorker.controller?.scriptURL") == ENVIRONMENTS[1]["pages_url"] + "sw.js",
             "development-controller-affected-by-other-tab",
         )
+        verify_cache_bodies(development, cache_expectations, report, "afterReload", save_report)
         after_reload = {
             name: sorted(paths)
             for name, paths in cache_inventory(development).items()
@@ -1536,6 +1669,7 @@ def run_pwa_and_multitab_check(browser, report, save_report):
             "cacheNamesBefore": sorted(before_reload),
             "cacheNamesAfter": sorted(after_reload),
             "cacheUrlInventoryUnchanged": True,
+            "cacheResponseBodiesMatchBeforeAndAfterReload": True,
             "waitingUpdateBehavior": "NOT_TESTED_NO_PUBLICATION_PERMITTED",
         }
         save_report()
@@ -1699,7 +1833,7 @@ def execute_stage(report, stage, operation, save_report):
         raise UnsafeLiveEnvironment("unexpected-" + type(error).__name__) from None
 
 
-def run_phase_checks(browser, browser_name, expected_releases, report, save_report):
+def run_phase_checks(browser, browser_name, expected_releases, report, save_report, cache_expectations):
     checks = report["checks"]
     checks["B1"] = {"status": "RUNNING", "production": "NOT_TESTED", "development": "NOT_TESTED"}
     for environment in ENVIRONMENTS:
@@ -1740,9 +1874,10 @@ def run_phase_checks(browser, browser_name, expected_releases, report, save_repo
     checks["B5"] = {"status": "RUNNING"}
     checks["B7"] = {"status": "BLOCKED", "reason": "B5-not-completed",
                     "waitingUpdateBehavior": "NOT_TESTED_NO_PUBLICATION_PERMITTED"}
-    if execute_stage(report, "B5-B7", lambda: run_pwa_and_multitab_check(browser, report, save_report), save_report):
+    if execute_stage(report, "B5-B7", lambda: run_pwa_and_multitab_check(browser, cache_expectations, report, save_report), save_report):
         checks["B7"] = {"status": "PARTIAL", "crossEnvironmentTabsAndReload": "PASSED",
                         "cacheUrlInventoryUnchanged": "PASSED",
+                        "cacheResponseBodies": "PASSED",
                         "waitingUpdateBehavior": "NOT_TESTED_NO_PUBLICATION_PERMITTED"}
     elif checks["B5"]["status"] == "RUNNING":
         checks["B5"]["status"] = "FAILED"
@@ -1768,6 +1903,7 @@ def required_checks_passed(report):
             checks["B7"]["status"] == "PARTIAL" and
             checks["B7"].get("crossEnvironmentTabsAndReload") == "PASSED" and
             checks["B7"].get("cacheUrlInventoryUnchanged") == "PASSED" and
+            checks["B7"].get("cacheResponseBodies") == "PASSED" and
             checks["B7"].get("publicMetadataUnchanged") is True)
 
 
@@ -1843,6 +1979,7 @@ def main():
                     }
 
                     expected_releases = {}
+                    cache_expectations = {}
                     for environment in ENVIRONMENTS:
                         key = environment["name"]
                         stage = f"snapshot-release-metadata-{key}"
@@ -1857,6 +1994,7 @@ def main():
                         require(release.get("sha") == state_release.get("sha"), f"snapshot-source-sha-{key}")
                         require(release.get("digest") == state_release.get("digest"), f"snapshot-release-digest-{key}")
                         expected_releases[key] = (release, release_bytes)
+                        cache_expectations[key] = snapshot_cache_expectation(snapshot_root, environment, release)
 
                         live_release_response = request.get(
                             environment["pages_url"] + "release.json",
@@ -1881,7 +2019,7 @@ def main():
                         }
 
                     stage = "phase-checks"
-                    run_phase_checks(browser, browser_name, expected_releases, report, save_report)
+                    run_phase_checks(browser, browser_name, expected_releases, report, save_report, cache_expectations)
 
                     stage = "public-metadata-stability"
                     final_environments = request.get(

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import types
 import unittest
 from unittest.mock import patch
@@ -41,7 +42,7 @@ def run_fake_stages(online, *, pwa_failure=None, offline_failure=None):
         calls.append('B4')
         result['storageSeparation'] = {'sameOrigin': True}
 
-    def pwa(_browser, result, _save):
+    def pwa(_browser, _expectations, result, _save):
         calls.append('PWA')
         if pwa_failure == 'B5':
             raise live.LiveE2EFailure('manifest-missing-production')
@@ -60,7 +61,7 @@ def run_fake_stages(online, *, pwa_failure=None, offline_failure=None):
          patch.object(live, 'run_storage_partition_check', side_effect=b4), \
          patch.object(live, 'run_pwa_and_multitab_check', side_effect=pwa), \
          patch.object(live, 'run_offline_cpu_check', side_effect=b6):
-        live.run_phase_checks(None, 'chromium', releases, report, lambda: None)
+        live.run_phase_checks(None, 'chromium', releases, report, lambda: None, {})
     return report, calls
 
 
@@ -139,7 +140,7 @@ class StageContractTests(unittest.TestCase):
              patch.object(live, 'run_online_checks', side_effect=live.UnsafeLiveEnvironment('worker-config-mismatch-production')), \
              patch.object(live, 'run_storage_partition_check') as storage:
             with self.assertRaises(live.UnsafeLiveEnvironment):
-                live.run_phase_checks(None, 'chromium', releases, report, lambda: None)
+                live.run_phase_checks(None, 'chromium', releases, report, lambda: None, {})
             storage.assert_not_called()
 
     def test_unknown_exception_does_not_expose_message_or_continue(self):
@@ -460,6 +461,103 @@ let input = ''; process.stdin.on('data', x => input += x); process.stdin.on('end
         self.assertEqual(page.clicks, 1)
         self.assertEqual(len(page.waits), 3)
         self.assertEqual(page.waits[1][1]['arg'], '#pass-calls')
+
+
+class CacheBodyTests(unittest.TestCase):
+    env = live.ENVIRONMENTS[0]
+    root = env['pages_url']
+    name = 'heibon-mahjong-shell-' + 'a' * 20
+    digest = live.sha256(b'fixture')
+
+    def test_snapshot_maps_root_and_index_separately_and_rejects_bad_mapping(self):
+        with tempfile.TemporaryDirectory() as directory:
+            snapshot = Path(directory)
+            (snapshot / 'site').mkdir()
+            (snapshot / 'site/index.html').write_bytes(b'fixture')
+            root = '/heibon-mahjong/'
+            for paths in ([root, root + 'index.html'], [root, root + 'missing.html'],
+                          [root, root + 'dev/index.html'], [root, root, root + 'index.html']):
+                with self.subTest(paths=paths):
+                    worker = '\n'.join(f'const {key} = {json.dumps(value)};' for key, value in
+                                       {'ROOT': root, 'CACHE': self.name, 'PRECACHE': paths}.items()).encode()
+                    (snapshot / 'site/sw.js').write_bytes(worker)
+                    release = {'files': {'index.html': self.digest, 'sw.js': live.sha256(worker)}}
+                    if paths == [root, root + 'index.html']:
+                        self.assertEqual(live.snapshot_cache_expectation(snapshot, self.env, release),
+                                         {'cacheName': self.name, 'urls': {self.root: self.digest,
+                                                                          self.root + 'index.html': self.digest}})
+                    else:
+                        with self.assertRaises(live.UnsafeLiveEnvironment):
+                            live.snapshot_cache_expectation(snapshot, self.env, release)
+
+    def test_browser_observation_and_comparison_distinguish_failures(self):
+        script = r'''
+const assert = require('node:assert/strict');
+const { webcrypto } = require('node:crypto');
+global.crypto = webcrypto;
+const input = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
+const { cacheName, urls } = input.expectation;
+const [url] = Object.keys(urls);
+const get = eval(input.javascript);
+(async () => {
+  const results = {};
+  for (const mode of ['ok', 'absent', 'missing-url', 'unexpected-url', 'duplicate',
+                       'missing-response', 'opaque', 'http-error', 'unreadable', 'wrong-body']) {
+    let requests = [{url}];
+    if (mode === 'missing-url') requests = [];
+    if (mode === 'duplicate') requests.push({url});
+    if (mode === 'unexpected-url') requests.push({url: url + '?token=private-marker'});
+    global.caches = {
+      keys: async () => mode === 'absent' ? [] : [cacheName],
+      open: async name => {
+        assert.equal(name, cacheName);
+        assert.notEqual(mode, 'absent');
+        return {
+          keys: async () => requests,
+          match: async request => {
+            assert.ok(requests.includes(request));
+            if (mode === 'missing-response') return undefined;
+            return {status: mode === 'http-error' ? 503 : 200,
+                    type: mode === 'opaque' ? 'opaque' : 'basic',
+                    arrayBuffer: async () => {
+                      if (mode === 'unreadable') throw Error('private-marker');
+                      return new TextEncoder().encode(mode === 'wrong-body' ? 'wrong' : 'fixture');
+                    }};
+          }
+        };
+      }
+    };
+    results[mode] = await get(input.expectation);
+  }
+  process.stdout.write(JSON.stringify(results));
+})().catch(error => { console.error(error); process.exitCode = 1; });
+'''
+        expectation = {'cacheName': self.name, 'urls': {self.root: self.digest}}
+        payload = json.dumps({'javascript': live.CACHE_BODY_OBSERVATION, 'expectation': expectation})
+        run = subprocess.run(['node', '-e', script], input=payload, text=True, capture_output=True, check=True)
+        self.assertNotIn('private-marker', run.stdout)
+        checks = {mode: live.compare_cached_bodies(expectation, observation, {self.name})
+                  for mode, observation in json.loads(run.stdout).items()}
+        self.assertEqual(checks['ok']['outcome'], 'PASSED')
+        self.assertEqual(checks['ok']['matchedBodyCount'], 1)
+        self.assertEqual(checks['absent']['outcome'], 'CACHE_MISSING')
+        self.assertEqual(checks['missing-url']['missingUrlCount'], 1)
+        self.assertEqual(checks['unexpected-url']['unexpectedUrlCount'], 1)
+        self.assertEqual(checks['duplicate']['duplicateUrlCount'], 1)
+        for mode, outcome in {'missing-response': 'RESPONSE_MISSING', 'opaque': 'OPAQUE',
+                              'http-error': 'HTTP_STATUS', 'unreadable': 'RESPONSE_READ_FAILED',
+                              'wrong-body': 'HASH_MISMATCH'}.items():
+            self.assertEqual(checks[mode]['entries'][0]['outcome'], outcome)
+        for mode in set(checks) - {'ok', 'absent'}:
+            self.assertEqual(checks[mode]['outcome'], 'FAILED', mode)
+
+    def test_bad_browser_observation_stops_stage_and_preserves_diagnostics(self):
+        page = types.SimpleNamespace(evaluate=lambda *_: {'names': [], 'entries': []})
+        expectation = {'cacheName': self.name, 'urls': {self.root: self.digest}}
+        report = {}
+        with self.assertRaises(live.UnsafeLiveEnvironment):
+            live.verify_cache_bodies(page, {'production': expectation}, report, 'beforeReload', lambda: None)
+        self.assertEqual(report['cacheBodies']['beforeReload']['production']['outcome'], 'CACHE_MISSING')
 
 
 if __name__ == '__main__':
