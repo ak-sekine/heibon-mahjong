@@ -272,3 +272,56 @@ Issue #47はOpen。実際の公開更新に伴うService Workerのwaiting/update
 先行調査ではリポジトリの自己Binding構成を確認した時点で、namespace IDは未取得、実環境分離は未確認だった。Phase 6-Bの自動E2EはWorker接続先と環境をまたぐ認証拒否などを確認した。今回のnamespace IDの根拠は、これらとは別のユーザー本人による管理画面での実環境確認である。
 
 Cloudflare管理APIによる独立した再取得と、Durable Objects内部の保存データの参照・内容の完全な非共有の直接検証は未実施。Service Workerの実公開更新時のwaiting/update、公開更新前後のキャッシュ内容の照合、公開成果物の更新・並行処理・競合・ロールバックに関する未達条件は残る。通信断・自動再接続・復旧はIssue #61の対象で、Issue #47はOpenを維持する。
+
+## 2026-11-19 Phase 6-B B7公開前確認
+
+対象developは `c3a6b6c4eeb72c82b8152ea299511df26e49c435`。保存台帳 `35abb1f931aeee4436c2fbd3dc9e35d0744b050c` は `pending=null`。保存済みscriptと候補のローカルビルドを比較した。
+
+| 対象 | cache名 | sw.js SHA-256 |
+| --- | --- | --- |
+| 本番の保存版 | `heibon-mahjong-shell-ff22f81eaaf9b90e6566` | `1d5e4bece1d59d90e8d461c11c8768abb1fbdec5eaa152d9aa7f52f4e2f28622` |
+| 開発の保存版 | `heibon-mahjong-dev-shell-5a990f26b84184c9fab1` | `cc7940280ea3ff0bec37d41d604af3ca65b278628c5e365fdf628cd8d6dfbca9` |
+| 開発のローカル候補 | `heibon-mahjong-dev-shell-798860a335e3d49104b6` | `c6911bb87a8ebc5aff912dab5429b0ae080b61705646477eb9ff9bfbf27f3411` |
+
+公開URLの両release.jsonとenvironments.jsonの取得はproxyのCONNECT段階で403。公開サーバーの応答、現在の公開ファイルと保存snapshotの一致、Cache Storageのresponse bytesは未確認。既存の実公開E2Eは単一公開版を対象とし、公開をまたいで旧controllerを保持する検証ブラウザーは準備できていない。確認時点で候補SHAのBrowser UI #44559846410は成功、Environments #44559846396は実行中だった。
+
+開発版の公開は未実施。今回の実公開更新に関するwaiting、承認、複数タブ、キャッシュ内容照合、更新後のオフラインCPUは未確認で、過去の自動B7はPARTIALを維持する。本番の実更新試験も未実施。Phase 7の本人報告とは別の記録とする。
+
+### 公開前監査の再確認
+
+候補 `c3a6b6c4eeb72c82b8152ea299511df26e49c435` の必須CI #44559846396 と #44559846410 はattempt 1でSuccess。前者で両ブラウザー全4グループ、環境分離、local-online、matrix auditが成功した。後者では文書変更としてブラウザー実行がskipされた。
+
+[公開前監査 #44564056003](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44564056003) のattempt 1は失敗。runnerから公開metadata 3件を取得して保存台帳と照合でき、開発のpayloadは16/16一致。本番は15/16一致で、manifest.webmanifestがHTTP 503のため未照合。取得できたファイルのhash不一致は0件。pendingはnull。公開前監査を通過しなかったためpublish=trueはdispatchしておらず、公開後の更新やCache Storageのresponse bytesは未確認。
+
+### 公開前再監査と開発版公開
+
+[公開前再監査 #44571306774](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44571306774) は attempt 1 で Success。本番の manifest.webmanifest は HTTP 200 で取得でき、SHA-256 は保存版と一致した。前回の HTTP 503 は再現せず、原因は未特定。本番・開発各16件と公開メタデータ3件が保存版と一致した。
+
+[開発版公開 #44625491003](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44625491003) は attempt 1 で Success。公開元は `c3a6b6c4eeb72c82b8152ea299511df26e49c435`。開発Worker deploymentは `7927498780`、Pages deploymentは `7927524147`。本番Worker jobはSkipped。
+
+[公開後監査 #44628782826](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44628782826) は attempt 1 で Success。本番・開発の公開ファイルは各16/16件、公開メタデータは3/3件が保存版と一致。台帳 `0259f5d5d5abbecf0ce1e111598f5ce18805712b` は `pending=null`。本番成果物のbytesは公開前後で同一だった。
+
+実配信と保存版が一致した開発版 `sw.js` のSHA-256は `b793fcbb313f5bc2d5547bfafbb774293c9fc4ffeea6f56658839e6cbb6dd866`、そのスクリプトが定義するcache名は `heibon-mahjong-dev-shell-2f7ad0f0a40ef105280f`。いずれも公開成果物からの確認値で、iPhoneからの採取値とは区別する。
+
+## 2026-11-20 Phase 6-B B7 Safari実機確認
+
+2026年11月20日（日本時間）に、ユーザー本人がiPhone XSのSafariで[開発版](https://ak-sekine.github.io/heibon-mahjong/dev/)を確認した。iOSバージョンと確認時刻は未報告。
+
+公開前から保持していたタブに戻ると、ページはすでに自動で再読み込みされていた。原因と、その時点で旧Service Workerによる制御が維持されていたかは未確認。この時点で「更新あり」は表示されず、CPU対局は開始できた。通信遮断の有無は報告されていない。
+
+手動再読み込み後に「更新あり」が表示された。確認ダイアログでキャンセルした後もCPU対局の打牌を継続できた。その後の更新承認に続いて、ページが自動で再読み込みされた。この再読み込みは、タブに戻った時点ですでに起きていた最初の再読み込みとは別に記録する。承認後の再読み込みで通知が消え、CPU対局を開始・操作できた。
+
+| No. | 本人確認項目 | 結果 |
+| --- | --- | --- |
+| 1 | 手動再読み込み後に更新通知が表示される | OK |
+| 2 | 更新確認ダイアログでキャンセルできる | OK |
+| 3 | キャンセル後もCPU対局の打牌を継続できる | OK |
+| 4 | 更新承認後に自動再読み込みされる | OK |
+| 5 | 更新後に更新通知が消える | OK |
+| 6 | 更新後もCPU対局を開始・操作できる | OK |
+
+本人報告の集計は **OK 6項目／NG 0項目／今回の6項目の未確認 0項目**。CPU対局の結果は機内モードでの確認には含めない。
+
+[Service Worker登録処理](../../src/pwa/register.ts)では、当該環境のService Workerがページを制御し、`registration.waiting` が存在する場合に「更新あり」を表示する。キャンセル時は `ACTIVATE_UPDATE` を送らず、承認時は送信後の `controllerchange` で当該環境の制御を確認して再読み込みする。本人が報告した通知・キャンセル後の対局継続・承認後の再読み込みは、この実装条件と整合する。Safari内部のService Worker状態や有効化されたスクリプトのSHA-256は直接取得していない。
+
+**Phase 6-B B7はPARTIAL、Issue #47はOpen。** 開発版の実機更新操作は確認済み。実機上のService WorkerのSHA-256、Cache Storageのresponse bytesの完全一致、今回の更新による本番版への実機上の影響、開発版を複数タブで開いた場合の更新ブロック、他環境のタブを開いた状態での更新可否、公開成果物の競合・ロールバック等は未確認または未達のまま。
