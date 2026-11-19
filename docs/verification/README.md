@@ -1,5 +1,7 @@
 # 検証記録の目次
 
+- [Issue #47 Durable Objects実環境確認](issue-47-environments.md#2026-11-19-durable-objects実環境確認) — 本人がCloudflare管理画面で4つの異なるnamespace IDを確認。
+
 - [Issue #47 Phase 7 iPhone Safari実機確認 — 2026-11-19](issue-47-environments.md#2026-11-19-phase-7実機確認) — 本人がiPhone XSで本番・開発を確認し、OK 10項目・NG 0項目・未確認0項目。Issue全体はOpen。
 
 - [Issue #47 Chromium PWA CI recovery — 2026-11-13](issue-47-environments.md#2026-11-13-chromium-pwa-ci-recovery) — `registration.installing`/`waiting`の未同期によるretry testの競合と修正を記録。develop run `43523795023`はverify、両engine Browser UI・環境分離、local-online、matrix auditがsuccess、Worker／Pages公開jobはskip。Phase 2完了を維持、Phase 3未開始、IssueはOpen。

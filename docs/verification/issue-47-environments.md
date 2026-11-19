@@ -255,3 +255,20 @@ No workflow was disabled, no repository variable was changed, and no workflow di
 自動検証は別記録とする。[実公開E2E #44425690247](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44425690247)ではChromium／WebKitの本番・開発でB1〜B6がPASSED、B7はPARTIAL。複数タブ、cacheのURL一覧、公開metadataの安定性を確認した。
 
 Issue #47はOpen。実際の公開更新に伴うService Workerのwaiting/update、公開更新前後のキャッシュ内容の完全一致、Cloudflare Durable Objectsの実namespaceの直接確認、公開成果物の更新・競合・ロールバックに関する未達の受入条件は残る。WebSocket切断・自動再接続・通信異常からの復旧は[Issue #61](https://github.com/ak-sekine/heibon-mahjong/issues/61)の対象。
+
+## 2026-11-19 Durable Objects実環境確認
+
+2026-11-19にユーザー本人がCloudflare管理画面の各Workerの「Settings → Bindings → Production」で、両Bindingの参照先を確認した。表には本人が訂正した最終値を記載する。
+
+| 環境 | Worker | Binding | namespace ID |
+| --- | --- | --- | --- |
+| 本番 | `heibon-mahjong-online` | `ROOMS` | `bb2855728c5b42beba5771655a131f8d` |
+| 本番 | `heibon-mahjong-online` | `RATE_LIMITER` | `7aef4eef34c14bf594b0d8b2070a8f52` |
+| 開発 | `heibon-mahjong-online-dev` | `ROOMS` | `5d60a68fe93b40958b974e973ddb7eed` |
+| 開発 | `heibon-mahjong-online-dev` | `RATE_LIMITER` | `f1a5e3c6ba1e40dc8eb60578409b1371` |
+
+4つのIDはすべて異なる。本人が確認したBinding表示と参照先IDに基づき、本番・開発の `ROOMS` と `RATE_LIMITER` はそれぞれ別のnamespaceを参照している。
+
+先行調査ではリポジトリの自己Binding構成を確認した時点で、namespace IDは未取得、実環境分離は未確認だった。Phase 6-Bの自動E2EはWorker接続先と環境をまたぐ認証拒否などを確認した。今回のnamespace IDの根拠は、これらとは別のユーザー本人による管理画面での実環境確認である。
+
+Cloudflare管理APIによる独立した再取得と、Durable Objects内部の保存データの参照・内容の完全な非共有の直接検証は未実施。Service Workerの実公開更新時のwaiting/update、公開更新前後のキャッシュ内容の照合、公開成果物の更新・並行処理・競合・ロールバックに関する未達条件は残る。通信断・自動再接続・復旧はIssue #61の対象で、Issue #47はOpenを維持する。
