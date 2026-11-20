@@ -1,5 +1,7 @@
 # 検証記録の目次
 
+- [Issue #47 B7 Cache Storage本文照合](issue-47-environments.md#2026-11-20-phase-6-b-b7-cache-storage本文照合) — Chromium／WebKitの本番・開発で再読み込み前後に各13/13 URL一致。B7はPARTIAL。
+
 - [Issue #47 Durable Objects実環境確認](issue-47-environments.md#2026-11-19-durable-objects実環境確認) — 本人がCloudflare管理画面で4つの異なるnamespace IDを確認。
 
 - [Issue #47 Phase 7 iPhone Safari実機確認 — 2026-11-19](issue-47-environments.md#2026-11-19-phase-7実機確認) — 本人がiPhone XSで本番・開発を確認し、OK 10項目・NG 0項目・未確認0項目。Issue全体はOpen。

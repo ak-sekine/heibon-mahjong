@@ -325,3 +325,22 @@ Cloudflare管理APIによる独立した再取得と、Durable Objects内部の�
 [Service Worker登録処理](../../src/pwa/register.ts)では、当該環境のService Workerがページを制御し、`registration.waiting` が存在する場合に「更新あり」を表示する。キャンセル時は `ACTIVATE_UPDATE` を送らず、承認時は送信後の `controllerchange` で当該環境の制御を確認して再読み込みする。本人が報告した通知・キャンセル後の対局継続・承認後の再読み込みは、この実装条件と整合する。Safari内部のService Worker状態や有効化されたスクリプトのSHA-256は直接取得していない。
 
 **Phase 6-B B7はPARTIAL、Issue #47はOpen。** 開発版の実機更新操作は確認済み。実機上のService WorkerのSHA-256、Cache Storageのresponse bytesの完全一致、今回の更新による本番版への実機上の影響、開発版を複数タブで開いた場合の更新ブロック、他環境のタブを開いた状態での更新可否、公開成果物の競合・ロールバック等は未確認または未達のまま。
+
+## 2026-11-20 Phase 6-B B7 Cache Storage本文照合
+
+実装コミットは `82bdaa6be20cba4372a43be5594797dcff165895`。照合元は `pages-verified` の `0259f5d5d5abbecf0ce1e111598f5ce18805712b`。この検証では、現在の公開版を新規のBrowserContextでキャッシュした。
+
+| ブラウザー | 環境 | 再読み込み前 | 再読み込み後 | 不一致／取得不能 |
+| --- | --- | --- | --- | --- |
+| Chromium 159.0.8154.6 | 本番 | 13/13 | 13/13 | 0／0 |
+| Chromium 159.0.8154.6 | 開発 | 13/13 | 13/13 | 0／0 |
+| WebKit 27.2 | 本番 | 13/13 | 13/13 | 0／0 |
+| WebKit 27.2 | 開発 | 13/13 | 13/13 | 0／0 |
+
+全組み合わせの再読み込み前後で不足・余剰・重複URL、本文SHA-256不一致、Response取得不能は各0件。本番のcache名は `heibon-mahjong-shell-ff22f81eaaf9b90e6566`、開発は `heibon-mahjong-dev-shell-2f7ad0f0a40ef105280f`。各環境の13 Request URLは12保存ファイルに対応し、ルートURLと明示的な `index.html` は別のキーで同じ期待SHA-256を使う。
+
+同一BrowserContextに各環境2タブを開き、再読み込み前後でService Worker controller、cache名、Request URL集合、Response本文のSHA-256、環境分離を確認した。公開metadataも前後で不変。既存B7に完全なRequest URLの照合、`Cache.match()` による保存Responseの取得、`arrayBuffer()` での本文読み取り、期待SHA-256との比較、再読み込み前後の採取、異常の個別判定を追加した。実装時の報告では限定テスト3件、関連Pythonテスト31件、構文検査、`git diff --check` が成功した。
+
+[Browser UI #44639413140](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44639413140)、[Environments #44639413210](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44639413210)、[実公開E2E #44640934294](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44640934294) は同じ実装SHAのattempt 1でSuccess。実公開E2Eは両ブラウザーともSuccess。上表の件数は両jobのJSONログで再取得した。[Chromium artifact](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44640934294/artifacts/14587031798) と[WebKit artifact](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44640934294/artifacts/14586574454) は保存を確認し、ZIP内部は今回未取得。
+
+**B7はPARTIAL、Issue #47はOpen。** 同日のiPhone XS Safariの本人報告（OK 6件）は別節に保持する。iPhone内部のCache Storage本文と有効化されたService Worker scriptのSHA-256、実公開更新前に保存されていた旧cacheの本文、実公開更新時の複数タブによる待機・ブロックと他環境タブの影響、本番版への実機上の影響、公開成果物の競合・ロールバックに関する未達条件は残る。
