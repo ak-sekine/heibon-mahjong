@@ -158,113 +158,15 @@ jobs:
         run: |
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" > "$RUNNER_TEMP/jobs.json"
           node .github/scripts/check-browser-ui-matrix.mjs "$RUNNER_TEMP/jobs.json"
-  # Publication remains disabled until external isolation and bootstrap are complete.
-  worker-production:
-    needs: [verify, browser-ui, isolation-browser, audit]
-    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.publish == true && vars.DUAL_PAGES_ENABLED == 'true' }}
-    runs-on: ubuntu-latest
-    concurrency:
-      group: worker-production
-      cancel-in-progress: false
-    environment: worker-production
-    outputs:
-      url: ${{ steps.deploy.outputs.url }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - id: deploy
-        run: node .github/scripts/deploy-isolated-worker.mjs production
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EXPECTED_WORKER_URL: ${{ vars.PRODUCTION_WORKER_URL }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-  worker-development:
-    needs: [verify, browser-ui, isolation-browser, audit]
-    if: ${{ github.ref == 'refs/heads/develop' && github.event_name == 'workflow_dispatch' && inputs.publish == true && vars.DUAL_PAGES_ENABLED == 'true' }}
-    runs-on: ubuntu-latest
-    concurrency:
-      group: worker-development
-      cancel-in-progress: false
-    environment: worker-development
-    outputs:
-      url: ${{ steps.deploy.outputs.url }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - id: deploy
-        run: node .github/scripts/deploy-isolated-worker.mjs development
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EXPECTED_WORKER_URL: ${{ vars.DEVELOPMENT_WORKER_URL }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-  online:
-    outputs:
-      worker_url: ${{ needs.worker-production.outputs.url || needs.worker-development.outputs.url }}
-    needs: [worker-production, worker-development]
-    if: ${{ always() && (needs.worker-production.result == 'success' || needs.worker-development.result == 'success') }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - run: npm run test:online:production
-        env:
-          ONLINE_API_URL: ${{ needs.worker-production.outputs.url || needs.worker-development.outputs.url }}
-          ONLINE_TEST_ORIGIN: https://ak-sekine.github.io
-          ONLINE_SECONDARY_TEST_ORIGIN: ${{ github.ref_name == 'main' && 'https://html-classic.itch.zone' || '' }}
-      - name: Build independent production itch ZIP with the deployed endpoint
-        if: github.ref_name == 'main'
-        run: npm run build:itch
-        env:
-          VITE_ONLINE_API_URL: ${{ vars.PRODUCTION_WORKER_URL }}
-      - name: Save production itch ZIP
-        if: github.ref_name == 'main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: itch-html5-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/itch/heibon-mahjong.zip
-          if-no-files-found: error
-          retention-days: 90
   publish:
     if: >-
-      ${{ !cancelled()
-        && github.event_name == 'workflow_dispatch'
+      ${{ github.event_name == 'workflow_dispatch'
         && inputs.publish == true
         && vars.DUAL_PAGES_ENABLED == 'true'
-        && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-        && needs.verify.result == 'success'
-        && needs.browser-ui.result == 'success'
-        && needs.isolation-browser.result == 'success'
-        && needs.local-online.result == 'success'
-        && needs.audit.result == 'success'
-        && needs.online.result == 'success'
-        && (
-          (github.ref == 'refs/heads/main'
-            && needs.worker-production.result == 'success'
-            && needs.worker-development.result == 'skipped')
-          || (github.ref == 'refs/heads/develop'
-            && needs.worker-development.result == 'success'
-            && needs.worker-production.result == 'skipped')
-        )
-      }}
+        && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
+    needs: [verify, browser-ui, isolation-browser, local-online, audit]
     permissions:
       contents: write
       pages: write
       id-token: write
-    needs: [verify, browser-ui, isolation-browser, local-online, audit, worker-production, worker-development, online]
     uses: ./.github/workflows/publish-environments.yml
-    with:
-      worker_url: ${{ needs.online.outputs.worker_url }}

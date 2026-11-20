@@ -95,6 +95,8 @@ function mockFetch(snapshotRoot, {
   missingProductionDeployment = false,
   productionDeploymentApiStatus = null,
   additionalDeploymentsByEnvironment = {},
+  reservedPublication = false,
+  skipReservation = false,
 } = {}) {
   const deploymentsByEnvironment = {
     [productionDeploymentEnvironment]: missingProductionDeployment ? [] : [{
@@ -130,6 +132,10 @@ function mockFetch(snapshotRoot, {
         const jobs = jobNames(env, productionWorkflowPath).map(name => ({ name, conclusion: 'success' }));
         if (env === 'development') jobs.push({ name: 'worker-production', conclusion: 'skipped' });
         if (env === 'production' && productionWorkflowPath === ENVIRONMENTS_WORKFLOW) jobs.push({ name: 'worker-development', conclusion: 'skipped' });
+        if (reservedPublication && (env === 'development' || productionWorkflowPath === ENVIRONMENTS_WORKFLOW)) {
+          for (const job of jobs) if (/^(online|worker-)/.test(job.name)) job.name = 'publish / ' + job.name;
+          if (!skipReservation) jobs.push({ name: 'publish / reserve', conclusion: 'success' });
+        }
         return new Response(JSON.stringify({ jobs }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
       if (apiPath.endsWith('/deployments')) {
@@ -223,6 +229,21 @@ test('production releases through environments.yml use the worker-production dep
     assert.equal(report.provenance.deployments.productionWorker.environment, 'worker-production');
     assert.equal(report.provenance.deployments.productionWorker.sha, prodSha);
     assert.match(renderSummary(report), /productionWorker worker-production/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('serialized publication requires reservation and recognizes relocated jobs for both branches', async () => {
+  const root = setup();
+  try {
+    const options = { productionWorkflowPath: ENVIRONMENTS_WORKFLOW, reservedPublication: true };
+    const report = await runAudit(args(root, mockFetch(root, options)));
+    assert.equal(report.outcome, 'SUCCESS', JSON.stringify(report.provenance));
+    for (const env of ['production', 'development']) {
+      assert.equal(report.provenance.runs[env].jobs['publish / reserve'], 'success');
+    }
+    const rejected = await runAudit(args(root, mockFetch(root, { ...options, skipReservation: true })));
+    assert.equal(rejected.outcome, 'FAIL');
+    assert(rejected.provenance.failures.some(failure => failure.kind === 'PUBLICATION_RUN_JOBS_FAILED'));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

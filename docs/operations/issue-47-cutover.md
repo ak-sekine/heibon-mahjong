@@ -110,7 +110,7 @@ GitHubの接続APIではRepository Variables、Environment/Secret登録状態、
 
 **前提**：Phase 4成功、本番Sの全hash/保存remoteを再確認。最新develop Dの全CI成功、未解決pendingなし、URLが末尾slashなし。
 
-**操作**：新`environments.yml`をdevelopで`publish=true`としてdispatchする。初回公開・通常更新とも、上記の継続許可により個別承認は不要。開発Worker→実online→candidate検証→stage→pendingのGit push→合成Pages公開→finalizeの順に待つ。各試行は一度だけ行い、失敗時は状態を調査して停止する。原因を修正し公開状態を確定した後の安全な通常再公開は、最新developの全ゲートとsnapshot確認をやり直して実行する。開発Worker再デプロイを伴うことも許可範囲に含める。
+**操作**：通常更新は `environments.yml` をdevelopで `publish=true` としてdispatchする。既存の継続許可を適用する。共通の公開排他グループ内で、候補検証→合成snapshotの `pending` 予約→開発Worker→実online→Pages公開→台帳確定の順で進む。各試行は一度だけ行う。失敗時はWorker・Pages・台帳の状態を照合して停止する。再公開は実公開状態と予約を解決した後に、最新developの全ゲートからやり直す。
 
 **期待・判定**：本番側を再ビルドせず保存bytesを保持し、devだけDへ更新。environments.jsonとstateのprod=S/dev=D、release.json全SHA256一致、pending=null、remote確定commit、Pages成功を確認。worker-productionはskip。本番URLの既存ファイルhashは不変（台帳metadata追加は別に比較）。
 
@@ -132,8 +132,8 @@ GitHubの`workflow_dispatch`は、そのworkflow定義がrepositoryのdefault br
 
 **停止・復旧**：
 
-1. pendingがremoteにない：Pages前で停止したことをrunで確認して最新全検証からやり直す。Workerだけ更新済みの可能性は別確認。
-2. pendingあり：後続stageは拒否される。branchの更新を凍結し、run/deployment ID、pending.siteDigest、公開bytesを比較する。main Sとdev D両方を記録する。
+1. pendingがremoteにない：予約push前で停止したか、すでに確定済みかをrun・台帳・deploymentで確認する。旧経路のrunではWorkerだけ更新済みの可能性も確認する。
+2. pendingあり：後続の予約とWorkerデプロイは拒否される。branchの更新を凍結し、runとattempt、Worker・Pagesのdeployment、`pending.siteDigest`、公開bytesを比較する。main Sとdev D両方を記録する。
 3. Pages成功・確定pushだけ失敗：正確なpending snapshotと実公開の全hash一致、deployment成功を確認した後にのみ、同じstoreをfinalizeして新commitを通常pushする。Pages再公開は不要。
 4. Pages未公開を確定：pending commitの親にあるstate/siteを新commitで復元して通常push。公開済み旧snapshotは保持する。Git reset/force push/保存branch削除は禁止。
 5. Pages結果不明・一部公開・hash不一致：pendingを消さず停止。公開成功/未公開を確定できなければ、直前の両版snapshotから検証済み合成artifactを作る明示承認付き復旧公開で一致状態を作ってから台帳を確定。古いworkflow再実行、単純フラグfalse、rootだけ旧公開での復旧は禁止。

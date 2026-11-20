@@ -275,7 +275,7 @@ const EXPECTED_ENVIRONMENT_JOBS = [
   'verify', 'local-online', 'isolation-browser (chromium)', 'isolation-browser (webkit)',
   'browser-ui / browser-ui (chromium, group 1)', 'browser-ui / browser-ui (chromium, group 2)',
   'browser-ui / browser-ui (webkit, group 1)', 'browser-ui / browser-ui (webkit, group 2)',
-  'audit', 'online', 'publish / publish',
+  'audit', 'publish / publish',
 ];
 
 function workflowPathMatches(runPath, expectedPath) {
@@ -305,18 +305,21 @@ async function releaseRun(environment, sourceSha, context) {
   const jobs = jobsResponse?.jobs;
   if (!Array.isArray(jobs)) throw new AuditError('GITHUB_API_INVALID_DATA', `publication run ${run.id} jobs response is invalid`);
   const byName = new Map(jobs.map(job => [job.name, job.conclusion]));
-  if (environment === 'development') {
-    const missing = [...EXPECTED_ENVIRONMENT_JOBS, 'worker-development'].filter(name => byName.get(name) !== 'success');
-    if (byName.get('worker-production') !== 'skipped') missing.push('worker-production (expected skipped)');
-    if (missing.length) throw new AuditError('PUBLICATION_RUN_JOBS_FAILED', `development publication run ${run.id} has incomplete jobs`, { missing });
-  } else if (workflowPathMatches(run.path, WORKFLOW_PATHS.legacyProduction)) {
+  if (environment === 'production' && workflowPathMatches(run.path, WORKFLOW_PATHS.legacyProduction)) {
     for (const name of ['deploy-worker', 'production-test', 'pages-deploy']) {
       if (byName.get(name) !== 'success') throw new AuditError('PUBLICATION_RUN_JOBS_FAILED', `production run ${run.id} job ${name} is not successful`, { job: name, conclusion: byName.get(name) || null });
     }
   } else {
-    const missing = [...EXPECTED_ENVIRONMENT_JOBS, 'worker-production'].filter(name => byName.get(name) !== 'success');
-    if (byName.get('worker-development') !== 'skipped') missing.push('worker-development (expected skipped)');
-    if (missing.length) throw new AuditError('PUBLICATION_RUN_JOBS_FAILED', `production run ${run.id} has incomplete jobs`, { missing });
+    const publicationJobs = ['reserve', 'online', 'worker-production', 'worker-development'];
+    const relocated = publicationJobs.some(name => byName.has('publish / ' + name));
+    const prefix = relocated ? 'publish / ' : '';
+    const opposite = environment === 'production' ? 'development' : 'production';
+    const required = [...EXPECTED_ENVIRONMENT_JOBS, prefix + 'online', prefix + 'worker-' + environment];
+    if (relocated) required.push('publish / reserve');
+    const missing = required.filter(name => byName.get(name) !== 'success');
+    const otherWorker = prefix + 'worker-' + opposite;
+    if (byName.get(otherWorker) !== 'skipped') missing.push(otherWorker + ' (expected skipped)');
+    if (missing.length) throw new AuditError('PUBLICATION_RUN_JOBS_FAILED', `${environment} publication run ${run.id} has incomplete jobs`, { missing });
   }
   return {
     id: run.id, url: run.html_url, branch, sha: run.head_sha, event: run.event,

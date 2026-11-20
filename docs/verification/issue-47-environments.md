@@ -344,3 +344,11 @@ Cloudflare管理APIによる独立した再取得と、Durable Objects内部の�
 [Browser UI #44639413140](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44639413140)、[Environments #44639413210](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44639413210)、[実公開E2E #44640934294](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44640934294) は同じ実装SHAのattempt 1でSuccess。実公開E2Eは両ブラウザーともSuccess。上表の件数は両jobのJSONログで再取得した。[Chromium artifact](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44640934294/artifacts/14587031798) と[WebKit artifact](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44640934294/artifacts/14586574454) は保存を確認し、ZIP内部は今回未取得。
 
 **B7はPARTIAL、Issue #47はOpen。** 同日のiPhone XS Safariの本人報告（OK 6件）は別節に保持する。iPhone内部のCache Storage本文と有効化されたService Worker scriptのSHA-256、実公開更新前に保存されていた旧cacheの本文、実公開更新時の複数タブによる待機・ブロックと他環境タブの影響、本番版への実機上の影響、公開成果物の競合・ロールバックに関する未達条件は残る。
+
+## 2026-11-20 統合公開ゲートとWorker再実行保護
+
+本番側の [Environments #43862310279](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43862310279) は、`main` の検証が `DUAL_PAGES_ENABLED=true` を拒否して失敗した。developのフラグ検証を使用し、通常pushと `publish=false` で公開処理を起動しない条件を維持する。
+
+統合公開では、保存snapshotを検証して `pending` を予約し、現在のrun・attempt・保存commitとの一致をWorker前に確認する。台帳予約から確定まで本番・開発共通の排他制御を適用する。対象環境の公開済みSHA、既存の `pending`、古い候補、競合による予約push失敗はWorker前に停止する。予約後にWorker・Pagesの結果が不明になった場合は予約を保持して後続公開を止める。
+
+関連39件のローカルテストで、本番・開発の新規候補の判定、同一SHA・pending・別attempt・古いSHAの拒否、Git競合、公開条件、旧・新の公開ジョブ名の監査を確認した。Workerはモックを使用した。mainへの反映、Worker・Pages公開は未実施。

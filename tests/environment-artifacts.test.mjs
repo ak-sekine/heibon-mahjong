@@ -6,6 +6,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { buildPwa, serviceWorkerSource, DEV_PWA_BASE, PWA_BASE } from '../scripts/build-pwa.mjs';
 import { seal, stage, finalize, inventory, digest, verifySealed } from '../scripts/environments/artifacts.mjs';
+import { checkPublication, preparePublication } from '../.github/scripts/publication-reservation.mjs';
 const prodSha = 'a'.repeat(40), devSha = 'b'.repeat(40);
 function fixture(root, env, sha) {
   mkdirSync(path.join(root, 'assets'), { recursive: true });
@@ -113,4 +114,90 @@ test('configuration drift cannot publish a candidate bound to a different Worker
     stage(store, prod, prodSha, actual);
     finalize(store);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('Worker deployment requires a fresh snapshot reserved by this run and attempt', () => {
+  const script = readFileSync(new URL('../.github/scripts/deploy-isolated-worker.mjs', import.meta.url), 'utf8')
+    .replace(/^import .*;$/gm, '');
+  for (const [environment, branch, config] of [
+    ['production', 'main', 'wrangler.jsonc'],
+    ['development', 'develop', 'wrangler.development.jsonc'],
+  ]) {
+    const { root, store, prod, dev } = setup();
+    try {
+      stage(store, prod, prodSha);
+      finalize(store);
+      const candidate = path.join(root, 'next');
+      const { sha, workerUrl } = fixture(candidate, environment, 'c'.repeat(40));
+      const commit = 'f'.repeat(40);
+      const env = {
+        GITHUB_REF: 'refs/heads/' + branch, GITHUB_SHA: sha, GITHUB_EVENT_NAME: 'workflow_dispatch',
+        GITHUB_REPOSITORY: 'fixture/repo', GITHUB_RUN_ID: '10', GITHUB_RUN_ATTEMPT: '1',
+        PUBLICATION_SNAPSHOT: commit, EXPECTED_WORKER_URL: workerUrl, GITHUB_OUTPUT: 'output',
+        CLOUDFLARE_API_TOKEN: 'test-token', CLOUDFLARE_ACCOUNT_ID: 'shared-account',
+      };
+      let remoteBranch = sha;
+      let remoteStore = commit;
+      const externalCalls = [];
+      const exec = (command, args) => {
+        if (command === 'git') {
+          assert.deepEqual(args, ['-C', store, 'rev-parse', 'HEAD']);
+          return commit;
+        }
+        if (command === 'gh') {
+          if (args[1].endsWith('/commits/pages-verified')) return remoteStore;
+          assert.equal(args[1], 'repos/fixture/repo/commits/' + branch);
+          return remoteBranch;
+        }
+        externalCalls.push([command, Array.from(args)]);
+        return workerUrl;
+      };
+      const deploy = (overrides = {}) => {
+        const deploymentEnv = { ...env, ...overrides };
+        return vm.runInNewContext(script, {
+          process: { argv: ['node', 'script', environment, store], env: deploymentEnv },
+          checkPublication: (dir, url) => checkPublication(dir, url, deploymentEnv, exec),
+          execFileSync: exec,
+          appendFileSync: (file, value) => {
+            assert.equal(file, 'output');
+            assert.equal(value, 'url=' + workerUrl + '\n');
+          },
+        });
+      };
+      const prepare = (dir = candidate, overrides = {}) => preparePublication(store, dir, workerUrl, { ...env, ...overrides }, exec);
+      const before = digest(inventory(store));
+      remoteBranch = 'e'.repeat(40);
+      assert.throws(() => prepare(), /Stale/);
+      remoteBranch = sha;
+      const wrongEnvironment = environment === 'production' ? dev : prod;
+      assert.throws(() => prepare(wrongEnvironment), /Stale|endpoint|Candidate/);
+      assert.equal(digest(inventory(store)), before);
+      assert.throws(deploy, /does not belong/);
+
+      prepare();
+      const reserved = digest(inventory(store));
+      assert.throws(() => prepare(), /pending/);
+      assert.throws(() => deploy({ GITHUB_RUN_ID: '11' }), /does not belong/);
+      assert.throws(() => deploy({ GITHUB_RUN_ATTEMPT: '2' }), /does not belong/);
+      assert.throws(() => deploy({ GITHUB_EVENT_NAME: 'push' }), /branch or event/);
+      assert.throws(() => deploy({ CLOUDFLARE_ACCOUNT_ID: '' }), /Missing explicit/);
+      remoteStore = 'e'.repeat(40);
+      assert.throws(deploy, /Remote snapshot changed/);
+      remoteStore = commit;
+      remoteBranch = 'e'.repeat(40);
+      assert.throws(deploy, /Stale source SHA/);
+      remoteBranch = sha;
+      assert.equal(digest(inventory(store)), reserved);
+      assert.deepEqual(externalCalls, []);
+
+      deploy();
+      assert.deepEqual(externalCalls, [['npx', ['wrangler', 'deploy', '--config', config]]]);
+      finalize(store);
+      const published = digest(inventory(store));
+      assert.throws(() => prepare(), /already published/);
+      assert.throws(deploy, /does not belong/);
+      assert.equal(digest(inventory(store)), published);
+      assert.equal(externalCalls.length, 1);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
 });

@@ -49,13 +49,15 @@ main未変更・開発URL未登録での作成は[専用手順](bootstrap-develo
 ブラウザ検証したdistを再ビルドせず公開する。artifact内のWorker URLは実デプロイ・オンライン検証を通ったjob outputと一致を要求し、実行中の設定変更でも接続先がずれた候補は公開しない。`release.json`はsource SHA、Worker URL、各ファイルSHA256を持つ。Pagesの`environments.json`が両公開版のSHAとdigestを記録する。ビルド情報にもgit SHAが入る。
 Actions artifactは90日。期限切れ/取得失敗時は停止し、ソースから勝手に再作成しない。新しい全検証runを実行する。公開snapshotは`pages-verified`のGit履歴に無期限保存する。履歴を削除・GCで切り捨てない。
 
-合成は共通concurrencyで直列化する。GitHub concurrencyはpending runの全件FIFOを保証しないため、対象runがキャンセルされた場合は最新branchで再実行する。古いSHAは公開しない。片方の更新は保持側を再ビルドせず、保存された同じbytesを使用する。取得失敗・破損・不明状態は空扱いせず停止する。
+通常の統合公開は本番・開発共通の `pages-publication` で、台帳の予約からWorker・オンライン検証・Pages・台帳の確定まで直列化する。GitHub concurrencyはpending runの全件FIFOを保証しない。キャンセル後は台帳と公開状態を確認し、未解決の予約がなければ最新branchで全ゲートを実行する。片方の更新では保持側の保存bytesを使用する。
+
+台帳取得失敗、破損、未解決 `pending`、対象環境の公開済みSHA、古い候補はWorker前に拒否する。予約は `pages-verified` への通常pushで保存し、競合でpushが拒否されたrunはWorkerへ進まない。Worker実行前とPages公開前に、予約commit・run・attempt、候補のWorker URL、対象branchの先端を再確認する。旧公開・初回bootstrap・手動デプロイとこの通常公開を並行運用しない。
 
 ## 障害と復旧・ロールバック
 
-- test/Worker失敗：Pagesに進まない。既存公開を維持。Worker公開成功後オンライン検証失敗の場合、Workerだけ更新済みになり得る。旧クライアント互換性を保ち、必要ならCloudflareの既知のWorker versionへ復旧する。DO migrationsを逆実行したり、本番DOを削除しない。
-- snapshot保存失敗：Pages未実行。Git remoteのpendingを確認する。
-- Pages失敗/結果不明/確定commit失敗：pendingを残して後続公開を止める。run URL、Pages deployment結果、保存branchのpending siteDigest、実公開のenvironments.jsonを照合する。公開成功を確認できた場合のみ同じ保存snapshotをfinalizeする。未公開ならpending commitの親からsite/stateを復元する新commitを作る（履歴をreset/force pushしない）。結果不明のままpendingを削除しない。
+- 品質ゲート失敗時は台帳予約へ進まない。台帳の予約push失敗時はWorker・Pagesへ進まない。Git remoteの `pending` を確認する。
+- 予約後に中断・失敗した場合は `pending` が残り、後続公開は停止する。branch更新は排他の対象外であり、Worker開始後に先端が変わるとPages前の再確認で停止する。run、Worker・Pagesのdeployment、保存branchの `pending.siteDigest`、実配信のmetadataとbytesを照合する。Workerだけ更新済みの場合は互換性を確認する。DO migrationsを逆実行したり、本番DOを削除しない。
+- Pages公開の成功と同じsnapshotの配信を確認できた場合のみ、そのsnapshotを確定する。未公開が確定し、Workerの状態も確認できた場合は、必要な承認を得て予約の親からsite/stateを復元する新commitを作る。結果不明のまま `pending` を削除したり、再実行したりしない。
 - 通常rollback：安全な旧ソースへのrevert commitを対象branchへ作り全ゲートを通す。保持側は同じsnapshotを使う。緊急の旧snapshot再公開は履歴・hash・対応Worker互換性・公開状態を確認する独立した復旧判断とし、古いworkflow再実行でfreshnessを迂回しない。
 - 初回失敗：本番bootstrap未完ならdev公開不可。既存Pagesを維持し、空の保存先を公開しない。
 - 切替後に旧workflowへ戻すと/devを消す恐れがある。DUAL_PAGES_ENABLEDを単純にfalseへ戻してlegacyを再開しない。両版snapshotを保持した復旧を行う。
