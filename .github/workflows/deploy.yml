@@ -194,7 +194,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Require both Browser UI engine jobs in this run attempt
+      - name: Require all four Browser UI groups in this run attempt
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ github.run_id }}

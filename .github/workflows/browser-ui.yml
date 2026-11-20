@@ -1,7 +1,7 @@
 name: Browser UI verification
 
 on:
-  # main is verified through Deploy, which calls this workflow exactly once.
+  # main is verified through Environments, which calls this workflow exactly once.
   push:
     branches: [fix-mobile-table-layout, ui-river-spacing, fix-riichi-discard-layout]
   pull_request:
@@ -110,9 +110,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 4
       matrix:
         browser: [chromium, webkit]
+        group: [1, 2]
+    name: browser-ui (${{ matrix.browser }}, group ${{ matrix.group }})
     steps:
       - uses: actions/checkout@v4
         with:
@@ -134,7 +136,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Test Browser UI engine selection
-        if: ${{ matrix.browser == 'chromium' }}
+        if: ${{ matrix.browser == 'chromium' && matrix.group == 2 }}
         run: python tests/test_browser_regressions_selection.py
       - run: npm ci
       - name: Download verified build from Deploy workflow
@@ -150,12 +152,14 @@ jobs:
           name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
           path: dist
       - name: Download verified itch build
+        if: ${{ matrix.group == 2 }}
         uses: actions/download-artifact@v4
         with:
           name: itch-dist-${{ github.sha }}-${{ github.run_attempt }}
           path: dist-itch
       - run: python -m pip install playwright
       - name: Test itch smoke startup transitions
+        if: ${{ matrix.group == 2 }}
         run: python tests/test_itch_smoke_startup.py
       - name: Record Playwright install environment
         env:
@@ -211,6 +215,7 @@ jobs:
         shell: bash
         run: python .github/scripts/timed-playwright-install.py install "${{ matrix.browser }}"
       - name: Run standalone itch smoke test before Browser UI suite
+        if: ${{ matrix.group == 2 }}
         shell: bash
         env:
           BROWSER: ${{ matrix.browser }}
@@ -249,8 +254,9 @@ jobs:
           fi
           export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
           set -o pipefail
-          python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
+          python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" --group "${{ matrix.group }}" 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
       - name: Report winning hand geometry
+        if: ${{ matrix.group == 2 }}
         env:
           BROWSER: ${{ matrix.browser }}
         run: |
@@ -271,6 +277,7 @@ jobs:
           }))
           PY_GEOMETRY
       - name: Run standalone itch smoke test after Browser UI suite
+        if: ${{ matrix.group == 2 }}
         shell: bash
         env:
           BROWSER: ${{ matrix.browser }}
@@ -287,6 +294,7 @@ jobs:
           set -o pipefail
           HEIBON_BROWSER="$BROWSER" HEIBON_SMOKE_ARTIFACT_DIR=/tmp/heibon-itch-smoke HEIBON_SMOKE_REPETITIONS=3 python tests/browser-itch-package.py 2>&1 | tee /tmp/heibon-itch-smoke-after.log
       - name: Verify standalone itch smoke failure diagnostics
+        if: ${{ matrix.group == 2 }}
         shell: bash
         env:
           BROWSER: ${{ matrix.browser }}
@@ -325,7 +333,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: browser-ui-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: browser-ui-${{ matrix.browser }}-group-${{ matrix.group }}-${{ github.sha }}-${{ github.run_attempt }}
           if-no-files-found: error
           path: |
             /tmp/heibon-browser-ui-timings.csv
@@ -347,7 +355,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: candidate-frame-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: candidate-frame-${{ matrix.browser }}-group-${{ matrix.group }}-${{ github.sha }}-${{ github.run_attempt }}
           if-no-files-found: warn
           path: |
             /tmp/heibon-table-ui/candidate-geometry/*.json
@@ -358,14 +366,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: center-round-display-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: center-round-display-${{ matrix.browser }}-group-${{ matrix.group }}-${{ github.sha }}-${{ github.run_attempt }}
           if-no-files-found: warn
           path: /tmp/heibon-table-ui/center-round-display
       - name: Save river spacing failure diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: river-spacing-diagnostics-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: river-spacing-diagnostics-${{ matrix.browser }}-group-${{ matrix.group }}-${{ github.sha }}-${{ github.run_attempt }}
           if-no-files-found: ignore
           path: |
             /tmp/heibon-table-ui/river-spacing-failure-*.png

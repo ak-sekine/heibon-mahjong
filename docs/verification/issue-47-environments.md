@@ -1,5 +1,7 @@
 # Issue #47 検証記録（2026-11-11）
 
+> **最新状態（2026-11-19）：Phase 7の本人実機確認10項目はすべてOK。** [Phase 7実機確認](#2026-11-19-phase-7実機確認)と[2026-11-13のPhase 2完了記録](#2026-11-13-phase-2完了記録)を参照。Issue #47全体はOpen。
+
 ## 自動検証
 
 - 開始時HEAD / fetch後origin/main: `cb457bb0dfe00455adf66d5f8c51284d0d00081f`。ブランチwork、clean、behind/ahead 0/0。最新mainからdevelop作成。
@@ -122,3 +124,231 @@ B7以後の追記は公開制御のWorker URL照合、Git競合回帰テスト�
 ## 2026-11-12 公開移行前チェック
 
 [今回の取得証跡・検証結果](issue-47-preflight-2026-11-12.md)と[確定したPhase別切替手順](../operations/issue-47-cutover.md)を追加。過去の成功記録と今回の再確認を区別する。公開は未実施、IssueはOpen。
+
+## 2026-11-13 Phase 2完了記録
+
+### 本番公開と自動検証
+
+今回の記録はGitHub Actionsの取得結果、既存の公開後ライブ監査記録、Issue #47の公開コメントと照合した。自動検証と本人の実機確認は別の結果として扱う。
+
+| 証跡 | 結果 |
+|---|---|
+| 統合後CI [run 43426274255](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43426274255) | success。verify、local-online、Chromium/WebKit環境分離、Browser UI両engine、auditがsuccess。worker-development、worker-production、online、publishはskip。 |
+| 本番公開workflow [run 43430225160](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43430225160) | success。release-freshness、verify、Chromium/WebKit、matrix audit、Worker deploy、production-test、Pages build/deployがsuccess。 |
+| 公開後ライブ監査 [run 43434482360](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43434482360) | success。既存記録では公開SHA、Worker状態、公開URLと実公開artifactの16ファイルを照合し、すべてSHA-256 MATCH。 |
+| Worker診断 [run 43434482361](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43434482361) | production-test success。 |
+
+- 公開元SHA: `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`。
+- Worker: deployment `3b6587ac-79fd-49a8-b6d1-2f77a9022331`、version `85e9510f-3f21-45c1-b0ff-4a4de66e7749`。
+- Pages deployment: `7766490026`。
+- 公開artifact: `published-pages-c3b84944daaa8fbba3b4b603c0d3f8430e9afb58-1`、artifact ID `14043735340`、ZIP SHA-256 `fe5744e7b7178a92db884c8926d1e637c9668eb79b7cc4c0da4fb4d1b0813aff`。Actions artifact API上の名前・ID・digestを再照合した。公開後監査記録はこの実artifactの16ファイルと本番公開URLの各SHA-256一致を報告している。
+
+### ユーザー本人によるiPhone Safari実機確認
+
+確認日：2026-11-13。端末：iPhone Safari、既存ホーム画面PWA。iOS/Safariバージョン詳細は未記録。以下は本人が報告した判定のみを転記し、自動テスト結果とは分ける。
+
+| No. | 確認項目 | 結果 |
+|---:|---|---|
+| 1 | 既存ホーム画面PWAが起動する | OK |
+| 2 | 更新通知があれば更新でき、再起動後も正常動作する | OK |
+| 3 | 既存ルール設定が保持されている | OK |
+| 4 | 既存オンライン参加・再接続情報が保持されている | 未検証 |
+| 5 | CPU対局を開始し、ツモ・打牌ができる | OK |
+| 6 | 鳴きなどの操作が正常にできる | OK |
+| 7 | 機内モード・Wi-Fi OFFでPWAを再起動し、CPU対局できる | OK |
+| 8 | 通常Safariから本番URLを開き、正常に起動できる | OK |
+
+集計はOK 7件、NG 0件、未検証1件。本人の補足は「オンライン対局していませんでした。」であり、更新前後のオンライン参加・再接続情報を比較できなかったことが未検証の理由。保存データの内部状態を調査していないため、保存キーや再接続情報が存在しなかったとは断定しない。iPhone実機でオンライン対局・再接続した結果もない。更新通知が実際に表示されたか、Service Worker内部でどのversionを照合したかは補足しない。
+
+### Phase 2判定とIssue全体の残件
+
+1. 本番Workerデプロイ: workflowの`deploy-worker` success。公開後のdeployment/versionは上記のとおり。
+2. 本番Pagesデプロイ: workflowの`pages-deploy` success、Pages deployment ID `7766490026`。
+3. 公開SHA: workflow記録と公開後監査により`c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`で一致。
+4. 公開artifact: API上のID・ZIP digestを照合。公開後監査が16ファイルすべてのSHA-256 MATCHを記録。
+5. 既存PWA: 本人報告で削除せず起動できた。
+6. 既存ルール設定: 本人報告で保持。
+7. CPU対局・操作: 本人報告でツモ・打牌と鳴き等が正常。
+8. オフラインPWA: 本人報告で機内モード・Wi-Fi OFFからの再起動後にCPU対局可能。
+9. オンライン再接続情報保持: 未検証のまま残す。
+
+以上を既存の公開移行手順に照らし、**Phase 2：完了**と判定する。この判定はIssue #47全体の受入条件達成を意味しない。全体の残件として、更新前後のオンライン参加・再接続情報の保持、iPhone実機でのオンライン対局・再接続、iOS/Safariバージョン詳細を維持する。
+
+Phase 3以降は未着手。[Issue #47のPhase 2完了報告](https://github.com/ak-sekine/heibon-mahjong/issues/47#issuecomment-6855362022)を追記した。Issue #47はOpen。Phase 3の初期登録、旧workflow停止、公開フラグ変更、新workflow publishは今回行っていない。
+
+## 2026-11-13 Chromium PWA CI recovery
+
+### 原因と修正
+
+対象だった[失敗run 43440434724](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43440434724)はdevelop SHA `e026828a2de6f4a9b594cd8e9f3e47e6e9c704c3`で、Chromiumの`tests/browser-pwa.py:273`が`-v2-retry` cacheを見つけられず失敗した。ログのcache一覧は旧cacheと`-v2`で、期待した`-v2-retry`はなかった。
+
+コード調査で、`registration.update()`の完了後に行う`!registration.installing && !registration.waiting`確認は、どのinstall eventが終了したかを示さず、別のupdate checkが進行・待機していないことも保証しないと分かった。テストは失敗対象assetへの503を確認していたが、最初の`-v2` installが`redundant`になるまでのstate transitionを記録せず、復旧後に実際に配信されたworker scriptが`-v2-retry`であることも確認していなかった。そのため、test serverの失敗経路を戻しscriptを書き換えた後、まだ重なっていたupdate checkが古い`-v2`をinstallしても、テストはretryと区別できなかった。これはテスト同期と観測不足であり、`src/pwa/register.ts`のユーザー承認・複数タブ制御や`build-pwa.mjs`のinstall/activate処理の不具合を示す結果ではない。
+
+失敗runはworker state transitionと配信script bodyを記録していなかったため、個別のChromiumがどのupdate requestから`-v2`をinstallしたか、retry script取得前にassertionへ到達したかまでは過去ログだけでは区別できない。確定した原因はテストが失敗installの終了とretryのscript/cache対応を保証していなかったことであり、上記の古いworkerが重なった経路はその競合で可能な説明として扱う。
+
+`tests/browser-pwa.py`のみを変更した。最初の更新で`updatefound`とworker state changeを追跡し、失敗workerが`redundant`になりregistrationがinstalling/waitingなしへ落ち着いてから配信経路を戻す。HTTP handlerは応答したworker scriptのcache名とSHA-256を記録する。再試行では実際に`-v2-retry` scriptが配信されたこと、`installed` workerが`waiting`に残ること、その名前のCache Storage entryがあることを確認する。旧cache保持、CPU対局継続、ユーザー承認前にreloadしないこと、複数タブ制御、オフラインCPU起動の既存assertは維持した。cache名assert、skip、固定sleepは追加・緩和していない。アプリ実装は変更していない。
+
+BrokenPipeは元runでHTTP handlerがレスポンスを書いている最中に接続が閉じた記録である。修正後のChromium PWAテストでも`do_GET`から`BrokenPipeError`が記録されたが、同じPWAケースはsuccessした。HTTP writeの副次エラーであり、cache assertionの原因ではないことを確認した。どのbrowser-side actionがその個別接続を閉じたかまではログにない。
+
+### 修正後検証
+
+| 検証 | 結果 |
+|---|---|
+| [develop CI run 43523795023](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43523795023)、SHA `f2952c7eaeac189a249fa5e8e9523eccbe4f30e2` | verify、local-online、Chromium/WebKit環境分離、Chromium/WebKit Browser UI、matrix auditがすべてsuccess。worker-development、worker-production、online、publishはすべてskip。 |
+| Chromium `tests/browser-pwa.py` | success、5.825秒。precache失敗後の旧PWA/cache保持、`-v2-retry`再取得とwaiting cache、更新通知、複数タブ制御、承認後更新、オフラインCPUを含むPWA suiteが通過。CPU対局は承認前にreloadしなかった。 |
+| WebKit `tests/browser-pwa.py` | success、5.899秒。同じPWA受入項目が通過。 |
+| local `npm test` | 91/91 success。 |
+| local型検査 | `npm run typecheck`、`npm run typecheck:worker` success。 |
+| local build | production Pages、development Pages、itch.io build/ZIPがsuccess。Pages用Worker URLは`.validation.workers.dev`の検証fixture、itchは`https://online-mock.invalid`。公開先ではない。 |
+| `git diff --check` / Python compile | success。 |
+
+独立した2回目の全体runは、検証記録を含む次のdevelop commitで確認する。Phase 2完了判定を維持し、Issue #47はOpen。Phase 3の初期登録は未開始。production Pages、Worker、Durable Objects、`pages-verified`、`DUAL_PAGES_ENABLED`はいずれも今回変更していない。main `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`、pages-verified `232205c5efc7f86df8d70432a62224e82b4fb0ed`。
+
+## 2026-11-14 Phase 4 preflight and CI
+
+### Remote state at start
+
+| Item | Rechecked value |
+|---|---|
+| `main` | `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58` |
+| `develop` before changes | `7e6046e12da21c8440f352598a9f46e3eda26ff9` |
+| `pages-verified` | `61d911d490ffabf5052aa190201ada1c0ab7d955` |
+| Production snapshot | SHA `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`; digest `2e6766ce7229fd4a96de431e01a4ddac26288c7b96af75dacfbd96dbbbf8408e`; snapshotDigest `62e514bb5d03e1347c1f67911b759ff29192abe3f300a4e37da7b58cdea332c7` |
+| `state.json` | `pending=null`; development snapshot absent |
+| Issue #47 | Open; Phase 3 completion comment present |
+| `DUAL_PAGES_ENABLED` in CI verify | Unset at run time; no value or secret was printed |
+
+### Workflow flag validation correction
+
+`.github/workflows/environments.yml` previously rejected every value except unset/false, which made the post-cutover `true` state fail verify. A dedicated validator now accepts unset, `false`, and `true`, rejects all other values, and writes only a safe publication-mode label. Deployment job conditions remain unchanged: worker jobs require a matching branch, `workflow_dispatch`, `publish=true`, and `DUAL_PAGES_ENABLED=true`; they still require verify, Chromium/WebKit UI, environment separation, and matrix audit. The reusable Pages publisher remains downstream of successful online validation.
+
+Regression tests cover all accepted and rejected flag values, new workflow push and publish-false behavior, exact Worker branch constraints, mandatory job dependencies, and unchanged legacy deployment gates.
+
+### CI attempts
+
+- `e2bf2b6eb637fe63f0286c7d751c1ba25d4a8e00`, run [43552298626](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43552298626): verify, npm tests, TypeScript/Worker typechecks, production/development/itch builds, artifacts, environment isolation, and local-online passed. Chromium Browser UI exposed a test race: an automatic Service Worker update could fetch the retry script before the test began counting responses. The run is not an acceptance pass.
+- `a7113b6fb7f029585c93bfd7f975a360b3e48f35`, run [43552735013](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43552735013): moving the response counter before replacing the retry script resolved the Browser UI failure. `npm test` (1544 tests), TypeScript typecheck, Worker typecheck, production/development/itch builds, artifact seal/verify, Chromium/WebKit Browser UI, Chromium/WebKit environment separation, local-online, and matrix audit all passed. `worker-production`, `worker-development`, `online`, and `publish` were skipped. The run was a `push`; the verify job observed `DUAL_PAGES_ENABLED` unset. No publication job ran.
+
+### Phase 4 status and stop reason
+
+No workflow was disabled, no repository variable was changed, and no workflow dispatch or publication was started. The connected GitHub API did not expose Repository Variables, Environment/Secret registrations, Pages settings, or deployment records. Local `gh` has no valid GitHub API token, and this execution has no browser interaction tool for the Settings UI. Treat environment protections, secret presence, Pages source, old repository secrets, and latest live deployment identifiers as unconfirmed. Do not proceed with workflow Disable or flag activation until these are verified. Issue #47 remains Open; Phase 4 is incomplete.
+
+## 2026-11-19 Phase 7実機確認
+
+2026-11-19にユーザー本人がiPhone XSのSafariで、本番系・開発系を確認した。最終回答は「すべてOKです」。iOSバージョン、確認時刻、操作の詳細は未報告。
+
+| No. | 確認内容 | 対象 | 結果 |
+| --- | --- | --- | --- |
+| 1 | Safariで正常に起動する | 本番・開発 | OK |
+| 2 | CPU対局を開始して打牌できる | 本番・開発 | OK |
+| 3 | ホーム画面にPWAとして追加できる | 本番・開発 | OK |
+| 4 | ホーム画面からPWAを起動できる | 本番・開発 | OK |
+| 5 | 機内モードでPWAを起動しCPU対局できる | 本番・開発 | OK |
+| 6 | オンラインルームを作成・参加できる | 本番・開発 | OK |
+| 7 | オンライン対局を開始し、打牌が相手に反映される | 本番・開発 | OK |
+| 8 | 本番で変更したルール設定が開発版に反映されない | 本番 → 開発 | OK |
+| 9 | 開発版で変更したルール設定が本番に反映されない | 開発 → 本番 | OK |
+| 10 | 本番・開発それぞれのPWAを起動しても、相手側の起動・オフライン動作に問題がない | 環境間の非干渉 | OK |
+
+**本人報告の集計はOK 10項目、NG 0項目、未確認0項目。** No.1〜7は両環境で確認し、集計は各項目を1回だけ数えた。No.8〜10は環境間の非干渉の確認。
+
+自動検証は別記録とする。[実公開E2E #44425690247](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44425690247)ではChromium／WebKitの本番・開発でB1〜B6がPASSED、B7はPARTIAL。複数タブ、cacheのURL一覧、公開metadataの安定性を確認した。
+
+Issue #47はOpen。実際の公開更新に伴うService Workerのwaiting/update、公開更新前後のキャッシュ内容の完全一致、Cloudflare Durable Objectsの実namespaceの直接確認、公開成果物の更新・競合・ロールバックに関する未達の受入条件は残る。WebSocket切断・自動再接続・通信異常からの復旧は[Issue #61](https://github.com/ak-sekine/heibon-mahjong/issues/61)の対象。
+
+## 2026-11-19 Durable Objects実環境確認
+
+2026-11-19にユーザー本人がCloudflare管理画面の各Workerの「Settings → Bindings → Production」で、両Bindingの参照先を確認した。表には本人が訂正した最終値を記載する。
+
+| 環境 | Worker | Binding | namespace ID |
+| --- | --- | --- | --- |
+| 本番 | `heibon-mahjong-online` | `ROOMS` | `bb2855728c5b42beba5771655a131f8d` |
+| 本番 | `heibon-mahjong-online` | `RATE_LIMITER` | `7aef4eef34c14bf594b0d8b2070a8f52` |
+| 開発 | `heibon-mahjong-online-dev` | `ROOMS` | `5d60a68fe93b40958b974e973ddb7eed` |
+| 開発 | `heibon-mahjong-online-dev` | `RATE_LIMITER` | `f1a5e3c6ba1e40dc8eb60578409b1371` |
+
+4つのIDはすべて異なる。本人が確認したBinding表示と参照先IDに基づき、本番・開発の `ROOMS` と `RATE_LIMITER` はそれぞれ別のnamespaceを参照している。
+
+先行調査ではリポジトリの自己Binding構成を確認した時点で、namespace IDは未取得、実環境分離は未確認だった。Phase 6-Bの自動E2EはWorker接続先と環境をまたぐ認証拒否などを確認した。今回のnamespace IDの根拠は、これらとは別のユーザー本人による管理画面での実環境確認である。
+
+Cloudflare管理APIによる独立した再取得と、Durable Objects内部の保存データの参照・内容の完全な非共有の直接検証は未実施。Service Workerの実公開更新時のwaiting/update、公開更新前後のキャッシュ内容の照合、公開成果物の更新・並行処理・競合・ロールバックに関する未達条件は残る。通信断・自動再接続・復旧はIssue #61の対象で、Issue #47はOpenを維持する。
+
+## 2026-11-19 Phase 6-B B7公開前確認
+
+対象developは `c3a6b6c4eeb72c82b8152ea299511df26e49c435`。保存台帳 `35abb1f931aeee4436c2fbd3dc9e35d0744b050c` は `pending=null`。保存済みscriptと候補のローカルビルドを比較した。
+
+| 対象 | cache名 | sw.js SHA-256 |
+| --- | --- | --- |
+| 本番の保存版 | `heibon-mahjong-shell-ff22f81eaaf9b90e6566` | `1d5e4bece1d59d90e8d461c11c8768abb1fbdec5eaa152d9aa7f52f4e2f28622` |
+| 開発の保存版 | `heibon-mahjong-dev-shell-5a990f26b84184c9fab1` | `cc7940280ea3ff0bec37d41d604af3ca65b278628c5e365fdf628cd8d6dfbca9` |
+| 開発のローカル候補 | `heibon-mahjong-dev-shell-798860a335e3d49104b6` | `c6911bb87a8ebc5aff912dab5429b0ae080b61705646477eb9ff9bfbf27f3411` |
+
+公開URLの両release.jsonとenvironments.jsonの取得はproxyのCONNECT段階で403。公開サーバーの応答、現在の公開ファイルと保存snapshotの一致、Cache Storageのresponse bytesは未確認。既存の実公開E2Eは単一公開版を対象とし、公開をまたいで旧controllerを保持する検証ブラウザーは準備できていない。確認時点で候補SHAのBrowser UI #44559846410は成功、Environments #44559846396は実行中だった。
+
+開発版の公開は未実施。今回の実公開更新に関するwaiting、承認、複数タブ、キャッシュ内容照合、更新後のオフラインCPUは未確認で、過去の自動B7はPARTIALを維持する。本番の実更新試験も未実施。Phase 7の本人報告とは別の記録とする。
+
+### 公開前監査の再確認
+
+候補 `c3a6b6c4eeb72c82b8152ea299511df26e49c435` の必須CI #44559846396 と #44559846410 はattempt 1でSuccess。前者で両ブラウザー全4グループ、環境分離、local-online、matrix auditが成功した。後者では文書変更としてブラウザー実行がskipされた。
+
+[公開前監査 #44564056003](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44564056003) のattempt 1は失敗。runnerから公開metadata 3件を取得して保存台帳と照合でき、開発のpayloadは16/16一致。本番は15/16一致で、manifest.webmanifestがHTTP 503のため未照合。取得できたファイルのhash不一致は0件。pendingはnull。公開前監査を通過しなかったためpublish=trueはdispatchしておらず、公開後の更新やCache Storageのresponse bytesは未確認。
+
+### 公開前再監査と開発版公開
+
+[公開前再監査 #44571306774](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44571306774) は attempt 1 で Success。本番の manifest.webmanifest は HTTP 200 で取得でき、SHA-256 は保存版と一致した。前回の HTTP 503 は再現せず、原因は未特定。本番・開発各16件と公開メタデータ3件が保存版と一致した。
+
+[開発版公開 #44625491003](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44625491003) は attempt 1 で Success。公開元は `c3a6b6c4eeb72c82b8152ea299511df26e49c435`。開発Worker deploymentは `7927498780`、Pages deploymentは `7927524147`。本番Worker jobはSkipped。
+
+[公開後監査 #44628782826](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44628782826) は attempt 1 で Success。本番・開発の公開ファイルは各16/16件、公開メタデータは3/3件が保存版と一致。台帳 `0259f5d5d5abbecf0ce1e111598f5ce18805712b` は `pending=null`。本番成果物のbytesは公開前後で同一だった。
+
+実配信と保存版が一致した開発版 `sw.js` のSHA-256は `b793fcbb313f5bc2d5547bfafbb774293c9fc4ffeea6f56658839e6cbb6dd866`、そのスクリプトが定義するcache名は `heibon-mahjong-dev-shell-2f7ad0f0a40ef105280f`。いずれも公開成果物からの確認値で、iPhoneからの採取値とは区別する。
+
+## 2026-11-20 Phase 6-B B7 Safari実機確認
+
+2026年11月20日（日本時間）に、ユーザー本人がiPhone XSのSafariで[開発版](https://ak-sekine.github.io/heibon-mahjong/dev/)を確認した。iOSバージョンと確認時刻は未報告。
+
+公開前から保持していたタブに戻ると、ページはすでに自動で再読み込みされていた。原因と、その時点で旧Service Workerによる制御が維持されていたかは未確認。この時点で「更新あり」は表示されず、CPU対局は開始できた。通信遮断の有無は報告されていない。
+
+手動再読み込み後に「更新あり」が表示された。確認ダイアログでキャンセルした後もCPU対局の打牌を継続できた。その後の更新承認に続いて、ページが自動で再読み込みされた。この再読み込みは、タブに戻った時点ですでに起きていた最初の再読み込みとは別に記録する。承認後の再読み込みで通知が消え、CPU対局を開始・操作できた。
+
+| No. | 本人確認項目 | 結果 |
+| --- | --- | --- |
+| 1 | 手動再読み込み後に更新通知が表示される | OK |
+| 2 | 更新確認ダイアログでキャンセルできる | OK |
+| 3 | キャンセル後もCPU対局の打牌を継続できる | OK |
+| 4 | 更新承認後に自動再読み込みされる | OK |
+| 5 | 更新後に更新通知が消える | OK |
+| 6 | 更新後もCPU対局を開始・操作できる | OK |
+
+本人報告の集計は **OK 6項目／NG 0項目／今回の6項目の未確認 0項目**。CPU対局の結果は機内モードでの確認には含めない。
+
+[Service Worker登録処理](../../src/pwa/register.ts)では、当該環境のService Workerがページを制御し、`registration.waiting` が存在する場合に「更新あり」を表示する。キャンセル時は `ACTIVATE_UPDATE` を送らず、承認時は送信後の `controllerchange` で当該環境の制御を確認して再読み込みする。本人が報告した通知・キャンセル後の対局継続・承認後の再読み込みは、この実装条件と整合する。Safari内部のService Worker状態や有効化されたスクリプトのSHA-256は直接取得していない。
+
+**Phase 6-B B7はPARTIAL、Issue #47はOpen。** 開発版の実機更新操作は確認済み。実機上のService WorkerのSHA-256、Cache Storageのresponse bytesの完全一致、今回の更新による本番版への実機上の影響、開発版を複数タブで開いた場合の更新ブロック、他環境のタブを開いた状態での更新可否、公開成果物の競合・ロールバック等は未確認または未達のまま。
+
+## 2026-11-20 Phase 6-B B7 Cache Storage本文照合
+
+実装コミットは `82bdaa6be20cba4372a43be5594797dcff165895`。照合元は `pages-verified` の `0259f5d5d5abbecf0ce1e111598f5ce18805712b`。この検証では、現在の公開版を新規のBrowserContextでキャッシュした。
+
+| ブラウザー | 環境 | 再読み込み前 | 再読み込み後 | 不一致／取得不能 |
+| --- | --- | --- | --- | --- |
+| Chromium 159.0.8154.6 | 本番 | 13/13 | 13/13 | 0／0 |
+| Chromium 159.0.8154.6 | 開発 | 13/13 | 13/13 | 0／0 |
+| WebKit 27.2 | 本番 | 13/13 | 13/13 | 0／0 |
+| WebKit 27.2 | 開発 | 13/13 | 13/13 | 0／0 |
+
+全組み合わせの再読み込み前後で不足・余剰・重複URL、本文SHA-256不一致、Response取得不能は各0件。本番のcache名は `heibon-mahjong-shell-ff22f81eaaf9b90e6566`、開発は `heibon-mahjong-dev-shell-2f7ad0f0a40ef105280f`。各環境の13 Request URLは12保存ファイルに対応し、ルートURLと明示的な `index.html` は別のキーで同じ期待SHA-256を使う。
+
+同一BrowserContextに各環境2タブを開き、再読み込み前後でService Worker controller、cache名、Request URL集合、Response本文のSHA-256、環境分離を確認した。公開metadataも前後で不変。既存B7に完全なRequest URLの照合、`Cache.match()` による保存Responseの取得、`arrayBuffer()` での本文読み取り、期待SHA-256との比較、再読み込み前後の採取、異常の個別判定を追加した。実装時の報告では限定テスト3件、関連Pythonテスト31件、構文検査、`git diff --check` が成功した。
+
+[Browser UI #44639413140](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44639413140)、[Environments #44639413210](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44639413210)、[実公開E2E #44640934294](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44640934294) は同じ実装SHAのattempt 1でSuccess。実公開E2Eは両ブラウザーともSuccess。上表の件数は両jobのJSONログで再取得した。[Chromium artifact](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44640934294/artifacts/14587031798) と[WebKit artifact](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44640934294/artifacts/14586574454) は保存を確認し、ZIP内部は今回未取得。
+
+**B7はPARTIAL、Issue #47はOpen。** 同日のiPhone XS Safariの本人報告（OK 6件）は別節に保持する。iPhone内部のCache Storage本文と有効化されたService Worker scriptのSHA-256、実公開更新前に保存されていた旧cacheの本文、実公開更新時の複数タブによる待機・ブロックと他環境タブの影響、本番版への実機上の影響、公開成果物の競合・ロールバックに関する未達条件は残る。
+
+## 2026-11-20 統合公開ゲートとWorker再実行保護
+
+本番側の [Environments #43862310279](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43862310279) は、`main` の検証が `DUAL_PAGES_ENABLED=true` を拒否して失敗した。developのフラグ検証を使用し、通常pushと `publish=false` で公開処理を起動しない条件を維持する。
+
+統合公開では、保存snapshotを検証して `pending` を予約し、現在のrun・attempt・保存commitとの一致をWorker前に確認する。台帳予約から確定まで本番・開発共通の排他制御を適用する。対象環境の公開済みSHA、既存の `pending`、古い候補、競合による予約push失敗はWorker前に停止する。予約後にWorker・Pagesの結果が不明になった場合は予約を保持して後続公開を止める。
+
+関連39件のローカルテストで、本番・開発の新規候補の判定、同一SHA・pending・別attempt・古いSHAの拒否、Git競合、公開条件、旧・新の公開ジョブ名の監査を確認した。Workerはモックを使用した。mainへの反映、Worker・Pages公開は未実施。

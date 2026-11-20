@@ -1,20 +1,158 @@
 name: Publish verified environment snapshots
-on:
-  workflow_call:
-    inputs:
-      worker_url:
-        description: Actual Worker endpoint that passed the post-deployment online test.
-        required: true
-        type: string
+on: workflow_call
 permissions:
   contents: read
+# Hold this lock across the Worker and Pages jobs, including pending finalization.
+concurrency:
+  group: pages-publication
+  cancel-in-progress: false
 jobs:
-  publish:
-    if: ${{ vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && github.event_name != 'pull_request' }}
+  reserve:
+    if: ${{ github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      snapshot: ${{ steps.reserve.outputs.snapshot }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          persist-credentials: false
+      - name: Fetch durable store (missing or unreadable must fail closed)
+        uses: actions/checkout@v4
+        with:
+          ref: pages-verified
+          path: store
+          fetch-depth: 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.ref_name == 'main' && 'pages-dist' || 'development-dist' }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: candidate
+      - name: Reserve the verified snapshot before deploying the Worker
+        id: reserve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_WORKER_URL: ${{ github.ref_name == 'main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+        run: |
+          node source/.github/scripts/publication-reservation.mjs prepare store candidate
+          git -C store config user.name github-actions[bot]
+          git -C store config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C store add state.json site
+          git -C store commit -m "Stage $GITHUB_REF_NAME $GITHUB_SHA for Pages (pending)"
+          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)"
+          test "$latest_sha" = "$GITHUB_SHA"
+          git -C store push origin HEAD:pages-verified
+          printf 'snapshot=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  worker-production:
+    needs: reserve
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     concurrency:
-      group: pages-publication
+      group: worker-production
       cancel-in-progress: false
+    environment: worker-production
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.reserve.outputs.snapshot }}
+          path: store
+          persist-credentials: false
+      - id: deploy
+        run: node .github/scripts/deploy-isolated-worker.mjs production store
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLICATION_SNAPSHOT: ${{ needs.reserve.outputs.snapshot }}
+          EXPECTED_WORKER_URL: ${{ vars.PRODUCTION_WORKER_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+  worker-development:
+    needs: reserve
+    if: ${{ github.ref == 'refs/heads/develop' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: worker-development
+      cancel-in-progress: false
+    environment: worker-development
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.reserve.outputs.snapshot }}
+          path: store
+          persist-credentials: false
+      - id: deploy
+        run: node .github/scripts/deploy-isolated-worker.mjs development store
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLICATION_SNAPSHOT: ${{ needs.reserve.outputs.snapshot }}
+          EXPECTED_WORKER_URL: ${{ vars.DEVELOPMENT_WORKER_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+  online:
+    outputs:
+      worker_url: ${{ needs.worker-production.outputs.url || needs.worker-development.outputs.url }}
+    needs: [reserve, worker-production, worker-development]
+    if: >-
+      ${{ !cancelled() && (
+        (github.ref == 'refs/heads/main' && needs.worker-production.result == 'success' && needs.worker-development.result == 'skipped')
+        || (github.ref == 'refs/heads/develop' && needs.worker-development.result == 'success' && needs.worker-production.result == 'skipped')
+      ) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.reserve.outputs.snapshot }}
+          path: store
+          persist-credentials: false
+      - name: Verify the reservation before testing the deployed Worker
+        run: node .github/scripts/publication-reservation.mjs check store
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLICATION_SNAPSHOT: ${{ needs.reserve.outputs.snapshot }}
+          EXPECTED_WORKER_URL: ${{ needs.worker-production.outputs.url || needs.worker-development.outputs.url }}
+      - run: npm run test:online:production
+        env:
+          ONLINE_API_URL: ${{ needs.worker-production.outputs.url || needs.worker-development.outputs.url }}
+          ONLINE_TEST_ORIGIN: https://ak-sekine.github.io
+          ONLINE_SECONDARY_TEST_ORIGIN: ${{ github.ref_name == 'main' && 'https://html-classic.itch.zone' || '' }}
+      - name: Build independent production itch ZIP with the deployed endpoint
+        if: github.ref_name == 'main'
+        run: npm run build:itch
+        env:
+          VITE_ONLINE_API_URL: ${{ vars.PRODUCTION_WORKER_URL }}
+      - name: Save production itch ZIP
+        if: github.ref_name == 'main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: itch-html5-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/itch/heibon-mahjong.zip
+          if-no-files-found: error
+          retention-days: 90
+  publish:
+    needs: [reserve, online]
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -26,47 +164,29 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: source
-      - name: Fetch durable store (missing or unreadable must fail closed)
-        uses: actions/checkout@v4
+          persist-credentials: false
+      - uses: actions/checkout@v4
         with:
-          ref: pages-verified
+          ref: ${{ needs.reserve.outputs.snapshot }}
           path: store
           fetch-depth: 1
-      - uses: actions/download-artifact@v4
-        with:
-          name: ${{ github.ref_name == 'main' && 'pages-dist' || 'development-dist' }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: candidate
-      - name: Validate and stage exact verified bytes
-        env:
-          DEPLOYED_WORKER_URL: ${{ inputs.worker_url }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)"
-          node source/scripts/environments/artifacts.mjs verify candidate
-          node source/scripts/environments/artifacts.mjs stage store candidate "$latest_sha" "$DEPLOYED_WORKER_URL"
-      - name: Persist pending journal and snapshot before Pages mutation
-        working-directory: store
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add state.json site
-          git commit -m "Stage $GITHUB_REF_NAME $GITHUB_SHA for Pages (pending)"
-          git push origin HEAD:pages-verified
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: store/site
-      - name: Recheck branch freshness immediately before publication
+      - name: Recheck reservation and branch freshness immediately before publication
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)"
-          test "$latest_sha" = "$GITHUB_SHA"
+          PUBLICATION_SNAPSHOT: ${{ needs.reserve.outputs.snapshot }}
+          EXPECTED_WORKER_URL: ${{ needs.online.outputs.worker_url }}
+        run: node source/.github/scripts/publication-reservation.mjs check store
       - uses: actions/deploy-pages@v4
         id: deploy
       - name: Confirm snapshot after successful Pages deployment
         run: |
           node source/scripts/environments/artifacts.mjs finalize store
+          git -C store config user.name github-actions[bot]
+          git -C store config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git -C store add state.json
           git -C store commit -m "Confirm Pages $GITHUB_REF_NAME $GITHUB_SHA"
           git -C store push origin HEAD:pages-verified

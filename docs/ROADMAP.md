@@ -198,6 +198,16 @@ PWAヘッダーの本人iPhone Safari報告は6 OK／0 NG／1未確認（複数�
 カンの位置・ツールバー操作とPWA複数タブは実機未確認のまま記録し、実機OKとはしない。
 Issue #32のPC実機や#52の方向別実機・focusの残課題とは区別する。
 
+Issue #32のdevelopでの3ダイアログ共通スクロール修正とCIは、[当時の検証記録](verification/issue32-responsive-layout-2026-11-03.md#2026-11-14-pc実機1111完了と3ダイアログの共通スクロール修正)を参照してください。mainの実機報告と公開状態は別途記録しています。
+
 ## Issue #47 環境分離
 
-一部実装：環境別build・PWA/Storage・Worker設定・検証成果物合成と公開ゲートを追加。外部設定、公開移行、実Worker分離とiPhone Safari確認は未完了。[設計](development/issue-47-environments.md) / [運用](operations/environments.md) / [検証](verification/issue-47-environments.md)。
+導入前の記録：環境別build・PWA/Storage・Worker設定・検証成果物合成と公開ゲートを追加。外部設定、公開移行、実Worker分離とiPhone Safari確認は未完了。[設計](development/issue-47-environments.md) / [運用](operations/environments.md) / [検証](verification/issue-47-environments.md)。
+
+2026-11-20の実公開E2Eで、Chromium／WebKitの本番・開発cache本文はタブ再読み込み前後とも各13/13 URL一致。開発版の更新操作はiPhone XS Safariの本人確認でOK 6項目。実機の本文SHA-256、旧cache、実更新時の複数タブ・環境間の挙動などが残るためB7はPARTIAL、Issue #47はOpen。[Cache Storage本文照合](verification/issue-47-environments.md#2026-11-20-phase-6-b-b7-cache-storage本文照合)。
+
+2026-11-19にユーザー本人がCloudflare管理画面で、本番・開発のROOMSとRATE_LIMITERが相互に異なる4つのnamespaceを参照することを確認した。[Durable Objects実環境確認](verification/issue-47-environments.md#2026-11-19-durable-objects実環境確認)。
+
+2026-11-19のPhase 7では、ユーザー本人がiPhone XSのSafariで本番・開発を確認し、OK 10項目・NG 0項目・未確認0項目と報告。当時の自動検証のB7はPARTIAL。実機の追加確認と公開版のcache照合は上記を参照。Cloudflare管理APIによるnamespace情報の独立した再取得、公開更新・競合・ロールバックの未達条件が残り、Issue #47はOpen。通信異常からの復旧はIssue #61で扱う。[Phase 7実機確認](verification/issue-47-environments.md#2026-11-19-phase-7実機確認)。
+
+2026-11-13時点のPhase 2記録：2026-11-13に本番Worker・PagesをSHA `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`で公開し、artifactと本番URLの16ファイル照合が一致。本人のiPhone Safari実機報告はOK 7件、NG 0件、未検証1件。既存PWA起動、ルール保持、CPU対局・鳴き、オフライン起動、通常Safari起動を確認。オンライン参加・再接続情報の更新前後保持は本人がオンライン対局していなかったため未検証。iPhone実機でのオンライン対局・再接続とiOS/Safariバージョン詳細も残件。Phase 3以降は未着手。Issue全体の受入条件は未達項目が残るためチェックせずOpenを維持する。[Phase 2検証記録](verification/issue-47-environments.md#2026-11-13-phase-2完了記録) / [公開移行手順](operations/issue-47-cutover.md#実施状況2026-11-13)。

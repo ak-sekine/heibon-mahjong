@@ -37,6 +37,18 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
         dialog_layout = next(item for item in SUITE if item['script'] == 'tests/browser-online-dialog-layout.py')
         self.assertEqual({item['browser'] for item in SUITE if item['script'] == dialog_layout['script']}, {'chromium', 'webkit'})
 
+    def test_four_groups_preserve_main_browser_suite(self):
+        for browser, counts in [('chromium', (14, 31)), ('webkit', (8, 27))]:
+            with self.subTest(browser=browser):
+                first, second = [set(select_scenarios(browser=browser, group=group)) for group in (1, 2)]
+                self.assertEqual((len(first), len(second)), counts)
+                self.assertFalse(first & second)
+                self.assertEqual(first | second, set(select_scenarios(browser=browser)))
+                self.assertEqual(select_scenarios(['browser-round-end-ui.py'], browser, 2),
+                                 select_scenarios(['browser-round-end-ui.py'], browser))
+                self.assertEqual(sum(SUITE[index]['env'].get('HEIBON_CANDIDATE_BASELINE') == '1'
+                                     for index in second), 1)
+
     def test_engine_runs_write_only_the_selected_engine_to_csv(self):
         class SuccessfulProcess:
             returncode = 0

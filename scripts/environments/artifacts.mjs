@@ -71,18 +71,24 @@ export function verifySealed(root) {
   return release;
 }
 /** Pure local staging. The caller MUST serialize, persist pending, deploy, then finalize. */
-export function stage(store, candidate, latestSha, deployedWorkerUrl) {
+export function stage(store, candidate, latestSha, expectedWorkerUrl, reservation) {
   const stateFile = path.join(store, 'state.json');
   // Missing store is an error, never an implicit empty production.
   const state = JSON.parse(readFileSync(stateFile));
-  if (state.version !== 1 || state.pending) throw new Error('Store unavailable or unresolved pending publication');
+  if (state.version !== 1 || state.pending !== null || !state.current ||
+      typeof state.current !== 'object' || Array.isArray(state.current)) {
+    throw new Error('Store unavailable or unresolved pending publication');
+  }
   const release = verifySealed(candidate);
   if (release.sha !== latestSha) throw new Error('Stale source SHA');
-  if (deployedWorkerUrl !== undefined && release.workerUrl !== deployedWorkerUrl) throw new Error('Worker endpoint changed after artifact verification');
+  if (expectedWorkerUrl !== undefined && release.workerUrl !== expectedWorkerUrl) throw new Error('Worker endpoint changed after artifact verification');
+  if (reservation && (release.sha !== reservation.sha || release.environment !== reservation.environment)) {
+    throw new Error('Candidate does not match this publication');
+  }
   const environment = release.environment;
   if (!state.current?.production && environment !== 'production') throw new Error('Production bootstrap required');
   const site = path.join(store, 'site');
-  const previous = state.current ?? {};
+  const previous = state.current;
   if (Object.keys(previous).some(env => !Object.hasOwn(environments, env))) throw new Error('Unknown stored environment');
   if (!previous.development && existsSync(path.join(site, 'dev'))) throw new Error('Untracked development snapshot');
   if (!previous.production && existsSync(site) && readdirSync(site).length) throw new Error('Untracked bootstrap snapshot');
@@ -103,6 +109,7 @@ export function stage(store, candidate, latestSha, deployedWorkerUrl) {
   const current = { ...previous, [environment]: { sha: release.sha, digest: release.digest, workerUrl: release.workerUrl, snapshotDigest: digest(inventory(candidate)) } };
   writeFileSync(path.join(site, 'environments.json'), JSON.stringify(current, null, 2) + '\n');
   const pending = { environment, sha: release.sha, previous, current, siteDigest: digest(inventory(site)) };
+  if (reservation) pending.reservation = { runId: reservation.runId, attempt: reservation.attempt };
   writeFileSync(stateFile, JSON.stringify({ version: 1, current: previous, pending }, null, 2) + '\n');
   return pending;
 }

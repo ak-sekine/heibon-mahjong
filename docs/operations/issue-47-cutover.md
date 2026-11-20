@@ -1,6 +1,22 @@
 # Issue #47 公開移行手順（2026-11-12）
 
-これは実行記録ではない。今回はmain、Worker、DO、Pages、公開snapshot、公開フラグを変更しない。実行開始にはユーザーの明示的許可が必要。[今回の確認結果](../verification/issue-47-preflight-2026-11-12.md) / [通常運用・障害復旧](environments.md)。
+これはPhase別の手順書であり、単独では実行記録ではない。2026-11-12の移行計画ではPhase開始前の個別許可を前提としていたが、2026-11-15以降のdevelop通常公開は下記の継続許可に従い毎回の承認を要しない。本番・外部設定・危険な復旧操作の許可条件は変わらない。[移行前記録](../verification/issue-47-preflight-2026-11-12.md) / [通常運用・障害復旧](environments.md)。
+
+## 現行の開発版公開許可（2026-11-15）
+
+Issue #47のdevelop開発Workerと開発版Pagesの通常公開・再デプロイは、必要なCI、Chromium/WebKit、online検証、公開前snapshot/hash確認に成功すればCodexが実行できる継続許可の対象であり、毎回の個別承認は不要。既存の手動`workflow_dispatch`と`publish=true`は維持し、develop pushで自動公開しない。失敗時はrun・deployment・公開bytes・保存台帳を照合し、安全な通常再公開は状態確定と原因修正後に限る。結果不明のまま再dispatch/rerunを重ねない。
+
+この許可はmain本番公開、初回Worker作成、Settings/Secrets変更、DO削除・逆migration、`pages-verified`の削除・再初期化・履歴改変、結果不明や一部公開からの復旧公開、本番Worker復旧には適用しない。これらの操作に関する停止・個別承認条件は維持する。Phase 1〜4の記載は当時の移行作業の前提・実施記録であり、この現行運用方針で過去の事実を変更しない。
+
+## 実施状況（2026-11-13）
+
+**Phase 2「本番PWAの先行移行」：完了。** Phase 2の公開・自動検証記録と、ユーザー本人によるiPhone Safari実機報告を照合した。公開結果は[Phase 2完了検証記録](../verification/issue-47-environments.md#2026-11-13-phase-2完了記録)と[公開後ライブ監査](../verification/issue-47-live-audit-2026-11-13.md#2026-11-13-phase-2実機報告と完了判定)を参照。
+
+実機報告は8項目中、OK 7・NG 0・未検証1。未検証は「既存オンライン参加・再接続情報の保持」で、本人から「オンライン対局していませんでした」と報告されたため更新前後を比較できていない。保存データ内部を調査した結果ではなく、オンライン参加・再接続情報が確実に存在しなかったとも断定しない。iPhone実機でのオンライン対局・再接続も成功扱いしない。iOS/Safariバージョン詳細は未記録。個別に報告されていない更新通知の表示有無やService Worker内部のversion照合は記録しない。
+
+本番公開run `43430225160` は成功し、Worker deployment `3b6587ac-79fd-49a8-b6d1-2f77a9022331` / version `85e9510f-3f21-45c1-b0ff-4a4de66e7749`、Pages deployment `7766490026`、公開元SHA `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`。公開artifact `published-pages-c3b84944daaa8fbba3b4b603c0d3f8430e9afb58-1`（ID `14043735340`、ZIP SHA-256 `fe5744e7b7178a92db884c8926d1e637c9668eb79b7cc4c0da4fb4d1b0813aff`）と公開URLの16ファイルのSHA-256はすべて一致した。統合後CI `43426274255`、公開後ライブ監査 `43434482360`、Worker診断 `43434482361` もsuccess。
+
+Issue #47全体はOpenのまま。更新前後のオンライン参加・再接続情報保持、iPhone Safari実機でのオンライン対局・再接続、iOS/Safariバージョン詳細は残件である。Phase 3以降は未着手で、この記録の更新では開始しない。Phase 3の初期登録、旧workflow Disable、`DUAL_PAGES_ENABLED`変更等は各Phaseの開始条件・許可を満たしてから扱う。
 
 ## 採用する経路と競合条件
 
@@ -82,11 +98,19 @@ git -C "$STORE" push origin HEAD:pages-verified
 
 **許可**：旧workflow Disable、フラグtrue設定、新公開経路の使用開始。
 
+### 2026-11-14 再確認（Phase 4未完了）
+
+develop `7e6046e12da21c8440f352598a9f46e3eda26ff9`から開始し、main `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`、pages-verified `61d911d490ffabf5052aa190201ada1c0ab7d955`をremote APIで再取得した。保存stateはproduction SHA/digest/snapshotDigestがPhase 3記録と一致し、`pending=null`、development snapshotなし。Phase 3完了コメントとIssue Openも確認した。
+
+フラグ検証修正後の初回run `43552298626`ではverify、isolation-browser両engine、local-onlineがsuccessしたが、Chromium Browser UIのService Worker再試行記録に同期競合があり失敗した。計測開始をService Worker再試行より前へ移し、develop `a7113b6fb7f029585c93bfd7f975a360b3e48f35`の全体run `43552735013`で再検証した結果、verify、Chromium/WebKit Browser UI、Chromium/WebKit環境分離、local-online、matrix auditがすべてsuccess。worker-production、worker-development、online、publishはすべてskipped。イベントはpushで、実行時の`DUAL_PAGES_ENABLED`は未設定。公開jobは起動していない。
+
+GitHubの接続APIではRepository Variables、Environment/Secret登録状態、Pages設定、Deployment一覧を取得できず、ローカルGitHub CLIにも有効なAPI認証がない。したがってEnvironmentのbranch制限とSecrets存在、Pages Source、旧Repository Secrets、deployment IDの現在値を確認済みとは扱わない。旧deploy workflowのDisable、`DUAL_PAGES_ENABLED`変更、workflow_dispatchは未実施。必要なSettings確認と操作ができるまでPhase 4を完了扱いしない。
+
 ## Phase 5：開発版の初公開
 
 **前提**：Phase 4成功、本番Sの全hash/保存remoteを再確認。最新develop Dの全CI成功、未解決pendingなし、URLが末尾slashなし。
 
-**操作**：新`environments.yml`をdevelopで`publish=true`として一度だけdispatch。開発Worker→実online→candidate検証→stage→pendingのGit push→合成Pages公開→finalizeの順に待つ。開発Worker再デプロイを伴うことも許可範囲に含める。
+**操作**：通常更新は `environments.yml` をdevelopで `publish=true` としてdispatchする。既存の継続許可を適用する。共通の公開排他グループ内で、候補検証→合成snapshotの `pending` 予約→開発Worker→実online→Pages公開→台帳確定の順で進む。各試行は一度だけ行う。失敗時はWorker・Pages・台帳の状態を照合して停止する。再公開は実公開状態と予約を解決した後に、最新developの全ゲートからやり直す。
 
 **期待・判定**：本番側を再ビルドせず保存bytesを保持し、devだけDへ更新。environments.jsonとstateのprod=S/dev=D、release.json全SHA256一致、pending=null、remote確定commit、Pages成功を確認。worker-productionはskip。本番URLの既存ファイルhashは不変（台帳metadata追加は別に比較）。
 
@@ -100,16 +124,22 @@ git -C "$STORE" push origin HEAD:pages-verified
 
 **操作・判定**：両URLでHTML/CSS/JS/icon/manifest、CPU対局、対応Workerへのonline対局/切断再接続、ルール/参加session/cacheの環境分離を確認。各PWAの更新・独立起動・offline CPU、同環境複数タブ更新停止/反対環境だけなら更新可能を確認。公開release.json/environments.json、保存state、runの元SHA・digestを照合し、全成果物hashを比較する。第三者ルームやtokenを使用しない。
 
+**Phase 6-A 静的公開監査**：`.github/workflows/issue47-phase6a-live-audit.yml`を`develop`上で手動実行する。監査は固定された本番・開発Pages URLだけへGETし、`pages-verified`をread-only checkoutして、pending、release/state/environments metadata、各16 payloadファイルのSHA-256、HTML/CSS/JavaScriptの同一環境内参照、manifest、Service Worker登録、Actions runとDeployment記録を照合する。GitHub tokenはcontents/actions/deploymentsのread権限のみで、Worker・Pagesのdeploy jobやsnapshot書き込みを持たない。結果はStep Summaryとrun artifact `issue47-phase6a-live-audit-<run>-<attempt>`に保存する。runがSuccessでも、両URLと全payloadの実取得結果を確認する。
+
+GitHubの`workflow_dispatch`は、そのworkflow定義がrepositoryのdefault branchに存在する必要がある。現在のdefault branchは`main`であり、このPhase 6-A workflowをmainへ追加する操作は別途許可が必要なため、developにファイルがあるだけでは手動実行できない場合がある。mainを変更せず実行できる既存の正規dispatch経路が確認できなければ、runを作ったことにせず停止して報告する。
+
+**Phase 6-B 実環境E2E**：Phase 6-Aの実URL/hash監査が成功した後に、両版のCPU・オンライン対局・再接続・PWA・offline・設定/room/token/cache分離を検証する。Phase 6-Aはブラウザー操作やWorker通信のE2Eを代替しない。
+
 **停止・復旧**：
 
-1. pendingがremoteにない：Pages前で停止したことをrunで確認して最新全検証からやり直す。Workerだけ更新済みの可能性は別確認。
-2. pendingあり：後続stageは拒否される。branchの更新を凍結し、run/deployment ID、pending.siteDigest、公開bytesを比較する。main Sとdev D両方を記録する。
+1. pendingがremoteにない：予約push前で停止したか、すでに確定済みかをrun・台帳・deploymentで確認する。旧経路のrunではWorkerだけ更新済みの可能性も確認する。
+2. pendingあり：後続の予約とWorkerデプロイは拒否される。branchの更新を凍結し、runとattempt、Worker・Pagesのdeployment、`pending.siteDigest`、公開bytesを比較する。main Sとdev D両方を記録する。
 3. Pages成功・確定pushだけ失敗：正確なpending snapshotと実公開の全hash一致、deployment成功を確認した後にのみ、同じstoreをfinalizeして新commitを通常pushする。Pages再公開は不要。
 4. Pages未公開を確定：pending commitの親にあるstate/siteを新commitで復元して通常push。公開済み旧snapshotは保持する。Git reset/force push/保存branch削除は禁止。
 5. Pages結果不明・一部公開・hash不一致：pendingを消さず停止。公開成功/未公開を確定できなければ、直前の両版snapshotから検証済み合成artifactを作る明示承認付き復旧公開で一致状態を作ってから台帳を確定。古いworkflow再実行、単純フラグfalse、rootだけ旧公開での復旧は禁止。
 6. 通常の機能rollbackは新しいrevert commitを対象branchに作り全ゲートを通す。保持側snapshotは同じbytes。Worker互換性/既知versionへの復旧は別途確認し、DO削除/逆migrationはしない。
 
-**許可**：実online試験、復旧公開/Worker version復旧、pending解消commit。今回は実環境への障害注入なし。
+**許可・停止条件**：実online試験と、公開状態が確定したpendingの整合commitを行う。Pages結果不明・一部公開からの復旧公開やWorker version復旧は通常公開の継続許可に含めず、状態を確定して別途許可を得る。実環境への障害注入は行わない。
 
 ## Phase 7：Issue完了判定
 
@@ -119,6 +149,6 @@ git -C "$STORE" push origin HEAD:pages-verified
 
 **期待・判定**：本番/開発URL、独立更新/保存、PWA、online、失敗時保全、SHA追跡が実証できる。自動WebKitをiPhone実機成功と扱わない。長期間offlineだった全利用者の旧SW消滅は保証できず、再訪時の更新とdev専用controller再取得を継続確認する。
 
-**停止・復旧**：未確認/NGは未チェックでOpen維持。再現条件を記録しdevelopで修正・検証、必要な公開は別承認を得る。
+**停止・復旧**：未確認/NGは未チェックでOpen維持。再現条件を記録しdevelopで修正・検証する。必要な通常の開発版公開は継続許可の範囲で行い、main本番公開や危険な復旧公開は別途承認を得る。
 
 **許可**：実機操作はユーザー。Issue Closeは別の明示指示後のみ。今回Openのまま終了する。

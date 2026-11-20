@@ -3,6 +3,19 @@
 - [Issue #32 PC実機確認11項目の完了報告（2026-11-14）](issue32-responsive-layout-2026-11-03.md#2026-11-14-pc実機確認11項目の完了報告)：本人PC実機確認はOK 11／NG 0／未確認 0。基本レイアウト・操作・結果詳細・順位表示・オンライン待機室・対局・再接続を確認済み。iPhone Safari修正後確認と3ダイアログのスクロールバー統一は別の未完了条件として残るため、Issue #32はOpenを維持。初回のOK 7／未確認 4、過去の本人実機履歴、自動検証との区別も記録。
 - [Issue #32 操作パネル共通外枠](issue32-common-frame-2026-11-11.md#pc実機による修正後の確認結果-2026-11-13)：2026-11-13の本人PC実機報告で修正対象はOK、修正前の二重枠NGは対象範囲で解消確認済み。Chromium／WebKit各182 geometryケースとDeploy gate・Pages公開の成功は自動検証として区別。iPhone Safariでの同修正再確認は未確認。
 
+- [Issue #47 B7 Cache Storage本文照合](issue-47-environments.md#2026-11-20-phase-6-b-b7-cache-storage本文照合) — Chromium／WebKitの本番・開発で再読み込み前後に各13/13 URL一致。B7はPARTIAL。
+
+- [Issue #47 Durable Objects実環境確認](issue-47-environments.md#2026-11-19-durable-objects実環境確認) — 本人がCloudflare管理画面で4つの異なるnamespace IDを確認。
+
+- [Issue #47 Phase 7 iPhone Safari実機確認 — 2026-11-19](issue-47-environments.md#2026-11-19-phase-7実機確認) — 本人がiPhone XSで本番・開発を確認し、OK 10項目・NG 0項目・未確認0項目。Issue全体はOpen。
+
+- [Issue #47 Chromium PWA CI recovery — 2026-11-13](issue-47-environments.md#2026-11-13-chromium-pwa-ci-recovery) — `registration.installing`/`waiting`の未同期によるretry testの競合と修正を記録。develop run `43523795023`はverify、両engine Browser UI・環境分離、local-online、matrix auditがsuccess、Worker／Pages公開jobはskip。Phase 2完了を維持、Phase 3未開始、IssueはOpen。
+
+- [Issue #47 Phase 2本番PWA先行移行 — 2026-11-13](issue-47-environments.md#2026-11-13-phase-2完了記録) — 本番Worker/Pages公開SHA・deployment・公開artifact ID/SHA-256と全16ファイル照合、統合後CI／公開workflow／ライブ監査／Worker診断の結果、本人報告のiPhone Safari実機OK 7件・NG 0件・未検証1件を区別して記録。Phase 2完了、Issue全体はOpen。オンライン情報保持・iPhone実機オンライン対局／再接続・iOS/Safari詳細は残件、Phase 3以降未着手。
+
+- [Issue #32 3ダイアログの共通スクロール — 2026-11-14](issue32-responsive-layout-2026-11-03.md#2026-11-14-pc実機1111完了と3ダイアログの共通スクロール修正)：develop SHA `60e7511`、Browser UI run [#43586831933](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831933)とenvironment run [#43586831954](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831954)でChromium／WebKit全suiteがsuccess。ローカル91/91、build、Worker型検査もsuccess。修正後PCの追加スクロール確認とiPhone Safari実機確認は未確認で、IssueはOpen。
+
+
 - [Issue #55 最終調査・本人実機報告（2026-11-11）](issue55-pwa-header.md#2026-11-11-最終調査本人実機報告) — PWA本人6 OK／0 NG／1未確認。CI比較状態を修正し、カン10件＋PWA7件すべて達成・Close可能（Closeはしない）。修正SHA `9598787`の両engine・全ゲート・Pages公開success。実機未確認は自動結果と区別。
 
 - [和了後の手牌順 — Issue #53、2026-11-10](issue53-winning-hand-order-2026-11-10.md) — 受入条件7件達成、completedでClose可能。本人報告はPages版iPhone Safari 7項目・itch.io版6項目すべてOK。Chromium45本・WebKit35本を2回成功、Pages build/deploy・itch ZIP生成成功。公開itch ZIPの厳密なSHA一致・アップロード日時は未確認。過去の失敗と解消、最終判断を記録。

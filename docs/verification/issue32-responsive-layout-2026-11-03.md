@@ -661,3 +661,175 @@ Issue本文には2026-11-14に次の3ダイアログのスクロールバー統�
 **PC実機確認チェックリストは完了（11/11 OK）。Issue #32全体は未完了のためCloseせず、Openを維持します。** iPhone Safariの修正後確認と、ルール確認・局結果詳細・最終順位ダイアログのスクロールバー統一、その自動回帰検証およびPC／iPhone Safariでの確認が残っています。
 
 この更新は検証記録・進捗文書のみです。ゲームのソース、CSS、HTML、テスト、CI、Worker設定は変更せず、今回ゲームテスト・ビルド・Browser UI再実行や再公開も行っていません。
+
+## 2026-11-14: PC実機11/11完了と3ダイアログの共通スクロール修正
+
+この節以降のスクロール修正とCIはdevelopでの履歴です。mainでの本人PC実機11項目の完了報告は上に保持しています。
+
+### 既存実機結果と今回の対象
+
+- ユーザー本人の2026-11-14 PCブラウザー実機確認は最終 **11/11 OK**。初回報告の7/11に加え、結果詳細・最終順位、ルーム作成・参加・待機室、オンライン操作・再接続もOKとの追加報告を受領した。初回集計と追加報告は履歴として区別して保持する。既存実機結果は今回の修正後テストに流用しない。
+- 操作パネル共通外枠の二重表示解消・複数候補の下端と上方向展開については、既存のPC実機OKを維持する。暗カン・加カン単一候補の即時実行と暗カン複数候補の基本操作について、2026-11-10のiPhone Safari実機OKを維持する。
+- 追加対象は、ルール確認、局結果詳細、最終順位の3本文を `.dialog-scroll-panel`／`.dialog-scroll-content`／`.dialog-scroll-indicator` と `mountDialogScrollIndicators()` に統一すること。本文IDは維持し、ヘッダーと操作ボタンはスクロールパネルの外に置く。結果描画処理、ゲーム処理、通信処理は変更しない。
+- 共通mount処理は、明示された `tabindex="0"` を保持し、属性のない既存本文だけを従来どおり `-1` にする。ルール本文も `tabindex="0"` とし、Tabで本文へ移動してPageDown／PageUpを使える。マウス操作とタッチ可能なネイティブoverflowは既存共通部品を使う。
+- Browser UI検証はdevelop pushでも起動するようworkflowのbranch triggerへdevelopを加え、3ダイアログの実表示・実スクロール操作を測るテストをChromium／WebKit双方の既存suiteに追加する。長短内容、バーの矩形・色、標準バー非表示、ホイール・キーボード・トラッククリック・つまみドラッグ、ヘッダー／ボタン固定、PC低高さ・狭いスマホviewport、動的更新と横overflowを検査する。
+- 修正前はスクロールバー統一項目の自動検証・修正後PC実機確認とも未実施。ローカルテスト、GitHub Actions対象SHA、push結果は作業完了時に追記する。Safari／PCの修正後本人実機確認は自動検証と分けて記録する。
+
+### Safari本人確認手順（今回修正後）
+
+この変更は未公開のdevelop上で確認する。PCとiPhoneを同じWi-Fiに接続し、developをチェックアウトして次を実行する。
+
+```sh
+npm ci
+npm run dev -- --host 0.0.0.0
+```
+
+PCのLAN IPを使い、iPhone Safariで `http://<PCのLAN IP>:5173/heibon-mahjong/` を開く。Safariのツールバー表示中と収納中の両方で操作し、ページを縦に動かして状態を切り替える。
+
+#### 確認ページと操作
+
+- 通常操作パネルと3ダイアログ: `/heibon-mahjong/`。オフライン対局を開始し、メニューから「ルール確認」を開閉する。局結果はロン・ツモ・流局を出した後に「結果詳細」を開く。最終順位は対局を終了して開く。オンライン対局を作成または参加し、オンライン局結果と最終順位も表示する。
+- 鳴き種類・複数候補・復帰: `/heibon-mahjong/call-test.html`。シナリオで「ポン（複数候補・赤五萬）」を選び「テスト開始」→「ポン」→「戻る」→「ポン」→候補を確定する。
+- 候補内部スクロール: 同ページで「チー（5候補・内部スクロール）」を選び「テスト開始」→「チー」。これは正規のゲーム判定で生成する5候補を使い、候補一覧だけを55pxに制限した検証専用局面です。一覧の中を上端から末尾まで指でスクロールし、最後の候補を選びます。「戻る」でも種類選択へ戻れることを確認できます。通常の卓、候補パネル、ゲームロジックは変更しません。
+- 暗カン・加カン: 同じ `/heibon-mahjong/call-test.html` で「配牌後・2候補」「暗カン」「加カン」「大明カン」の各局面を選び、候補選択後と「戻る」後に操作パネルへ復元する。
+
+実際にスクロールが必要な長さの結果がない場合、短い結果本文ではインジケーターが隠れることを確認する。Browser UIの長文fixture検査と実機表示結果は分けて記録する。
+
+| 確認項目 | 本人確認 |
+| --- | --- |
+| 通常操作、鳴き種類選択、複数候補選択で二重枠が出ない | 未確認 |
+| 複数候補の左右幅と下端が元の操作領域と一致する | 未確認 |
+| 候補が上方向へ展開し、卓のサイズ・位置が変化しない | 未確認 |
+| 候補が多いときに内部スクロールで選択できる | 未確認 |
+| 「戻る」や候補確定後に通常操作へ復元できる | 未確認 |
+| Safariツールバーの表示・収納後も操作できる | 未確認 |
+| ルール確認のスクロール表示・操作が正常 | 未確認 |
+| 局結果詳細のスクロール表示・操作が正常 | 未確認 |
+| 最終順位のスクロール表示・操作が正常 | 未確認 |
+| 白い標準スクロールバーが重複しない | 未確認 |
+| ダイアログの表示・閉じる・卓への復帰が正常 | 未確認 |
+| Safariツールバー変化後も本文とボタンが操作可能 | 未確認 |
+
+期待結果: スクロールが必要な本文だけがスクロールし、金色の共通インジケーターが本文の長さ・位置に追従する。短い本文ではインジケーターが隠れる。ヘッダーと閉じる／卓を見る／次の対局ボタンは画面内に残り、タッチ後も操作できる。ダイアログを閉じると対局画面へ戻る。白い標準スクロールバー、意図しない横移動、二重枠がない。
+
+### PC修正後の追加確認（既存11/11とは別）
+
+上記ローカルdevelopページでルール・結果画面を開く。長い本文でマウスホイール、トラッククリック、つまみの上下ドラッグ、本文にフォーカスした状態でのPageDown／PageUpを確認する。本文が動き、閉じる／卓を見るボタンは固定位置で押せること、短い本文ではトラックが消えることを確認する。**これは修正後に必要な追加確認であり、既存PC実機11/11をやり直す要求ではない。**
+
+Android・タブレット実機は未確認のまま記録し、viewport自動検証を実機結果に数えない。本人実機確認前のためIssue #32はOpenのままとし、Issue本文のチェック項目・状態を変更しない。
+
+### 今回のローカル自動検証（2026-11-14）
+
+- `npm test`: **91/91成功**。
+- `npm run build`: **成功**。index、test、kan-test、call-testのHTML bundleを生成。
+- `npm run typecheck:worker`: **成功**。
+- Browser UI選択テスト: **9件成功**。Chromium 46 scenario／WebKit 36 scenario、既存80 scenarioを維持したまま共通スクロールテスト2実行を追加。
+- `tests/browser-dialog-scroll.py`のPython構文検査、`git diff --check`: **成功**。
+- Browser実エンジンのChromium／WebKit 82 scenarioはCodex Cloudでは起動せず、develop pushによりGitHub Actions `Browser UI verification` で実行する。対象SHA・run URL・Chromium／WebKitの結果はpush後に記録する。
+- Safari／PCの修正後本人実機確認: **未確認**。従来のPC実機11/11 OKはこの追加スクロールUI確認に読み替えない。
+
+### 初回Browser UI実行の失敗記録
+
+- push対象SHA `e3f1f59678925d21464c25328570b9534a9f89c6` のBrowser UI run [#43583062970](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43583062970) はverify-build・差分検出・docs-checkがsuccessした。Chromium／WebKitの既存 `browser-create-dialog-layout.py` はsuccessしたが、新規 `browser-dialog-scroll.py` の最初のルール確認ケースで、長文fixture後にインジケーターがvisibleにならず両engineとも30秒timeoutした。これはBrowser UI成功とは扱わない。
+- そのログを受け、共通mount処理が内容更新に加えて親dialogのopen属性変化でも再計測するようにした。新しいテストでは長文の実scroll rangeと、失敗時の本文・panel・track矩形を出力する。修正後のローカル `npm test` 91/91、build、Worker型検査、Browser UI選択9件、Python構文・差分検査はsuccess。Browser UI再試行は次のdevelop SHAのActionsで実施し、結果が出るまで未確認とする。
+
+### 2回目のBrowser UI実行とCSS修正
+
+- SHA `6427ecc834936cd5760a3b9839586cd7ce218357` のBrowser UI run [#43583783072](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43583783072) はverify-build、docs-check、差分検出に成功し、両engineの既存 `browser-create-dialog-layout.py` も成功した。追加した `browser-dialog-scroll.py` はChromium／WebKitともルールdialogの長文fixtureで失敗した。実測値は本文の `scrollHeight` と `clientHeight` が共に7780pxで、実際のスクロール範囲がなかった。
+- 原因はJavaScriptの再計測ではなく、共通パネルへ移す際に、従来本文自身に指定していた `max-height:min(68dvh,620px)` をパネルへ移したことで、ルール本文のグリッド項目が長文の高さまで伸びたこと。本文要素にも同じviewport上限を戻し、本文だけがoverflowするよう修正した。標準スクロールバーを含む各ダイアログの操作は引き続き共通部品を使う。
+- このCSS修正後のローカル `npm test` 91/91、`npm run build`、`npm run typecheck:worker`、`git diff --check` は成功。新しいdevelop SHAのChromium／WebKit Browser UI再実行待ち。今回と前回のBrowser UI失敗は成功扱いしない。
+- PC／iPhone Safariの修正後本人実機確認は未確認。Issue本文は編集せずOpenを維持する。
+
+### 3回目のBrowser UI実行とengine別検査
+
+- SHA `2ed1fe6543a1f01b64e87c19fab3629e872347bf` のrun [#43584387902](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43584387902) はverify-build、差分検出、docs-checkに成功。Chromium／WebKitの新しいテストは、長文ルール本文のスクロール範囲、tabindex、overflow、スクロールバー非表示、touch-actionを確認した後、`getComputedStyle(...).webkitOverflowScrolling` が両engineで `null` となり停止した。
+- `-webkit-overflow-scrolling` は実機Safari向けにCSSへ残し、Browser UIでは両engine共通の `overflow-y:auto` と `touch-action:auto`、touch pointerをキャンセルしないことを検査する。Chromiumでは別途CDPの実タッチスワイプを確認する。headless WebKitのcomputed style値をSafari実機動作の代用にしない。
+- 上記engine別assertionへ変更後、Chromium／WebKit Browser UIを次のdevelop SHAで再実行する。run #43584387902 のChromium／WebKitは成功扱いしない。
+
+### 4回目のBrowser UI実行で見つかったWebKitのキーボード差
+
+- SHA `76172899d50e9109de607ae63e0a82e90e2a1d32` のrun [#43584712654](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43584712654) はverify-buildが成功。WebKitの新規検証は本文へフォーカス後のPageDownでスクロールしましたが、その後のPageUpでは位置が戻らずタイムアウトしました。実機Safari確認とは区別し、Browser UIは成功扱いしません。
+- 共通スクロール本文自身にフォーカスがある場合だけ、mount処理でPageUp／PageDownを本文高分ぶん上下へ移動し、スクロール範囲内に制限する処理を追加。本文内のボタン等がフォーカス中のキー操作はそのまま通します。次のdevelop SHAでChromium／WebKitを再実行します。
+
+### 5回目のBrowser UI実行で見つかったmobile WebKit入力API制約
+
+- SHA `24cfdb80668bd1b921d3f297ae4b068dd5307950` のrun [#43585321942](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43585321942) はverify-buildが成功。WebKitはPC高さを含む1280×800と1280×420で3 dialogのスクロール操作を完了し、390px幅のmobile WebKit viewportではPlaywrightの `page.mouse.wheel` が未対応として例外になった。これはブラウザー操作APIの制約で、アプリのスクロール失敗ではありません。
+- wheel入力はデスクトップChromium／WebKitとChromiumスマホviewportで続け、mobile WebKitでは未対応wheel呼び出しを行わない。WebKitモバイル幅のキーボード・トラック・pointer条件は維持し、ChromiumではCDPネイティブタッチスワイプを維持する。iPhone Safari実機の実タッチはチェックリストに残す。
+
+### 最終Browser UI実行（2026-11-14）
+
+- コード検証対象SHAは `60e7511da3a6eaa4df6c47c3d0e5df496a5402a6`（develop）。[Browser UI verification run #43586831933](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831933) はdetect-changes、docs-check、verify-build、Chromium、WebKitの全jobがsuccess。[Environments run #43586831954](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831954) もverify、local-online、Chromium／WebKitのenvironment isolationとBrowser UI、auditがsuccess。Worker、publish、online deploy jobはskipで、本番昇格・公開は行っていない。
+- `tests/browser-dialog-scroll.py` はChromium／WebKitそれぞれで `1280×800`、低高さ `1280×420`、スマホ `390×844`、狭い画面 `320×480` を実行し、3ダイアログすべてpass。長短本文、共通トラック・つまみの表示と矩形・色、標準スクロールバー非表示、最終行到達、ホイール（mobile WebKitを除く）、トラッククリック、つまみドラッグ、キーボード、タッチ相当、開閉・本文更新後の再計測、固定ヘッダー／フッター、横overflowなしを実画面とスクロール状態で確認した。
+- `tests/browser-call-test.py` は両engineで全viewport suiteがsuccessし、5候補チーの内部スクロール、最後の候補選択、戻る、ポン複数候補、暗カン・加カン等を検証した。鳴きパネルの通常表示・下端位置、上方向展開と卓寸法維持も既存検査でpass。
+- `tests/browser-round-end-ui.py` は両engineで8 viewport suitesがpass。オフラインのロン・ツモ・流局、役・翻・符・ドラ・点数・和了手牌、局結果詳細の「卓を見る」、対局終了順位・持ち点、閉じる・再表示・次対局の操作を含む。既存のオンライン結果・待機室suiteも両engineでpassした。
+- ローカル検証は `npm test` 91/91、`npm run build`、`npm run typecheck:worker`、Browser UI選択テスト9件、2つの変更Browser UIスクリプトのPython構文検査、`git diff --check` がsuccess。Codex Cloudではブラウザーを起動せず、Chromium／WebKitの実エンジンは上記Actionsで確認した。
+
+#### 追加受け入れ条件の判定
+
+| 条件 | 状態 | 根拠・残件 |
+| --- | --- | --- |
+| 1. 対象3ダイアログを既存の共通部品へ統一 | 自動検証済み | 共通panel/content/indicatorと`mountDialogScrollIndicators()`を使用。 |
+| 2. 標準白スクロールバーの重複なし | 自動検証済み | Chromium／WebKitで標準バー非表示と共通indicatorの実表示を確認。 |
+| 3. 長短本文に応じたindicator表示、末尾到達 | 自動検証済み | 3ダイアログ×4 viewportで長文・短文・最下端を検証。 |
+| 4. マウス・キーボード・タッチ操作 | 自動検証済み／Safari実機待ち | wheel、track、drag、PageUp／PageDown、Chromium実タッチ相当、WebKitタッチ入力経路を確認。iPhone Safariの実タッチは本人確認待ち。 |
+| 5. 固定ヘッダー／フッターとボタン | 自動検証済み | 低いPC・スマホを含む各viewportで固定位置と操作可能状態を確認。 |
+| 6. 結果本文の動的更新への追従 | 自動検証済み | mutation、表示／非表示、dialog open、resize後の再計測を確認。 |
+| 7. 新規対局など既存の共通スクロールUI | 自動検証済み | 新規対局・オンラインルーム・候補パネル・通常卓の既存suite成功。 |
+| 8. Chromium／WebKit回帰 | 自動検証済み | run #43586831933/#43586831954の両engine成功。 |
+| 9. ゲームロジック・点数・CPU・通信仕様を維持 | 自動検証済み | 変更範囲はHTML/CSS/共通スクロールUIとBrowser UIテスト。`npm test`とlocal-onlineを含む検証成功。 |
+| 10. iPhone Safari実機用チェックリスト | 作成済み／本人確認待ち | 上記「Safari本人確認手順」の項目はすべて未確認のまま。本人の実機報告を受領するまでIssueをOpenで維持。 |
+
+以前のBrowser UI失敗は履歴として残す。最終成功は上記の対象SHAとrunに限って記録する。既存PC実機11/11 OK、2026-11-10のiPhone Safari報告、PC修正後の追加スクロール確認、今回の自動viewport検証はそれぞれ別の結果として扱う。今回のiPhone Safari実機確認と修正後PCスクロール確認は未実施。Issue本文は変更せずOpenを維持する。
+
+## 2026-11-15: Browser UI失敗の調査と品質ゲート復旧
+
+### 作業開始・終了SHA
+
+- 作業開始時はcleanな `work` / `a97e8550e87f198ba11205be877ccf5302f2c0a6`。開始前のローカル `origin/main` は古い `405128d` でしたが、`git fetch origin` 成功後に最新 `origin/main`=`cbf406b0d0112a2e5e0e055e6502dcf289df8fbb`、`origin/develop`=`efd937e955b1e699291e65c2b58976cdca112dce` を確認しました。workはdevelopの先祖で、未コミット変更はありません。
+- コード変更 `07e26e14ad8c8fb72dd7908fc77eefa3e67910d9` を `develop` へfast-forward pushしました。修正・記録後は `main`=`cbf406b0d0112a2e5e0e055e6502dcf289df8fbb` のまま、コード検証対象developは上記SHAです。Issue #32はOpenのままで、Issue本文は変更していません。
+
+### 原因と対応
+
+- 失敗run [Browser UI #43624478134](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43624478134)（SHA `d6ee5320ccbf56cc6076007e9aa27959b7b1f62c`）のChromiumは `tests/browser-pwa.py:269` の `wait_for_human_discard()` で29,999ms timeoutしました。同じrunのWebKitはPWAテストを5.943秒で通過し、その後、候補geometryの別ケースで失敗しました。元ログはPWAタイムアウト時の局面診断を保存しておらず、CPUがその一局で何をしていたかは後から特定できません。
+- ソース上で確定できたテスト側の原因は、PWAレイアウト比較に無作為座席・CPU先行進行を持ち込んでいたことです。`GameController`は通常対局の座席を乱数で決め、ユーザーが親でなければCPUの初期手番を進めます。一方、このPWAテストの目的は更新中の表示比較で、CPU手番やランダム配牌ではありません。Chromiumだけで人間入力待ちが期限切れになったことも、対局ロジック不具合を示す再現証拠ではありません。
+- `tests/browser-pwa.py`ではページ初期化時の乱数をテスト内で固定し、座席shuffleが順序を維持して人間の親・初手打牌待ちになるようにしました。待機期限は延ばしていません。打牌を受け付ける条件、CPU判断、PWA更新処理は変更していません。タイムアウト時の診断は、アクション状態、鳴き・ロン状態、牌山枚数、表示中の操作、結果・ダイアログ状態に限定し、牌姿や非公開牌IDを出しません。
+- オンラインチーのgeometry失敗は、375×635で候補を開いた後、同じ高さのまま幅を375→399pxに変えたケースです。失敗記録では変更前の基準下端と候補下端は `633px`、リサイズ後のviewport高は `635px`のままなのに、候補下端が`627px`へ6px移動していました。操作領域自体は下へ移動しており、元の下端アンカーはまだviewport内でした。
+- 原因となった再アンカー条件は現行developに既に含まれている `5bc86318c5a5ade930c49cc864218e9ef84ee9c3` で修正済みです。viewport signatureが変わっても保存済み下端が可視範囲に収まる間はそのアンカーを維持し、収まらない場合だけ画面内へ補正します。今回の作業では候補UIソースを重複変更せず、限定検証と全件検証で現在の修正を再確認しました。
+- CPUポンで打牌が河ではなく公開面子へ移動するケースを追跡する `tests/browser-mobile-table-layout.py` とwitness検証は変更していません。
+
+### 限定検証
+
+- [候補geometry限定run #43705851525](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43705851525)、SHA `efd937e955b1e699291e65c2b58976cdca112dce`：375×635・online chiをChromium／WebKitでsuccess。現行の下端固定、上方向展開、リサイズ後の復元、卓矩形維持、候補操作を含む。
+- [修正後PWA限定run #43706448132](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43706448132)、SHA `07e26e14ad8c8fb72dd7908fc77eefa3e67910d9`：Chromium／WebKit success。ログは両engineで初期画面が人間の手番、手牌ボタン14件有効、牌山69枚、ページoverflowなしであることを示し、CPU進行待ちなしで更新UI比較に進みました。
+- `PYTHONPYCACHEPREFIX=/tmp/heibon-pycache python -m py_compile tests/browser-pwa.py` と `git diff --check` はsuccess。
+
+### 最終必須CI
+
+- [Browser UI run #43706416066](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43706416066)、SHA `07e26e14ad8c8fb72dd7908fc77eefa3e67910d9`：workflow success。verify-build、差分検出、docs-checkとChromium／WebKit両engineのGroup 1・2がすべてsuccess。80件の必須Browser UIシナリオを分割実行し、PWA、候補geometry、3ダイアログ、打牌後のCPUポンを含む回帰群を確認しました。
+- [Environment CI run #43706416094](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43706416094)、同SHA：workflow success。verify、local-online、Chromium／WebKitの環境分離、4つのBrowser UI child group、auditがsuccess。auditログは4つの必須browser/groupすべてに成功jobが1件あることを確認しました。
+- `worker-production`、`worker-development`、`online`、`publish`はすべてSkippedです。GitHub Pages、Cloudflare Worker、公開workflow、`publish=true`は実行していません。Issue #47のCI品質ゲートは監査まで成功し技術的に復旧しましたが、Phase 5公開は今回実施していません。
+- verify-build／Environment verifyでnpm test、型検査、Pages/itch buildが成功しました。Browser UIはCodex Cloud内では起動せずGitHub ActionsのChromium／WebKitで実行しています。
+
+### 本人による未実施確認
+
+既存のPC実機11/11 OKは以前の本人報告として維持し、今回再確認済みとは扱いません。次の追加項目はすべて未確認です。
+
+**iPhone XS / Safari**
+
+- [ ] 鳴き候補が上方向へ展開し、下端が固定される。
+- [ ] 候補が多いとき一覧の内部スクロールで最後まで到達できる。
+- [ ] 二重枠、候補の位置ずれがない。
+- [ ] Safariツールバーを表示・収納した後も候補と戻るを操作できる。
+- [ ] 候補確定・戻るの後に通常操作へ復帰できる。
+- [ ] ルール確認、局結果詳細、最終順位をそれぞれ最後までスクロールできる。
+- [ ] 共通バーと白い標準スクロールバーが重複しない。
+- [ ] ダイアログを閉じて卓へ戻り、通常操作を続けられる。
+
+**PCブラウザー（修正後の追加確認）**
+
+- [ ] ルール確認・局結果詳細・最終順位の3ダイアログが共通スクロール表示になる。
+- [ ] ホイール、トラッククリック、つまみドラッグでスクロールできる。
+- [ ] キーボードでスクロールできる。
+- [ ] ヘッダー・フッターが固定され、各ボタンを操作できる。
+
+自動検証は上記の本人実機確認を代替しません。Safari／PCの追加確認が報告されるまでIssue #32はOpenのままにします。
