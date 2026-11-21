@@ -1,9 +1,9 @@
 {
   "production": {
-    "sha": "0e1185df53cc17ae08cb4be3a105f3b61b9c8528",
-    "digest": "f241a5bf1ed9fa688bb984c7ebeef492218762189700632b3c9722e33f1a41b7",
+    "sha": "3c52d17b7c301cb8a4ff5d22fa53bb5594cade94",
+    "digest": "f5ced37fb91f42fb433d1dd1df9f0dbd56b77334e8b3dea2b296ef1ad4d437fa",
     "workerUrl": "https://heibon-mahjong-online.ak-sekine.workers.dev",
-    "snapshotDigest": "71255375f57cd9d4a0ce26fcf1af73aa8f629c7eef818907246de5055b14c30a"
+    "snapshotDigest": "0d39f9a6f3e8e0320f113cc0ec55373f7b0f64358e76bdf1892e2f2500ce72eb"
   },
   "development": {
     "sha": "c3a6b6c4eeb72c82b8152ea299511df26e49c435",

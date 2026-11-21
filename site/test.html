@@ -7,11 +7,11 @@
   <meta name="theme-color" content="#185640" />
   <meta name="robots" content="noindex, nofollow" />
   <title>テスト環境 — Heibon Mahjong</title>
-  <script type="module" crossorigin src="/heibon-mahjong/assets/test-By_IjYsK.js"></script>
-  <link rel="modulepreload" crossorigin href="/heibon-mahjong/assets/main-CtHupAW9.js">
-  <link rel="modulepreload" crossorigin href="/heibon-mahjong/assets/style-B3aHcN8H.js">
-  <link rel="stylesheet" crossorigin href="/heibon-mahjong/assets/main-CaJFw03I.css">
-  <link rel="stylesheet" crossorigin href="/heibon-mahjong/assets/style-Dxl6LO0b.css">
+  <script type="module" crossorigin src="/heibon-mahjong/assets/test-BFdwToZf.js"></script>
+  <link rel="modulepreload" crossorigin href="/heibon-mahjong/assets/main-DjcwWRaX.js">
+  <link rel="modulepreload" crossorigin href="/heibon-mahjong/assets/style-BWCBAXPO.js">
+  <link rel="stylesheet" crossorigin href="/heibon-mahjong/assets/main-C98vpl_r.css">
+  <link rel="stylesheet" crossorigin href="/heibon-mahjong/assets/style-DOorKaLM.css">
 </head>
 <body>
 <main>
@@ -135,10 +135,13 @@
   </template>
   <dialog id="result-dialog" aria-labelledby="result-title">
     <header class="result-header"><h2 id="result-title"></h2></header>
-    <div id="result-body" tabindex="0" role="region" aria-label="結果の詳細">
-      <section id="win-result" hidden></section>
-      <section id="match-result" hidden></section>
-      <section id="online-result-content" aria-label="オンライン対局の結果" hidden></section>
+    <div class="dialog-scroll-panel">
+      <div id="result-body" class="dialog-scroll-content" tabindex="0" role="region" aria-label="結果の詳細">
+        <section id="win-result" hidden></section>
+        <section id="match-result" hidden></section>
+        <section id="online-result-content" aria-label="オンライン対局の結果" hidden></section>
+      </div>
+      <div class="dialog-scroll-indicator" aria-hidden="true"><span></span></div>
     </div>
     <footer class="result-footer">
       <button id="view-table" type="button" autofocus class="ui-button ui-button--b">卓を見る</button>
@@ -146,7 +149,10 @@
   </dialog>
   <dialog id="match-result-dialog" aria-labelledby="match-result-title">
     <header class="result-header"><h2 id="match-result-title">対局結果</h2></header>
-    <div id="match-result-body" tabindex="0" role="region" aria-label="対局結果の順位と持ち点"></div>
+    <div class="dialog-scroll-panel">
+      <div id="match-result-body" class="dialog-scroll-content" tabindex="0" role="region" aria-label="対局結果の順位と持ち点"></div>
+      <div class="dialog-scroll-indicator" aria-hidden="true"><span></span></div>
+    </div>
     <footer class="result-footer"><button id="match-result-new-game" type="button" hidden class="ui-button ui-button--a">次の対局を始める</button><button id="match-result-close" type="button" class="ui-button ui-button--b">閉じる</button></footer>
   </dialog>
   <dialog id="new-game-dialog" aria-labelledby="new-game-question">

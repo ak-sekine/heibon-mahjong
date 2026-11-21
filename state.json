@@ -14,5 +14,41 @@
       "snapshotDigest": "7eae7099af8ff2dc6f4cae831d1bb83f36a6577f3dd6fccaafdbd70bc9a64da0"
     }
   },
-  "pending": null
+  "pending": {
+    "environment": "production",
+    "sha": "3c52d17b7c301cb8a4ff5d22fa53bb5594cade94",
+    "previous": {
+      "production": {
+        "sha": "0e1185df53cc17ae08cb4be3a105f3b61b9c8528",
+        "digest": "f241a5bf1ed9fa688bb984c7ebeef492218762189700632b3c9722e33f1a41b7",
+        "workerUrl": "https://heibon-mahjong-online.ak-sekine.workers.dev",
+        "snapshotDigest": "71255375f57cd9d4a0ce26fcf1af73aa8f629c7eef818907246de5055b14c30a"
+      },
+      "development": {
+        "sha": "c3a6b6c4eeb72c82b8152ea299511df26e49c435",
+        "digest": "e52f6cf6f99fb5bab8b25f9b6ac5d5c094ff83ba675a0aebfb97e63d579d58e0",
+        "workerUrl": "https://heibon-mahjong-online-dev.ak-sekine.workers.dev",
+        "snapshotDigest": "7eae7099af8ff2dc6f4cae831d1bb83f36a6577f3dd6fccaafdbd70bc9a64da0"
+      }
+    },
+    "current": {
+      "production": {
+        "sha": "3c52d17b7c301cb8a4ff5d22fa53bb5594cade94",
+        "digest": "f5ced37fb91f42fb433d1dd1df9f0dbd56b77334e8b3dea2b296ef1ad4d437fa",
+        "workerUrl": "https://heibon-mahjong-online.ak-sekine.workers.dev",
+        "snapshotDigest": "0d39f9a6f3e8e0320f113cc0ec55373f7b0f64358e76bdf1892e2f2500ce72eb"
+      },
+      "development": {
+        "sha": "c3a6b6c4eeb72c82b8152ea299511df26e49c435",
+        "digest": "e52f6cf6f99fb5bab8b25f9b6ac5d5c094ff83ba675a0aebfb97e63d579d58e0",
+        "workerUrl": "https://heibon-mahjong-online-dev.ak-sekine.workers.dev",
+        "snapshotDigest": "7eae7099af8ff2dc6f4cae831d1bb83f36a6577f3dd6fccaafdbd70bc9a64da0"
+      }
+    },
+    "siteDigest": "a819244b386375ee3a7a7fc483fb94cd5a24fb42dcaac4a7bc4abd2815d718a8",
+    "reservation": {
+      "runId": "44917709085",
+      "attempt": "1"
+    }
+  }
 }
