@@ -175,6 +175,7 @@ jobs:
           retention-days: 90
   publish:
     needs: [reserve, online]
+    if: ${{ !cancelled() && needs.reserve.result == 'success' && needs.online.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
