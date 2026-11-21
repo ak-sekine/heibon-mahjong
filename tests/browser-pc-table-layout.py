@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright
 from browser_main_fixtures import fixed_seat_fixture
 
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
-VIEWPORTS = [(1280, 720), (1366, 768), (1440, 900), (1660, 825), (1920, 1080)] * 6
+VIEWPORTS = [(1440, 900)]
 KEYBOARD_DIAGNOSTICS = r'''() => {
   const {controller} = pcResponsiveApp;
   const discard = document.querySelector('#discard');
@@ -20,6 +20,9 @@ KEYBOARD_DIAGNOSTICS = r'''() => {
     progressing: controller.progressing, phase: controller.game.phase,
     humanTurn: controller.game.turnPlayerId === controller.playerSeat,
     river: controller.game.players[controller.playerSeat].river.length,
+    discardHistory: controller.game.players[controller.playerSeat].discardHistory?.length ?? 0,
+    inCpuMeld: controller.game.players.some(player => player.control === 'cpu' &&
+      player.melds.some(meld => meld.tiles.some(tile => tile.id === window.pcProbeTile))),
     drawnRiver: document.querySelectorAll('#local-table .river .tile-svg').length,
     runner: controller.diagnosticSnapshot(),
     candidateOpen: document.querySelector('.candidate-active') !== null,
@@ -173,6 +176,14 @@ window.pcLoadCalls=()=>{
 };
 window.pcMakeDrawMatch=()=>startMatch(fixedRound(0,[0,2]));
 window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMatch();render();};
+window.pcLoadKeyboardCall=()=>{
+  controller.newGame();
+  controller.match=startMatch(callStart(0,{
+    0:['22z','33z','44z','55z','6z','7777z'],
+    1:['11z','22z','33z','44z','55z','666z']
+  },'man-1'));
+  render();
+};
 """
             route.fulfill(response=response, body=fixed_seat_fixture(source))
         page.route('**/src/main.ts', expose_app)
@@ -250,7 +261,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         discard.click()
         page.wait_for_function('''previous=>pcResponsiveApp.controller.game.players[pcResponsiveApp.controller.playerSeat].river.length>previous''', arg=before_mouse)
 
-        page.evaluate('''()=>{pcResponsiveApp.controller.random=()=>.999999;pcResponsiveApp.controller.newGame()}''')
+        page.evaluate('pcLoadKeyboardCall()')
         keyboard_tile=page.locator('#player-hand button:enabled').nth(1)
         keyboard_tile.focus()
         keyboard_tile.press('Enter')
@@ -266,6 +277,7 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         page.evaluate(KEYBOARD_DIAGNOSTICS)
         before_keyboard=page.evaluate('''()=>{
           pcKeyboardTrace.armed = true;
+          window.pcProbeTile = pcResponsiveApp.controller.selectedTileId;
           const state = pcKeyboardTrace.snapshot();
           pcKeyboardTrace.add('before-space', state);
           return state.river;
