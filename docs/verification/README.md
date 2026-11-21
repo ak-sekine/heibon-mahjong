@@ -1,5 +1,7 @@
 # 検証記録の目次
 
+- [Issue #57 文書のみpushの環境workflow軽量化](issue57-docs-only-environment-workflow.md) — 既存変更分類の再利用、docs-only skipとrequired-check監査、手動公開ゲート、Actions計測を記録。
+
 - [Issue #47 本番公開と最終受入判定](issue-47-environments.md#2026-11-21-本番公開と最終受入判定) — 公開後35件一致、本人のiPhone XS Safari確認3件OK、受入条件7件達成。B7はPARTIAL。
 
 - [Issue #47 B7 Cache Storage本文照合](issue-47-environments.md#2026-11-20-phase-6-b-b7-cache-storage本文照合) — Chromium／WebKitの本番・開発で再読み込み前後に各13/13 URL一致。B7はPARTIAL。

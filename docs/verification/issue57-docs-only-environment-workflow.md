@@ -16,8 +16,8 @@ GitHub Actions APIから取得した変更前の計測:
 | 指標 | 変更前 |
 | --- | ---: |
 | Environments runのjob数（skipを含む） | 14 |
-| runner時間（job実行時間の合計） | 3,112秒（51分52秒） |
-| 壁時計（最初のjob開始〜最後のjob完了） | 1,554秒（25分54秒） |
+| runner時間（skipを除く7 jobの実行時間合計） | 3,114秒（51分54秒） |
+| 壁時計（最初の実行job開始〜最後の実行job完了） | 1,553秒（25分53秒） |
 | Browser UI matrix | Chromium 2 job + WebKit 2 job、全件実行 |
 
 ## 変更後の設計
@@ -67,32 +67,34 @@ job-level skipを含む実際のrequired-check状態は、変更後の通常push
 
 ## Actions実行・計測
 
-変更後の通常pushと手動`publish=false`は、push後に対象SHAのrunを追記する。`publish=true`は公開発生を防ぐためGitHub Actionsへdispatchしない。eligible条件は限定テストで評価する。
+通常pushと手動`publish=false`は同じSHA `983251ef2a8a2712311f3713e6a05096be70a9d1`でそれぞれ全検証を実施した。`publish=true`は公開発生を防ぐためGitHub Actionsへdispatchしていない。job conditionのeligible条件は限定テストで評価した。
 
 | run | URL / SHA | job数 | runner時間 | 壁時計 | 結果 |
 | --- | --- | ---: | ---: | ---: | --- |
-| 変更前 Environments | [#43593235082](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43593235082), `f4d01f6e` | 14 | 51分52秒 | 25分54秒 | success、docs-onlyにも全重いjobが起動 |
-| 変更後通常push | 未確認 | 未確認 | 未確認 | 未確認 | push後に記録 |
+| 変更前 Environments docs-only push | [#43593235082](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43593235082), `f4d01f6e` | 14（7実行） | 51分54秒 | 25分53秒 | success、docs-onlyにも全重いjobが起動 |
+| 変更前同一pushのBrowser UI | [#43593235090](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43593235090) | 4（2実行） | 27秒 | 20秒 | docs-check・分類のみ実行 |
+| 変更後通常push Environments | [#44893196109](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44893196109), `983251ef` | 16（11実行） | 34分38秒 | 11分04秒 | success。4 Browser UI groups、環境分離2件、local-online、audit success。publish skip |
+| 変更後同一pushのBrowser UI | [#44893196054](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44893196054) | 8（7実行） | 33分02秒 | 9分46秒 | success。Chromium／WebKit 4 groups success |
 | 変更後docs-only push | 未確認 | 未確認 | 未確認 | 未確認 | push後に記録 |
-| 手動 `publish=false` | 未確認 | 未確認 | 未確認 | 未確認 | push後に記録。publishはskipが必要 |
+| 手動 `publish=false` | [#44893278635](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44893278635), `983251ef` | 16（11実行） | 37分22秒 | 10分27秒 | success。全必須gate success、publish skip |
 | 手動 `publish=true` | dispatchしない | — | — | — | 公開job条件のみ静的評価 |
 
-削減率: 変更前後の実runを取得後に算出する。job数・runner時間・壁時計時間は異なる指標として記録し、取得できない値は推測しない。
+この時点の新docs-only push runは未実施のため、削減率は未算出。変更前後で`browser-ui.yml`に含まれる独立push runも記録した。各指標はEnvironments runとBrowser UI runを混ぜずに比較する。skip jobはrunner時間合計から除外。
 
 公開への影響: 実Worker／Pages公開、公開workflow、`DUAL_PAGES_ENABLED`、secrets、branch protection、rulesetsを変更しない。
 
 ## 受入条件（6件）
 
-1. AGENTS.mdのみのpushで重い検証を省略し文書検査を実行 — ローカル条件テスト成功。実run確認待ち。
-2. コード・CI設定・依存・混在・判定不能で全検証 — ローカル条件テスト成功。通常push run確認待ち。
-3. 手動公開と公開条件 — ローカル評価ではfalse/true両経路とも全検証成功を前提とする。`publish=true` dispatch・公開なし。手動`publish=false` run確認待ち。
-4. required checksの成立 — main/developにbranch protection required contextsなしを確認。job/workflow conclusionの実run確認待ち。
-5. Chromium/WebKit品質ゲート維持 — workflow matrix定義、対象条件、既存matrix監査を維持。対象テスト成功。run確認待ち。
-6. 削減効果を文書化し、意図しない公開なし — 変更前計測と公開条件を記録。変更後run計測・公開なしの最終照合待ち。
+1. AGENTS.mdのみのpushで重い検証を省略し文書検査を実行 — 条件テスト成功。新しいmarkdown-only pushでActions実動確認を行う。
+2. コード・CI設定・依存・混在・判定不能で全検証 — 条件テスト成功。通常pushでverify、Chromium/WebKit、環境分離、local-online、auditがsuccess。
+3. 手動公開と公開条件 — `publish=false` full run success、publish skip。`publish=true`の全gate eligible条件はテストで評価し、dispatchも公開もしていない。
+4. required checksの成立 — main/developにbranch protection required contextsなしを確認。通常push・manual全jobでfailure/pendingなし、audit success。
+5. Chromium/WebKit品質ゲート維持 — 4 groups全success、既存matrix監査success。対象範囲・assert・並列設定を削除・緩和していない。
+6. 削減効果を文書化し、意図しない公開なし — docs-only pushの計測・最終公開なし照合待ち。
 
 ## 未確認事項
 
-- 通常push、docs-only push、手動`publish=false`のGitHub Actions run、実job数・runner時間・壁時計、公開job skip。
-- GitHub Actions上での分類・required check conclusionと、手動`publish=false`全検証成功。
+- docs-only pushのGitHub Actions run、実job数・runner時間・壁時計、削減率。
+- `publish=true`をdispatchした場合の実runは未確認（公開防止のため意図的に未実施）。
 - 組織・上位階層で適用されるルール（APIで取得できるrepository rulesetsは空）。
 - iPhone Safari実機確認（本変更はworkflowのみで、実機操作を伴わない）。
