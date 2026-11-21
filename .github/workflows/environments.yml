@@ -14,7 +14,62 @@ on:
 permissions:
   contents: read
 jobs:
+  classify-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_full_suite: ${{ steps.classify.outputs.run_full_suite }}
+      classification: ${{ steps.classify.outputs.classification }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Classify changed files
+        id: classify
+        env:
+          BASE_REF: ${{ github.event.before || github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        shell: bash
+        run: |
+          if [[ "$EVENT_NAME" == "push" && -n "$BASE_REF" ]] \
+            && git rev-parse --verify "${BASE_REF}^{commit}" >/dev/null 2>&1 \
+            && git rev-parse --verify "${HEAD_REF}^{commit}" >/dev/null 2>&1; then
+            if git diff --no-renames --name-only -z "$BASE_REF" "$HEAD_REF" -- > "$RUNNER_TEMP/changed-paths"; then
+              node .github/scripts/classify-changes.mjs < "$RUNNER_TEMP/changed-paths"
+            else
+              node .github/scripts/classify-changes.mjs --unsafe
+            fi
+          else
+            # PRs and all manual runs retain the full suite regardless of paths.
+            node .github/scripts/classify-changes.mjs --unsafe
+          fi
+
+  docs-check:
+    needs: classify-changes
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check changed files for whitespace errors
+        env:
+          BASE_REF: ${{ github.event.before || github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.sha }}
+        shell: bash
+        run: |
+          if [[ -n "$BASE_REF" ]] && git rev-parse --verify "${BASE_REF}^{commit}" >/dev/null 2>&1 \
+            && git rev-parse --verify "${HEAD_REF}^{commit}" >/dev/null 2>&1; then
+            git diff --check "$BASE_REF" "$HEAD_REF" --
+          else
+            git show --check --format= --no-renames "$HEAD_REF"
+          fi
+
   verify:
+    needs: classify-changes
+    if: >-
+      ${{ !cancelled() && (needs.classify-changes.result != 'success'
+        || needs.classify-changes.outputs.run_full_suite != 'false') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -87,11 +142,13 @@ jobs:
           retention-days: 90
   browser-ui:
     needs: verify
+    if: ${{ !cancelled() && needs.verify.result == 'success' }}
     uses: ./.github/workflows/browser-ui.yml
     with:
       reuse_build: true
   isolation-browser:
     needs: verify
+    if: ${{ !cancelled() && needs.verify.result == 'success' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -117,6 +174,7 @@ jobs:
           HEIBON_BROWSER: ${{ matrix.browser }}
   local-online:
     needs: verify
+    if: ${{ !cancelled() && needs.verify.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -144,7 +202,7 @@ jobs:
           ONLINE_API_URL=http://127.0.0.1:8787 ONLINE_TEST_ORIGIN=http://localhost:5173 npm run test:online:production
           ONLINE_API_URL=http://127.0.0.1:8788 ONLINE_TEST_ORIGIN=http://localhost:5173 npm run test:online:production
   audit:
-    needs: [browser-ui, isolation-browser, local-online]
+    needs: [classify-changes, docs-check, verify, browser-ui, isolation-browser, local-online]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     permissions:
@@ -153,18 +211,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Audit all four Browser UI groups for this attempt
+        if: >-
+          ${{ needs.classify-changes.result != 'success'
+            || needs.classify-changes.outputs.run_full_suite != 'false' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" > "$RUNNER_TEMP/jobs.json"
           node .github/scripts/check-browser-ui-matrix.mjs "$RUNNER_TEMP/jobs.json"
+      - name: Confirm intentional docs-only skips
+        if: ${{ needs.classify-changes.outputs.run_full_suite == 'false' }}
+        env:
+          CLASSIFY_RESULT: ${{ needs.classify-changes.result }}
+          DOCS_RESULT: ${{ needs.docs-check.result }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          BROWSER_UI_RESULT: ${{ needs.browser-ui.result }}
+          ISOLATION_RESULT: ${{ needs.isolation-browser.result }}
+          LOCAL_ONLINE_RESULT: ${{ needs.local-online.result }}
+        run: |
+          set -euo pipefail
+          test "$CLASSIFY_RESULT" = success
+          test "$DOCS_RESULT" = success
+          test "$VERIFY_RESULT" = skipped
+          test "$BROWSER_UI_RESULT" = skipped
+          test "$ISOLATION_RESULT" = skipped
+          test "$LOCAL_ONLINE_RESULT" = skipped
+          echo 'Docs-only change: document checks passed; all heavy environment checks were intentionally skipped.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Fail closed when classification is unavailable
+        if: >-
+          ${{ always() && (needs.classify-changes.result != 'success'
+            || (needs.classify-changes.outputs.run_full_suite != 'true'
+              && needs.classify-changes.outputs.run_full_suite != 'false')) }}
+        run: |
+          echo '::error::Change classification did not produce a safe full-suite decision.'
+          exit 1
   publish:
     if: >-
       ${{ github.event_name == 'workflow_dispatch'
         && inputs.publish == true
         && vars.DUAL_PAGES_ENABLED == 'true'
         && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
-    needs: [verify, browser-ui, isolation-browser, local-online, audit]
+    needs: [classify-changes, docs-check, verify, browser-ui, isolation-browser, local-online, audit]
     permissions:
       contents: write
       pages: write

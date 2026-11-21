@@ -97,9 +97,11 @@ function evaluateActionsCondition(source, context) {
 }
 
 test('markdown-only changes skip the application suite and deployment', () => {
-  assert.deepEqual(classifyChanges(['docs/ci.md']), {
-    run_full_suite: 'false', deploy_required: 'false', changed_count: '1', classification: 'docs-only',
-  });
+  for (const file of ['AGENTS.md', 'docs/ci.md']) {
+    assert.deepEqual(classifyChanges([file]), {
+      run_full_suite: 'false', deploy_required: 'false', changed_count: '1', classification: 'docs-only',
+    }, file);
+  }
 });
 
 test('application plus markdown changes run all checks and remain deployable', () => {

@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { publicationMode } from '../.github/scripts/validate-publication-mode.mjs';
+import { classifyChanges } from '../.github/scripts/classify-changes.mjs';
 const read = name => readFileSync(new URL('../' + name, import.meta.url), 'utf8');
 function jobSection(workflow, id) {
   const jobsStart = workflow.indexOf('\njobs:\n');
@@ -28,16 +29,22 @@ function jobCondition(workflow, id) {
   assert.match(expression, /^\$\{\{[\s\S]*\}\}$/);
   return expression.slice(3, -2).trim();
 }
-function workflowContext({ branch = 'develop', ref = `refs/heads/${branch}`, event = 'workflow_dispatch', publish = true, dualPages = 'true', canceled = false, results = {} } = {}) {
+function workflowContext({ branch = 'develop', ref = `refs/heads/${branch}`, event = 'workflow_dispatch', publish = true, dualPages = 'true', canceled = false, results = {}, fullSuite = 'true' } = {}) {
   const jobResults = {
-    verify: 'success', 'browser-ui': 'success', 'isolation-browser': 'success',
+    'classify-changes': 'success', 'docs-check': 'success', verify: 'success', 'browser-ui': 'success', 'isolation-browser': 'success',
     'local-online': 'success', audit: 'success', ...results,
   };
   return {
     github: { ref, event_name: event },
     inputs: { publish },
     vars: { DUAL_PAGES_ENABLED: dualPages },
-    needs: Object.fromEntries(Object.entries(jobResults).map(([name, result]) => [name, { result }])),
+    needs: Object.fromEntries(Object.entries(jobResults).map(([name, result]) => [name, {
+      result,
+      outputs: name === 'classify-changes' ? { run_full_suite: fullSuite } : {},
+    }])),
+    always: () => true,
+    success: () => true,
+    failure: () => false,
     cancelled: () => canceled,
     jobResults,
   };
@@ -45,7 +52,7 @@ function workflowContext({ branch = 'develop', ref = `refs/heads/${branch}`, eve
 function evaluateJobCondition(expression, context, dependencyResults) {
   const hasStatusCheck = /\b(?:always|cancelled|failure|success)\s*\(/.test(expression);
   if (!hasStatusCheck && dependencyResults.some(result => result !== 'success')) return false;
-  const jsExpression = (expression || 'true').replace(/\bneeds\.([a-zA-Z][\w-]*)\.result/g, 'needs["$1"].result');
+  const jsExpression = (expression || 'true').replace(/\bneeds\.([a-zA-Z][\w-]*)\.(result|outputs(?:\.[a-zA-Z_][\w-]*)?)/g, 'needs["$1"].$2');
   return Boolean(runInNewContext(jsExpression, context, { timeout: 100 }));
 }
 test('production and development configs bind their own DO namespace, with no external script binding', () => {
@@ -68,6 +75,7 @@ test('development worker job never references production token, and push cannot 
   const audit = workflow.split('  audit:')[1].split('  worker-production:')[0];
   assert.match(audit, /if: \$\{\{ always\(\) \}\}/);
   assert.match(audit, /Audit all four Browser UI groups/);
+  assert.match(audit, /Confirm intentional docs-only skips/);
   assert(workflow.includes('test -s artifacts/itch/heibon-mahjong.zip'));
   assert(workflow.includes('node scripts/environments/artifacts.mjs verify dist'));
   assert(workflow.includes('node scripts/environments/artifacts.mjs verify dist-dev'));
@@ -178,7 +186,7 @@ test('new publication remains manual and branch scoped; legacy production gate i
 
   const caller = jobSection(workflow, 'publish');
   const condition = jobCondition(workflow, 'publish');
-  const gates = ['verify', 'browser-ui', 'isolation-browser', 'local-online', 'audit'];
+  const gates = ['classify-changes', 'docs-check', 'verify', 'browser-ui', 'isolation-browser', 'local-online', 'audit'];
   const needs = caller.match(/^    needs: \[([^\]]+)\]$/m)?.[1].split(',').map(value => value.trim());
   assert.deepEqual(needs, gates);
   assert(caller.includes('uses: ./.github/workflows/publish-environments.yml'));
@@ -237,5 +245,94 @@ test('new publication remains manual and branch scoped; legacy production gate i
   for (const branch of ['main', 'develop']) {
     assert.equal(evaluateJobCondition(reserve, workflowContext({ branch }), []), true);
     assert.equal(evaluateJobCondition(reserve, workflowContext({ branch, event: 'push' }), []), false);
+  }
+});
+
+test('environment workflow reuses safe change classification and reserves light mode for docs-only pushes', () => {
+  const workflow = read('.github/workflows/environments.yml');
+  const classify = jobSection(workflow, 'classify-changes');
+  assert.match(classify, /git diff --no-renames --name-only -z/);
+  assert.match(classify, /node \.github\/scripts\/classify-changes\.mjs </);
+  assert.match(classify, /node \.github\/scripts\/classify-changes\.mjs --unsafe/);
+  assert.match(classify, /"\$EVENT_NAME" == "push"/);
+  assert.match(jobCondition(workflow, 'verify'), /!cancelled\(\)/);
+  assert.match(jobCondition(workflow, 'verify'), /run_full_suite != 'false'/);
+  for (const name of ['browser-ui', 'isolation-browser', 'local-online']) {
+    const condition = jobCondition(workflow, name);
+    assert.match(jobSection(workflow, name), /^    needs: verify$/m);
+    assert.match(condition, /needs\.verify\.result == 'success'/);
+  }
+  assert.match(jobCondition(workflow, 'audit'), /always\(\)/);
+  assert.match(jobSection(workflow, 'docs-check'), /git diff --check/);
+  const audit = jobSection(workflow, 'audit');
+  assert.match(audit, /Fail closed when classification is unavailable/);
+  const docsAudit = audit.match(/- name: Confirm intentional docs-only skips[\s\S]*?run: \|\n((?: {10}[^\n]*\n)+)/)?.[1];
+  assert.ok(docsAudit, 'docs-only audit must execute the skip checks');
+  const expectedResults = {
+    CLASSIFY_RESULT: 'success', DOCS_RESULT: 'success', VERIFY_RESULT: 'skipped',
+    BROWSER_UI_RESULT: 'skipped', ISOLATION_RESULT: 'skipped', LOCAL_ONLINE_RESULT: 'skipped',
+  };
+  const runDocsAudit = results => spawnSync('bash', ['-c', docsAudit], {
+    env: { ...process.env, GITHUB_STEP_SUMMARY: '/dev/null', ...results },
+  }).status;
+  assert.equal(runDocsAudit(expectedResults), 0);
+  for (const [name, expected] of Object.entries(expectedResults)) {
+    const unexpected = expected === 'skipped' ? 'success' : 'failure';
+    assert.equal(runDocsAudit({ ...expectedResults, [name]: unexpected }), 1, name);
+  }
+
+  const cases = [
+    { name: 'AGENTS.md only', files: ['AGENTS.md'], full: false },
+    { name: 'ordinary Markdown only', files: ['docs/ci.md'], full: false },
+    { name: 'game source', files: ['src/main.ts'], full: true },
+    { name: 'Worker source', files: ['worker/development.ts'], full: true },
+    { name: 'PWA assets', files: ['public/sw.js'], full: true },
+    { name: 'workflow, script, test, and dependency changes', files: [
+      '.github/workflows/ci.yml', '.github/scripts/check.mjs', 'tests/check.test.mjs', 'package-lock.json',
+    ], full: true },
+    { name: 'documentation and code mixed', files: ['README.md', 'src/main.ts'], full: true },
+    { name: 'failed or unknown diff', files: [], reliable: false, full: true },
+  ];
+  for (const scenario of cases) {
+    const result = classifyChanges(scenario.files, scenario.reliable ?? true);
+    assert.equal(result.run_full_suite, String(scenario.full), scenario.name);
+    const context = workflowContext({ event: 'push', publish: false, fullSuite: result.run_full_suite });
+    const verifyRuns = evaluateJobCondition(jobCondition(workflow, 'verify'), context, ['success']);
+    assert.equal(verifyRuns, scenario.full, `${scenario.name}: verify`);
+    const verifyResult = scenario.full ? 'success' : 'skipped';
+    context.needs.verify.result = verifyResult;
+    for (const name of ['browser-ui', 'isolation-browser', 'local-online']) {
+      assert.equal(evaluateJobCondition(jobCondition(workflow, name), context, [verifyResult]),
+        scenario.full, `${scenario.name}: ${name}`);
+    }
+    const expectedPublish = evaluateJobCondition(jobCondition(workflow, 'publish'), context,
+      ['success', 'success', scenario.full ? 'success' : 'skipped', scenario.full ? 'success' : 'skipped',
+        scenario.full ? 'success' : 'skipped', scenario.full ? 'success' : 'skipped', 'success']);
+    assert.equal(expectedPublish, false, `${scenario.name}: push must never publish`);
+  }
+
+  const failedClassifier = workflowContext({
+    event: 'push', fullSuite: '', results: { 'classify-changes': 'failure' },
+  });
+  assert.equal(evaluateJobCondition(jobCondition(workflow, 'verify'), failedClassifier, ['failure']), true);
+  for (const name of ['browser-ui', 'isolation-browser', 'local-online']) {
+    assert.equal(evaluateJobCondition(jobCondition(workflow, name), failedClassifier, ['success']), true);
+  }
+  assert.equal(evaluateJobCondition(jobCondition(workflow, 'publish'), failedClassifier, ['failure']), false);
+
+  // The classifier step uses --unsafe for both manual routes, forcing the same
+  // full verification whether the caller requests publication or not.
+  for (const [event, publish, fullSuite, expectedVerify] of [
+    ['workflow_dispatch', false, 'true', true],
+    ['workflow_dispatch', true, 'true', true],
+  ]) {
+    const context = workflowContext({ event, publish, fullSuite });
+    const heavyCondition = jobCondition(workflow, 'browser-ui');
+    const allowed = evaluateJobCondition(heavyCondition, context, ['success', expectedVerify ? 'success' : 'skipped']);
+    assert.equal(allowed, expectedVerify, `${event} publish=${publish} fullSuite=${fullSuite}`);
+    const gateNames = ['classify-changes', 'docs-check', 'verify', 'browser-ui', 'isolation-browser', 'local-online', 'audit'];
+    const gateResults = gateNames.map(name => context.jobResults[name]);
+    assert.equal(evaluateJobCondition(jobCondition(workflow, 'publish'), context, gateResults), publish,
+      `${event} publish=${publish}: publish outcome`);
   }
 });
