@@ -57,6 +57,7 @@ Actions artifactは90日。期限切れ/取得失敗時は停止し、ソース�
 
 ## 障害と復旧・ロールバック
 
+- 2026-11-21の本番Worker公開済み・Pages未公開の状態は、[予約からのPages専用復旧計画](issue-47-pages-recovery.md)を参照する。
 - 品質ゲート失敗時は台帳予約へ進まない。台帳の予約push失敗時はWorker・Pagesへ進まない。Git remoteの `pending` を確認する。
 - 予約後に中断・失敗した場合は `pending` が残り、後続公開は停止する。branch更新は排他の対象外であり、Worker開始後に先端が変わるとPages前の再確認で停止する。run、Worker・Pagesのdeployment、保存branchの `pending.siteDigest`、実配信のmetadataとbytesを照合する。Workerだけ更新済みの場合は互換性を確認する。DO migrationsを逆実行したり、本番DOを削除しない。
 - Pages公開の成功と同じsnapshotの配信を確認できた場合のみ、そのsnapshotを確定する。未公開が確定し、Workerの状態も確認できた場合は、必要な承認を得て予約の親からsite/stateを復元する新commitを作る。結果不明のまま `pending` を削除したり、再実行したりしない。

@@ -200,6 +200,7 @@ test('new publication remains manual and branch scoped; legacy production gate i
   }
 
   const online = jobCondition(publisher, 'online');
+  const pages = jobCondition(publisher, 'publish');
   assert.match(jobSection(publisher, 'online'), /needs: \[reserve, worker-production, worker-development\]/);
   for (const branch of ['main', 'develop']) {
     const own = branch === 'main' ? 'worker-production' : 'worker-development';
@@ -213,6 +214,18 @@ test('new publication remains manual and branch scoped; legacy production gate i
     assert.equal(evaluateOnline('failure', 'skipped'), false);
     assert.equal(evaluateOnline('skipped', 'success'), false);
     assert.equal(evaluateOnline('success', 'skipped', true), false);
+    const evaluatePages = (reservation, onlineResult, canceled = false) => {
+      const context = workflowContext({ branch, canceled, results: { reserve: reservation, online: onlineResult } });
+      // The unselected Worker is a transitively skipped dependency.
+      return evaluateJobCondition(pages, context, [reservation, onlineResult, 'skipped']);
+    };
+    assert.equal(evaluatePages('success', evaluateOnline('success', 'skipped') ? 'success' : 'skipped'), true);
+    assert.equal(evaluatePages('success', evaluateOnline('failure', 'skipped') ? 'success' : 'skipped'), false);
+    assert.equal(evaluatePages('success', 'success', true), false);
+    for (const result of ['failure', 'skipped', 'cancelled']) {
+      assert.equal(evaluatePages(result, 'success'), false);
+      assert.equal(evaluatePages('success', result), false);
+    }
   }
 
   const legacy = read('.github/workflows/deploy.yml');
