@@ -1,0 +1,53 @@
+name: Pages dependency probe (no deployment)
+on:
+  workflow_call:
+    inputs:
+      release_ref:
+        required: true
+        type: string
+permissions: {}
+jobs:
+  reserve:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo mock-reservation
+  worker-production:
+    needs: reserve
+    if: ${{ inputs.release_ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo mock-production-worker
+  worker-development:
+    needs: reserve
+    if: ${{ inputs.release_ref == 'refs/heads/develop' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo mock-development-worker
+  online:
+    needs: [reserve, worker-production, worker-development]
+    if: ${{ !cancelled() && ( (inputs.release_ref == 'refs/heads/main' && needs.worker-production.result == 'success' && needs.worker-development.result == 'skipped') || (inputs.release_ref == 'refs/heads/develop' && needs.worker-development.result == 'success' && needs.worker-production.result == 'skipped') ) }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo mock-online
+  previous-pages:
+    needs: [reserve, online]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo unexpected-old-job
+  fixed-pages:
+    needs: [reserve, online]
+    if: ${{ !cancelled() && needs.reserve.result == 'success' && needs.online.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo mock-pages
+  verdict:
+    needs: [previous-pages, fixed-pages]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    env:
+      OLD: ${{ needs.previous-pages.result }}
+      FIXED: ${{ needs.fixed-pages.result }}
+    steps:
+      - run: |
+          echo "Before=$OLD After=$FIXED"
+          test "$OLD" = skipped && test "$FIXED" = success
