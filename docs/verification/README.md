@@ -4,6 +4,8 @@
 
 - [Issue #47 本番公開と最終受入判定](issue-47-environments.md#2026-11-21-本番公開と最終受入判定) — 公開後35件一致、本人のiPhone XS Safari確認3件OK、受入条件7件達成。B7はPARTIAL。
 
+- [Issue #32 本人実機確認・受け入れ条件再評価・本番昇格調査 — 2026-11-21](issue32-common-frame-2026-11-11.md#2026-11-21-本人実機確認と本番昇格事前調査) — iPhone XS Safari 8/8 OK、PC追加4/4 OK、過去のPC 11/11 OKを別記録として維持。基本7件＋追加10件の受け入れ条件を達成と評価。main/develop 9/67分岐と競合を調べ、本番未反映・Issue Openのまま安全な昇格経路と残ゲートを記録。
+
 - [Issue #47 B7 Cache Storage本文照合](issue-47-environments.md#2026-11-20-phase-6-b-b7-cache-storage本文照合) — Chromium／WebKitの本番・開発で再読み込み前後に各13/13 URL一致。B7はPARTIAL。
 
 - [Issue #47 Durable Objects実環境確認](issue-47-environments.md#2026-11-19-durable-objects実環境確認) — 本人がCloudflare管理画面で4つの異なるnamespace IDを確認。
@@ -14,9 +16,9 @@
 
 - [Issue #47 Phase 2本番PWA先行移行 — 2026-11-13](issue-47-environments.md#2026-11-13-phase-2完了記録) — 本番Worker/Pages公開SHA・deployment・公開artifact ID/SHA-256と全16ファイル照合、統合後CI／公開workflow／ライブ監査／Worker診断の結果、本人報告のiPhone Safari実機OK 7件・NG 0件・未検証1件を区別して記録。Phase 2完了、Issue全体はOpen。オンライン情報保持・iPhone実機オンライン対局／再接続・iOS/Safari詳細は残件、Phase 3以降未着手。
 
-- [Issue #32 操作パネル共通外枠](issue32-common-frame-2026-11-11.md#pc実機による修正後の確認結果-2026-11-13)：2026-11-13の本人PC実機報告で修正対象はOK、修正前の二重枠NGは対象範囲で解消確認済み。Chromium／WebKit各182 geometryケースとDeploy gate・Pages公開の成功は自動検証として区別。iPhone Safariでの同修正再確認と他のPC必須項目は未確認、IssueはOpen。
+- [Issue #32 操作パネル共通外枠](issue32-common-frame-2026-11-11.md#pc実機による修正後の確認結果-2026-11-13)：2026-11-13時点の本人PC実機報告で修正対象はOK、修正前の二重枠NGは対象範囲で解消確認済み。Chromium／WebKit各182 geometryケースとDeploy gate・Pages公開の成功は自動検証として区別。後日確認は上記2026-11-21の記録を参照。
 
-- [Issue #32 3ダイアログの共通スクロール — 2026-11-14](issue32-responsive-layout-2026-11-03.md#2026-11-14-pc実機1111完了と3ダイアログの共通スクロール修正)：develop SHA `60e7511`、Browser UI run [#43586831933](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831933)とenvironment run [#43586831954](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831954)でChromium／WebKit全suiteがsuccess。ローカル91/91、build、Worker型検査もsuccess。修正後PCの追加スクロール確認とiPhone Safari実機確認は未確認で、IssueはOpen。
+- [Issue #32 3ダイアログの共通スクロール — 2026-11-14](issue32-responsive-layout-2026-11-03.md#2026-11-14-pc実機1111完了と3ダイアログの共通スクロール修正)：当時のdevelop SHA `60e7511`、Browser UI run [#43586831933](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831933)とenvironment run [#43586831954](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831954)でChromium／WebKit全suiteがsuccess。ローカル91/91、build、Worker型検査もsuccess。修正後PCの追加スクロール確認とiPhone Safari実機確認は当時未確認。後日結果は上記2026-11-21記録に追記。
 
 - [Issue #55 最終調査・本人実機報告（2026-11-11）](issue55-pwa-header.md#2026-11-11-最終調査本人実機報告) — PWA本人6 OK／0 NG／1未確認。CI比較状態を修正し、カン10件＋PWA7件すべて達成・Close可能（Closeはしない）。修正SHA `9598787`の両engine・全ゲート・Pages公開success。実機未確認は自動結果と区別。
 

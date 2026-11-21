@@ -134,4 +134,88 @@ Pagesのbuildとdeployは別jobでsuccessを確認。Deployment statusも以下�
 
 今回作成したコード・検証変更の履歴：`c4cc7e5`、`4d028f8`、`2d51321`（mainのIssue #52修正を保全したmerge）、`0bb6fc2`、`a0fbd6e`、`2491ff1`、`674a2d0`、`d50e8a6`。force push・履歴改変は行っていない。最終公開SHAのpush後、リモートmainが同SHAであること、作業ツリーcleanを確認。結果追記はMarkdownのみの別コミットとする。
 
-**2026-11-11時点では修正前PC本人確認がNG、修正後PC／iPhone Safari実機確認は未確認だった。** 2026-11-13に今回の修正対象についてPC実機OKの報告があり、修正前の二重枠NGは対象範囲で解消確認済みとなった。iPhone Safariの同修正再確認とIssue #32の他の必須条件は未確認のため、Issueは引き続きOpenとする。2026-11-11時点のIssue状態確認は当時の履歴として残す。
+**2026-11-11時点では修正前PC本人確認がNG、修正後PC／iPhone Safari実機確認は未確認だった。** 2026-11-13に今回の修正対象についてPC実機OKの報告があり、修正前の二重枠NGは対象範囲で解消確認済みとなった。この段落の未確認事項・Issue評価は当時の状態であり、以降の報告と評価は次節に時系列で追記する。
+
+## 2026-11-21 本人実機確認と本番昇格事前調査
+
+### 本人実機確認
+
+確認者はユーザー本人、確認日は2026年11月21日。iPhone XS Safariの対象URLは開発版 <https://ak-sekine.github.io/heibon-mahjong/dev/>。報告にないOS／ブラウザーのバージョン、画面サイズ、確認時刻は記録しない。
+
+#### iPhone XS Safari：8項目
+
+| # | 本人報告 | 判定 |
+| --- | --- | --- |
+| 1 | 鳴き候補が上方向に展開し、下端位置が固定される | OK |
+| 2 | 候補がすべて表示され、選択できる | OK |
+| 3 | 操作パネルに二重枠や候補の位置ずれが発生しない | OK |
+| 4 | Safariのツールバーを表示・収納した後も、候補と「戻る」を操作できる | OK |
+| 5 | 候補確定・「戻る」の後に通常操作へ復帰できる | OK |
+| 6 | ルール確認・局結果詳細・最終順位の各ダイアログを最後までスクロールできる | OK |
+| 7 | 金色の共通スクロールバーと白い標準スクロールバーが重複表示されない | OK |
+| 8 | ダイアログを閉じて卓へ戻り、通常操作を続けられる | OK |
+
+**集計：OK 8／NG 0／未確認 0。** 鳴き候補の内部スクロールは候補が表示領域を超える場合だけ必要となる。今回の通常実機確認では全候補の表示・選択可能性を受け入れ、条件付き内部スクロール動作はChromium／WebKit自動テストの根拠として別扱いにする。
+
+#### PCブラウザー追加確認：4項目
+
+確認対象は開発版。本人報告にある「PCブラウザー」以上の環境情報は補わない。
+
+| # | 本人報告 | 判定 |
+| --- | --- | --- |
+| 1 | ルール確認・局結果詳細・最終順位の3ダイアログで金色の共通スクロールバーが適切に表示され、白い標準スクロールバーが重複しない | OK |
+| 2 | マウスホイール、スクロールバートラッククリック、つまみドラッグで本文をスクロールできる | OK |
+| 3 | 本文にフォーカスした状態でPageDown／PageUpによるスクロールができる | OK |
+| 4 | スクロール中のヘッダー・フッター固定、各ボタン、高さの低いウィンドウでの操作に問題がない | OK |
+
+**集計：OK 4／NG 0／未確認 0。** 2026-11-14のPC本人実機確認11/11 OKは別の既存検証結果として維持し、この追加4件へ統合・置換しない。2026-11-11の修正前NG、2026-11-13のPC報告、iPhone Safariの暗カン・加カン過去結果も当時の記録を保持する。
+
+### Issue #32受け入れ条件の再評価
+
+現行Issue本文を2026-11-21に読み取り、基本条件7件と追加条件10件（ルール確認5件、局結果・最終順位5件）の全17件を条件ごとに評価した。詳しい根拠は[一覧と自動検証記録](issue32-responsive-layout-2026-11-03.md#2026-11-21-本人実機確認と受け入れ条件の再評価)に記載する。基本7件と追加10件はすべて**達成**。Android・タブレットの実機は未確認と明記し、Issue本文でも必須条件ではない。本人報告は申告された画面・操作の範囲に限って適用し、別環境へ拡張しない。
+
+| 検証・公開レイヤー | 2026-11-21時点の状態 | 根拠・制約 |
+| --- | --- | --- |
+| Issue #32の実装 | 達成 | developに共通スクロール、候補位置・リサイズ対応と関連テストがある。該当コミット一覧は下記。 |
+| Chromium／WebKit自動検証 | 達成 | SHA `60e7511da3a6eaa4df6c47c3d0e5df496a5402a6`のBrowser UI run [#43586831933](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831933)／Environments run [#43586831954](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43586831954)、および後続SHA `7ee1e643d60cfeaaeccaacfd0509a3f77289f418`のEnvironments run [#44890605757](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44890605757)。両engine、unit/type/build、Browser UI、環境分離、local-online、auditが成功。 |
+| iPhone Safari本人実機 | 達成 | 今節の開発版URLでの本人報告8/8 OK。確認対象SHAは本人報告に含まれないため、特定SHAでの検証とは断定しない。 |
+| PCブラウザー本人実機 | 達成 | 2026-11-14の別チェックリスト11/11 OKと、今回の追加4/4 OKを独立して記録。 |
+| 開発版への反映・公開 | 一部達成 | 本人が開発版URLを確認。今回報告に配信SHAがなく、運用記録で最後に確認できる開発版公開はSHA `c3a6b6c4eeb72c82b8152ea299511df26e49c435`、publish run [#44625491003](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44625491003)。このSHAは後続の候補viewport調整を含まない。報告されたURLの具体的配信物とdevelop先端の一致は未確認。 |
+| mainへの本番反映・公開 | 未達 | mainはdevelopの祖先ではなく、必要なIssue #32差分と安全な統合経路を確定できない。今回mainへの統合・公開はしていない。 |
+
+### main／developの分岐とIssue #32差分
+
+作業開始時に取得した最新のリモートは`origin/main`=`0e1185df53cc17ae08cb4be3a105f3b61b9c8528`、`origin/develop`=`a528103ceb15d7baeef93f922c118d8a43992c0d`。merge-baseは`c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`。`origin/main...origin/develop`はmain側9コミット、develop側67コミットで、developはmainより67 ahead／9 behind。mainへfast-forwardできない。
+
+mainに未反映のIssue #32関連変更は次のとおり。
+
+| 変更 | developコミット | mainとの差 |
+| --- | --- | --- |
+| ルール確認・局結果・最終順位の共通スクロール構造、インジケーター更新 | `e3f1f59678925d21464c25328570b9534a9f89c6`、`6427ecc834936cd5760a3b9839586cd7ce218357` | mainに未反映 |
+| ルール本文の高さ制約、標準overflow回帰検査、PageUp／PageDown対応 | `2ed1fe6543a1f01b64e87c19fab3629e872347bf`、`76172899d50e9109de607ae63e0a82e90e2a1d32`、`24cfdb80668bd1b921d3f297ae4b068dd5307950` | mainに未反映 |
+| mobile WebKit入力制約、複数チー候補シナリオ | `14b353d72fa1cd99cba2c1f2e1414240e9334bde`、`60e7511da3a6eaa4df6c47c3d0e5df496a5402a6` | mainに未反映 |
+| トラッククリック・結果ダイアログ再表示の診断検査 | `6cb0e7dfb9550d3b4d265d138e7250c031600428`、`13c9360f50ed0eb4b5a719cfaee280ea596447bf` | mainに未反映 |
+| 候補位置をviewport resize後も保つ変更と短い可視領域の補正 | `5bc86318c5a5ade930c49cc864218e9ef84ee9c3`、`0a889f38b05a0f60c31be61a6a5be04033e5ddbb` | mainに未反映 |
+| WebKitのviewport resize診断・イベント転送テスト | `0a3d3d2d737c03a040fdf3e814f05fe4f8c7428e`、`f204841faa3e82f1bfa4f8e9756b8790e09ef9b5` | mainに未反映 |
+| 操作領域リサイズ時の候補再計測 | develop `df748beb8816c695a0e1b7009c980ccada9c6ab2` | 実装の同じResizeObserver追加はmain `3d076f8bf02cbd48a0534372bad816859c808042`にもあるが、対応するgeometryテスト差分は同一ではない。 |
+| CPU直後の打牌geometryテスト | develop `dbb1bf9a14b533149a580d928d4aa013ddb36a14` | main `c4baa3be9994fcc6d50d57ed3a7bf3ae998aa2ea`とpatch-equivalent。機能差分は解消済みだがコミット履歴は別。 |
+
+developから見たmain独自9コミットは、`0e1185d` Pages公開順序修正、`c4baa3b` PC打牌検査、`3d076f8` 操作領域resize対応、`c3aa4e9` Worker secret受け渡し、`1ae2243` Issue #47公開ゲート統合、`0b49691` Issue #47監査workflow、`cbf406b`・`412210b`・`00c4342` Issue #32の11/14 PC記録とdocs CI記録。うち`c4baa3b`と`3d076f8`の一部実装はdevelopにも相当変更がある。Issue #47のworkflow・secret・Pages順序変更は相互依存する本番公開基盤であり、Issue #32だけを昇格する際に落とせない。
+
+read-onlyの`git merge-tree origin/main origin/develop`は15ファイルで競合を報告した。workflow 3件、運用・Issue47文書3件、Issue32記録2件、audit script追加、geometry／CI／環境検証テスト6件が含まれ、その他の変更にも自動merge箇所がある。統合や競合解消は行っていない。developの67コミットにはIssue #32以外のIssue47・58などの実装、テスト、公開関連変更があり、Issue #32だけの内容ではない。
+
+### 安全な昇格案と残るゲート
+
+現行の[環境運用規則](../operations/environments.md#通常開発と昇格)は、確認済みdevelopの内容だけをmainへfast-forward昇格する方針。現状は分岐し、15ファイルの競合もあるため、その通常手順で安全に昇格できる状態ではない。develop全体をmainへ統合するとIssue #32以外の67コミットを巻き込む。未検証変更を含むため本タスクでは採用しない。
+
+候補案は、まずmain独自の公開基盤9コミットとdevelop側Issue #32修正をファイル・依存コミット単位で照合し、mainの公開ゲートを維持した専用統合候補を作ること。その候補でIssue #32に必要な変更だけを選別できるか、依存関係・テスト差分・15競合を人がレビューし、全CIと本番事前ゲートを通す。これは現行文書の「developからfast-forward」手順を外れる可能性があるため、具体的なbranch/commit操作の前に統合方針の判断が必要。現時点では安全な最終統合方式を確定できず、merge／rebase／cherry-pickは実施しない。
+
+本番昇格時は次の品質ゲート・手動手順が必要。
+
+1. 候補SHAを固定し、main先端・選別した変更・公開台帳のhashを照合。Issue #47由来のworkflow／Environment分離を維持し、main/developの成果物やWorker URLを混ぜない。
+2. 本番・dev・itchのbuild、unit/typecheck、Chromium／WebKit Browser UI、環境分離Browser UI、local-online、matrix/audit等を候補SHAで成功させる。最新developのコードCIとしてrun [#44890605757](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44890605757)は再利用根拠だが、未統合のmainとの差分を検証するものではない。
+3. `DUAL_PAGES_ENABLED=true`、`workflow_dispatch`、`publish=true`、`main` refを確認し、`worker-production`の必要secretと`github-pages` Environmentのbranch/Pages設定、実Worker URL、`pages-verified`の`pending=null`と保存hashを公開直前に確認する。
+4. main候補SHAの全ゲート完了後に本番公開workflowを手動実行する。予約済みsnapshot確認、production Worker、オンラインproduction test、Pages deploy、finalizeの各結果と同一SHAを照合する。develop pushは検証のみで、自動本番公開はしない。
+5. 本番公開・配信SHAの照合後にのみ、別途Issue #32の最終判定とCloseを行う。今回の作業では公開もIssue操作も行わない。
+
+最新の外部Environment許可設定・required reviewer状態は今回独立に取得していないため、実行直前にGitHub Environmentと手動承認条件を確認する。現状は実機確認・自動検証まで達成、develop URLでの本人確認済み、正確な公開SHAは不明、本番反映未達、IssueはOpenである。
