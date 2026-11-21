@@ -53,6 +53,8 @@ Actions artifactは90日。期限切れ/取得失敗時は停止し、ソース�
 
 台帳取得失敗、破損、未解決 `pending`、対象環境の公開済みSHA、古い候補はWorker前に拒否する。予約は `pages-verified` への通常pushで保存し、競合でpushが拒否されたrunはWorkerへ進まない。Worker実行前とPages公開前に、予約commit・run・attempt、候補のWorker URL、対象branchの先端を再確認する。旧公開・初回bootstrap・手動デプロイとこの通常公開を並行運用しない。
 
+再利用WorkflowへWorker用Secretを名前付きで渡す。公開対象と同じEnvironmentでSecretが空なら、台帳予約前に停止する。この確認ではdeploymentを作成せず、Secretの値を出力しない。認証と権限の有効性はWorkerデプロイ時に確認する。
+
 ## 障害と復旧・ロールバック
 
 - 品質ゲート失敗時は台帳予約へ進まない。台帳の予約push失敗時はWorker・Pagesへ進まない。Git remoteの `pending` を確認する。

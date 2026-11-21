@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { publicationMode } from '../.github/scripts/validate-publication-mode.mjs';
@@ -111,6 +112,55 @@ test('publication mode accepts unset, false, and true, rejects other values, and
   assert(workflow.includes('node .github/scripts/validate-publication-mode.mjs | tee -a "$GITHUB_STEP_SUMMARY"'));
   assert.doesNotMatch(workflow, /echo .*DUAL_PAGES_ENABLED/);
   assert.match(read('.github/scripts/validate-publication-mode.mjs'), /Publication mode:/);
+});
+
+test('publisher forwards only the two declared Worker secrets and checks the selected environment before reservation', () => {
+  const caller = jobSection(read('.github/workflows/environments.yml'), 'publish');
+  const publisher = read('.github/workflows/publish-environments.yml');
+  const credentials = jobSection(publisher, 'worker-credentials');
+  const reserve = jobSection(publisher, 'reserve');
+  const checkScript = credentials.match(/^\s+run: \|\n([\s\S]+)$/m)?.[1];
+  const callerSecrets = caller.split('\n    secrets:\n')[1];
+  assert(checkScript);
+  assert(callerSecrets);
+  assert.match(credentials, /deployment: false/);
+  assert.match(reserve, /^    needs: worker-credentials$/m);
+  assert.equal(jobCondition(publisher, 'worker-credentials'), jobCondition(publisher, 'reserve'));
+  const evaluate = (key, context) => {
+    const binding = credentials.split('\n').find(line => line.trimStart().startsWith(key + ':'));
+    assert(binding, key);
+    const expression = binding.trim().slice(key.length + ': ${{ '.length, -' }}'.length);
+    return runInNewContext(expression, context, { timeout: 100 });
+  };
+  const names = ['CLOUDFLARE_PRODUCTION_API_TOKEN', 'CLOUDFLARE_DEVELOPMENT_API_TOKEN'];
+  assert.deepEqual(callerSecrets.trim().split('\n').map(line => line.trim()), names.map(name =>
+    name + ': ${{ secrets.' + name + ' }}'));
+
+  for (const [branch, environment, name] of [
+    ['main', 'worker-production', names[0]],
+    ['develop', 'worker-development', names[1]],
+  ]) {
+    assert(publisher.split('\njobs:\n')[0].includes('      ' + name + ':\n        required: true'));
+    assert(jobSection(publisher, environment).includes('CLOUDFLARE_API_TOKEN: ${{ secrets.' + name + ' }}'));
+    const context = workflowContext({ branch });
+    assert.equal(evaluate('name', context), environment);
+    assert.equal(evaluate('TOKEN_NAME', context), name);
+    for (const available of [false, true]) {
+      const dummy = 'mock-token-not-for-output';
+      const secrets = Object.fromEntries(names.map(key => [key, key === name && !available ? '' : dummy]));
+      const token = evaluate('CLOUDFLARE_API_TOKEN', { ...context, secrets });
+      const result = spawnSync('bash', ['-c', checkScript], {
+        encoding: 'utf8', env: { TOKEN_NAME: name, CLOUDFLARE_API_TOKEN: token },
+      });
+      assert.equal(result.status, available ? 0 : 1);
+      const output = result.stdout + result.stderr;
+      assert(!output.includes(dummy));
+      if (available) assert.equal(output, '');
+      else assert(output.includes(name));
+      assert.equal(evaluateJobCondition(jobCondition(publisher, 'reserve'), context,
+        [result.status === 0 ? 'success' : 'failure']), available);
+    }
+  }
 });
 
 test('new publication remains manual and branch scoped; legacy production gate is unchanged', () => {
