@@ -6,7 +6,51 @@ from playwright.sync_api import sync_playwright
 from browser_main_fixtures import fixed_seat_fixture
 
 ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
-VIEWPORTS = [(1280, 720), (1366, 768), (1440, 900), (1660, 825), (1920, 1080)]
+VIEWPORTS = [(1280, 720), (1366, 768), (1440, 900), (1660, 825), (1920, 1080)] * 6
+KEYBOARD_DIAGNOSTICS = r'''() => {
+  const {controller} = pcResponsiveApp;
+  const discard = document.querySelector('#discard');
+  const trace = [];
+  const snapshot = () => ({
+    active: document.activeElement?.id || document.activeElement?.tagName,
+    viewport: [innerWidth, innerHeight], hidden: discard.hidden || Boolean(discard.closest('[hidden]')),
+    disabled: discard.disabled, connected: discard.isConnected,
+    focused: document.activeElement === discard, visibility: document.visibilityState,
+    selected: controller.selectedTileId !== null, canConfirm: controller.canConfirm,
+    progressing: controller.progressing, phase: controller.game.phase,
+    humanTurn: controller.game.turnPlayerId === controller.playerSeat,
+    river: controller.game.players[controller.playerSeat].river.length,
+    drawnRiver: document.querySelectorAll('#local-table .river .tile-svg').length,
+    runner: controller.diagnosticSnapshot(),
+    candidateOpen: document.querySelector('.candidate-active') !== null,
+  });
+  const add = (stage, data = {}) => {
+    if (trace.length < 30) trace.push({stage, ms: Math.round(performance.now()), ...data});
+  };
+  window.pcKeyboardTrace = {trace, snapshot, add, armed: false};
+  const eventData = e => ({
+    type: e.type, key: e.key || null, target: e.target?.id || e.target?.tagName,
+    active: document.activeElement?.id || document.activeElement?.tagName,
+    defaultPrevented: e.defaultPrevented, trusted: e.isTrusted,
+    disabled: discard.disabled,
+  });
+  for (const type of ['keydown', 'keyup', 'click', 'focusin', 'focusout']) {
+    window.addEventListener(type, e => {
+      if (pcKeyboardTrace.armed) add('capture', eventData(e));
+    }, true);
+    window.addEventListener(type, e => {
+      if (pcKeyboardTrace.armed) add('bubble', eventData(e));
+    });
+  }
+  const original = controller.confirm;
+  controller.confirm = function(...args) {
+    if (pcKeyboardTrace.armed) add('confirm-before', snapshot());
+    try { return original.apply(this, args); }
+    finally {
+      if (pcKeyboardTrace.armed) add('confirm-after', snapshot());
+    }
+  };
+}'''
 reports = []
 out = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui'))
 out.mkdir(parents=True, exist_ok=True)
@@ -109,7 +153,7 @@ def assert_same_table(expected, actual, label):
 
 with sync_playwright() as p:
     browser = getattr(p, ENGINE).launch()
-    for width, height in VIEWPORTS:
+    for attempt, (width, height) in enumerate(VIEWPORTS, 1):
         page = browser.new_page(viewport={'width': width, 'height': height})
         def expose_app(route):
             response = route.fetch()
@@ -219,9 +263,30 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
                 focused_discard=True
                 break
         assert focused_discard, f'{width}x{height}: Tab did not reach the discard button'
-        before_keyboard=page.evaluate('''()=>pcResponsiveApp.controller.game.players[pcResponsiveApp.controller.playerSeat].river.length''')
-        page.keyboard.press('Space')
-        page.wait_for_function('''previous=>pcResponsiveApp.controller.game.players[pcResponsiveApp.controller.playerSeat].river.length>previous''', arg=before_keyboard)
+        page.evaluate(KEYBOARD_DIAGNOSTICS)
+        before_keyboard=page.evaluate('''()=>{
+          pcKeyboardTrace.armed = true;
+          const state = pcKeyboardTrace.snapshot();
+          pcKeyboardTrace.add('before-space', state);
+          return state.river;
+        }''')
+        failed = False
+        try:
+            page.keyboard.press('Space')
+            page.wait_for_function('''previous=>pcResponsiveApp.controller.game.players[pcResponsiveApp.controller.playerSeat].river.length>previous''', arg=before_keyboard)
+        except Exception:
+            failed = True
+            raise
+        finally:
+            trace = page.evaluate('''()=>{
+              pcKeyboardTrace.armed = false;
+              pcKeyboardTrace.add('after-wait', pcKeyboardTrace.snapshot());
+              return pcKeyboardTrace.trace;
+            }''')
+            if failed or (width, height) == (1440, 900):
+                print('pc-keyboard-witness ' + json.dumps({
+                    'attempt': attempt, 'viewport': [width, height], 'failed': failed, 'trace': trace,
+                }, separators=(',', ':')), flush=True)
         assert page.evaluate('document.scrollingElement.scrollTop') <= 1, f'{width}x{height}: keyboard flow unexpectedly scrolled the page'
 
         normal_board = page.locator('#local-table').bounding_box()
