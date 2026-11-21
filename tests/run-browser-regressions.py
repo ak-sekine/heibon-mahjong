@@ -19,6 +19,8 @@ def run(script, browser='chromium', *, group, **extra_env):
 SUITE = [
     run('tests/browser-create-dialog-layout.py', group=1),
     run('tests/browser-create-dialog-layout.py', 'webkit', group=2),
+    run('tests/browser-dialog-scroll.py', group=1),
+    run('tests/browser-dialog-scroll.py', 'webkit', group=1),
     run('tests/browser-online-dialog-layout.py', HEIBON_PRODUCTION_URL='http://127.0.0.1:4174/heibon-mahjong/', group=1),
     run('tests/browser-online-dialog-layout.py', 'webkit', HEIBON_PRODUCTION_URL='http://127.0.0.1:4174/heibon-mahjong/', group=1),
     run('tests/browser-pwa.py', group=1),

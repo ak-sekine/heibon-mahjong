@@ -588,7 +588,9 @@ export class ActionPanel {
     const bounds = this.root.getBoundingClientRect();
     const layoutViewport = `${window.innerWidth}:${window.innerHeight}`;
     if (layoutViewport !== this.candidateAnchorLayoutViewport) {
-      this.candidateAnchorDocumentBottom = bounds.bottom + window.scrollY;
+      // Keep the operation area's original document anchor across layout
+      // viewport resizes. Responsive CSS can move the root at a breakpoint;
+      // recapturing here would make the candidate panel jump with it.
       this.candidateAnchorLayoutViewport = layoutViewport;
     }
     panel.style.setProperty('--candidate-panel-left', `${bounds.left}px`);
@@ -608,7 +610,8 @@ export class ActionPanel {
       ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth', 'rowGap'].reduce((sum, key) =>
         sum + (Number.parseFloat(style[key as keyof CSSStyleDeclaration] as string) || 0), 0);
     const minimumBottom = visualTop + 8 + Math.min(minimumHeight, Math.max(0, visualBottom - visualTop - 16));
-    const bottom = this.candidateAnchorViewport === this.viewportSignature()
+    const anchorFitsViewport = rootBottom >= minimumBottom && rootBottom <= visualBottom - 1;
+    const bottom = this.candidateAnchorViewport === this.viewportSignature() || anchorFitsViewport
       ? rootBottom : Math.min(Math.max(rootBottom, minimumBottom), visualBottom - 8);
     panel.style.setProperty('--candidate-panel-bottom', `${window.innerHeight - bottom}px`);
     panel.style.setProperty('--candidate-panel-available-height', `${Math.max(0, bottom - visualTop - 8)}px`);

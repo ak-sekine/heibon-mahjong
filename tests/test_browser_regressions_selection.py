@@ -27,9 +27,9 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
         webkit = select_scenarios(browser='webkit')
         all_engines = select_scenarios(browser='both')
 
-        self.assertEqual(len(SUITE), 80)
-        self.assertEqual(len(chromium), 45)
-        self.assertEqual(len(webkit), 35)
+        self.assertEqual(len(SUITE), 82)
+        self.assertEqual(len(chromium), 46)
+        self.assertEqual(len(webkit), 36)
         self.assertEqual(set(chromium).intersection(webkit), set())
         self.assertEqual(set(chromium).union(webkit), set(all_engines))
         self.assertEqual(all_engines, list(range(len(SUITE))))
@@ -38,7 +38,7 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
         self.assertEqual({item['browser'] for item in SUITE if item['script'] == dialog_layout['script']}, {'chromium', 'webkit'})
 
     def test_four_groups_preserve_main_browser_suite(self):
-        for browser, counts in [('chromium', (14, 31)), ('webkit', (8, 27))]:
+        for browser, counts in [('chromium', (15, 31)), ('webkit', (9, 27))]:
             with self.subTest(browser=browser):
                 first, second = [set(select_scenarios(browser=browser, group=group)) for group in (1, 2)]
                 self.assertEqual((len(first), len(second)), counts)
@@ -59,7 +59,7 @@ class BrowserRegressionSelectionTests(unittest.TestCase):
             def poll(self):
                 return None
 
-        for engine, expected_count in [('chromium', 45), ('webkit', 35)]:
+        for engine, expected_count in [('chromium', 46), ('webkit', 36)]:
             with self.subTest(engine=engine), tempfile.TemporaryDirectory() as directory:
                 report = Path(directory) / 'timings.csv'
                 argv = [str(RUNNER), '--browser', engine, '--timings-file', str(report)]

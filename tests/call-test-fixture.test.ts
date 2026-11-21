@@ -7,7 +7,7 @@ import { tileKindKey } from '../src/model/tile.ts';
 import { uniqueCallOptionsByDisplay } from '../src/ui/call-options.ts';
 import { scenarioGame, type Scenario } from '../src/verification/scenarios.ts';
 
-const cases = ['pon', 'pon-multiple', 'daiminkan', 'opening', 'ankan', 'kakan'] as const satisfies readonly Scenario[];
+const cases = ['pon', 'pon-multiple', 'chi-scroll', 'daiminkan', 'opening', 'ankan', 'kakan'] as const satisfies readonly Scenario[];
 
 function assertCompletePhysicalWall(game: GameState): void {
   const physical: PhysicalTile[] = [
@@ -29,7 +29,7 @@ test('call test fixtures use 136 unique physical tiles and expose only legal act
     const game = scenarioGame(mode);
     assertCompletePhysicalWall(game);
 
-    if (mode === 'pon' || mode === 'pon-multiple' || mode === 'daiminkan') {
+    if (mode === 'pon' || mode === 'pon-multiple' || mode === 'chi-scroll' || mode === 'daiminkan') {
       const options = getCallOptions(game, 0);
       assert.equal(game.phase, 'awaiting-call');
       assert.equal(game.turnPlayerId, mode === 'pon-multiple' ? 1 : 3);
@@ -45,11 +45,16 @@ test('call test fixtures use 136 unique physical tiles and expose only legal act
         assert.deepEqual(displayed.map(option => option.tiles.some(tile => tile.tile.isRed)).sort(), [false, true]);
         assert.equal(options.filter(option => option.type === 'daiminkan').length, 1, 'the three matching hand tiles also permit daiminkan');
       }
+      if (mode === 'chi-scroll') {
+        const chiOptions = options.filter(option => option.type === 'chi');
+        assert.equal(chiOptions.length, 5, 'the physical scroll fixture must expose five legal chi choices');
+        assert.equal(uniqueCallOptionsByDisplay(chiOptions, () => 'チー').length, 5, 'all five choices must be visually distinct');
+      }
       if (mode === 'daiminkan') {
         assert.equal(options.filter(option => option.type === 'pon').length, 3);
         assert.equal(options.filter(option => option.type === 'daiminkan').length, 1);
       }
-      const callType = mode === 'daiminkan' ? 'daiminkan' : 'pon';
+      const callType = mode === 'daiminkan' ? 'daiminkan' : mode === 'chi-scroll' ? 'chi' : 'pon';
       const selected = options.find(option => option.type === callType);
       assert.ok(selected, `${callType} must be a legal choice`);
       assertCompletePhysicalWall(declareCall(game, 0, selected.id));

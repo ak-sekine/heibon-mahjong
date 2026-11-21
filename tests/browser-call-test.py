@@ -107,7 +107,7 @@ def start_scenario(page, mode):
     page.wait_for_function('''()=>!document.querySelector('#call-test-settings').open''')
     page.wait_for_selector('#local-game-controls')
     assert page.evaluate('document.scrollingElement.scrollTop') <= 1, f'{mode}: initial-view check started after scrolling'
-    if mode in ('pon', 'pon-multiple', 'daiminkan'):
+    if mode in ('pon', 'pon-multiple', 'daiminkan', 'chi-scroll'):
         page.wait_for_function("()=>!document.querySelector('#call-controls').hidden")
     else:
         page.wait_for_function("()=>!document.querySelector('#kan').hidden")
@@ -130,7 +130,7 @@ with sync_playwright() as p:
         page.wait_for_selector('#scenario-help:not(:empty)')
         assert page.title().startswith('ポン・カン実機検証')
         assert page.locator('meta[name="robots"]').get_attribute('content') == 'noindex, nofollow'
-        assert page.locator('#scenario option').evaluate_all('nodes=>nodes.map(node=>node.value)') == ['pon', 'pon-multiple', 'daiminkan', 'opening', 'ankan', 'kakan']
+        assert page.locator('#scenario option').evaluate_all('nodes=>nodes.map(node=>node.value)') == ['pon', 'pon-multiple', 'chi-scroll', 'daiminkan', 'opening', 'ankan', 'kakan']
         settings_geometry = page.evaluate('''()=>{
           const rect=e=>{const r=e.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
           const targets=['#scenario','#load-scenario'].map(selector=>{
@@ -244,6 +244,32 @@ with sync_playwright() as p:
         assert page.evaluate('readGame().players[0].melds.at(-1).tiles.some(tile=>tile.tile.isRed)'), f'{width}x{height}: chosen red five is absent from the completed meld'
         assert called['cpuRivers'][0] == 0 and called['drawSource'] is None, f'{width}x{height}: Pon must remove the CPU1 discard and resume discard turn: {called}'
         assert_same_table(before, table_rect(page), f'{width}x{height} multi-Pon completion')
+
+        start_scenario(page, 'chi-scroll')
+        before = table_rect(page)
+        assert page.locator('#call-test-lab').get_attribute('data-candidate-scroll-test') == 'true'
+        assert_click_target(page, '#call-chi', f'{width}x{height} five-chi action', below_table=True)
+        page.locator('#call-chi').click()
+        candidates = page.locator('#candidate-options button[data-action-choice="call"]')
+        page.wait_for_function("document.querySelectorAll('#candidate-options button[data-action-choice=call]').length===5")
+        metrics = page.locator('#candidate-options').evaluate('''node=>({clientHeight:node.clientHeight,scrollHeight:node.scrollHeight,
+          overflow:getComputedStyle(node).overflowY,maxHeight:getComputedStyle(node).maxHeight})''')
+        assert metrics['overflow'] == 'auto' and metrics['scrollHeight'] > metrics['clientHeight'], f'{width}x{height}: physical scroll fixture did not overflow its inner candidate list: {metrics}'
+        page.locator('#candidate-options').evaluate('node=>node.scrollTop=node.scrollHeight')
+        last = candidates.last
+        last_target = last.evaluate('''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {top:r.top,bottom:r.bottom,receivesPointer:hit===node||node.contains(hit)}}''')
+        assert last_target['top'] >= 0 and last_target['bottom'] <= page.viewport_size['height'] and last_target['receivesPointer'], f'{width}x{height}: last chi choice was not reachable by internal scrolling: {last_target}'
+        assert_click_target(page, '#candidate-back', f'{width}x{height} five-chi back')
+        page.locator('#candidate-back').click()
+        page.wait_for_function("document.querySelector('#candidate-options').children.length===0 && !document.querySelector('#call-chi').hidden")
+        assert_same_table(before, table_rect(page), f'{width}x{height} five-chi back')
+        page.locator('#call-chi').click()
+        page.wait_for_function("document.querySelectorAll('#candidate-options button[data-action-choice=call]').length===5")
+        page.locator('#candidate-options').evaluate('node=>node.scrollTop=node.scrollHeight')
+        candidates.last.click()
+        page.wait_for_function("()=>!window.testController.progressing && window.readGame().players[0].melds.some(m=>m.type==='chi')")
+        assert_integrity(page, {'type': 'chi', 'size': 3}, 0)
+        assert_same_table(before, table_rect(page), f'{width}x{height} five-chi selection')
 
         for mode, meld_type in [('opening', 'ankan'), ('ankan', 'ankan'), ('kakan', 'kakan')]:
             start_scenario(page, mode)

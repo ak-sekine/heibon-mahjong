@@ -7,8 +7,9 @@ export function mountDialogScrollIndicators(root: ParentNode = document): void {
     if (!content || !track || !thumb) return;
 
     // The content remains the accessible, native scrolling region. Keep the
-    // decorative mouse shortcut out of the tab order and preserve touch panning.
-    content.tabIndex = -1;
+    // decorative mouse shortcut out of the tab order and preserve any explicit
+    // keyboard tab stop used by result and rules dialogs.
+    if (!content.hasAttribute('tabindex')) content.tabIndex = -1;
     let drag: { pointerId: number; grabOffset: number } | undefined;
 
     const endDrag = (): void => {
@@ -78,22 +79,38 @@ export function mountDialogScrollIndicators(root: ParentNode = document): void {
     window.addEventListener('blur', endDrag);
 
     content.addEventListener('scroll', update, { passive: true });
+    content.addEventListener('keydown', event => {
+      if (event.target !== content || (event.key !== 'PageDown' && event.key !== 'PageUp')) return;
+      if (content.scrollHeight - content.clientHeight <= 1) return;
+      event.preventDefault();
+      const direction = event.key === 'PageDown' ? 1 : -1;
+      content.scrollTop = Math.max(0, Math.min(content.scrollHeight - content.clientHeight,
+        content.scrollTop + direction * content.clientHeight));
+    });
     window.addEventListener('resize', update, { passive: true });
     window.addEventListener('orientationchange', update, { passive: true });
     window.visualViewport?.addEventListener('resize', update, { passive: true });
 
+    let resizeObserver: ResizeObserver | undefined;
     if (typeof ResizeObserver !== 'undefined') {
-      const resizeObserver = new ResizeObserver(update);
-      resizeObserver.observe(panel);
-      resizeObserver.observe(content);
-      resizeObserver.observe(track);
-      content.querySelectorAll<HTMLElement>(':scope > *').forEach(child => resizeObserver.observe(child));
-      const mutationObserver = new MutationObserver(() => {
-        content.querySelectorAll<HTMLElement>(':scope > *').forEach(child => resizeObserver.observe(child));
-        update();
-      });
-      mutationObserver.observe(content, { childList: true, subtree: true, characterData: true, attributes: true });
+      const observer = new ResizeObserver(update);
+      resizeObserver = observer;
+      observer.observe(panel);
+      observer.observe(content);
+      observer.observe(track);
+      content.querySelectorAll<HTMLElement>(':scope > *').forEach(child => observer.observe(child));
     }
+
+    // Re-measure when result rows are rendered or a dialog is opened after its
+    // first hidden measurement. ResizeObserver covers geometry changes; this
+    // observer also covers content changes that do not change the panel box.
+    const mutationObserver = new MutationObserver(() => {
+      if (resizeObserver) content.querySelectorAll<HTMLElement>(':scope > *').forEach(child => resizeObserver!.observe(child));
+      update();
+    });
+    mutationObserver.observe(content, { childList: true, subtree: true, characterData: true, attributes: true });
+    const dialog = panel.closest<HTMLDialogElement>('dialog');
+    if (dialog) mutationObserver.observe(dialog, { attributes: true, attributeFilter: ['open'] });
 
     update();
   });

@@ -28,8 +28,11 @@ function load() {
 }
 function startFromCallTest() {
   load();
+  const lab = document.querySelector('#call-test-lab');
+  if (select.value === 'chi-scroll') lab?.setAttribute('data-candidate-scroll-test', 'true');
+  else lab?.removeAttribute('data-candidate-scroll-test');
   if (callTestSettings) callTestSettings.open = false;
-  document.querySelector('#call-test-lab')?.setAttribute('data-game-active', 'true');
+  lab?.setAttribute('data-game-active', 'true');
 }
 if (callTestSettings) {
   const updateSettingsToggle = () => {

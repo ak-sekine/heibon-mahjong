@@ -49,11 +49,13 @@ with sync_playwright() as p:
                                 device_scale_factor=2 if mobile else 1,
                                 is_mobile=mobile, has_touch=mobile)
         errors = []
+        console_errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
+        page.on('console', lambda message: console_errors.append(message.text) if message.type == 'error' else None)
 
         def expose_app(route):
             response = route.fetch()
-            source = response.text() + '\nwindow.roundEndTest = { controller, render };\n'
+            source = response.text() + '\nwindow.roundEndTest = { controller, render, resultDialog };\n'
             route.fulfill(response=response, body=source)
 
         page.route('**/src/main.ts', expose_app)
@@ -844,7 +846,218 @@ with sync_playwright() as p:
         page.locator('#match-result-close').click()
         page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
         page.set_viewport_size({'width': width, 'height': height})
+        page.evaluate('''async () => {
+          const { ResultDialog } = await import('/heibon-mahjong/src/ui/result-dialog.ts');
+          const originalOpen = ResultDialog.prototype.open;
+          const registeredButton = document.querySelector('#show-result');
+          const panel = document.querySelector('#local-game-controls');
+          const debug = window.resultReopenDebug = {
+            buttonClicks: 0, panelClicks: 0, openAttempts: [], events: [], eventLimit: 48,
+          };
+          Object.defineProperty(debug, 'registeredButton', { value: registeredButton });
+          Object.defineProperty(debug, 'registeredPanel', { value: panel });
+          const snapshot = instance => ({
+            resultAvailable: instance.resultAvailable,
+            mode: instance.mode,
+            hasResult: Boolean(instance.result),
+            resultOpen: instance.dialog.open,
+            newGameOpen: document.querySelector('#new-game-dialog').open,
+          });
+          ResultDialog.prototype.open = function (...args) {
+            const attempt = { before: snapshot(this) };
+            debug.openAttempts.push(attempt);
+            try {
+              const value = originalOpen.apply(this, args);
+              attempt.after = snapshot(this);
+              return value;
+            } catch (error) {
+              attempt.error = String(error);
+              attempt.after = snapshot(this);
+              throw error;
+            }
+          };
+          const describeNode = node => {
+            if (!(node instanceof Element)) return { nodeName: node?.nodeName ?? null };
+            const style = getComputedStyle(node);
+            const rect = node.getBoundingClientRect();
+            return {
+              tag: node.tagName.toLowerCase(), id: node.id || null,
+              className: typeof node.className === 'string' ? node.className : null,
+              rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
+                width: rect.width, height: rect.height },
+              zIndex: style.zIndex, pointerEvents: style.pointerEvents,
+              visibility: style.visibility, display: style.display,
+            };
+          };
+          const buttonSnapshot = (button, currentButton) => {
+            if (!button) return null;
+            const style = getComputedStyle(button);
+            const rect = button.getBoundingClientRect();
+            return {
+              isConnected: button.isConnected,
+              sameAsRegisteredButton: button === registeredButton,
+              isSameNodeAsRegisteredButton: Boolean(registeredButton && button.isSameNode(registeredButton)),
+              isCurrentButton: button === currentButton,
+              hidden: button.hidden, disabled: button.disabled,
+              computed: { visibility: style.visibility, display: style.display,
+                pointerEvents: style.pointerEvents },
+              rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
+                width: rect.width, height: rect.height },
+            };
+          };
+          const stateSnapshot = () => {
+            const currentButton = document.querySelector('#show-result');
+            const currentPanel = document.querySelector('#local-game-controls');
+            const resultDialog = window.roundEndTest.resultDialog;
+            const dialogs = {
+              result: document.querySelector('#result-dialog'),
+              matchResult: document.querySelector('#match-result-dialog'),
+              newGame: document.querySelector('#new-game-dialog'),
+            };
+            const match = window.roundEndTest.controller.match;
+            return {
+              matchStatus: match.status,
+              hasSettlement: Boolean(match.lastSettlement),
+              resultAvailable: resultDialog.resultAvailable,
+              resultMode: resultDialog.mode,
+              hasResult: Boolean(resultDialog.result),
+              resultDialogOpen: dialogs.result.open,
+              matchResultDialogOpen: dialogs.matchResult.open,
+              newGameDialogOpen: dialogs.newGame.open,
+              activeElement: document.activeElement?.id || document.activeElement?.tagName?.toLowerCase() || null,
+              openDialogs: [...document.querySelectorAll('dialog[open]')].map(dialog => dialog.id),
+              showResultRegisteredButton: buttonSnapshot(registeredButton, currentButton),
+              showResultCurrentButton: buttonSnapshot(currentButton, currentButton),
+              panelIdentity: { registeredIsConnected: Boolean(panel?.isConnected),
+                sameAsCurrentPanel: panel === currentPanel,
+                currentIsConnected: Boolean(currentPanel?.isConnected) },
+              resultDialogUsesRegisteredButton: resultDialog.localReopen === registeredButton,
+            };
+          };
+          const hitTestSnapshot = () => {
+            const button = document.querySelector('#show-result');
+            if (!button) return { available: false };
+            const rect = button.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+            const stack = document.elementsFromPoint(x, y);
+            return {
+              available: true,
+              coordinate: { x, y, source: 'button bounding-box center snapshot; not the observed Playwright input coordinate' },
+              elementFromPoint: describeNode(document.elementFromPoint(x, y)),
+              elementsFromPoint: stack.slice(0, 8).map(describeNode),
+            };
+          };
+          const eventTargets = [
+            ['document', document], ['button-at-registration', registeredButton], ['panel', panel],
+          ].filter(([, target]) => target);
+          for (const type of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click']) {
+            for (const [targetName, target] of eventTargets) {
+              for (const capture of [true, false]) {
+                target.addEventListener(type, event => {
+                  if (debug.events.length >= debug.eventLimit) return;
+                  const currentButton = document.querySelector('#show-result');
+                  const path = event.composedPath();
+                  debug.events.push({
+                    type, listenerTarget: targetName, listenerPhase: capture ? 'capture' : 'bubble',
+                    target: describeNode(event.target),
+                    currentTarget: { listener: targetName, node: describeNode(target) },
+                    eventPhase: event.eventPhase,
+                    clientX: Number.isFinite(event.clientX) ? event.clientX : null,
+                    clientY: Number.isFinite(event.clientY) ? event.clientY : null,
+                    pointerType: 'pointerType' in event ? event.pointerType : null,
+                    button: 'button' in event ? event.button : null,
+                    relationToShowResult: {
+                      targetIsRegisteredButton: event.target === registeredButton,
+                      pathIncludesRegisteredButton: path.includes(registeredButton),
+                      targetIsCurrentButton: event.target === currentButton,
+                      pathIncludesCurrentButton: Boolean(currentButton && path.includes(currentButton)),
+                    },
+                    resultOpenAttemptsAtEvent: debug.openAttempts.length,
+                  });
+                }, capture);
+              }
+            }
+          }
+          debug.beforeClick = stateSnapshot();
+          debug.hitTestBefore = hitTestSnapshot();
+          debug.playwrightCoordinateNote = 'Actual input coordinates are available only from captured pointer/mouse events; the center hit-test is not proof of the click target.';
+          document.querySelector('#show-result').addEventListener('click', () => debug.buttonClicks++, true);
+          document.querySelector('#local-game-controls').addEventListener('click', event => {
+            if (event.target.closest('#show-result')) debug.panelClicks++;
+          }, true);
+        }''')
         page.locator('#show-result').click()
+        page.evaluate('''() => {
+          const debug = window.resultReopenDebug;
+          const resultDialog = document.querySelector('#result-dialog');
+          const registeredPanel = debug.registeredPanel;
+          const currentPanel = document.querySelector('#local-game-controls');
+          debug.afterClick = (() => {
+            const match = window.roundEndTest.controller.match;
+            const instance = window.roundEndTest.resultDialog;
+            const button = document.querySelector('#show-result');
+            const style = getComputedStyle(button);
+            const rect = button.getBoundingClientRect();
+            return {
+              matchStatus: match.status, hasSettlement: Boolean(match.lastSettlement),
+              resultAvailable: instance.resultAvailable, resultMode: instance.mode,
+              hasResult: Boolean(instance.result), resultDialogOpen: resultDialog.open,
+              matchResultDialogOpen: document.querySelector('#match-result-dialog').open,
+              newGameDialogOpen: document.querySelector('#new-game-dialog').open,
+              activeElement: document.activeElement?.id || document.activeElement?.tagName?.toLowerCase() || null,
+              openDialogs: [...document.querySelectorAll('dialog[open]')].map(dialog => dialog.id),
+              showResultRegisteredButton: (() => {
+                const node = debug.registeredButton;
+                if (!node) return null;
+                const nodeStyle = getComputedStyle(node);
+                const nodeRect = node.getBoundingClientRect();
+                return { isConnected: node.isConnected, sameAsCurrentButton: node === button,
+                  hidden: node.hidden, disabled: node.disabled,
+                  computed: { visibility: nodeStyle.visibility, display: nodeStyle.display,
+                    pointerEvents: nodeStyle.pointerEvents },
+                  rect: { left: nodeRect.left, top: nodeRect.top, right: nodeRect.right, bottom: nodeRect.bottom,
+                    width: nodeRect.width, height: nodeRect.height } };
+              })(),
+              showResultCurrentButton: {
+                isConnected: button.isConnected,
+                sameAsRegisteredButton: button === debug.registeredButton,
+                isSameNodeAsRegisteredButton: Boolean(debug.registeredButton && button.isSameNode(debug.registeredButton)),
+                hidden: button.hidden, disabled: button.disabled,
+                computed: { visibility: style.visibility, display: style.display, pointerEvents: style.pointerEvents },
+                rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
+                  width: rect.width, height: rect.height },
+              },
+              panelIdentity: { registeredIsConnected: Boolean(registeredPanel?.isConnected),
+                sameAsCurrentPanel: registeredPanel === currentPanel,
+                currentIsConnected: Boolean(currentPanel?.isConnected) },
+              resultDialogUsesRegisteredButton: instance.localReopen === debug.registeredButton,
+            };
+          })();
+          const button = document.querySelector('#show-result');
+          const rect = button.getBoundingClientRect();
+          const x = rect.left + rect.width / 2;
+          const y = rect.top + rect.height / 2;
+          const describe = element => {
+            if (!(element instanceof Element)) return { nodeName: element?.nodeName ?? null };
+            const style = getComputedStyle(element);
+            const bounds = element.getBoundingClientRect();
+            return { tag: element.tagName.toLowerCase(), id: element.id || null,
+              className: typeof element.className === 'string' ? element.className : null,
+              zIndex: style.zIndex, pointerEvents: style.pointerEvents,
+              rect: { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom,
+                width: bounds.width, height: bounds.height } };
+          };
+          debug.hitTestAfter = {
+            coordinate: { x, y, source: 'button bounding-box center snapshot; not the observed Playwright input coordinate' },
+            elementFromPoint: describe(document.elementFromPoint(x, y)),
+            elementsFromPoint: document.elementsFromPoint(x, y).slice(0, 8).map(describe),
+          };
+        }''')
+        reopen_diagnostic_path = OUT / f'{ENGINE}-{width}x{height}-result-reopen-diagnostic.json'
+        result_reopen_snapshot = page.evaluate('window.resultReopenDebug')
+        reopen_diagnostic_path.write_text(
+            json.dumps(result_reopen_snapshot, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
         assert page.locator('#result-title').inner_text() == '東風戦終了'
         assert not page.locator('#next-round').is_visible()
         assert page.locator('#result-dialog #result-new-game').count() == 0
@@ -861,8 +1074,29 @@ with sync_playwright() as p:
             status:window.roundEndTest.controller.match.status,hasSettlement:Boolean(window.roundEndTest.controller.match.lastSettlement),
             activeElement:document.activeElement?.id,openDialogs:[...document.querySelectorAll('dialog[open]')].map(dialog=>dialog.id)};
             }''')
+            debug['resultReopen'] = page.evaluate('window.resultReopenDebug')
+            debug['pageErrors'] = errors
+            debug['consoleErrors'] = console_errors
+            diagnostic = page.evaluate('window.resultReopenDebug')
+            diagnostic['failureState'] = debug
+            diagnostic['pageErrors'] = list(errors)
+            diagnostic['consoleErrors'] = list(console_errors)
+            reopen_diagnostic_path.write_text(
+                json.dumps(diagnostic, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
             page.screenshot(path=str(OUT / f'{ENGINE}-{width}x{height}-result-reopen-failure.png'), full_page=True)
             raise AssertionError(f'result dialog did not reopen after closing match results at {width}x{height}: {debug}')
+        result_reopen = page.evaluate('window.resultReopenDebug')
+        result_reopen['pageErrors'] = list(errors)
+        result_reopen['consoleErrors'] = list(console_errors)
+        reopen_diagnostic_path.write_text(
+            json.dumps(result_reopen, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        assert result_reopen['buttonClicks'] == 1 and result_reopen['panelClicks'] == 1, (width, result_reopen)
+        assert len(result_reopen['openAttempts']) == 1, (width, result_reopen)
+        assert result_reopen['openAttempts'][0]['before'] == {
+            'resultAvailable': True, 'mode': 'local', 'hasResult': True,
+            'resultOpen': False, 'newGameOpen': False,
+        }, (width, result_reopen)
+        assert result_reopen['openAttempts'][0]['after']['resultOpen'], (width, result_reopen)
         assert page.locator('#view-table').is_visible(), page.evaluate('''() => {
           const button=document.querySelector('#view-table'),r=button.getBoundingClientRect();
           return {display:getComputedStyle(button).display,rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
@@ -881,7 +1115,8 @@ with sync_playwright() as p:
         assert reset == {'status':'playing','summaryHidden':True,'showHidden':True,'dialogOpen':False,'faces':0,'privateIds':True}, (width, reset)
         assert not errors, errors
         reports.append({'viewport': [width, height], 'squareTable': True, 'meldLayouts': meld_cases,
-            'roundVariants': variant_reports, 'nextRoundOnce': True, 'eastEndAndReset': True})
+            'roundVariants': variant_reports, 'nextRoundOnce': True, 'eastEndAndReset': True,
+            'resultReopen': result_reopen})
         page.screenshot(path=str(OUT / f'{ENGINE}-{width}x{height}-round-end.png'), full_page=True)
         page.close()
     browser.close()
