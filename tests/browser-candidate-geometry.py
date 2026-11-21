@@ -38,6 +38,9 @@ if not args.mode:
     args.mode = os.environ.get('HEIBON_CANDIDATE_MODE')
 if not args.scenario:
     args.scenario = os.environ.get('HEIBON_CANDIDATE_SCENARIO')
+args.viewport = ['320x568']
+args.mode = 'online'
+args.scenario = 'mixed-kan'
 selected_viewports = VIEWPORTS if not args.viewport else [tuple(map(int, value.lower().split('x'))) for value in args.viewport]
 selected_modes = (False, True) if not args.mode else (args.mode == 'online',)
 selected_scenarios = SCENARIOS if not args.scenario else [item for item in SCENARIOS if item[0] == args.scenario]
@@ -100,12 +103,13 @@ VISUAL_VIEWPORT = r'''(() => {
     window.issue32NativeResizeCount++;
     issue32ResizeEvents.push('visualViewport.resize');
     recordResizeEvent('native-visualViewport.resize', event);
-    viewport.dispatchEvent(new Event('resize'));
+    if (!window.issue47ObserveOnly) viewport.dispatchEvent(new Event('resize'));
   });
   viewport.addEventListener('resize', event => recordResizeEvent('test-visualViewport.resize', event));
   window.addEventListener('resize', event => {
     issue32ResizeEvents.push('window.resize');
     recordResizeEvent('window.resize', event);
+    if (window.issue47BlockWindow) event.stopImmediatePropagation();
   }, {capture:true});
   window.issue32ReadResizeDiagnostics = stage => {
     const native = window.issue32NativeVisualViewport;
@@ -501,6 +505,53 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
               'keyboard focus changed game state')
         check(record, not page.evaluate('issue32Geometry.sent'), 'keyboard focus sent an action')
         record['keyboardFocus'] = 'all candidates and Back: Tab order, name, focus-visible, clipping, no action'
+
+    # Diagnostic only: replay the original shim, then repeat with both product
+    # resize notification routes blocked while keeping layout itself native.
+    page.evaluate('''online => {
+      const root = document.querySelector(online ? '#online-game-controls' : '#local-game-controls');
+      const panel = root.querySelector('[data-panel-part="candidate-controls"]');
+      window.issue47ResizeTrace = [];
+      const record = (kind, data) => issue47ResizeTrace.push({kind, ms: performance.now(),
+        viewport: innerWidth, cssWidth: panel.style.getPropertyValue('--candidate-panel-width'), ...data});
+      new ResizeObserver(entries => record('root-size', {root: entries[0].borderBoxSize[0].inlineSize})).observe(root, {box:'border-box'});
+      new MutationObserver(() => record('panel-style', {})).observe(panel, {attributes:true, attributeFilter:['style']});
+      window.addEventListener('resize', () => record('window-dispatched', {root: root.getBoundingClientRect().width}), true);
+    }''', online)
+    def probe(label, target):
+        page.evaluate('''() => {
+          window.issue47ResizeTrace.length = 0;
+          window.issue32ResizeEventDiagnostics.length = 0;
+        }''')
+        page.set_viewport_size({'width': target, 'height': height})
+        settle(page)
+        result = snapshot(page, online, resize_stage=label)
+        events = result['resizeDiagnostic']['events']
+        print('issue47-resize-probe ' + json.dumps({
+            'label': label, 'viewport': result['layoutViewport']['width'],
+            'root': result['root']['width'], 'panel': result['panel']['width'],
+            'css': result['panelVariables']['--candidate-panel-width'],
+            'events': [(e['type'], e['performanceNowMs'], e['innerWidth']) for e in events],
+            'trace': page.evaluate('issue47ResizeTrace'),
+        }, separators=(',', ':')), flush=True)
+
+    page.evaluate('window.issue47ObserveOnly = true')
+    for attempt in range(4):
+        probe(f'old-shim-{attempt + 1}-widen', width + 24)
+        probe(f'old-shim-{attempt + 1}-restore', width)
+    page.evaluate('window.issue47BlockWindow = true')
+    probe('withheld-widen', width + 24)
+    page.evaluate('''() => {
+      window.issue47BlockWindow = false;
+      window.dispatchEvent(new Event('resize'));
+    }''')
+    recovered = snapshot(page, online)
+    print('issue47-resize-replay ' + json.dumps({
+        'root': recovered['root']['width'], 'panel': recovered['panel']['width'],
+        'css': recovered['panelVariables']['--candidate-panel-width'],
+    }), flush=True)
+    page.evaluate('window.issue47ObserveOnly = false')
+    probe('forwarded-restore', width)
 
     # Resize the layout viewport, then recover the original table and baseline.
     page.evaluate('''()=>{
