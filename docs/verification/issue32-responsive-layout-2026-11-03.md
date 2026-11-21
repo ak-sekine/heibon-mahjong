@@ -833,3 +833,37 @@ Android・タブレット実機は未確認のまま記録し、viewport自動�
 - [ ] ヘッダー・フッターが固定され、各ボタンを操作できる。
 
 自動検証は上記の本人実機確認を代替しません。Safari／PCの追加確認が報告されるまでIssue #32はOpenのままにします。
+
+## 最終受入評価
+
+Issue #32の本文順に、基本7件と追加10件を照合した。前回未確認だったNo.16は、2026年11月21日に受領した[本番版のiPhone XS Safari本人追加報告2/2 OK](issue32-common-frame-2026-11-11.md#本番版の最終実機確認)により達成。実施日時と本人が直接確認した配信SHAは未報告。本人報告と自動テストを区別する。
+
+| No. | 受入条件 | 判定 | 根拠 |
+| --- | --- | --- | --- |
+| 1 | 代表viewportの主要画面操作 | 達成 | 両エンジンのレイアウト検証 |
+| 2 | 重なり・横スクロール・操作不能領域 | 達成 | 寸法・overflow・操作検査 |
+| 3 | 複数チー・ロン・カン・結果の回帰 | 達成 | 両エンジンの候補・局結果テスト |
+| 4 | iPhone Safari本人実機 | 達成 | 開発版8/8と本番追加2/2の本人報告 |
+| 5 | PC本人実機 | 達成 | 従来11/11と開発版追加4/4の本人報告 |
+| 6 | Android・タブレット実機の未確認明記 | 達成 | 実機未確認。viewport自動検証と区別 |
+| 7 | 設計・検証記録 | 達成 | 本節と共通外枠の検証記録 |
+| 8 | ルール確認の共通バーと白バー非重複 | 達成 | 両エンジンと本人報告 |
+| 9 | ルール確認の長短本文 | 達成 | 両エンジンの長短本文テスト |
+| 10 | PCのルール確認操作 | 達成 | PC追加報告と操作テスト |
+| 11 | iPhone Safariのルール確認操作 | 達成 | 本人報告のタッチ操作と卓への復帰 |
+| 12 | 既存共通スクロールUIの回帰 | 達成 | mainの両エンジン全件CI |
+| 13 | 局結果詳細の共通バーと白バー非重複 | 達成 | 両エンジンと本人報告 |
+| 14 | 最終順位の共通構造と長短本文 | 達成 | 両エンジンの長短本文テスト |
+| 15 | PCの結果画面操作と固定部品 | 達成 | PC追加報告と操作テスト |
+| 16 | iPhone Safariの結果画面・ツールバー変化後操作 | 達成 | 本番iPhone XS Safariの追加2/2本人報告 |
+| 17 | オンライン・オフラインの結果と既存ダイアログの回帰 | 達成 | 両エンジンの回帰検証、local-online、本番オンライン検証 |
+
+**最終判定：17/17達成。**
+
+### 統合・公開の証跡
+
+- 対象アプリのmain統合SHAと本番公開SHAはともに `3c52d17b7c301cb8a4ff5d22fa53bb5594cade94`。この追記を含むmainの文書コミットは公開済みアプリの変更を含まず、文書のみの公開例外を適用する。
+- [mainの必須CI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44914960575)は単体・型検査・ビルド、Chromium／WebKit全4グループ、環境分離、local-online、matrix auditに成功。
+- [本番公開workflow](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44917709085)は再検証、本番Worker、オンライン検証、Pages、台帳確定に成功。Worker deployment `7965528881`、Pages deployment `7965544141`は対象SHAで成功。
+- 公開台帳 `305479dc1986552246a4fcf67bdbdd3ae487fc41` は `pending=null`。本番digest `f5ced37fb91f42fb433d1dd1df9f0dbd56b77334e8b3dea2b296ef1ad4d437fa` とsnapshot digest `0d39f9a6f3e8e0320f113cc0ec55373f7b0f64358e76bdf1892e2f2500ce72eb` は保存ファイルからの再計算と一致。公開後の配信ファイルは本番・開発版とも16/16件一致し、環境メタデータの不一致もなかった。
+- 必須ゲートとは別の[補助監査1](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44920691665)はdevelop専用の監査をmainで実行したため失敗。[補助監査2](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44920763797)は配信ファイル照合に成功したが、共有Pagesの最新deploymentに開発版SHAを要求し、本番SHAを検出して監査全体は失敗。最新Pages deploymentのSHA・成功状態・本番公開ジョブとの対応はGitHub APIで別途照合した。両監査の結論は失敗のまま記録する。
