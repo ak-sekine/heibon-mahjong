@@ -1,6 +1,6 @@
 # Issue #47 検証記録（2026-11-11）
 
-> **最新状態（2026-11-19）：Phase 7の本人実機確認10項目はすべてOK。** [Phase 7実機確認](#2026-11-19-phase-7実機確認)と[2026-11-13のPhase 2完了記録](#2026-11-13-phase-2完了記録)を参照。Issue #47全体はOpen。
+> **最新状態は[main反映の照合](#2026-11-21-main反映の照合)を参照。2026-11-19のPhase 7本人実機確認10項目はすべてOK。** [Phase 7実機確認](#2026-11-19-phase-7実機確認)と[2026-11-13のPhase 2完了記録](#2026-11-13-phase-2完了記録)を参照。Issue #47全体はOpen。
 
 ## 自動検証
 
@@ -384,7 +384,7 @@ GitHub Pages deployment `7961328983` は成功。上表の32ファイルに加�
 
 本人報告の集計は **OK 3件／NG 0件／報告された3項目の未確認0件**。[11月19日の両版の実機確認](#2026-11-19-phase-7実機確認)、[11月20日の開発版更新の実機確認](#2026-11-20-phase-6-b-b7-safari実機確認)、[Chromium／WebKitのCache Storage本文照合](#2026-11-20-phase-6-b-b7-cache-storage本文照合) はそれぞれ別の証拠として扱う。
 
-### 最新のIssue #47受入判定
+### 再Open前のIssue #47受入判定
 
 | 受入条件 | 判定 | 根拠 |
 | --- | --- | --- |
@@ -398,4 +398,40 @@ GitHub Pages deployment `7961328983` は成功。上表の32ファイルに加�
 
 作業項目7件も達成。ブランチ／リリース運用と運用文書は受入条件7、開発用ビルドとURLは条件1・2、PWAとブラウザ保存状態の分離は条件3、開発用Workerの分離は条件4、GitHub Actions公開設計は条件1・5・6、ゲートと権限管理は条件5・6と、環境別のSecret参照・ブランチ条件の回帰テストに対応する。[公開Workflowの回帰テスト](../../tests/environment-workflows.test.mjs)
 
-**最終判定は受入条件7/7件達成、Issue #47はClose可。B7はPARTIALを維持。** iPhone内のCache Storage本文と有効なService Workerスクリプトの直接ハッシュ照合、更新前に残っていた旧cache本文の完全照合、実公開更新時の同環境複数タブのブロックと他環境タブが開いていた場合の更新可否の詳細、実環境で競合や障害を意図的に発生させる追加検証は未確認・未実施。キャッシュ本文照合は上記の旧本番・維持開発版を対象とするPC自動検証であり、今回のiPhone内の本文は取得していない。複数タブと競合制御は現行CIおよび回帰テストで確認した範囲を根拠に、実公開や実機での追加条件の再現は必須受入条件に含めないと判定した。通信断・自動再接続・通信異常からの復旧はIssue #61の範囲。[PWA仕様](../SPEC.md#pwa更新通知) / [PWA自動テスト](../../tests/browser-pwa.py) / [環境分離自動テスト](../../tests/browser-environments.py) / [Issue #47](https://github.com/ak-sekine/heibon-mahjong/issues/47) / [Issue #61](https://github.com/ak-sekine/heibon-mahjong/issues/61)
+**再Open前の判定は既存受入条件7/7件達成。B7はPARTIALを維持。** iPhone内のCache Storage本文と有効なService Workerスクリプトの直接ハッシュ照合、更新前に残っていた旧cache本文の完全照合、実公開更新時の同環境複数タブのブロックと他環境タブが開いていた場合の更新可否の詳細、実環境で競合や障害を意図的に発生させる追加検証は未確認・未実施。キャッシュ本文照合は上記の旧本番・維持開発版を対象とするPC自動検証であり、今回のiPhone内の本文は取得していない。複数タブと競合制御は現行CIおよび回帰テストで確認した範囲を根拠に、実公開や実機での追加条件の再現は必須受入条件に含めないと判定した。通信断・自動再接続・通信異常からの復旧はIssue #61の範囲。[PWA仕様](../SPEC.md#pwa更新通知) / [PWA自動テスト](../../tests/browser-pwa.py) / [環境分離自動テスト](../../tests/browser-environments.py) / [Issue #47](https://github.com/ak-sekine/heibon-mahjong/issues/47) / [Issue #61](https://github.com/ak-sekine/heibon-mahjong/issues/61)
+
+## 2026-11-21 main反映の照合
+
+再Open時に追加された8件目の受入条件を確認した。既存7件の達成判定と実機報告の範囲は上節のとおり。[再Open時のコメント](https://github.com/ak-sekine/heibon-mahjong/issues/47#issuecomment-7063247788)
+
+| 比較対象 | SHA |
+| --- | --- |
+| main（文書追記前） | `b7792780825468e961a18cc525e544d0d7d4d4bd` |
+| develop（文書追記前） | `93363ef0848759eb24c4c5f01a591ede6a69f3e5` |
+| merge-base | `c3b84944daaa8fbba3b4b603c0d3f8430e9afb58` |
+| 本番公開済みアプリ | `3c52d17b7c301cb8a4ff5d22fa53bb5594cade94` |
+| 維持された開発公開版 | `c3a6b6c4eeb72c82b8152ea299511df26e49c435` |
+| 確定公開台帳 | `305479dc1986552246a4fcf67bdbdd3ae487fc41` |
+
+両先端の差分は30パス、分岐コミットはmain側11件・develop側70件。最新の両 `AGENTS.md` を照合し、Issue別の差分だけを確認した。
+
+| 判定 | ファイル・機能 | 根拠 |
+| --- | --- | --- |
+| 反映済み | Worker分離と接続先。 `wrangler.jsonc`、`wrangler.development.jsonc`、`vite.config.ts`、`.github/scripts/deploy-isolated-worker.mjs` | Worker名・DO自己binding・接続先を環境別に定義。公開workflowは対応するEnvironmentと名前付きSecretを選択し、予約前に認証設定の有無、公開時に候補とWorker URLの一致を確認する。現行mainのlocal-onlineと、本番公開SHAの実オンラインが成功。DOの独立namespaceは上節の実環境記録を参照。 |
+| 反映済み | Pagesと公開保護。 `publish-environments.yml`、`deploy.yml`、`publication-reservation.mjs`、`validate-publication-mode.mjs`、`scripts/environments/artifacts.mjs` | 手動公開条件、共通排他、最新SHAとrun/attemptを使った予約、Worker・オンライン成功後のPages、台帳確定を維持。sealとsnapshot/hashで保持版のbytesを確認する。失敗・並行更新・古い候補・pendingの拒否は `environment-artifacts.test.mjs` と `environment-git-store.test.mjs` で検証。 |
+| 反映済み | PWA、Service Worker、保存状態とBrowser UI。 `scripts/build-pwa.mjs`、`src/pwa/register.ts`、`tests/browser-environments.py`、`tests/browser-pwa.py` | 環境別manifest/scope/cache、別環境の取得と更新への非干渉を両エンジンで確認。mainのPWAテストは失敗した更新からの再試行、複数タブ待機、承認後のキャッシュ更新、オフラインCPUを検証する。developの失敗診断・固定座席・配信スクリプトの追加計測とテスト構成には差がある。現行mainの4グループと環境分離が成功。 |
+| 反映済み | 設計・標準運用と一般復旧 | 設計とcutover文書は両側に存在。mainの環境運用にはURL、開発通常公開、昇格、pending時の停止、証拠照合、承認付き復旧、実機手順がある。初回Worker作成文書の補足は、標準運用がすでに定義する継続許可の再掲。 |
+| 反映必要 | 環境運用の現況、Issue #47の最終公開と受入検証、Phase 2監査への参照 | `docs/operations/environments.md` の現況を更新し、`docs/verification/issue-47-environments.md` に最終公開・本人報告・本照合を反映する。cutoverの既存リンク先となる `docs/verification/issue-47-live-audit-2026-11-13.md` のPhase 2追記も反映する。 |
+| 反映不要 | develop限定のB1–B7 live E2EとPythonテスト、`browser-ui.yml` の対応job | 手動の補助検証で、テスト用ルームの作成・参加・打牌でWorker状態を作る。公開構成の読み取りに加え、この副作用がある。既存live結果は当時の公開版の証拠として使い、mainで必要な環境分離・PWA・オンラインは必須CIと実公開オンライン、保存された配信照合、本人実機報告で確認する。新しい本番PWA上で同一live suiteを再実行した証拠はない。[既存B1–B7](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44640934294) |
+| 反映不要 | live-auditの履歴復旧モードと `pages-recovery.mjs`、専用runbook、対応テスト | 通常の静的照合は両側にある。developの監査追加は過去の予約run `44839474104`、台帳の親と先端、旧Worker versionを固定して確認する。Pages専用復旧の実装・記録も過去の部分公開を対象とする。現行台帳は `pending=null`。通常公開・一般復旧の受入に固定条件の追加は不要。 |
+| 反映不要 | #32、#57、#58、#52および共通文書 | #32の候補・共通スクロールは現行mainで実装・公開済み。残る #32 の文書差は対象外。 `environments.yml` と分類テストのdocs-only分岐は #57、Browser UIの限定実行・テスト選択は #58。4グループとmatrix auditはmainにある。itch smokeの鳴き追跡差分は #52 の依存を伴い、現行mainの必須smokeは成功。共通索引、他Issueの検証記録、 `AGENTS.md` の枝別履歴の統合は不要。 |
+| 未確定・未確認 | B7の追加検証、補助監査の共有Pages判定 | B7はPARTIAL。実機内のCache Storage本文・有効なService Workerのハッシュ、旧cache本文、実公開更新時の同環境・他環境タブの詳細は未確認。補助監査は後述の制約が残る。 |
+
+### 対象SHAと公開の証拠
+
+- 比較時のmain `b7792780825468e961a18cc525e544d0d7d4d4bd` で、単体・型検査・ビルド、local-online、Chromium／WebKit環境分離、Browser UI全4グループ、matrix auditが成功。通常pushの公開ジョブはSkipped。[必須CI #44923094549](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44923094549)
+- 本番アプリ `3c52d17b7c301cb8a4ff5d22fa53bb5594cade94` の必須CI、本番Worker、実オンライン、Pages、台帳確定が成功。Worker deploymentは `7965528881`、Pages deploymentは `7965544141`。公開済みアプリから比較時mainまでの差分は #32 の検証文書2件のみ。本照合の反映も文書のみで、既存の文書変更の公開例外を適用する。[必須CI #44914960575](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44914960575) / [本番公開 #44917709085](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44917709085) / [確定台帳](https://github.com/ak-sekine/heibon-mahjong/blob/305479dc1986552246a4fcf67bdbdd3ae487fc41/state.json)
+- 補助監査はmain refでの実行を拒否した。develop refでの実行は両版の32 payloadと3 metadataが保存bytesと一致し、本番Worker deploymentも確認できた。監査全体は、共有Pagesの最新deploymentを開発版SHAと比較するため失敗。Pagesの本番SHA・公開ジョブ・成功状態は本番公開記録と #32 のAPI照合結果を参照する。補助監査の失敗結論は維持する。[補助監査1](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44920691665) / [補助監査2](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44920763797/job/136896076872) / [API照合の記録](https://github.com/ak-sekine/heibon-mahjong/blob/b7792780825468e961a18cc525e544d0d7d4d4bd/docs/verification/issue32-responsive-layout-2026-11-03.md#統合公開の証跡)
+- `44884664040` と `44886709578` は旧本番SHA `0e1185df53cc17ae08cb4be3a105f3b61b9c8528` の成功記録。 `44888822486` は別ブランチから実施した当時の公開後監査で、mainのゲートとは別。上節に各Actionsへのリンクを残す。
+
+本照合で取り込む差分は上表の文書のみ。Issue本文・チェック項目・状態はOpenのまま維持し、統合した文書コミットと同SHAの品質ゲートを最終報告で照合する。
