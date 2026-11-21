@@ -72,3 +72,32 @@ manifestの`id`、`start_url`、`scope`はいずれも`/heibon-mahjong/`でし�
 今回のライブ到達性と公開bytes照合により、前回の「proxy CONNECT 403により現行本番のhealthと公開PWAの確認が未完了」という停止理由は解消しました。Phase 2は公開開始の許可を意味しません。Phase 2の公開操作、既存iPhone Safari PWA移行確認、後続Phaseに必要な別の開始前提は未実施です。Issueの公開移行手順に従い、公開前確認を再評価してください。
 
 この記録と読み取り専用workflow/script以外に本番変更はありません。main、Pages、Worker、Durable Objects、`DUAL_PAGES_ENABLED`、旧workflow、`pages-verified`を変更していません。PRを作らず、Issue #47をOpenのまま維持します。
+
+## 2026-11-13 Phase 2実機報告と完了判定
+
+> この節は同日後刻にユーザー本人から受け取った既存PWAのiPhone Safari実機結果を追加したもの。上記の「実機未確認」「Phase 2未実施」は、このライブ監査時点の状態を表す記録として保持する。
+
+本番公開workflow [run 43430225160](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43430225160)、統合後CI [run 43426274255](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43426274255)、公開後ライブ監査 [run 43434482360](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43434482360)、Worker診断 [run 43434482361](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43434482361) のjob結果をGitHub Actions APIで再取得し、成功を確認した。Worker deploy、production-test、Pages build/deploy、公開後audit、Worker診断はいずれもsuccess。公開元SHAは`c3b84944daaa8fbba3b4b603c0d3f8430e9afb58`。
+
+Worker deployment/versionは`3b6587ac-79fd-49a8-b6d1-2f77a9022331` / `85e9510f-3f21-45c1-b0ff-4a4de66e7749`、Pages deploymentは`7766490026`。公開artifact `published-pages-c3b84944daaa8fbba3b4b603c0d3f8430e9afb58-1`（ID `14043735340`）のActions API digestは`sha256:fe5744e7b7178a92db884c8926d1e637c9668eb79b7cc4c0da4fb4d1b0813aff`で既存記録と一致。既存の公開後監査記録では実artifactと公開URLの全16ファイルがSHA-256 MATCH。
+
+### 実機報告（本人申告、2026-11-13）
+
+端末はiPhone Safariの既存ホーム画面PWA。iOS/Safariバージョン詳細は未記録。
+
+| No. | 確認項目 | 結果 |
+|---:|---|---|
+| 1 | 既存ホーム画面PWAが起動する | OK |
+| 2 | 更新通知があれば更新でき、再起動後も正常動作する | OK |
+| 3 | 既存ルール設定が保持されている | OK |
+| 4 | 既存オンライン参加・再接続情報が保持されている | 未検証 |
+| 5 | CPU対局を開始し、ツモ・打牌ができる | OK |
+| 6 | 鳴きなどの操作が正常にできる | OK |
+| 7 | 機内モード・Wi-Fi OFFでPWAを再起動し、CPU対局できる | OK |
+| 8 | 通常Safariから本番URLを開き、正常に起動できる | OK |
+
+**集計：OK 7件、NG 0件、未検証1件。** 未検証の理由について本人から「オンライン対局していませんでした。」との補足があり、更新前後のオンライン参加・再接続情報を比較できなかった。保存データ内部を直接調査していないため、保存キーや再接続情報が存在しなかったとは断定しない。iPhone実機のオンライン対局・再接続は成功済みとして扱わない。更新通知の表示有無、Service Worker内部のversion照合など、個別に報告されていない詳細も補わない。
+
+Phase 2手順上の本番Worker/Pages/SHA/artifact確認に加え、既存ホーム画面PWA起動、ルール設定保持、CPU対局・操作、オフライン起動が本人報告で確認されたため、**Phase 2：完了**と判定する。オンライン参加・再接続情報の更新前後保持、iPhone実機でのオンライン対局・再接続、iOS/Safariバージョン詳細はIssue #47全体の残件として維持する。Issue #47はOpen。Phase 3以降は未着手であり、初期登録・公開経路切替・新workflow publishを開始していない。
+
+詳細とPhaseごとの境界は[Issue #47検証記録](issue-47-environments.md#2026-11-13-phase-2完了記録)、[公開移行手順](../operations/issue-47-cutover.md#実施状況2026-11-13)を参照。

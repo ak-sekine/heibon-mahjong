@@ -1,6 +1,6 @@
 # 本番・開発運用（Issue #47）
 
-現状は段階導入。実装追加と公開完了を混同しない。公開移行は[確定したPhase別手順](issue-47-cutover.md)に従う。今回の[移行前チェック](../verification/issue-47-preflight-2026-11-12.md)で確認済み・未確認を区別する。[設計](../development/issue-47-environments.md) / [検証・未確認一覧](../verification/issue-47-environments.md)。
+本番・開発の分離公開と既存7件の受入結果を確認済み。公開SHA、main反映状況、B7の未確認項目は検証記録を参照する。公開移行の経緯はPhase別手順と移行前チェックに残す。[検証記録](../verification/issue-47-environments.md#2026-11-21-main反映の照合) / [Phase別手順](issue-47-cutover.md) / [移行前チェック](../verification/issue-47-preflight-2026-11-12.md) / [設計](../development/issue-47-environments.md)
 
 | 項目 | 本番 | 開発 |
 |---|---|---|
