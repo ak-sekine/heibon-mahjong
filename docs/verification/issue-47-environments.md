@@ -435,3 +435,9 @@ GitHub Pages deployment `7961328983` は成功。上表の32ファイルに加�
 - `44884664040` と `44886709578` は旧本番SHA `0e1185df53cc17ae08cb4be3a105f3b61b9c8528` の成功記録。 `44888822486` は別ブランチから実施した当時の公開後監査で、mainのゲートとは別。上節に各Actionsへのリンクを残す。
 
 本照合で取り込む差分は上表の文書のみ。Issue本文・チェック項目・状態はOpenのまま維持し、統合した文書コミットと同SHAの品質ゲートを最終報告で照合する。
+
+### main反映後の確認
+
+`main` の最終SHAは `25ca994be34b9d45fe1752588982d6a3ea84144b`。文書3件をfast-forwardで反映し、同SHAのpushに対する必須CIが成功した。単体1,562件、アプリ・Worker型検査、候補ビルド、local-online、Chromium／WebKit環境分離、Browser UI全4グループ、matrix auditが成功。公開ジョブはSkipped。[main文書コミット](https://github.com/ak-sekine/heibon-mahjong/commit/25ca994be34b9d45fe1752588982d6a3ea84144b) / [必須CI #44952666228](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44952666228)
+
+本番アプリの公開済みSHAは `3c52d17b7c301cb8a4ff5d22fa53bb5594cade94`。以降のmain差分はすべて文書。GitHub APIで本番WorkerとPagesのdeploymentの成功を再確認し、台帳から本番・開発各16 payloadのハッシュ、両snapshot digestと公開メタデータを再計算して一致を確認した。この環境からの実配信URLの再取得はHTTP 403で、実配信bytesの証拠は上記の補助監査ログを使用した。B7はPARTIAL。追加されたmain反映条件は達成と判定し、IssueはOpenのまま最終確認へ引き継ぐ。
