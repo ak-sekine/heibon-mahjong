@@ -185,6 +185,32 @@ def verify_open(record, before, after):
     check(record, after['panel']['top'] < before['root']['top'], 'candidate did not expand above the original operation area')
 
 
+def verify_operation_area_resize(page, record, online, root_selector, opened):
+    # Change only the operation area's size. Neither viewport has to emit a
+    # resize event when CSS changes the border box of this element.
+    root = page.locator(root_selector)
+    initial_max_width = root.evaluate('node => node.style.maxWidth')
+    try:
+        root.evaluate('(node, width) => node.style.maxWidth = width + "px"', opened['root']['width'] - 24)
+        settle(page)
+        record['operationAreaResized'] = narrowed = snapshot(page, online)
+        check(record, abs(opened['root']['width'] - narrowed['root']['width'] - 24) <= 1,
+              'operation-area resize did not change the width as intended')
+        for key in ('left', 'right', 'width'):
+            check(record, abs(narrowed['root'][key] - narrowed['panel'][key]) <= 1,
+                  f'operation-area resize lost common {key}')
+        same_rect(record, opened['table'], narrowed['table'], 'table after operation-area resize')
+        check(record, narrowed['layoutViewport'] == opened['layoutViewport'] and
+              narrowed['visual'] == opened['visual'], 'operation-area resize changed a viewport')
+    finally:
+        root.evaluate('(node, value) => node.style.maxWidth = value', initial_max_width)
+    settle(page)
+    record['operationAreaResizeRestored'] = restored = snapshot(page, online)
+    same_rect(record, opened['root'], restored['root'], 'operation area after width restoration')
+    same_rect(record, opened['panel'], restored['panel'], 'candidate panel after width restoration')
+    same_rect(record, opened['table'], restored['table'], 'table after operation-area width restoration')
+
+
 def exercise(page, width, height, scenario, trigger, expected_count, online):
     record = {'viewport': f'{width}x{height}', 'mode': 'online' if online else 'local', 'scenario': scenario}
     report['measurements'].append(record)
@@ -280,6 +306,9 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
         check(record, not page.evaluate('issue32Geometry.sent'), 'keyboard focus sent an action')
         record['keyboardFocus'] = 'all candidates and Back: Tab order, name, focus-visible, clipping, no action'
 
+    if not args.baseline and (width, height) == (320, 568) and scenario in ('pon-multiple', 'mixed-kan'):
+        verify_operation_area_resize(page, record, online, root_selector, after)
+
     # Resize the layout viewport, then recover the original table and baseline.
     page.set_viewport_size({'width': width + 24, 'height': height})
     settle(page)
@@ -291,6 +320,9 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
     page.set_viewport_size({'width': width, 'height': height})
     settle(page)
     recovered = snapshot(page, online)
+    for key in ('left', 'right', 'width'):
+        check(record, abs(recovered['root'][key] - recovered['panel'][key]) <= 1,
+              f'window resize restoration lost common {key}')
     check(record, abs(recovered['panel']['bottom'] - before['root']['bottom']) <= 2,
           'window resize restoration lost bottom anchor')
     same_rect(record, before['table'], recovered['table'], 'table after resize restoration')

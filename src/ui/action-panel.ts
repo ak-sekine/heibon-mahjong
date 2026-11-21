@@ -167,6 +167,8 @@ export class ActionPanel {
   private candidateAnchorDocumentBottom: number | null = null;
   private candidateAnchorViewport: string | null = null;
   private candidateAnchorLayoutViewport: string | null = null;
+  private readonly candidateResizeObserver = typeof ResizeObserver === 'undefined' ? undefined
+    : new ResizeObserver(() => this.repositionCandidatePanel());
   private state: ActionPanelState | null = null;
   private callType: 'pon' | 'daiminkan' | 'chi' | null = null;
   private activeCallOptions: readonly ActionChoiceOption[] = [];
@@ -575,6 +577,9 @@ export class ActionPanel {
     // occupied by call types. Hiding ordinary controls must not shrink the flow.
     this.root.style.setProperty('--candidate-anchor-height', `${bounds.height}px`);
     this.root.classList.add('candidate-active');
+    // The fixed panel cannot inherit the operation area's width. Its border
+    // box can change before (or without) a viewport resize notification.
+    this.candidateResizeObserver?.observe(this.root, { box: 'border-box' });
   }
 
   private repositionCandidatePanel(): void {
@@ -610,6 +615,7 @@ export class ActionPanel {
   }
 
   private clearCandidateAnchor(): void {
+    this.candidateResizeObserver?.disconnect();
     const panel = this.part('candidate-controls');
     delete panel.dataset.mode;
     panel.style.removeProperty('--candidate-panel-left');
