@@ -1,18 +1,21 @@
-name: Issue 47 Pages dependency probe and read-only inspection
-on: workflow_dispatch
+name: Issue 47 read-only production release audit
+run-name: Issue 47 audit of snapshot ${{ inputs.snapshot }}
+on:
+  workflow_dispatch:
+    inputs:
+      snapshot:
+        description: Expected pages-verified commit
+        type: string
+        required: true
+      production_run:
+        description: New production run ID (leave empty for the pre-publication audit)
+        type: string
+        default: ''
 permissions:
   contents: read
   actions: read
   deployments: read
 jobs:
-  main:
-    uses: ./.github/workflows/issue47-pages-condition-probe.yml
-    with:
-      release_ref: refs/heads/main
-  develop:
-    uses: ./.github/workflows/issue47-pages-condition-probe.yml
-    with:
-      release_ref: refs/heads/develop
   inspect:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -24,17 +27,13 @@ jobs:
         with:
           ref: pages-verified
           path: store
-          fetch-depth: 2
+          fetch-depth: 3
           persist-credentials: false
-      - name: Read Worker and compare currently served Pages with the pre-reservation snapshot
+      - name: Compare Cloudflare deployments and public Pages with the finalized snapshot
         env:
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          test "$(git -C store rev-parse HEAD)" = 1d538542c75bf0b49f468acb55ad414c35ce0c10
-          test "$(git -C store show -s --format=%P HEAD)" = d4d9a8a7cc9723b9d4a1b5eac9c829929cb4cb61
-          mkdir previous
-          git -C store archive HEAD^ site state.json | tar -x -C previous
-          node .github/scripts/issue47-pages-inspection.mjs
+          AUDIT_SNAPSHOT: ${{ inputs.snapshot }}
+          AUDIT_PRODUCTION_RUN: ${{ inputs.production_run }}
+        run: node .github/scripts/issue47-pages-inspection.mjs
