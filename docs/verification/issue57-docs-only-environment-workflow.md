@@ -118,3 +118,20 @@ job-level skipを含む実際のrequired-check状態は、変更後の通常push
 - `publish=true`をdispatchした場合の実runは未確認（公開防止のため意図的に未実施）。
 - 組織・上位階層で適用されるルール（APIで取得できるrepository rulesetsは空）。
 - iPhone Safari実機確認（本変更はworkflowのみで、実機操作を伴わない）。
+
+## main 統合と検証
+
+作業開始時のローカルHEADは `a97e8550e87f198ba11205be877ccf5302f2c0a6`（`work`、clean、最新mainに対してbehind 40 / ahead 0）。許可付きのGit通信で取得した統合前mainは `25ca994be34b9d45fe1752588982d6a3ea84144b`、参照developは `3d3a1bd76d8c6fd55b2f09ae50e2375ba4d180aa`。比較時点でmain固有12件、develop固有72件。参照developの先端でも、分類・文書検査・auditの成功と重い検証・publishのskipを確認した。[develop run #44955079999](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44955079999)
+
+mainには `6318fa1192ece23a8d6b73a13a22f468612bb670` をfast-forwardで反映した。Issue #57の分類・文書検査・audit、関連テスト、および過去のdevelop検証記録を移植した。環境workflowとテストのIssue #57差分はmainに競合なく適用できた。分類ジョブの実行失敗時も全検証が動くよう、後続の重いjobはverify成功で選択し、auditは分類失敗を検出する。分類処理そのものは既存スクリプトを再利用した。
+
+Issue #58のBrowser UI再編、ゲーム・実機検証差分、運用文書の無関係な差分を除外した。mainのChromium/WebKit全4グループと環境分離2件を維持し、公開用reusable workflow、旧Deploy workflow、予約・環境承認・SHA確認・Worker/Pages順序には差分がない。公開callerには分類と文書検査の成功を依存条件として追加した。GitHubで旧Deploy workflowは `disabled_manually`、mainの `protected` は `false`、branch rules一覧は空だった。required status checks個別APIと公開フラグの読取APIはHTTP 403だった。
+
+ローカルでは分類17件、環境workflow 6件、関連CIテスト6ファイル、`npm test` 92ファイル、Worker型検査、本番・開発・itchビルド、`git diff --check` が成功。開発・itchビルドにはCIの検証用URLを指定した。開発ビルドは初回にURL未指定で既存のガードが作動し、指定後に成功した。Chromium/WebKitの実行結果はActionsで確認する。
+
+| Environments run | SHA | 状態 |
+| --- | --- | --- |
+| [変更前のmain文書のみpush #44952666228](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44952666228) | `25ca994be34b9d45fe1752588982d6a3ea84144b` | 9実行 / 13件、runner合計4,000秒、壁時計1,589秒。Chromium/WebKit全4グループを実行、publishはskip |
+| [統合コミットの通常push #44960150625](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44960150625) | `6318fa1192ece23a8d6b73a13a22f468612bb670` | 起動を確認。結果は後続の確認で追記 |
+
+比較はEnvironments workflowに限定し、runner時間はskipを除く各jobの開始から完了までの合計、壁時計は最初の実行jobの開始から最後の実行jobの完了までとした。公開停止の比較基準として、作業開始時点の最新Worker/Pages deploymentはいずれも `3c52d17b7c301cb8a4ff5d22fa53bb5594cade94`（Worker ID `7965528881`、Pages ID `7965544141`）。
