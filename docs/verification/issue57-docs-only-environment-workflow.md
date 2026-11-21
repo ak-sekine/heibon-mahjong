@@ -20,6 +20,8 @@ GitHub Actions APIから取得した変更前の計測:
 | 壁時計（最初の実行job開始〜最後の実行job完了） | 1,553秒（25分53秒） |
 | Browser UI matrix | Chromium 2 job + WebKit 2 job、全件実行 |
 
+同じpushでは独立したBrowser UI run [#43593235090](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43593235090)も起動し、4 jobs中2 jobs（変更分類とdocs-check）が実行、runner 27秒・壁時計20秒だった。Development Worker bootstrap run [#43593235177](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43593235177)は3 jobsすべてskip。
+
 ## 変更後の設計
 
 - push差分は既存`.github/scripts/classify-changes.mjs`で分類する。base/head不明、`git diff`失敗、空差分は`--unsafe`により全検証へ倒す。
@@ -75,26 +77,44 @@ job-level skipを含む実際のrequired-check状態は、変更後の通常push
 | 変更前同一pushのBrowser UI | [#43593235090](https://github.com/ak-sekine/heibon-mahjong/actions/runs/43593235090) | 4（2実行） | 27秒 | 20秒 | docs-check・分類のみ実行 |
 | 変更後通常push Environments | [#44893196109](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44893196109), `983251ef` | 16（11実行） | 34分38秒 | 11分04秒 | success。4 Browser UI groups、環境分離2件、local-online、audit success。publish skip |
 | 変更後同一pushのBrowser UI | [#44893196054](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44893196054) | 8（7実行） | 33分02秒 | 9分46秒 | success。Chromium／WebKit 4 groups success |
-| 変更後docs-only push | 未確認 | 未確認 | 未確認 | 未確認 | push後に記録 |
+| 変更後docs-only Environments | [#44894465861](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44894465861), `f7b4e41` | 8（3実行） | 40秒 | 45秒 | success。重いjobとpublishはskip、docs-only audit success |
+| 変更後同一pushのBrowser UI | [#44894465845](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44894465845) | 5（2実行） | 20秒 | 11秒 | success。verify-build・Browser UI matrix skip |
+| 変更後同一pushのWorker bootstrap | [#44894465847](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44894465847) | 3（0実行） | 0秒 | — | 全job skip |
 | 手動 `publish=false` | [#44893278635](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44893278635), `983251ef` | 16（11実行） | 37分22秒 | 10分27秒 | success。全必須gate success、publish skip |
 | 手動 `publish=true` | dispatchしない | — | — | — | 公開job条件のみ静的評価 |
 
-この時点の新docs-only push runは未実施のため、削減率は未算出。変更前後で`browser-ui.yml`に含まれる独立push runも記録した。各指標はEnvironments runとBrowser UI runを混ぜずに比較する。skip jobはrunner時間合計から除外。
+変更後のdocs-only pushは、検証記録と目次だけを変更したcommit `f7b4e415975c86914d2574308fb23163f29ef01a`で実施した。Actionsログの分類出力は`changed_count=2`、`classification=docs-only`、`run_full_suite=false`、`deploy_required=false`。Environmentsの分類とdocs-check、独立Browser UIの分類とdocs-checkがsuccess。Environments auditの「Confirm intentional docs-only skips」もsuccessし、matrix audit stepは意図どおりskip、audit job自体はsuccess、publishはskipになった。
+
+| docs-only push計測範囲 | 変更前 | 変更後 | 削減率 |
+| --- | ---: | ---: | ---: |
+| Environments jobs（実行/全job） | 7 / 14 | 3 / 8 | job総数42.9% |
+| Environments runner時間 | 3,114秒 | 40秒 | 98.7% |
+| Environments壁時計 | 1,553秒 | 45秒 | 97.1% |
+| push event全workflowのjobs | 9 / 21 | 5 / 16 | job総数23.8% |
+| push event全workflowのrunner時間 | 3,141秒 | 60秒 | 98.1% |
+| push event全workflowの壁時計 | 1,554秒 | 46秒 | 97.0% |
+
+変更後docs-only run一覧:
+
+- Environments [#44894465861](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44894465861): 8 jobs（3実行）、runner 40秒、壁時計45秒、success。`verify`、Browser UI、環境分離、local-onlineはskip。
+- Browser UI [#44894465845](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44894465845): 5 jobs（2実行）、runner 20秒、壁時計11秒、success。verify-buildとBrowser UI matrixはskip。
+- Development Worker bootstrap [#44894465847](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44894465847): 3 jobsすべてskip、runner 0秒。
+
+全workflow job数は実行jobとskip jobを含む。runner時間はskip jobを含めず、Actions jobの開始・完了timestampの合計。壁時計は対象run群で最初の実行job開始から最後の実行job完了まで。並列実行した3 workflowを合わせた比較値は同日・同runner環境の実測であり、他のpushへの保証値ではない。
 
 公開への影響: 実Worker／Pages公開、公開workflow、`DUAL_PAGES_ENABLED`、secrets、branch protection、rulesetsを変更しない。
 
 ## 受入条件（6件）
 
-1. AGENTS.mdのみのpushで重い検証を省略し文書検査を実行 — 条件テスト成功。新しいmarkdown-only pushでActions実動確認を行う。
+1. AGENTS.mdのみのpushで重い検証を省略し文書検査を実行 — `AGENTS.md`の分類テスト成功。markdown-only pushで重いjobのskip、文書検査、audit successをActionsで確認。
 2. コード・CI設定・依存・混在・判定不能で全検証 — 条件テスト成功。通常pushでverify、Chromium/WebKit、環境分離、local-online、auditがsuccess。
 3. 手動公開と公開条件 — `publish=false` full run success、publish skip。`publish=true`の全gate eligible条件はテストで評価し、dispatchも公開もしていない。
 4. required checksの成立 — main/developにbranch protection required contextsなしを確認。通常push・manual全jobでfailure/pendingなし、audit success。
 5. Chromium/WebKit品質ゲート維持 — 4 groups全success、既存matrix監査success。対象範囲・assert・並列設定を削除・緩和していない。
-6. 削減効果を文書化し、意図しない公開なし — docs-only pushの計測・最終公開なし照合待ち。
+6. 削減効果を文書化し、意図しない公開なし — docs-only pushのjob数、runner時間、壁時計、削減率を実測・記録。通常push・manual・docs-onlyでpublish skipを確認。
 
 ## 未確認事項
 
-- docs-only pushのGitHub Actions run、実job数・runner時間・壁時計、削減率。
 - `publish=true`をdispatchした場合の実runは未確認（公開防止のため意図的に未実施）。
 - 組織・上位階層で適用されるルール（APIで取得できるrepository rulesetsは空）。
 - iPhone Safari実機確認（本変更はworkflowのみで、実機操作を伴わない）。
