@@ -352,3 +352,50 @@ Cloudflare管理APIによる独立した再取得と、Durable Objects内部の�
 統合公開では、保存snapshotを検証して `pending` を予約し、現在のrun・attempt・保存commitとの一致をWorker前に確認する。台帳予約から確定まで本番・開発共通の排他制御を適用する。対象環境の公開済みSHA、既存の `pending`、古い候補、競合による予約push失敗はWorker前に停止する。予約後にWorker・Pagesの結果が不明になった場合は予約を保持して後続公開を止める。
 
 関連39件のローカルテストで、本番・開発の新規候補の判定、同一SHA・pending・別attempt・古いSHAの拒否、Git競合、公開条件、旧・新の公開ジョブ名の監査を確認した。Workerはモックを使用した。mainへの反映、Worker・Pages公開は未実施。
+
+## 2026-11-21 本番公開と最終受入判定
+
+### 公開・復旧・自動検証
+
+| 環境 | 確定した公開元SHA | Worker | Pagesの実配信 |
+| --- | --- | --- | --- |
+| 本番 | `0e1185df53cc17ae08cb4be3a105f3b61b9c8528` | GitHub deployment `7961303624`、Cloudflare deployment `46423e39-6070-4684-ac96-02854a199d81`、version `2d9fcb60-6ca9-4171-a1c3-15d578f60045` に100%配信。`/health` はHTTP 200 | 16/16ファイルのSHA-256が保存snapshotと一致。ルートはHTTP 200で `index.html` と一致 |
+| 開発 | `c3a6b6c4eeb72c82b8152ea299511df26e49c435` を維持 | GitHub deployment `7927498780`、Cloudflare deployment `51c274e5-a4e0-4960-9cae-7031a6387076` を維持。`/health` はHTTP 200 | 公開前後で保存ファイルを維持。16/16ファイルのSHA-256が保存snapshotと一致。ルートはHTTP 200で `dev/index.html` と一致 |
+
+GitHub Pages deployment `7961328983` は成功。上表の32ファイルに加え、`environments.json` と本番・開発の `release.json` の3/3件が一致した。確定台帳 `pages-verified` は [`18dfe7274e04cbce49dce729c67149039f4225c6`](https://github.com/ak-sekine/heibon-mahjong/tree/18dfe7274e04cbce49dce729c67149039f4225c6) で `pending=null`。[公開後監査のログ](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44888822486/job/136799934562)
+
+| Actions | 結果 |
+| --- | --- |
+| 必須CI #44884664040・attempt 1 | `main` の確定公開元で成功。単体テスト1,561件、Chromium／WebKit全4グループ、両ブラウザーの環境分離、local-online、matrix auditが成功。通常pushで公開ジョブはSkipped。[CI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44884664040) |
+| 本番公開 #44886709578・attempt 1 | 同じ `main` SHAの全品質ゲート、認証確認、予約、本番Worker、実オンライン検証、Pages、台帳確定が成功。開発WorkerはSkipped。本番Workerでルーム作成・参加・対局開始・打牌同期を確認。[公開run](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44886709578) / [オンライン検証ログ](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44886709578/job/136799322857) |
+| 公開後監査 #44888822486・attempt 1 | 読み取り専用の監査コード `da544975f205bc216b9d7e4b3d1a9e14ba890ead` で実施。確定台帳、実配信35件、両Workerの稼働deploymentを照合し、成功。[監査run](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44888822486) |
+
+先行する本番runでは、認証情報が渡らず予約後にWorkerで停止した。別のrunではWebKitの品質ゲート失敗により公開がSkippedになった。その後のrunではWorker公開後にPagesジョブがSkippedとなり、予約が残った。ユーザーが旧Worker versionへ戻し、旧versionへの100%配信と旧Pagesの35件一致を監査で確認した。予約前と同じGitツリーを履歴を保持した新規コミットで復元し、`pending=null` を確認した。Pagesジョブの実行条件を修正して `main` のCIを通した後に、上記の新版を公開した。[認証失敗](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44839474104) / [品質ゲート失敗](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44856037817) / [Pages Skipped](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44869022035) / [復旧監査](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44884469028) / [台帳復旧コミット](https://github.com/ak-sekine/heibon-mahjong/commit/4ea775f823c0e9bc38561c106278a2ea) / [公開条件の修正](https://github.com/ak-sekine/heibon-mahjong/commit/0e1185df53cc17ae08cb4be3a105f3b61b9c8528)
+
+### iPhone XS Safariの本人報告
+
+報告日は2026-11-21。iOSバージョンと実際の検証開始・終了時刻は未報告。
+
+| 本人確認項目 | 結果 | 報告内容 |
+| --- | --- | --- |
+| 本番PWAの更新 | OK | 既存の本番PWAに「更新あり」が表示された。承認するとPWAが更新され、CPU対局・打牌が正常にできた。以前のルール設定も保持された |
+| 開発版への非干渉 | OK | 本番PWAを更新しても、開発版PWAに更新通知や意図しない再読み込みは発生しなかった |
+| オフライン動作 | OK | 機内モードでWi-Fiもオフにし、本番・開発それぞれをホーム画面アイコンから起動してCPU対局を開始できた |
+
+本人報告の集計は **OK 3件／NG 0件／報告された3項目の未確認0件**。[11月19日の両版の実機確認](#2026-11-19-phase-7実機確認)、[11月20日の開発版更新の実機確認](#2026-11-20-phase-6-b-b7-safari実機確認)、[Chromium／WebKitのCache Storage本文照合](#2026-11-20-phase-6-b-b7-cache-storage本文照合) はそれぞれ別の証拠として扱う。
+
+### 最新のIssue #47受入判定
+
+| 受入条件 | 判定 | 根拠 |
+| --- | --- | --- |
+| 1. 公開成果物の分離と相互の巻き戻り防止 | 達成 | 開発版のみの公開で旧本番版を保持し、今回の本番版のみの公開で開発版を保持。両公開後監査で各16ファイルとメタデータを照合。[開発公開後監査](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44628782826) / [本番公開後監査](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44888822486) |
+| 2. 両URLの表示とPC・iPhone SafariのCPU対局 | 達成 | 最新公開監査で両URLとHTML・CSS・JS・アイコンを照合。PCの両環境は既存実公開E2EのB1および現行CIの環境分離で成功。iPhoneの両環境は11月19日のSafari確認と今回の実機報告でCPU対局を確認。[既存実公開E2E](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44640934294) / [Phase 7実機確認](#2026-11-19-phase-7実機確認) |
+| 3. PWAインストール・更新・オフライン起動の非干渉 | 達成 | 11月19日に両PWAのホーム画面追加・起動を本人確認。11月20日に開発版の実更新を本人確認。今回は本番PWAの更新、開発版への非干渉、両版のオフライン起動を本人確認。Chromium／WebKitの環境分離テストでスコープ・保存状態・別環境タブとの非干渉も確認。[CI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44884664040) |
+| 4. 通常のオンライン対局とWorker・状態・認証の環境分離 | 達成 | 現行本番Workerの実オンライン検証、維持した開発Workerと既存実公開E2EのB2・B3、両Workerの自己bindingと本人確認済みの4つの独立namespaceが根拠。既存E2Eでは接続先、両環境のルーム・対局状態、他環境の認証情報の拒否を確認。[本番オンライン検証](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44886709578/job/136799322857) / [既存実公開E2E](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44640934294) / [Durable Objects実環境確認](#2026-11-19-durable-objects実環境確認) |
+| 5. 単独更新・並行push・CI失敗・再実行の保護 | 達成 | 両方向の単独更新は公開後監査で保持側を確認。並行pushは同じ保存ブランチを起点にした2クライアントのGit競合テストで拒否を確認。CI失敗は実際に公開ジョブがSkippedとなることを確認。同一SHA・古い候補・別attempt・未確定予約は回帰テストで拒否を確認。部分失敗時の復旧は上記実績を参照。[Git競合テスト](../../tests/environment-git-store.test.mjs) / [成果物・再実行テスト](../../tests/environment-artifacts.test.mjs) / [公開ゲート失敗run](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44856037817) |
+| 6. 本番公開ゲート・可用性・公開SHA追跡 | 達成 | 通常pushでは公開されず、手動公開で全ゲートを通過した。実配信とWorkerの正常応答を確認し、両環境のSHAを台帳と公開メタデータで照合。[必須CI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44884664040) / [公開後監査](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44888822486) |
+| 7. ブランチ運用・リリース・ロールバック・未確認項目の文書化 | 達成 | ブランチ方針、公開URLと接続先、更新・昇格・ロールバック、実機確認方法を運用文書に記載。今回の復旧・公開結果と未確認項目は本節に記録。[環境運用](../operations/environments.md) |
+
+作業項目7件も達成。ブランチ／リリース運用と運用文書は受入条件7、開発用ビルドとURLは条件1・2、PWAとブラウザ保存状態の分離は条件3、開発用Workerの分離は条件4、GitHub Actions公開設計は条件1・5・6、ゲートと権限管理は条件5・6と、環境別のSecret参照・ブランチ条件の回帰テストに対応する。[公開Workflowの回帰テスト](../../tests/environment-workflows.test.mjs)
+
+**最終判定は受入条件7/7件達成、Issue #47はClose可。B7はPARTIALを維持。** iPhone内のCache Storage本文と有効なService Workerスクリプトの直接ハッシュ照合、更新前に残っていた旧cache本文の完全照合、実公開更新時の同環境複数タブのブロックと他環境タブが開いていた場合の更新可否の詳細、実環境で競合や障害を意図的に発生させる追加検証は未確認・未実施。キャッシュ本文照合は上記の旧本番・維持開発版を対象とするPC自動検証であり、今回のiPhone内の本文は取得していない。複数タブと競合制御は現行CIおよび回帰テストで確認した範囲を根拠に、実公開や実機での追加条件の再現は必須受入条件に含めないと判定した。通信断・自動再接続・通信異常からの復旧はIssue #61の範囲。[PWA仕様](../SPEC.md#pwa更新通知) / [PWA自動テスト](../../tests/browser-pwa.py) / [環境分離自動テスト](../../tests/browser-environments.py) / [Issue #47](https://github.com/ak-sekine/heibon-mahjong/issues/47) / [Issue #61](https://github.com/ak-sekine/heibon-mahjong/issues/61)

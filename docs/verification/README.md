@@ -1,5 +1,7 @@
 # 検証記録の目次
 
+- [Issue #47 本番公開と最終受入判定](issue-47-environments.md#2026-11-21-本番公開と最終受入判定) — 公開後35件一致、本人のiPhone XS Safari確認3件OK、受入条件7件達成。B7はPARTIAL。
+
 - [Issue #47 B7 Cache Storage本文照合](issue-47-environments.md#2026-11-20-phase-6-b-b7-cache-storage本文照合) — Chromium／WebKitの本番・開発で再読み込み前後に各13/13 URL一致。B7はPARTIAL。
 
 - [Issue #47 Durable Objects実環境確認](issue-47-environments.md#2026-11-19-durable-objects実環境確認) — 本人がCloudflare管理画面で4つの異なるnamespace IDを確認。

@@ -200,6 +200,10 @@ Issue #32のPC実機や#52の方向別実機・focusの残課題とは区別す�
 
 ## Issue #47 環境分離
 
+2026-11-21の最終判定で必須受入条件7件を達成。本番Worker・Pagesの公開後監査で35件のハッシュが一致し、開発版が保持された。本人のiPhone XS Safari確認は、本番PWA更新・開発版への非干渉・両版のオフラインCPU起動が3件ともOK。B7は実機内の直接ハッシュ照合や実更新時の複数タブ等の追加検証が残るためPARTIAL。[最終検証記録](verification/issue-47-environments.md#2026-11-21-本番公開と最終受入判定)
+
+### 検証履歴
+
 2026-11-20の実公開E2Eで、Chromium／WebKitの本番・開発cache本文はタブ再読み込み前後とも各13/13 URL一致。開発版の更新操作はiPhone XS Safariの本人確認でOK 6項目。実機の本文SHA-256、旧cache、実更新時の複数タブ・環境間の挙動などが残るためB7はPARTIAL、Issue #47はOpen。[Cache Storage本文照合](verification/issue-47-environments.md#2026-11-20-phase-6-b-b7-cache-storage本文照合)。
 
 2026-11-19にユーザー本人がCloudflare管理画面で、本番・開発のROOMSとRATE_LIMITERが相互に異なる4つのnamespaceを参照することを確認した。[Durable Objects実環境確認](verification/issue-47-environments.md#2026-11-19-durable-objects実環境確認)。
