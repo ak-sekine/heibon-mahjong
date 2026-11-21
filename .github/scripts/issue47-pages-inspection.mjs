@@ -6,8 +6,11 @@ import { digest, inventory, sha256 } from '../../scripts/environments/pages-live
 const repo = 'ak-sekine/heibon-mahjong';
 assert.equal(process.env.GITHUB_REPOSITORY, repo);
 const main = 'c4baa3be9994fcc6d50d57ed3a7bf3ae998aa2ea';
-const develop = 'dbb1bf9a14b533149a580d928d4aa013ddb36a14';
+const develop = '592e49088e1e5b1823722d6519c80edb432cab15';
 const reservation = '1d538542c75bf0b49f468acb55ad414c35ce0c10';
+const rollbackVersion = '85e9510f-3f21-45c1-b0ff-4a4de66e7749';
+const partialDeployment = 'e951a473-6ec3-452d-9625-1d9ba4c8fbff';
+const originalDeployment = '3b6587ac-79fd-49a8-b6d1-2f77a9022331';
 const base = 'https://ak-sekine.github.io/heibon-mahjong/';
 const previous = JSON.parse(readFileSync('previous/state.json'));
 const staged = JSON.parse(readFileSync('store/state.json'));
@@ -56,15 +59,14 @@ async function worker() {
   const result = await (await get(url, {authorization: `Bearer ${token}`})).json();
   assert.equal(result.success, true);
   const latest = (result.result.deployments ?? result.result)[0];
-  const job = github('actions/jobs/136744875631');
-  assert.equal(job.conclusion, 'success');
-  const step = job.steps.find(step => step.name.includes('deploy-isolated-worker.mjs'));
-  assert.equal(step?.conclusion, 'success');
-  assert(Date.parse(latest.created_on) >= Date.parse(step.started_at) && Date.parse(latest.created_on) <= Date.parse(step.completed_at), 'Cloudflare deployment outside the successful deploy step');
+  assert.notEqual(latest.id, partialDeployment);
+  assert.notEqual(latest.id, originalDeployment);
+  assert(Date.parse(latest.created_on) > Date.parse('2026-11-21T05:26:42.973104Z'), 'Latest production deployment predates the rollback');
   assert.equal(latest.versions.length, 1);
+  assert.equal(latest.versions[0].version_id, rollbackVersion);
   assert.equal(latest.versions[0].percentage, 100);
   for (const id of [latest.id, latest.versions[0].version_id]) assert.match(id, /^[\da-f-]{36}$/i);
-  return {deployment: latest.id, version: latest.versions[0].version_id, createdOn: latest.created_on};
+  return {deployment: latest.id, version: latest.versions[0].version_id, percentage: latest.versions[0].percentage, createdOn: latest.created_on};
 }
 readStableEvidence();
 const before = await worker();
