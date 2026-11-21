@@ -1,5 +1,11 @@
 name: Publish verified environment snapshots
-on: workflow_call
+on:
+  workflow_call:
+    secrets:
+      CLOUDFLARE_PRODUCTION_API_TOKEN:
+        required: true
+      CLOUDFLARE_DEVELOPMENT_API_TOKEN:
+        required: true
 permissions:
   contents: read
 # Hold this lock across the Worker and Pages jobs, including pending finalization.
@@ -7,7 +13,24 @@ concurrency:
   group: pages-publication
   cancel-in-progress: false
 jobs:
+  worker-credentials:
+    if: ${{ github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'worker-production' || 'worker-development' }}
+      deployment: false
+    steps:
+      - name: Check that the selected Worker token is available
+        env:
+          TOKEN_NAME: ${{ github.ref == 'refs/heads/main' && 'CLOUDFLARE_PRODUCTION_API_TOKEN' || 'CLOUDFLARE_DEVELOPMENT_API_TOKEN' }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets[github.ref == 'refs/heads/main' && 'CLOUDFLARE_PRODUCTION_API_TOKEN' || 'CLOUDFLARE_DEVELOPMENT_API_TOKEN'] }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::$TOKEN_NAME is unavailable in the selected Worker environment."
+            exit 1
+          fi
   reserve:
+    needs: worker-credentials
     if: ${{ github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
     runs-on: ubuntu-latest
     permissions:

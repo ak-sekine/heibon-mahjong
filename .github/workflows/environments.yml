@@ -170,3 +170,6 @@ jobs:
       pages: write
       id-token: write
     uses: ./.github/workflows/publish-environments.yml
+    secrets:
+      CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_API_TOKEN }}
+      CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}
