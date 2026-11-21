@@ -606,8 +606,9 @@ async function verifyProvenance(snapshot, context) {
   }
   try {
     result.branchHeads.atStart = await branchHeads(context);
-    if (result.branchHeads.atStart['pages-verified'] !== snapshot.snapshotSha) {
-      throw new AuditError('SNAPSHOT_REF_CHANGED', 'checked-out pages-verified SHA is not the current remote branch head', { checkoutSha: snapshot.snapshotSha, remoteSha: result.branchHeads.atStart['pages-verified'] });
+    const expectedHead = context.reservationSha || snapshot.snapshotSha;
+    if (result.branchHeads.atStart['pages-verified'] !== expectedHead) {
+      throw new AuditError('SNAPSHOT_REF_CHANGED', 'pages-verified does not match the expected branch head', { expectedHead, remoteSha: result.branchHeads.atStart['pages-verified'] });
     }
     if (!context.auditSha || result.branchHeads.atStart.develop !== context.auditSha) {
       throw new AuditError('DEVELOP_REF_CHANGED', 'audit workflow SHA is not the current develop branch head', { auditSha: context.auditSha || null, remoteSha: result.branchHeads.atStart.develop });
@@ -658,6 +659,12 @@ async function verifyProvenance(snapshot, context) {
       (result.failures ||= []).push(failure); context.failures.push(failure);
     }
   }
+  if (!context.reservationSha) await verifyEndHeads(result, context);
+  if (!result.failures?.length) result.outcome = 'SUCCESS';
+  return result;
+}
+
+async function verifyEndHeads(result, context) {
   try {
     result.branchHeads.atEnd = await branchHeads(context);
     for (const branch of ['main', 'develop', 'pages-verified']) {
@@ -669,23 +676,58 @@ async function verifyProvenance(snapshot, context) {
     const failure = { kind: error.kind || 'BRANCH_HEADS_UNAVAILABLE', message: error.message, details: error.details || null };
     (result.failures ||= []).push(failure);
     context.failures.push(failure);
+    result.outcome = 'FAIL';
   }
-  if (!result.failures?.length) result.outcome = 'SUCCESS';
-  return result;
+}
+
+export async function productionWorkerVersion({ accountId, token, deploymentId, versionId, fetchImpl = globalThis.fetch }) {
+  if (!/^[a-f0-9]{32}$/i.test(accountId || '') || !token) {
+    throw new AuditError('CLOUDFLARE_AUTH_MISSING', 'Cloudflare audit credentials are unavailable');
+  }
+  let response;
+  try {
+    response = await fetchImpl(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/heibon-mahjong-online/deployments`, {
+      method: 'GET', headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
+      redirect: 'error', signal: AbortSignal.timeout(20000),
+    });
+  } catch {
+    throw new AuditError('CLOUDFLARE_CONNECTION_FAILED', 'Cloudflare deployment request failed');
+  }
+  if (response.status !== 200) {
+    throw new AuditError('CLOUDFLARE_HTTP_ERROR', `Cloudflare deployment request returned HTTP ${response.status}`);
+  }
+  const payload = await response.json().catch(() => null);
+  const deployments = Array.isArray(payload?.result) ? payload.result : payload?.result?.deployments;
+  const deployment = deployments?.[0];
+  if (payload?.success !== true || !Array.isArray(deployments) || !deployment) {
+    throw new AuditError('CLOUDFLARE_INVALID_RESULT', 'Cloudflare did not return a current deployment');
+  }
+  const versions = deployment.versions;
+  if (deployment.id !== deploymentId || !Array.isArray(versions) || versions.length !== 1 ||
+      versions[0]?.version_id !== versionId || versions[0]?.percentage !== 100) {
+    throw new AuditError('CLOUDFLARE_DEPLOYMENT_CHANGED', 'Production Worker deployment, version or traffic does not match the recorded baseline');
+  }
+  return { deploymentId, versionId, percentage: 100 };
 }
 
 export async function runAudit({
   snapshotRoot, snapshotSha, repository, token, ref = 'refs/heads/develop', auditSha,
   runId = 'local', runAttempt = 1, now = () => new Date(),
   fetchImpl = globalThis.fetch, apiBase = API_BASE, timeoutMs = 20000,
+  reservationSha, workerBaseline,
 }) {
   const report = {
     schemaVersion: 1, outcome: 'FAIL', startedAt: now().toISOString(),
-    audit: { ref, sha: auditSha || null, runId, runAttempt, snapshotSha: snapshotSha || null },
+    audit: { ref, sha: auditSha || null, runId, runAttempt, snapshotSha: snapshotSha || null, ...(reservationSha ? { reservationSha } : {}) },
     targets: {}, provenance: { outcome: 'NOT_CHECKED' }, requests: [], failures: [],
   };
   if (ref !== 'refs/heads/develop') {
     report.failures.push({ kind: 'WRONG_BRANCH', message: 'Phase 6-A audit must be dispatched from develop' });
+    report.finishedAt = now().toISOString();
+    return report;
+  }
+  if (reservationSha && (!SHA_RE.test(reservationSha) || reservationSha === snapshotSha)) {
+    report.failures.push({ kind: 'RESERVATION_REF_INVALID', message: 'Recovery audit needs the reservation head and a separate snapshot SHA' });
     report.finishedAt = now().toISOString();
     return report;
   }
@@ -703,7 +745,7 @@ export async function runAudit({
     development: { sourceSha: snapshot.records.development.release.sha, digest: snapshot.records.development.release.digest, snapshotDigest: snapshot.records.development.record.snapshotDigest, fileCount: Object.keys(snapshot.records.development.release.files).length },
   };
 
-  const context = { fetchImpl, apiBase, repository, token, timeoutMs, report, failures: report.failures, runId, runAttempt, now, auditSha };
+  const context = { fetchImpl, apiBase, repository, token, timeoutMs, report, failures: report.failures, runId, runAttempt, now, auditSha, reservationSha };
   try {
     if (!repository || !/^[^/]+\/[^/]+$/.test(repository) || !token) throw new AuditError('GITHUB_API_AUTH_MISSING', 'read-only GitHub API credentials are unavailable');
     report.provenance = await verifyProvenance(snapshot, context);
@@ -712,6 +754,17 @@ export async function runAudit({
     report.failures.push({ kind: report.provenance.failure.kind, message: report.provenance.failure.message });
   }
 
+  async function verifyWorker(phase) {
+    try {
+      report.productionWorker[phase] = await productionWorkerVersion({ ...workerBaseline, fetchImpl });
+    } catch (error) {
+      report.failures.push({ kind: error.kind || 'CLOUDFLARE_AUDIT_FAILED', message: error.message, phase });
+    }
+  }
+  if (reservationSha) {
+    report.productionWorker = {};
+    await verifyWorker('before');
+  }
   for (const environment of ['production', 'development']) {
     try {
       report.targets[environment] = await verifyEnvironment(environment, snapshot, context);
@@ -722,6 +775,10 @@ export async function runAudit({
       report.targets[environment] = { environment, baseUrl: TARGETS[environment].baseUrl, outcome: 'FAIL', failure: { kind: error.kind || 'LIVE_AUDIT_FAILED', message: error.message, details: error.details || null }, fileCount: 0, hashMatches: 0, hashMismatches: 0, files: [] };
       report.failures.push({ environment, kind: error.kind || 'LIVE_AUDIT_FAILED', message: error.message, details: error.details || null });
     }
+  }
+  if (reservationSha) {
+    await verifyWorker('after');
+    if (report.provenance.branchHeads) await verifyEndHeads(report.provenance, context);
   }
   if (report.failures.length === 0 && report.provenance.outcome === 'SUCCESS' && report.targets.production?.outcome === 'SUCCESS' && report.targets.development?.outcome === 'SUCCESS') {
     report.outcome = 'SUCCESS';
@@ -735,10 +792,16 @@ export function renderSummary(report) {
     '# Issue #47 Phase 6-A public Pages audit', '',
     `- Outcome: **${report.outcome}**`,
     `- Audit ref/SHA: ${report.audit?.ref || 'unknown'} / ${report.audit?.sha || 'unknown'}`,
-    `- pages-verified SHA: ${report.snapshot?.sha || 'unavailable'}`,
-    `- pending: ${report.snapshot?.pending === null ? 'null' : JSON.stringify(report.snapshot?.pending ?? 'unavailable')}`,
+    `- Audited snapshot SHA: ${report.snapshot?.sha || 'unavailable'}`,
+    `- Audited snapshot pending: ${report.snapshot?.pending === null ? 'null' : 'unavailable'}`,
     `- Provenance: ${report.provenance?.outcome || 'not checked'}`,
   ];
+  if (report.audit?.reservationSha) {
+    lines.push(`- Current pages-verified reservation SHA: ${report.audit.reservationSha}`);
+    for (const [phase, worker] of Object.entries(report.productionWorker || {})) {
+      lines.push(`- Cloudflare production Worker ${phase}: deployment ${worker.deploymentId}, version ${worker.versionId} (${worker.percentage}%)`);
+    }
+  }
   for (const env of ['production', 'development']) {
     const result = report.targets?.[env];
     if (!result) { lines.push(`- ${env}: not checked`); continue; }
@@ -762,7 +825,7 @@ export function renderSummary(report) {
   }
   if (report.failures?.length) {
     lines.push('', '## Failures');
-    for (const failure of report.failures) lines.push(`- ${failure.environment ? `${failure.environment}: ` : ''}${failure.kind}: ${failure.message}`);
+    for (const failure of report.failures) lines.push(`- ${failure.environment || failure.phase ? `${failure.environment || failure.phase}: ` : ''}${failure.kind}: ${failure.message}`);
   }
   lines.push('', 'Cache handling: unique query per run plus no-store/no-cache request headers; response Age/cache headers are recorded. Redirects are not followed.');
   return `${lines.join('\n')}\n`;
@@ -773,6 +836,11 @@ async function cli() {
   const report = await runAudit({
     snapshotRoot: process.env.SNAPSHOT_ROOT || 'pages-verified',
     snapshotSha: process.env.SNAPSHOT_SHA,
+    reservationSha: process.env.AUDIT_RESERVATION_SHA || undefined,
+    workerBaseline: {
+      accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN,
+      deploymentId: process.env.WORKER_BASELINE_DEPLOYMENT, versionId: process.env.WORKER_BASELINE_VERSION,
+    },
     repository: process.env.GITHUB_REPOSITORY,
     token: process.env.GH_TOKEN,
     ref: process.env.GITHUB_REF,

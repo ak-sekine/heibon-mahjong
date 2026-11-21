@@ -432,13 +432,59 @@ test('moving a protected branch during the audit is recorded as a failure', asyn
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('recovery audit proves the production deployment and sole version are unchanged across the Pages reads', async () => {
+  const root = setup();
+  const baseline = { accountId: 'a'.repeat(32), token: 'fixture-token', deploymentId: 'prior-deployment', versionId: 'prior-version' };
+  const ordinaryFetch = mockFetch(root);
+  const head = 'c'.repeat(40);
+  let workerChecks = 0;
+  let pagesRead = false;
+  let changed = false;
+  const fetchImpl = (input, options) => {
+    const url = new URL(input);
+    if (url.hostname === 'api.cloudflare.com') {
+      assert.equal(url.pathname, `/client/v4/accounts/${baseline.accountId}/workers/scripts/heibon-mahjong-online/deployments`);
+      assert.equal(options.method, 'GET');
+      assert.equal(options.redirect, 'error');
+      assert.equal(options.headers.authorization, 'Bearer fixture-token');
+      assert.equal(pagesRead, workerChecks === 1);
+      workerChecks += 1;
+      return Promise.resolve(Response.json({ success: true, result: { deployments: [{
+        id: changed && pagesRead ? 'unexpected' : baseline.deploymentId,
+        versions: [{ version_id: baseline.versionId, percentage: 100 }],
+      }] } }));
+    }
+    if (url.hostname === 'ak-sekine.github.io') pagesRead = true;
+    return ordinaryFetch(input, options);
+  };
+  try {
+    const options = args(root, fetchImpl, { snapshotSha: '1'.repeat(40), reservationSha: head, workerBaseline: baseline });
+    const report = await runAudit(options);
+    assert.equal(report.outcome, 'SUCCESS');
+    assert.equal(workerChecks, 2);
+    assert.deepEqual(report.productionWorker.before, report.productionWorker.after);
+    assert.doesNotMatch(JSON.stringify(report), /fixture-token/);
+    assert.equal(report.provenance.branchHeads.atEnd['pages-verified'], head);
+    changed = true;
+    workerChecks = 0;
+    pagesRead = false;
+    const failed = await runAudit(options);
+    assert.equal(failed.outcome, 'FAIL');
+    assert.ok(failed.failures.some(failure => failure.kind === 'CLOUDFLARE_DEPLOYMENT_CHANGED' && failure.phase === 'after'));
+    assert.equal(failed.targets.production.hashMatches, 16);
+    assert.equal(failed.targets.development.hashMatches, 16);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('manual workflow has read-only GITHUB_TOKEN permissions and no publication or deploy step', () => {
   const workflow = readFileSync(new URL('../.github/workflows/issue47-phase6a-live-audit.yml', import.meta.url), 'utf8');
   assert.match(workflow, /^on:\n  workflow_dispatch:/m);
   assert.match(workflow, /contents: read/);
   assert.match(workflow, /actions: read/);
   assert.match(workflow, /deployments: read/);
-  assert.doesNotMatch(workflow, /contents: write|actions: write|deployments: write|pages: write|id-token: write|CLOUDFLARE|wrangler deploy|actions\/deploy-pages/);
+  assert.doesNotMatch(workflow, /contents: write|actions: write|deployments: write|pages: write|id-token: write|wrangler deploy|actions\/deploy-pages|environment:/);
+  assert.match(workflow, /audit_failed_reservation:[\s\S]*?default: false/);
+  assert.match(workflow, /inputs\.audit_failed_reservation && secrets\.CLOUDFLARE_API_TOKEN/);
   assert.doesNotMatch(workflow, /^  push:/m);
   assert.match(workflow, /if: \$\{\{ always\(\) \}\}/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
