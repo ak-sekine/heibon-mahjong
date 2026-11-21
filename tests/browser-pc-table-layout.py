@@ -107,6 +107,36 @@ def assert_same_table(expected, actual, label):
     )), f'{label}: table position or size changed: expected={expected}, actual={actual}'
 
 
+def confirm_local_discard(page, activate, label, expect_cpu_call=False):
+    # Keep the selected physical ID inside the page. An immediate CPU call may
+    # consume the tile from the river before the discard is ever rendered there.
+    before = page.evaluate_handle('''() => {
+      const c = pcResponsiveApp.controller;
+      const player = c.game.players[c.playerSeat];
+      return {seat: c.playerSeat, tileId: c.selectedTileId,
+        canConfirm: c.canConfirm && [...player.hand, player.drawnTile].some(tile => tile && tile.id === c.selectedTileId),
+        count: (player.discardHistory ?? player.river).length};
+    }''')
+    try:
+        assert before.evaluate('state => state.canConfirm'), f'{label}: selected tile was not confirmable'
+        activate()
+        page.wait_for_function('''expected => {
+          const c = pcResponsiveApp.controller;
+          const player = c.game.players[expected.seat];
+          const history = player.discardHistory ?? player.river;
+          return c.playerSeat === expected.seat && history.length === expected.count + 1 &&
+            history.at(-1)?.id === expected.tileId &&
+            ![...player.hand, player.drawnTile].some(tile => tile?.id === expected.tileId);
+        }''', arg=before)
+        if expect_cpu_call:
+            assert before.evaluate('''expected => pcResponsiveApp.controller.game.players.some(player =>
+              player.control === 'cpu' && player.melds.some(meld =>
+                meld.type !== 'ankan' && meld.fromPlayerId === expected.seat &&
+                meld.tiles.some(tile => tile.id === expected.tileId)))'''), f'{label}: CPU did not call the selected discard'
+    finally:
+        before.dispose()
+
+
 with sync_playwright() as p:
     browser = getattr(p, ENGINE).launch()
     for width, height in VIEWPORTS:
@@ -129,6 +159,14 @@ window.pcLoadCalls=()=>{
 };
 window.pcMakeDrawMatch=()=>startMatch(fixedRound(0,[0,2]));
 window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMatch();render();};
+window.pcLoadKeyboardCall=()=>{
+  controller.newGame();
+  controller.match=startMatch(callStart(0,{
+    0:['22z','33z','44z','55z','6z','7777z'],
+    1:['11z','22z','33z','44z','55z','666z']
+  },'man-1'));
+  render();
+};
 """
             route.fulfill(response=response, body=fixed_seat_fixture(source))
         page.route('**/src/main.ts', expose_app)
@@ -201,12 +239,16 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
         hand_tile.click()
         discard=page.locator('#discard')
         assert discard.is_visible(), f'{width}x{height}: mouse tile selection did not enable discard'
-        before_mouse=page.evaluate('''()=>pcResponsiveApp.controller.game.players[pcResponsiveApp.controller.playerSeat].river.length''')
         assert page.evaluate('document.scrollingElement.scrollTop') <= 1, f'{width}x{height}: mouse flow required scrolling before discard'
-        discard.click()
-        page.wait_for_function('''previous=>pcResponsiveApp.controller.game.players[pcResponsiveApp.controller.playerSeat].river.length>previous''', arg=before_mouse)
+        confirm_local_discard(page, discard.click, f'{width}x{height} mouse')
 
-        page.evaluate('''()=>{pcResponsiveApp.controller.random=()=>.999999;pcResponsiveApp.controller.newGame()}''')
+        # At the viewport that timed out, verify a legal keyboard discard
+        # that leaves the river immediately via a CPU call.
+        keyboard_call = (width, height) == (1440, 900)
+        if keyboard_call:
+            page.evaluate('pcLoadKeyboardCall()')
+        else:
+            page.evaluate('''()=>{pcResponsiveApp.controller.random=()=>.999999;pcResponsiveApp.controller.newGame()}''')
         keyboard_tile=page.locator('#player-hand button:enabled').nth(1)
         keyboard_tile.focus()
         keyboard_tile.press('Enter')
@@ -219,9 +261,8 @@ window.pcShowDrawResult=()=>{controller.newGame();controller.match=pcMakeDrawMat
                 focused_discard=True
                 break
         assert focused_discard, f'{width}x{height}: Tab did not reach the discard button'
-        before_keyboard=page.evaluate('''()=>pcResponsiveApp.controller.game.players[pcResponsiveApp.controller.playerSeat].river.length''')
-        page.keyboard.press('Space')
-        page.wait_for_function('''previous=>pcResponsiveApp.controller.game.players[pcResponsiveApp.controller.playerSeat].river.length>previous''', arg=before_keyboard)
+        confirm_local_discard(page, lambda: page.keyboard.press('Space'), f'{width}x{height} keyboard',
+                              expect_cpu_call=keyboard_call)
         assert page.evaluate('document.scrollingElement.scrollTop') <= 1, f'{width}x{height}: keyboard flow unexpectedly scrolled the page'
 
         normal_board = page.locator('#local-table').bounding_box()
