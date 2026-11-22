@@ -239,3 +239,42 @@ gh workflow run browser-ui.yml --ref main \
   -f diagnostic_mode=scenarios -f diagnostic_browser=webkit \
   -f diagnostic_scenarios=browser-candidate-geometry-webkit-candidate-baseline-1
 ```
+
+### Local verification
+
+- Selection tests passed 20/20. They cover classification, required coverage, group membership, exact IDs, baseline exclusion, and invalid types of selection. The workflow's validation shell block passed nine direct tests covering valid one- and two-engine selections and rejection of empty, malformed, unknown, or mismatched input.
+- `npm test` passed 1563/1563. The Issue #57 classifier test now evaluates the actual matrix axes for push, pull request, reusable calls, default manual runs, and diagnostic modes. The existing matrix audit tests still cover missing, duplicate, failed, cancelled, and skipped legs.
+- The itch startup tests passed 13/13. Worker type checking and the standard, development, and itch builds passed. The latter two used the same validation URLs as the workflow defaults. Actionlint passed for Browser UI, Environments, and Deploy. `git diff --check` passed.
+
+### GitHub Actions on main
+
+The integration commit was fast-forwarded to main as `2333c166c4ee15423443261b2db2c3ba1283355e`. In the first [Environments run](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44978394935), WebKit Group 2 stopped at `browser-pwa-webkit` after the existing human-discard wait timed out. It had completed only `browser-create-dialog-layout-webkit` before that failure. The failed test line and its group assignment were already present on main. The runner log identifies the wait that expired. It does not capture the exact deal or game state that led to it.
+
+The follow-up `a3a4eeabdef611a8e59b8ee54aa2e61882517ac2` applies only the test fixture from develop commit [07e26e1](https://github.com/ak-sekine/heibon-mahjong/commit/07e26e14ad8c8fb72dd7908fc77eefa3e67910d9). It fixes the random seating dependency so the human opens the round in the PWA layout test. The existing wait, assertions, update recovery checks, and game code are unchanged. `python -m py_compile tests/browser-pwa.py` and `git diff --check` passed for the follow-up. The fixture is the only code difference between the two main verification SHAs.
+
+The initial full-suite runner logs matched all 15 Chromium Group 1, 30 Chromium Group 2, and 9 WebKit Group 1 IDs. WebKit Group 2 recorded one success and one timeout before stopping with 24 scenarios unrun. The matrix audit failed with `expected success, found failure` for WebKit Group 2, and publication was skipped. The initial [single-ID diagnostic](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44978416764) and [multi-ID diagnostic](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44978418919) succeeded for their selected IDs. Their diagnostic job names and results were independent of the failed required gate. The initial [Chromium baseline](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44978413305) and [WebKit baseline](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44978415003) also passed with only the selected baseline ID and all 13 viewports. Their logged scenario times were 17m37.331s and 20m23.169s.
+
+#### Required suite on `a3a4eeabdef611a8e59b8ee54aa2e61882517ac2`
+
+[Environments run 44979272637](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44979272637) succeeded. The ordered start and timing notices matched the manifest for every group. All 80 IDs were distinct and successful, with zero timeouts and no baseline IDs among the executed scenarios.
+
+| Group | Required successes | Scenario time sum | Job elapsed | Actions job |
+| --- | ---: | ---: | ---: | --- |
+| Chromium Group 1 | 15/15 | 8m24.929s | 9m12s | [137076326302](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44979272637/job/137076326302) |
+| Chromium Group 2 | 30/30 | 6m22.863s | 7m25s | [137076326277](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44979272637/job/137076326277) |
+| WebKit Group 1 | 9/9 | 5m22.302s | 6m49s | [137076326330](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44979272637/job/137076326330) |
+| WebKit Group 2 | 26/26 | 5m47.947s | 7m18s | [137076326326](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44979272637/job/137076326326) |
+| Matrix audit | Success | | | [137078505557](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44979272637/job/137078505557) |
+
+The run took 10m59s from creation to conclusion, with 34m46s summed elapsed time across successful jobs. Both environment isolation legs and local online verification passed. Both Group 2 jobs passed the before and after itch smoke and its forced-failure diagnostics. The four result artifacts were registered with IDs `14737222286`, `14737103762`, `14736749633`, and `14737351665` in table order. The publication job was skipped. The legacy Deploy workflow was already disabled, and the main Environments publication conditions and the Issue #47 live audit workflow were unchanged.
+
+#### Exact-ID diagnostics on `a3a4eeabdef611a8e59b8ee54aa2e61882517ac2`
+
+- [Single regular ID](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44979297105) passed and executed only `browser-app-idle-chromium` (4.030s).
+- [Multiple IDs with both engines](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44979299505) passed. Chromium executed only `browser-online-waiting-room-chromium-online-next-round-only-1` (2.000s) and `browser-online-waiting-room-chromium-online-rematch-multi-client-only-1` (17.851s). WebKit executed only `browser-app-idle-webkit` (8.457s).
+- [Chromium Geometry baseline](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44979292924) passed. It executed only `browser-candidate-geometry-chromium-candidate-baseline-1` (21m25.921s).
+- [WebKit Geometry baseline](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44979295054) passed. It executed only `browser-candidate-geometry-webkit-candidate-baseline-1` (21m31.785s).
+
+Each baseline log recorded all 13 viewports and a dedicated baseline report path. The baseline result archives and candidate reviews were registered. The diagnostics skipped the itch build and itch smoke, and their result job names differ from the four names required by the matrix audit.
+
+Artifact registration, job and step conclusions, and scenario logs were verified. Artifact ZIP contents and a new production live E2E execution were outside these checks. The Environments isolation and local-online jobs, existing gates, and prior Issue #47 live evidence cover the compatibility review. No production publication was requested or executed. Issue #58 can be closed based on the required suite, audit, diagnostics, and this record. The Issue remains open.
