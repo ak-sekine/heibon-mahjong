@@ -1,10 +1,9 @@
 import { appendFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { checkPublication } from './publication-reservation.mjs';
+import { checkPublication, publicationIdentity } from './publication-reservation.mjs';
 const env = process.argv[2];
 if (!['production', 'development'].includes(env)) throw new Error('Invalid environment');
-const branch = env === 'production' ? 'main' : 'develop';
-if (process.env.GITHUB_REF !== 'refs/heads/' + branch) throw new Error('Wrong deployment branch');
+if (publicationIdentity(process.env).environment !== env) throw new Error('Wrong deployment branch');
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID || !process.env.EXPECTED_WORKER_URL) throw new Error('Missing explicit deployment configuration');
 const name = env === 'production' ? 'heibon-mahjong-online' : 'heibon-mahjong-online-dev';
 const expected = process.env.EXPECTED_WORKER_URL;

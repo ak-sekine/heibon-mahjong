@@ -1,5 +1,7 @@
 # 開発Workerの初回作成（Issue #47）
 
+> この手順はIssue #47の初回作成・検査用です。Issue #64の通常開発公開は[環境運用](environments.md)を参照してください。旧経路を停止するまでは個別承認条件を適用します。
+
 ## 実行経路と承認
 
 mainに新しいworkflowを置かず、developのpushイベントで独立した

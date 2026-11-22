@@ -107,6 +107,10 @@ export function stage(store, candidate, latestSha, expectedWorkerUrl, reservatio
   } else rmSync(target, { recursive: true, force: true });
   cpSync(candidate, target, { recursive: true, errorOnExist: true });
   const current = { ...previous, [environment]: { sha: release.sha, digest: release.digest, workerUrl: release.workerUrl, snapshotDigest: digest(inventory(candidate)) } };
+  if (reservation?.sourceRef) {
+    const { sourceRef, workflowRef, workflowSha, baseSha, runId, attempt } = reservation;
+    current[environment].publication = { sourceRef, workflowRef, workflowSha, baseSha, runId, attempt };
+  }
   writeFileSync(path.join(site, 'environments.json'), JSON.stringify(current, null, 2) + '\n');
   const pending = { environment, sha: release.sha, previous, current, siteDigest: digest(inventory(site)) };
   if (reservation) pending.reservation = { runId: reservation.runId, attempt: reservation.attempt };

@@ -1,3 +1,4 @@
+import { isIssueRef } from './issue-ref.mjs';
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -290,18 +291,30 @@ function workflowPathMatches(runPath, expectedPath) {
   return typeof runPath === 'string' && (runPath === expectedPath || runPath.startsWith(`${expectedPath}@`));
 }
 
-async function releaseRun(environment, sourceSha, context, pagesLink) {
-  const branch = environment === 'development' ? 'develop' : 'main';
+async function releaseRun(environment, saved, context, pagesLink) {
+  const sourceSha = saved.sha;
+  const publication = saved.publication;
+  if (publication && (environment !== 'development' || !isIssueRef(publication.sourceRef) ||
+      publication.workflowSha !== sourceSha || !SHA_RE.test(publication.baseSha || '') ||
+      publication.workflowRef !== `${context.repository}/${WORKFLOW_PATHS.environments}@${publication.sourceRef}` ||
+      !/^[1-9][0-9]*$/.test(publication.runId) || !/^[1-9][0-9]*$/.test(publication.attempt))) {
+    throw new AuditError('SNAPSHOT_INVALID', 'invalid saved Issue publication identity');
+  }
+  const branch = publication ? publication.sourceRef.slice('refs/heads/'.length)
+    : environment === 'development' ? 'develop' : 'main';
   const runsUrl = `${context.apiBase}/repos/${context.repository}/actions/runs`;
   const query = new URLSearchParams({ branch, head_sha: sourceSha, per_page: '100' });
-  const response = await apiJson(pagesLink ? `${runsUrl}/${pagesLink.runId}` : `${runsUrl}?${query}`, {
+  const runId = pagesLink?.runId || publication?.runId;
+  const response = await apiJson(runId ? `${runsUrl}/${runId}` : `${runsUrl}?${query}`, {
     ...context, label: `${environment} publication workflow runs`,
   });
-  if (!pagesLink && !Array.isArray(response?.workflow_runs)) {
+  if (!runId && !Array.isArray(response?.workflow_runs)) {
     throw new AuditError('GITHUB_API_INVALID_DATA', `${environment} workflow runs response is invalid`);
   }
-  const runs = (pagesLink ? [response] : response.workflow_runs).filter(run => {
+  const runs = (runId ? [response] : response.workflow_runs).filter(run => {
     if (run?.head_sha !== sourceSha || run.head_branch !== branch || run.conclusion !== 'success') return false;
+    if (publication && (String(run.id) !== publication.runId || String(run.run_attempt) !== publication.attempt ||
+        run.head_repository?.full_name !== context.repository || run.status !== 'completed')) return false;
     if (pagesLink && (run.id !== pagesLink.runId || run.status !== 'completed' ||
         !Number.isSafeInteger(run.run_attempt) || run.run_attempt < 1)) return false;
     if (environment === 'production' && workflowPathMatches(run.path, WORKFLOW_PATHS.legacyProduction)) return true;
@@ -309,7 +322,15 @@ async function releaseRun(environment, sourceSha, context, pagesLink) {
   });
   const run = runs.sort((a, b) => Date.parse(b.updated_at || b.created_at) - Date.parse(a.updated_at || a.created_at))[0];
   if (!run) throw new AuditError('PUBLICATION_RUN_NOT_FOUND', `successful ${branch} publication run not found for ${sourceSha}`, pagesLink);
-  const attemptPath = pagesLink ? `/attempts/${run.run_attempt}` : '';
+  if (publication) {
+    const retained = await apiJson(`${context.apiBase}/repos/${context.repository}/git/ref/tags/verified/development/${sourceSha}`, {
+      ...context, label: 'retained Issue publication commit',
+    });
+    if (retained?.object?.type !== 'commit' || retained.object.sha !== sourceSha) {
+      throw new AuditError('PUBLICATION_REF_MISMATCH', 'retained Issue publication commit differs from the saved SHA');
+    }
+  }
+  const attemptPath = runId ? `/attempts/${run.run_attempt}` : '';
   const jobsResponse = await apiJson(`${runsUrl}/${run.id}${attemptPath}/jobs?per_page=100`, {
     ...context, label: `${environment} publication run ${run.id} jobs`,
   });
@@ -367,11 +388,13 @@ function ensureRunWindow(deployment, run) {
   }
 }
 
-async function verifyPagesDeployment(deployment, sourceShas, context) {
-  const environment = { main: 'production', develop: 'development' }[deployment.ref];
-  if (!Object.hasOwn(sourceShas, environment) || deployment.sha !== sourceShas[environment]) {
+async function verifyPagesDeployment(deployment, sources, context) {
+  const branch = deployment.ref?.replace(/^refs\/heads\//, '');
+  const developmentBranch = sources.development.publication?.sourceRef?.slice('refs/heads/'.length) ?? 'develop';
+  const environment = branch === 'main' ? 'production' : branch === developmentBranch ? 'development' : null;
+  if (!environment || deployment.sha !== sources[environment].sha) {
     throw new AuditError('DEPLOYMENT_SHA_MISMATCH', 'latest github-pages deployment does not match the saved source SHA for its ref', {
-      ref: deployment.ref || null, sha: deployment.sha, expectedSha: sourceShas[environment] || null,
+      ref: deployment.ref || null, sha: deployment.sha, expectedSha: sources[environment]?.sha || null,
     });
   }
   const link = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/actions\/runs\/([1-9]\d*)\/job\/([1-9]\d*)$/.exec(deployment.logUrl || '');
@@ -380,7 +403,7 @@ async function verifyPagesDeployment(deployment, sourceShas, context) {
   if (link?.[1] !== context.repository || !Number.isSafeInteger(runId) || !Number.isSafeInteger(jobId)) {
     throw new AuditError('DEPLOYMENT_RUN_LINK_INVALID', 'latest github-pages status has no Actions job URL for this repository', { deploymentId: deployment.id });
   }
-  const run = await releaseRun(environment, sourceShas[environment], context, { runId, jobId });
+  const run = await releaseRun(environment, sources[environment], context, { runId, jobId });
   // GitHub creates the environment deployment before the job starts (including any approval wait).
   const times = [run.createdAt, deployment.createdAt, run.pagesJob.completedAt, run.updatedAt].map(value => Date.parse(value || ''));
   if (!times.every(Number.isFinite) || times.some((time, index) => index > 0 && time < times[index - 1])) {
@@ -621,7 +644,7 @@ async function verifyEnvironment(environment, snapshot, context) {
 
 async function branchHeads(context) {
   const result = {};
-  for (const branch of ['main', 'develop', 'pages-verified']) {
+  for (const branch of new Set(['main', context.ref.slice('refs/heads/'.length), 'pages-verified'])) {
     const commit = await apiJson(`${context.apiBase}/repos/${context.repository}/commits/${branch}`, {
       ...context, label: `${branch} branch head`,
     });
@@ -636,11 +659,12 @@ async function verifyProvenance(snapshot, context) {
     outcome: 'FAIL', runs: {}, deployments: {}, branchHeads: {},
     deploymentEnvironments: { productionWorker: null, developmentWorker: 'worker-development', pages: 'github-pages' },
   };
-  const productionSha = snapshot.records.production.release.sha;
-  const developmentSha = snapshot.records.development.release.sha;
+  const sources = snapshot.state.current;
+  const productionSha = sources.production.sha;
+  const developmentSha = sources.development.sha;
   const runChecks = [
-    ['production', () => releaseRun('production', productionSha, context)],
-    ['development', () => releaseRun('development', developmentSha, context)],
+    ['production', () => releaseRun('production', sources.production, context)],
+    ['development', () => releaseRun('development', sources.development, context)],
   ];
   async function capture(collection, name, check) {
     try { result[collection][name] = await check(); }
@@ -655,8 +679,10 @@ async function verifyProvenance(snapshot, context) {
     if (result.branchHeads.atStart['pages-verified'] !== snapshot.snapshotSha) {
       throw new AuditError('SNAPSHOT_REF_CHANGED', 'checked-out pages-verified SHA is not the current remote branch head', { checkoutSha: snapshot.snapshotSha, remoteSha: result.branchHeads.atStart['pages-verified'] });
     }
-    if (!context.auditSha || result.branchHeads.atStart.develop !== context.auditSha) {
-      throw new AuditError('DEVELOP_REF_CHANGED', 'audit workflow SHA is not the current develop branch head', { auditSha: context.auditSha || null, remoteSha: result.branchHeads.atStart.develop });
+    const branch = context.ref.slice('refs/heads/'.length);
+    if (!context.auditSha || result.branchHeads.atStart[branch] !== context.auditSha) {
+      throw new AuditError(branch === 'develop' ? 'DEVELOP_REF_CHANGED' : 'AUDIT_REF_CHANGED',
+        'audit workflow SHA is not the current branch head', { auditSha: context.auditSha || null, remoteSha: result.branchHeads.atStart[branch] });
     }
   } catch (error) {
     const failure = { kind: error.kind || 'BRANCH_HEADS_UNAVAILABLE', message: error.message, details: error.details || null };
@@ -668,7 +694,7 @@ async function verifyProvenance(snapshot, context) {
   let linkedPublication;
   if (result.deployments.pages) {
     await capture('runs', 'pages', async () => {
-      linkedPublication = await verifyPagesDeployment(result.deployments.pages, { production: productionSha, development: developmentSha }, context);
+      linkedPublication = await verifyPagesDeployment(result.deployments.pages, sources, context);
       return { environment: linkedPublication.environment, runId: linkedPublication.run.id, jobId: linkedPublication.run.pagesJob.id };
     });
   }
@@ -714,7 +740,7 @@ async function verifyProvenance(snapshot, context) {
 async function verifyEndHeads(result, context) {
   try {
     result.branchHeads.atEnd = await branchHeads(context);
-    for (const branch of ['main', 'develop', 'pages-verified']) {
+    for (const branch of new Set(['main', context.ref.slice('refs/heads/'.length), 'pages-verified'])) {
       if (result.branchHeads.atStart?.[branch] && result.branchHeads.atStart[branch] !== result.branchHeads.atEnd[branch]) {
         throw new AuditError('REMOTE_REF_CHANGED', `${branch} changed while the live audit was running`, { before: result.branchHeads.atStart[branch], after: result.branchHeads.atEnd[branch] });
       }
@@ -737,8 +763,8 @@ export async function runAudit({
     audit: { ref, sha: auditSha || null, runId, runAttempt, snapshotSha: snapshotSha || null },
     targets: {}, provenance: { outcome: 'NOT_CHECKED' }, requests: [], failures: [],
   };
-  if (ref !== 'refs/heads/develop') {
-    report.failures.push({ kind: 'WRONG_BRANCH', message: 'Phase 6-A audit must be dispatched from develop' });
+  if (!['refs/heads/main', 'refs/heads/develop'].includes(ref) && !isIssueRef(ref)) {
+    report.failures.push({ kind: 'WRONG_BRANCH', message: 'Phase 6-A audit must be dispatched from main, legacy develop or an Issue branch' });
     report.finishedAt = now().toISOString();
     return report;
   }
@@ -756,7 +782,7 @@ export async function runAudit({
     development: { sourceSha: snapshot.records.development.release.sha, digest: snapshot.records.development.release.digest, snapshotDigest: snapshot.records.development.record.snapshotDigest, fileCount: Object.keys(snapshot.records.development.release.files).length },
   };
 
-  const context = { fetchImpl, apiBase, repository, token, timeoutMs, report, failures: report.failures, runId, runAttempt, now, auditSha };
+  const context = { fetchImpl, apiBase, repository, token, timeoutMs, report, failures: report.failures, runId, runAttempt, now, auditSha, ref };
   try {
     if (!repository || !/^[^/]+\/[^/]+$/.test(repository) || !token) throw new AuditError('GITHUB_API_AUTH_MISSING', 'read-only GitHub API credentials are unavailable');
     report.provenance = await verifyProvenance(snapshot, context);
@@ -809,8 +835,8 @@ export function renderSummary(report) {
   }
   if (report.provenance?.branchHeads?.atStart) {
     const heads = report.provenance.branchHeads;
-    lines.push(`- Remote heads at audit: main ${heads.atStart.main}; develop ${heads.atStart.develop}; pages-verified ${heads.atStart['pages-verified']}`);
-    lines.push(`- Remote refs stable through audit: ${heads.atEnd ? ['main', 'develop', 'pages-verified'].every(branch => heads.atStart[branch] === heads.atEnd[branch]) : 'unconfirmed'}`);
+    lines.push(`- Remote heads at audit: ${Object.entries(heads.atStart).map(([branch, sha]) => branch + ' ' + sha).join('; ')}`);
+    lines.push(`- Remote refs stable through audit: ${heads.atEnd ? Object.keys(heads.atStart).every(branch => heads.atStart[branch] === heads.atEnd[branch]) : 'unconfirmed'}`);
   }
   if (report.provenance?.deployments) {
     for (const [key, deployment] of Object.entries(report.provenance.deployments)) lines.push(`- ${key} deployment: ${deployment.id} (${deployment.sha}, ${deployment.status})`);

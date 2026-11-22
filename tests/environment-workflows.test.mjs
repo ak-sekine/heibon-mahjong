@@ -3,6 +3,7 @@ import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
+import { hasRequiredIssueJobs } from '../.github/scripts/check-issue-publication-ci.mjs';
 import { publicationMode } from '../.github/scripts/validate-publication-mode.mjs';
 import { classifyChanges } from '../.github/scripts/classify-changes.mjs';
 const read = name => readFileSync(new URL('../' + name, import.meta.url), 'utf8');
@@ -29,13 +30,14 @@ function jobCondition(workflow, id) {
   assert.match(expression, /^\$\{\{[\s\S]*\}\}$/);
   return expression.slice(3, -2).trim();
 }
-function workflowContext({ branch = 'develop', ref = `refs/heads/${branch}`, event = 'workflow_dispatch', publish = true, dualPages = 'true', canceled = false, results = {}, fullSuite = 'true' } = {}) {
+function workflowContext({ branch = 'develop', repository = 'ak-sekine/heibon-mahjong', ref = `refs/heads/${branch}`, event = 'workflow_dispatch', publish = true, dualPages = 'true', canceled = false, results = {}, fullSuite = 'true' } = {}) {
   const jobResults = {
     'classify-changes': 'success', 'docs-check': 'success', verify: 'success', 'browser-ui': 'success', 'isolation-browser': 'success',
     'local-online': 'success', audit: 'success', ...results,
   };
   return {
-    github: { ref, event_name: event },
+    github: { ref, event_name: event, repository },
+    startsWith: (value, prefix) => value.startsWith(prefix),
     inputs: { publish },
     vars: { DUAL_PAGES_ENABLED: dualPages },
     needs: Object.fromEntries(Object.entries(jobResults).map(([name, result]) => [name, {
@@ -141,8 +143,10 @@ test('publisher forwards only the two declared Worker secrets and checks the sel
     return runInNewContext(expression, context, { timeout: 100 });
   };
   const names = ['CLOUDFLARE_PRODUCTION_API_TOKEN', 'CLOUDFLARE_DEVELOPMENT_API_TOKEN'];
-  assert.deepEqual(callerSecrets.trim().split('\n').map(line => line.trim()), names.map(name =>
-    name + ': ${{ secrets.' + name + ' }}'));
+  assert.deepEqual(callerSecrets.trim().split('\n').map(line => line.trim()), [
+    "CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_PRODUCTION_API_TOKEN || '' }}",
+    'CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}',
+  ]);
 
   for (const [branch, environment, name] of [
     ['main', 'worker-production', names[0]],
@@ -236,6 +240,13 @@ test('new publication remains manual and branch scoped; legacy production gate i
     }
   }
 
+  const issue = workflowContext({ branch: 'issue/64-main-github-flow' });
+  assert.equal(evaluateJobCondition(condition, issue, []), true);
+  assert.equal(evaluateJobCondition(jobCondition(publisher, 'worker-development'), issue, []), true);
+  assert.equal(evaluateJobCondition(jobCondition(publisher, 'worker-production'), issue, []), false);
+  for (const overrides of [{ event: 'push' }, { publish: false }, { repository: 'other/fork' }, { ref: 'refs/tags/issue/64-main-github-flow' }]) {
+    assert.equal(evaluateJobCondition(condition, workflowContext({ branch: 'issue/64-main-github-flow', ...overrides }), []), false);
+  }
   const legacy = read('.github/workflows/deploy.yml');
   assert.match(legacy, /group: production-deploy[\s\S]*?cancel-in-progress: false/);
   assert.match(legacy, /if: \$\{\{ vars\.DUAL_PAGES_ENABLED != 'true' \}\}/);
@@ -335,4 +346,29 @@ test('environment workflow reuses safe change classification and reserves light 
     assert.equal(evaluateJobCondition(jobCondition(workflow, 'publish'), context, gateResults), publish,
       `${event} publish=${publish}: publish outcome`);
   }
+});
+
+test('Issue publish requires full push CI and keeps live E2E and special reservation audit out of publication', () => {
+  const jobs = [
+    'classify-changes', 'docs-check', 'verify', 'local-online', 'audit',
+    'isolation-browser (chromium)', 'isolation-browser (webkit)',
+    'browser-ui / browser-ui (chromium, group 1)', 'browser-ui / browser-ui (chromium, group 2)',
+    'browser-ui / browser-ui (webkit, group 1)', 'browser-ui / browser-ui (webkit, group 2)',
+  ].map(name => ({ name, conclusion: 'success' }));
+  assert(hasRequiredIssueJobs({ jobs }));
+  assert(!hasRequiredIssueJobs({ jobs: jobs.slice(0, -1) }));
+  assert(!hasRequiredIssueJobs({ jobs: [...jobs, jobs[0]] }));
+  assert(!hasRequiredIssueJobs({ jobs: [{ ...jobs[0], conclusion: 'skipped' }, ...jobs.slice(1)] }));
+
+  const publisher = read('.github/workflows/publish-environments.yml');
+  const reserve = jobSection(publisher, 'reserve');
+  assert(reserve.indexOf('check-issue-publication-ci.mjs') < reserve.indexOf('publication-reservation.mjs prepare'));
+  assert.match(reserve, /push --atomic origin HEAD:pages-verified.*refs\/tags\/verified\/development/);
+  const pages = jobSection(publisher, 'publish');
+  assert(pages.indexOf('actions/deploy-pages') < pages.indexOf('check-issue-publication-site.mjs bytes'));
+  assert(pages.indexOf('check-issue-publication-site.mjs bytes') < pages.indexOf('artifacts.mjs finalize'));
+  const e2e = read('.github/workflows/live-development-e2e.yml');
+  assert.doesNotMatch(e2e, /^  (push|workflow_call|pull_request):|secrets\./m);
+  assert.match(e2e, /inputs\.run_live_e2e == true/);
+  assert.doesNotMatch(read('.github/workflows/issue47-phase6a-live-audit.yml'), /44839474104|secrets\./);
 });

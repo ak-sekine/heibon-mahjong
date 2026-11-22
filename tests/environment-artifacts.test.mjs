@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { buildPwa, serviceWorkerSource, DEV_PWA_BASE, PWA_BASE } from '../scripts/build-pwa.mjs';
 import { seal, stage, finalize, inventory, digest, verifySealed } from '../scripts/environments/artifacts.mjs';
-import { checkPublication, preparePublication } from '../.github/scripts/publication-reservation.mjs';
+import { checkPublication, preparePublication, publicationIdentity } from '../.github/scripts/publication-reservation.mjs';
+import { inspectRecoverySnapshots, verifyRecoveryPublicSite } from '../scripts/environments/pages-recovery.mjs';
 const prodSha = 'a'.repeat(40), devSha = 'b'.repeat(40);
 function fixture(root, env, sha) {
   mkdirSync(path.join(root, 'assets'), { recursive: true });
@@ -27,6 +28,64 @@ function setup() {
   fixture(prod, 'production', prodSha); fixture(dev, 'development', devSha);
   return { root, store, prod, dev };
 }
+
+test('Pages recovery verifies the pinned snapshots and requires exact live hashes before finalization', async () => {
+  const { root, store, prod, dev } = setup();
+  try {
+    stage(store, prod, prodSha); finalize(store);
+    stage(store, dev, devSha); finalize(store);
+    const previousStore = path.join(root, 'previous');
+    cpSync(store, previousStore, { recursive: true });
+    const sha = 'c'.repeat(40);
+    const candidate = path.join(root, 'next');
+    const { workerUrl } = fixture(candidate, 'production', sha);
+    const owner = { environment: 'production', sha, runId: '100', attempt: '1' };
+    const { siteDigest } = stage(store, candidate, sha, workerUrl, owner);
+    const expected = { sha, workerUrl, siteDigest, runId: owner.runId, attempt: owner.attempt };
+    const inspect = (overrides = {}) => inspectRecoverySnapshots({
+      previousStore, store, expected: { ...expected, ...overrides },
+    });
+    const stateFile = path.join(store, 'state.json');
+    const oldState = readFileSync(stateFile, 'utf8');
+    const sites = inspect();
+    assert.equal(digest(sites.candidate), siteDigest);
+    assert.equal(readFileSync(stateFile, 'utf8'), oldState);
+    assert.equal(sites.before['dev/release.json'], sites.candidate['dev/release.json']);
+    assert.notEqual(sites.before['release.json'], sites.candidate['release.json']);
+    assert.throws(() => inspect({ runId: '101' }), /reservation owner/);
+    assert.throws(() => inspect({ attempt: '2' }), /reservation owner/);
+    assert.throws(() => inspect({ sha: 'd'.repeat(40) }), /reserved source/);
+    assert.throws(() => inspect({ siteDigest: '0'.repeat(64) }), /reserved digest/);
+    assert.throws(() => stage(store, candidate, sha), /pending/);
+
+    const snapshotCommit = 'e'.repeat(40);
+    const env = { GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch',
+      GITHUB_SHA: sha, GITHUB_RUN_ID: owner.runId, GITHUB_RUN_ATTEMPT: owner.attempt,
+      GITHUB_REPOSITORY: 'fixture/repo', PUBLICATION_SNAPSHOT: snapshotCommit };
+    const latest = (_command, args) => args.some(arg => arg === 'repos/fixture/repo/commits/main')
+      ? 'd'.repeat(40) : snapshotCommit;
+    assert.throws(() => checkPublication(store, workerUrl, env, latest), /Stale source SHA/);
+    assert.throws(() => checkPublication(store, workerUrl, { ...env, GITHUB_RUN_ID: '101' }, latest), /does not belong/);
+
+    const serve = (snapshot, unavailable) => async (url, options) => {
+      assert.equal(url.origin, 'https://ak-sekine.github.io');
+      assert.equal(options.method, 'GET');
+      assert.equal(options.redirect, 'error');
+      const name = url.pathname.slice('/heibon-mahjong/'.length);
+      return name === unavailable ? new Response(null, { status: 503 })
+        : new Response(readFileSync(path.join(snapshot, 'site', name)));
+    };
+    await verifyRecoveryPublicSite(sites.before, serve(previousStore));
+    await verifyRecoveryPublicSite(sites.candidate, serve(store));
+    await assert.rejects(verifyRecoveryPublicSite(sites.candidate, serve(previousStore)), /bytes differ/);
+    await assert.rejects(verifyRecoveryPublicSite(sites.candidate, serve(store, 'release.json')), /not HTTP 200/);
+    assert.equal(readFileSync(stateFile, 'utf8'), oldState, 'hash audit must not finalize or clear the reservation');
+
+    writeFileSync(path.join(store, 'site/dev/index.html'), 'changed');
+    assert.throws(inspect, /snapshot bytes changed/);
+    assert.equal(readFileSync(stateFile, 'utf8'), oldState);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 for (const order of [['production', 'development'], ['development', 'production']]) test('independent updates preserve opposite bytes: ' + order.join(', '), () => {
   const { root, store, prod, dev } = setup();
   try {
@@ -145,8 +204,8 @@ test('Worker deployment requires a fresh snapshot reserved by this run and attem
           return commit;
         }
         if (command === 'gh') {
-          if (args[1].endsWith('/commits/pages-verified')) return remoteStore;
-          assert.equal(args[1], 'repos/fixture/repo/commits/' + branch);
+          if (args[1].endsWith('/git/ref/heads/pages-verified')) return remoteStore;
+          assert.equal(args[1], 'repos/fixture/repo/git/ref/heads/' + branch);
           return remoteBranch;
         }
         externalCalls.push([command, Array.from(args)]);
@@ -156,6 +215,7 @@ test('Worker deployment requires a fresh snapshot reserved by this run and attem
         const deploymentEnv = { ...env, ...overrides };
         return vm.runInNewContext(script, {
           process: { argv: ['node', 'script', environment, store], env: deploymentEnv },
+          publicationIdentity,
           checkPublication: (dir, url) => checkPublication(dir, url, deploymentEnv, exec),
           execFileSync: exec,
           appendFileSync: (file, value) => {
@@ -200,4 +260,46 @@ test('Worker deployment requires a fresh snapshot reserved by this run and attem
       assert.equal(externalCalls.length, 1);
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
+});
+
+test('Issue reservation saves independent ref and workflow identity and rejects changed main', () => {
+  const { root, store, prod, dev } = setup();
+  const ref = 'refs/heads/issue/64-main-flow';
+  const snapshot = 'e'.repeat(40);
+  const env = {
+    GITHUB_REPOSITORY: 'ak-sekine/heibon-mahjong', GITHUB_REF: ref, GITHUB_SHA: devSha,
+    GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '1',
+    GITHUB_WORKFLOW_SHA: devSha, GITHUB_WORKFLOW_REF: `ak-sekine/heibon-mahjong/.github/workflows/environments.yml@${ref}`,
+    PUBLICATION_SNAPSHOT: snapshot,
+  };
+  const workerUrl = JSON.parse(readFileSync(path.join(dev, 'release.json'))).workerUrl;
+  let main = prodSha;
+  let comparison = 'ahead';
+  const exec = (command, args) => {
+    if (command === 'git' || args[1].endsWith('/heads/pages-verified')) return snapshot;
+    if (args[1].includes('/compare/')) return comparison;
+    if (args[1].endsWith('/heads/main')) return main;
+    assert(args[1].endsWith('/heads/issue/64-main-flow'));
+    return devSha;
+  };
+  try {
+    stage(store, prod, prodSha);
+    finalize(store);
+    assert.throws(() => publicationIdentity({ ...env, GITHUB_REPOSITORY: 'fork/heibon-mahjong' }), /Wrong deployment/);
+    assert.throws(() => publicationIdentity({ ...env, GITHUB_REF: 'refs/tags/issue/64-main-flow' }), /Wrong deployment/);
+    assert.throws(() => publicationIdentity({ ...env, GITHUB_WORKFLOW_SHA: main }), /workflow identity/);
+    assert.throws(() => preparePublication(store, dev, workerUrl, { ...env, GITHUB_RUN_ATTEMPT: '2' }, exec), /new explicit dispatch/);
+    comparison = 'diverged';
+    assert.throws(() => preparePublication(store, dev, workerUrl, env, exec), /current main/);
+    comparison = 'ahead';
+    preparePublication(store, dev, workerUrl, env, exec);
+    assert.equal(checkPublication(store, workerUrl, env, exec), 'development');
+    main = snapshot;
+    assert.throws(() => checkPublication(store, workerUrl, env, exec), /Main changed/);
+    finalize(store);
+    const state = JSON.parse(readFileSync(path.join(store, 'state.json')));
+    assert.equal(state.current.development.publication.sourceRef, ref);
+    assert.equal(state.current.development.publication.workflowSha, devSha);
+    assert.equal(state.current.production.sha, prodSha);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

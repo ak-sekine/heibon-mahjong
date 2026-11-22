@@ -2,23 +2,29 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isIssueRef } from '../../scripts/environments/issue-ref.mjs';
 import { digest, inventory, stage } from '../../scripts/environments/artifacts.mjs';
 
-function publicationIdentity(env) {
-  const branch = { 'refs/heads/main': 'main', 'refs/heads/develop': 'develop' }[env.GITHUB_REF];
+export function publicationIdentity(env) {
+  const issue = env.GITHUB_REPOSITORY === 'ak-sekine/heibon-mahjong' && isIssueRef(env.GITHUB_REF);
+  const branch = issue ? env.GITHUB_REF.slice('refs/heads/'.length)
+    : { 'refs/heads/main': 'main', 'refs/heads/develop': 'develop' }[env.GITHUB_REF];
   if (!branch || env.GITHUB_EVENT_NAME !== 'workflow_dispatch') throw new Error('Wrong deployment branch or event');
   if (!/^[a-f0-9]{40}$/.test(env.GITHUB_SHA) ||
       !/^[1-9][0-9]*$/.test(env.GITHUB_RUN_ID) || !/^[1-9][0-9]*$/.test(env.GITHUB_RUN_ATTEMPT)) {
     throw new Error('Missing publication identity');
   }
+  if (issue && (env.GITHUB_WORKFLOW_REF !== `${env.GITHUB_REPOSITORY}/.github/workflows/environments.yml@${env.GITHUB_REF}` ||
+      env.GITHUB_WORKFLOW_SHA !== env.GITHUB_SHA)) throw new Error('Wrong Issue publication workflow identity');
   return {
     branch, environment: branch === 'main' ? 'production' : 'development',
     sha: env.GITHUB_SHA, runId: env.GITHUB_RUN_ID, attempt: env.GITHUB_RUN_ATTEMPT,
+    ...(issue ? { sourceRef: env.GITHUB_REF, workflowRef: env.GITHUB_WORKFLOW_REF, workflowSha: env.GITHUB_WORKFLOW_SHA } : {}),
   };
 }
 
 function remoteSha(ref, env, exec) {
-  return exec('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/commits/${ref}`, '--jq', '.sha'], { encoding: 'utf8' }).trim();
+  return exec('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/git/ref/heads/${ref}`, '--jq', '.object.sha'], { encoding: 'utf8' }).trim();
 }
 
 export function preparePublication(store, candidate, workerUrl, env = process.env, exec = execFileSync) {
@@ -26,6 +32,13 @@ export function preparePublication(store, candidate, workerUrl, env = process.en
   if (!workerUrl) throw new Error('Missing expected Worker endpoint');
   const latestSha = remoteSha(publication.branch, env, exec);
   if (latestSha !== publication.sha) throw new Error('Stale source SHA');
+  if (publication.sourceRef) {
+    if (publication.attempt !== '1') throw new Error('Issue publication requires a new explicit dispatch');
+    publication.baseSha = remoteSha('main', env, exec);
+    const status = exec('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/compare/${publication.baseSha}...${publication.sha}`,
+      '--jq', '.status'], { encoding: 'utf8' }).trim();
+    if (status !== 'ahead') throw new Error('Issue candidate is not based on current main');
+  }
   stage(store, candidate, latestSha, workerUrl, publication);
 }
 
@@ -42,6 +55,16 @@ export function checkPublication(store, workerUrl, env = process.env, exec = exe
       pending.sha !== publication.sha || pending.reservation?.runId !== publication.runId ||
       pending.reservation?.attempt !== publication.attempt || release?.sha !== publication.sha ||
       !workerUrl || release.workerUrl !== workerUrl) throw new Error('Pending snapshot does not belong to this publication attempt');
+  if (publication.sourceRef && (
+    release.publication?.sourceRef !== publication.sourceRef ||
+    release.publication.workflowRef !== publication.workflowRef ||
+    release.publication.workflowSha !== publication.workflowSha ||
+    release.publication.runId !== publication.runId ||
+    release.publication.attempt !== publication.attempt
+  )) throw new Error('Wrong saved publication identity');
+  if (publication.sourceRef && remoteSha('main', env, exec) !== release.publication.baseSha) {
+    throw new Error('Main changed after Issue reservation');
+  }
   if (digest(inventory(path.join(store, 'site'))) !== pending.siteDigest) throw new Error('Pending snapshot mismatch');
   if (remoteSha('pages-verified', env, exec) !== commit) throw new Error('Remote snapshot changed after reservation');
   if (remoteSha(publication.branch, env, exec) !== publication.sha) throw new Error('Stale source SHA');

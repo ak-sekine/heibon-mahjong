@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   worker-credentials:
-    if: ${{ github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'worker-production' || 'worker-development' }}
@@ -31,12 +31,15 @@ jobs:
           fi
   reserve:
     needs: worker-credentials
-    if: ${{ github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
+      deployments: read
     outputs:
       snapshot: ${{ steps.reserve.outputs.snapshot }}
+      production_worker: ${{ steps.reserve.outputs.production_worker }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,14 +61,27 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_WORKER_URL: ${{ github.ref_name == 'main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
         run: |
+          if [[ "$GITHUB_REF" == refs/heads/issue/* ]]; then
+            node source/.github/scripts/check-issue-publication-ci.mjs
+            production_worker="$(node source/.github/scripts/check-issue-publication-site.mjs worker store)"
+            printf 'production_worker=%s\n' "$production_worker" >> "$GITHUB_OUTPUT"
+            node source/.github/scripts/check-issue-publication-site.mjs bytes store
+          fi
           node source/.github/scripts/publication-reservation.mjs prepare store candidate
           git -C store config user.name github-actions[bot]
           git -C store config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git -C store add state.json site
           git -C store commit -m "Stage $GITHUB_REF_NAME $GITHUB_SHA for Pages (pending)"
-          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)"
+          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$GITHUB_REF_NAME" --jq .object.sha)"
           test "$latest_sha" = "$GITHUB_SHA"
-          git -C store push origin HEAD:pages-verified
+          if [[ "$GITHUB_REF" == refs/heads/issue/* ]]; then
+            # Keep the source commit reachable after the temporary branch is removed.
+            git -C store fetch --no-tags origin "$GITHUB_REF"
+            test "$(git -C store rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+            git -C store push --atomic origin HEAD:pages-verified "$GITHUB_SHA:refs/tags/verified/development/$GITHUB_SHA"
+          else
+            git -C store push origin HEAD:pages-verified
+          fi
           printf 'snapshot=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
   worker-production:
     needs: reserve
@@ -99,7 +115,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
   worker-development:
     needs: reserve
-    if: ${{ github.ref == 'refs/heads/develop' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' }}
+    if: ${{ (github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     concurrency:
       group: worker-development
@@ -134,7 +150,7 @@ jobs:
     if: >-
       ${{ !cancelled() && (
         (github.ref == 'refs/heads/main' && needs.worker-production.result == 'success' && needs.worker-development.result == 'skipped')
-        || (github.ref == 'refs/heads/develop' && needs.worker-development.result == 'success' && needs.worker-production.result == 'skipped')
+        || ((github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) && needs.worker-development.result == 'success' && needs.worker-production.result == 'skipped')
       ) }}
     runs-on: ubuntu-latest
     steps:
@@ -184,6 +200,7 @@ jobs:
       contents: write
       pages: write
       id-token: write
+      deployments: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -204,8 +221,25 @@ jobs:
           PUBLICATION_SNAPSHOT: ${{ needs.reserve.outputs.snapshot }}
           EXPECTED_WORKER_URL: ${{ needs.online.outputs.worker_url }}
         run: node source/.github/scripts/publication-reservation.mjs check store
+      - name: Confirm production Worker still matches the preflight deployment
+        if: startsWith(github.ref, 'refs/heads/issue/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRODUCTION_WORKER: ${{ needs.reserve.outputs.production_worker }}
+        run: test "$(node source/.github/scripts/check-issue-publication-site.mjs worker store)" = "$PRODUCTION_WORKER"
       - uses: actions/deploy-pages@v4
         id: deploy
+      - name: Verify served snapshot and unchanged production Worker
+        if: startsWith(github.ref, 'refs/heads/issue/')
+        env:
+          PUBLICATION_SNAPSHOT: ${{ needs.reserve.outputs.snapshot }}
+          EXPECTED_WORKER_URL: ${{ needs.online.outputs.worker_url }}
+          GH_TOKEN: ${{ github.token }}
+          PRODUCTION_WORKER: ${{ needs.reserve.outputs.production_worker }}
+        run: |
+          node source/.github/scripts/check-issue-publication-site.mjs bytes store
+          test "$(node source/.github/scripts/check-issue-publication-site.mjs worker store)" = "$PRODUCTION_WORKER"
+          node source/.github/scripts/publication-reservation.mjs check store
       - name: Confirm snapshot after successful Pages deployment
         run: |
           node source/scripts/environments/artifacts.mjs finalize store

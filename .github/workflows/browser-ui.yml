@@ -83,6 +83,12 @@ jobs:
           TARGET_MOBILE: ${{ inputs.targeted_mobile_table_layout }}
         shell: bash
         run: |
+          if [[ "$GITHUB_REPOSITORY" != ak-sekine/heibon-mahjong ]] ||
+             [[ "$GITHUB_REF" != refs/heads/main && "$GITHUB_REF" != refs/heads/develop &&
+                ! "$GITHUB_REF" =~ ^refs/heads/issue/[1-9][0-9]*-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+            echo "Diagnostic runs require an approved repository branch"
+            exit 2
+          fi
           if [[ "$DIAGNOSTIC_MODE" == scenarios ]]; then
             if [[ -z "$SCENARIOS" || "$TARGET_CANDIDATE" == true || "$TARGET_MOBILE" == true ]]; then
               echo "Scenario-ID diagnostics require one or more IDs and cannot be combined with legacy targeted inputs"

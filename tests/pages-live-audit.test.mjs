@@ -489,11 +489,11 @@ test('a same-origin link from development to production root fails path isolatio
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('an audit dispatched outside develop stops before API or Pages requests', async () => {
+test('an audit dispatched from an unapproved ref stops before API or Pages requests', async () => {
   const root = setup();
   try {
     let calls = 0;
-    const report = await runAudit(args(root, async () => { calls++; throw new Error('must not run'); }, { ref: 'refs/heads/main' }));
+    const report = await runAudit(args(root, async () => { calls++; throw new Error('must not run'); }, { ref: 'refs/heads/arbitrary' }));
     assert.equal(report.outcome, 'FAIL');
     assert.equal(report.failures[0].kind, 'WRONG_BRANCH');
     assert.equal(calls, 0);
@@ -554,4 +554,37 @@ test('manual workflow has read-only GITHUB_TOKEN permissions and no publication 
   assert.doesNotMatch(workflow, /^  push:/m);
   assert.match(workflow, /if: \$\{\{ always\(\) \}\}/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
+});
+
+test('Issue deployment origin survives source branch removal and rejects an incorrect retained tag', async () => {
+  const root = setup();
+  try {
+    const branch = 'issue/64-main-flow';
+    const sourceRef = `refs/heads/${branch}`;
+    const state = JSON.parse(readFileSync(path.join(root, 'state.json')));
+    state.current.development.publication = {
+      sourceRef, workflowRef: `${repo}/${ENVIRONMENTS_WORKFLOW}@${sourceRef}`, workflowSha: devSha,
+      baseSha: prodSha, runId: '200', attempt: '1',
+    };
+    writeFile(root, 'state.json', JSON.stringify(state));
+    writeFile(root, 'site/environments.json', JSON.stringify(state.current));
+    const underlying = mockFetch(root, {
+      reservedPublication: true, pagesDeployment: { ref: branch },
+      publicationRun: { head_branch: branch, head_repository: { full_name: repo } },
+    });
+    for (const tagSha of [devSha, prodSha]) {
+      const mock = url => {
+        const parsed = new URL(url);
+        assert(!parsed.pathname.includes('/commits/issue/'), 'audit consulted the removed source branch');
+        if (parsed.pathname.endsWith(`/git/ref/tags/verified/development/${devSha}`)) {
+          return Response.json({ object: { type: 'commit', sha: tagSha } });
+        }
+        return underlying(url);
+      };
+      const report = await runAudit(args(root, mock, { ref: 'refs/heads/main', auditSha: 'e'.repeat(40) }));
+      assert.equal(report.outcome, tagSha === devSha ? 'SUCCESS' : 'FAIL', JSON.stringify(report.failures));
+      if (tagSha === devSha) assert.equal(report.provenance.runs.development.branch, branch);
+      else assert(report.failures.some(failure => failure.kind === 'PUBLICATION_REF_MISMATCH'));
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
