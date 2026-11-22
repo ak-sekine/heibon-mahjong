@@ -28,7 +28,7 @@ function jobCondition(workflow, jobName) {
 // Evaluate the small expression subset used by the production gates. The input
 // is the condition extracted from the workflow itself, so edits to those
 // conditions are evaluated instead of mirrored in a test-only predicate.
-function evaluateActionsCondition(source, context) {
+function evaluateActionsCondition(source, context, { raw = false } = {}) {
   const tokens = source.match(/\s*(\&\&|\|\||==|!=|!|\(|\)|[A-Za-z_][A-Za-z0-9_.-]*|'[^']*'|"[^"]*")/g)
     ?.map((token) => token.trim()) ?? [];
   let position = 0;
@@ -76,7 +76,7 @@ function evaluateActionsCondition(source, context) {
     while (peek() === '&&') {
       take();
       const right = comparison();
-      value = Boolean(value) && Boolean(right);
+      value = value && right;
     }
     return value;
   }
@@ -86,14 +86,14 @@ function evaluateActionsCondition(source, context) {
     while (peek() === '||') {
       take();
       const right = logicalAnd();
-      value = Boolean(value) || Boolean(right);
+      value = value || right;
     }
     return value;
   }
 
-  const result = Boolean(logicalOr());
+  const result = logicalOr();
   assert.equal(position, tokens.length, `unparsed Actions expression: ${source}`);
-  return result;
+  return raw ? result : Boolean(result);
 }
 
 test('markdown-only changes skip the application suite and deployment', () => {
@@ -183,9 +183,24 @@ test('Browser UI engine matrix keeps scenarios independent and avoids duplicate 
   const browserJob = browserWorkflow.match(/  browser-ui:\n([\s\S]*)$/)?.[1] ?? '';
   assert.match(browserJob, /fail-fast: false/);
   assert.match(browserJob, /max-parallel: 4/);
-  assert.match(browserJob, /browser: \[chromium, webkit\]/);
-  assert.match(browserJob, /group: \[1, 2\]/);
-  assert.match(browserJob, /run-browser-regressions\.py --browser [^\n]+ --group "\$\{\{ matrix\.group \}\}"/);
+  const axes = [...browserJob.matchAll(/^        (browser|group): >-\n          \$\{\{ fromJSON\(([\s\S]*?)\) \}\}/gm)];
+  assert.deepEqual(axes.map(([, axis]) => axis), ['browser', 'group']);
+  for (const [event, inputs, browsers, groups] of [
+    ['push', {}, ['chromium', 'webkit'], [1, 2]],
+    ['pull_request', {}, ['chromium', 'webkit'], [1, 2]],
+    ['workflow_dispatch', { reuse_build: true }, ['chromium', 'webkit'], [1, 2]],
+    ['workflow_dispatch', { diagnostic_mode: 'full' }, ['chromium', 'webkit'], [1, 2]],
+    ['workflow_dispatch', { diagnostic_mode: 'scenarios', diagnostic_browser: 'chromium' }, ['chromium'], [1]],
+    ['workflow_dispatch', { diagnostic_mode: 'scenarios', diagnostic_browser: 'webkit' }, ['webkit'], [1]],
+    ['workflow_dispatch', { diagnostic_mode: 'scenarios', diagnostic_browser: 'both' }, ['chromium', 'webkit'], [1]],
+    ['workflow_dispatch', { targeted_candidate_geometry: true }, ['chromium', 'webkit'], [1]],
+    ['workflow_dispatch', { targeted_mobile_table_layout: true }, ['chromium', 'webkit'], [1]],
+  ]) {
+    const context = { github: { event_name: event }, inputs };
+    const actual = axes.map(([, , expression]) => JSON.parse(evaluateActionsCondition(expression, context, { raw: true })));
+    assert.deepEqual(actual, [browsers, groups], JSON.stringify(context));
+  }
+  assert.match(browserJob, /run-browser-regressions\.py --browser "\$BROWSER" --group "\$GROUP"/);
   assert.match(browserJob, /Install OS dependencies \(\$\{\{ matrix\.browser \}\}\)/);
   assert.match(browserJob, /timed-playwright-install\.py install-deps "\$\{\{ matrix\.browser \}\}"/);
   assert.match(browserJob, /Install browser \(\$\{\{ matrix\.browser \}\}\)/);

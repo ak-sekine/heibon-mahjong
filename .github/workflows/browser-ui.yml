@@ -1,4 +1,5 @@
 name: Browser UI verification
+run-name: ${{ github.event_name == 'workflow_dispatch' && (inputs.diagnostic_mode == 'scenarios' || inputs.targeted_candidate_geometry || inputs.targeted_mobile_table_layout) && 'Browser UI diagnostic' || 'Browser UI verification' }}
 
 on:
   # main is verified through Environments, which calls this workflow exactly once.
@@ -6,6 +7,51 @@ on:
     branches: [fix-mobile-table-layout, ui-river-spacing, fix-riichi-discard-layout]
   pull_request:
   workflow_dispatch:
+    inputs:
+      targeted_candidate_geometry:
+        description: Run only a selected candidate geometry case.
+        required: false
+        type: boolean
+        default: false
+      targeted_mobile_table_layout:
+        description: Run only the responsive table scenarios.
+        required: false
+        type: boolean
+        default: false
+      candidate_geometry_viewport:
+        description: Candidate geometry viewport (WxH).
+        required: false
+        type: string
+        default: 375x560
+      candidate_geometry_mode:
+        description: Candidate geometry game mode.
+        required: false
+        type: choice
+        options: [online, local]
+        default: online
+      candidate_geometry_scenario:
+        description: Candidate geometry scenario.
+        required: false
+        type: choice
+        options: [mixed-kan, pon-multiple, chi, daiminkan, ankan, opening, kakan]
+        default: mixed-kan
+      diagnostic_mode:
+        description: Run the required suite (Geometry baseline excluded) or exact manifest IDs for diagnosis.
+        required: false
+        type: choice
+        options: [full, scenarios]
+        default: full
+      diagnostic_browser:
+        description: Browser for exact scenario-ID diagnostics.
+        required: false
+        type: choice
+        options: [chromium, webkit, both]
+        default: both
+      diagnostic_scenarios:
+        description: Exact manifest IDs; Geometry baselines are manual-only and require an explicit ID.
+        required: false
+        type: string
+        default: ''
   workflow_call:
     inputs:
       reuse_build:
@@ -27,6 +73,35 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Validate exact diagnostic scenario selection
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.diagnostic_mode == 'scenarios' || inputs.diagnostic_scenarios != '' || inputs.targeted_candidate_geometry || inputs.targeted_mobile_table_layout) }}
+        env:
+          BROWSER: ${{ inputs.diagnostic_browser }}
+          SCENARIOS: ${{ inputs.diagnostic_scenarios }}
+          DIAGNOSTIC_MODE: ${{ inputs.diagnostic_mode }}
+          TARGET_CANDIDATE: ${{ inputs.targeted_candidate_geometry }}
+          TARGET_MOBILE: ${{ inputs.targeted_mobile_table_layout }}
+        shell: bash
+        run: |
+          if [[ "$DIAGNOSTIC_MODE" == scenarios ]]; then
+            if [[ -z "$SCENARIOS" || "$TARGET_CANDIDATE" == true || "$TARGET_MOBILE" == true ]]; then
+              echo "Scenario-ID diagnostics require one or more IDs and cannot be combined with legacy targeted inputs"
+              exit 2
+            fi
+            if [[ "$BROWSER" == both ]]; then
+              for engine in chromium webkit; do
+                python tests/run-browser-regressions.py --browser both --matrix-browser "$engine" --scenario-ids="$SCENARIOS" --list-only
+              done
+            else
+              python tests/run-browser-regressions.py --browser "$BROWSER" --scenario-ids="$SCENARIOS" --list-only
+            fi
+          elif [[ "$TARGET_CANDIDATE" == true && "$TARGET_MOBILE" == true ]]; then
+            echo "Select one targeted Browser UI regression at a time"
+            exit 2
+          elif [[ -n "$SCENARIOS" ]]; then
+            echo "Set diagnostic_mode=scenarios when supplying diagnostic_scenarios"
+            exit 2
+          fi
       - name: Classify changed files
         id: classify
         env:
@@ -76,10 +151,12 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Run all unit and integration tests
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.diagnostic_mode != 'scenarios' }}
         run: npm test
       - name: Build the browser test site
         run: npm run build
       - name: Build the standalone itch browser test site
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.diagnostic_mode != 'scenarios' }}
         env:
           VITE_ONLINE_API_URL: https://online-mock.invalid
         run: npm run build:itch
@@ -90,6 +167,7 @@ jobs:
           path: dist
           if-no-files-found: error
       - name: Save the verified itch browser build
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.diagnostic_mode != 'scenarios' }}
         uses: actions/upload-artifact@v4
         with:
           name: itch-dist-${{ github.sha }}-${{ github.run_attempt }}
@@ -112,9 +190,19 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        browser: [chromium, webkit]
-        group: [1, 2]
-    name: browser-ui (${{ matrix.browser }}, group ${{ matrix.group }})
+        # tests/run-browser-regressions.py owns required/manual classification and the scenario-to-group map.
+        browser: >-
+          ${{ fromJSON(
+            (github.event_name == 'workflow_dispatch' && inputs.diagnostic_mode == 'scenarios' && inputs.diagnostic_browser == 'chromium' && '["chromium"]') ||
+            (github.event_name == 'workflow_dispatch' && inputs.diagnostic_mode == 'scenarios' && inputs.diagnostic_browser == 'webkit' && '["webkit"]') ||
+            '["chromium","webkit"]'
+          ) }}
+        group: >-
+          ${{ fromJSON(
+            (github.event_name == 'workflow_dispatch' && (inputs.diagnostic_mode == 'scenarios' || inputs.targeted_candidate_geometry || inputs.targeted_mobile_table_layout) && '[1]') ||
+            '[1,2]'
+          ) }}
+    name: ${{ github.event_name == 'workflow_dispatch' && (inputs.diagnostic_mode == 'scenarios' || inputs.targeted_candidate_geometry || inputs.targeted_mobile_table_layout) && format('browser-ui diagnostic ({0})', matrix.browser) || format('browser-ui ({0}, group {1})', matrix.browser, matrix.group) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -122,10 +210,11 @@ jobs:
       - name: Prepare engine-specific diagnostics
         env:
           BROWSER: ${{ matrix.browser }}
+          GROUP: ${{ matrix.group }}
         run: |
           mkdir -p /tmp/heibon-table-ui
-          printf 'script,browser,start_utc,end_utc,duration_seconds,status,timed_out\n' > "/tmp/heibon-browser-ui-timings.csv"
-          : > "/tmp/heibon-browser-ui-${BROWSER}.log"
+          printf 'scenario_id,script,browser,start_utc,end_utc,duration_seconds,status,timed_out\n' > "/tmp/heibon-browser-ui-${{ matrix.browser }}-group-${{ matrix.group }}-timings.csv"
+          : > "/tmp/heibon-browser-ui-${BROWSER}-group-${GROUP}.log"
           : > /tmp/heibon-vite.log
           : > /tmp/heibon-preview.log
       - uses: actions/setup-node@v4
@@ -234,7 +323,17 @@ jobs:
       - name: Run Vite and browser regressions
         shell: bash
         env:
-          HEIBON_BROWSER_TIMINGS: /tmp/heibon-browser-ui-timings.csv
+          BROWSER: ${{ matrix.browser }}
+          GROUP: ${{ matrix.group }}
+          HEIBON_BROWSER_TIMINGS: /tmp/heibon-browser-ui-${{ matrix.browser }}-group-${{ matrix.group }}-timings.csv
+          HEIBON_TARGETED_CANDIDATE_GEOMETRY: ${{ github.event_name == 'workflow_dispatch' && inputs.targeted_candidate_geometry }}
+          HEIBON_TARGETED_MOBILE_TABLE_LAYOUT: ${{ github.event_name == 'workflow_dispatch' && inputs.targeted_mobile_table_layout }}
+          HEIBON_DIAGNOSTIC_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic_mode }}
+          HEIBON_DIAGNOSTIC_SCENARIOS: ${{ inputs.diagnostic_scenarios }}
+          HEIBON_CANDIDATE_VIEWPORT: ${{ github.event_name == 'workflow_dispatch' && inputs.targeted_candidate_geometry && inputs.candidate_geometry_viewport || '' }}
+          HEIBON_CANDIDATE_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.targeted_candidate_geometry && inputs.candidate_geometry_mode || '' }}
+          HEIBON_CANDIDATE_SCENARIO: ${{ github.event_name == 'workflow_dispatch' && inputs.targeted_candidate_geometry && inputs.candidate_geometry_scenario || '' }}
+          HEIBON_DIAGNOSTIC_BROWSER: ${{ inputs.diagnostic_browser }}
         run: |
           VITE_ONLINE_API_URL=https://online-mock.invalid npm run dev -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/heibon-vite.log 2>&1 &
           vite_pid=$!
@@ -254,7 +353,15 @@ jobs:
           fi
           export HEIBON_SCREENSHOTS=/tmp/heibon-table-ui
           set -o pipefail
-          python tests/run-browser-regressions.py --browser "${{ matrix.browser }}" --group "${{ matrix.group }}" 2>&1 | tee "/tmp/heibon-browser-ui-${{ matrix.browser }}.log"
+          if [[ "$HEIBON_DIAGNOSTIC_MODE" == "scenarios" ]]; then
+            python tests/run-browser-regressions.py --browser "$HEIBON_DIAGNOSTIC_BROWSER" --matrix-browser "$BROWSER" --scenario-ids="$HEIBON_DIAGNOSTIC_SCENARIOS" 2>&1 | tee "/tmp/heibon-browser-ui-${BROWSER}-group-${GROUP}.log"
+          elif [[ "$HEIBON_TARGETED_CANDIDATE_GEOMETRY" == "true" ]]; then
+            python tests/run-browser-regressions.py --browser "$BROWSER" --script browser-candidate-geometry.py 2>&1 | tee "/tmp/heibon-browser-ui-${BROWSER}-group-${GROUP}.log"
+          elif [[ "$HEIBON_TARGETED_MOBILE_TABLE_LAYOUT" == "true" ]]; then
+            python tests/run-browser-regressions.py --browser "$BROWSER" --script browser-mobile-table-layout.py 2>&1 | tee "/tmp/heibon-browser-ui-${BROWSER}-group-${GROUP}.log"
+          else
+            python tests/run-browser-regressions.py --browser "$BROWSER" --group "$GROUP" 2>&1 | tee "/tmp/heibon-browser-ui-${BROWSER}-group-${GROUP}.log"
+          fi
       - name: Report winning hand geometry
         if: ${{ matrix.group == 2 }}
         env:
@@ -336,8 +443,8 @@ jobs:
           name: browser-ui-${{ matrix.browser }}-group-${{ matrix.group }}-${{ github.sha }}-${{ github.run_attempt }}
           if-no-files-found: error
           path: |
-            /tmp/heibon-browser-ui-timings.csv
-            /tmp/heibon-browser-ui-${{ matrix.browser }}.log
+            /tmp/heibon-browser-ui-${{ matrix.browser }}-group-${{ matrix.group }}-timings.csv
+            /tmp/heibon-browser-ui-${{ matrix.browser }}-group-${{ matrix.group }}.log
             /tmp/heibon-table-ui
             /tmp/heibon-vite.log
             /tmp/heibon-preview.log

@@ -1,5 +1,7 @@
 # 検証記録の目次
 
+- [Issue #58 Browser UI の並列化と限定診断](issue58-browser-ui-sharding.md) — 必須80件の割当、Geometry baseline の手動実行、main と develop の検証記録。
+
 - [Issue #32 PC実機確認11項目の完了報告（2026-11-14）](issue32-responsive-layout-2026-11-03.md#2026-11-14-pc実機確認11項目の完了報告)：本人PC実機確認はOK 11／NG 0／未確認 0。基本レイアウト・操作・結果詳細・順位表示・オンライン待機室・対局・再接続を確認済み。iPhone Safari修正後確認と3ダイアログのスクロールバー統一は別の未完了条件として残るため、Issue #32はOpenを維持。初回のOK 7／未確認 4、過去の本人実機履歴、自動検証との区別も記録。
 - [Issue #32 操作パネル共通外枠](issue32-common-frame-2026-11-11.md#pc実機による修正後の確認結果-2026-11-13)：2026-11-13の本人PC実機報告で修正対象はOK、修正前の二重枠NGは対象範囲で解消確認済み。Chromium／WebKit各182 geometryケースとDeploy gate・Pages公開の成功は自動検証として区別。iPhone Safariでの同修正再確認は未確認。
 
