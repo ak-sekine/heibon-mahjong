@@ -259,16 +259,24 @@ async function deploymentRecord(environment, expectedSha, { apiBase, repository,
       actualEnvironment: candidate.environment || null, expectedEnvironment: environment,
     });
   }
-  if (String(candidate.sha || '').toLowerCase() !== expectedSha) {
+  if (expectedSha && String(candidate.sha || '').toLowerCase() !== expectedSha) {
     throw new AuditError('DEPLOYMENT_SHA_MISMATCH', `latest ${environment} deployment does not match the saved source SHA`, { latestSha: candidate.sha || null, expectedSha });
+  }
+  if (typeof candidate.sha !== 'string' || !SHA_RE.test(candidate.sha.toLowerCase())) {
+    throw new AuditError('DEPLOYMENT_SHA_MISMATCH', `latest ${environment} deployment has an invalid SHA`);
   }
   const statuses = await apiJson(`${apiBase}/repos/${repository}/deployments/${candidate.id}/statuses?per_page=100`, {
     fetchImpl, token, timeoutMs, report, label: `${environment} deployment ${candidate.id} statuses`,
   });
-  if (!Array.isArray(statuses) || statuses[0]?.state !== 'success') {
+  if (!Array.isArray(statuses)) {
+    throw new AuditError('GITHUB_API_INVALID_DATA', `${environment} deployment statuses response is not an array`);
+  }
+  if (statuses[0]?.state !== 'success') {
     throw new AuditError('DEPLOYMENT_NOT_SUCCESS', `${environment} deployment ${candidate.id} latest status is not success`, { latestStatus: statuses?.[0]?.state || null });
   }
-  return { id: candidate.id, environment, sha: candidate.sha.toLowerCase(), createdAt: candidate.created_at, status: statuses[0].state, statusUrl: statuses[0].url || null };
+  const record = { id: candidate.id, environment, sha: candidate.sha.toLowerCase(), createdAt: candidate.created_at, status: statuses[0].state, statusUrl: statuses[0].url || null };
+  if (!expectedSha) Object.assign(record, { ref: candidate.ref, logUrl: statuses[0].log_url || null });
+  return record;
 }
 
 const EXPECTED_ENVIRONMENT_JOBS = [
@@ -282,29 +290,42 @@ function workflowPathMatches(runPath, expectedPath) {
   return typeof runPath === 'string' && (runPath === expectedPath || runPath.startsWith(`${expectedPath}@`));
 }
 
-async function releaseRun(environment, sourceSha, context) {
+async function releaseRun(environment, sourceSha, context, pagesLink) {
   const branch = environment === 'development' ? 'develop' : 'main';
+  const runsUrl = `${context.apiBase}/repos/${context.repository}/actions/runs`;
   const query = new URLSearchParams({ branch, head_sha: sourceSha, per_page: '100' });
-  const response = await apiJson(`${context.apiBase}/repos/${context.repository}/actions/runs?${query}`, {
+  const response = await apiJson(pagesLink ? `${runsUrl}/${pagesLink.runId}` : `${runsUrl}?${query}`, {
     ...context, label: `${environment} publication workflow runs`,
   });
-  const runs = (response?.workflow_runs || []).filter(run => {
-    const shared = run.head_sha === sourceSha && run.head_branch === branch && run.conclusion === 'success';
-    if (!shared) return false;
-    if (environment === 'development') {
-      return workflowPathMatches(run.path, WORKFLOW_PATHS.environments) && run.event === 'workflow_dispatch';
-    }
-    if (workflowPathMatches(run.path, WORKFLOW_PATHS.legacyProduction)) return true;
+  if (!pagesLink && !Array.isArray(response?.workflow_runs)) {
+    throw new AuditError('GITHUB_API_INVALID_DATA', `${environment} workflow runs response is invalid`);
+  }
+  const runs = (pagesLink ? [response] : response.workflow_runs).filter(run => {
+    if (run?.head_sha !== sourceSha || run.head_branch !== branch || run.conclusion !== 'success') return false;
+    if (pagesLink && (run.id !== pagesLink.runId || run.status !== 'completed' ||
+        !Number.isSafeInteger(run.run_attempt) || run.run_attempt < 1)) return false;
+    if (environment === 'production' && workflowPathMatches(run.path, WORKFLOW_PATHS.legacyProduction)) return true;
     return workflowPathMatches(run.path, WORKFLOW_PATHS.environments) && run.event === 'workflow_dispatch';
   });
   const run = runs.sort((a, b) => Date.parse(b.updated_at || b.created_at) - Date.parse(a.updated_at || a.created_at))[0];
-  if (!run) throw new AuditError('PUBLICATION_RUN_NOT_FOUND', `successful ${branch} publication run not found for ${sourceSha}`);
-  const jobsResponse = await apiJson(`${context.apiBase}/repos/${context.repository}/actions/runs/${run.id}/jobs?per_page=100`, {
+  if (!run) throw new AuditError('PUBLICATION_RUN_NOT_FOUND', `successful ${branch} publication run not found for ${sourceSha}`, pagesLink);
+  const attemptPath = pagesLink ? `/attempts/${run.run_attempt}` : '';
+  const jobsResponse = await apiJson(`${runsUrl}/${run.id}${attemptPath}/jobs?per_page=100`, {
     ...context, label: `${environment} publication run ${run.id} jobs`,
   });
   const jobs = jobsResponse?.jobs;
   if (!Array.isArray(jobs)) throw new AuditError('GITHUB_API_INVALID_DATA', `publication run ${run.id} jobs response is invalid`);
   const byName = new Map(jobs.map(job => [job.name, job.conclusion]));
+  let pagesJob;
+  if (pagesLink) {
+    const expectedName = workflowPathMatches(run.path, WORKFLOW_PATHS.legacyProduction) ? 'pages-deploy' : 'publish / publish';
+    const job = jobs.find(job => job.id === pagesLink.jobId);
+    if (!job || job.name !== expectedName || job.run_id !== run.id || job.run_attempt !== run.run_attempt ||
+        job.head_sha !== run.head_sha || job.status !== 'completed' || job.conclusion !== 'success') {
+      throw new AuditError('DEPLOYMENT_JOB_MISMATCH', `linked job is not the successful Pages publication job of run ${run.id}`, pagesLink);
+    }
+    pagesJob = { id: job.id, name: job.name, completedAt: job.completed_at };
+  }
   if (environment === 'production' && workflowPathMatches(run.path, WORKFLOW_PATHS.legacyProduction)) {
     for (const name of ['deploy-worker', 'production-test', 'pages-deploy']) {
       if (byName.get(name) !== 'success') throw new AuditError('PUBLICATION_RUN_JOBS_FAILED', `production run ${run.id} job ${name} is not successful`, { job: name, conclusion: byName.get(name) || null });
@@ -324,7 +345,7 @@ async function releaseRun(environment, sourceSha, context) {
   return {
     id: run.id, url: run.html_url, branch, sha: run.head_sha, event: run.event,
     conclusion: run.conclusion, attempt: run.run_attempt, createdAt: run.created_at, updatedAt: run.updated_at,
-    workflowPath: run.path, jobs: Object.fromEntries([...byName.entries()].sort(([a], [b]) => a.localeCompare(b))),
+    workflowPath: run.path, ...(pagesJob ? { pagesJob } : {}), jobs: Object.fromEntries([...byName.entries()].sort(([a], [b]) => a.localeCompare(b))),
   };
 }
 
@@ -344,6 +365,31 @@ function ensureRunWindow(deployment, run) {
   if (![deployedAt, start, end].every(Number.isFinite) || deployedAt < start - 60 * 60 * 1000 || deployedAt > end + 60 * 60 * 1000) {
     throw new AuditError('DEPLOYMENT_RUN_MISMATCH', `${deployment.environment} deployment ${deployment.id} is outside its publication run window`, { createdAt: deployment.createdAt, runId: run.id, runCreatedAt: run.createdAt, runUpdatedAt: run.updatedAt });
   }
+}
+
+async function verifyPagesDeployment(deployment, sourceShas, context) {
+  const environment = { main: 'production', develop: 'development' }[deployment.ref];
+  if (!Object.hasOwn(sourceShas, environment) || deployment.sha !== sourceShas[environment]) {
+    throw new AuditError('DEPLOYMENT_SHA_MISMATCH', 'latest github-pages deployment does not match the saved source SHA for its ref', {
+      ref: deployment.ref || null, sha: deployment.sha, expectedSha: sourceShas[environment] || null,
+    });
+  }
+  const link = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/actions\/runs\/([1-9]\d*)\/job\/([1-9]\d*)$/.exec(deployment.logUrl || '');
+  const runId = Number(link?.[2]);
+  const jobId = Number(link?.[3]);
+  if (link?.[1] !== context.repository || !Number.isSafeInteger(runId) || !Number.isSafeInteger(jobId)) {
+    throw new AuditError('DEPLOYMENT_RUN_LINK_INVALID', 'latest github-pages status has no Actions job URL for this repository', { deploymentId: deployment.id });
+  }
+  const run = await releaseRun(environment, sourceShas[environment], context, { runId, jobId });
+  // GitHub creates the environment deployment before the job starts (including any approval wait).
+  const times = [run.createdAt, deployment.createdAt, run.pagesJob.completedAt, run.updatedAt].map(value => Date.parse(value || ''));
+  if (!times.every(Number.isFinite) || times.some((time, index) => index > 0 && time < times[index - 1])) {
+    throw new AuditError('DEPLOYMENT_RUN_MISMATCH', 'github-pages deployment is outside its linked publication run window', {
+      deploymentId: deployment.id, createdAt: deployment.createdAt, runId, runCreatedAt: run.createdAt,
+      jobCompletedAt: run.pagesJob.completedAt, runUpdatedAt: run.updatedAt,
+    });
+  }
+  return { environment, run };
 }
 
 function resolveLocalReference(raw, environment, files, sourceUrl = TARGETS[environment].baseUrl) {
@@ -618,7 +664,18 @@ async function verifyProvenance(snapshot, context) {
     (result.failures ||= []).push(failure);
     context.failures.push(failure);
   }
-  for (const [name, check] of runChecks) await capture('runs', name, check);
+  const pages = result.deploymentEnvironments.pages;
+  await capture('deployments', 'pages', () => deploymentRecord(pages, null, context));
+  let linkedPublication;
+  if (result.deployments.pages) {
+    await capture('runs', 'pages', async () => {
+      linkedPublication = await verifyPagesDeployment(result.deployments.pages, { production: productionSha, development: developmentSha }, context);
+      return { environment: linkedPublication.environment, runId: linkedPublication.run.id, jobId: linkedPublication.run.pagesJob.id };
+    });
+  }
+  for (const [name, check] of runChecks) {
+    await capture('runs', name, () => linkedPublication?.environment === name ? linkedPublication.run : check());
+  }
   if (result.runs.production) {
     try { result.deploymentEnvironments.productionWorker = productionWorkerDeploymentEnvironment(result.runs.production); }
     catch (error) {
@@ -635,16 +692,8 @@ async function verifyProvenance(snapshot, context) {
       return deploymentRecord(result.deploymentEnvironments.productionWorker, productionSha, context);
     }],
     ['developmentWorker', () => deploymentRecord(result.deploymentEnvironments.developmentWorker, developmentSha, context)],
-    ['pages', () => deploymentRecord(result.deploymentEnvironments.pages, developmentSha, context)],
   ];
   for (const [name, check] of deploymentChecks) await capture('deployments', name, check);
-  if (result.deployments.pages && result.runs.development) {
-    try { ensureRunWindow(result.deployments.pages, result.runs.development); }
-    catch (error) {
-      const failure = { kind: error.kind || 'DEPLOYMENT_RUN_MISMATCH', message: error.message, details: error.details || null };
-      (result.failures ||= []).push(failure); context.failures.push(failure);
-    }
-  }
   if (result.deployments.developmentWorker && result.runs.development) {
     try { ensureRunWindow(result.deployments.developmentWorker, result.runs.development); }
     catch (error) {
@@ -659,7 +708,6 @@ async function verifyProvenance(snapshot, context) {
       (result.failures ||= []).push(failure); context.failures.push(failure);
     }
   }
-  if (!context.reservationSha) await verifyEndHeads(result, context);
   if (!result.failures?.length) result.outcome = 'SUCCESS';
   return result;
 }
@@ -776,10 +824,8 @@ export async function runAudit({
       report.failures.push({ environment, kind: error.kind || 'LIVE_AUDIT_FAILED', message: error.message, details: error.details || null });
     }
   }
-  if (reservationSha) {
-    await verifyWorker('after');
-    if (report.provenance.branchHeads) await verifyEndHeads(report.provenance, context);
-  }
+  if (reservationSha) await verifyWorker('after');
+  if (report.provenance.branchHeads) await verifyEndHeads(report.provenance, context);
   if (report.failures.length === 0 && report.provenance.outcome === 'SUCCESS' && report.targets.production?.outcome === 'SUCCESS' && report.targets.development?.outcome === 'SUCCESS') {
     report.outcome = 'SUCCESS';
   }
@@ -808,8 +854,13 @@ export function renderSummary(report) {
     lines.push(`- ${env}: ${result.outcome}; URL ${result.baseUrl}; source ${result.sourceSha || 'unknown'}; payload hashes ${result.hashMatches || 0}/${result.fileCount || 0}; metadata hashes ${result.metadataMatches || 0}; mismatches ${result.hashMismatches || 0} payload / ${result.metadataMismatches || 0} metadata`);
     for (const file of result.files || []) lines.push(`  - ${file.outcome}: ${file.path} (HTTP ${file.status ?? 'not fetched'}; expected ${file.expectedSha256}; live ${file.liveSha256 || 'unavailable'})`);
   }
+  const pagesRun = report.provenance?.runs?.pages;
+  if (pagesRun) lines.push(`- Shared Pages publication: ${pagesRun.environment}, run ${pagesRun.runId}, job ${pagesRun.jobId}`);
   if (report.provenance?.runs) {
-    for (const [key, run] of Object.entries(report.provenance.runs)) lines.push(`- ${key} publication run: ${run.url} (${run.id}, ${run.sha}, attempt ${run.attempt})`);
+    for (const key of ['production', 'development']) {
+      const run = report.provenance.runs[key];
+      if (run) lines.push(`- ${key} publication run: ${run.url} (${run.id}, ${run.sha}, attempt ${run.attempt})`);
+    }
   }
   if (report.provenance?.branchHeads?.atStart) {
     const heads = report.provenance.branchHeads;
