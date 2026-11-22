@@ -327,3 +327,11 @@ Chromiumの既知起動制限はAGENTS.mdに従い再試行していない。Web
 ### 検証状況
 
 ローカル検証: `npm test` 1518 pass / fail 0 / skip 0、`npm run build`、`npm run typecheck:worker`、`git diff --check`、全 `tests/*.py` AST構文確認、Browser UI選択unit 9件、itch startup unit 1件（開閉2条件）が成功。調査中にmainへIssue #32 commit `c4cc7e51b985e326d0066bfcd8e0d9344988101b` が追加されたため、差分を確認しfast-forwardで保全して取り込んだ。上記npm検証はこの新HEADで実行した。最終CI対象SHAは再検証完了後に追記する。Issueは必須の両エンジン・アクセシビリティ検証成功までOpenを維持する。
+
+## キーボードの個別検証 — 2026-11-22
+
+main `711f3ac580e8415fb0deca2215b12c25a2b0e92f` の [Environments CI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45007785841) で、[Chromium group 1](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45007785841/job/137163521116) と [WebKit group 2](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45007785841/job/137163521099) のログに各3 viewport（320×568、390×844、1280×720）の個別成功行を確認した。対象の `browser-call-decision-dialog.py` は Enter と Space をそれぞれ実行する。種類の Tab 順、候補から「戻る」までの Tab／Shift+Tab、名前、focus-visible と枠の検査を行い、フォーカス移動と「戻る」で対局状態が変わらないこと、候補の確定と単一候補の即時確定を確認する。
+
+`browser-candidate-geometry.py` は共通のフォーカス検査をオンライン・オフラインの候補に適用する。オンラインの従来の重複送信検査は、同じ候補 DOM に連続クリックを発生させる。1280×720 のオンラインのチーに、Enter／Space を個別に使うシナリオを追加した。各キーで候補を開き、「戻る」で未回答の種類選択とチーボタンのフォーカスに戻ること、再表示後に候補へフォーカスしても送信しないこと、有効なチーの送信が1回で追加キー入力後にも増えないことを検査する。
+
+1440×900 のオンラインチー再表示タイムアウトは原因未確定。develop `400ba6010fb9f694df4613f4b0dd7a0e4ae66e6b` の [Environments CI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45004172187) と [単独 Browser UI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45004172150) は診断付きテストで成功した。観測追加は再発時の調査に使う。従来の再表示検査はそのまま維持する。実機確認には2026-11-07と2026-11-11の本人報告を使用する。
