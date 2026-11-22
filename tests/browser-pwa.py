@@ -159,6 +159,11 @@ with tempfile.TemporaryDirectory(prefix='heibon-pwa-browser-') as tmp:
         browser = getattr(playwright, os.environ.get('HEIBON_BROWSER', 'chromium')).launch()
         context = browser.new_context(viewport={'width': 390, 'height': 750}, service_workers='allow')
         page = context.new_page()
+        # This test measures PWA layout while a game is open; random seating can
+        # start several CPU-only turns (or end the round) before the human can
+        # act. Keep the fixture deterministic so the first input boundary is
+        # the human dealer's opening discard, not a timing race against CPUs.
+        page.add_init_script('Math.random = () => 0.999999;')
         page.goto(base_url, wait_until='networkidle')
         page.evaluate('async () => { await navigator.serviceWorker.ready; }')
         page.reload()  # Root SW avoids clients.claim: it must not steal dev clients.
