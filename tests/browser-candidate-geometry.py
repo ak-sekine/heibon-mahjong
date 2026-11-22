@@ -25,7 +25,7 @@ SCENARIOS = [('pon-multiple', 'call-pon', 2), ('chi', 'call-chi', 5),
 ROOT = Path.cwd()
 sys.path.insert(0, str(ROOT / 'tests'))
 from browser_main_fixtures import fixed_seat_fixture
-from browser_focus_assertions import tab_candidates
+from browser_focus_assertions import assert_button_focus, tab_candidates
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--baseline', action='store_true', default=os.environ.get('HEIBON_CANDIDATE_BASELINE') == '1')
 parser.add_argument('--viewport', action='append', help='Limit to one or more WxH viewport sizes.')
@@ -559,6 +559,52 @@ def verify_operation_area_resize(page, record, online, root_selector, opened):
     same_rect(record, opened['table'], restored['table'], 'table after operation-area width restoration')
 
 
+def verify_online_keyboard(page, record):
+    root = page.locator('#online-game-controls')
+    chi = root.locator('[data-panel-part="call-chi"]')
+    candidates = root.locator('[data-panel-part="candidate-options"] button')
+    back = root.get_by_role('button', name='戻る', exact=True)
+    pass_call = root.locator('[data-panel-part="pass-call"]')
+    record['keyboardActivation'] = []
+    for key in ('Enter', 'Space'):
+        page.evaluate("issue32Geometry.load('chi', true)")
+        settle(page)
+        fingerprint = page.evaluate('issue32Geometry.fingerprint(true)')
+        chi.focus()
+        page.keyboard.press('Tab')
+        page.keyboard.press('Shift+Tab')
+        assert_button_focus(page, chi)
+        page.keyboard.press(key)
+        check(record, candidates.count() == 5 and not pass_call.is_visible(), f'{key}: wrong candidate screen')
+        tab_candidates(page, '#online-game-controls')
+        check(record, back.evaluate('node=>node===document.activeElement'), f'{key}: Back lost focus')
+        page.keyboard.press(key)
+        check(record, candidates.count() == 0 and pass_call.is_visible(), f'{key}: Back did not restore types')
+        assert_button_focus(page, chi)
+        check(record, page.evaluate('issue32Geometry.fingerprint(true)') == fingerprint and
+              not page.evaluate('issue32Geometry.sent.length'), f'{key}: focus or Back answered the decision')
+
+        page.keyboard.press(key)
+        tab_candidates(page, '#online-game-controls')
+        page.keyboard.press('Shift+Tab')
+        assert_button_focus(page, candidates.last)
+        check(record, not page.evaluate('issue32Geometry.sent.length'), f'{key}: focus sent an action')
+        page.keyboard.press(key)
+        check(record, page.evaluate("""()=>{
+          const {online, sent}=issue32Geometry;
+          if (sent.length !== 1) return false;
+          const [{action, revision}]=sent;
+          return action.type==='declare-call' && revision===online.view.gameRevision &&
+            online.view.self.callOptions.some(o=>o.type==='chi' && o.id===action.optionId);
+        }"""), f'{key}: expected one legal chi action')
+        page.keyboard.press(key)
+        settle(page)
+        check(record, page.evaluate('issue32Geometry.sent.length') == 1, f'{key}: repeated activation sent twice')
+        record['keyboardActivation'].append(key)
+        save()
+        print(f'{ENGINE} online chi 1280x720: {key} confirmed once after keyboard Back and reopen', flush=True)
+
+
 def exercise(page, width, height, scenario, trigger, expected_count, online):
     record = {'viewport': f'{width}x{height}', 'mode': 'online' if online else 'local', 'scenario': scenario}
     if online and (width, height, scenario) == (1440, 900, 'chi') and not args.baseline:
@@ -862,6 +908,8 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
         check(record, len(record['sentActions']) == 1, 'online candidate confirmation executed twice')
         if diagnostic is not None:
             diagnostic['stage'] = 'confirmed'
+        if not args.baseline and (width, height, scenario) == (1280, 720, 'chi'):
+            verify_online_keyboard(page, record)
     save()
 
 
