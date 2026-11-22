@@ -183,6 +183,122 @@ window.issue32Geometry = { controller, online: onlineGameController, local: loca
 '''
 
 
+# Test-page observer. Only structural roles, counts and scalar game state are retained.
+CHI_REOPEN_OBSERVER = r'''(() => {
+  window.issue52ObserveChi = root => {
+    const part = name => root.querySelector(`[data-panel-part="${name}"]`);
+    const list = part('candidate-options');
+    const panel = part('candidate-controls');
+    const callControls = part('call-controls');
+    const chi = part('call-chi');
+    const back = part('candidate-back');
+    const started = performance.now();
+    const history = [];
+    let stage = 'initial-chi';
+    let dropped = 0;
+    let expired = false;
+    let timer;
+    const events = ['pointerdown', 'pointerup', 'click'];
+    const elapsed = () => Math.round((performance.now() - started) * 1000) / 1000;
+    const target = element => {
+      if (!(element instanceof Element)) return 'none';
+      if (chi.contains(element)) return 'call-chi';
+      if (back.contains(element)) return 'candidate-back';
+      if (list.contains(element)) return element.closest('button') ? 'candidate-button' : 'candidate-list';
+      if (panel.contains(element)) return 'candidate-panel';
+      return root.contains(element) ? 'other-operation-area' : 'outside-operation-area';
+    };
+    const shown = element => !element.closest('[hidden]');
+    const dom = () => ({
+      candidates: list.querySelectorAll('button').length,
+      enabledCandidates: list.querySelectorAll('button:enabled').length,
+      candidatePanelShown: shown(panel),
+      callControlsShown: shown(callControls),
+      chiShown: shown(chi),
+      chiEnabled: !chi.disabled,
+    });
+    const state = () => {
+      const fixture = window.issue32Geometry;
+      const view = fixture.online.view;
+      const decision = view?.self?.decision;
+      return {
+        revision: view?.gameRevision ?? null,
+        decisionPresent: Boolean(decision),
+        decisionActive: Boolean(decision && !decision.answered && decision.expiresAt > Date.now()),
+        decisionAnswered: decision?.answered ?? null,
+        actionPending: Boolean(fixture.online.decisionPending),
+        callOptions: view?.self?.callOptions.length ?? 0,
+        chiOptions: view?.self?.callOptions.filter(option => option.type === 'chi').length ?? 0,
+        actionsSent: fixture.sent.length,
+      };
+    };
+    const record = (kind, data) => {
+      if (history.length >= 128) {
+        dropped++;
+        return;
+      }
+      history.push({kind, stage, atMs: elapsed(), ...data});
+    };
+    const input = event => record('input', {
+      event: event.type, eventTimeStampMs: event.timeStamp,
+      target: target(event.target), x: event.clientX, y: event.clientY, trusted: event.isTrusted,
+    });
+    const observer = new MutationObserver(records => {
+      let added = 0, removed = 0;
+      for (const mutation of records) {
+        if (mutation.type !== 'childList') continue;
+        added += [...mutation.addedNodes].filter(node => node.nodeName === 'BUTTON').length;
+        removed += [...mutation.removedNodes].filter(node => node.nodeName === 'BUTTON').length;
+      }
+      record('dom-change', {added, removed, dom: dom()});
+    });
+    const attrs = {attributes: true, attributeFilter: ['hidden', 'disabled']};
+    observer.observe(list, {childList: true});
+    for (const node of [panel, callControls, chi]) observer.observe(node, attrs);
+    for (const type of events) document.addEventListener(type, input, {capture: true, passive: true});
+    const stop = () => {
+      clearTimeout(timer);
+      observer.disconnect();
+      for (const type of events) document.removeEventListener(type, input, true);
+    };
+    timer = setTimeout(() => { expired = true; stop(); }, 90000);
+    return {
+      mark(next, details = {}) {
+        stage = next;
+        if (!expired) record('checkpoint', {...details, dom: dom(), game: state()});
+      },
+      finish() {
+        stop();
+        return {history, dropped, expired, final: {dom: dom(), game: state()}};
+      },
+    };
+  };
+})();'''
+
+
+def capture_chi_diagnostics(page, record, error=None):
+    diagnostic = record['chiReopenDiagnostic']
+    if error is not None:
+        # Omit the arbitrary exception message here. The existing report keeps
+        # the original test error and the diagnostic adds the exact stage.
+        diagnostic['errorType'] = type(error).__name__
+    try:
+        diagnostic['observation'] = page.evaluate('() => window.issue52ChiTrace?.finish() ?? null')
+    except Exception as error:
+        diagnostic['observationError'] = type(error).__name__
+    if 'errorType' in diagnostic:
+        name = screenshot_filename(ENGINE, 1440, 900, 'online', 'chi', 'diagnostic-failure', report['pass'])
+        try:
+            # The table and candidate tile faces can show the player's hand.
+            page.screenshot(path=str(OUT / name), timeout=5000, mask=[
+                page.locator('#online-table'),
+                page.locator('#online-game-controls [data-panel-part="candidate-options"] button > *'),
+            ])
+            diagnostic['screenshot'] = name
+        except Exception as screenshot_error:
+            diagnostic['screenshotError'] = type(screenshot_error).__name__
+
+
 def save():
     REPORT_PATH.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
@@ -364,8 +480,22 @@ def same_rect(record, before, after, label, tolerance=1):
 
 def click_part(page, online, part, record):
     selector = ('#online-game-controls' if online else '#local-game-controls') + f' [data-panel-part="{part}"]'
-    target = page.locator(selector).evaluate(r'''node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
-      return {x:r.x+r.width/2,y:r.y+r.height/2,top:r.top,bottom:r.bottom,ok:hit===node||node.contains(hit),disabled:node.disabled};}''')
+    diagnostic = record.get('chiReopenDiagnostic')
+    stage = diagnostic['stage'] if diagnostic is not None else None
+    target = page.locator(selector).evaluate(r'''(node, {selector, stage})=>{
+      const r=node.getBoundingClientRect(), x=r.x+r.width/2, y=r.y+r.height/2;
+      const hit=document.elementFromPoint(x,y), ok=hit===node||node.contains(hit);
+      if (stage) {
+        try {
+          if (stage==='initial-chi') window.issue52ChiTrace=window.issue52ObserveChi(node.closest('#online-game-controls'));
+          window.issue52ChiTrace?.mark(stage, {selector, x, y, hitTarget: ok ? 'intended-button' :
+            hit ? (node.closest('#online-game-controls').contains(hit) ? 'other-operation-area' : 'outside-operation-area') : 'none',
+            enabled: !node.disabled, visible: Boolean(r.width && r.height && !node.closest('[hidden]') &&
+              getComputedStyle(node).visibility==='visible')});
+        } catch { /* diagnostics cannot change the existing click or assertions */ }
+      }
+      return {x,y,top:r.top,bottom:r.bottom,ok,disabled:node.disabled};
+    }''', {'selector': selector, 'stage': stage})
     # Mouse coordinates avoid Playwright's implicit scrollIntoView, which can
     # otherwise hide an initial layout failure before we measure it.
     check(record, target['ok'] and not target['disabled'] and target['top'] >= -.5 and
@@ -431,6 +561,9 @@ def verify_operation_area_resize(page, record, online, root_selector, opened):
 
 def exercise(page, width, height, scenario, trigger, expected_count, online):
     record = {'viewport': f'{width}x{height}', 'mode': 'online' if online else 'local', 'scenario': scenario}
+    if online and (width, height, scenario) == (1440, 900, 'chi') and not args.baseline:
+        record['chiReopenDiagnostic'] = {'stage': 'setup'}
+    diagnostic = record.get('chiReopenDiagnostic')
     report['measurements'].append(record)
     save()
     page.evaluate('issue32SetVisualViewport()')
@@ -456,6 +589,8 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
         check(record, unchanged, 'kan executed before button press')
     if args.baseline and scenario in ('ankan', 'kakan'):
         expected_count = 1
+    if diagnostic is not None:
+        diagnostic['stage'] = 'initial-chi'
     click_part(page, online, trigger, record)
     record['open'] = after = snapshot(page, online)
     page.screenshot(path=str(OUT / screenshot_filename(
@@ -694,6 +829,8 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
                                               'offsetTop': large_offset, 'availableHeight': height-large_offset,
                                               'requiredHeight': minimum_panel_height+16}
 
+    if diagnostic is not None:
+        diagnostic['stage'] = 'back'
     click_part(page, online, 'candidate-back', record)
     record['back'] = back = snapshot(page, online)
     check(record, back['panel'] is None, 'Back did not close the candidate screen')
@@ -705,11 +842,26 @@ def exercise(page, width, height, scenario, trigger, expected_count, online):
         check(record, not page.evaluate('issue32Geometry.sent'), 'Back sent a game action')
         # Confirm through the real online ActionSender, then try the same DOM
         # button again synchronously: only the first action may be transmitted.
+        if diagnostic is not None:
+            diagnostic['stage'] = 'reopen-chi'
         click_part(page, online, trigger, record)
-        page.locator(root_selector + ' [data-panel-part="candidate-options"] button').first.evaluate('node=>{node.click();node.click()}')
+        if diagnostic is not None:
+            diagnostic['stage'] = 'await-reopened-candidate'
+        page.locator(root_selector + ' [data-panel-part="candidate-options"] button').first.evaluate(r'''(node, observe)=>{
+          if (observe) {
+            try { window.issue52ChiTrace?.mark('reopened-candidate', {
+              enabled: !node.disabled, visible: Boolean(node.getClientRects().length && !node.closest('[hidden]')),
+            }); } catch { /* preserve the original two clicks */ }
+          }
+          node.click();node.click();
+        }''', diagnostic is not None)
+        if diagnostic is not None:
+            diagnostic['stage'] = 'confirm-candidate'
         settle(page)
-        record['sentActions'] = page.evaluate('issue32Geometry.sent')
+        record['sentActions'] = page.evaluate('issue32Geometry.sent.map(({action,revision})=>({type:action.type,revision}))')
         check(record, len(record['sentActions']) == 1, 'online candidate confirmation executed twice')
+        if diagnostic is not None:
+            diagnostic['stage'] = 'confirmed'
     save()
 
 
@@ -731,6 +883,8 @@ try:
                 errors = []
                 page.on('pageerror', lambda error: errors.append(str(error)))
                 page.add_init_script(VISUAL_VIEWPORT)
+                if (width, height) == (1440, 900) and True in selected_modes and not args.baseline:
+                    page.add_init_script(CHI_REOPEN_OBSERVER)
 
                 def expose_main(route):
                     response = route.fetch()
@@ -753,7 +907,19 @@ try:
                     page.add_style_tag(content=old_css)
                 for online in selected_modes:
                     for scenario, trigger, count in selected_scenarios:
-                        exercise(page, width, height, scenario, trigger, count, online)
+                        measurement_count = len(report['measurements'])
+                        try:
+                            exercise(page, width, height, scenario, trigger, count, online)
+                        except Exception as error:
+                            if len(report['measurements']) > measurement_count:
+                                record = report['measurements'][-1]
+                                if 'chiReopenDiagnostic' in record:
+                                    capture_chi_diagnostics(page, record, error)
+                            raise
+                        else:
+                            record = report['measurements'][-1]
+                            if 'chiReopenDiagnostic' in record:
+                                capture_chi_diagnostics(page, record)
                 if errors:
                     raise AssertionError(f'{width}x{height}: page errors: {errors}')
                 print(f'{ENGINE} {width}x{height}: candidate geometry {report["pass"]} recorded', flush=True)
