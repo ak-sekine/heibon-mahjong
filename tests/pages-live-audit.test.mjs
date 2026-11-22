@@ -91,19 +91,38 @@ function mockFetch(snapshotRoot, {
   productionDeploymentEnvironment = productionWorkflowPath === LEGACY_PRODUCTION_WORKFLOW ? 'heibon-production-worker' : 'worker-production',
   productionDeploymentSha = prodSha,
   productionDeploymentStatus = 'success',
-  productionDeploymentCreatedAt = dates.production.deployment,
+  productionDeploymentCreatedAt,
   missingProductionDeployment = false,
   productionDeploymentApiStatus = null,
   additionalDeploymentsByEnvironment = {},
   reservedPublication = false,
   skipReservation = false,
+  latestPages = 'development',
+  pagesStatus = 'success',
+  pagesStatusLogUrl,
+  pagesDeployment = {},
+  publicationRun = {},
+  publicationJob = {},
+  pagesApiStatus = 200,
 } = {}) {
+  const productionLatest = latestPages === 'production';
+  const releaseDates = {
+    production: productionLatest ? dates.development : dates.production,
+    development: productionLatest ? dates.production : dates.development,
+  };
+  const pagesRunId = productionLatest ? 100 : 200;
+  const pagesJobId = pagesRunId + 1;
+  const pagesJobUrl = `https://github.com/${repo}/actions/runs/${pagesRunId}/job/${pagesJobId}`;
   const deploymentsByEnvironment = {
     [productionDeploymentEnvironment]: missingProductionDeployment ? [] : [{
-      id: 1, environment: productionDeploymentEnvironment, sha: productionDeploymentSha, created_at: productionDeploymentCreatedAt,
+      id: 1, environment: productionDeploymentEnvironment, sha: productionDeploymentSha, created_at: productionDeploymentCreatedAt || releaseDates.production.deployment,
     }],
-    'worker-development': [{ id: 2, environment: 'worker-development', sha: devSha, created_at: dates.development.deployment }],
-    'github-pages': [{ id: 3, environment: 'github-pages', sha: devSha, created_at: dates.development.deployment }],
+    'worker-development': [{ id: 2, environment: 'worker-development', sha: devSha, created_at: releaseDates.development.deployment }],
+    'github-pages': [{
+      id: 3, environment: 'github-pages', ref: productionLatest ? 'main' : 'develop',
+      sha: productionLatest ? prodSha : devSha, created_at: releaseDates[latestPages].deployment,
+      ...pagesDeployment,
+    }],
     ...additionalDeploymentsByEnvironment,
   };
   return async (input) => {
@@ -115,21 +134,31 @@ function mockFetch(snapshotRoot, {
         const sha = branch === 'main' ? 'e'.repeat(40) : branch === 'develop' ? 'd'.repeat(40) : 'c'.repeat(40);
         return new Response(JSON.stringify({ sha }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
-      if (apiPath.endsWith('/actions/runs')) {
-        const branch = url.searchParams.get('branch');
+      const runMatch = apiPath.match(/\/actions\/runs\/(\d+)$/);
+      if (apiPath.endsWith('/actions/runs') || runMatch) {
+        if (runMatch && Number(runMatch[1]) !== pagesRunId) return new Response('not found', { status: 404 });
+        const branch = runMatch ? (productionLatest ? 'main' : 'develop') : url.searchParams.get('branch');
         const env = branch === 'develop' ? 'development' : 'production';
         const sha = env === 'development' ? devSha : prodSha;
-        return new Response(JSON.stringify({ workflow_runs: [{
+        const run = {
           id: env === 'development' ? 200 : 100,
           head_branch: branch, head_sha: sha, path: env === 'development' ? ENVIRONMENTS_WORKFLOW : productionWorkflowPath,
-          conclusion: 'success', event: env === 'development' || productionWorkflowPath === ENVIRONMENTS_WORKFLOW ? 'workflow_dispatch' : 'push',
+          status: 'completed', conclusion: 'success', event: env === 'development' || productionWorkflowPath === ENVIRONMENTS_WORKFLOW ? 'workflow_dispatch' : 'push',
           run_attempt: 1, html_url: `https://github.com/${repo}/actions/runs/${env === 'development' ? 200 : 100}`,
-          created_at: dates[env].created, updated_at: dates[env].updated,
-        }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+          created_at: releaseDates[env].created, updated_at: releaseDates[env].updated,
+        };
+        return Response.json(runMatch ? { ...run, ...publicationRun } : { workflow_runs: [run] });
       }
-      if (/\/actions\/runs\/(100|200)\/jobs$/.test(apiPath)) {
+      if (/\/actions\/runs\/(100|200)(?:\/attempts\/1)?\/jobs$/.test(apiPath)) {
         const env = apiPath.includes('/200/') ? 'development' : 'production';
         const jobs = jobNames(env, productionWorkflowPath).map(name => ({ name, conclusion: 'success' }));
+        if (apiPath.includes('/attempts/')) {
+          const job = jobs.find(job => job.name === (env === 'production' && productionWorkflowPath === LEGACY_PRODUCTION_WORKFLOW ? 'pages-deploy' : 'publish / publish'));
+          Object.assign(job, {
+            id: pagesJobId, run_id: pagesRunId, run_attempt: 1, head_sha: productionLatest ? prodSha : devSha,
+            status: 'completed', completed_at: releaseDates[env].updated, ...publicationJob,
+          });
+        }
         if (env === 'development') jobs.push({ name: 'worker-production', conclusion: 'skipped' });
         if (env === 'production' && productionWorkflowPath === ENVIRONMENTS_WORKFLOW) jobs.push({ name: 'worker-development', conclusion: 'skipped' });
         if (reservedPublication && (env === 'development' || productionWorkflowPath === ENVIRONMENTS_WORKFLOW)) {
@@ -143,13 +172,15 @@ function mockFetch(snapshotRoot, {
         if (environment === productionDeploymentEnvironment && productionDeploymentApiStatus) {
           return new Response('API access denied', { status: productionDeploymentApiStatus, headers: { 'content-type': 'text/plain' } });
         }
+        if (environment === 'github-pages' && pagesApiStatus !== 200) return new Response(null, { status: pagesApiStatus });
         return new Response(JSON.stringify(deploymentsByEnvironment[environment] || []), { status: 200, headers: { 'content-type': 'application/json' } });
       }
       const statusMatch = apiPath.match(/\/deployments\/(\d+)\/statuses$/);
       if (statusMatch) {
         const deploymentId = Number(statusMatch[1]);
-        const state = deploymentId === 1 ? productionDeploymentStatus : 'success';
-        return new Response(JSON.stringify([{ state, url: `https://api.test/deployments/${deploymentId}` }]), { status: 200, headers: { 'content-type': 'application/json' } });
+        const state = deploymentId === 1 ? productionDeploymentStatus : deploymentId === 3 ? pagesStatus : 'success';
+        const log_url = deploymentId === 3 ? pagesStatusLogUrl ?? pagesJobUrl : null;
+        return new Response(JSON.stringify([{ state, log_url, url: `https://api.test/deployments/${deploymentId}` }]), { status: 200, headers: { 'content-type': 'application/json' } });
       }
       return new Response('not found', { status: 404 });
     }
@@ -217,6 +248,65 @@ test('matches both live Pages environments, metadata, deployment records, and al
     assert.equal(report.provenance.deployments.productionWorker.sha, prodSha);
     assert.match(renderSummary(report), /productionWorker heibon-production-worker/);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('accepts the linked Pages publication after either release order', async t => {
+  const root = setup();
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  for (const environment of ['production', 'development']) {
+    const report = await runAudit(args(root, mockFetch(root, {
+      latestPages: environment, productionWorkflowPath: ENVIRONMENTS_WORKFLOW, reservedPublication: true,
+    })));
+    assert.equal(report.outcome, 'SUCCESS', JSON.stringify(report.failures));
+    const runId = environment === 'production' ? 100 : 200;
+    assert.deepEqual(report.provenance.runs.pages, { environment, runId, jobId: runId + 1 });
+    assert.equal(report.provenance.deployments.pages.sha, report.provenance.runs[environment].sha);
+    assert.match(renderSummary(report), new RegExp(`Shared Pages publication: ${environment}, run ${runId}, job ${runId + 1}`));
+    assert.deepEqual(Object.values(report.targets).map(target => [target.hashMatches, target.metadataMatches]), [[16, 2], [16, 1]]);
+  }
+});
+
+test('rejects the latest Pages deployment when its source, status, linked run or job cannot be proven', async t => {
+  const root = setup();
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  for (const [kind, options] of [
+    ['DEPLOYMENT_SHA_MISMATCH', { pagesDeployment: { sha: 'f'.repeat(40) } }],
+    ['DEPLOYMENT_SHA_MISMATCH', { pagesDeployment: { sha: prodSha } }],
+    ['DEPLOYMENT_NOT_SUCCESS', { pagesStatus: 'failure' }],
+    ['DEPLOYMENT_NOT_SUCCESS', { pagesStatus: 'in_progress' }],
+    ['DEPLOYMENT_RUN_LINK_INVALID', { pagesStatusLogUrl: '' }],
+    ['GITHUB_API_HTTP_404', { pagesStatusLogUrl: `https://github.com/${repo}/actions/runs/999/job/201` }],
+    ['PUBLICATION_RUN_NOT_FOUND', { publicationRun: { conclusion: 'failure' } }],
+    ['PUBLICATION_RUN_NOT_FOUND', { publicationRun: { head_sha: prodSha } }],
+    ['DEPLOYMENT_RUN_MISMATCH', { pagesDeployment: { created_at: dates.production.deployment } }],
+    ['DEPLOYMENT_RUN_MISMATCH', { pagesDeployment: { created_at: '2026-11-15T22:30:00Z' } }],
+    ['DEPLOYMENT_JOB_MISMATCH', { pagesStatusLogUrl: `https://github.com/${repo}/actions/runs/200/job/999` }],
+    ['DEPLOYMENT_JOB_MISMATCH', { publicationJob: { run_id: 100 } }],
+    ['DEPLOYMENT_JOB_MISMATCH', { publicationJob: { run_attempt: 2 } }],
+    ['GITHUB_API_FORBIDDEN', { pagesApiStatus: 403 }],
+  ]) {
+    await t.test(`${kind} ${JSON.stringify(options)}`, async () => {
+      const report = await runAudit(args(root, mockFetch(root, options)));
+      assert.equal(report.outcome, 'FAIL');
+      assert.equal(report.provenance.failures.find(failure => failure.name === 'pages')?.kind, kind);
+    });
+  }
+});
+
+test('rejects invalid deployment API data and live metadata that differs from the snapshot', async t => {
+  const root = setup();
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const fetch = mockFetch(root, { corrupt: new Map([['https://ak-sekine.github.io/heibon-mahjong/dev/release.json', '{}']]) });
+  const report = await runAudit(args(root, (input, options) => {
+    const url = new URL(input);
+    if (url.pathname.endsWith('/deployments/3/statuses')) return Response.json({});
+    return fetch(input, options);
+  }));
+  assert.equal(report.outcome, 'FAIL');
+  assert.equal(report.provenance.failures.find(failure => failure.name === 'pages')?.kind, 'GITHUB_API_INVALID_DATA');
+  assert.equal(report.targets.development.outcome, 'FAIL');
+  assert.equal(report.targets.development.metadataMismatches, 1);
+  assert.equal(report.targets.production.outcome, 'SUCCESS');
 });
 
 test('production releases through environments.yml use the worker-production deployment environment', async () => {
@@ -420,6 +510,28 @@ test('moving a protected branch during the audit is recorded as a failure', asyn
       if (url.hostname === 'api.test' && url.pathname.endsWith('/commits/develop')) {
         developReads++;
         const sha = developReads === 1 ? 'd'.repeat(40) : 'f'.repeat(40);
+        return new Response(JSON.stringify({ sha }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return baseFetch(input, options);
+    };
+    const report = await runAudit(args(root, changingFetch));
+    assert.equal(report.outcome, 'FAIL');
+    assert.ok(report.failures.some(failure => failure.kind === 'REMOTE_REF_CHANGED'));
+    assert.equal(report.targets.production.outcome, 'SUCCESS');
+    assert.equal(report.targets.development.outcome, 'SUCCESS');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('moving pages-verified during public reads is recorded as a failure', async () => {
+  const root = setup();
+  try {
+    const baseFetch = mockFetch(root);
+    let publicRead = false;
+    const changingFetch = async (input, options) => {
+      const url = new URL(input);
+      if (url.hostname !== 'api.test') publicRead = true;
+      if (url.pathname.endsWith('/commits/pages-verified') && publicRead) {
+        const sha = 'f'.repeat(40);
         return new Response(JSON.stringify({ sha }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
       return baseFetch(input, options);
