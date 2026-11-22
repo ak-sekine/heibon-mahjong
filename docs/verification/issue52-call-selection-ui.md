@@ -334,4 +334,6 @@ main `711f3ac580e8415fb0deca2215b12c25a2b0e92f` の [Environments CI](https://gi
 
 `browser-candidate-geometry.py` は共通のフォーカス検査をオンライン・オフラインの候補に適用する。オンラインの従来の重複送信検査は、同じ候補 DOM に連続クリックを発生させる。1280×720 のオンラインのチーに、Enter／Space を個別に使うシナリオを追加した。各キーで候補を開き、「戻る」で未回答の種類選択とチーボタンのフォーカスに戻ること、再表示後に候補へフォーカスしても送信しないこと、有効なチーの送信が1回で追加キー入力後にも増えないことを検査する。
 
+[限定 Browser UI run](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45009649213)（`cc8806bce51c38c63b2368604b3cee95bf1a31a5`）では、[Chromium](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45009649213/job/137169261286) と [WebKit](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45009649213/job/137169261386) の各ログで Enter と Space の成功行を個別に確認した。Python 構文、テスト選択、型検査、ビルド、差分チェックも成功した。
+
 1440×900 のオンラインチー再表示タイムアウトは原因未確定。develop `400ba6010fb9f694df4613f4b0dd7a0e4ae66e6b` の [Environments CI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45004172187) と [単独 Browser UI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45004172150) は診断付きテストで成功した。観測追加は再発時の調査に使う。従来の再表示検査はそのまま維持する。実機確認には2026-11-07と2026-11-11の本人報告を使用する。
