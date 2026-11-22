@@ -132,6 +132,67 @@ Issue #58のBrowser UI再編、ゲーム・実機検証差分、運用文書の�
 | Environments run | SHA | 状態 |
 | --- | --- | --- |
 | [変更前のmain文書のみpush #44952666228](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44952666228) | `25ca994be34b9d45fe1752588982d6a3ea84144b` | 9実行 / 13件、runner合計4,000秒、壁時計1,589秒。Chromium/WebKit全4グループを実行、publishはskip |
-| [統合コミットの通常push #44960150625](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44960150625) | `6318fa1192ece23a8d6b73a13a22f468612bb670` | 起動を確認。結果は後続の確認で追記 |
+| [統合コミットの通常push #44960150625](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44960150625) | `6318fa1192ece23a8d6b73a13a22f468612bb670` | 分類・docs-check・verify・環境分離2件・local-online成功。WebKit group 2が失敗し、残り3グループとauditは停止判断時点で未確定 |
 
-比較はEnvironments workflowに限定し、runner時間はskipを除く各jobの開始から完了までの合計、壁時計は最初の実行jobの開始から最後の実行jobの完了までとした。公開停止の比較基準として、作業開始時点の最新Worker/Pages deploymentはいずれも `3c52d17b7c301cb8a4ff5d22fa53bb5594cade94`（Worker ID `7965528881`、Pages ID `7965544141`）。
+比較はEnvironments workflowに限定し、runner時間はskipを除く各jobの開始から完了までの合計、壁時計は最初の実行jobの開始から最後の実行jobの完了までとした。公開有無の比較基準として、作業開始時点の最新Worker/Pages deploymentはいずれも `3c52d17b7c301cb8a4ff5d22fa53bb5594cade94`（Worker ID `7965528881`、Pages ID `7965544141`）。
+
+### main 上の文書のみ push
+
+統合記録および変更前のCI実測値の追記だけを含む `85999b4c59c39b5be1dbc8521b6c689c671199fc` をmainに反映した。[Environments #44960242324](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44960242324)
+
+- 分類ログは `classification=docs-only`、`changed_count=1`、`run_full_suite=false`、`deploy_required=false`。分類とdocs-checkは成功。
+- verify、Browser UI、環境分離、local-online、publishはskip。auditの軽量経路がskipを検証して成功し、通常経路のmatrix監査stepはskip。run全体もsuccess。
+- 変更前のmain文書pushとの比較では、全job数は13件から8件、実行job数は9件から3件。runner時間は4,000秒から27秒（99.3%減）、壁時計は1,589秒から33秒（97.9%減）。変更前後ともmain上の文書pushを比較した実測値。
+- `AGENTS.md` 単独の分類はローカルテストで確認した。main上の実pushには内容のある既存検証記録の更新を使った。
+
+公開フラグの読取APIは利用できなかったが、統合コミットのverifyログで `Publication mode: enabled (true; manual publish=true dispatch still required).` を確認した。
+
+### main 上の通常 push と停止判断
+
+WebKit group 2の「Run standalone itch smoke test before Browser UI suite」で、2回目の対局開始・打牌確認時に `tests/browser-itch-package.py:317` のassertが失敗した。打牌受理の診断は取得できたが、取得した診断に `GameController.confirm` 由来の期待する状態遷移は含まれていなかった。原因は未確定。スモークテスト本体とBrowser UI workflowは統合前mainと同一であり、assertやゲートは変更していない。[失敗job](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44960150625/job/137017389804)
+
+必須ゲートの失敗により作業を停止した。停止判断時点で通常pushの残り3ブラウザーグループは進行中で、auditとpublishの最終結果は未確認。通常pushの公開callerはイベント条件で対象外。docs-only runではpublishのskipを確認した。Worker/Pagesの最新deployment IDとSHAは統合前と同一だった。非公開手動 `publish=false` は停止条件に従い未実施。公開用 `publish=true` も実行していない。
+
+確認済みのリモートmain先端は `85999b4c59c39b5be1dbc8521b6c689c671199fc`。docs-only実測以降の追記は、停止条件に従い作業ツリーに保存した。通常pushの必須ゲート成功と手動全検証が未達のため、Issue #57はOpenのまま。
+
+### WebKit itchスモークの競合修正
+
+前回停止時の追記は当時の記録として保持した。失敗runの最終結果は、分類・docs-check・verify・環境分離2件・local-online・Browser UIの残り3グループが成功、WebKit group 2とauditが失敗、publishがskipだった。[通常push #44960150625](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44960150625)
+
+失敗時も打牌受理、`GameController.confirm` 由来の遷移、選択牌の手牌からの消失と河または公開面子での一意性を要求するPlaywrightの待機は成立していた。その後、診断画面を経由して直近40件だけを読み直す間にCPUが進み、確認済みの遷移が抜粋範囲から外れてassertが失敗した。Issue #57統合前後でスモークテスト、Browser UI workflow、ゲームソースは同一だった。[失敗job](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44960150625/job/137017389804)・[診断JSONとtrace](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44960150625/artifacts/14729460966)
+
+修正前mainは `85999b4c59c39b5be1dbc8521b6c689c671199fc`、参照developは `3d3a1bd76d8c6fd55b2f09ae50e2375ba4d180aa`。developの `d701d227e94563dab5f367d38a9287df4e200c2a`、`9b1f49264565419fa06b1578f25d1279d9bac12e`、`d353bacc92acd34155c92d9cd72c678e522b3c68` から、`tests/browser-itch-package.py` と `tests/test_itch_smoke_startup.py` の差分だけを `e84b2f023d0aa1b9222c6cc504fe40e2d0b342d5` としてmainへ反映した。
+
+打牌前に確認した操作IDを除外し、新規打牌の開始・受理を同じIDで対応付け、その間に記録された `GameController.confirm` 遷移と牌の位置を診断画面を開く前に取得する。証拠を確保した後も牌の移動先の検査と失敗時の直近40件の診断を維持する。5秒の待機上限と既存の検査条件は維持した。CPU鳴きと40件を超える後続CPUログを同時に検査する回帰ケースを含め、関連ユニットテスト13件が成功した。
+
+現行mainのworkflowにWebKitスモーク単独起動の入力はなく、ローカルPlaywrightのWebKit取得も配信元でHTTP 403だった。ブラウザー実行結果は、既存のGitHub Actions WebKit group 2のstandalone itchスモークで確認する。[修正後の通常push #44963268562](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44963268562)
+
+修正後の通常pushではWebKit standalone itchスモークが回帰suiteの前後で各3回成功した。制御失敗を使ったスクリーンショット、Playwright trace、診断JSONの採取検査も成功した。通常CIの全必須ゲート成功とpublishのskipを確認した後、同じmain SHAを対象に `publish=false` を明示して手動起動した。[WebKit group 2](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44963268562/job/137026876986)・[非公開手動検証 #44965425797](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44965425797)
+
+### 修正後 main の最終検証（2026-11-22 UTC）
+
+検証対象SHAは `e84b2f023d0aa1b9222c6cc504fe40e2d0b342d5`。通常pushと手動 `publish=false` の両runがsuccess。手動runでもWebKit standalone itchスモーク前後各3回と制御失敗時の診断採取に成功した。
+
+| Job | 通常push #44963268562 | 手動 `publish=false` #44965425797 |
+| --- | --- | --- |
+| `classify-changes` | success | success |
+| `verify` | success | success |
+| `docs-check` | success | success |
+| `local-online` | success | success |
+| `isolation-browser (chromium)` | success | success |
+| `isolation-browser (webkit)` | success | success |
+| `browser-ui / browser-ui (webkit, group 1)` | success | success |
+| `browser-ui / browser-ui (chromium, group 1)` | success | success |
+| `browser-ui / browser-ui (chromium, group 2)` | success | success |
+| `browser-ui / browser-ui (webkit, group 2)` | success | success |
+| `browser-ui / detect-changes` | skipped | skipped |
+| `browser-ui / docs-check` | skipped | skipped |
+| `browser-ui / verify-build` | skipped | skipped |
+| `audit` | success | success |
+| `publish` | skipped | skipped |
+
+Browser UI内でskipされた3件は、呼び出し元の検証済みビルドを再利用するための既存の分岐。全4グループは両runで成功し、auditが確認した。
+
+本番WorkerとPagesの最新deployment IDはそれぞれ `7965528881` と `7965544141`、SHAは両方 `3c52d17b7c301cb8a4ff5d22fa53bb5594cade94` で作業前と同一。旧Deploy workflowは手動無効の状態を維持した。公開用 `publish=true` の実行は対象外で、公開保護は既存テスト・workflow条件と両runのskipで確認した。
+
+受入条件7件は、mainの文書のみpush、限定テスト、修正後mainの通常pushと非公開手動検証で照合した。AGENTS.md単独は分類テスト、実pushは本検証文書の更新で確認した。ローカルWebKitは取得制限があり、WebKitの実行はGitHub Actionsで検証した。iPhone Safari実機と上位階層の外部ルールは今回の実行対象外。Issue本文とチェックボックスは変更せずOpenを維持する。
