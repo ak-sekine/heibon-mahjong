@@ -400,3 +400,29 @@ test('main reuse deliberately skips the repeated suite but requires successful r
   assert.match(audit, /contents: read\s*deployments: read/);
   assert.doesNotMatch(audit, /secrets\.|: write/);
 });
+
+test('production audit runs after successful Pages publication despite an intentionally skipped Worker', () => {
+  const publisher = read('.github/workflows/publish-environments.yml');
+  const condition = jobCondition(publisher, 'audit-production');
+  const cases = [
+    { name: 'production success', publishResult: 'success', expected: true },
+    { name: 'Pages or ledger finalization failed', publishResult: 'failure' },
+    { name: 'Pages job cancelled', publishResult: 'cancelled' },
+    { name: 'Pages job skipped', publishResult: 'skipped' },
+    { name: 'workflow cancelled after publication', publishResult: 'success', canceled: true },
+    { name: 'develop publication', branch: 'develop', publishResult: 'success' },
+    { name: 'Issue branch publication', branch: 'issue/62-audit', publishResult: 'success' },
+  ];
+  for (const { name, publishResult, expected = false, branch = 'main', canceled = false } of cases) {
+    const production = branch === 'main';
+    const results = {
+      'worker-production': production ? 'success' : 'skipped',
+      'worker-development': production ? 'skipped' : 'success',
+      reserve: 'success',
+      online: 'success',
+      publish: publishResult,
+    };
+    const context = workflowContext({ branch, canceled, results });
+    assert.equal(evaluateJobCondition(condition, context, Object.values(results)), expected, name);
+  }
+});

@@ -312,7 +312,8 @@ jobs:
           printf 'commit=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
   audit-production:
     needs: publish
-    if: ${{ github.ref == 'refs/heads/main' && needs.publish.result == 'success' }}
+    # The unselected Worker job is an intentionally skipped ancestor.
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && needs.publish.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
