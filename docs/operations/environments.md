@@ -4,7 +4,7 @@
 
 | 項目 | 本番 | 開発 |
 |---|---|---|
-| branch | main | 承認済みの `issue/**`（移行中は従来のdevelopも利用可能） |
+| branch | main | 承認済みの `issue/<番号>-<説明>` |
 | URL | https://ak-sekine.github.io/heibon-mahjong/ | https://ak-sekine.github.io/heibon-mahjong/dev/ |
 | Cloudflareアカウント | 本番・開発で同一 | 本番と同一 |
 | Worker名 | heibon-mahjong-online | heibon-mahjong-online-dev |
@@ -18,20 +18,19 @@
 
 1. 本番・開発で同一のCloudflareアカウントを使用し、workers.devを初期化。WorkersとSQLite DOを有効化する。Worker名は本番`heibon-mahjong-online`、開発`heibon-mahjong-online-dev`を維持する。
 2. GitHub Environment `worker-production`をmain限定にし、secret `CLOUDFLARE_PRODUCTION_API_TOKEN`を登録する。旧公開経路のrepository secretは維持する。削除は今回の切替作業に含めず、別途ユーザーの明示的許可を得る。
-3. `worker-development`は移行前のdevelopを維持し、承認されたIssue refだけを新経路に許可する。同じCloudflareアカウント用のtokenをEnvironment secret `CLOUDFLARE_DEVELOPMENT_API_TOKEN`へ登録する。Secretsの登録先・名前は本番と区別する。tokenをチャットやリポジトリへ貼らない。DO migrationsは各Workerに適用され、ROOMS / RATE_LIMITERは各Worker自身のクラスへbindする。外部Workerのscript_nameやnamespace IDを指定しないため、クラス名・migration tagが同じでも状態は共有されない。
+3. `worker-development`はブランチパターン `issue/*` だけを許可する。同じCloudflareアカウント用のtokenをEnvironment secret `CLOUDFLARE_DEVELOPMENT_API_TOKEN`へ登録する。Secretsの登録先・名前は本番と区別する。tokenをチャットやリポジトリへ貼らない。DO migrationsは各Workerに適用され、ROOMS / RATE_LIMITERは各Worker自身のクラスへbindする。外部Workerのscript_nameやnamespace IDを指定しないため、クラス名・migration tagが同じでも状態は共有されない。
 4. repository variable `CLOUDFLARE_ACCOUNT_ID`に共通アカウントIDを登録する。新経路の両Worker jobはこの変数を参照する。旧`CLOUDFLARE_PRODUCTION_ACCOUNT_ID` / `CLOUDFLARE_DEVELOPMENT_ACCOUNT_ID`は新経路では不要。旧deploy.ymlの同名repository **secret** `CLOUDFLARE_ACCOUNT_ID`は旧公開経路用であり、variable登録とは別に既存値を維持する。`PRODUCTION_WORKER_URL` / `DEVELOPMENT_WORKER_URL`には同アカウントの各Workerの実workers.dev URLを登録する。URLはCloudflare出力で確認し、検証fixtureを登録しない。
-5. `github-pages` Environmentの許可branchとPages Actions設定を確認。新publisherのGITHUB_TOKENにはcontents:write、pages:write、id-token:writeが必要。保存ブランチ`pages-verified`は2026-11-11に`232205c5efc7f86df8d70432a62224e82b4fb0ed`で初期化済み。`state.json`は`{"version":1,"current":{},"pending":null}`で、公開snapshotは未登録。再作成せず、まず現状を取得・検証する。別リポジトリで初期化する場合も取得失敗を空状態と判断せず、明示的に初期台帳を作る。main/developのソースファイルを混ぜず、Git履歴を保持する。削除・force pushを禁止する。
+5. `github-pages` Environmentは `main` と `issue/*` を許可する。Pages Actions設定も公開前に確認する。新publisherのGITHUB_TOKENにはcontents:write、pages:write、id-token:writeが必要。保存ブランチ`pages-verified`は2026-11-11に`232205c5efc7f86df8d70432a62224e82b4fb0ed`で初期化済み。`state.json`は`{"version":1,"current":{},"pending":null}`で、公開snapshotは未登録。再作成せず、まず現状を取得・検証する。別リポジトリで初期化する場合も取得失敗を空状態と判断せず、明示的に初期台帳を作る。main/developのソースファイルを混ぜず、Git履歴を保持する。削除・force pushを禁止する。
 6. #47の初回切替では旧公開を進行中のまま切り替えない。旧production-deployを完了させ、本番SW移行版の公開・既存PWA更新を検証してから新経路を有効化する。移行中にdevelopを公開しない。
 7. #47の初期登録は[切替手順Phase 2〜5](issue-47-cutover.md)：旧経路で本番PWAを先行移行・実機確認し、その実公開artifactを再ビルドせず保存branchへ登録する。旧run終了・旧workflow Disable後にフラグを有効化し、最初の新経路公開をdevelopで行う。登録済みと同じmain SHAの再publishは拒否される。空の本番をdevで上書きすることはできない。フラグだけでは現在mainの旧workflowや開始済みrunを停止できない。
 
 Issue #64は既存のCloudflare構成を維持する。Workers編集tokenは同一アカウント内の他Workerへ権限を持つ場合があり、別EnvironmentをCloudflare権限の隔離とみなさない。
 
-外部設定の最新確認範囲は[2026-11-12移行前記録](../verification/issue-47-preflight-2026-11-12.md)を参照。Variables/Secrets一覧APIは403。Pagesとbranch制限は確認済み。Actions入力の両URLには末尾slashがあり、新公開前にユーザーが修正する。設定完了後も公開前のチェックは省略しない。
+2026-11-23に3つのEnvironmentの現行許可をAPIで確認した。許可ルールIDと確認範囲は[Issue #64検証記録](../verification/issue64-github-flow-migration.md)を参照。初期設定の経緯は[2026-11-12移行前記録](../verification/issue-47-preflight-2026-11-12.md)に保存している。
 
-## 開発Workerの初回作成
+## 旧開発Workerの初回作成
 
-main未変更・開発URL未登録での作成は[専用手順](bootstrap-development-worker.md)を使用する。
-通常公開経路とは独立し、ユーザーの明示的な許可後に専用メッセージ付きdevelop pushで実行する。
+[Issue #47の初回作成・検査手順](bootstrap-development-worker.md)は履歴として保持する。旧bootstrapとinspectはdevelopが `worker-development` に許可されていないため利用できない。
 
 ## Issueブランチ、開発公開、main統合
 
@@ -45,7 +44,7 @@ main未変更・開発URL未登録での作成は[専用手順](bootstrap-develo
 
 開発候補の公開元は、台帳のsource SHA、完全ref、公開workflow ref/SHA、run/attemptと `verified/development/<SHA>` タグで追跡する。短命ブランチを削除する前に、候補が配信対象から外れ、台帳と監査結果および参照が維持され、未push変更と未解決pendingがないことを確認する。不採用候補は承認を失効させ、配信中なら承認済み後継候補で置換する。
 
-新経路の公開と監査が成功し、旧機能と来歴の保持を確認した後、承認済みの作業として旧develop公開の手順・許可ref・bootstrap経路を停止する。台帳と実配信状態が不明な間は旧経路も再開しない。developブランチの削除は別途明示承認が必要。
+旧developのWorkerとPages公開許可は削除済み。手動公開の入口が残っていても `worker-credentials` がEnvironmentで拒否され、台帳予約前に止まる。developの通常CIと読み取り専用監査の起動条件は維持する。現在の配信来歴はmain側の [通常Phase 6-A](../../.github/workflows/issue47-phase6a-live-audit.yml) で監査する。developは履歴保持のため存続し、削除には別途明示承認が必要。旧経路の再開が必要なら、新たな承認を得て進行中の公開、台帳、実配信、Workerと復旧手順を再照合する。
 
 ## 成果物とSHA
 
