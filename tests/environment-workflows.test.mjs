@@ -183,8 +183,9 @@ test('new publication remains manual and branch scoped; legacy production gate i
   for (const [name, expectedBranch] of [['worker-production', 'main'], ['worker-development', 'develop']]) {
     const condition = jobCondition(publisher, name);
     for (const branch of ['main', 'develop']) {
-      const context = workflowContext({ branch });
+      const context = workflowContext({ branch, results: { reserve: 'success' } });
       assert.equal(evaluateJobCondition(condition, context, ['success']), branch === expectedBranch);
+      context.needs.reserve.result = 'failure';
       assert.equal(evaluateJobCondition(condition, context, ['failure']), false);
     }
   }
@@ -241,7 +242,7 @@ test('new publication remains manual and branch scoped; legacy production gate i
     }
   }
 
-  const issue = workflowContext({ branch: 'issue/64-main-github-flow' });
+  const issue = workflowContext({ branch: 'issue/64-main-github-flow', results: { reserve: 'success' } });
   assert.equal(evaluateJobCondition(condition, issue, []), true);
   assert.equal(evaluateJobCondition(jobCondition(publisher, 'worker-development'), issue, []), true);
   assert.equal(evaluateJobCondition(jobCondition(publisher, 'worker-production'), issue, []), false);
@@ -424,5 +425,53 @@ test('production audit runs after successful Pages publication despite an intent
     };
     const context = workflowContext({ branch, canceled, results });
     assert.equal(evaluateJobCondition(condition, context, Object.values(results)), expected, name);
+  }
+});
+
+test('selected Worker requires a successful reservation and tolerates an intentionally skipped source check', () => {
+  const publisher = read('.github/workflows/publish-environments.yml');
+  const cases = [
+    { name: 'production full', expected: 'worker-production' },
+    { name: 'production reuse', reuseProduction: true, source: 'success', expected: 'worker-production' },
+    { name: 'development Issue', branch: 'issue/62-candidate', expected: 'worker-development' },
+    { name: 'develop ref', branch: 'develop', expected: 'worker-development' },
+    { name: 'invalid ref', branch: 'feature/other' },
+    { name: 'untrusted Issue ref', branch: 'issue/62-candidate', repository: 'other/repo' },
+    { name: 'push', event: 'push' },
+    { name: 'publication disabled', dualPages: 'false' },
+    { name: 'workflow cancelled', canceled: true },
+  ];
+  for (const { name, expected, source = 'skipped', ...options } of cases) {
+    for (const reserve of ['success', 'failure', 'skipped', 'cancelled']) {
+      const context = workflowContext({ branch: 'main', ...options, results: { reserve } });
+      for (const worker of ['worker-production', 'worker-development']) {
+        assert.equal(evaluateJobCondition(jobCondition(publisher, worker), context, ['success', source, reserve]),
+          reserve === 'success' && worker === expected, `${name}, ${reserve}, ${worker}`);
+      }
+    }
+  }
+});
+
+test('a reserved publication fails closed if Pages or the required production audit does not complete', () => {
+  const publisher = read('.github/workflows/publish-environments.yml');
+  const completion = jobSection(publisher, 'check-publication-completion');
+  assert.match(completion, /needs: \[reserve, publish, audit-production\]/);
+  assert.match(completion, /permissions: \{\}/);
+  assert.match(completion, /^        run: exit 1$/m);
+  const condition = jobCondition(publisher, 'check-publication-completion');
+  for (const branch of ['main', 'issue/62-candidate']) {
+    for (const publish of ['success', 'failure', 'skipped', 'cancelled']) {
+      for (const audit of ['success', 'failure', 'skipped', 'cancelled']) {
+        const results = { reserve: 'success', publish, 'audit-production': audit };
+        const context = workflowContext({ branch, results });
+        assert.equal(evaluateJobCondition(condition, context, Object.values(results)),
+          publish !== 'success' || (branch === 'main' && audit !== 'success'), `${branch}, ${publish}, ${audit}`);
+      }
+    }
+  }
+  for (const options of [{ results: { reserve: 'skipped' } }, { canceled: true, results: { reserve: 'success' } }]) {
+    const results = { publish: 'skipped', 'audit-production': 'skipped', ...options.results };
+    assert.equal(evaluateJobCondition(condition, workflowContext({ branch: 'main', ...options, results }),
+      Object.values(results)), false);
   }
 });

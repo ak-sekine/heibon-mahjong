@@ -142,7 +142,7 @@ jobs:
           printf 'snapshot=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
   worker-production:
     needs: reserve
-    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' }}
+    if: ${{ !cancelled() && needs.reserve.result == 'success' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     concurrency:
       group: worker-production
@@ -172,7 +172,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
   worker-development:
     needs: reserve
-    if: ${{ (github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' }}
+    if: ${{ !cancelled() && needs.reserve.result == 'success' && (github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     concurrency:
       group: worker-development
@@ -333,3 +333,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           FINALIZED_SNAPSHOT: ${{ needs.publish.outputs.finalized }}
         run: node .github/scripts/audit-main-publication.mjs store
+
+  check-publication-completion:
+    needs: [reserve, publish, audit-production]
+    if: >-
+      ${{ !cancelled() && needs.reserve.result == 'success'
+        && (needs.publish.result != 'success'
+          || (github.ref == 'refs/heads/main' && needs.audit-production.result != 'success')) }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Report incomplete publication
+        run: exit 1
