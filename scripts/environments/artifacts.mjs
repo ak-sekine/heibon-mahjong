@@ -111,6 +111,10 @@ export function stage(store, candidate, latestSha, expectedWorkerUrl, reservatio
     const { sourceRef, workflowRef, workflowSha, baseSha, runId, attempt } = reservation;
     current[environment].publication = { sourceRef, workflowRef, workflowSha, baseSha, runId, attempt };
   }
+  if (reservation?.sourceVerification) {
+    const { runId, attempt } = reservation;
+    current[environment].publication = { runId, attempt, sourceVerification: reservation.sourceVerification };
+  }
   writeFileSync(path.join(site, 'environments.json'), JSON.stringify(current, null, 2) + '\n');
   const pending = { environment, sha: release.sha, previous, current, siteDigest: digest(inventory(site)) };
   if (reservation) pending.reservation = { runId: reservation.runId, attempt: reservation.attempt };

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isIssueRef } from '../../scripts/environments/issue-ref.mjs';
+import { validateEvidence } from './reuse-production-ci.mjs';
 import { digest, inventory, stage } from '../../scripts/environments/artifacts.mjs';
 
 export function publicationIdentity(env) {
@@ -39,6 +40,15 @@ export function preparePublication(store, candidate, workerUrl, env = process.en
       '--jq', '.status'], { encoding: 'utf8' }).trim();
     if (status !== 'ahead') throw new Error('Issue candidate is not based on current main');
   }
+  if (env.REUSE_PRODUCTION === 'true') {
+    if (publication.environment !== 'production' || publication.attempt !== '1') {
+      throw new Error('Only a new production dispatch can reuse verification');
+    }
+    publication.sourceVerification = validateEvidence(JSON.parse(env.SOURCE_VERIFICATION));
+    if (String(publication.sourceVerification.runId) === publication.runId) {
+      throw new Error('Source and publication run must differ');
+    }
+  } else if (env.SOURCE_VERIFICATION) throw new Error('Unexpected source verification evidence');
   stage(store, candidate, latestSha, workerUrl, publication);
 }
 

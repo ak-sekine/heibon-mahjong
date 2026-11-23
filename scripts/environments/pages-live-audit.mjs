@@ -1,3 +1,5 @@
+import { REQUIRED_ENVIRONMENT_JOBS } from '../../.github/scripts/check-browser-ui-matrix.mjs';
+import { validateEvidence, REPOSITORY_ID } from '../../.github/scripts/reuse-production-ci.mjs';
 import { isIssueRef } from './issue-ref.mjs';
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -294,13 +296,26 @@ function workflowPathMatches(runPath, expectedPath) {
 async function releaseRun(environment, saved, context, pagesLink) {
   const sourceSha = saved.sha;
   const publication = saved.publication;
-  if (publication && (environment !== 'development' || !isIssueRef(publication.sourceRef) ||
+  const reused = environment === 'production' && publication?.sourceVerification;
+  if (reused) {
+    try {
+      validateEvidence(reused);
+      if (!/^[1-9][0-9]*$/.test(publication.runId) || publication.attempt !== '1' ||
+          String(reused.runId) === publication.runId || (pagesLink && String(pagesLink.runId) !== publication.runId)) {
+        throw new Error('Wrong publication run identity');
+      }
+    } catch {
+      throw new AuditError('SNAPSHOT_INVALID', 'invalid saved production verification identity');
+    }
+  }
+  const issuePublication = publication && !reused;
+  if (issuePublication && (environment !== 'development' || !isIssueRef(publication.sourceRef) ||
       publication.workflowSha !== sourceSha || !SHA_RE.test(publication.baseSha || '') ||
       publication.workflowRef !== `${context.repository}/${WORKFLOW_PATHS.environments}@${publication.sourceRef}` ||
       !/^[1-9][0-9]*$/.test(publication.runId) || !/^[1-9][0-9]*$/.test(publication.attempt))) {
     throw new AuditError('SNAPSHOT_INVALID', 'invalid saved Issue publication identity');
   }
-  const branch = publication ? publication.sourceRef.slice('refs/heads/'.length)
+  const branch = issuePublication ? publication.sourceRef.slice('refs/heads/'.length)
     : environment === 'development' ? 'develop' : 'main';
   const runsUrl = `${context.apiBase}/repos/${context.repository}/actions/runs`;
   const query = new URLSearchParams({ branch, head_sha: sourceSha, per_page: '100' });
@@ -322,7 +337,7 @@ async function releaseRun(environment, saved, context, pagesLink) {
   });
   const run = runs.sort((a, b) => Date.parse(b.updated_at || b.created_at) - Date.parse(a.updated_at || a.created_at))[0];
   if (!run) throw new AuditError('PUBLICATION_RUN_NOT_FOUND', `successful ${branch} publication run not found for ${sourceSha}`, pagesLink);
-  if (publication) {
+  if (issuePublication) {
     const retained = await apiJson(`${context.apiBase}/repos/${context.repository}/git/ref/tags/verified/development/${sourceSha}`, {
       ...context, label: 'retained Issue publication commit',
     });
@@ -356,7 +371,31 @@ async function releaseRun(environment, saved, context, pagesLink) {
     const relocated = publicationJobs.some(name => byName.has('publish / ' + name));
     const prefix = relocated ? 'publish / ' : '';
     const opposite = environment === 'production' ? 'development' : 'production';
-    const required = [...EXPECTED_ENVIRONMENT_JOBS, prefix + 'online', prefix + 'worker-' + environment];
+    if (reused) {
+      const source = await apiJson(`${runsUrl}/${reused.runId}/attempts/1`, {
+        ...context, label: 'reused production push CI',
+      });
+      if (source?.id !== reused.runId || source.workflow_id !== reused.workflowId ||
+          source.repository?.id !== REPOSITORY_ID || source.head_repository?.id !== REPOSITORY_ID ||
+          source.head_branch !== 'main' || source.head_sha !== sourceSha || source.event !== 'push' ||
+          source.run_attempt !== 1 || source.status !== 'completed' || source.conclusion !== 'success' ||
+          !workflowPathMatches(source.path, WORKFLOW_PATHS.environments)) {
+        throw new AuditError('PUBLICATION_REF_MISMATCH', 'saved production verification run mismatch');
+      }
+      const sourceJobs = await apiJson(`${runsUrl}/${reused.runId}/attempts/1/jobs?per_page=100`, {
+        ...context, label: 'reused production push CI jobs',
+      });
+      if (!Array.isArray(sourceJobs?.jobs) || sourceJobs.total_count !== sourceJobs.jobs.length ||
+          !REQUIRED_ENVIRONMENT_JOBS.every(name => {
+            const matching = sourceJobs.jobs.filter(job => job.name === name);
+            return matching.length === 1 && matching[0].run_id === reused.runId && matching[0].run_attempt === 1 &&
+              matching[0].status === 'completed' && matching[0].conclusion === 'success';
+          })) throw new AuditError('PUBLICATION_RUN_JOBS_FAILED', 'saved production verification jobs incomplete');
+    }
+    const verificationJobs = reused
+      ? ['classify-changes', 'docs-check', 'publish / verify-production-source', 'publish / publish']
+      : EXPECTED_ENVIRONMENT_JOBS;
+    const required = [...verificationJobs, prefix + 'online', prefix + 'worker-' + environment];
     if (relocated) required.push('publish / reserve');
     const missing = required.filter(name => byName.get(name) !== 'success');
     const otherWorker = prefix + 'worker-' + opposite;

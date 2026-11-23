@@ -1,6 +1,10 @@
 name: Publish verified environment snapshots
 on:
   workflow_call:
+    inputs:
+      reuse_production:
+        type: boolean
+        default: false
     secrets:
       CLOUDFLARE_PRODUCTION_API_TOKEN:
         required: true
@@ -13,6 +17,41 @@ concurrency:
   group: pages-publication
   cancel-in-progress: false
 jobs:
+  verify-production-source:
+    needs: worker-credentials
+    if: ${{ inputs.reuse_production && needs.worker-credentials.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      evidence: ${{ steps.source.outputs.evidence }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify current publication settings and source CI
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DUAL_PAGES_ENABLED: ${{ vars.DUAL_PAGES_ENABLED }}
+          PRODUCTION_WORKER_URL: ${{ vars.PRODUCTION_WORKER_URL }}
+          DEVELOPMENT_WORKER_URL: ${{ vars.DEVELOPMENT_WORKER_URL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node .github/scripts/validate-publication-settings.mjs
+          node .github/scripts/reuse-production-ci.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: checked-production-zip-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/verified-pages.zip
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
   worker-credentials:
     if: ${{ github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
     runs-on: ubuntu-latest
@@ -30,8 +69,12 @@ jobs:
             exit 1
           fi
   reserve:
-    needs: worker-credentials
-    if: ${{ github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
+    needs: [worker-credentials, verify-production-source]
+    if: >-
+      ${{ !cancelled() && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) &&
+        needs.worker-credentials.result == 'success' &&
+        ((inputs.reuse_production && needs.verify-production-source.result == 'success') ||
+          (!inputs.reuse_production && needs.verify-production-source.result == 'skipped')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -52,15 +95,29 @@ jobs:
           path: store
           fetch-depth: 1
       - uses: actions/download-artifact@v4
+        if: ${{ !inputs.reuse_production }}
         with:
           name: ${{ github.ref_name == 'main' && 'pages-dist' || 'development-dist' }}-${{ github.sha }}-${{ github.run_attempt }}
           path: candidate
+      - uses: actions/download-artifact@v4
+        if: ${{ inputs.reuse_production }}
+        with:
+          name: checked-production-zip-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/checked-production
       - name: Reserve the verified snapshot before deploying the Worker
         id: reserve
         env:
           GH_TOKEN: ${{ github.token }}
+          REUSE_PRODUCTION: ${{ inputs.reuse_production }}
+          SOURCE_VERIFICATION: ${{ needs.verify-production-source.outputs.evidence }}
           EXPECTED_WORKER_URL: ${{ github.ref_name == 'main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
         run: |
+          set -euo pipefail
+          if [[ "$REUSE_PRODUCTION" == true ]]; then
+            archive="$RUNNER_TEMP/checked-production/verified-pages.zip"
+            node source/.github/scripts/reuse-production-ci.mjs check-zip "$archive"
+            python3 source/.github/scripts/extract-pages-zip.py "$archive" candidate
+          fi
           if [[ "$GITHUB_REF" == refs/heads/issue/* ]]; then
             node source/.github/scripts/check-issue-publication-ci.mjs
             production_worker="$(node source/.github/scripts/check-issue-publication-site.mjs worker store)"
@@ -193,6 +250,8 @@ jobs:
     needs: [reserve, online]
     if: ${{ !cancelled() && needs.reserve.result == 'success' && needs.online.result == 'success' }}
     runs-on: ubuntu-latest
+    outputs:
+      finalized: ${{ steps.finalize.outputs.commit }}
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -241,10 +300,35 @@ jobs:
           test "$(node source/.github/scripts/check-issue-publication-site.mjs worker store)" = "$PRODUCTION_WORKER"
           node source/.github/scripts/publication-reservation.mjs check store
       - name: Confirm snapshot after successful Pages deployment
+        id: finalize
         run: |
+          set -euo pipefail
           node source/scripts/environments/artifacts.mjs finalize store
           git -C store config user.name github-actions[bot]
           git -C store config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git -C store add state.json
           git -C store commit -m "Confirm Pages $GITHUB_REF_NAME $GITHUB_SHA"
           git -C store push origin HEAD:pages-verified
+          printf 'commit=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  audit-production:
+    needs: publish
+    if: ${{ github.ref == 'refs/heads/main' && needs.publish.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      deployments: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.publish.outputs.finalized }}
+          path: store
+          persist-credentials: false
+      - name: Audit finalized production separately from deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINALIZED_SNAPSHOT: ${{ needs.publish.outputs.finalized }}
+        run: node .github/scripts/audit-main-publication.mjs store

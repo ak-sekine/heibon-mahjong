@@ -85,3 +85,13 @@ PWA更新は対局の区切りで行う。同環境の複数タブは更新を�
 7. 新規テストルームのみ使用し、各Workerで作成→参加→対局→再接続。他環境のtokenで復帰できないこと、作成したルームが反対環境に現れないこと。6文字コードが偶然一致してもWorkerごとに独立した別ルームであり、コードだけでは環境を識別できない。公開済みの他人のルームを変更しない。
 
 未確認が残る間はIssue #47をCloseしない。
+
+## 本番公開時の検証結果再利用（Issue #62）
+
+本番の手動公開は latest main の `Verify isolated environments` で `publish=true` を指定する。`production_validation=reuse`（既定）は、同じ SHA の一意な main push run の attempt 1、全必須ジョブ、最終 audit、その audit に記録された Pages artifact ID・ZIP digest を照合する。同じ ZIP を ID 指定で取得し、ZIP と展開後の各ファイルを別々に検証する。公開 run と検証元の識別情報は公開台帳で区別する。
+
+docs-only、再実行済みの CI、欠損や期限切れなどで再利用できない場合は公開を停止する。公開が必要で既存の承認・CI 条件を満たす場合は、新規 dispatch で明示的に `production_validation=full` を選ぶ。この経路は従来通り検証から成果物を作る。`publish=false` は全検証を実行する。未解決の予約や古い SHA は全検証経路でも公開できない。
+
+本番の Worker・オンライン検証・Pages・台帳確定が成功した後に別ジョブで配信バイト列、台帳、main と公開 SHA、GitHub deployment 記録、公開 Worker のヘルスを照合する。監査失敗時は公開操作がすでに完了している場合があるため、再実行前に台帳・deployment・配信状態を確認する。Worker のヘルスと GitHub deployment は Cloudflare token の実効権限や稼働バージョン ID を証明しない。
+
+変更前後の比較は同一 SHA の main push と公開成功 dispatch を1組とし、run 数、skip を除いたジョブ数、run の開始から完了まで、各実行ジョブの時間合計、push run 作成から Pages の公開完了までを別々に記録する。公開後監査は独立して集計し、公開判定・承認待ちを可能な範囲で分ける。Issue ブランチでは fixture と CI の確認を行い、本番の公開結果・所要時間は main 統合後に承認済みの作業で測定する。

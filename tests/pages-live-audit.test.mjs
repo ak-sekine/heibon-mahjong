@@ -3,6 +3,7 @@ import test from 'node:test';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { REQUIRED_ENVIRONMENT_JOBS } from '../.github/scripts/check-browser-ui-matrix.mjs';
 import { digest, inventory, renderSummary, runAudit, sha256, classifyTransportError } from '../scripts/environments/pages-live-audit.mjs';
 
 const repo = 'ak-sekine/heibon-mahjong';
@@ -103,6 +104,8 @@ function mockFetch(snapshotRoot, {
   pagesDeployment = {},
   publicationRun = {},
   publicationJob = {},
+  reuseProduction = false,
+  sourceJobResult = 'success',
   pagesApiStatus = 200,
 } = {}) {
   const productionLatest = latestPages === 'production';
@@ -134,6 +137,16 @@ function mockFetch(snapshotRoot, {
         const sha = branch === 'main' ? 'e'.repeat(40) : branch === 'develop' ? 'd'.repeat(40) : 'c'.repeat(40);
         return new Response(JSON.stringify({ sha }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
+      if (reuseProduction && apiPath.endsWith('/actions/runs/90/attempts/1')) {
+        return Response.json({ id: 90, workflow_id: 415213931, path: ENVIRONMENTS_WORKFLOW,
+          head_branch: 'main', head_sha: prodSha, event: 'push', run_attempt: 1, status: 'completed', conclusion: 'success',
+          repository: { id: 1415016053 }, head_repository: { id: 1415016053 } });
+      }
+      if (reuseProduction && apiPath.endsWith('/actions/runs/90/attempts/1/jobs')) {
+        const jobs = REQUIRED_ENVIRONMENT_JOBS.map((name, index) => ({ name, run_id: 90, run_attempt: 1,
+          status: 'completed', conclusion: index === 0 ? sourceJobResult : 'success' }));
+        return Response.json({ total_count: jobs.length, jobs });
+      }
       const runMatch = apiPath.match(/\/actions\/runs\/(\d+)$/);
       if (apiPath.endsWith('/actions/runs') || runMatch) {
         if (runMatch && Number(runMatch[1]) !== pagesRunId) return new Response('not found', { status: 404 });
@@ -145,13 +158,17 @@ function mockFetch(snapshotRoot, {
           head_branch: branch, head_sha: sha, path: env === 'development' ? ENVIRONMENTS_WORKFLOW : productionWorkflowPath,
           status: 'completed', conclusion: 'success', event: env === 'development' || productionWorkflowPath === ENVIRONMENTS_WORKFLOW ? 'workflow_dispatch' : 'push',
           run_attempt: 1, html_url: `https://github.com/${repo}/actions/runs/${env === 'development' ? 200 : 100}`,
+          head_repository: { full_name: repo },
           created_at: releaseDates[env].created, updated_at: releaseDates[env].updated,
         };
         return Response.json(runMatch ? { ...run, ...publicationRun } : { workflow_runs: [run] });
       }
       if (/\/actions\/runs\/(100|200)(?:\/attempts\/1)?\/jobs$/.test(apiPath)) {
         const env = apiPath.includes('/200/') ? 'development' : 'production';
-        const jobs = jobNames(env, productionWorkflowPath).map(name => ({ name, conclusion: 'success' }));
+        const names = reuseProduction && env === 'production'
+          ? ['classify-changes', 'docs-check', 'publish / verify-production-source', 'publish / publish', 'online', 'worker-production']
+          : jobNames(env, productionWorkflowPath);
+        const jobs = names.map(name => ({ name, conclusion: 'success' }));
         if (apiPath.includes('/attempts/')) {
           const job = jobs.find(job => job.name === (env === 'production' && productionWorkflowPath === LEGACY_PRODUCTION_WORKFLOW ? 'pages-deploy' : 'publish / publish'));
           Object.assign(job, {
@@ -586,5 +603,24 @@ test('Issue deployment origin survives source branch removal and rejects an inco
       if (tagSha === devSha) assert.equal(report.provenance.runs.development.branch, branch);
       else assert(report.failures.some(failure => failure.kind === 'PUBLICATION_REF_MISMATCH'));
     }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('live audit traces a reused production publication back to its complete push attempt', async () => {
+  const root = setup();
+  try {
+    const state = JSON.parse(readFileSync(path.join(root, 'state.json')));
+    state.current.production.publication = { runId: '100', attempt: '1', sourceVerification: {
+      workflowId: 415213931, workflowRef: repo + '/' + ENVIRONMENTS_WORKFLOW + '@refs/heads/main',
+      runId: 90, attempt: 1, artifactId: 30, digest: 'sha256:' + 'f'.repeat(64), expiresAt: '2027-02-20T00:00:00Z',
+    } };
+    writeFile(root, 'state.json', JSON.stringify(state));
+    writeFile(root, 'site/environments.json', JSON.stringify(state.current));
+    const options = { productionWorkflowPath: ENVIRONMENTS_WORKFLOW, latestPages: 'production',
+      reservedPublication: true, reuseProduction: true };
+    const report = await runAudit(args(root, mockFetch(root, options)));
+    assert.equal(report.outcome, 'SUCCESS', JSON.stringify(report.failures));
+    const failed = await runAudit(args(root, mockFetch(root, { ...options, sourceJobResult: 'skipped' })));
+    assert(failed.failures.some(failure => failure.kind === 'PUBLICATION_RUN_JOBS_FAILED'));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

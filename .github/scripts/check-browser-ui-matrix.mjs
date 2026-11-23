@@ -7,6 +7,11 @@ export const REQUIRED_BROWSER_UI_JOBS = [
   'browser-ui / browser-ui (webkit, group 2)',
 ];
 
+export const REQUIRED_ENVIRONMENT_JOBS = [
+  'classify-changes', 'docs-check', 'verify', 'isolation-browser (chromium)',
+  'isolation-browser (webkit)', 'local-online', 'audit', ...REQUIRED_BROWSER_UI_JOBS,
+];
+
 export function checkBrowserUiMatrix(jobs) {
   if (!Array.isArray(jobs)) throw new TypeError('GitHub Actions jobs must be an array');
 

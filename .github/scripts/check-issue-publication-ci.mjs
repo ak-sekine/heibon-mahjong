@@ -1,16 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { REQUIRED_ENVIRONMENT_JOBS } from './check-browser-ui-matrix.mjs';
 import { publicationIdentity } from './publication-reservation.mjs';
 
-const required = [
-  'classify-changes', 'docs-check', 'verify', 'isolation-browser (chromium)',
-  'isolation-browser (webkit)', 'local-online', 'audit',
-  ...['chromium', 'webkit'].flatMap(browser =>
-    [1, 2].map(group => `browser-ui / browser-ui (${browser}, group ${group})`)),
-];
-
 export function hasRequiredIssueJobs(response) {
-  return Array.isArray(response.jobs) && required.every(name => {
+  return Array.isArray(response.jobs) && REQUIRED_ENVIRONMENT_JOBS.every(name => {
     const matches = response.jobs.filter(job => job.name === name);
     return matches.length === 1 && matches[0].conclusion === 'success';
   });

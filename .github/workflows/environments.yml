@@ -11,6 +11,11 @@ on:
         required: true
         type: boolean
         default: false
+      production_validation:
+        description: Reuse verified main push CI, or explicitly run full validation for production.
+        type: choice
+        options: [reuse, full]
+        default: reuse
 permissions:
   contents: read
 jobs:
@@ -19,6 +24,11 @@ jobs:
     outputs:
       run_full_suite: ${{ steps.classify.outputs.run_full_suite }}
       classification: ${{ steps.classify.outputs.classification }}
+      reuse: >-
+        ${{ github.repository == 'ak-sekine/heibon-mahjong'
+          && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+          && inputs.publish == true && vars.DUAL_PAGES_ENABLED == 'true'
+          && inputs.production_validation == 'reuse' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,9 +78,13 @@ jobs:
   verify:
     needs: classify-changes
     if: >-
-      ${{ !cancelled() && (needs.classify-changes.result != 'success'
+      ${{ !cancelled() && needs.classify-changes.outputs.reuse != 'true'
+        && (needs.classify-changes.result != 'success'
         || needs.classify-changes.outputs.run_full_suite != 'false') }}
     runs-on: ubuntu-latest
+    outputs:
+      pages_id: ${{ steps.pages.outputs.artifact-id }}
+      pages_digest: ${{ steps.pages.outputs.artifact-digest }}
     steps:
       - uses: actions/checkout@v4
       - name: Validate raw publication variables without exposing values
@@ -82,22 +96,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$PRODUCTION_WORKER_URL" != "https://heibon-mahjong-online.ak-sekine.workers.dev" || "$PRODUCTION_WORKER_URL" == */ ]]; then
-            echo '::error::PRODUCTION_WORKER_URL must exactly match the production Worker URL without a trailing slash.'
-            exit 1
-          fi
-          if [[ "$DEVELOPMENT_WORKER_URL" != "https://heibon-mahjong-online-dev.ak-sekine.workers.dev" || "$DEVELOPMENT_WORKER_URL" == */ ]]; then
-            echo '::error::DEVELOPMENT_WORKER_URL must exactly match the development Worker URL without a trailing slash.'
-            exit 1
-          fi
-          if [[ ! "$CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9a-fA-F]{32}$ ]]; then
-            echo '::error::CLOUDFLARE_ACCOUNT_ID must be set to a 32-character hexadecimal account ID.'
-            exit 1
-          fi
-          {
-            echo 'Raw production and development Worker URLs exactly match the expected values and have no trailing slash.'
-            echo 'The shared Cloudflare account ID is present and has the expected format.'
-          } >> "$GITHUB_STEP_SUMMARY"
+          node .github/scripts/validate-publication-settings.mjs
           node .github/scripts/validate-publication-mode.mjs | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/setup-node@v4
         with:
@@ -123,6 +122,7 @@ jobs:
           node scripts/environments/artifacts.mjs verify dist
           node scripts/environments/artifacts.mjs verify dist-dev
       - uses: actions/upload-artifact@v4
+        id: pages
         with:
           name: pages-dist-${{ github.sha }}-${{ github.run_attempt }}
           path: dist
@@ -203,7 +203,7 @@ jobs:
           ONLINE_API_URL=http://127.0.0.1:8788 ONLINE_TEST_ORIGIN=http://localhost:5173 npm run test:online:production
   audit:
     needs: [classify-changes, docs-check, verify, browser-ui, isolation-browser, local-online]
-    if: ${{ always() }}
+    if: ${{ always() && needs.classify-changes.outputs.reuse != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -248,13 +248,43 @@ jobs:
         run: |
           echo '::error::Change classification did not produce a safe full-suite decision.'
           exit 1
+      - name: Record verified Pages artifact identity
+        id: pages-evidence
+        if: >-
+          ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1
+            && needs.classify-changes.outputs.run_full_suite == 'true'
+            && needs.docs-check.result == 'success' && needs.verify.result == 'success'
+            && needs.browser-ui.result == 'success' && needs.isolation-browser.result == 'success'
+            && needs.local-online.result == 'success' }}
+        env:
+          ARTIFACT_ID: ${{ needs.verify.outputs.pages_id }}
+          ARTIFACT_DIGEST: ${{ needs.verify.outputs.pages_digest }}
+        run: |
+          set -euo pipefail
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ && "$ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          printf '%s %s %s %s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$ARTIFACT_ID" "$ARTIFACT_DIGEST" > "$RUNNER_TEMP/pages-audit.txt"
+      - uses: actions/upload-artifact@v4
+        if: ${{ steps.pages-evidence.outcome == 'success' }}
+        with:
+          name: pages-audit-${{ needs.verify.outputs.pages_id }}-${{ needs.verify.outputs.pages_digest }}
+          path: ${{ runner.temp }}/pages-audit.txt
+          if-no-files-found: error
+          retention-days: 90
   publish:
     if: >-
-      ${{ github.event_name == 'workflow_dispatch'
+      ${{ !cancelled() && github.event_name == 'workflow_dispatch'
         && inputs.publish == true
         && vars.DUAL_PAGES_ENABLED == 'true'
         && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
-          || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
+          || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/')))
+        && needs.classify-changes.result == 'success' && needs.docs-check.result == 'success'
+        && ((needs.classify-changes.outputs.reuse == 'true' && needs.verify.result == 'skipped'
+            && needs.browser-ui.result == 'skipped' && needs.isolation-browser.result == 'skipped'
+            && needs.local-online.result == 'skipped' && needs.audit.result == 'skipped')
+          || (needs.classify-changes.outputs.reuse == 'false' && needs.verify.result == 'success'
+            && needs.browser-ui.result == 'success' && needs.isolation-browser.result == 'success'
+            && needs.local-online.result == 'success' && needs.audit.result == 'success'
+            && (github.ref != 'refs/heads/main' || inputs.production_validation == 'full'))) }}
     needs: [classify-changes, docs-check, verify, browser-ui, isolation-browser, local-online, audit]
     permissions:
       contents: write
@@ -263,6 +293,8 @@ jobs:
       actions: read
       deployments: read
     uses: ./.github/workflows/publish-environments.yml
+    with:
+      reuse_production: ${{ needs.classify-changes.outputs.reuse == 'true' }}
     secrets:
       CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_PRODUCTION_API_TOKEN || '' }}
       CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}
