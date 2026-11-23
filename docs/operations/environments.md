@@ -37,10 +37,17 @@ Issue #64は既存のCloudflare構成を維持する。Workers編集tokenは同�
 1. 最新mainから `issue/<番号>-<説明>` を作成し、実装・テスト・commit・通常pushする。緊急修正も最新main起点の短命ブランチで検証する。承認済みの候補と同じ完全SHAに対するEnvironments push CIを確認する。
 2. 開発公開が必要なら、候補のref・完全SHA・公開許可・外部設定を確認し、当該Issueブランチの `Verify isolated environments` を `publish=true` で手動起動する。実行中も候補ブランチとmainの先端を照合する。候補が動いた場合は新SHAでCI・承認・手動起動からやり直す。
 3. 開発候補は1つを共有する。開発公開もサイト全体の再デプロイを伴う。開発成果物とWorkerだけを更新し、本番ファイル、snapshot/hash、WorkerのGitHub deployment記録を公開前後に照合する。Cloudflareの実稼働版は外部承認時の確認対象とする。公開後に通常の読み取り専用Pages監査を実行する。
-4. 最新mainと候補の先端・SHA・差分・検証結果を再照合し、候補SHAへのfast-forwardのみでmainへ通常pushする。分岐した場合は最新mainから候補を再作成する。未完成の機能は候補に保持する。
-5. 統合後の同一main SHAの必須CI・最終auditを確認する。**Issueブランチからの本番公開は禁止。** 本番はmainから既存の `workflow_dispatch`、`publish=true`、`DUAL_PAGES_ENABLED=true` とEnvironment・外部承認を通して公開する。
+4. ユーザーが許可した範囲を確認し、最新mainと候補の先端・SHA・差分・検証結果を再照合し、候補SHAへのfast-forwardのみでmainへ通常pushする。分岐した場合は最新mainから候補を再作成する。未完成の機能は候補に保持する。
+5. 統合後は最新mainと統合したSHAの一致、同じSHAの必須CI・最終auditの成功を確認する。既存の公開ゲートを満たす場合、Codexは追加のユーザー承認を求めず、main pushとは別に本番公開を手動起動する。手順は[本番公開時の検証結果再利用](#本番公開時の検証結果再利用issue-62)に従う。
+6. Worker、本番オンライン検証、Pages、台帳確定、独立した公開後auditを順に確認し、公開結果とSHAを報告する。
 
-新規のIssue公開は従来のdevelop継続許可の対象外。初回は `worker-development` と `github-pages` の許可ref、既存の本番承認、Secretsの適用範囲、Cloudflareトークン・Worker/DO設定及び現在の本番Worker versionを確認する。設定変更・追加承認が必要なら公開前に停止する。共有Pagesへの権限はサイト全体に及ぶため、workflowを含む候補差分をレビューする。
+ユーザーのmain統合許可には、同じ作業範囲の通常の本番公開許可が含まれる。統合後に確定したSHAについて追加承認は不要。無関係な変更や別Issueの未承認変更に許可を広げず、明示的な公開保留を優先する。GitHub EnvironmentのRequired reviewersなどのシステム承認、Secrets、権限制限は維持する。
+
+本番アプリに影響しない文書のみの変更、明示的な公開保留、必須CI・品質ゲート・システム承認の未達、公開競合や未解決 `pending`、公開状態の不明、外部サービス障害などで安全に公開できない場合は、省略・延期の理由、main SHA、確認できた公開済みSHA、残作業を報告する。
+
+不可逆なデータ移行やデータ破壊、本番データの削除・復旧、品質ゲート・承認ゲートの緩和、本番基盤・権限の重大な変更、通常経路を迂回する緊急公開・ロールバック、許可範囲の拡大は個別の明示承認が必要。該当するか不明なら事前に影響を調査し、安全性を判断できなければ停止する。
+
+Issueブランチの開発公開には別の許可が必要で、従来のdevelop継続許可やmain統合許可は適用しない。初回は `worker-development` と `github-pages` の許可ref、既存の本番Environment保護設定、Secretsの適用範囲、Cloudflareトークン・Worker/DO設定及び現在の本番Worker versionを確認する。設定変更・追加承認が必要なら公開前に停止する。共有Pagesへの権限はサイト全体に及ぶため、workflowを含む候補差分をレビューする。
 
 開発候補の公開元は、台帳のsource SHA、完全ref、公開workflow ref/SHA、run/attemptと `verified/development/<SHA>` タグで追跡する。短命ブランチを削除する前に、候補が配信対象から外れ、台帳と監査結果および参照が維持され、未push変更と未解決pendingがないことを確認する。不採用候補は承認を失効させ、配信中なら承認済み後継候補で置換する。
 
@@ -88,10 +95,10 @@ PWA更新は対局の区切りで行う。同環境の複数タブは更新を�
 
 ## 本番公開時の検証結果再利用（Issue #62）
 
-本番の手動公開は latest main の `Verify isolated environments` で `publish=true` を指定する。`production_validation=reuse`（既定）は、同じ SHA の一意な main push run の attempt 1、全必須ジョブ、最終 audit、その audit に記録された Pages artifact ID・ZIP digest を照合する。同じ ZIP を ID 指定で取得し、ZIP と展開後の各ファイルを別々に検証する。公開 run と検証元の識別情報は公開台帳で区別する。
+**Issueブランチからの本番公開は禁止。** Codexは最新のmain refから `Verify isolated environments` を `workflow_dispatch` で起動し、`publish=true` を指定する。公開には `DUAL_PAGES_ENABLED=true` が必要。`production_validation=reuse`（既定）は、同じ SHA の一意な main push run の attempt 1、全必須ジョブ、最終 audit、その audit に記録された Pages artifact ID・ZIP digest を照合する。同じ ZIP を ID 指定で取得し、ZIP と展開後の各ファイルを別々に検証する。公開 run と検証元の識別情報は公開台帳で区別する。
 
-docs-only、再実行済みの CI、欠損や期限切れなどで再利用できない場合は公開を停止する。公開が必要で既存の承認・CI 条件を満たす場合は、新規 dispatch で明示的に `production_validation=full` を選ぶ。この経路は従来通り検証から成果物を作る。`publish=false` は全検証を実行する。未解決の予約や古い SHA は全検証経路でも公開できない。
+docs-only、再実行済みの CI、欠損や期限切れなどで再利用できない場合は公開を停止する。公開が必要で上記の許可範囲内にあり、既存のCI・公開ゲート・システム承認の条件を満たす場合は、新規 dispatch で明示的に `production_validation=full` を選ぶ。この経路は従来通り検証から成果物を作る。`publish=false` は全検証を実行する。未解決の予約や古い SHA は全検証経路でも公開できない。
 
 本番の Worker・オンライン検証・Pages・台帳確定が成功した後に別ジョブで配信バイト列、台帳、main と公開 SHA、GitHub deployment 記録、公開 Worker のヘルスを照合する。監査失敗時は公開操作がすでに完了している場合があるため、再実行前に台帳・deployment・配信状態を確認する。Worker のヘルスと GitHub deployment は Cloudflare token の実効権限や稼働バージョン ID を証明しない。
 
-変更前後の比較は同一 SHA の main push と公開成功 dispatch を1組とし、run 数、skip を除いたジョブ数、run の開始から完了まで、各実行ジョブの時間合計、push run 作成から Pages の公開完了までを別々に記録する。公開後監査は独立して集計し、公開判定・承認待ちを可能な範囲で分ける。Issue ブランチでは fixture と CI の確認を行い、本番の公開結果・所要時間は main 統合後に承認済みの作業で測定する。
+変更前後の比較は同一 SHA の main push と公開成功 dispatch を1組とし、run 数、skip を除いたジョブ数、run の開始から完了まで、各実行ジョブの時間合計、push run 作成から Pages の公開完了までを別々に記録する。公開後監査は独立して集計し、公開判定・承認待ちを可能な範囲で分ける。Issue ブランチでは fixture と CI の確認を行い、本番の公開結果・所要時間は main 統合後の通常公開で測定する。
