@@ -8,15 +8,14 @@ import { REPOSITORY } from './reuse-production-ci.mjs';
 
 export async function auditMainPublication(store, { sha, finalized, runId, api = readApi, get = fetch,
   checkout = () => execFileSync('git', ['-C', store, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() } = {}) {
-  const checkHeads = () => {
-    for (const [branch, expected] of [['main', sha], ['pages-verified', finalized]]) {
-      if (!/^[0-9a-f]{40}$/.test(expected) ||
-          api(`repos/${REPOSITORY}/git/ref/heads/${branch}`)?.object?.sha !== expected) {
-        throw new Error(`Public audit: ${branch} changed`);
-      }
+  const shaPattern = /^[0-9a-f]{40}$/;
+  if (!shaPattern.test(sha) || !shaPattern.test(finalized)) throw new Error('Invalid production audit identity');
+  const checkLedgerHead = () => {
+    if (api(`repos/${REPOSITORY}/git/ref/heads/pages-verified`)?.object?.sha !== finalized) {
+      throw new Error('Public audit: pages-verified changed');
     }
   };
-  checkHeads();
+  checkLedgerHead();
   if (checkout() !== finalized) throw new Error('Unexpected finalized snapshot checkout');
   const state = JSON.parse(readFileSync(path.join(store, 'state.json'), 'utf8'));
   const site = path.join(store, 'site');
@@ -49,19 +48,30 @@ export async function auditMainPublication(store, { sha, finalized, runId, api =
   const body = await health.json();
   if (body.ok !== true || body.service !== 'heibon-mahjong-online') throw new Error('Unexpected production Worker health');
   await checkPublicBytes(store, get);
-  checkHeads();
+
+  let main;
+  try {
+    main = api(`repos/${REPOSITORY}/git/ref/heads/main`)?.object?.sha;
+  } catch {
+    // The current main ref is informational after the pinned release is verified.
+  }
+  checkLedgerHead();
   if (checkDeployment('worker-production', sha, api, runId, REPOSITORY) !== workerDeployment ||
       checkDeployment('github-pages', sha, api, runId, REPOSITORY) !== pagesDeployment) throw new Error('Deployment changed during audit');
+  return { main: shaPattern.test(main) ? main : null };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   try {
     if (process.env.GITHUB_REPOSITORY !== REPOSITORY || process.env.GITHUB_REF !== 'refs/heads/main' ||
         process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch') throw new Error('Unexpected production audit run');
-    await auditMainPublication(process.argv[2], { sha: process.env.GITHUB_SHA, finalized: process.env.FINALIZED_SNAPSHOT,
+    const { main } = await auditMainPublication(process.argv[2], { sha: process.env.GITHUB_SHA, finalized: process.env.FINALIZED_SNAPSHOT,
       runId: process.env.GITHUB_RUN_ID });
     console.log('Production audit passed for ' + process.env.GITHUB_SHA);
-    appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Production publication audit passed for `' + process.env.GITHUB_SHA + '`.\n');
+    const tracking = main === null ? 'unconfirmed' : main === process.env.GITHUB_SHA
+      ? 'matches the published SHA' : 'differs from the published SHA (`' + main + '`)';
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Production publication audit passed for `' + process.env.GITHUB_SHA +
+      '`.\nCurrent main: ' + tracking + '.\n');
   } catch (error) {
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Production publication audit failed. Check the audit job before retrying.\n');
     throw error;

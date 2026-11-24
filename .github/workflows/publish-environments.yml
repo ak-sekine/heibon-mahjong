@@ -40,10 +40,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           DUAL_PAGES_ENABLED: ${{ vars.DUAL_PAGES_ENABLED }}
           PRODUCTION_WORKER_URL: ${{ vars.PRODUCTION_WORKER_URL }}
-          DEVELOPMENT_WORKER_URL: ${{ vars.DEVELOPMENT_WORKER_URL }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          node .github/scripts/validate-publication-settings.mjs
+          node .github/scripts/validate-publication-settings.mjs production-reuse
           node .github/scripts/reuse-production-ci.mjs
       - uses: actions/upload-artifact@v4
         with:
@@ -223,7 +222,7 @@ jobs:
           path: store
           persist-credentials: false
       - name: Verify the reservation before testing the deployed Worker
-        run: node .github/scripts/publication-reservation.mjs check store
+        run: node .github/scripts/publication-reservation.mjs ${{ github.ref == 'refs/heads/main' && 'check-production-continuation' || 'check' }} store
         env:
           GH_TOKEN: ${{ github.token }}
           PUBLICATION_SNAPSHOT: ${{ needs.reserve.outputs.snapshot }}
@@ -274,12 +273,12 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: store/site
-      - name: Recheck reservation and branch freshness immediately before publication
+      - name: Recheck reservation immediately before publication
         env:
           GH_TOKEN: ${{ github.token }}
           PUBLICATION_SNAPSHOT: ${{ needs.reserve.outputs.snapshot }}
           EXPECTED_WORKER_URL: ${{ needs.online.outputs.worker_url }}
-        run: node source/.github/scripts/publication-reservation.mjs check store
+        run: node source/.github/scripts/publication-reservation.mjs ${{ github.ref == 'refs/heads/main' && 'check-production-continuation' || 'check' }} store
       - name: Confirm production Worker still matches the preflight deployment
         if: startsWith(github.ref, 'refs/heads/issue/')
         env:
@@ -310,6 +309,27 @@ jobs:
           git -C store commit -m "Confirm Pages $GITHUB_REF_NAME $GITHUB_SHA"
           git -C store push origin HEAD:pages-verified
           printf 'commit=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Report Pages deployment and ledger finalization separately
+        if: ${{ always() }}
+        env:
+          PAGES_OUTCOME: ${{ steps.deploy.outcome }}
+          FINALIZE_OUTCOME: ${{ steps.finalize.outcome }}
+          FINALIZED_COMMIT: ${{ steps.finalize.outputs.commit }}
+        run: |
+          report() {
+            case "$2" in
+              success) printf '%s: confirmed by this run.\n' "$1" ;;
+              skipped|'') printf '%s: step did not run.\n' "$1" ;;
+              *) printf '%s: unconfirmed (%s). Check live state before retrying.\n' "$1" "$2" ;;
+            esac
+          }
+          {
+            report 'Pages deployment' "$PAGES_OUTCOME"
+            report 'Ledger finalization' "$FINALIZE_OUTCOME"
+            if [[ "$FINALIZE_OUTCOME" == success ]]; then
+              printf 'Finalized snapshot: `%s`\n' "$FINALIZED_COMMIT"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
   audit-production:
     needs: publish
     # The unselected Worker job is an intentionally skipped ancestor.

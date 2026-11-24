@@ -105,7 +105,8 @@ test('development worker job never references production token, and push cannot 
   const pages = jobSection(publisher, 'publish');
   assert.match(pages, /needs: \[reserve, online\]/);
   assert.match(pages, /EXPECTED_WORKER_URL: \$\{\{ needs.online.outputs.worker_url \}\}/);
-  assert(pages.indexOf('publication-reservation.mjs check') < pages.indexOf('uses: actions/deploy-pages@v4'));
+  const reservationCheck = pages.indexOf('run: node source/.github/scripts/publication-reservation.mjs');
+  assert(reservationCheck >= 0 && reservationCheck < pages.indexOf('uses: actions/deploy-pages@v4'));
   assert(pages.indexOf('artifacts.mjs finalize') > pages.indexOf('uses: actions/deploy-pages@v4'));
 });
 
@@ -400,6 +401,56 @@ test('main reuse deliberately skips the repeated suite but requires successful r
   assert.match(audit, /needs: publish/);
   assert.match(audit, /contents: read\s*deployments: read/);
   assert.doesNotMatch(audit, /secrets\.|: write/);
+});
+
+test('only production reuse validates the selected Worker settings', () => {
+  const caller = read('.github/workflows/environments.yml');
+  const publisher = read('.github/workflows/publish-environments.yml');
+  const source = jobSection(publisher, 'verify-production-source');
+  assert.doesNotMatch(source, /DEVELOPMENT_WORKER_URL/);
+  assert.match(source, /validate-publication-settings\.mjs production-reuse/);
+  assert.match(jobSection(caller, 'verify'), /validate-publication-settings\.mjs\s*\n/);
+
+  const env = {
+    PRODUCTION_WORKER_URL: 'https://heibon-mahjong-online.ak-sekine.workers.dev',
+    DEVELOPMENT_WORKER_URL: 'https://heibon-mahjong-online-dev.ak-sekine.workers.dev',
+    CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32),
+  };
+  const validate = (args, overrides = {}) => spawnSync(process.execPath,
+    ['.github/scripts/validate-publication-settings.mjs', ...args], {
+      env: { ...env, ...overrides }, encoding: 'utf8',
+    });
+  assert.equal(validate([]).status, 0);
+  for (const development of [undefined, 'https://wrong.invalid']) {
+    assert.equal(validate(['production-reuse'], { DEVELOPMENT_WORKER_URL: development }).status, 0);
+    assert.match(validate([], { DEVELOPMENT_WORKER_URL: development }).stderr, /Invalid development Worker URL/);
+  }
+  assert.match(validate(['production-reuse'], { PRODUCTION_WORKER_URL: 'invalid' }).stderr, /Invalid production Worker URL/);
+  assert.match(validate(['production-reuse'], { CLOUDFLARE_ACCOUNT_ID: 'invalid' }).stderr, /account ID/);
+  assert.match(validate(['unknown']).stderr, /Unknown publication settings mode/);
+});
+
+test('production continuation runs only downstream of the successful Worker and online checks', () => {
+  const publisher = read('.github/workflows/publish-environments.yml');
+  const continuation = /github\.ref == 'refs\/heads\/main' && 'check-production-continuation' \|\| 'check'/;
+  for (const job of ['online', 'publish']) assert.match(jobSection(publisher, job), continuation);
+  for (const job of ['reserve', 'worker-production', 'worker-development']) {
+    assert.doesNotMatch(jobSection(publisher, job), /check-production-continuation/);
+  }
+  const pages = jobSection(publisher, 'publish');
+  assert.match(pages, /needs: \[reserve, online\]/);
+  assert.match(pages, /PAGES_OUTCOME: .*steps\.deploy\.outcome/);
+  assert.match(pages, /FINALIZE_OUTCOME: .*steps\.finalize\.outcome/);
+  for (const result of ['success', 'failure', 'skipped', 'cancelled']) {
+    for (const canceled of [false, true]) {
+      const results = { reserve: 'success', 'worker-production': result, 'worker-development': 'skipped', online: result };
+      const context = workflowContext({ branch: 'main', canceled, results });
+      for (const job of ['online', 'publish']) {
+        assert.equal(evaluateJobCondition(jobCondition(publisher, job), context, Object.values(results)),
+          result === 'success' && !canceled, `${job}, ${result}, ${canceled}`);
+      }
+    }
+  }
 });
 
 test('production audit runs after successful Pages publication despite an intentionally skipped Worker', () => {

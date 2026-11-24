@@ -60,18 +60,32 @@ Actions artifactは90日。期限切れ/取得失敗時は停止し、ソース�
 
 通常の統合公開は本番・開発共通の `pages-publication` で、台帳の予約からWorker・オンライン検証・Pages・台帳の確定まで直列化する。GitHub concurrencyはpending runの全件FIFOを保証しない。キャンセル後は台帳と公開状態を確認し、未解決の予約がなければ最新branchで全ゲートを実行する。片方の更新では保持側の保存bytesを使用する。
 
-台帳取得失敗、破損、未解決 `pending`、対象環境の公開済みSHA、古い候補はWorker前に拒否する。予約は `pages-verified` への通常pushで保存し、競合でpushが拒否されたrunはWorkerへ進まない。Worker実行前とPages公開前に、予約commit・run・attempt、候補のWorker URL、対象branchの先端を再確認する。旧公開・初回bootstrap・手動デプロイとこの通常公開を並行運用しない。
+台帳取得失敗、破損、未解決 `pending`、対象環境の公開済みSHA、古い候補はWorker前に拒否する。予約は `pages-verified` への通常pushで保存し、競合でpushが拒否されたrunはWorkerへ進まない。Worker実行直前まで対象branchの最新SHAとの一致を要求する。本番Worker成功後のオンライン検証・Pages公開は予約時のSHAで続行し、最新mainが進んでも候補を差し替えない。予約commit・run・attempt、候補のWorker URL、snapshotのdigest、保存branch先端は引き続き照合する。開発公開では対象branchとIssue候補のbase mainの照合を維持する。旧公開・初回bootstrap・手動デプロイとこの通常公開を並行運用しない。
 
 再利用WorkflowへWorker用Secretを名前付きで渡す。公開対象と同じEnvironmentでSecretが空なら、台帳予約前に停止する。この確認ではdeploymentを作成せず、Secretの値を出力しない。認証と権限の有効性はWorkerデプロイ時に確認する。
 
 ## 障害と復旧・ロールバック
 
-- 品質ゲート失敗時は台帳予約へ進まない。台帳の予約push失敗時はWorker・Pagesへ進まない。Git remoteの `pending` を確認する。
-- 予約後に中断・失敗した場合は `pending` が残り、後続公開は停止する。branch更新は排他の対象外であり、Worker開始後に先端が変わるとPages前の再確認で停止する。run、Worker・Pagesのdeployment、保存branchの `pending.siteDigest`、実配信のmetadataとbytesを照合する。Workerだけ更新済みの場合は互換性を確認する。DO migrationsを逆実行したり、本番DOを削除しない。
-- Pages公開の成功と同じsnapshotの配信を確認できた場合のみ、そのsnapshotを確定する。未公開が確定し、Workerの状態も確認できた場合は、必要な承認を得て予約の親からsite/stateを復元する新commitを作る。結果不明のまま `pending` を削除したり、再実行したりしない。
-- 通常rollback：安全な旧ソースへのrevert commitを対象branchへ作り全ゲートを通す。保持側は同じsnapshotを使う。緊急の旧snapshot再公開は履歴・hash・対応Worker互換性・公開状態を確認する独立した復旧判断とし、古いworkflow再実行でfreshnessを迂回しない。
-- 初回失敗：本番bootstrap未完ならdev公開不可。既存Pagesを維持し、空の保存先を公開しない。
-- 切替後に旧workflowへ戻すと/devを消す恐れがある。DUAL_PAGES_ENABLEDを単純にfalseへ戻してlegacyを再開しない。両版snapshotを保持した復旧を行う。
+品質ゲートや予約pushの失敗後は、まずリモート台帳を読む。予約後の中断は `pending` が残り得る。Workerのdeploy step、Pagesのdeploy step、台帳確定stepと確定commit、独立auditを個別に確認する。ジョブのFailure・Skipped・キャンセルだけで配信状況を決めず、結果不明の操作は再実行前に照合する。
+
+公開経路だけが停止し実配信が正常なら、稼働中の版を維持する。ゲーム起動やオンライン対局に利用者影響がある場合は、影響する配信先を絞り、互換性が確認できる復旧を優先する。WorkerコードとGitHub管理設定の正本はGitHubの検証済みソースとする。検証済み正常版への緊急復旧では、最新main一致、全UI再実行、Cloudflareの全操作履歴・稼働version IDの独立照合を一律には要求しない。対象の特定・互換性・安全判断に必要な証拠は取得する。取得できない事項は未確認と記録する。DO永続データ、Secrets、GitHub管理外設定はコード再デプロイから独立して扱う。
+
+| 状態 | 判断・必要な証拠と実行手順 |
+|---|---|
+| Worker・Pagesとも未公開 | **Abort。** 元run/jobと対象deployment、親snapshotと実配信から未公開を確認。予約を親にする新規コミットで、予約前の `state.json` と `site/` をセットで復元し通常pushする。実配信は維持する |
+| Workerのみ公開 | 旧Pagesのbytesと更新後Workerを確認。旧WorkerとDOの保存形式・migrationが互換ならRollbackを検討。候補Workerが健全で予約Pagesと互換なら、検証済み予約サイトをPagesへ出すロールフォワードを検討 |
+| Pagesのみ公開 | 配信中の共有Pagesのhash、旧Worker、保持側snapshotを確認。互換性に応じて旧共有サイトを戻すか、対応する検証済みWorkerを公開してロールフォワード |
+| 両方公開・台帳未確定 | **Finalize。** 予約所有者、同じ候補のWorker/Pages deployment、実配信hashとWorkerの健全性が整合する場合、`node scripts/environments/artifacts.mjs finalize <store>` で台帳だけを確定し通常pushする |
+| 台帳確定済み・audit失敗 | 確定commit、deployment、Worker health、配信hashを読み取り専用で再確認する。audit失敗だけを理由に再公開しない |
+| 外部状態不明・証拠矛盾 | 予定する操作の影響範囲に限って調査する。未公開・互換・安全を判定できない操作は停止し、独立して安全と判断できる復旧選択肢を検討 |
+| 競合あり | 進行・待機run、外部管理操作、台帳先端を確認する。競合解消までは影響する書込を停止し、解消後に証拠を取得し直す |
+| DO形式・migration非互換 | 機械的なRollbackを禁止。互換版へのロールフォワードやデータ保持を前提とする復旧を別途検討する |
+
+1. **書込前。** 対象環境、固定SHA、run/attempt、予約と親、成果物hash、配信と互換性を特定する。本番予約の親・候補照合には [`inspectRecoverySnapshots` と `verifyRecoveryPublicSite`](../../scripts/environments/pages-recovery.mjs) を利用できる。通常rollbackは安全な旧ソースへのrevertを全ゲートに通す。通常経路外の緊急公開・ロールバック、手動台帳復旧、本番データ操作にはそれぞれ個別の明示承認が必要。配信変更には対象Environmentの保護と必要な承認を適用する。
+2. **書込直前。** 公開予約の解消と配信変更を別操作として扱い、各操作の対象・先端・排他を再確認する。競合、不一致、必要な証拠や承認の不足で停止。台帳更新は履歴を残すfast-forwardとし、拒否されたら調べ直す。DO migrationsの逆実行、本番DOの削除、旧workflowの再実行による鮮度検査の迂回は行わない。
+3. **書込後。** Worker healthと対象側オンライン、両環境のPagesメタデータ・hash、保存snapshotと台帳の整合を確認する。Rollback後は実配信が旧保存版と整合してから台帳を復元し、ロールフォワード後は配信を確認してから確定する。最終状態、audit結果、未確認のDO・Secrets・外部設定を記録する。不一致なら追加書込を止める。
+
+本番bootstrap未完なら開発公開を止め、既存Pagesを維持する。切替後は旧workflowの再開で `/dev/` を失い得るため、`DUAL_PAGES_ENABLED` を単純に `false` に戻さず、両版snapshotを保持する。
 
 ## PWA・保存状態とiPhone Safari実機確認
 
@@ -99,6 +113,6 @@ PWA更新は対局の区切りで行う。同環境の複数タブは更新を�
 
 docs-only、再実行済みの CI、欠損や期限切れなどで再利用できない場合は公開を停止する。公開が必要で上記の許可範囲内にあり、既存のCI・公開ゲート・システム承認の条件を満たす場合は、新規 dispatch で明示的に `production_validation=full` を選ぶ。この経路は従来通り検証から成果物を作る。`publish=false` は全検証を実行する。未解決の予約や古い SHA は全検証経路でも公開できない。
 
-本番の Worker・オンライン検証・Pages・台帳確定が成功した後に別ジョブで配信バイト列、台帳、main と公開 SHA、GitHub deployment 記録、公開 Worker のヘルスを照合する。監査失敗時は公開操作がすでに完了している場合があるため、再実行前に台帳・deployment・配信状態を確認する。Worker のヘルスと GitHub deployment は Cloudflare token の実効権限や稼働バージョン ID を証明しない。
+本番の Worker・オンライン検証・Pages・台帳確定が成功した後に別ジョブで固定した公開SHA、配信バイト列、確定台帳とその先端、GitHub deployment記録、公開Workerのヘルスを照合する。main先端は参考情報として報告し、公開SHAと異なる場合や取得不能でも配信の整合性判定には影響しない。監査失敗時は公開操作がすでに完了している場合があるため、再実行前に台帳・deployment・配信状態を確認する。Worker のヘルスと GitHub deployment は Cloudflare token の実効権限や稼働バージョン ID を証明しない。
 
 変更前後の比較は同一 SHA の main push と公開成功 dispatch を1組とし、run 数、skip を除いたジョブ数、run の開始から完了まで、各実行ジョブの時間合計、push run 作成から Pages の公開完了までを別々に記録する。公開後監査は独立して集計し、公開判定・承認待ちを可能な範囲で分ける。Issue ブランチでは fixture と CI の確認を行い、本番の公開結果・所要時間は main 統合後の通常公開で測定する。

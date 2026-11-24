@@ -7,7 +7,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { buildPwa } from '../scripts/build-pwa.mjs';
 import { finalize, seal } from '../scripts/environments/artifacts.mjs';
-import { checkPublication, preparePublication } from '../.github/scripts/publication-reservation.mjs';
+import { checkProductionContinuation, checkPublication, preparePublication } from '../.github/scripts/publication-reservation.mjs';
 import { REQUIRED_ENVIRONMENT_JOBS } from '../.github/scripts/check-browser-ui-matrix.mjs';
 import { checkArchive, checkCandidate, findVerifiedArtifact, readPages, REPOSITORY } from '../.github/scripts/reuse-production-ci.mjs';
 import { auditMainPublication } from '../.github/scripts/audit-main-publication.mjs';
@@ -185,6 +185,26 @@ test('reservation retains source evidence and the read-only audit detects deploy
   assert.throws(() => preparePublication(store, candidate, workerUrl, env, refs), /pending/);
   assert.throws(() => checkPublication(store, workerUrl, { ...env, GITHUB_RUN_ATTEMPT: '2' }, refs), /does not belong/);
   assert.equal(checkPublication(store, workerUrl, env, refs), 'production');
+  const advanced = (command, args) => args[1]?.endsWith('/main') ? 'c'.repeat(40) : refs(command, args);
+  assert.throws(() => checkPublication(store, workerUrl, env, advanced), /Stale source SHA/);
+  assert.equal(checkProductionContinuation(store, workerUrl, env, advanced), 'production');
+  for (const invalid of [{ GITHUB_RUN_ID: '51' }, { GITHUB_RUN_ATTEMPT: '2' }, { GITHUB_SHA: snapshot }]) {
+    assert.throws(() => checkProductionContinuation(store, workerUrl, { ...env, ...invalid }, advanced), /does not belong/);
+  }
+  for (const invalid of [{ GITHUB_REF: 'refs/heads/develop' }, { GITHUB_REF: 'refs/heads/issue/65-candidate' },
+    { GITHUB_REPOSITORY: 'other/repo' }, { GITHUB_EVENT_NAME: 'push' }]) {
+    assert.throws(() => checkProductionContinuation(store, workerUrl, { ...env, ...invalid }, advanced), /production|event/);
+  }
+  assert.throws(() => checkProductionContinuation(store, 'https://wrong.invalid', env, advanced), /does not belong/);
+  assert.throws(() => checkProductionContinuation(store, workerUrl, env, (command, args) =>
+    args[1]?.endsWith('/pages-verified') ? sha : advanced(command, args)), /Remote snapshot changed/);
+  assert.throws(() => checkProductionContinuation(store, workerUrl, { ...env, PUBLICATION_SNAPSHOT: sha }, advanced),
+    /Wrong reserved snapshot checkout/);
+  const index = path.join(store, 'site', 'index.html');
+  const original = readFileSync(index);
+  writeFileSync(index, 'corrupt');
+  assert.throws(() => checkProductionContinuation(store, workerUrl, env, advanced), /Pending snapshot mismatch/);
+  writeFileSync(index, original);
   finalize(store);
   const api = endpoint => endpoint.includes('refs') || endpoint.includes('git/ref')
     ? { object: { sha: endpoint.endsWith('main') ? sha : snapshot } }
@@ -194,7 +214,7 @@ test('reservation retains source evidence and the read-only audit detects deploy
     ? Response.json({ ok: true, service: 'heibon-mahjong-online' })
     : new Response(readFileSync(path.join(store, 'site', url.pathname.slice('/heibon-mahjong/'.length))));
   const options = { sha, finalized: snapshot, runId: '50', checkout: () => snapshot, api, get };
-  await auditMainPublication(store, options);
+  assert.deepEqual(await auditMainPublication(store, options), { main: sha });
   await assert.rejects(auditMainPublication(store, { ...options, runId: '51' }), /another run/);
   assert.equal(JSON.parse(readFileSync(ledger)).pending, null);
   await assert.rejects(auditMainPublication(store, { ...options, get: async () => new Response(null, { status: 503 }) }), /Worker health/);
@@ -202,6 +222,19 @@ test('reservation retains source evidence and the read-only audit detects deploy
     url.pathname.endsWith('release.json') ? new Response('altered') : get(url) }), /Pages bytes/);
   await assert.rejects(auditMainPublication(store, { ...options, api: endpoint =>
     endpoint.includes('/statuses') ? [{ id: 3, state: 'failure' }] : api(endpoint) }), /Deployment not successful/);
+  assert.deepEqual(await auditMainPublication(store, { ...options, api: endpoint =>
+    endpoint.endsWith('main') ? { object: { sha: snapshot } } : api(endpoint) }), { main: snapshot });
+  assert.deepEqual(await auditMainPublication(store, { ...options, api: endpoint => {
+    if (endpoint.endsWith('main')) throw new Error('main unavailable');
+    return api(endpoint);
+  } }), { main: null });
+
+  let ledgerReads = 0;
   await assert.rejects(auditMainPublication(store, { ...options, api: endpoint =>
-    endpoint.endsWith('main') ? { object: { sha: snapshot } } : api(endpoint) }), /main changed/);
+    endpoint.endsWith('/pages-verified') && ++ledgerReads === 2
+      ? { object: { sha } } : api(endpoint) }), /pages-verified changed/);
+  let workerReads = 0;
+  await assert.rejects(auditMainPublication(store, { ...options, api: endpoint =>
+    endpoint.includes('environment=worker-production') && ++workerReads === 2
+      ? [{ id: 8, sha }] : api(endpoint) }), /Deployment changed during audit/);
 });

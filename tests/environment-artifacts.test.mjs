@@ -84,6 +84,15 @@ test('Pages recovery verifies the pinned snapshots and requires exact live hashe
     writeFileSync(path.join(store, 'site/dev/index.html'), 'changed');
     assert.throws(inspect, /snapshot bytes changed/);
     assert.equal(readFileSync(stateFile, 'utf8'), oldState);
+    assert.throws(() => finalize(store), /Pending snapshot mismatch/);
+    cpSync(path.join(previousStore, 'site/dev/index.html'), path.join(store, 'site/dev/index.html'));
+    const verified = inspect();
+    await verifyRecoveryPublicSite(verified.candidate, serve(store));
+    finalize(store);
+    assert.deepEqual(JSON.parse(readFileSync(stateFile)), {
+      version: 1, pending: null, current: JSON.parse(oldState).pending.current,
+    });
+    assert.deepEqual(inventory(path.join(store, 'site')), verified.candidate);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 for (const order of [['production', 'development'], ['development', 'production']]) test('independent updates preserve opposite bytes: ' + order.join(', '), () => {

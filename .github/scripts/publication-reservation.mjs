@@ -53,6 +53,18 @@ export function preparePublication(store, candidate, workerUrl, env = process.en
 }
 
 export function checkPublication(store, workerUrl, env = process.env, exec = execFileSync) {
+  return verifyReservation(store, workerUrl, env, exec, true);
+}
+
+// The workflow calls this only downstream of a successful production Worker job.
+export function checkProductionContinuation(store, workerUrl, env = process.env, exec = execFileSync) {
+  if (env.GITHUB_REPOSITORY !== 'ak-sekine/heibon-mahjong' || env.GITHUB_REF !== 'refs/heads/main') {
+    throw new Error('Only production publication can continue on a pinned SHA');
+  }
+  return verifyReservation(store, workerUrl, env, exec, false);
+}
+
+function verifyReservation(store, workerUrl, env, exec, requireSourceHead) {
   const publication = publicationIdentity(env);
   const commit = env.PUBLICATION_SNAPSHOT;
   if (!/^[a-f0-9]{40}$/.test(commit)) throw new Error('Missing reserved snapshot commit');
@@ -77,7 +89,7 @@ export function checkPublication(store, workerUrl, env = process.env, exec = exe
   }
   if (digest(inventory(path.join(store, 'site'))) !== pending.siteDigest) throw new Error('Pending snapshot mismatch');
   if (remoteSha('pages-verified', env, exec) !== commit) throw new Error('Remote snapshot changed after reservation');
-  if (remoteSha(publication.branch, env, exec) !== publication.sha) throw new Error('Stale source SHA');
+  if (requireSourceHead && remoteSha(publication.branch, env, exec) !== publication.sha) throw new Error('Stale source SHA');
   return publication.environment;
 }
 
@@ -85,5 +97,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const [command, store, candidate] = process.argv.slice(2);
   if (command === 'prepare') preparePublication(store, candidate, process.env.EXPECTED_WORKER_URL);
   else if (command === 'check') checkPublication(store, process.env.EXPECTED_WORKER_URL);
+  else if (command === 'check-production-continuation') checkProductionContinuation(store, process.env.EXPECTED_WORKER_URL);
   else throw new Error('Unknown publication reservation command');
 }

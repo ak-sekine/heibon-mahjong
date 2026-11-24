@@ -71,7 +71,23 @@ test('concurrent Git writers cannot overwrite verified snapshots or bypass pendi
     assert.equal(state.pending.current.production.sha, a);
     assert.equal(state.pending.current.development.sha, b);
     assert.throws(() => stage(first, nextProduction, c), /pending/);
-    // The workflow's failing push step stops before any Pages deployment action.
+    const recovery = path.join(root, 'recovery');
+    git(root, 'clone', '--branch', 'pages-verified', remote, recovery);
+    identity(recovery);
+    const reservation = git(recovery, 'rev-parse', 'HEAD');
+    const parent = git(recovery, 'rev-parse', 'HEAD^');
+    git(recovery, 'restore', '--source=' + parent, '--staged', '--worktree', '--', 'state.json', 'site');
+    git(recovery, 'commit', '-m', 'Abort unpublished reservation');
+    assert.equal(git(recovery, 'rev-parse', 'HEAD^'), reservation);
+    assert.equal(git(recovery, 'rev-parse', 'HEAD^{tree}'), git(recovery, 'rev-parse', parent + '^{tree}'));
+    git(recovery, 'push', 'origin', 'pages-verified');
+
+    finalize(first);
+    git(first, 'add', 'state.json');
+    git(first, 'commit', '-m', 'Stale finalization');
+    assert.throws(() => git(first, 'push', 'origin', 'pages-verified'), /rejected/);
+    assert.equal(git(recovery, 'ls-remote', 'origin', 'refs/heads/pages-verified').split('\t')[0],
+      git(recovery, 'rev-parse', 'HEAD'));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
