@@ -1,8 +1,11 @@
 """Inline call selection, responsive candidate grids and upward expansion regression."""
+import json
 import os
+from pathlib import Path
 import shutil
 
 from playwright.sync_api import sync_playwright
+from browser_decision_layout import assert_decisions_match, decision_metrics
 from browser_main_fixtures import fixed_seat_fixture
 from browser_focus_assertions import assert_button_focus, tab_candidates, check_focus_detector
 
@@ -312,6 +315,44 @@ window.loadTurn=()=>{
         assert abs(normal_after['controls']['y'] - normal_action_position['controls']['y']) < 1, (normal_action_position, normal_after)
 
         print(f'{browser_name} call UI at {width}x{height}: {grid["columns"]} candidate columns')
+
+    # Compare the two actual offline decisions, including the existing short portrait viewport.
+    out = Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui')) / 'decision-panels'
+    out.mkdir(parents=True, exist_ok=True)
+    for width, height in [(375, 667), (375, 567), (1280, 720)]:
+        page.set_viewport_size({'width': width, 'height': height})
+        page.evaluate('window.scrollTo(0,0);loadTurn()')
+        table = page.locator('#local-table')
+        frame = page.locator('#local-game-controls')
+        before = table.bounding_box()
+        ron = decision_metrics(page.locator('#ron-controls'))
+        assert ron['status'] is None
+        assert page.locator('#ron').evaluate('node => node === document.activeElement')
+        for selector in ('#ron', '#pass-ron'):
+            assert page.locator(selector).evaluate("""button => {
+              const r = button.getBoundingClientRect(), v = visualViewport;
+              return r.left >= v.offsetLeft && r.right <= v.offsetLeft + v.width &&
+                r.top >= v.offsetTop && r.bottom <= v.offsetTop + v.height &&
+                button.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+            }""")
+        frame.screenshot(path=str(out / f'{width}x{height}-offline-ron.png'))
+        page.keyboard.press('Tab')
+        assert_button_focus(page, page.locator('#pass-ron'))
+        page.keyboard.press('Space')
+        page.wait_for_function("document.querySelector('#ron-controls').hidden")
+        assert table.bounding_box() == before and page.evaluate('scrollY') == 0
+
+        page.evaluate('loadCalls("pon-one")')
+        pon = decision_metrics(page.locator('#call-controls'))
+        assert_decisions_match(pon, ron)
+        assert table.bounding_box() == before and page.evaluate('scrollY') == 0
+        frame.screenshot(path=str(out / f'{width}x{height}-offline-pon.png'))
+        button = page.locator('#pass-calls')
+        box = button.bounding_box()
+        page.mouse.click(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+        page.wait_for_function("document.querySelector('#call-controls').hidden")
+        assert table.bounding_box() == before and page.evaluate('scrollY') == 0
+        print(f'Offline decision parity {width}x{height}: {json.dumps(ron)}')
 
     # Issue #52: native keyboard activation, actual Tab order and visual focus.
     for width, height in [(320, 568), (390, 844), (1280, 720)]:

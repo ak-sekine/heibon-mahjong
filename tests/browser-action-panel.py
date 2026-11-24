@@ -3,6 +3,7 @@ import os
 import pathlib
 import shutil
 from playwright.sync_api import sync_playwright
+from browser_decision_layout import assert_decisions_match, decision_metrics
 
 out = pathlib.Path(os.environ.get('HEIBON_SCREENSHOTS', '/tmp/heibon-table-ui')) / 'browser-action-panel'
 out.mkdir(parents=True, exist_ok=True)
@@ -180,7 +181,7 @@ with sync_playwright() as p:
           const root = document.querySelector('[data-browser-action-panel]').children[1];
           const status = root.querySelector('[data-panel-part="call-status"]');
           const actionStatus = root.querySelector('[data-panel-part="action-status"]');
-          const choices = [...root.querySelectorAll('.call-type-buttons button:not([hidden])')]
+          const choices = [...root.querySelectorAll('[data-panel-part="call-controls"] .decision-buttons button:not([hidden])')]
             .filter(button => button.dataset.panelPart !== 'candidate-back' && button.dataset.panelPart !== 'pass-call');
           const pass = root.querySelector('[data-panel-part="pass-call"]');
           const box = element => element.getBoundingClientRect();
@@ -193,11 +194,14 @@ with sync_playwright() as p:
             statusBox.bottom <= passBox.top,
             choiceCount: choices.length, statusText: status.innerText, actionStatusText: actionStatus.innerText, text,
             statusBox: statusBox.toJSON(), choiceBox: choiceBox?.toJSON() ?? null, passBox: passBox.toJSON(),
-            groupDisplay: getComputedStyle(root.querySelector('.call-type-buttons')).display,
-            groupColumns: getComputedStyle(root.querySelector('.call-type-buttons')).gridTemplateColumns,
+            groupDisplay: getComputedStyle(root.querySelector('[data-panel-part="call-controls"] .decision-buttons')).display,
+            groupColumns: getComputedStyle(root.querySelector('[data-panel-part="call-controls"] .decision-buttons')).gridTemplateColumns,
           };
         }""")
         assert call_panel_metrics['passed'], (width, call_panel_metrics)
+        pon_geometry = decision_metrics(online_panel.locator('[data-panel-part="call-controls"]'))
+        if width == 375:
+            online_panel.screenshot(path=str(out / '375-online-pon.png'))
         for seconds in [9, 8]:
           page.evaluate("seconds => window.actionPanelBrowser.update(null, false, false, false, seconds)", seconds)
           assert page.evaluate("""() => {
@@ -296,7 +300,13 @@ with sync_playwright() as p:
             root.querySelector('[data-panel-part="action-status"]').innerText === 'ロン判断を待っています。';
         }""")
         ron_group = online_panel.locator('[data-panel-part="ron-controls"]')
-        assert ron_group.locator(':scope > *').all_inner_texts() == ['ロン判断の残り 10 秒です。', 'ロン和了', '見逃す']
+        ron_geometry = decision_metrics(ron_group)
+        assert ron_geometry['status'] is not None
+        assert_decisions_match(pon_geometry, ron_geometry)
+        if width == 375:
+            online_panel.screenshot(path=str(out / '375-online-ron.png'))
+        print(f'Online decision parity {width}x844: {json.dumps(ron_geometry)}')
+        assert ron_group.locator('[data-panel-part]').all_inner_texts() == ['ロン判断の残り 10 秒です。', 'ロン和了', '見逃す']
         assert ron_group.locator('svg, [data-panel-part="ron-target"]').count() == 0
         page.evaluate("window.actionPanelBrowser.update(null, false, false, false, 9)")
         assert ron_group.locator('[data-panel-part="ron-status"]').inner_text() == 'ロン判断の残り 9 秒です。'

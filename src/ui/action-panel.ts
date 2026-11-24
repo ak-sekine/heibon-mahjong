@@ -293,7 +293,9 @@ export class ActionPanel {
     const callControls = this.part('call-controls');
     if (!state.callGroup.visible) this.callType = null;
     callControls.hidden = !state.callGroup.visible || this.callSelectionPending;
-    this.part('call-status').textContent = state.callGroup.status;
+    const callStatus = this.part('call-status');
+    callStatus.textContent = state.callGroup.status;
+    callStatus.hidden = state.callGroup.status === '';
     for (const [type, part] of [['pon', 'call-pon'], ['daiminkan', 'call-kan'], ['chi', 'call-chi']] as const) {
       const button = this.part(part) as HTMLButtonElement;
       const candidates = this.activeCallOptions.filter(option => callTypeForLabel(option.label) === type);
