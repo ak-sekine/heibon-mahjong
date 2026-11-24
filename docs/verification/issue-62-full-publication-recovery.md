@@ -24,3 +24,35 @@
 5. リモート先端が復元コミットで、`pending: null`、`current` と保存サイトが親と一致し、配信バイト列と deployment が以前のままであることを読み取り専用で確認する。Worker や Pages の再デプロイはこの計画の対象外。照合に失敗した場合は追加操作を止めて報告する。
 
 この調査では台帳復元・公開・main 統合を実施していない。[本番・開発運用](../operations/environments.md#障害と復旧ロールバック)の停止条件に従う。
+
+## 2026-11-24 の台帳復元と本番公開結果
+
+障害 run 45276890552 の予約は、今回限りの承認に従い [bd2077c](https://github.com/ak-sekine/heibon-mahjong/commit/bd2077cca4b255c7cbe80c9d009af207227f65db) で復元した。その後の [reuse run 45381502132](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45381502132) は Worker と本番オンライン検証に成功し、Pages deployment 作成後に失敗した。台帳確定と独立 audit はスキップされ、終了チェックが run を失敗にした。エラーの根本原因は未特定。
+
+Pages が旧版を配信し、予約前の保存サイト全35ファイルと一致すること、失敗 deployment が失敗のままであること、Worker コードと Wrangler 設定に差分がないことを確認した。別途承認を得て、予約を親に残した [78a1caa](https://github.com/ak-sekine/heibon-mahjong/commit/78a1caa00d700c0b861b2e11da910e1a7a9f92dc) で state.json と site/ を予約前のツリーへ復元した。Abort では Worker を切り戻していない。Cloudflare の管理履歴・稼働 version ID と開発 Worker の公開ヘルスは独立確認していない。
+
+本番公開元は `422ca54a1ccf1df3531017e4e0b3ec5e41d7ec4c`。後続の文書のみの main 更新とは区別する。[main push CI 45294395931](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45294395931) の attempt 1 で必須品質ゲートと最終 audit が成功し、Pages artifact 14874923811 と audit artifact 14875319681 を生成した。[reuse 再試行 45399996598](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45399996598) の attempt 1 は同じ Pages artifact と ZIP digest を照合し、全品質ゲートの重複実行なしで Worker、オンライン検証、Pages、台帳確定、[独立 audit](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45399996598/job/138468007873) が成功した。Worker と Pages の成功 deployment は 8028734815 と 8028772302。[確定台帳 ce7703d](https://github.com/ak-sekine/heibon-mahjong/blob/ce7703dc428ff0eba54422eccb6440a811cdf9a9/state.json) は pending が null で、公開の実配信メタデータと一致した。開発版の確定記録と site/dev/ は復旧時のまま。修正後の full は回帰テストで条件を確認し、本番では再実行していない。
+
+### 実測
+
+ジョブ数は skipped を除外し、runner 時間はジョブの開始から完了までの合計。壁時計は Actions API の run 開始から完了まで。
+
+| 実行 | ジョブ数 | 壁時計 | runner 合計 |
+|---|---:|---:|---:|
+| [変更前 push 44914960575](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44914960575) | 9 | 31分15秒 | 75分55秒 |
+| [変更前の成功公開 44917709085](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44917709085) | 14 | 33分07秒 | 76分56秒 |
+| 今回の main push | 11 | 11分17秒 | 37分47秒 |
+| 今回の成功した reuse 再試行 | 9 | 4分14秒 | 3分30秒 |
+| 今回の失敗した reuse 初回 | 9 | 3分35秒 | 2分47秒 |
+
+push と成功公開の組では run 数はともに2、全品質ゲートは2回から1回、ジョブ数は23から20、壁時計合計は64分22秒から15分31秒、runner 合計は152分51秒から41分17秒。今回は失敗した初回を含めると3 run・29ジョブ、壁時計合計19分06秒、runner 合計44分04秒。独立 audit は21秒。push run 作成から Pages 成功まで、変更前は1時間04分38秒、今回は復旧待ちと再試行を含め13時間03分41秒。対象 SHA、監査範囲と経過条件が異なるため、差のすべてを再利用方式の効果とはみなさない。過去の reuse 45188804189 は独立 audit をスキップし、full 45276890552 は予約で止まった。Actions の課金使用量は未確認。
+
+### 受入条件の根拠
+
+1. 同一 SHA の main push と成功した reuse で、全品質ゲートを一度だけ実行し、検証元と成果物の来歴を台帳で追跡できた。
+2. main CI で既存の必須検証と Chromium／WebKit 各2グループ、最終 audit が成功した。
+3. [再利用テスト](../../tests/reuse-production-ci.test.mjs)、[台帳競合テスト](../../tests/environment-git-store.test.mjs)、[条件テスト](../../tests/environment-workflows.test.mjs) で異常時の拒否を確認した。失敗した reuse は実際に全体 failure になった。
+4. 最新 main、予約、Worker → オンライン検証 → Pages → 台帳確定 → 独立 audit を成功 run で確認した。Environment と権限制限を維持した。
+5. docs-only の[成功実績](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45275801281)、[手動の非公開全検証](https://github.com/ak-sekine/heibon-mahjong/actions/runs/44965425797)、[開発公開](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45038169955)、[#58 の限定診断記録](issue58-browser-ui-sharding.md) と、現行の条件回帰テスト・main CI の並列4グループを照合した。開発公開は #64 以降の Issue ブランチ経路を対象とする。旧 develop の公開権限停止は既定の運用である。
+6. 限定2件、関連51件、[候補 CI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45281204111)、main CI、失敗・成功の実公開で確認した。full の修正後ライブ公開は未実施。
+7. 上記の実測に、再試行コストと比較上の制約を記録した。
