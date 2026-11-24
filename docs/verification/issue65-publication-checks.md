@@ -65,3 +65,53 @@ attempt 1、Skippedを除いたジョブ数、wallは開始から完了、runner
 | 10 代表障害と安全停止 | 一部達成。既存コードの拒否条件は検証。部分公開・DO非互換の実復旧は手動手順 |
 
 [運用手順](../operations/environments.md#障害と復旧ロールバック)の契約に沿い、今回の候補CIが成功すればPhase 3を終了する。main統合時には最新先端・候補SHA・CIを再確認し、統合後の必須CIと最終auditを確認する。承認範囲内で通常公開する段階ではWorker、Pages、台帳確定、auditを個別に確認する。重大な安全上の問題がなければ、開発reuseなどの追加改善を保留してゲーム機能開発に戻る。
+
+## Phase 4 — main統合・最終検証（2026-11-24 UTC）
+
+実装開始時のmainは `b22c40654a29fb963bda3fbed05aa85981d2d76f`。候補先端、全必須ジョブのhead SHAとattempt、無関係な差分がないこと、fast-forward可能であることを照合し、検証済み `837f298a9b64200bb374c83182ff08e6a6339363` をmainへ通常pushした。統合前の台帳先端は `ce7703dc428ff0eba54422eccb6440a811cdf9a9`、`pending=null`。GitHub Actionsに進行中・待機中の公開・復旧runは見つからなかった。外部の人手による操作履歴の全件確認は未実施。今回の追記は別の文書コミットで、全検証の対象は上記のコードSHA。
+
+限定18件、関連81件、単体テスト全1,599件、ビルド、Worker型検査はPhase 3の同一候補SHAの結果を利用した。候補pushは必須11ジョブと最終auditが成功。統合後のmain pushも同じSHAのattempt 1で、必須11ジョブ、Chromium／WebKit UI各2グループ、両環境分離、local-online、最終auditが成功した。両runとも公開ジョブはSkipped。候補CIの実測はwall 10:07、runner合計35:55。main CIはwall 10:40、runner合計34:29。[候補CI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45411513670/attempts/1) · [main CI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45414795376/attempts/1) · [main最終audit](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45414795376/job/138524912553)
+
+### 障害シナリオの照合
+
+Pは確定済み親、Cは予約した候補、Rはrun 50・attempt 1の予約とする。以下は模擬入力であり、障害・公開・データ変更は実環境で発生させていない。自動欄はPhase 3で成功した既存fixtureの証跡を再利用した。机上欄は運用手順の「書込前→直前→書込後」を適用し、書込範囲と終了時の整合を判定した。配信変更は対象Environment保護と個別の明示承認、手動台帳変更は別の個別承認と台帳書込権限が必要。読取確認に公開承認は不要。
+
+| シナリオ・模擬入力と証拠 | 期待する判断 | 照合結果と承認条件 |
+|---|---|---|
+| 両方未公開。Worker・Pagesのstepは未実行、対象deploymentはP、両側の配信と親hashが一致、Rは先端 | Abort | **自動＋机上、一致。** Git fixtureはRを親にPのtreeを復元し、競合した確定pushを拒否。運用上は未公開の証拠を確認し、台帳の承認だけを取り、配信を維持して両パスとpendingを照合 |
+| WorkerのみC。Worker deploymentとhealthはC、Pages配信はP。P WorkerがCの書いたDO形式を読め、migration変更なし | Rollbackまたは安全なロールフォワード | **机上、一致。** Pの既知の正常版へのWorker切り戻しを選択可能。Workerの個別承認とEnvironment保護を適用し、PのWorker・Pages整合後に別承認で親台帳を復元。C Workerと候補Pagesの互換・正常性が揃えばPages側のロールフォワードも可能 |
+| WorkerのみC。CのDO保存形式はPで読めない | 機械的Rollback拒否 | **机上、一致。** 旧版を戻す経路を停止。Cと候補Pagesの互換性、あるいはデータを保持できる互換版が証明されるまで追加書込を保留。配信変更やデータ操作の個別承認は別 |
+| PagesのみC。全配信hashはC、Worker deploymentはP。C PagesはP APIと非互換、旧PagesはPで動作 | Rollbackまたはロールフォワード | **机上、一致。** 保持側bytesを確認し、PagesだけPに戻す経路を選択。Pages承認とEnvironment保護を適用し、両環境のhashとP Workerを再確認してから別承認で親台帳を復元 |
+| 両方C。対象deployment、Worker health、両環境の配信hash、Rの所有者が一致。確定pushだけ未完了 | Finalize | **自動＋机上、一致。** 既存fixtureはCの全bytesを照合した後、Cのsiteを保持して台帳だけ確定。実運用は別の台帳承認と直前の先端照合を要求し、成功後にpendingなしとCを確認 |
+| C確定済み。Worker/Pages deploy成功、確定commitあり、auditが配信hash差異を報告 | 読取再確認 | **自動＋机上、一致。** audit mockは不一致を失敗扱いし、確定台帳を保持。運用手順で再デプロイを選ばず、deployment・hash・healthを読取比較。追加書込は別判断・別承認 |
+| Pages deploy要求後に応答が途切れ、deployment不明、配信hashの取得は503 | 必要証拠がない書込を停止 | **自動＋机上、一致。** 既存fixtureはHTTP 503でC配信確認を拒否。運用手順でAbort・Finalize・Pages再実行を保留し、Pages側だけを調査。停止中に承認があっても書込へ進まない |
+| Cloudflare全履歴が取得不能。元Worker deployは未実行、追加deploymentなし、Worker正常、両PagesはP、競合なし | 他の証拠で安全なら復旧選択肢を残す | **机上、一致。** GitHubの操作証拠と親配信で台帳のみのAbortを選択可能。Cloudflare履歴は未確認と記録し、手動台帳の個別承認を要求。直接操作を示す矛盾が出れば再判定 |
+| R確認後に別の保守操作が始まり、pages-verified先端も変化 | 影響する書込を停止 | **自動＋机上、一致。** Git fixtureは古い確定pushを拒否。運用手順で配信操作も止め、競合解消後に証拠を取得し直す |
+| Rはattempt 1だが作業元がattempt 2、または候補の保持側digestが異なる | 不正な確定・復旧を拒否 | **自動＋机上、一致。** 既存の予約・復旧fixtureは所有者、snapshot、digest不一致を拒否。確定コマンド単体は所有者や外部配信を証明しないため、手順の書込前照合を通過できず停止 |
+
+参照先は [環境運用](../operations/environments.md#障害と復旧ロールバック)、[成果物・復旧fixture](../../tests/environment-artifacts.test.mjs)、[Git競合fixture](../../tests/environment-git-store.test.mjs)、[再利用・監査fixture](../../tests/reuse-production-ci.test.mjs)。
+
+### 公開とコスト
+
+統合差分と直前の本番公開SHAからの差分は、CI・公開制御、テスト、文書に限られる。通常のアプリ公開を要する差分がないため、本番・開発とも新規公開は実施しなかった。成果物選別、予約、Workerの新規デプロイ、実オンライン、Pagesの新規デプロイ、台帳確定、公開後auditの各段階は今回未実施。
+
+公開Pagesの `release.json` を読取確認し、本番 `422ca54a1ccf1df3531017e4e0b3ec5e41d7ec4c`、開発 `99f6d146049133a1471bd62265089f5b65500563` が確定台帳と一致した。本番Worker `/health` は `ok=true`。開発WorkerのGETはこの環境からHTTP 403だったため健全性は未確認。403の発生元と利用者影響、両WorkerのCloudflare稼働version、現時点の全配信bytesは未確認。台帳に記録された前回の本番公開では独立auditが成功した。[確定台帳](https://github.com/ak-sekine/heibon-mahjong/blob/ce7703dc428ff0eba54422eccb6440a811cdf9a9/state.json) · [前回本番audit](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45399996598/job/138468007873)
+
+ソース上、公開のジョブ数、全検証回数、予約照合の回数は変わらない。本番継続・auditのmain一致要求は4→0、main参照は4→1（参考情報）、本番reuseの開発URL検証は1→0。旧成功reuseは9ジョブ・全検証0回・wall 4:14・runner合計3:30。変更後の公開wall、runner、人手・承認回数は未計測。机上検証ではAbortの配信作業、Finalizeの再デプロイ、audit失敗時の無条件再公開を避けられることを確認した。CIの実測はSkipped除外、wallはrun開始から完了、runner合計は各ジョブの開始から終了の和。[旧成功reuse](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45399996598)
+
+### 最終受入条件
+
+| 条件 | 評価 |
+|---|---|
+| 1 チェック棚卸し | 達成。実行段階・重複・故障境界・採否を記録 |
+| 2 過去の実例と証拠 | 達成。Skipped、予約残存、重複、監査誤判定を区分 |
+| 3 最小変更 | 達成。選定した3項目を統合し、保留案を保持 |
+| 4 回帰検証 | 達成。限定・関連・候補・mainの必須CIと最終audit |
+| 5 同等条件の公開コスト | 一部達成。過去実測とソース・CIを比較。変更後の公開実測と復旧手間は未計測 |
+| 6 文書・運用の整合 | 達成。履歴を保持し手順と結果を記録 |
+| 7 機能開発へ戻る終了条件 | 達成。重大な問題のない追加改善は保留 |
+| 8 状態別復旧と整合 | 達成。既存fixtureと具体的な模擬入力で実行条件・互換性・停止・整合化を照合。実復旧は未実施 |
+| 9 GitHub正本と承認範囲 | 達成。操作対象・証拠・権限・データ保護を手順化 |
+| 10 代表障害の限定検証 | 一部達成。所有権・競合・hash・台帳処理を自動fixtureで検証。DO非互換と部分公開での復旧選択は机上検証 |
+
+Phase 4の範囲を終了し、通常のゲーム機能開発へ戻れる。項目5の公開実測と項目10の自動検証範囲に残りがあるため、IssueのCloseは別判断とし、状態を変更しない。開発公開再利用や監査基盤の追加は保留する。
