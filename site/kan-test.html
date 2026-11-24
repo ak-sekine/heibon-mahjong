@@ -7,10 +7,10 @@
   <meta name="theme-color" content="#185640" />
   <meta name="robots" content="noindex, nofollow" />
   <title>カン検証 — Heibon Mahjong</title>
-  <script type="module" crossorigin src="/heibon-mahjong/assets/main-CrzXC6mr.js"></script>
+  <script type="module" crossorigin src="/heibon-mahjong/assets/main-Crp2GRWg.js"></script>
   <script type="module" crossorigin src="/heibon-mahjong/assets/style-BWCBAXPO.js"></script>
-  <script type="module" crossorigin src="/heibon-mahjong/assets/page-BNfDuBHC.js"></script>
-  <link rel="stylesheet" crossorigin href="/heibon-mahjong/assets/main-CAn7jULi.css">
+  <script type="module" crossorigin src="/heibon-mahjong/assets/page-DI19dUKu.js"></script>
+  <link rel="stylesheet" crossorigin href="/heibon-mahjong/assets/main-DSdz8lhf.css">
   <link rel="stylesheet" crossorigin href="/heibon-mahjong/assets/style-DOorKaLM.css">
 </head>
 <body>
@@ -65,9 +65,9 @@
   </template>
   <template id="game-controls-template">
     <section class="discard-controls" data-panel-part="root">
-      <div class="action-choice-group call-controls" data-panel-part="call-controls" role="group" aria-label="鳴き判断" hidden>
-        <p class="action-group-status" data-panel-part="call-status" role="status" aria-live="polite"></p>
-        <div class="call-type-buttons" role="group" aria-label="鳴き種類と判断操作">
+      <div class="decision-controls" data-panel-part="call-controls" role="group" aria-label="鳴き判断" hidden>
+        <p class="action-group-status" data-panel-part="call-status" role="status" aria-live="polite" hidden></p>
+        <div class="decision-buttons" role="group" aria-label="鳴き種類と判断操作">
           <button class="control-action-button ui-button ui-button--a" data-panel-part="call-pon" type="button" hidden>ポン</button>
           <button class="control-action-button ui-button ui-button--a" data-panel-part="call-kan" type="button" hidden>カン</button>
           <button class="control-action-button ui-button ui-button--a" data-panel-part="call-chi" type="button" hidden>チー</button>
@@ -78,10 +78,12 @@
         <div class="candidate-option-list" data-panel-part="candidate-options" role="group" aria-label="候補"></div>
         <button class="candidate-back-button control-action-button ui-button ui-button--b" data-panel-part="candidate-back" type="button">戻る</button>
       </div>
-      <div class="action-choice-group" data-panel-part="ron-controls" role="group" aria-label="ロン判断" hidden>
+      <div class="decision-controls" data-panel-part="ron-controls" role="group" aria-label="ロン判断" hidden>
         <p class="action-group-status" data-panel-part="ron-status" hidden></p>
-        <button class="control-action-button ui-button ui-button--a" data-panel-part="ron" type="button">ロン和了</button>
-        <button class="control-action-button ui-button ui-button--c" data-panel-part="pass-ron" type="button">見逃す</button>
+        <div class="decision-buttons">
+          <button class="control-action-button ui-button ui-button--a" data-panel-part="ron" type="button">ロン和了</button>
+          <button class="control-action-button ui-button ui-button--c" data-panel-part="pass-ron" type="button">見逃す</button>
+        </div>
       </div>
       <div class="normal-controls" data-panel-part="normal-controls">
       <p class="action-status" data-panel-part="action-status" role="status" aria-live="polite"></p>
