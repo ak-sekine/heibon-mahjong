@@ -1,25 +1,25 @@
 {
   "version": 1,
   "environment": "production",
-  "sha": "422ca54a1ccf1df3531017e4e0b3ec5e41d7ec4c",
+  "sha": "463a3ff019a50d9e5d23d8776ddf2640100a77b4",
   "workerUrl": "https://heibon-mahjong-online.ak-sekine.workers.dev",
   "files": {
-    "assets/main-B-xjH5y6.js": "b92ca435a21aa0ca968d17721ee7c71db7ede148c4af86ae8017e6c5136986f5",
     "assets/main-C98vpl_r.css": "d3fb8c9d16b6f1733f4b1fcb24d30116585f5918446784137c718d0a927e844a",
-    "assets/page-B7Ogiz4M.js": "3084f9d8cbc9420c785103a8e39898de6322e7f9093a23f8fc6c8942cc378fcb",
+    "assets/main-Ca4_M5_v.js": "fbf2c5d229f3da3b5b3cbb04a56d889bc1b83bb06014d6c1038b7341a0a7ed80",
+    "assets/page-B2LyQTiE.js": "1707a08899724bbd8fc335adebc0cdc882e8e9f6f948dcdc9871a5e5d717ae60",
     "assets/style-BWCBAXPO.js": "d6bfacf17b204f2d0b3380fc44981d090bd7b43ddbd86a9cdbff410791dc39ed",
     "assets/style-DOorKaLM.css": "abcb9e15acfc284e2c072ef03803b32fcbf088bb1b8eec68ed0e6ad20f5aaa07",
-    "assets/test-Bz2NKetA.js": "f968617ff08e6625af9e9a294b79584620b1ca63377c5f30efd6bfb3be7a198c",
-    "call-test.html": "ce1052e68322f6077593a9a5c9c9223cafdbeb27717d15aa2e9b1578df2b3459",
+    "assets/test-BtDGQIw_.js": "52802bdd73b90452eab8183796fe602ee5d4a500bf24f57c1466e33d1c44aa11",
+    "call-test.html": "a35075f34adfc22289116cabf5ec433864e0e88153060fb7483a344355e4e0b2",
     "icons/icon-180.png": "9a58f7f37981373eb144bbf5857f0598e1307224d29ce8cc626ec8bdffdafb90",
     "icons/icon-192.png": "e93570632d88d79a0899d87620bf9b633a8b92cfd73511d0dcae2e567fed444d",
     "icons/icon-512.png": "7a085a12c12882b1e00bf1fca5d1d3d95086b5a7f070648acae930f1b698eb42",
     "icons/icon-maskable-512.png": "703c1d5b452996a1671efb5c246acbcd5c2a35d8815c414be49b511bf30b96c9",
-    "index.html": "51fdb10bbf532b682d64591bddce556ddabc9b171dec5010d6985ab9c1db8b77",
-    "kan-test.html": "092acc0200ac64e83c929bb027bbea2f210c52a854d55e039d509e526bd5903a",
+    "index.html": "d1d0769bba74aedf926d1392d3fb8627e0b844a7cf0a26c708ef987ff220474f",
+    "kan-test.html": "28693b6d84e92c3e4bb4d8a7b2c8bd04f44b0d88f09fb157f442ad85766c0351",
     "manifest.webmanifest": "9298c553712a5ebda07fcc8adc7cd08cae88c210a4e8f52d902d022b3a8e401c",
-    "sw.js": "fba80f850d14baf2cd6b29742e04338736e5dfa27a6b7f8b3d474aca6c8c1b05",
-    "test.html": "f233c43b43944858741e62b768e183b42411d2bac57c5076799e4bdbd2be47ec"
+    "sw.js": "9af5857f304e2150963602fdfcd1ecc500e71088a4720bd55634c114484b8855",
+    "test.html": "1d79274a6f20b58a870b91d4823810bbf6f442c417dc9a991d64c645f7546850"
   },
-  "digest": "05d034029e1a4cd71971f57be52cd789903f03bf1302230efb91b00a26397239"
+  "digest": "c8c2a106b1cf65e55927b14017bb2cf02332a25f40450f19950b6c6d2c37c7ab"
 }
