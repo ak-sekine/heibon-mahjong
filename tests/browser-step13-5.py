@@ -91,14 +91,12 @@ controller.match=startMatch(g);render();};
    assert page.locator('.result-dora-slot').count()>=5
    assert page.locator('#result-body').evaluate('e=>e.scrollHeight>=e.clientHeight')
    page.locator('#next-round').click();assert page.evaluate('kanCheck().game.kanCount')==0
-  page.evaluate("loadKan('ron')");assert page.locator('#ron-target svg').count()==1
-  assert page.locator('#ron-target svg').get_attribute('aria-hidden')=='true'
+  page.evaluate("loadKan('ron')");assert page.locator('#ron-controls svg, #ron-target').count()==0
   assert page.locator('#ron-status').inner_text()=='CPU1が赤5索を捨てました'
-  assert page.locator('#ron-target svg title').text_content()=='赤5索'
-  check();shot('normal-ron');page.locator('#pass-ron').click();assert page.locator('#ron-target svg').count()==0
+  check();shot('normal-ron');page.locator('#pass-ron').click();assert page.locator('#ron-controls').is_hidden()
   page.evaluate("loadKan('ron')");page.locator('#ron').click();assert page.evaluate('kanCheck().game.phase')=='won'
   page.locator('#view-table').click()
-  page.evaluate("loadKan('robbery');startRobbery()");assert page.locator('#ron').is_enabled();assert page.locator('#ron-target svg').count()==1;assert page.locator('.pending-kan-tile svg').count()==1;check();shot('chankan-pending')
+  page.evaluate("loadKan('robbery');startRobbery()");assert page.locator('#ron').is_enabled();assert page.locator('#ron-controls svg, #ron-target').count()==0;assert page.locator('.pending-kan-tile svg').count()==1;check();shot('chankan-pending')
   page.locator('#pass-ron').click();assert page.evaluate('kanCheck().game.players[1].melds[0].type')=='kakan'
   page.evaluate("loadKan('robbery');startRobbery()");page.locator('#ron').click();assert '槍槓 1翻' in page.locator('#win-result').inner_text();check();shot('chankan-result')
   page.locator('#view-table').click()

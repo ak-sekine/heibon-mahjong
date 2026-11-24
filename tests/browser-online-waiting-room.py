@@ -2353,11 +2353,47 @@ with sync_playwright() as p:
     page.evaluate('window.onlineMock.advanceCpu()')
     wait_for("document.querySelector('[data-online-river=top] .river-tile') !== null")
 
+    original_viewport = page.viewport_size
+    page.set_viewport_size({'width': 375, 'height': 667})
+    page.evaluate('window.scrollTo(0, 0)')
+    ron_table = page.locator('#online-table')
+    before_ron = ron_table.bounding_box()
+    before_ron_scroll = page.evaluate('scrollY')
     page.evaluate('window.onlineMock.showRon()')
     wait_for("document.querySelector('#online-ron-controls').hidden === false")
-    assert page.locator('#online-ron').is_enabled() and page.locator('#online-pass-ron').is_enabled(), 'ron choices were not actionable'
-    page.locator('#online-pass-ron').click()
+    ron_controls = page.locator('#online-ron-controls')
+    assert ron_controls.locator('svg, [data-panel-part="ron-target"]').count() == 0
+    assert ron_table.bounding_box() == before_ron
+    initial_seconds = page.locator('#online-ron-status').inner_text()
+    assert 'ロン判断の残り' in initial_seconds
+    page.wait_for_function("text => document.querySelector('#online-ron-status').textContent !== text", arg=initial_seconds)
+    for height in (667, 550):
+      page.set_viewport_size({'width': 375, 'height': height})
+      bounds = ron_controls.evaluate("""panel => {
+        const {offsetLeft, offsetTop, width, height} = visualViewport;
+        const buttons = [...panel.querySelectorAll('button')].map(button => {
+          const r = button.getBoundingClientRect();
+          const points = [[r.left + 1, r.top + 1], [r.right - 1, r.bottom - 1], [r.x + r.width / 2, r.y + r.height / 2]];
+          return {box:r.toJSON(), enabled: !button.disabled,
+            visible: r.left >= offsetLeft && r.top >= offsetTop &&
+              r.right <= offsetLeft + width && r.bottom <= offsetTop + height &&
+              points.every(([x, y]) => button.contains(document.elementFromPoint(x, y)))};
+        });
+        return {buttons, height:panel.getBoundingClientRect().height, scrollY};
+      }""")
+      ron, skip = bounds['buttons']
+      assert all(b['visible'] and b['enabled'] and b['box']['height'] >= 44 for b in (ron, skip)), bounds
+      assert ron['box']['y'] == skip['box']['y'] and ron['box']['right'] < skip['box']['left'], bounds
+      assert bounds['scrollY'] == before_ron_scroll, bounds
+      print(f'Online ron 375x{height}: {json.dumps(bounds)}')
+    short_ron_table = ron_table.bounding_box()
+    box = page.locator('#online-pass-ron').bounding_box()
+    page.mouse.click(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
     wait_for("document.querySelector('#online-ron-controls').hidden === true")
+    assert ron_table.bounding_box() == short_ron_table
+    assert page.evaluate('scrollY') == before_ron_scroll
+    assert page.evaluate('window.onlineMock.gameActions.at(-1)') == 'pass-ron'
+    page.set_viewport_size(original_viewport)
     def online_call_layout():
       return page.evaluate("""()=>Object.fromEntries(['.app-header','.score-strip','#online-table','#online-player-hand','[data-online-rivers]','.center-info']
         .map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return [selector,[r.x,r.y,r.width,r.height]]}))""")

@@ -79,9 +79,6 @@ ul { list-style:none; padding:0; margin:0; }
  .candidate-controls { max-height:var(--candidate-panel-available-height,calc(100dvh - 16px)); }
  .candidate-option-list { max-height:var(--candidate-panel-available-height,calc(100dvh - 104px)); }
 }
-.ron-target { flex:1 1 100%; display:flex; align-items:center; justify-content:center; gap:12px; min-width:0; }
-.ron-target > .tile-svg { width:48px; height:67.2px; flex-shrink:0; }
-.ron-target p { margin:0; overflow-wrap:anywhere; }
 .round-result-actions { display:flex; align-items:stretch; justify-content:center; flex:1 1 100%; gap:6px; }
 .round-result-actions button { flex:1 1 0; min-width:72px; min-height:44px; padding:8px 6px; }
 .keyboard-help { width:100%; margin:0; font-size:11px; color:#d4e5db; }
@@ -113,10 +110,7 @@ ul { list-style:none; padding:0; margin:0; }
 .winning-hand,.public-winning-hand { display:grid; grid-template-columns:repeat(14,minmax(0,1fr)); gap:1px; padding:0; margin:8px 0; list-style:none; width:100%; max-width:560px; }
 .winning-hand li,.public-winning-hand li { min-width:0; aspect-ratio:60/84; }
 .winning-hand .tile-svg,.public-winning-hand .tile-svg { width:100%; height:100%; }
-.ron-pending .action-status,
-.ron-pending .action-buttons > [data-panel-part="discard"],
-.ron-pending .action-buttons > [data-panel-part="tsumo"],
-.ron-pending > .keyboard-help { display:none; }
+.ron-pending > .normal-controls:not([hidden]) { display:none; }
 .winner-result + .winner-result { border-top:1px solid #63947a; margin-top:16px; padding-top:16px; }
 .win-score { font-weight:700; }
 .win-payments { padding-left:20px; overflow-wrap:anywhere; }

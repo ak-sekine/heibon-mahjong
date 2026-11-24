@@ -4,7 +4,7 @@ import type { MatchState } from '../model/match.ts';
 import type { PlayerId } from '../model/game.ts';
 import { canDeclareRiichi } from '../game/riichi.ts';
 import { canDeclareTsumo } from '../game/tsumo.ts';
-import { canDeclareRon, getRonTile } from '../game/ron.ts';
+import { canDeclareRon } from '../game/ron.ts';
 import { canDeclareKyuushuKyuuhai } from '../game/special-draws.ts';
 import { canDiscard } from '../game/discard.ts';
 import { getKanOptions } from '../game/kan.ts';
@@ -41,7 +41,6 @@ export function createLocalActionPanelState(
   const callTarget = callOptions.length
     ? game.players[callOptions[0].fromPlayerId].river.find(tile => tile.id === callOptions[0].calledTileId)?.tile ?? null
     : null;
-  const ronTile = canRon ? getRonTile(game) : null;
   const allCallChoices: ActionChoiceOption[] = callOptions.map(option => {
     const label = option.type === 'pon' ? 'ポン' : option.type === 'daiminkan' ? '大明カン' : 'チー';
     return {
@@ -75,9 +74,6 @@ export function createLocalActionPanelState(
   else if (selected) actionStatus = `選択：${tileLabel(selected.tile)}`;
   else actionStatus = 'あなたの手番：牌を選択して「打牌する」で確定';
 
-  const ronAction = canRon && ronTile ? game.ronWindow?.kind === 'kakan'
-    ? 'を加カンしようとしています'
-    : game.ronWindow?.kind === 'ankan' ? 'で暗カンを宣言しました' : 'を捨てました' : '';
   const roundResultAvailable = match.lastSettlement !== null;
 
   return {
@@ -107,14 +103,7 @@ export function createLocalActionPanelState(
     },
     ronGroup: {
       visible: canRon,
-      status: canRon && ronTile
-        ? `${seatNames[game.ronWindow!.discarderId]}が${tileLabel(ronTile.tile)}${ronAction}`
-        : '',
-      target: canRon && ronTile ? {
-        tile: ronTile.tile,
-        description: game.ronWindow?.kind === 'kakan' ? '追加する牌・この牌で槍槓できます'
-          : game.ronWindow?.kind === 'ankan' ? 'この牌で槍槓できます' : 'この牌でロンできます',
-      } : null,
+      status: canRon ? 'ロン判断です。' : '',
     },
     roundActionsVisible: roundResultAvailable,
     ronPending: canRon,

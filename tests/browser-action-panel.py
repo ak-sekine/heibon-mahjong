@@ -295,6 +295,14 @@ with sync_playwright() as p:
           return (root.innerText.match(/ロン判断の残り/gu) || []).length === 1 &&
             root.querySelector('[data-panel-part="action-status"]').innerText === 'ロン判断を待っています。';
         }""")
+        ron_group = online_panel.locator('[data-panel-part="ron-controls"]')
+        assert ron_group.locator(':scope > *').all_inner_texts() == ['ロン判断の残り 10 秒です。', 'ロン和了', '見逃す']
+        assert ron_group.locator('svg, [data-panel-part="ron-target"]').count() == 0
+        page.evaluate("window.actionPanelBrowser.update(null, false, false, false, 9)")
+        assert ron_group.locator('[data-panel-part="ron-status"]').inner_text() == 'ロン判断の残り 9 秒です。'
+        for action in ('ron', 'pass-ron'):
+            ron_group.locator(f'[data-panel-part="{action}"]').click()
+            assert page.evaluate("window.actionPanelBrowser.onlineEvents.at(-1)") == {'type': action}
         page.evaluate("""() => {
           const test = window.actionPanelBrowser;
           test.update(null, false, false, false, 0);

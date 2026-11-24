@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { TILE_KINDS, ordinaryTile } from '../src/model/tile.ts';
-import { tileSvgMarkup } from '../src/rendering/tile-svg.ts';
 import { diagnosticLog } from '../src/online/diagnostics.ts';
 import { CandidateSelection } from '../src/ui/candidate-selection.ts';
 import {
@@ -124,7 +123,7 @@ function panelFixture(handler: ActionPanelHandler = () => {}, options: ActionPan
     'candidate-options': 'candidate-controls', 'candidate-back': 'candidate-controls',
     'action-status': 'normal-controls', 'discard': 'normal-controls', 'riichi': 'normal-controls', 'tsumo': 'normal-controls',
     'kan-toggle': 'normal-controls', 'kyuushu': 'normal-controls', 'round-actions': 'normal-controls',
-    'ron-status': 'ron-controls', 'ron-target': 'ron-controls', ron: 'ron-controls', 'pass-ron': 'ron-controls',
+    'ron-status': 'ron-controls', ron: 'ron-controls', 'pass-ron': 'ron-controls',
     'show-result': 'round-actions', 'next-round': 'round-actions',
   };
   for (const part of ACTION_PANEL_TEMPLATE_PARTS) {
@@ -169,7 +168,7 @@ function state(overrides: Partial<ActionPanelState> = {}): ActionPanelState {
     actionStatus: '牌を選択してください。',
     callGroup: { visible: false, status: '', options: [] },
     kanGroup: { visible: false, status: '', options: [] },
-    ronGroup: { visible: false, status: '', target: null },
+    ronGroup: { visible: false, status: '' },
     roundActionsVisible: false,
     ronPending: false,
     gameEnded: false,
@@ -341,7 +340,7 @@ test('ActionPanel keeps one countdown in the decision group while it updates and
     assert.equal(fixture.parts.get('call-controls')!.hidden, true);
 
     fixture.panel.update(state({
-      ronGroup: { visible: true, status: 'ロン判断の残り 12 秒です。', target: null },
+      ronGroup: { visible: true, status: 'ロン判断の残り 12 秒です。' },
       actionStatus: 'ロン判断を待っています。',
     }));
     assert.deepEqual(['ron-status', 'action-status'].filter(part => fixture.parts.get(part)!.textContent.includes('判断の残り')), ['ron-status']);
@@ -612,19 +611,14 @@ test('call panel diagnostics correlate displayed choices and clicks without reta
 test('ActionPanel manages ron focus and result actions centrally', () => {
   const fixture = panelFixture();
   try {
-    const tile = ordinaryTile(TILE_KINDS.find(kind => kind.category === 'suited' && kind.suit === 'sou' && kind.rank === 5)!);
     fixture.panel.update(state({
       buttons: { ...state().buttons, ron: { visible: true, enabled: true, label: 'ロン和了' } },
-      ronGroup: { visible: true, status: 'ロン判断です。', target: { tile, description: 'この牌でロンできます' } },
+      ronGroup: { visible: true, status: 'ロン判断です。' },
       roundActionsVisible: true,
     }));
     assert.equal(fixture.parts.get('ron')!.focused, true);
     assert.equal(fixture.parts.get('ron-controls')!.hidden, false);
-    const target = fixture.parts.get('ron-target')!;
-    assert.equal(target.children[0] instanceof FakeElement, true);
-    assert.equal((target.children[0] as FakeElement).innerHTML, tileSvgMarkup(tile));
-    assert.equal((target.children[0] as FakeElement).attributes.get('aria-hidden'), 'true');
-    assert.equal((target.children[0] as FakeElement).dataset.tileId, undefined);
+    assert.equal(fixture.parts.get('ron-status')!.textContent, 'ロン判断です。');
     assert.equal(fixture.parts.get('round-actions')!.hidden, false);
 
     fixture.panel.update(state());

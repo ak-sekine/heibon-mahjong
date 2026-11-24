@@ -73,7 +73,7 @@ with sync_playwright() as p:
         load('chankan')
         page.locator('#start-cpu-kan').tap()
         check()
-        assert page.locator('#ron-target svg').count()==1
+        assert page.locator('#ron-controls svg, #ron-target').count()==0
         assert page.locator('.pending-kan-tile svg').count()==1
         group=page.locator('.open-meld[data-kan-pending]')
         assert group.get_attribute('data-meld-type')=='pon'
@@ -81,7 +81,7 @@ with sync_playwright() as p:
         assert page.locator('.pending-kan-tile').get_attribute('data-tile-id') is None
         assert page.locator('#ron').evaluate('e=>e===document.activeElement')
         page.wait_for_timeout(100)
-        for sel in ['#ron','#pass-ron','#ron-target']:
+        for sel in ['#ron','#pass-ron']:
             r=page.locator(sel).bounding_box()
             assert r['y']>=0 and r['y']+r['height']<=height
         page.screenshot(path=str(out/f'{width}-pending.png'),full_page=True)
@@ -93,11 +93,11 @@ with sync_playwright() as p:
         load('chankan')
         page.locator('#start-cpu-kan').tap()
         page.evaluate("""()=>{window.nativeViewport=visualViewport;window.testViewport=new EventTarget();Object.assign(testViewport,{height:300,offsetTop:24});Object.defineProperty(window,'visualViewport',{configurable:true,get:()=>testViewport});nativeViewport.dispatchEvent(new Event('resize'));}""")
-        page.wait_for_function("""()=>[...document.querySelectorAll('#ron,#pass-ron,#ron-target')].every(e=>{let r=e.getBoundingClientRect();return r.top>=24&&r.bottom<=324})""")
+        page.wait_for_function("""()=>[...document.querySelectorAll('#ron,#pass-ron')].every(e=>{let r=e.getBoundingClientRect();return r.top>=24&&r.bottom<=324})""")
         page.screenshot(path=str(out/f'{width}-viewport.png'),full_page=True)
         page.locator('#pass-ron').tap()
         assert page.locator('.pending-kan-tile').count()==0
-        assert page.locator('#ron-target svg').count()==0
+        assert page.locator('#ron-controls').is_hidden()
         page.evaluate("Object.defineProperty(window,'visualViewport',{configurable:true,get:()=>nativeViewport})")
         page.screenshot(path=str(out/f'{width}-passed.png'),full_page=True)
         assert page.evaluate("readGame().players[1].melds[0].type")=='kakan'
@@ -107,12 +107,12 @@ with sync_playwright() as p:
         page.locator('#start-cpu-kan').tap()
         page.locator('#load-scenario').tap()
         assert page.locator('.pending-kan-tile').count()==0
-        assert page.locator('#ron-target svg').count()==0
+        assert page.locator('#ron-controls').is_hidden()
         page.locator('#start-cpu-kan').tap()
         page.locator('#new-game').tap()
         page.locator('#confirm-new-game').tap()
         assert page.locator('.pending-kan-tile').count()==0
-        assert page.locator('#ron-target svg').count()==0
+        assert page.locator('#ron-controls').is_hidden()
         check()
         load('multiple')
         for i in range(2):

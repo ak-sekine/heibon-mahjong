@@ -1,6 +1,5 @@
 import type { ActionButtonState, ActionChoiceOption, ActionPanelState } from '../ui/action-panel.ts';
 import { choiceAccessibleLabel } from '../ui/action-panel.ts';
-import { tileLabel } from '../rendering/tile-svg.ts';
 import { actionChoicesForDisplay } from '../ui/action-panel.ts';
 import type { PlayerGameView } from './game-view.ts';
 
@@ -125,10 +124,7 @@ export function createOnlineActionPanelState(
     ronGroup: {
       visible: decision?.type === 'ron',
       status: decision?.type === 'ron' ? decisionStatus : '',
-      target: ronAllowed && view.self.ronTile ? {
-        tile: view.self.ronTile.tile,
-        description: `${tileLabel(view.self.ronTile.tile)} · この牌でロンできます`,
-      } : null,
+
     },
     roundActionsVisible: showResult || nextRound,
     ronPending: decision?.type === 'ron' && ronAllowed,

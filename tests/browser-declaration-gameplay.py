@@ -117,6 +117,74 @@ window.declarationGameplayTest = { controller, render, onlineGameController };
         !document.querySelector('#local-table .declaration-bubble');
     }''', timeout=1000)
 
+    # Use the real local panel and a fixed red-five ron window, before any
+    # automation can scroll the buttons into view.
+    for width, height in [(320, 568), (375, 667), (390, 844)]:
+      page.set_viewport_size({'width': width, 'height': height})
+      page.evaluate('''() => {
+        window.declarationGameplayTest.controller.newGame();
+        window.scrollTo(0, 0);
+      }''')
+      table = page.locator('#local-table')
+      before = table.bounding_box()
+      scroll_before = page.evaluate('scrollY')
+      page.evaluate("""async () => {
+        const [{ ronGame }, { startMatch }] = await Promise.all([
+          import('/heibon-mahjong/tests/ron-fixture.ts'),
+          import('/heibon-mahjong/src/game/match.ts'),
+        ]);
+        const app = window.declarationGameplayTest;
+        app.controller.match = startMatch(ronGame(1, [0], undefined, 'sou-5', true));
+        app.controller.selectedTileId = null;
+        app.render();
+      }""")
+      group = page.locator('#ron-controls')
+      assert group.locator(':scope > *').all_inner_texts() == ['ロン判断です。', 'ロン和了', '見逃す']
+      assert group.locator('svg, [data-panel-part="ron-target"]').count() == 0
+      assert table.bounding_box() == before
+      assert page.evaluate('scrollY') == scroll_before
+      assert page.evaluate('document.activeElement.id') == 'ron'
+      for current_height in (height, height - 100):
+        page.set_viewport_size({'width': width, 'height': current_height})
+        metrics = group.evaluate("""panel => {
+          const viewport = visualViewport;
+          const buttons = [...panel.querySelectorAll('button')].map(button => {
+            const box = button.getBoundingClientRect();
+            let clipped = false;
+            for (let parent = button.parentElement; parent; parent = parent.parentElement) {
+              const style = getComputedStyle(parent), rect = parent.getBoundingClientRect();
+              const left = rect.left + parent.clientLeft, top = rect.top + parent.clientTop;
+              clipped ||= style.overflowX !== 'visible' &&
+                (box.left < left - .5 || box.right > left + parent.clientWidth + .5);
+              clipped ||= style.overflowY !== 'visible' &&
+                (box.top < top - .5 || box.bottom > top + parent.clientHeight + .5);
+            }
+            return { box: box.toJSON(), clipped, enabled: !button.disabled,
+              inViewport: box.left >= viewport.offsetLeft && box.top >= viewport.offsetTop &&
+                box.right <= viewport.offsetLeft + viewport.width &&
+                box.bottom <= viewport.offsetTop + viewport.height,
+              hit: button.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)) };
+          });
+          return { panelHeight: panel.getBoundingClientRect().height, scrollY, buttons };
+        }""")
+        print(f'Ron {ENGINE} {width}x{current_height}: {json.dumps(metrics)}')
+        ron, skip = metrics['buttons']
+        assert all(button['box']['height'] >= 44 and not button['clipped'] and button['inViewport']
+                   and button['hit'] and button['enabled'] for button in (ron, skip)), metrics
+        assert ron['box']['y'] == skip['box']['y'] and ron['box']['right'] < skip['box']['left'], metrics
+        assert metrics['scrollY'] == scroll_before, metrics
+      resized_table = table.bounding_box()
+      button = page.locator('#pass-ron' if width == 375 else '#ron')
+      box = button.bounding_box()
+      page.mouse.click(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+      assert group.is_hidden()
+      assert page.evaluate('scrollY') == scroll_before
+      if width == 375:
+        assert table.bounding_box() == resized_table
+      else:
+        assert page.evaluate("window.declarationGameplayTest.controller.game.phase") == 'won'
+
+    page.set_viewport_size({'width': 320, 'height': 568})
     online = page.evaluate('''async() => {
       const [fixture, matchModule, engine, views] = await Promise.all([
         import('/heibon-mahjong/tests/riichi-fixture.ts'),

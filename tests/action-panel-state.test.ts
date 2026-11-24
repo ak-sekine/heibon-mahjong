@@ -278,7 +278,7 @@ test('ron judgement shows legal actions and focuses on server timeout or action 
   assert.equal(local.ronGroup.visible, true);
   assert.equal(online.ronGroup.visible, true);
   assertSharedButtons(local, online, ['ron', 'pass-ron']);
-  assert.equal(local.ronGroup.target?.tile !== undefined, true);
+  assert.equal(local.ronGroup.status, 'ロン判断です。');
   assert.equal(online.ronGroup.status, 'ロン判断の残り 10 秒です。');
   assert.equal(online.callGroup.status, '');
   assert.equal(online.actionStatus, 'ロン判断を待っています。');

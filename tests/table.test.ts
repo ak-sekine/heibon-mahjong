@@ -663,8 +663,7 @@ for (const scenario of ['waiting','same-kind','call-waiting','human','double','t
       assert.equal(panelState.buttons['pass-ron'].enabled,pendingRon);
       assert.equal(panelState.callGroup.visible,pendingCall);
       if (pendingRon) {
-        assert.match(panelState.ronGroup.status,/CPU1が赤5索を捨てました/);
-        assert.equal(panelState.ronGroup.target?.tile.category,'suited');
+        assert.equal(panelState.ronGroup.status,'ロン判断です。');
       }
       assert.ok(nodes.get('#player-hand')!.children.every(c=>c.children[0].disabled));
       const panel = nodes.get('#win-result')!;
@@ -806,8 +805,7 @@ for (const mode of ['discard', 'red', 'pending', 'ron', 'pass', 'reset', 'new-ma
     const physical=game.ronWindow!.kan?.tile ?? game.players[1].river.at(-1)!;
     const actionState=createLocalActionPanelState(startMatch(game),null,false,false);
     assert.equal(actionState.ronGroup.visible,true);
-    assert.deepEqual(actionState.ronGroup.target?.tile,physical.tile);
-    if(mode==='red') assert.match(actionState.ronGroup.status,/赤5索/);
+    assert.equal(actionState.ronGroup.status,'ロン判断です。');
     if(game===pending) {
       const group=nodes.get('.open-melds[data-player-id="1"]')!.children[0];
       assert.equal(group.dataset.meldType,'pon');assert.equal(group.dataset.kanPending,'true');
@@ -816,7 +814,6 @@ for (const mode of ['discard', 'red', 'pending', 'ron', 'pass', 'reset', 'new-ma
       const preview=called.children.find(n=>n.className.includes('pending-kan-tile'))!;
       assert.equal(preview.dataset.tileId,undefined);
       assert.equal(preview.children[0].innerHTML,tileSvgMarkup(physical.tile));
-      assert.match(actionState.ronGroup.status,/CPU1が1萬を加カン/);
     }
     for(const p of game.players.slice(1)) for(const t of p.hand) assert.ok(![...nodes.values()].flatMap(walk).some(n=>n.dataset.tileId===t.id));
     inventory(game,mode==='discard'||mode==='red'?game:initial);
@@ -831,7 +828,7 @@ for (const mode of ['discard', 'red', 'pending', 'ron', 'pass', 'reset', 'new-ma
     } else if(game!==pending && !['discard','red'].includes(mode)) {
       renderTable(game);renderSelection(game,null);
       const actionStateAfter=createLocalActionPanelState(startMatch(game),null,false,false);
-      assert.equal(actionStateAfter.ronGroup.target,null);
+      assert.equal(actionStateAfter.ronGroup.visible,false);
       assert.equal(actionStateAfter.ronGroup.status,'');
       assert.ok(![...nodes.values()].flatMap(walk).some(n=>n.dataset.kanPending==='true'));
       if(mode==='ron') {

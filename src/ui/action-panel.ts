@@ -1,5 +1,5 @@
 import type { Tile } from '../model/tile.ts';
-import { createTileElement, tileLabel } from '../rendering/tile-svg.ts';
+import { tileLabel } from '../rendering/tile-svg.ts';
 import { diagnosticLog } from '../online/diagnostics.ts';
 import { uniqueCallOptionsByDisplay } from './call-options.ts';
 import { CandidateSelection, operationFor, type CandidateOperation, type CandidateOption } from './candidate-selection.ts';
@@ -36,7 +36,6 @@ export type ActionPanelState = Readonly<{
   ronGroup: Readonly<{
     visible: boolean;
     status: string;
-    target: Readonly<{ tile: Tile; description: string }> | null;
   }>;
   roundActionsVisible: boolean;
   ronPending: boolean;
@@ -88,7 +87,6 @@ const LOCAL_IDS: Readonly<Record<string, string>> = {
   'normal-controls': 'normal-controls',
   'ron-controls': 'ron-controls',
   'ron-status': 'ron-status',
-  'ron-target': 'ron-target',
   ron: 'ron',
   'pass-ron': 'pass-ron',
   'action-status': 'selection-status',
@@ -117,7 +115,6 @@ const ONLINE_IDS: Readonly<Record<string, string>> = {
   'normal-controls': 'online-normal-controls',
   'ron-controls': 'online-ron-controls',
   'ron-status': 'online-ron-status',
-  'ron-target': 'online-ron-target',
   ron: 'online-ron',
   'pass-ron': 'online-pass-ron',
   'action-status': 'online-game-action-status',
@@ -268,7 +265,6 @@ export class ActionPanel {
       button.removeAttribute('aria-busy');
     }
     for (const part of ['call-controls', 'candidate-controls', 'normal-controls', 'ron-controls', 'round-actions']) this.part(part).hidden = true;
-    for (const part of ['ron-target']) this.part(part).replaceChildren();
     for (const part of ['call-status', 'ron-status', 'action-status']) this.part(part).textContent = '';
     this.root.classList.remove('ron-pending', 'game-ended', 'result-available');
   }
@@ -322,16 +318,6 @@ export class ActionPanel {
     const ronControls = this.part('ron-controls');
     ronControls.hidden = !state.ronGroup.visible;
     this.part('ron-status').textContent = state.ronGroup.status;
-    const target = this.part('ron-target');
-    target.replaceChildren();
-    if (state.ronGroup.target) {
-      const face = createTileElement(state.ronGroup.target.tile);
-      face.setAttribute('aria-hidden', 'true');
-      const description = document.createElement('p');
-      description.textContent = state.ronGroup.target.description;
-      target.append(face, description);
-    }
-
     this.part('round-actions').hidden = !state.roundActionsVisible;
     this.part('action-status').textContent = state.actionStatus;
     this.root.classList.toggle('ron-pending', state.ronPending);
