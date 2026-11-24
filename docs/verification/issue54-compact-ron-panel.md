@@ -23,3 +23,5 @@ Pages版とitch.io版を更新後にそれぞれ縦画面で開く。同じ版�
 ## 候補作成時の結果
 
 限定テスト83件、`npm test` 1,599件、Pagesビルド、Worker型検査、itchビルドとZIPのCRC検査、変更したPythonの構文、`git diff --check` は成功。通常のサンドボックスでは既存のZIPテストでPython子プロセスが `EPERM` となったため、許可付きで同じテストと全テストを実行して成功を確認した。ブラウザー実測と必須CIはGitHub Actionsの対象SHAで確認する。
+
+初回候補 `b385e99` のChromium／WebKitは、オフラインの各幅で高さ44 CSS pxのボタン、375 CSS px幅で各113.66 CSS pxの横幅、判断前後の卓位置・寸法とスクロール維持を確認した。オンラインの375×667では両ボタンの下端が576 CSS pxだった一方、ヒット検査に含めた矩形の角は8 CSS pxの角丸の外側だった。後続候補では矩形全体のviewport検査を維持し、ヒットはボタン中心と上下左右の縁の内側で確認する。[初回候補CI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45424290473)

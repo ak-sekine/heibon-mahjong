@@ -2373,16 +2373,19 @@ with sync_playwright() as p:
         const {offsetLeft, offsetTop, width, height} = visualViewport;
         const buttons = [...panel.querySelectorAll('button')].map(button => {
           const r = button.getBoundingClientRect();
-          const points = [[r.left + 1, r.top + 1], [r.right - 1, r.bottom - 1], [r.x + r.width / 2, r.y + r.height / 2]];
+          const midX = r.x + r.width / 2, midY = r.y + r.height / 2;
+          // The rounded corners are outside the button's hit area.
+          const points = [[midX, midY], [midX, r.top + 1], [midX, r.bottom - 1],
+            [r.left + 1, midY], [r.right - 1, midY]];
           return {box:r.toJSON(), enabled: !button.disabled,
-            visible: r.left >= offsetLeft && r.top >= offsetTop &&
-              r.right <= offsetLeft + width && r.bottom <= offsetTop + height &&
-              points.every(([x, y]) => button.contains(document.elementFromPoint(x, y)))};
+            inViewport: r.left >= offsetLeft && r.top >= offsetTop &&
+              r.right <= offsetLeft + width && r.bottom <= offsetTop + height,
+            hit: points.every(([x, y]) => button.contains(document.elementFromPoint(x, y)))};
         });
         return {buttons, height:panel.getBoundingClientRect().height, scrollY};
       }""")
       ron, skip = bounds['buttons']
-      assert all(b['visible'] and b['enabled'] and b['box']['height'] >= 44 for b in (ron, skip)), bounds
+      assert all(b['inViewport'] and b['hit'] and b['enabled'] and b['box']['height'] >= 44 for b in (ron, skip)), bounds
       assert ron['box']['y'] == skip['box']['y'] and ron['box']['right'] < skip['box']['left'], bounds
       assert bounds['scrollY'] == before_ron_scroll, bounds
       print(f'Online ron 375x{height}: {json.dumps(bounds)}')
