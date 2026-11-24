@@ -52,3 +52,20 @@ Pages版とitch.io版を更新後にそれぞれ縦画面で開く。同じ版�
 鳴き種類選択のGridを `.decision-controls` と `.decision-buttons` に共通化した。ロンと鳴きはいずれも全列にまたがるステータスとボタン行を持ち、空のステータスは行ごと非表示になる。2ボタンは均等な列を使い、複数種類の鳴きは同じauto-fit規則で列を作る。外側の操作枠の余白、内側の枠、ボタン間隔も共通のCSSで指定する。イベント、ラベル、配色と候補選択の配置・操作は既存の経路を使う。
 
 既存のBrowser UIテストで、実オフライン局面の375×667、375×567、1280×720と、残り時間付きオンラインfixtureの各幅を比較する。操作枠・判断パネル・ステータス・ボタン行・ボタンの矩形に加え、余白、枠線、角丸、背景色、文字サイズを比較し、代表画面を既存のBrowser UI artifactに保存する。列幅と行端にはCSSサブピクセル丸め用に0.02 CSS pxの許容値を設け、同一条件のロンとポンの測定値同士は完全一致を要求する。既存の実局面テストでは短いviewportでの押下、通常の鳴き、複数候補、Tabとキーボード操作、卓とスクロール位置を検証する。修正後のiPhone Safari実機確認はPages版・itch.io版とも未実施。
+
+### 追加対応の計測・公開結果
+
+375×667 CSS pxのオフライン比較。外枠は背景を描画する領域、判断パネルはその内側のGrid。旧版の外枠とポンの数値はmain `3c276ac` のCSSからの算出値（safe area 0、空のステータス行が作る6 CSS pxの間隔を含む）。旧ロンのボタンは前回CI実測。修正後はChromium／WebKitの両方で実測した。
+
+| 対象 | 旧外枠 | 旧判断パネル | 旧ボタン各 | 修正後の外枠 | 修正後の判断パネル | 修正後のボタン各 |
+|---|---:|---:|---:|---:|---:|---:|
+| ポン | 367×70 | 365×68 | 170.5×44 | 367×64 | 365×62 | 170.5×44 |
+| ロン | 367×66 | 353×44 | 113.66×44 | 367×64 | 365×62 | 170.5×44 |
+
+両者の修正後の判断パネルは、375×667で `(x,y)=(5,500)`、375×567で `(5,412)`。PC 1280×720では外枠450×108、判断パネル436×62、各206×44。オンライン375×844の同一fixtureでは外枠375×88、判断パネル373×86、ステータス行355×18、各ボタン174.5×44で一致した。間隔は全例6 CSS px。位置・余白、枠線、角丸、色、文字サイズを含む比較に差はなかった。PCの小数座標はブラウザーがレイアウトをCSSサブピクセルで返すためで、ポン・ロンで同じ値だった。実際のオンライン対局フローの375×550では、各170.5×44、下端480 CSS pxで可視性と見逃しの座標クリックを確認。実オフライン局面でフォーカス、Tab、Space、押下、卓の矩形、スクロール0を確認した。[Chromiumオフライン画像](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45497503652/artifacts/14970826730) · [Chromiumオンライン画像](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45497503652/artifacts/14970297072) · [WebKit画像](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45497503652/artifacts/14970706599)
+
+限定86件、全1,599件、Pagesビルド、Worker型検査、Python構文、差分の空白検査が成功。アプリ候補・main統合・本番公開のSHAは `d2b9bb2322bf40fde07e5beb3797fbbc80f12515`。同一SHAの候補・mainでChromium／WebKit各2グループ、分離、ローカルオンラインと最終auditが成功した。既存の鳴き種類・複数候補・戻る・キーボード、ロン成立・見逃し・期限切れ、itchパッケージの起動テストも成功。[候補CI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45497503652) · [main CI](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45499359359) · [main最終audit](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45499359359/job/138823984917)
+
+本番公開は検証済みPages成果物を再利用し、Worker、本番オンライン、Pages、台帳確定、公開後auditが成功した。配信HTML、release・台帳のSHAとハッシュ、Worker healthを照合した。本番runのitch ZIPは92,017 bytes、SHA-256 `84723b98fed11b36fe1a8d1b3045ba97d6669f49bd6c99c2d06718ffb849cd91`。外側artifactのハッシュ、内外ZIPのCRC、ルートHTMLの共通構造、アセットの相対参照、同一公開SHAと本番Worker URLを確認した。[本番run](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45501201166) · [公開後audit](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45501201166/job/138826470796) · [本番itch ZIP artifact](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45501201166/artifacts/14969554937)
+
+実機では、Pages版とZIP差し替え後のitch.io版をiPhone Safari縦画面で開き、同じステータス条件のポン・ロンを比較する。枠とボタンの寸法、Safariツールバー表示時の可視性と押下、卓とスクロール、オンラインの残り時間、複数候補からの戻るを確認する。修正後の実機確認とitch.ioでの差し替えは未実施。IssueはOpen継続。
