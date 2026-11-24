@@ -663,7 +663,7 @@ for (const scenario of ['waiting','same-kind','call-waiting','human','double','t
       assert.equal(panelState.buttons['pass-ron'].enabled,pendingRon);
       assert.equal(panelState.callGroup.visible,pendingCall);
       if (pendingRon) {
-        assert.equal(panelState.ronGroup.status,'ロン判断です。');
+        assert.equal(panelState.ronGroup.status,'');
       }
       assert.ok(nodes.get('#player-hand')!.children.every(c=>c.children[0].disabled));
       const panel = nodes.get('#win-result')!;
@@ -805,7 +805,7 @@ for (const mode of ['discard', 'red', 'pending', 'ron', 'pass', 'reset', 'new-ma
     const physical=game.ronWindow!.kan?.tile ?? game.players[1].river.at(-1)!;
     const actionState=createLocalActionPanelState(startMatch(game),null,false,false);
     assert.equal(actionState.ronGroup.visible,true);
-    assert.equal(actionState.ronGroup.status,'ロン判断です。');
+    assert.equal(actionState.ronGroup.status,'');
     if(game===pending) {
       const group=nodes.get('.open-melds[data-player-id="1"]')!.children[0];
       assert.equal(group.dataset.meldType,'pon');assert.equal(group.dataset.kanPending,'true');

@@ -103,7 +103,7 @@ export function createLocalActionPanelState(
     },
     ronGroup: {
       visible: canRon,
-      status: canRon ? 'ロン判断です。' : '',
+      status: '',
     },
     roundActionsVisible: roundResultAvailable,
     ronPending: canRon,

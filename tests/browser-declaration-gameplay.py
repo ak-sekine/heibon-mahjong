@@ -139,7 +139,7 @@ window.declarationGameplayTest = { controller, render, onlineGameController };
         app.render();
       }""")
       group = page.locator('#ron-controls')
-      assert group.locator(':scope > *').all_inner_texts() == ['ロン判断です。', 'ロン和了', '見逃す']
+      assert group.locator(':scope > :visible').all_inner_texts() == ['ロン和了', '見逃す']
       assert group.locator('svg, [data-panel-part="ron-target"]').count() == 0
       assert table.bounding_box() == before
       assert page.evaluate('scrollY') == scroll_before

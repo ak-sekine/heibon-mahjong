@@ -98,7 +98,7 @@ with sync_playwright() as p:
                 page.wait_for_function('ronCheck().phase === "awaiting-ron" && !ronCheck().running')
                 assert page.locator('#ron-controls').is_visible()
                 assert page.locator('#ron').is_enabled() and page.locator('#pass-ron').is_enabled()
-                assert page.locator('#ron-status').inner_text() == 'ロン判断です。'
+                assert page.locator('#ron-status').is_hidden()
                 assert page.locator('#ron-controls').get_attribute('aria-label') == 'ロン判断'
                 assert page.locator('#ron-controls svg, #ron-target').count() == 0
                 assert page.evaluate('document.activeElement.id') == 'ron'

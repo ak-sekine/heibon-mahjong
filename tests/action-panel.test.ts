@@ -613,12 +613,12 @@ test('ActionPanel manages ron focus and result actions centrally', () => {
   try {
     fixture.panel.update(state({
       buttons: { ...state().buttons, ron: { visible: true, enabled: true, label: 'ロン和了' } },
-      ronGroup: { visible: true, status: 'ロン判断です。' },
+      ronGroup: { visible: true, status: '' },
       roundActionsVisible: true,
     }));
     assert.equal(fixture.parts.get('ron')!.focused, true);
     assert.equal(fixture.parts.get('ron-controls')!.hidden, false);
-    assert.equal(fixture.parts.get('ron-status')!.textContent, 'ロン判断です。');
+    assert.equal(fixture.parts.get('ron-status')!.hidden, true);
     assert.equal(fixture.parts.get('round-actions')!.hidden, false);
 
     fixture.panel.update(state());

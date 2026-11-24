@@ -317,7 +317,9 @@ export class ActionPanel {
 
     const ronControls = this.part('ron-controls');
     ronControls.hidden = !state.ronGroup.visible;
-    this.part('ron-status').textContent = state.ronGroup.status;
+    const ronStatus = this.part('ron-status');
+    ronStatus.textContent = state.ronGroup.status;
+    ronStatus.hidden = state.ronGroup.status === '';
     this.part('round-actions').hidden = !state.roundActionsVisible;
     this.part('action-status').textContent = state.actionStatus;
     this.root.classList.toggle('ron-pending', state.ronPending);
