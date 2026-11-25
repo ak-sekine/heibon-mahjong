@@ -1437,6 +1437,62 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     assert.equal(expiredPlayers[0].temporaryFuriten, true, 'timeout did not apply furiten to the ron passer');
   });
 
+  for (const count of [1, 2]) await t.test(`restores finalized Ready for ${count} humans before first start`, async () => {
+    const fixture = await makeRoom('Host', token('a'));
+    const tokens = [fixture.hostToken];
+    if (count === 2) tokens.push((await joinRoom(fixture, 'Guest', token('b'))).token);
+    const players: Participant[] = [];
+    for (const credential of tokens) players.push(await connectParticipant(fixture, credential));
+    const finalized = await readyAndFinalize(fixture, players);
+    const composition = (state: Record<string, unknown>) =>
+      publicSeats(state).map(({ seat, gameSeat, name, kind, isHost }) => ({ seat, gameSeat, name, kind, isHost }));
+    const start = { type: 'start-game', requestId: 'start', expectedGameRevision: 0 };
+    for (const [index, player] of players.entries()) {
+      player.server.close(1000, 'waiting dialog closed');
+      fixture.room.webSocketClose(player.server as unknown as WebSocket);
+      const disconnected = await readState(fixture);
+      assert.equal(publicSeats(disconnected)[index].connected, false);
+      if (index !== 0) {
+        assert.equal((await sendGameAction(fixture, players[0], { ...start, requestId: 'guest-offline' })).ok, false);
+      }
+      fixture.room = new RoomDurableObject(fixture.ctx as unknown as DurableObjectState, {} as Env);
+      const reconnected = players[index] = await connectParticipant(fixture, tokens[index]);
+      const state = await readState(fixture);
+      assert.equal(state.status, 'finalized');
+      assert.equal(state.gameRevision, 0);
+      assert.equal(publicSeats(state)[index].connected, true);
+      assert.equal(publicSeats(state)[index].ready, false);
+      assert.equal((await sendGameAction(fixture, players[0], { ...start, requestId: `unready-${index}` })).code, 'players_not_ready');
+      const ready = { type: 'set-ready', requestId: 'restore', expectedRevision: state.revision as number, ready: true };
+      assert.equal(sendAction(fixture, reconnected, {
+        ...ready, requestId: 'stale-ready', expectedRevision: finalized.revision as number,
+      }).code, 'revision_conflict');
+      assert.equal(sendAction(fixture, reconnected, ready).ok, true);
+      const restored = await readState(fixture);
+      assert.equal(sendAction(fixture, reconnected, ready).ok, true);
+      assert.deepEqual(await readState(fixture), restored);
+      assert.equal(publicSeats(restored)[index].ready, true);
+      assert.deepEqual(composition(restored), composition(finalized));
+      for (const key of ['roomCode', 'hostSeat', 'format', 'rules', 'gameRevision']) {
+        assert.deepEqual(restored[key], finalized[key]);
+      }
+    }
+    if (count === 2) assert.equal((await sendGameAction(fixture, players[1], start)).code, 'not_host');
+    assert.equal((await sendGameAction(fixture, players[0], {
+      ...start, requestId: 'stale-start', expectedGameRevision: 1,
+    })).code, 'stale_revision');
+    assert.equal((await sendGameAction(fixture, players[0], start)).ok, true);
+    assert.equal((await sendGameAction(fixture, players[0], start)).ok, true);
+    assert.equal((await sendGameAction(fixture, players[0], { ...start, requestId: 'second-start' })).code, 'already_started');
+    const started = await readState(fixture);
+    const readyDuringGame = { type: 'set-ready', requestId: 'during-game', expectedRevision: started.revision as number, ready: true };
+    assert.equal(sendAction(fixture, players[0], readyDuringGame).code, 'room_finalized');
+    const active = persistedGame(fixture) as unknown as OnlineGameSession;
+    saveGameSession(fixture, { ...active, status: 'match-ended' });
+    assert.equal(sendAction(fixture, players[0], { ...readyDuringGame, requestId: 'after-game' }).code, 'room_finalized');
+    assert.deepEqual(composition(await readState(fixture)), composition(finalized));
+  });
+
   await t.test('rematch keeps the room, resets readiness and starts fresh matches once across generations', async () => {
     const fixture = await makeRoom('Rematch host', token('b'));
     const guestInfo = await joinRoom(fixture, 'Rematch guest', token('c'));

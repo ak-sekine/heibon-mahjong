@@ -165,6 +165,9 @@ MOCK = r"""
     ...(codeName ? { code: codeName } : {}),
   });
 
+  const canSetReady = message => state.status === 'waiting' || (state.status === 'finalized' &&
+    (state.rematchWaiting || (message.ready === true && gameRevision === 0)));
+
   class MockWebSocket extends EventTarget {
     static CONNECTING = 0;
     static OPEN = 1;
@@ -316,7 +319,7 @@ MOCK = r"""
         result(this, message, true);
         broadcast();
       } else if (message.type === 'set-ready') {
-        if (state.status !== 'waiting' && !state.rematchWaiting) return result(this, message, false, 'room_finalized');
+        if (!canSetReady(message)) return result(this, message, false, 'room_finalized');
         state.seats[0].ready = message.ready;
         state.revision++;
         result(this, message, true);
@@ -330,10 +333,11 @@ MOCK = r"""
           return result(this, message, false, 'players_not_ready');
         }
         const gameSeats = [2, 0, 3, 1];
+        let cpuCount = 0;
         state.seats = state.seats.map(seat => ({
           ...seat,
           gameSeat: gameSeats[seat.seat],
-          ...(seat.kind === 'empty' ? { kind: 'cpu', name: `CPU${seat.seat === 2 ? 1 : 2}` } : {}),
+          ...(seat.kind === 'empty' ? { kind: 'cpu', name: `CPU${++cpuCount}` } : {}),
         }));
         state.status = 'finalized';
         state.revision++;
@@ -451,7 +455,7 @@ MOCK = r"""
     } else if (message.type === 'request-game-state') {
       if (gameStarted) publishToGuest({ type: 'game-state', view: makeView(1) });
     } else if (message.type === 'set-ready') {
-      if (state.status !== 'waiting' && !state.rematchWaiting) result(guest, message, false, 'room_finalized');
+      if (!canSetReady(message)) result(guest, message, false, 'room_finalized');
       else {
         state.seats[1].ready = Boolean(message.ready);
         state.revision++;
@@ -494,6 +498,12 @@ MOCK = r"""
     clearAdditionalGuests() {
       state.seats[2] = empty(2);
       state.seats[3] = empty(3);
+      state.revision++;
+      broadcast();
+    },
+    setGuestConnected(connected) {
+      state.seats[1].connected = connected;
+      state.seats[1].ready = false;
       state.revision++;
       broadcast();
     },
@@ -920,6 +930,7 @@ with sync_playwright() as p:
       assert layout['documentWidth'] <= layout['viewportWidth'] and layout['dialogWidth'] <= layout['dialogClientWidth'], \
         f'waiting actions caused horizontal overflow at {width}px: {layout}'
       assert_common_button_colors(page, '#online-actions button:not([hidden])')
+      return primary_position
 
     if REMATCH_MULTI_CLIENT_ONLY:
         guest_page = page.context.new_page()
@@ -941,6 +952,32 @@ with sync_playwright() as p:
             if target.locator('#main-menu-items').is_hidden():
                 target.locator('#main-menu-toggle').click()
             target.locator(selector).click()
+
+        solo_context = browser.new_context(viewport={'width': 390, 'height': 844})
+        solo = solo_context.new_page()
+        solo.add_init_script(MOCK)
+        solo.goto(BASE_URL)
+        open_menu_item(solo, '#online-create-open')
+        solo.locator('#online-create-name').fill('単独ホスト')
+        solo.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').check()
+        solo.locator('#online-create').click()
+        solo.locator('#online-ready').click()
+        solo.locator('#online-finalize').click()
+        solo.locator('#online-start-game').wait_for(state='visible')
+        before = solo.evaluate('window.onlineMock.snapshot().room')
+        assert before['format'] == 'tonnan'
+        assert [seat['kind'] for seat in before['seats']] == ['human', 'cpu', 'cpu', 'cpu']
+        solo.locator('#online-close').click()
+        open_menu_item(solo, '#menu-room')
+        solo.wait_for_function("document.querySelector('#online-seats').innerText.includes('接続中・未準備')")
+        assert solo.locator('#online-start-game').is_hidden()
+        solo.locator('#online-ready').click()
+        solo.wait_for_function("!document.querySelector('#online-start-game').hidden && !document.querySelector('#online-start-game').disabled")
+        after = solo.evaluate('window.onlineMock.snapshot().room')
+        assert {**after, 'revision': before['revision']} == before
+        solo.locator('#online-start-game').click()
+        solo.locator('#online-match').wait_for(state='visible')
+        solo_context.close()
 
         open_menu_item(page, '#online-create-open')
         page.locator('#online-create-name').fill('テストホスト')
@@ -988,13 +1025,27 @@ with sync_playwright() as p:
         assert page.locator('#online-error').is_hidden(), 'a successful seat finalization did not clear the prior error'
         assert page.locator('#online-finalized-message').is_hidden(), 'showing an error restored the duplicate seat-finalized message'
         assert page.locator('#online-start-game').inner_text() == '対局開始'
-        guest_page.wait_for_function("document.querySelector('#online-status').textContent === '座席が確定しました。ホストはオンライン対局を開始できます。'")
+        wait_guest("document.querySelector('#online-status').textContent.includes('ホストの対局開始を待っています')")
         assert guest_page.locator('#online-finalized-message').is_hidden(), 'the guest saw a duplicate seat-finalized message below the player list'
         state_before = page.evaluate('window.onlineMock.snapshot()')
         assert state_before['room']['roomCode'] == guest_page.evaluate('window.onlineMock.snapshot().room.roomCode')
         assert [seat['name'] for seat in state_before['room']['seats'] if seat['kind'] == 'human'] == ['テストホスト', 'テスト参加者']
         assert [seat['kind'] for seat in state_before['room']['seats']] == ['human', 'human', 'cpu', 'cpu']
         assert state_before['room']['format'] == 'tonpu' and state_before['room']['rules']['matchFormat'] == 'tonpu'
+
+        # The host-side mock retains room state while the guest reloads.
+        page.evaluate('window.onlineMock.setGuestConnected(false)')
+        wait_for("document.querySelector('#online-start-game').disabled")
+        guest_page.reload()
+        page.evaluate('window.onlineMock.setGuestConnected(true)')
+        if guest_page.locator('#online-dialog').is_hidden():
+            open_menu_item(guest_page, '#menu-room')
+        wait_guest("!document.querySelector('#online-ready').hidden && !document.querySelector('#online-ready').disabled")
+        assert guest_page.locator('#online-start-game').is_hidden()
+        guest_page.locator('#online-ready').click()
+        wait_guest("document.querySelector('#online-ready').hidden")
+        assert guest_page.locator('#online-start-game').is_hidden()
+        wait_for("!document.querySelector('#online-start-game').disabled")
 
         page.locator('#online-start-game').click()
         wait_for("document.querySelector('#online-match').hidden === false")
@@ -2185,6 +2236,47 @@ with sync_playwright() as p:
     wait_for("window.onlineMock.copied === 'ABC234'")
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'online dialog causes horizontal overflow at 390px'
     assert_no_private_cpu_tile_ids_in_main('CPU private tile IDs leaked while the waiting room was open')
+
+    # Closing the finalized waiting dialog disconnects without leaving the room.
+    finalized_room = page.evaluate('window.onlineMock.snapshot().room')
+    original_session = page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session')")
+    page.locator('#online-close').click()
+    select_menu_item('#menu-room')
+    wait_for("document.querySelector('#online-seats').innerText.includes('接続中・未準備')")
+    wait_for("!document.querySelector('#online-ready').hidden && !document.querySelector('#online-ready').disabled")
+    assert page.locator('#online-start-game').is_hidden()
+    finalized_viewports = [(390, 844), (1280, 900)]
+    restored_ready_positions = {
+      width: assert_waiting_action_layout(width, height, False) for width, height in finalized_viewports
+    }
+    page.set_viewport_size({'width': 390, 'height': 844})
+    page.locator('#online-ready').click()
+    wait_for("!document.querySelector('#online-start-game').hidden && !document.querySelector('#online-start-game').disabled")
+    assert page.locator('#online-ready').is_hidden()
+    for width, height in finalized_viewports:
+      started_position = assert_waiting_action_layout(width, height, False)
+      assert all(abs(actual - expected) <= 1
+                 for actual, expected in zip(started_position, restored_ready_positions[width]))
+    page.set_viewport_size({'width': 390, 'height': 844})
+
+    page.evaluate('window.onlineMock.setGuestConnected(false)')
+    wait_for("document.querySelector('#online-status').textContent.includes('再接続と準備完了')")
+    assert page.locator('#online-start-game').is_disabled()
+    page.evaluate('window.onlineMock.setGuestConnected(true)')
+    wait_for("document.querySelector('#online-status').textContent.includes('人間プレイヤーの準備完了を待っています')")
+    assert page.locator('#online-start-game').is_disabled()
+    page.evaluate('window.onlineMock.setGuestReady(true)')
+    wait_for("!document.querySelector('#online-start-game').disabled")
+
+    page.evaluate('window.onlineMock.forceDisconnect()')
+    wait_for("!document.querySelector('#online-ready').hidden && !document.querySelector('#online-ready').disabled")
+    page.locator('#online-ready').click()
+    wait_for("!document.querySelector('#online-start-game').hidden && !document.querySelector('#online-start-game').disabled")
+    restored_room = page.evaluate('window.onlineMock.snapshot().room')
+    assert {key: value for key, value in restored_room.items() if key != 'revision'} == {
+      key: value for key, value in finalized_room.items() if key != 'revision'
+    }
+    assert page.evaluate("sessionStorage.getItem('heibon-mahjong-online-session')") == original_session
 
     page.locator('#online-start-game').click()
     wait_for("document.querySelector('#online-dialog').open === false && document.querySelector('#online-match').hidden === false")

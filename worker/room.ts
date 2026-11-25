@@ -806,7 +806,8 @@ export class RoomDurableObject {
       else if (action.expectedRevision !== room.revision &&
           !(action.type === 'prepare-rematch' && room.rematch_waiting === 1)) code = 'revision_conflict';
       else if (action.type === 'set-ready') {
-        if (room.status !== 'waiting' && !(room.status === 'finalized' && room.rematch_waiting === 1)) code = 'room_finalized';
+        if (room.status !== 'waiting' && !(room.status === 'finalized' &&
+            (room.rematch_waiting === 1 || (action.ready && this.gameSession() === null)))) code = 'room_finalized';
         else if (actor.ready !== (action.ready ? 1 : 0)) {
           this.ctx.storage.sql.exec('UPDATE seats SET ready = ? WHERE seat = ?', action.ready ? 1 : 0, actor.seat);
           this.incrementRevision();

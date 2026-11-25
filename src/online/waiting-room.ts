@@ -70,7 +70,7 @@ const socketErrorMessages: Record<string, string> = {
   request_id_reused: '操作IDが重複しました。状態を更新してから操作してください。',
   revision_conflict: 'ルーム状態が更新されました。最新状態を確認して、もう一度操作してください。',
   not_host: 'この操作はホストだけが行えます。',
-  room_finalized: '座席確定後は準備状態を変更できません。',
+  room_finalized: '現在の対局状態では準備状態を変更できません。',
   game_not_ended: '対局終了後に再戦準備へ進めます。',
   already_finalized: '座席はすでに確定しています。',
   no_participants: '座席確定には人間の参加者が必要です。',
@@ -839,7 +839,18 @@ export class OnlineWaitingRoom {
     if (state.rematchWaiting) {
       this.setStatus('次の対局の準備中です。人間プレイヤー全員の準備完了後、ホストが開始します。');
     } else if (state.status === 'finalized') {
-      this.setStatus(this.gameActive ? 'オンライン対局を進行しています。' : '座席が確定しました。ホストはオンライン対局を開始できます。');
+      if (this.gameActive || (state.gameRevision ?? 0) > 0) {
+        this.setStatus('オンライン対局を進行しています。');
+      } else {
+        const humans = state.seats.filter(seat => seat.kind === 'human');
+        const self = humans.find(seat => seat.seat === this.session?.playerSeat);
+        if (self && !self.ready) this.setStatus('座席は確定済みです。「準備完了」を押してください。');
+        else if (humans.some(seat => !seat.connected)) this.setStatus('切断中のプレイヤーの再接続と準備完了を待っています。');
+        else if (humans.some(seat => !seat.ready)) this.setStatus('すべての人間プレイヤーの準備完了を待っています。');
+        else this.setStatus(self?.isHost
+          ? '座席が確定しました。ホストはオンライン対局を開始できます。'
+          : '座席が確定しました。ホストの対局開始を待っています。');
+      }
     }
     this.roomPanel.hidden = false;
     this.confirmRulesButton.hidden = state.status === 'closed';
@@ -854,8 +865,8 @@ export class OnlineWaitingRoom {
     const allReady = humans.length > 0 && humans.every(seat => seat.connected && seat.ready);
     const pending = this.pendingAction !== null || this.pendingGameAction !== null;
     const socketConnected = this.isSocketOpen();
-    const readyPhase = state?.status === 'waiting' || state?.rematchWaiting === true;
-    const rematchNeedsHostReady = state?.rematchWaiting === true && self?.isHost === true && !self.ready;
+    const readyPhase = state?.status === 'waiting' || state?.rematchWaiting === true ||
+      (state?.status === 'finalized' && !this.gameActive && (state.gameRevision ?? 0) === 0);
     this.readyButton.hidden = !self || !readyPhase || self.ready;
     this.readyButton.textContent = '準備完了';
     this.readyButton.disabled = pending || !self?.connected || !socketConnected;
@@ -866,7 +877,7 @@ export class OnlineWaitingRoom {
     this.setBusy(this.finalizeButton, this.pendingAction?.payload.type === 'finalize-seats');
     const allHumansConnected = humans.length > 0 && humans.every(seat => seat.connected);
     const startable = !this.gameActive && (state?.rematchWaiting === true || (state?.gameRevision ?? 0) === 0);
-    this.startGameButton.hidden = !self?.isHost || state?.status !== 'finalized' || !startable || rematchNeedsHostReady;
+    this.startGameButton.hidden = !self?.isHost || state?.status !== 'finalized' || !startable || !self.ready;
     this.startGameButton.disabled = pending || !socketConnected || !allReady || !allHumansConnected;
     this.setBusy(this.startGameButton, this.pendingGameAction?.payload.type === 'start-game');
     this.leaveButton.hidden = !session || state?.status === 'closed';
