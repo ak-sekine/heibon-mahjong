@@ -101,7 +101,7 @@ with sync_playwright() as playwright:
     page.locator('#main-menu-toggle').click()
     page.locator('#online-create-open').click()
     assert page.locator('#online-create-dialog').is_visible()
-    page.locator('#online-create-close').click()
+    page.locator('#online-create-cancel').click()
     assert not page.locator('#online-create-dialog').is_visible()
 
     cases = [

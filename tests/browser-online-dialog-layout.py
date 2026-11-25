@@ -13,7 +13,7 @@ VIEWPORTS = [(320, 568), (375, 667), (390, 844), (430, 932),
              (667, 375), (844, 390), (768, 1024), (1024, 768),
              (1280, 800), (1440, 900)]
 DIALOGS = [
-    ('create', '#online-create-dialog', '#online-create-close', '#online-create-open'),
+    ('create', '#online-create-dialog', '#online-create-cancel', '#online-create-open'),
     ('join', '#online-join-dialog', '#online-join-close', '#online-join-open'),
     ('waiting', '#online-dialog', '#online-close', None),
 ]
@@ -120,6 +120,17 @@ with sync_playwright() as playwright:
                   dialog.querySelector('#online-room-expiry').textContent = '2026/10/27 14:00';
                   dialog.showModal();
                 }''')
+
+            if name == 'create':
+                assert page.locator('#online-create-close').count() == 0
+                assert page.locator('#online-create-dialog h2').inner_text() == '新しくルームを作る'
+                for selector in ['#online-create-cancel', '#online-create']:
+                    button = page.locator(selector)
+                    assert button.is_visible(), (name, width, selector)
+                    box = button.bounding_box()
+                    assert box and box['x'] >= 0 and box['x'] + box['width'] <= width and box['height'] >= 44, (name, width, selector, box)
+                page.locator(close_selector).click()
+                continue
 
             layout = page.locator(dialog_selector).evaluate('''dialog => {
               const close = dialog.querySelector('.online-dialog-close');

@@ -1847,16 +1847,9 @@ with sync_playwright() as p:
     assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').is_checked(), 'room creation did not restore the last accepted format'
     assert page.locator('input[name="online-create-rules-editor-cpu-difficulty"][value="beginner"]').is_checked(), 'online creation did not restore the last accepted CPU difficulty'
     assert page.locator('#online-create-dialog #online-join').count() == 0, 'room creation dialog contains a join button'
-    assert page.locator('#online-create-close').evaluate('element => document.activeElement === element'), 'opening the create dialog did not focus its close button'
+    assert page.locator('#online-create-close').count() == 0, 'redundant create close button remains'
+    assert page.locator('#online-create-cancel').evaluate('element => document.activeElement === element'), 'opening the create dialog did not focus cancel'
     assert page.locator('#online-create-name').evaluate('element => document.activeElement !== element'), 'opening the create dialog focused its display-name input'
-    page.keyboard.press('Tab')
-    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Tab did not move from the create close button to the display-name input'
-    page.keyboard.press('Tab')
-    assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').evaluate('element => document.activeElement === element'), 'Tab did not move from display name to the inline rule editor'
-    page.keyboard.press('Shift+Tab')
-    assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return from rules to display name'
-    page.keyboard.press('Shift+Tab')
-    assert page.locator('#online-create-close').evaluate('element => document.activeElement === element'), 'Shift+Tab did not return to the create close button'
     assert page.locator('#online-create').is_disabled(), 'room creation was enabled without a display name'
     page.locator('#online-create-name').click()
     assert page.locator('#online-create-name').evaluate('element => document.activeElement === element'), 'manually selecting the create name input did not focus it'
@@ -1871,7 +1864,6 @@ with sync_playwright() as p:
     create_form_layouts = []
     for width, height in [[320,700],[375,812],[390,844],[414,896],[1280,800]]:
       page.set_viewport_size({'width': width, 'height': height})
-      assert_online_dialog_header('#online-create-dialog', '#online-create-close', width)
       layout = page.locator('#online-create-dialog').evaluate('''dialog => {
         const rect = dialog.getBoundingClientRect();
         const form = dialog.querySelector('#online-create-form');
@@ -1900,7 +1892,7 @@ with sync_playwright() as p:
     page.locator('#online-create').scroll_into_view_if_needed()
     assert page.locator('#online-create').evaluate('element => { const rect = element.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight; }'), 'the create action could not be reached after manual selection and scrolling in a short viewport'
     page.set_viewport_size({'width': 390, 'height': 844})
-    page.locator('#online-create-close').click()
+    page.locator('#online-create-cancel').click()
     assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'closing the create form did not restore menu focus'
     select_menu_item('#online-join-open')
     assert page.locator('#online-join-dialog').evaluate('element => element.open'), 'room joining did not open its dedicated dialog'
@@ -2174,7 +2166,7 @@ with sync_playwright() as p:
     })''')
     assert disabled_rule_controls['fieldsetDisabled'] and len(disabled_rule_controls['ruleControlsDisabled']) == 2 and all(disabled_rule_controls['ruleControlsDisabled']), \
       f'a joined participant could still edit room creation rules: {disabled_rule_controls}'
-    page.locator('#online-create-close').click()
+    page.locator('#online-create-cancel').click()
     select_menu_item('#online-join-open')
     assert page.locator('#online-join').is_disabled(), 'joining another room was allowed while a session was active'
     assert 'すでにルームに参加' in page.locator('#online-join-message').inner_text(), 'the active-session restriction was not explained in the join form'

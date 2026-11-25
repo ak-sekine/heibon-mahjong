@@ -115,8 +115,7 @@ export class OnlineWaitingRoom {
   private readonly joinCodeInput = document.querySelector<HTMLInputElement>('#online-join-code')!;
   private readonly createButton = document.querySelector<HTMLButtonElement>('#online-create')!;
   private readonly joinButton = document.querySelector<HTMLButtonElement>('#online-join')!;
-  private readonly createCloseButton = document.querySelector<HTMLButtonElement>('#online-create-close')!;
-  private readonly createCancelButton = document.querySelector<HTMLButtonElement>('#online-create-cancel');
+  private readonly createCancelButton = document.querySelector<HTMLButtonElement>('#online-create-cancel')!;
   private readonly joinCloseButton = document.querySelector<HTMLButtonElement>('#online-join-close')!;
   private readonly createMessage = document.querySelector<HTMLElement>('#online-create-message')!;
   private readonly joinMessage = document.querySelector<HTMLElement>('#online-join-message')!;
@@ -179,12 +178,11 @@ export class OnlineWaitingRoom {
     document.querySelector<HTMLButtonElement>('#online-create-open')!.addEventListener('click', () => {
       this.rulePreferences?.resetToLastStarted();
       this.ruleEditor?.update();
-      this.openEntryDialog(this.createDialog, this.createCloseButton);
+      this.openEntryDialog(this.createDialog, this.createCancelButton);
     });
     document.querySelector<HTMLButtonElement>('#online-join-open')!.addEventListener('click', () => this.openEntryDialog(this.joinDialog, this.joinCloseButton));
     this.roomMenuItem.addEventListener('click', () => this.openRoomDialog());
-    this.createCloseButton.addEventListener('click', () => this.closeEntryDialog(this.createDialog));
-    this.createCancelButton?.addEventListener('click', () => this.closeEntryDialog(this.createDialog));
+    this.createCancelButton.addEventListener('click', () => this.closeEntryDialog(this.createDialog));
     this.joinCloseButton.addEventListener('click', () => this.closeEntryDialog(this.joinDialog));
     document.querySelector<HTMLButtonElement>('#online-close')!.addEventListener('click', () => this.closeDialog());
     this.dialog.addEventListener('close', () => {
@@ -288,8 +286,7 @@ export class OnlineWaitingRoom {
     const validCode = ROOM_CODE_PATTERN.test(code.toUpperCase());
     const blocked = Boolean(this.onlineUnavailableMessage || this.session || this.roomRequestPending);
     this.createButton.disabled = !validName || blocked;
-    this.createCloseButton.disabled = this.roomRequestPending;
-    if (this.createCancelButton) this.createCancelButton.disabled = this.roomRequestPending;
+    this.createCancelButton.disabled = this.roomRequestPending;
     this.ruleEditor?.setDisabled(Boolean(this.onlineUnavailableMessage || this.session || this.roomRequestPending));
     this.joinButton.disabled = !validName || !validCode || blocked;
 

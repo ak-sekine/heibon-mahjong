@@ -5,7 +5,7 @@ import { test } from 'node:test';
 const files = ['index.html', 'test.html', 'kan-test.html', 'call-test.html'];
 const roleById: Record<string, string> = {
   'new-game': 'a',
-  'online-create-close': 'b', 'online-create-cancel': 'b', 'online-create': 'a', 'diagnostic-close': 'b',
+  'online-create-cancel': 'b', 'online-create': 'a', 'diagnostic-close': 'b',
   'diagnostic-copy': 'b', 'diagnostic-clear': 'd1', 'online-join-close': 'b', 'online-join': 'a',
   'online-close': 'b', 'online-copy-code': 'b', 'online-confirm-rules': 'b', 'online-ready': 'a',
   'online-finalize': 'a', 'online-start-game': 'a', 'online-reconnect': 'a', 'online-leave': 'd1',
@@ -26,7 +26,7 @@ test('every static operation button on product and verification pages has exactl
   for (const file of files) {
     const html = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     const nodes = buttons(html);
-    assert.equal(nodes.length, file === 'index.html' ? 45 : file === 'kan-test.html' ? 23 : file === 'call-test.html' ? 24 : 24);
+    assert.equal(nodes.length, file === 'index.html' ? 44 : file === 'kan-test.html' ? 23 : file === 'call-test.html' ? 24 : 24);
     for (const button of nodes) {
       const classes = button.match(/\bclass="([^"]*)"/u)?.[1]?.split(/\s+/u) ?? [];
       if (classes.includes('main-menu-item') || classes.includes('main-menu-toggle')) {
