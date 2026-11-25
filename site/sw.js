@@ -1,7 +1,7 @@
 'use strict';
 const ROOT = "/heibon-mahjong/";
-const CACHE = "heibon-mahjong-shell-b4bce92048133ebee74a";
-const PRECACHE = ["/heibon-mahjong/","/heibon-mahjong/index.html","/heibon-mahjong/manifest.webmanifest","/heibon-mahjong/icons/icon-180.png","/heibon-mahjong/icons/icon-192.png","/heibon-mahjong/icons/icon-512.png","/heibon-mahjong/icons/icon-maskable-512.png","/heibon-mahjong/assets/main-D8Ws2SRK.js","/heibon-mahjong/assets/main-DSdz8lhf.css","/heibon-mahjong/assets/page-LLDqb8ju.js","/heibon-mahjong/assets/style-BWCBAXPO.js","/heibon-mahjong/assets/style-DOorKaLM.css","/heibon-mahjong/assets/test-D7vmxC7t.js"];
+const CACHE = "heibon-mahjong-shell-c02bcfe6f46d409f99f8";
+const PRECACHE = ["/heibon-mahjong/","/heibon-mahjong/index.html","/heibon-mahjong/manifest.webmanifest","/heibon-mahjong/icons/icon-180.png","/heibon-mahjong/icons/icon-192.png","/heibon-mahjong/icons/icon-512.png","/heibon-mahjong/icons/icon-maskable-512.png","/heibon-mahjong/assets/main-DZbcw0Zf.js","/heibon-mahjong/assets/main-XaFuRHRL.css","/heibon-mahjong/assets/page-QpY4hLnz.js","/heibon-mahjong/assets/style-BWCBAXPO.js","/heibon-mahjong/assets/style-DOorKaLM.css","/heibon-mahjong/assets/test-BW8oa77m.js"];
 const PATHS = new Set(PRECACHE);
 const owns = pathname => pathname.startsWith(ROOT) && !pathname.startsWith("/heibon-mahjong/dev/");
 self.addEventListener('install', event => {
