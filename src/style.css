@@ -281,7 +281,8 @@ header > div { min-width:0; }
 /* 3px outline + 2px offset + 1px clearance, borrowed from the indicator gap. */
 .online-create-dialog .dialog-scroll-content { margin-right:-6px; padding-left:6px; }
 .online-create-fields { display:grid; gap:10px; min-width:0; }
-.online-create-dialog #online-create-actions { flex:none; margin-top:8px; background:#185640; }
+/* Reserve space for the 3px outline and 2px offset inside the clipped form. */
+.online-create-dialog #online-create-actions { flex:none; margin-top:8px; padding:8px 6px 6px; background:#185640; }
 .online-create-dialog #online-create-actions button { width:auto; white-space:normal; overflow-wrap:anywhere; }
 .online-entry-form label { margin:0; font-weight:600; }
 .online-entry-form input { box-sizing:border-box; width:100%; min-width:0; min-height:48px; padding:10px; border:1px solid #9dc5b2; border-radius:6px; font:inherit; }

@@ -144,6 +144,44 @@ with sync_playwright() as playwright:
                 'wheel':True, 'keyboard':True, 'touchNotCancelled':True,
                 'nativeTouchSwipe':'pass' if ENGINE == 'chromium' else 'unsupported by Playwright WebKit API', 'fixedFooter':True}
 
+    def verify_create_focus_outline(width, height):
+        # Enter keyboard modality before focusing each action, and compare the
+        # entire painted outline with every ancestor's clipping boundary.
+        page.keyboard.press('Tab')
+        for selector in ['#online-create-cancel', '#online-create']:
+            button = page.locator(selector)
+            assert button.is_enabled(), (selector, width, height)
+            button.focus()
+            result = button.evaluate("""element => {
+              const style = getComputedStyle(element), rect = element.getBoundingClientRect();
+              const extent = parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset);
+              const painted = {left:rect.left-extent, right:rect.right+extent, top:rect.top-extent, bottom:rect.bottom+extent};
+              const clips = [];
+              for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+                const s = getComputedStyle(parent), r = parent.getBoundingClientRect();
+                if (['hidden','clip','auto','scroll'].includes(s.overflowX) || ['hidden','clip','auto','scroll'].includes(s.overflowY)) {
+                  clips.push({id:parent.id || parent.tagName, x:['hidden','clip','auto','scroll'].includes(s.overflowX),
+                    y:['hidden','clip','auto','scroll'].includes(s.overflowY), left:r.left+parent.clientLeft,
+                    top:r.top+parent.clientTop, right:r.left+parent.clientLeft+parent.clientWidth,
+                    bottom:r.top+parent.clientTop+parent.clientHeight});
+                }
+              }
+              return {focused:document.activeElement===element, visible:element.matches(':focus-visible'),
+                style:style.outlineStyle, color:style.outlineColor, width:style.outlineWidth,
+                offset:style.outlineOffset, painted, clips};
+            }""")
+            assert result['focused'] and result['visible'], (selector, width, height, result)
+            assert result['style'] != 'none' and result['color'] == 'rgb(130, 220, 255)' and result['width'] == '3px' and result['offset'] == '2px', result
+            painted = result['painted']
+            assert painted['left'] >= 0 and painted['right'] <= width and painted['top'] >= 0 and painted['bottom'] <= height, (selector, width, height, result)
+            for clip in result['clips']:
+                if clip['x']:
+                    assert painted['left'] >= clip['left'] - 0.5 and painted['right'] <= clip['right'] + 0.5, (selector, width, height, result)
+                if clip['y']:
+                    assert painted['top'] >= clip['top'] - 0.5 and painted['bottom'] <= clip['bottom'] + 0.5, (selector, width, height, result)
+            if (width, height) in [(320, 320), (390, 844), (1280, 800)]:
+                page.screenshot(path=str(OUT / f'focus-{selector[1:]}-{width}x{height}-{ENGINE}.png'))
+
     def verify_dialog(dialog_selector, content_selector, footer_selector, action_selector, name):
         snapshots = []
         for width, height in VIEWPORTS:
@@ -217,6 +255,8 @@ with sync_playwright() as playwright:
                 assert initial_thumb != bottom['expectedTop'] and bottom['actualTop'] > 0, f'{name} indicator did not move from the top: {bottom}'
                 layout['atBottom'] = bottom
 
+            if name == 'online':
+                verify_create_focus_outline(width, height)
             snapshots.append({'viewport':f'{width}x{height}', **layout})
         return snapshots
 
@@ -228,6 +268,8 @@ with sync_playwright() as playwright:
     assert not page.locator('#new-game-dialog').evaluate('dialog => dialog.open'), 'offline cancel was blocked by scrolling'
 
     open_menu_item('#online-create-open')
+    assert page.locator('#online-create-cancel').evaluate('e => document.activeElement === e'), 'online create did not initially focus cancel'
+    assert page.locator('#online-create-name').evaluate('e => document.activeElement !== e'), 'online create focused the text input'
     page.locator('#online-create-name').fill('テストホスト')
     verify_cpu_difficulty_options('#online-create-dialog', 'online')
     online = verify_dialog('#online-create-dialog', '#online-create-content', '#online-create-actions', '#online-create', 'online')
