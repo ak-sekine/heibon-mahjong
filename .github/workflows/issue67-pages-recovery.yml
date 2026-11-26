@@ -1,0 +1,79 @@
+name: Issue 67 Pages recovery preflight
+run-name: Issue 67 recovery preflight @ ${{ github.sha }}
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Preflight only; recovery is blocked until audit provenance is resolved
+        type: choice
+        required: true
+        default: preflight
+        options: [preflight, recover]
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+  id-token: write
+concurrency:
+  group: pages-publication
+  cancel-in-progress: false
+jobs:
+  preflight:
+    if: ${{ github.event.inputs.mode == 'preflight' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ed460b9ebc676bef9204d61903f91e6bf5f51add
+          path: store
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: a89929fe0abd8897cf1ce9bb1b329992b444c014
+          path: parent
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check pinned reservation, original evidence and current public bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node source/.github/scripts/issue67-recovery-preflight.mjs store parent
+      - name: Verify OIDC token availability without logging it
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ACTIONS_ID_TOKEN_REQUEST_URL"
+          test -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN"
+          curl --fail --silent --show-error -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=issue67-preflight" | node -e 'let s=""; process.stdin.on("data",x=>s+=x).on("end",()=>{if(!JSON.parse(s).value) process.exit(1); console.log("OIDC token obtained; Pages deployment permission remains unverified.")})'
+      - name: Upload unique non-deployable preflight artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue67-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          path: store/site
+          if-no-files-found: error
+          retention-days: 1
+      - name: Verify unique uploaded artifact can be searched
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_ID: ${{ steps.upload.outputs.artifact-id }}
+          EXPECTED_NAME: issue67-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" --slurp > "$RUNNER_TEMP/issue67-artifacts.json"
+          node -e 'const fs=require("fs"); const pages=JSON.parse(fs.readFileSync(process.argv[1])); const matches=pages.flatMap(p=>p.artifacts).filter(a=>a.name===process.env.EXPECTED_NAME && !a.expired); if(matches.length!==1 || String(matches[0].id)!==process.env.EXPECTED_ID) throw Error("Artifact search did not return the unique uploaded artifact"); console.log(`artifact ${matches[0].id} uniquely found`)' "$RUNNER_TEMP/issue67-artifacts.json"
+  recover-blocked:
+    if: ${{ github.event.inputs.mode == 'recover' }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - run: |
+          echo '::error::Recovery is disabled: the normal audit cannot verify a different Pages run without a tested provenance design.'
+          exit 1
