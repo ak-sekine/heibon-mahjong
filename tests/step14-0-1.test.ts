@@ -343,6 +343,36 @@ async function readyAndFinalize(fixture: RoomFixture, participants: Participant[
 }
 
 test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout: 30_000 }, async t => {
+  await t.test('unsupported or corrupt room requirements fail closed without state changes after restart', async () => {
+    const fixture = await makeRoom();
+    const host = await connectParticipant(fixture, fixture.hostToken);
+    const before = await readState(fixture);
+    for (const requirements of ['["fixture.v1"]', '{broken']) {
+      fixture.ctx.storage.sql.exec('UPDATE room SET required_features = ?', requirements);
+      fixture.room = new RoomDurableObject(fixture.ctx as unknown as DurableObjectState, {} as Env);
+      const join = await fixture.room.fetch(new Request('https://room.internal/internal/join', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: 'Guest', participantToken: token('b') }),
+      }));
+      assert.equal(join.status, 409);
+      assert.equal((await responseObject(join)).error, 'unsupported_room_features');
+      const state = await fixture.room.fetch(new Request('https://room.internal/internal/state'));
+      assert.equal(state.status, 409);
+      const ticket = await fixture.room.fetch(new Request('https://room.internal/internal/ticket', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participantToken: fixture.hostToken }),
+      }));
+      assert.equal(ticket.status, 409);
+      await fixture.room.webSocketMessage(host.server as unknown as WebSocket, JSON.stringify({
+        type: 'set-ready', requestId: 'unsupported', expectedRevision: before.revision, ready: true,
+      }));
+      assert.equal(JSON.parse(host.client.sent.at(-1)!).code, 'unsupported_room_features');
+      await fixture.room.alarm();
+      const row = fixture.ctx.storage.sql.exec<{ revision: number }>('SELECT revision FROM room').toArray()[0];
+      assert.equal(row.revision, before.revision);
+      assert.equal(fixture.ctx.storage.sql.exec<{ count: number }>('SELECT count(*) AS count FROM seats').toArray()[0].count, 1);
+    }
+  });
   await t.test('migrates Step 14.0 SQLite rows without changing the participant hash or TTL', async () => {
     const ctx = new TestRoomContext();
     const legacyToken = token('d');

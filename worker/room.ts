@@ -47,6 +47,7 @@ type RoomRow = {
   host_seat: number | null;
   revision: number;
   rematch_waiting: number;
+  required_features: string;
 };
 type SeatRow = {
   seat: number;
@@ -183,6 +184,9 @@ export class RoomDurableObject {
     this.ensureColumn('room', 'format', "TEXT NOT NULL DEFAULT 'tonpu'");
     this.ensureColumn('room', 'rules_json', 'TEXT');
     this.ensureColumn('room', 'rematch_waiting', 'INTEGER NOT NULL DEFAULT 0');
+    // Legacy rooms require only v1. Nonempty or malformed requirements must
+    // fail closed until a supported extension is implemented.
+    this.ensureColumn('room', 'required_features', "TEXT NOT NULL DEFAULT '[]'");
     this.ensureColumn('seats', 'kind', "TEXT NOT NULL DEFAULT 'human'");
     this.ensureColumn('seats', 'ready', 'INTEGER NOT NULL DEFAULT 0');
     this.ensureColumn('seats', 'connection_id', 'TEXT');
@@ -338,8 +342,18 @@ export class RoomDurableObject {
 
   private room(): RoomRow | undefined {
     return this.ctx.storage.sql.exec<RoomRow>(
-      'SELECT code, created_at, expires_at, status, host_seat, revision, format, rules_json, rematch_waiting FROM room LIMIT 1',
+      'SELECT code, created_at, expires_at, status, host_seat, revision, format, rules_json, rematch_waiting, required_features FROM room LIMIT 1',
     ).toArray()[0];
+  }
+
+  private supportsRoom(room = this.room()): boolean {
+    if (!room) return true;
+    try {
+      const required: unknown = JSON.parse(room.required_features);
+      // No production extension is implemented; do not silently treat corrupt
+      // data or a future required feature as a basic-v1 room.
+      return Array.isArray(required) && required.length === 0;
+    } catch { return false; }
   }
 
   private seats(): SeatRow[] {
@@ -522,6 +536,8 @@ export class RoomDurableObject {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') ?? undefined;
+
+    if (!this.supportsRoom()) return json({ error: 'unsupported_room_features' }, 409, origin);
 
     if (url.pathname === '/internal/create' && request.method === 'POST') {
       const body = await internalJson(request);
@@ -1143,6 +1159,11 @@ export class RoomDurableObject {
   }
 
   private async processSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    if (!this.supportsRoom()) {
+      this.sendError(socket, 'unsupported_room_features');
+      try { socket.close(1008, 'Unsupported room features'); } catch { /* Already closed. */ }
+      return;
+    }
     const attachment = this.attachment(socket);
     if (!attachment) {
       this.sendError(socket, 'unauthorized');
@@ -1278,13 +1299,13 @@ export class RoomDurableObject {
     // Before 2026-04-07, the runtime requires the application to answer a peer Close frame.
     // On newer compatibility dates this is harmless because the runtime has already closed it.
     try { socket.close(code, reason); } catch { /* Already closed or no close frame was received. */ }
-    try { this.socketEnded(socket); }
+    try { if (this.supportsRoom()) this.socketEnded(socket); }
     catch { logWorker({ event: 'server_internal_error', level: 'ERROR', errorCode: 'websocket_close_handler_failed' }); }
   }
 
   webSocketError(socket: WebSocket): void {
     logWorker({ event: 'websocket_error', level: 'ERROR' });
-    try { this.socketEnded(socket); }
+    try { if (this.supportsRoom()) this.socketEnded(socket); }
     catch { logWorker({ event: 'server_internal_error', level: 'ERROR', errorCode: 'websocket_error_handler_failed' }); }
   }
 
@@ -1298,6 +1319,7 @@ export class RoomDurableObject {
   private async processAlarm(): Promise<void> {
     const room = this.room();
     if (!room) return;
+    if (!this.supportsRoom(room)) return;
     const now = Date.now();
     if (now >= room.expires_at) {
       if (room.status !== 'closed') {
