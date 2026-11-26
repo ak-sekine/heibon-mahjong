@@ -60,11 +60,9 @@ const roomErrorMessages: Record<string, string> = {
   room_finalized: '座席確定後は新しい参加者を受け付けていません。',
   room_full: 'このルームは満席です。',
   unauthorized: '認証に失敗しました。セッションを確認してください。',
-  unsupported_room_features: 'このルームには未対応の機能が必要です。アプリを更新してから再試行してください。',
   rate_limited: '通信が集中したため、操作を受け付けられませんでした。しばらくしてから再試行してください。',
 };
 const socketErrorMessages: Record<string, string> = {
-  unsupported_room_features: 'このルームには未対応の機能が必要です。アプリを更新してから再試行してください。',
   invalid_message: 'サーバーが操作内容を確認できませんでした。',
   invalid_json: '送信内容を読み取れませんでした。',
   message_too_large: '送信内容が大きすぎます。',
@@ -624,14 +622,6 @@ export class OnlineWaitingRoom {
     } catch (error) {
       if (generation !== this.connectGeneration) return;
       diagnosticLog.record('ERROR', 'websocket_connect_failed', { connectionGeneration: generation, errorCode: error instanceof RoomApiError ? error.code : 'connection_failed' });
-      if (error instanceof RoomApiError && error.code === 'unsupported_room_features') {
-        // Preserve the session for a compatible client or a later manual retry.
-        this.automaticReconnectAllowed = false;
-        this.reconnectButton.hidden = false;
-        this.setConnection(error.message);
-        this.renderControls();
-        return;
-      }
       if (error instanceof RoomApiError && (error.code === 'unauthorized' || error.code === 'room_closed' || error.code === 'room_expired')) {
         this.finishSession(error.message);
         return;

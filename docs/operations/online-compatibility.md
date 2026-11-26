@@ -1,37 +1,25 @@
-# オンライン v1 通信互換性（Issue #70 基礎調査）
+# オンライン通信契約と公開互換性
 
-この文書は `heibon-majong.v1` の現行契約と、拡張を有効化する前に必要な条件を示す。現行型定義が変更されたことだけを理由に、この契約や固定テストの期待値を更新しない。実配布されたすべての旧版を検証済みとするものではない。
+## v1 の契約
 
-## 現行契約
+`heibon-mahjong.v1` は、許可 Origin からの HTTP と WebSocket の基本契約である。`POST /api/rooms` は displayName と任意の rules / format からルームを作り、roomCode、participantToken、playerSeat、期限とルールを返す。`POST /api/rooms/{code}/join` は名前を受け、参加トークンと座席を返す。`GET /api/rooms/{code}` はルーム状態、`POST .../ticket` は Bearer participantToken を認証し使い捨て ticket を返す。WebSocket `GET .../socket` は `heibon-mahjong.v1` と ticket を subprotocol で提示する。サーバーは非対応プロトコルを 400 `websocket_protocol_required` で拒否し、ticket を消費せず接続や状態変更を行わない。
 
-許可 Origin のみ HTTP と WebSocket を受け付ける。`POST /api/rooms` は displayName と任意の rules / format から部屋を作り、roomCode、participantToken、playerSeat、期限とルール等を返す。`GET /api/rooms/{code}` は待機状態、`POST .../join` は名前を受け参加トークンと座席を返す。`POST .../ticket` は Bearer participantToken を認証し一回限りの ticket を返す。`GET .../socket` は `heibon-mahjong.v1` と ticket を WebSocket subprotocol で提示する。能力情報は認証ではない。
+ルームの `set-ready`、`finalize-seats`、`prepare-rematch`、`leave-room`、`close-room` は requestId と expectedRevision が必要。対局操作は requestId と expectedGameRevision、操作に応じて tileId、windowId、optionId が必要。`request-state`、`request-game-state` は type のみ。未知操作、未知フィールド、必須フィールドの欠落や不正な型は拒否する。操作結果は requestId と revision を返し、古い revision や同一 ID の異なる内容を拒否する。同じ要求の再送は保存された結果を使用し、二重に適用しない。
 
-room の `set-ready`、`finalize-seats`、`prepare-rematch`、`leave-room`、`close-room` は requestId と expectedRevision が必要。対局操作は requestId と expectedGameRevision が必要で、打牌・リーチは tileId、ロン・鳴き判断は windowId、鳴き・カンは optionId が必要。`request-state`、`request-game-state` は type のみ。未知操作・未知フィールドは拒否される。revision 競合、認可失敗、不正入力等は結果または error で返り、再送した requestId の操作結果は保存される。同じ ID で異なる内容を実行してはならない。
+状態同期は `room-state` と旧別名 `room_state`、`game-state` および開始・局終了・対局終了・中断通知を使用する。非公開牌は参加者別 view によって保護する。旧形式の format だけの要求や rules 欠損には既存の補完がある。再接続時は環境別 sessionStorage に保存した roomCode、participantToken、playerSeat、displayName、expiresAt を検証し、ticket を再取得する。DO の room、seats、tickets、操作履歴、online_game 等と revision・認証 hash は復元時も維持する。
 
-状態は `room-state` と旧 `room_state` の互換別名、`game-state`、開始・局終了・対局終了・中断通知で同期する。プレイヤー別 view の非公開牌保護を維持する。format だけの旧要求や rules の欠損には既存の補完がある。ルームの rules は対局中に変更しない。再接続では sessionStorage に保存した roomCode、participantToken、playerSeat、displayName、expiresAt を検証し、ticket を再取得する。DO の SQLite は room / seats / tickets / operations / online_game / game_operations 等を保持し、participant の認証 hash、revision と対局状態を復元する。SQL テーブルの配置・内部関数は外部 API ではないが、永続データと rollback の互換性は必要。
+## 拡張・非互換と利用者への案内
 
-## 追加発見 API の試作と制約
+互換な変更では v1 を維持する。フィールドの削除・型や意味の変更、必須入力の追加、既存操作・応答の意味変更は非互換として扱い、新プロトコル版と移行を別途設計する。任意フィールド追加も旧受信側が受け入れる場合に限る。特に現在の Worker は WebSocket 操作の未知フィールドを拒否する。ソース SHA はプロトコル互換性の判定に使わない。
 
-`GET /api/capabilities` は `{ "protocol": "heibon-mahjong.v1", "features": [] }` を返す。追加機能はまだ存在せず、通常クライアントの接続フローには未接続。旧 Worker の厳密な `404 {"error":"not_found"}` のみ基本 v1 にフォールバックし、通信失敗、401/403、その他の応答や不正 JSON は失敗とする試作関数を用意した。404 の扱いの安全性は初回導入前に実配信経路で検証する。HTTP discovery は既存の厳格な WebSocket 操作に未交渉フィールドを加えないが、参加能力を証明しない。
+WebSocket のプロトコル検査は HTTP 作成・参加後に行われるため、HTTP の状態変更を保護しない。将来非互換な HTTP 要求を追加する際は、旧 Worker が通常 v1 として受理できないバージョン付き経路等を使い、状態変更前に識別・拒否する。旧クライアントに新しい必須 HTTP フィールドを要求しない。今回 v2 や新しい経路は実装しない。
 
-## 拡張と保存の規則
+ブラウザーの WebSocket API はハンドシェイク失敗の HTTP 状態・本文を通常公開しない。そのため、現行クライアントはプロトコル不一致を通信障害や Origin 拒否と確実に区別できず、不明な障害を非互換と断定してはならない。明確に識別できる将来の非互換エラーでは、状態変更前に拒否し、セッションを安全に保持し、無意味な自動再接続を止めて更新方法を案内する。既に配布済みの旧クライアントに新たな案内を追加することはできない。Pages は最新ページを再読み込みし、PWA は提供される更新を適用する。itch.io は配布元が更新されるまで再読み込みだけで解決しない場合がある。
 
-- 既存フィールドの削除・型・意味の変更は非互換として扱う。任意の応答フィールド追加も旧クライアントで無視可能なことを固定契約テストで確認する。旧 Worker は未知の操作フィールドを拒否するため、送信フィールドの追加は無条件に互換とは扱わない。
-- 機能 ID は小文字英数字とハイフンの名前に `.v1` のような正の整数版を付け、意味を変更する場合は新しい ID を付ける。共通能力を確認するまで新操作・フィールドを送らない。
-- 必須機能付きルームは、Worker が作成時に条件を固定し、参加・操作・再接続を状態変更前に検証する仕組みが完成するまで提供しない。旧ルームの必要機能は空とする。自己申告は認証・認可の代替にならない。
-- 旧 DO データの復元、座席・認証 hash、requestId と revision、二重実行防止を固定 fixture と再接続テストで維持する。旧 Worker が新データを読めない書き込みや非破壊と確認できないマイグレーションでは、独立公開・rollback を止め、段階移行と別途承認を必要とする。
-- 非互換変更、v1 サポート終了は移行対象・影響・更新案内・進行中対局保護・rollback を明示し別途判断する。固定 fixture や期待値を更新する際は互換性の意味をレビューし、新テストを追加する。単に実装から期待値を生成し直さない。
+## 保存・公開・検証
 
-## 初回導入と #69
+通常の互換変更では固定通信契約テスト、既存の必須 CI、オンライン検証、旧 DO 保存データの復元と認証・非公開牌保護を維持する。固定期待値を現在の実装から自動生成し直さず、契約変更時は意図と影響をレビューする。既存データを破壊する保存形式変更は個別の移行設計・検証・承認が必要。現在の保存状態を安全に扱えない旧 Worker への切り戻しは禁止し、必要なら修正版への前進公開を検討する。例外操作は AGENTS.md の承認規則に従う。
 
-通常の互換拡張では、契約・旧保存復元・新旧通信テストを同一 SHA の必須 CI とし、個々の配布 SHA の恒常的な突合や手動互換フラグをなくすことを目指す。現時点ではルーム単位の強制・新旧の通信契約テストが未完成であり、この条件を満たさない。初回導入は現行 Pages、itch Draft、PWA、開いたタブの実通信と再接続を別途確認する。itch Draft の元 SHA・digest・日付は不明。全旧 PWA の無期限保証はしない。進行中対局や保存形式の非互換変更では例外的な順序制御・停止が必要。
+通常の契約を維持した独立公開で、配布済みクライアント SHA の個別特定、Pages と Worker の SHA 一致、新旧全組合せの調査、手動互換フラグ、恒常的な Worker 先行公開、配布先間の版対応表を恒常的に要求しない。非互換な通信・保存変更や切り戻しでは公開順序・利用者更新・移行を個別判断する。代表的 fixture の成功は、実配布されたすべての旧版との互換性を証明しない。
 
-## Phase 2: 切り戻し境界の未解決事項
-
-旧 Worker は能力取得後に有効化され得る。旧 Worker は通常のルーム作成時に未知フィールドを無視し、旧 RoomDurableObject は新しい必須機能の状態を認識しない。従って、通常 v1 の作成要求への能力フィールド追加や、既存ルーム保存行への必須機能の追加だけでは、切り戻し後の誤った作成・参加・操作を防げない。新規の拡張専用 API が旧 Worker で 404 になるだけでは、既に作成されたルームへの旧 v1 経路を保護できない。
-
-通常の通信互換性と旧 Worker への切り戻しは別に扱う。既存 DO namespace を維持し、追加・分離しない。現在の保存データ・通信契約・必要機能を安全に扱えない旧 Worker への切り戻しは禁止し、安全性を確認できない障害では原則として修正版への前進公開を検討する。切り戻しは例外操作として既存 AGENTS.md の承認・判断手順に従い、通常公開に配布 SHA の突合や恒常的な追加承認を課さない。必須機能を使用していない状態の切り戻しも、保存形式と現行状態の互換性を確認する。将来の必須機能や非互換保存形式の移行・切り戻し条件は、その変更の導入時に定義する。
-
-現行候補は旧ルームに空の必須機能を補完し、未知の必須機能や破損した値を持つルームは、参加・ticket・WebSocket 操作・自動進行を停止する。対応する必須機能付きルームの作成や参加、クライアントへの能力取得統合はまだ未実装である。
-
-能力取得試作はリクエストと応答本文を時間制限し、クライアントの明示的な対応集合との積集合を計算する。現行の対応集合は空であり、接続・再接続フローには未接続である。固定値と mock を使った検証は実 Worker 更新や旧 Worker との実通信の代替ではない。
+初回導入後は Pages と itch.io 間のルーム作成・参加、対局の基本操作・状態同期・再接続、PWA と開いたままのタブの更新・再接続を必要な環境で確認する。itch.io Draft の現在の配布 SHA・digest・配布日は不明。実機確認と自動テストは区別する。
