@@ -2034,7 +2034,11 @@ with sync_playwright() as p:
     assert page.locator('#online-create-cancel').is_disabled(), 'cancel remained enabled while request was pending'
     assert page.locator('#online-join').is_disabled(), 'join remained enabled while request was pending'
     for selector in ['.match-format-options', '.cpu-difficulty-options', '.optional-rule-options']:
-      assert page.locator(f'#online-create-rules-editor {selector}').is_disabled(), f'{selector} remained enabled while request was pending'
+      disabled = page.locator(f'#online-create-rules-editor {selector}').evaluate('''fieldset => ({
+        fieldsetDisabled: fieldset instanceof HTMLFieldSetElement && fieldset.disabled,
+        inputsDisabled: [...fieldset.querySelectorAll('input')].map(input => input.matches(':disabled')),
+      })''')
+      assert disabled['fieldsetDisabled'] and disabled['inputsDisabled'] and all(disabled['inputsDisabled']), f'{selector} remained enabled while request was pending: {disabled}'
     assert page.locator('#online-create-name').is_enabled(), 'current name input behavior changed while request was pending'
     page.locator('#online-create-form').evaluate("form => form.dispatchEvent(new Event('submit', {bubbles:true, cancelable:true}))")
     assert page.evaluate('window.onlineMock.requests.length') == before_create + 1, 'a second room request was sent while pending'
