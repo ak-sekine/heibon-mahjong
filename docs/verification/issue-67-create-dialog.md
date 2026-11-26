@@ -58,3 +58,20 @@
 - 最新main `8b66b925fad1eab2a773a512e0e36b9e87eb3b01` のpush CIはdocs-onlyで成果物再利用条件を満たさないため、許可された `production_validation=full` を選択。新規通常公開run https://github.com/ak-sekine/heibon-mahjong/actions/runs/45739409626 で全必須CI、Worker再公開、オンライン検証、Pages、台帳確定、独立した公開後auditは成功。開発Workerはskip。公開対象SHAは同main SHA。
 - 本番Worker deployment `8074552298`、Pages deployment `8074574325`。公開予約commit `447dfe5`、確定commit `3c96a4ef4606d4890dd6c34bd0d0b59ece0b642c`。確定台帳の本番SHAは公開対象、開発SHAは上記のまま、pending null。公開後の本番・開発Pages全35ファイルは確定snapshotと一致し、release.jsonも各SHAと一致。本番Worker healthは正常。
 - 修正後のiPhone Safari縦画面の実機再確認はユーザーによる確認待ち。Issue #67はOpenのまま。実機確認と自動検証を区別する。
+
+### 2026-11-26 ユーザー本人による実機再確認
+
+本番GitHub Pages版をiPhone Safari縦画面で確認したとのユーザー報告。自動検証とは独立した実機結果である。
+
+1. 右上の「閉じる」ボタンが表示されない：OK
+2. キャンセルボタンの初期フォーカス枠が全周表示される：OK
+3. ルーム作成ボタンのフォーカス枠が全周表示される：OK
+4. 本文スクロールと固定フッターが正常：OK
+5. キャンセル時に未確定のルール変更が保存されない：OK
+6. ルーム作成と待機画面への遷移が正常：OK
+
+合計：OK 6、NG 0、報告対象内の未確認0。上記はユーザー本人の報告であり、報告にない操作を実機で確認したとは扱わない。過去の実機未確認の記載は各時点の記録。
+
+### 残存検証
+
+作成ダイアログのEscapeによる終了・保存済みルールとフォーカスの復帰、保留中の作成要求での操作制限・二重送信防止と応答後の遷移を既存ブラウザー回帰に追加。Chromium・WebKitの結果と最終受入評価は検証待ち。実機6項目の結果はこの自動検証の成否に依存しない。

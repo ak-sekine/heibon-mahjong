@@ -482,7 +482,17 @@ MOCK = r"""
 
   window.WebSocket = MockWebSocket;
   const requests = [];
+  let holdCreateResponse = false;
+  let releaseCreateResponse = null;
   window.onlineMock = {
+    holdNextCreateResponse() { holdCreateResponse = true; },
+    get createResponseHeld() { return releaseCreateResponse !== null; },
+    releaseCreateResponse() {
+      if (!releaseCreateResponse) throw new Error('No create response is held');
+      const release = releaseCreateResponse;
+      releaseCreateResponse = null;
+      release();
+    },
     addGuest() {
       state.seats[1] = { seat: 1, gameSeat: null, kind: 'human', name: 'テスト参加者', connected: true, ready: false, isHost: false };
       state.revision++;
@@ -742,6 +752,10 @@ MOCK = r"""
     requests.push({ path: requestUrl.pathname, body: init.body ? JSON.parse(init.body) : null });
     let value;
     if (requestUrl.pathname === '/api/rooms' && init.method === 'POST') {
+      if (holdCreateResponse) {
+        holdCreateResponse = false;
+        await new Promise(resolve => { releaseCreateResponse = resolve; });
+      }
       const request = JSON.parse(init.body);
       state.format = request.rules?.matchFormat ?? request.format ?? 'tonpu';
       state.rules = request.rules ?? {schemaVersion: 1, matchFormat: state.format};
@@ -1984,6 +1998,16 @@ with sync_playwright() as p:
     page.locator('#online-create-name').fill('テストホスト')
     assert page.locator('#online-create').is_enabled(), 'room creation remained disabled after restoring a valid display name'
     assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').is_checked(), 'online creation did not restore the last started format'
+    saved_before_escape = page.evaluate("localStorage.getItem('heibon-mahjong-last-rules')")
+    requests_before_escape = page.evaluate('window.onlineMock.requests.length')
+    page.locator('input[name="online-create-rules-editor-match-format"][value="tonpu"]').check()
+    page.keyboard.press('Escape')
+    assert not page.locator('#online-create-dialog').evaluate('dialog => dialog.open'), 'Escape did not close room creation'
+    assert page.evaluate('window.onlineMock.requests.length') == requests_before_escape, 'Escape sent a room request'
+    assert page.evaluate("localStorage.getItem('heibon-mahjong-last-rules')") == saved_before_escape, 'Escape saved unaccepted rules'
+    assert page.locator('#main-menu-toggle').evaluate('element => document.activeElement === element'), 'Escape did not restore menu focus from room creation'
+    select_menu_item('#online-create-open')
+    assert page.locator('input[name="online-create-rules-editor-match-format"][value="tonnan"]').is_checked(), 'room creation did not restore saved rules after Escape'
     page.locator('input[name="online-create-rules-editor-match-format"][value="tonpu"]').check()
     page.locator('#online-create-cancel').click()
     assert page.evaluate("JSON.parse(localStorage.getItem('heibon-mahjong-last-rules')).rules.matchFormat === 'tonnan'"), 'canceling room creation saved an unaccepted format'
@@ -2000,8 +2024,23 @@ with sync_playwright() as p:
     page.locator('#online-create-rules-editor input[data-rule-key="doubleYakuman"]').check()
     page.locator('#online-create-rules-editor input[data-rule-key="pao"]').check()
     page.locator('input[name="online-create-rules-editor-cpu-difficulty"][value="advanced"]').check()
+    before_create = page.evaluate('window.onlineMock.requests.length')
+    page.evaluate('window.onlineMock.holdNextCreateResponse()')
     page.locator('#online-create').click()
+    wait_for('window.onlineMock.createResponseHeld')
+    assert page.evaluate('window.onlineMock.requests.length') == before_create + 1, 'room creation request was not sent exactly once'
+    assert page.locator('#online-create-dialog').evaluate('dialog => dialog.open'), 'create dialog closed while request was pending'
+    assert page.locator('#online-create').is_disabled(), 'create remained enabled while request was pending'
+    assert page.locator('#online-create-cancel').is_disabled(), 'cancel remained enabled while request was pending'
+    assert page.locator('#online-join').is_disabled(), 'join remained enabled while request was pending'
+    for selector in ['.match-format-options', '.cpu-difficulty-options', '.optional-rule-options']:
+      assert page.locator(f'#online-create-rules-editor {selector}').is_disabled(), f'{selector} remained enabled while request was pending'
+    assert page.locator('#online-create-name').is_enabled(), 'current name input behavior changed while request was pending'
+    page.locator('#online-create-form').evaluate("form => form.dispatchEvent(new Event('submit', {bubbles:true, cancelable:true}))")
+    assert page.evaluate('window.onlineMock.requests.length') == before_create + 1, 'a second room request was sent while pending'
+    page.evaluate('window.onlineMock.releaseCreateResponse()')
     wait_for("document.querySelector('#online-dialog').open && document.querySelector('#online-room-code').textContent === 'ABC234'")
+    assert page.evaluate("window.onlineMock.requests.filter(r => r.path === '/api/rooms').length") == 1, 'room creation was submitted more than once'
     assert not page.locator('#online-create-dialog').evaluate('element => element.open'), 'room creation form remained open after success'
     assert not page.locator('#online-join-dialog').evaluate('element => element.open'), 'join form opened after room creation'
     assert page.locator('#online-dialog #online-create-form, #online-dialog #online-join-form').count() == 0, 'input forms were mixed into the room management screen'
