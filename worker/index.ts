@@ -159,6 +159,9 @@ async function createRoom(env: Env, origin: string, displayName: string, rules: 
 }
 
 async function handleApi(request: Request, env: Env, origin: string): Promise<Response> {
+  if (request.method === 'GET' && new URL(request.url).pathname === '/api/capabilities') {
+    return json({ protocol: 'heibon-mahjong.v1', features: [] }, 200, origin);
+  }
   if (request.method === 'GET' && new URL(request.url).pathname === '/health') {
     return json({ ok: true, service: 'heibon-mahjong-online' }, 200, origin);
   }
