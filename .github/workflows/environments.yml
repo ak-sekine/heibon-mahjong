@@ -11,6 +11,22 @@ on:
         required: true
         type: boolean
         default: false
+      artifact_probe:
+        description: Temporary non-deploy Artifact interoperability probe.
+        type: boolean
+        default: false
+      probe_source_run:
+        description: Source run ID for cross-run probe.
+        type: string
+        required: false
+      probe_source_id:
+        description: Source Artifact ID for cross-run probe.
+        type: string
+        required: false
+      probe_source_digest:
+        description: Source Artifact digest for cross-run probe.
+        type: string
+        required: false
       production_validation:
         description: Reuse verified main push CI, or explicitly run full validation for production.
         type: choice
@@ -298,3 +314,61 @@ jobs:
     secrets:
       CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_PRODUCTION_API_TOKEN || '' }}
       CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}
+
+  artifact-interoperability-probe:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == false && inputs.artifact_probe == true && startsWith(github.ref, 'refs/heads/issue/69-independent-publication-v2') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install the same Artifact library used by deploy-pages
+        run: npm install --prefix "$RUNNER_TEMP/issue69-artifact" --no-save --ignore-scripts --package-lock=false @actions/artifact@2.1.3
+      - name: Verify prior run ZIP and metadata
+        if: ${{ inputs.probe_source_run != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.probe_source_run }}
+          SOURCE_ID: ${{ inputs.probe_source_id }}
+          SOURCE_DIGEST: ${{ inputs.probe_source_digest }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ && "$SOURCE_ID" =~ ^[0-9]+$ && "$SOURCE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ID" > "$RUNNER_TEMP/issue69-metadata.json"
+          jq -e --argjson id "$SOURCE_ID" --argjson run "$SOURCE_RUN" --arg digest "$SOURCE_DIGEST" '.id == $id and .workflow_run.id == $run and .digest == $digest and .expired == false' "$RUNNER_TEMP/issue69-metadata.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ID/zip" > "$RUNNER_TEMP/issue69-original.zip"
+          printf '%s  %s\n' "${SOURCE_DIGEST#sha256:}" "$RUNNER_TEMP/issue69-original.zip" | sha256sum -c -
+      - uses: actions/download-artifact@v4
+        if: ${{ inputs.probe_source_run != '' }}
+        with:
+          artifact-ids: ${{ inputs.probe_source_id }}
+          run-id: ${{ inputs.probe_source_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/issue69-probe
+      - name: Prepare or check probe content
+        env:
+          SOURCE_RUN: ${{ inputs.probe_source_run }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/issue69-probe"
+          if [[ -z "$SOURCE_RUN" ]]; then printf 'issue69 artifact probe\n' > "$RUNNER_TEMP/issue69-probe/probe.txt"; fi
+          test "$(cat "$RUNNER_TEMP/issue69-probe/probe.txt")" = 'issue69 artifact probe'
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: issue69-probe-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/issue69-probe
+          retention-days: 1
+      - uses: ./.github/actions/issue69-artifact-probe
+        env:
+          NODE_PATH: ${{ runner.temp }}/issue69-artifact/node_modules
+          GH_TOKEN: ${{ github.token }}
+          PROBE_NAME: issue69-probe-${{ github.run_id }}-${{ github.run_attempt }}
+          PROBE_ID: ${{ steps.upload.outputs.artifact-id }}
+          PROBE_DIGEST: ${{ steps.upload.outputs.artifact-digest }}

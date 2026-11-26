@@ -43,15 +43,19 @@ export function planPublication({ environment, candidate, pagesBase, workerBase,
   }
   const pagesDiff = compareRelease(pagesBase, candidate, git);
   const workerDiff = compareRelease(workerBase, candidate, git);
-  if (!pagesDiff.reliable || !workerDiff.reliable) return { classification: 'unknown', blocked: true, reason: 'unreliable-baseline' };
   const pagesImpacts = pagesDiff.files.map(file => pathImpact(file, environment));
   const workerImpacts = workerDiff.files.map(file => pathImpact(file, environment));
-  if ([...pagesImpacts, ...workerImpacts].includes('unknown')) return { classification: 'unknown', blocked: true, reason: 'unknown-path' };
-  const pagesPending = pagesImpacts.some(impact => impact === 'pages' || impact === 'both');
-  const workerPending = workerImpacts.some(impact => impact === 'worker' || impact === 'both');
-  const classification = pagesPending && workerPending ? 'both' : pagesPending ? 'pages' : workerPending ? 'worker' : 'none';
+  const pagesKnown = pagesDiff.reliable && !pagesImpacts.includes('unknown');
+  const workerKnown = workerDiff.reliable && !workerImpacts.includes('unknown');
+  if ((target === 'auto' || target === 'both' || target === 'pages') && !pagesKnown ||
+      (target === 'auto' || target === 'both' || target === 'worker') && !workerKnown) {
+    return { classification: 'unknown', blocked: true, reason: (!pagesDiff.reliable || !workerDiff.reliable) ? 'unreliable-baseline' : 'unknown-path' };
+  }
+  const pagesPending = pagesKnown ? pagesImpacts.some(impact => impact === 'pages' || impact === 'both') : null;
+  const workerPending = workerKnown ? workerImpacts.some(impact => impact === 'worker' || impact === 'both') : null;
+  const classification = !pagesKnown || !workerKnown ? 'unknown' : pagesPending && workerPending ? 'both' : pagesPending ? 'pages' : workerPending ? 'worker' : 'none';
   const selected = target === 'auto' ? classification : target;
   const pages = ['pages', 'both'].includes(selected);
   const worker = ['worker', 'both'].includes(selected);
-  return { classification, selected, blocked: false, pages, worker, pagesPending, workerPending, pagesDeferred: pagesPending && !pages, workerDeferred: workerPending && !worker, onlineVerification: pages || worker };
+  return { classification, selected, blocked: false, pages, worker, pagesPending, workerPending, pagesDeferred: pagesPending === null ? null : pagesPending && !pages, workerDeferred: workerPending === null ? null : workerPending && !worker, onlineVerification: pages || worker };
 }

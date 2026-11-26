@@ -59,6 +59,17 @@ test('directly compares each successful tree and records deferred independent ch
     assert.equal(planPublication({ ...options, candidate: base, pagesBase: base, workerBase: base }).classification, 'none');
     assert.equal(planPublication({ ...options, environment: 'development' }).classification, 'pages');
     assert.equal(planPublication({ ...options, pagesBase: '' }).classification, 'unknown');
+    const workerSelected = planPublication({ ...options, candidate: both, pagesBase: '', target: 'worker' });
+    assert.equal(workerSelected.blocked, false);
+    assert.equal(workerSelected.classification, 'unknown');
+    assert.equal(workerSelected.pagesPending, null);
+    assert.equal(workerSelected.pagesDeferred, null);
+    assert.equal(workerSelected.worker, true);
+    assert.equal(planPublication({ ...options, workerBase: '', target: 'worker' }).blocked, true);
+    const pagesSelected = planPublication({ ...options, workerBase: '', target: 'pages' });
+    assert.equal(pagesSelected.blocked, false);
+    assert.equal(pagesSelected.workerPending, null);
+    assert.equal(planPublication({ ...options, workerBase: '', target: 'auto' }).blocked, true);
     assert.equal(planPublication({ ...options, pagesBase: 'f'.repeat(40) }).reason, 'unreliable-baseline');
     // Neither of these two commit trees is an ancestor of the other.
     git('checkout', '-q', '--detach', base); writeFileSync(path.join(dir, 'index.html'), 'other'); git('commit', '-qam', 'other'); const other = git('rev-parse', 'HEAD');
