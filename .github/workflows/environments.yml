@@ -348,6 +348,7 @@ jobs:
         if: ${{ inputs.probe_source_run != '' }}
         with:
           artifact-ids: ${{ inputs.probe_source_id }}
+          merge-multiple: true
           run-id: ${{ inputs.probe_source_run }}
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/issue69-probe
