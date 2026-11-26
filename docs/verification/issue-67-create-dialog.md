@@ -43,3 +43,10 @@
 - 予約・親・元run・main CI・Worker deployment・現在の配信を読み取るpreflightと、一意な非公開用artifactのアップロード・検索検査を追加。Pages公開、Worker公開、台帳pushは含めない。書込権限やPages deploy権限の確認とは区別する。
 - 現行監査は確定台帳の元publication runと最新Pages deploymentのrun・SHA、元Workerの来歴の一致を要求する。別runによる復旧に対応する限定的な来歴検証は未実装であり、recoverモードはfail-closed。候補CI、main CI、Actions上のpreflight、本番復旧、Finalize、復旧audit、修正後実機確認は未実施。
 - ローカルでYAML構文検査、限定テストと既存のsnapshot・workflow・Pages監査テストが成功。上記の以前の「未コミット」は当時の状態を記録する。
+
+### 復旧 preflight 実行結果
+
+- 読み取り専用preflight候補・mainのworkflow SHAは `9d6f201a77da26510e6cdf5553805205aed14410`。対象ゲームSHA `988bbaca276363583e6d3bffed602d60c8f86963` とは異なる。候補CI https://github.com/ak-sekine/heibon-mahjong/actions/runs/45726266288 とmain CI https://github.com/ak-sekine/heibon-mahjong/actions/runs/45727608463 は必須ジョブ・audit成功。
+- mainからのpreflight https://github.com/ak-sekine/heibon-mahjong/actions/runs/45728923606 は成功。固定予約と親、元runとmain CI、Worker deployment、予約前の配信全ファイル、production health、API読取、OIDC取得、テスト用artifactの作成と一意検索を確認。artifact ID `15075253537`。これは通常の汎用artifactであり、Pages deploy用artifact検索やPages書込権限の成功を証明しない。Environment保護を変更せず、preflightはdeploymentを作っていない。
+- recoverは実装済みの公開経路ではなく明示的に失敗する安全停止。通常監査は最新Pages deploymentのSHA・runを台帳のゲームSHA・元runと一致させ、元runも成功を要求する。別workflow SHA・別runによる復旧を元の失敗runと偽らず検証する限定的来歴設計とテストが未完了。このためPages復旧、Finalize、復旧auditは実施していない。Worker再公開も行っていない。
+- 前回のCodex APIでのHTTP 403は `GET /repos/ak-sekine/heibon-mahjong/actions/permissions/workflow` への照会。Actionsの読み取りやOIDCの成功とは異なり、Pages書込権限の可否は未確認。修正後のiPhone Safari実機確認も未実施。
