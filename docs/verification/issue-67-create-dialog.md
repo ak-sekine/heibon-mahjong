@@ -50,3 +50,11 @@
 - mainからのpreflight https://github.com/ak-sekine/heibon-mahjong/actions/runs/45728923606 は成功。固定予約と親、元runとmain CI、Worker deployment、予約前の配信全ファイル、production health、API読取、OIDC取得、テスト用artifactの作成と一意検索を確認。artifact ID `15075253537`。これは通常の汎用artifactであり、Pages deploy用artifact検索やPages書込権限の成功を証明しない。Environment保護を変更せず、preflightはdeploymentを作っていない。
 - recoverは実装済みの公開経路ではなく明示的に失敗する安全停止。通常監査は最新Pages deploymentのSHA・runを台帳のゲームSHA・元runと一致させ、元runも成功を要求する。別workflow SHA・別runによる復旧を元の失敗runと偽らず検証する限定的来歴設計とテストが未完了。このためPages復旧、Finalize、復旧auditは実施していない。Worker再公開も行っていない。
 - 前回のCodex APIでのHTTP 403は `GET /repos/ak-sekine/heibon-mahjong/actions/permissions/workflow` への照会。Actionsの読み取りやOIDCの成功とは異なり、Pages書込権限の可否は未確認。修正後のiPhone Safari実機確認も未実施。
+
+### 台帳復元と通常公開の再実行
+
+- ユーザーの今回限定承認により、Worker公開済み予約 `ed460b9ebc676bef9204d61903f91e6bf5f51add` を親として、予約前 `a89929fe0abd8897cf1ce9bb1b329992b444c014` の `state.json` と `site/` をセットで復元。復元commit `193527d258c29e8712a1fbd2d3c7fd2d77d78194` のツリー全体が予約前commitと一致し、履歴を保持したfast-forwardで `pages-verified` に反映。復元後は本番 `c823a8311d295453d0b51c79a5627c5fae7e0284`、開発 `99f6d146049133a1471bd62265089f5b65500563`、pending null。Workerは戻さず、台帳との一時的なSHA不一致は明示承認に基づく。
+- 復元前に予約所有者・台帳先端・公開競合なし・本番Worker healthを確認し、配信35ファイルと予約前snapshotが一致した。旧版から最新mainまでWorkerソース・設定・migrationに差分はなく、元の本番オンライン検証も成功していた。
+- 最新main `8b66b925fad1eab2a773a512e0e36b9e87eb3b01` のpush CIはdocs-onlyで成果物再利用条件を満たさないため、許可された `production_validation=full` を選択。新規通常公開run https://github.com/ak-sekine/heibon-mahjong/actions/runs/45739409626 で全必須CI、Worker再公開、オンライン検証、Pages、台帳確定、独立した公開後auditは成功。開発Workerはskip。公開対象SHAは同main SHA。
+- 本番Worker deployment `8074552298`、Pages deployment `8074574325`。公開予約commit `447dfe5`、確定commit `3c96a4ef4606d4890dd6c34bd0d0b59ece0b642c`。確定台帳の本番SHAは公開対象、開発SHAは上記のまま、pending null。公開後の本番・開発Pages全35ファイルは確定snapshotと一致し、release.jsonも各SHAと一致。本番Worker healthは正常。
+- 修正後のiPhone Safari縦画面の実機再確認はユーザーによる確認待ち。Issue #67はOpenのまま。実機確認と自動検証を区別する。
