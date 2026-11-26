@@ -4,7 +4,7 @@
 
 ## 対象判定
 
-候補の `publication-plan.mjs` は配布先ごとの成功 SHA を入力として各ツリーを直接比較し、非祖先同士も対象とする。入力は信頼済みの環境別成功記録であることが前提。main または承認済み開発 SHA との一致、Environment・Secrets、同一 SHA の CI・成果物の出所と完全性の検証は呼び出し側の責任で、この候補では workflow に接続していない。明示対象が一方の場合、他方の未公開変更は deferred として返し成功記録を更新しない。基準欠損・不明なパス・差分取得失敗では停止する。
+候補の `publication-plan.mjs` は配布先ごとの成功 SHA を入力として各ツリーを直接比較し、非祖先同士も対象とする。入力は信頼済みの環境別成功記録であることが前提。main または承認済み開発 SHA との一致、Environment・Secrets、同一 SHA の CI・成果物の出所と完全性の検証は呼び出し側の責任で、この候補では workflow に接続していない。明示対象が一方の場合、他方の未公開変更は deferred として返し成功記録を更新しない。auto・both は両方の基準欠損・不明なパス・差分取得失敗で停止する。pages・worker の明示指定では、選択側の比較が成立すれば他方は不明のまま返す。実公開時の承認、CI、通信と保存の安全性確認は別途必要で、この関数だけでは保証されない。
 
 共通 `src/game`・`src/model`・`src/analysis` とオンライン契約は双方、UI・PWA は Pages、Worker 固有は Worker、依存定義は双方として扱う。検証・公開処理の既知ファイルは配信物の変更と区別するが、テスト・CI の実行を不要にするものではない。未知ファイルは停止する。
 
@@ -18,9 +18,9 @@
 
 ## Artifact と復旧
 
-`actions/deploy-pages@v4` の同梱 `@actions/artifact` 2.1.3 は Actions の内部 ListArtifacts を呼び、結果に name、id、size、createdAt を返す。digest や有効期限は一覧に含まれない。候補 helper は検索結果の一意性・ID と、別途取得した REST metadata の digest・期限を分けて確認し、ZIP の digest 検証は既存 `reuse-production-ci.mjs` の `checkArchive` を再利用する。現在は mock のみで、Actions 実行文脈の内部検索や別 run/attempt の取得・再アップロードには未接続である。元 CI の成功証跡と公開・再開 run の ID は分け、元 CI の検証条件を緩めない。
+`actions/deploy-pages@v4` の同梱 `@actions/artifact` 2.1.3 は Actions の内部 ListArtifacts を呼び、結果に name、id、size、createdAt を返す。digest や有効期限は一覧に含まれない。候補 helper は検索結果の一意性・ID と、別途取得した REST metadata の digest・期限を分けて確認し、ZIP の digest 検証は既存 `reuse-production-ci.mjs` の `checkArchive` を再利用する。非公開 Actions の run `45910715661` で内部一覧の名前・ID、REST の digest・期限を確認した。run `45910804831` は別 run ZIP の REST 取得、digest 照合、download-artifact による取得に成功したが、取得後のパスの想定が誤っていたため内容確認で失敗した。パスを修正した run `45910927509` では別 run ZIP の digest 照合、download-artifact による取得、内容確認、再アップロード、内部一覧・REST の照合が成功した。これはテスト用 Artifact の検証であり、公開 workflow への接続は未実施。attempt をまたぐ検索範囲や実際の Pages deploy は未検証。元 CI の成功証跡と公開・再開 run の ID は分け、元 CI の検証条件を緩めない。
 
-検索だけがデプロイ要求前に失敗した場合の候補は、元 CI と成果物を再照合し、Pages 専用 run で再アップロードする方法。要求後の結果不明や成功後の記録失敗では再公開しないで標準記録・実配信を照合する。現状、この再開経路と同一検索ライブラリの利用権限は実証できておらず、成功済み Worker を再公開せず安全に再開できると保証しない。
+検索だけがデプロイ要求前に失敗した場合の候補は、元 CI と成果物を再照合し、Pages 専用 run で再アップロードする方法。要求後の結果不明や成功後の記録失敗では再公開しないで標準記録・実配信を照合する。一時的な非公開検証では `actions: read` の GitHub token と Actions runtime token を使用できた。実際の公開 workflow の権限・制約と安全な Pages 専用再開経路は未検証であり、成功済み Worker を再公開せず安全に再開できると保証しない。
 
 ## 品質・itch.io
 

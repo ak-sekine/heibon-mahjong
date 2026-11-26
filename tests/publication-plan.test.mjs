@@ -76,5 +76,6 @@ test('directly compares each successful tree and records deferred independent ch
     assert.equal(planPublication({ ...options, candidate: other, pagesBase: both, workerBase: both }).classification, 'both');
     renameSync(path.join(dir, 'index.html'), path.join(dir, 'unclassified')); git('add', '-A'); git('commit', '-qm', 'rename'); const moved = git('rev-parse', 'HEAD');
     assert.equal(planPublication({ ...options, candidate: moved }).reason, 'unknown-path');
+    assert.equal(planPublication({ ...options, candidate: moved, workerBase: '', target: 'pages' }).reason, 'unknown-path');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

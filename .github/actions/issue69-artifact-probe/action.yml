@@ -1,5 +1,0 @@
-name: Issue 69 non-deployment Artifact probe
-description: Verify internal listing and REST metadata without publishing.
-runs:
-  using: node20
-  main: index.cjs
