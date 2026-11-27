@@ -1,9 +1,43 @@
 {
   "production": {
-    "sha": "8b66b925fad1eab2a773a512e0e36b9e87eb3b01",
-    "digest": "db77fe988b3549f71e51daae76f81ca61fa07c04cb446217d66c0381ad7b6c4c",
+    "sha": "77c6c35cc381ffe6987f4ace8bca8cff0fe1653f",
+    "digest": "05d1b512492a202263ad10c1af135ac4971e3a5685686c285c17bc4cce441570",
     "workerUrl": "https://heibon-mahjong-online.ak-sekine.workers.dev",
-    "snapshotDigest": "165aaaf15ce409d4b9c4a2cf9000cf371e4b88fe166e2b309bc49028cb3d1b49"
+    "snapshotDigest": "ff3de58d7e3ea1eb206fb85560ec11e5e332b7f00b726843445077504d6718cb",
+    "publication": {
+      "runId": "46084987199",
+      "attempt": "1",
+      "sourceVerification": {
+        "workflowId": 415213931,
+        "workflowRef": "ak-sekine/heibon-mahjong/.github/workflows/environments.yml@refs/heads/main",
+        "runId": 46045430838,
+        "attempt": 1,
+        "artifactId": 15222420956,
+        "digest": "sha256:d7579ac3178a8f8d3941d7487eb99f964d425bdfdbe5b0b667d5505d621c6f11",
+        "expiresAt": "2027-02-25T17:54:28Z"
+      },
+      "pagesSource": {
+        "version": 1,
+        "kind": "production-reuse",
+        "environment": "production",
+        "sha": "77c6c35cc381ffe6987f4ace8bca8cff0fe1653f",
+        "runId": 46045430838,
+        "attempt": 1,
+        "artifactId": 15222420956,
+        "digest": "sha256:d7579ac3178a8f8d3941d7487eb99f964d425bdfdbe5b0b667d5505d621c6f11",
+        "name": "pages-dist-77c6c35cc381ffe6987f4ace8bca8cff0fe1653f-1",
+        "expiresAt": "2027-02-25T17:54:28Z",
+        "productionEvidence": {
+          "workflowId": 415213931,
+          "workflowRef": "ak-sekine/heibon-mahjong/.github/workflows/environments.yml@refs/heads/main",
+          "runId": 46045430838,
+          "attempt": 1,
+          "artifactId": 15222420956,
+          "digest": "sha256:d7579ac3178a8f8d3941d7487eb99f964d425bdfdbe5b0b667d5505d621c6f11",
+          "expiresAt": "2027-02-25T17:54:28Z"
+        }
+      }
+    }
   },
   "development": {
     "sha": "da1962ce27c500d9e01b998df2f0828794a7c1cd",
