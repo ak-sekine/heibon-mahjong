@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      issue69_recovery:
+        description: One-time recovery of the verified accidental deployment record.
+        type: boolean
+        default: false
       publish:
         description: Publish after external isolation and bootstrap have been verified.
         required: true
@@ -36,6 +40,27 @@ on:
 permissions:
   contents: read
 jobs:
+  issue69-recovery:
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' && inputs.issue69_recovery == true && inputs.publish == false
+        && github.repository == 'ak-sekine/heibon-mahjong' && github.ref == 'refs/heads/issue/69-independent-publication-v2' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: pages-publication
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Recover only the accidental deployment record
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/issue69-once-recovery.mjs
   classify-changes:
     runs-on: ubuntu-latest
     outputs:
