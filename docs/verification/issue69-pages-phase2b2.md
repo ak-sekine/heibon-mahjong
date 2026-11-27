@@ -70,3 +70,13 @@ node .github/scripts/pages-independent-recovery.mjs <pending-checkout> <parent-c
 ### 開発環境のiPhone Safari実機確認（2026-11-28）
 
 ユーザー本人による報告：開発Pages正常起動、CPU対局の開始・基本操作、局結果・最終順位を閉じた後の再表示、オンライン卓の作成・参加、操作・状態同期、切断後の再接続、開発PWAの更新・再起動、本番・開発の設定・保存情報の分離はいずれもOK。OK 8件、NG 0件、報告対象内の未確認0件。過去のWebKit失敗は限定診断で非再現、後続必須CI成功、今回の実機確認OKだが、根本原因は未確定。
+
+### 本番独立公開への切替（2026-11-28）
+
+main `77c6c35cc381ffe6987f4ace8bca8cff0fe1653f`、必須CI [46045430838](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46045430838) 成功を基準に、ユーザーが確認・承認した単一100%の本番Worker version `ad3804cb-fcf9-470a-8581-a443d51bae50` と独立記録なしを初回公開処理で再照合した。ユーザーはROOMS・RATE_LIMITER bindingの存在を確認したが、完全なnamespace ID等は画面で取得していない。旧Pages公開SHAから本候補へのWorker・DO設定・共有通信／ゲームコードの差分はない。
+
+[Worker初回公開 46083763674](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46083763674) は成功。独立Deployment 8121540156 は開始pending、`deployed:01b049b2-0c4a-4055-b5c1-22a870d61d5f`、オンライン検証後 `verified:01b049b2-0c4a-4055-b5c1-22a870d61d5f` を記録した。Pages・itch由来の両Origin間のルーム・対局同期を含む本番オンライン検証が成功した。これは現在のitch.io配布物そのものの実機確認ではない。Worker公開時にPagesはskipされ、pages-verified HEADは変更されなかった。
+
+[Pages専用公開 46084987199](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46084987199) はmain push CI run 46045430838 attempt 1のArtifact 15222420956、ZIP digest `sha256:d7579ac3178a8f8d3941d7487eb99f964d425bdfdbe5b0b667d5505d621c6f11`（期限 2027-02-25 17:54:28 UTC）を再利用し成功、全配信ファイル照合と独立auditに成功した。確定commit `5fff1df032e672948187bb610f54691b3086c70f`、本番snapshotDigest `ff3de58d7e3ea1eb206fb85560ec11e5e332b7f00b726843445077504d6718cb`、pending null。開発snapshot SHA `da1962ce27c500d9e01b998df2f0828794a7c1cd`、digest `ee6ddf1402f38dc6eb52f591a42c36f5a9effe06067825222cfd5ab3d7f710bf` と `site/dev` は保持された。共有 `environments.json` は本番更新に伴い変更。Pages公開でWorker jobはskipされ、本番独立Deploymentは1件のまま、開発Deployment 8111581288は `verified:132dd0c6-57e4-444b-9515-0bda6392ca2f` を保持した。開発Worker稼働versionの別途直接再照合は未実施。
+
+本番Pages・PWAおよび現在のitch.io Draft実配布物について、ユーザー実機での起動、CPU対局、Pages↔itch.ioの卓作成・参加・基本操作・同期・再接続を次段階で確認する。itch.io ZIPの元SHA・digestは不明で、既存配布物との実機互換性を今回のOriginテスト成功だけで保証しない。Issue #69はOpenのまま。
