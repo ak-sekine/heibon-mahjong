@@ -328,6 +328,7 @@ jobs:
       - name: Install the pinned Pages lookup client
         run: npm ci --ignore-scripts --prefix source/.github/actions/pages-artifact-check
       - name: Verify uploaded Pages artifact via the deploy-pages lookup
+        timeout-minutes: 3
         uses: ./source/.github/actions/pages-artifact-check
         env:
           GH_TOKEN: ${{ github.token }}

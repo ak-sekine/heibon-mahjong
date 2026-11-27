@@ -618,7 +618,7 @@ test('auto and explicit targets select independent jobs and fail closed on unkno
   assert.match(jobSection(wf, 'plan-auto'), /deployment: false/);
   assert.match(jobSection(wf, 'reserve'), /false &&/);
   assert.match(jobSection(read('.github/workflows/deploy.yml'), 'release-freshness'), /retired[\s\S]*exit 1/);
-  assert.match(jobSection(wf, 'pages-only'), /pages-artifact-check/);
+  assert.match(jobSection(wf, 'pages-only'), /Verify uploaded Pages artifact via the deploy-pages lookup\s+timeout-minutes: 3\s+uses:/);
   assert.match(read('.github/workflows/environments.yml'), /itch-html5-\$\{\{ github.sha \}\}/);
 });
 
