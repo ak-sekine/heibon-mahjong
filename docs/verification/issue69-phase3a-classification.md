@@ -11,3 +11,11 @@
 **診断による意図しないGitHub記録変更：** Environment指定に `deployment: false` を付けなかったため、GitHubが `worker-development` Deployment `8107050354` を自動作成し、診断成功をstatus `success` とした。この記録のSHA `c3165603f31f9efd2cebe3ced87fcbcea7576551` は診断workflowのSHAであり、Worker公開を意味しない。Cloudflareの実公開要求は行っていない。記録を削除・修正していない。旧 `pages-live-audit.mjs` は `worker-development` の最新Deployment SHAと現行台帳を比較するため、この記録により監査がSHA不一致で停止する。新方式の独立Worker基準 `heibon-independent-worker-development` は未初期化のまま。移行・旧監査の前に管理者が本記録と元公開の証跡を照合し、記録の取扱いと復旧を別途承認する必要がある。
 
 移行時は管理者が他Issueの公開、旧main・develop・過去Issue refの公開や再実行、Cloudflare等からの手動公開を一時停止し、共有Pagesへの競合を防ぐ。各操作直前に待機・実行中run、Pages pending・実配信・snapshot、対象Workerの最新version・trafficと記録を再確認する。過去refを技術的にすべて無効化したわけではない。環境別の元公開SHAと稼働versionを確実に結び付けられなければ独立基準を作らず、承認済み初回公開による基準確立の実現方法を別途判断する。GitHubの書き込み権限やEnvironment設定、Cloudflareの本番readは管理者が確認する。
+
+## 誤Deployment復旧の事前確認（2026-11-27）
+
+GitHub APIで `worker-development` 最新の誤Deployment `8107050354`、SHA `c3165603f31f9efd2cebe3ced87fcbcea7576551` が[診断run 45979397697 / job 140439145030](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45979397697/job/140439145030) に対応することを確認した。全statusは新しい順に `success`（ID 23297617226、10:07:28 UTC）、`in_progress`（23297614005）、`queued`（23297611248）、`waiting`（23297609562）。診断workflowはCloudflareへのGETのみを実行した。
+
+元の正常Deployment `7980952202`、SHA `99f6d146049133a1471bd62265089f5b65500563` は[公開run 45038169955 / job 137259637776](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45038169955/job/137259637776) に対応し、最新statusは `success`（ID 22861091348、2026-11-22 15:36:24 UTC）。過去statusは新しい順に `in_progress`（22861076849）、`queued`（22861075502、22861075273）、`waiting`（22861074385）で、inactiveへの変更は確認されなかった。元runのWorker公開・オンラインjobは成功。
+
+事前確認時、`pages-verified` HEADは `3c96a4ef4606d4890dd6c34bd0d0b59ece0b642c`、pendingはnullで、保存済み35ファイルと実配信のhashが一致した。queued・in_progress・waitingのActions runは0件。両Deploymentと全statusのAPI応答・診断workflow・台帳の写しは作業環境の `/tmp/issue69-deployment-recovery/` に保存した。Webhook一覧はGitHub APIがHTTP 403を返し、status変更による外部連携の有無を確認できなかった。削除・status変更は行っていない。
