@@ -10,13 +10,21 @@ const pipelinePaths = new Set([
   '.github/actions/pages-artifact-check/action.yml', '.github/actions/pages-artifact-check/index.cjs',
   '.github/actions/pages-artifact-check/package.json', '.github/actions/pages-artifact-check/package-lock.json',
   '.github/scripts/reuse-production-ci.mjs', '.github/scripts/audit-main-publication.mjs',
+  '.github/scripts/bootstrap-development-worker.mjs', '.github/scripts/check-browser-ui-matrix.mjs',
+  '.github/scripts/check-issue-publication-ci.mjs', '.github/scripts/check-issue-publication-site.mjs',
+  '.github/scripts/extract-pages-zip.py', '.github/scripts/inspect-development-worker.mjs',
+  '.github/scripts/issue67-recovery-preflight.mjs', '.github/scripts/timed-playwright-install.py',
+  '.github/scripts/validate-publication-mode.mjs', '.github/scripts/validate-publication-settings.mjs',
+  '.github/workflows/bootstrap-development-worker.yml', '.github/workflows/issue47-phase6a-live-audit.yml',
+  '.github/workflows/issue67-pages-recovery.yml', '.github/workflows/live-development-e2e.yml',
+  '.github/workflows/production-diagnostics.yml', '.github/workflows/production-live-audit.yml',
 ]);
 
 // This classifies product bytes, not whether changed CI or deployment code must be tested.
 // Rename detection is disabled so both the old and new paths are classified.
 export function pathImpact(file, environment = 'production') {
   if (!['production', 'development'].includes(environment) || typeof file !== 'string' || !file || file.startsWith('/') || file.split('/').includes('..')) return 'unknown';
-  if ((file.startsWith('docs/') && file.endsWith('.md')) || /^[^/]+\.md$/.test(file) || file.startsWith('tests/') || pipelinePaths.has(file)) return 'none';
+  if ((file.startsWith('docs/') && /\.(?:md|png|json|jsonl|txt|csv|log)$/.test(file)) || /^[^/]+\.md$/.test(file) || file.startsWith('tests/') || pipelinePaths.has(file)) return 'none';
   if (file === 'wrangler.jsonc') return environment === 'production' ? 'worker' : 'none';
   if (file === 'wrangler.development.jsonc') return environment === 'development' ? 'worker' : 'none';
   if (file === 'worker/development.ts' && environment === 'production') return 'none';

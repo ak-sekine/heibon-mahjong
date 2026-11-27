@@ -6,6 +6,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathImpact, planPublication } from '../.github/scripts/publication-plan.mjs';
 
+test('every tracked path is classified in each environment', () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const files = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+  assert.ok(files.length > 0, 'Tracked file listing is empty');
+  for (const environment of ['production', 'development']) {
+    assert.deepEqual(files.filter(file => pathImpact(file, environment) === 'unknown'), [], `${environment}: classify each tracked path explicitly`);
+  }
+});
+
 test('current Worker import graph never classifies a shared dependency as Pages only', () => {
   const root = path.resolve(import.meta.dirname, '..');
   const seen = new Set();
@@ -33,6 +42,16 @@ test('classifies product and tooling changes, including shared transitive import
   assert.equal(pathImpact('worker/development.ts', 'production'), 'none');
   assert.equal(pathImpact('worker/development.ts', 'development'), 'worker');
   assert.equal(pathImpact('.github/scripts/unclassified.mjs'), 'unknown');
+  assert.equal(pathImpact('docs/unclassified.js'), 'unknown');
+  assert.equal(pathImpact('docs/verification/result.png'), 'none');
+  // A deleted or renamed historical path still appears in a no-renames diff.
+  for (const file of [
+    '.github/scripts/check-browser-ui-matrix.mjs', '.github/scripts/check-issue-publication-ci.mjs',
+    '.github/scripts/check-issue-publication-site.mjs', '.github/scripts/extract-pages-zip.py',
+    '.github/scripts/issue67-recovery-preflight.mjs', '.github/scripts/validate-publication-settings.mjs',
+    '.github/workflows/issue67-pages-recovery.yml',
+  ]) assert.equal(pathImpact(file), 'none', file);
+  assert.equal(pathImpact('.github/scripts/deleted-unknown.mjs'), 'unknown');
   for (const file of ['pages-source-evidence.mjs', 'pages-predeploy-evidence.mjs', 'pages-resume-preflight.mjs', 'pages-resume-artifact.mjs']) {
     assert.equal(pathImpact(`.github/scripts/${file}`), 'none');
   }
