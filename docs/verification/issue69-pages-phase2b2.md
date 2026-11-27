@@ -40,3 +40,13 @@ node .github/scripts/pages-independent-recovery.mjs <pending-checkout> <parent-c
 ## 切替と未確認事項
 
 新旧 workflow ref 間の排他を候補 workflow だけで保証したとは扱わない。切替時は公開停止、旧 main・旧 ref の経路無効化、既存 pending の解消、実配信と両 snapshot の照合、Worker・Pages 基準の確認を実施する。Phase 2-B-1 の独立 Worker 記録がある環境では旧一体経路は停止したままとする。実サービスの Pages write・OIDC・Environment・contents write・Actions read 権限と実配信は未確認。旧 workflow ref からの競合、Cloudflare/GitHub 外部操作、Artifact の別 run への再アップロードと上限付き検索の接続は後続 Phase で検証する。
+
+### WebKit group 2 失敗調査（2026-11-27）
+
+[失敗run 46021197973](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46021197973/job/140581878590) の `browser-round-end-ui.py` は、320×480で対局結果を閉じた後の局結果再表示で失敗した。ログ上は `#show-result` が表示・有効で、pointerdown / mousedown / pointerup / mouseup は同じボタンに届いたが、clickは記録されず、再表示処理も呼ばれなかった。対象DOMの置換やJavaScriptエラーは記録されていない。押下前のフォーカスは `show-match-result`、押下後は `show-result` だった。
+
+テストはダイアログ表示中にviewportを320×320へ変更し、閉じる・キーボードで再表示・再度閉じる操作の後、320×480へ戻してクリックしている。ダイアログのcloseイベントにはフォーカス復元処理があるが、このサイズでは詳細な時系列トレースが有効でなく、close処理・viewport復元・フォーカスとclick不成立の因果関係は確認できない。Playwright/WebKit固有か実利用でも起こるかも判別できない。同じ公開SHAの [候補CI 46007635096](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46007635096)、[Worker公開 46010218955](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46010218955)、[Pages公開 46019125645](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46019125645) では同じWebKitシナリオが成功しているが、それだけで原因や再現性を確定できない。失敗Artifact 15208572340 の取得先は得られたが、アーカイブ取得はHTTP 403となり、診断JSON・スクリーンショットを個別に確認できなかった。
+
+原因をテスト固有と断定できないため、製品・テストの修正、根拠のない再試行およびauto実行は行わない。次の調査では保存済みArtifactをアクセス可能な方法で確認し、必要なら320×480に限定してclose・focus・viewport・pointer/clickの時系列を観測する。観測結果を基に実UIとテスト操作を区別してから最小修正を判断する。
+
+調査時点のGitHub記録では開発Worker独立Deployment 8111581288 は公開SHA `da1962ce27c500d9e01b998df2f0828794a7c1cd`、最新statusは `success` / `verified:132dd0c6-57e4-444b-9515-0bda6392ca2f`。Pages stateは開発の同SHA、本番 `8b66b925fad1eab2a773a512e0e36b9e87eb3b01`、pending null。Cloudflare稼働versionの今回の直接再確認や実配信の全ファイル再照合は行っていない。autoは候補SHA変更後の実行承認と、必須CI・直前の公開状態確認を必要とする。
