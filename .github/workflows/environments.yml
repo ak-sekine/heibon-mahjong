@@ -11,16 +11,16 @@ on:
         required: true
         type: boolean
         default: false
-      artifact_probe:
+      pages_resume:
+        description: Resume a proven pre-request Pages failure using its original verified artifact.
         type: boolean
         default: false
-      artifact_probe_run:
+      resume_snapshot:
+        description: Pending pages-verified commit to inspect.
         type: string
         required: false
-      artifact_probe_id:
-        type: string
-        required: false
-      artifact_probe_digest:
+      resume_parent:
+        description: Finalized parent of that pending commit.
         type: string
         required: false
       publication_target:
@@ -41,11 +41,14 @@ jobs:
     outputs:
       run_full_suite: ${{ steps.classify.outputs.run_full_suite }}
       classification: ${{ steps.classify.outputs.classification }}
+      resume: >-
+        ${{ github.repository == 'ak-sekine/heibon-mahjong' && github.event_name == 'workflow_dispatch'
+          && inputs.publish == true && inputs.pages_resume == true && inputs.publication_target == 'pages' }}
       reuse: >-
         ${{ github.repository == 'ak-sekine/heibon-mahjong'
           && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
           && inputs.publish == true && vars.DUAL_PAGES_ENABLED == 'true'
-          && inputs.production_validation == 'reuse' && inputs.publication_target != 'worker' && inputs.publication_target != 'auto' }}
+          && inputs.pages_resume != true && inputs.production_validation == 'reuse' && inputs.publication_target != 'worker' && inputs.publication_target != 'auto' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -95,7 +98,7 @@ jobs:
   verify:
     needs: classify-changes
     if: >-
-      ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && inputs.artifact_probe == true && inputs.publish == false) && needs.classify-changes.outputs.reuse != 'true'
+      ${{ !cancelled() && needs.classify-changes.outputs.reuse != 'true' && needs.classify-changes.outputs.resume != 'true'
         && (needs.classify-changes.result != 'success'
         || needs.classify-changes.outputs.run_full_suite != 'false') }}
     runs-on: ubuntu-latest
@@ -238,7 +241,7 @@ jobs:
           ONLINE_API_URL=http://127.0.0.1:8788 ONLINE_TEST_ORIGIN=http://localhost:5173 npm run test:online:production
   audit:
     needs: [classify-changes, docs-check, verify, browser-ui, isolation-browser, local-online]
-    if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.artifact_probe == true && inputs.publish == false) && needs.classify-changes.outputs.reuse != 'true' }}
+    if: ${{ always() && needs.classify-changes.outputs.reuse != 'true' && needs.classify-changes.outputs.resume != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -313,10 +316,10 @@ jobs:
         && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
           || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/')))
         && needs.classify-changes.result == 'success' && needs.docs-check.result == 'success'
-        && ((needs.classify-changes.outputs.reuse == 'true' && needs.verify.result == 'skipped'
+        && ((((needs.classify-changes.outputs.reuse == 'true' && inputs.pages_resume != true) || (needs.classify-changes.outputs.resume == 'true' && inputs.pages_resume == true && inputs.publication_target == 'pages')) && needs.verify.result == 'skipped'
             && needs.browser-ui.result == 'skipped' && needs.isolation-browser.result == 'skipped'
             && needs.local-online.result == 'skipped' && needs.audit.result == 'skipped')
-          || (needs.classify-changes.outputs.reuse == 'false' && needs.verify.result == 'success'
+          || (needs.classify-changes.outputs.reuse == 'false' && needs.classify-changes.outputs.resume != 'true' && inputs.pages_resume != true && needs.verify.result == 'success'
             && needs.browser-ui.result == 'success' && needs.isolation-browser.result == 'success'
             && needs.local-online.result == 'success' && needs.audit.result == 'success'
             && (github.ref != 'refs/heads/main' || inputs.production_validation == 'full' || inputs.publication_target == 'worker' || inputs.publication_target == 'auto'))) }}
@@ -330,75 +333,12 @@ jobs:
     uses: ./.github/workflows/publish-environments.yml
     with:
       reuse_production: ${{ needs.classify-changes.outputs.reuse == 'true' }}
+      pages_resume: ${{ needs.classify-changes.outputs.resume == 'true' }}
+      resume_snapshot: ${{ inputs.resume_snapshot || '' }}
+      resume_parent: ${{ inputs.resume_parent || '' }}
       publication_target: ${{ inputs.publication_target || 'auto' }}
       verified_artifact_id: ${{ github.ref_name == 'main' && needs.verify.outputs.pages_id || needs.verify.outputs.development_id }}
       verified_artifact_digest: ${{ github.ref_name == 'main' && needs.verify.outputs.pages_digest || needs.verify.outputs.development_digest }}
     secrets:
       CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ inputs.publication_target != 'pages' && inputs.publication_target != 'none' && github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_PRODUCTION_API_TOKEN || '' }}
       CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ inputs.publication_target != 'pages' && inputs.publication_target != 'none' && secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN || '' }}
-
-  artifact-wrapper-probe:
-    if: >-
-      ${{ github.event_name == 'workflow_dispatch' && inputs.publish == false && inputs.artifact_probe == true
-        && github.ref == 'refs/heads/issue/69-independent-publication-v2' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: source
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - name: Install pinned wrapper dependencies
-        run: npm ci --ignore-scripts --prefix source/.github/actions/pages-artifact-check
-      - name: Check original Artifact metadata and ZIP digest
-        if: ${{ inputs.artifact_probe_run != '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SOURCE_RUN: ${{ inputs.artifact_probe_run }}
-          SOURCE_ID: ${{ inputs.artifact_probe_id }}
-          SOURCE_DIGEST: ${{ inputs.artifact_probe_digest }}
-        run: |
-          set -euo pipefail
-          [[ "$SOURCE_RUN" =~ ^[0-9]+$ && "$SOURCE_ID" =~ ^[0-9]+$ && "$SOURCE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ID" > "$RUNNER_TEMP/probe-metadata.json"
-          jq -e --argjson id "$SOURCE_ID" --argjson run "$SOURCE_RUN" --arg digest "$SOURCE_DIGEST" '.id == $id and .workflow_run.id == $run and .digest == $digest and .expired == false' "$RUNNER_TEMP/probe-metadata.json"
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ID/zip" > "$RUNNER_TEMP/probe-source.zip"
-          printf '%s  %s\n' "${SOURCE_DIGEST#sha256:}" "$RUNNER_TEMP/probe-source.zip" | sha256sum -c -
-      - uses: actions/download-artifact@v4
-        if: ${{ inputs.artifact_probe_run != '' }}
-        with:
-          artifact-ids: ${{ inputs.artifact_probe_id }}
-          run-id: ${{ inputs.artifact_probe_run }}
-          github-token: ${{ github.token }}
-          merge-multiple: true
-          path: store/site
-      - name: Prepare or verify isolated fixture
-        env:
-          SOURCE_RUN: ${{ inputs.artifact_probe_run }}
-        run: |
-          set -euo pipefail
-          mkdir -p store/site/dev
-          if [[ -z "$SOURCE_RUN" ]]; then printf 'isolated production\n' > store/site/index.html; printf 'isolated development\n' > store/site/dev/index.html; fi
-          test "$(cat store/site/index.html)" = 'isolated production'
-          test "$(cat store/site/dev/index.html)" = 'isolated development'
-      - uses: actions/upload-artifact@v4
-        id: fixture
-        with:
-          name: issue69-wrapper-source-${{ github.run_id }}-${{ github.run_attempt }}
-          path: store/site
-          retention-days: 1
-      - uses: actions/upload-pages-artifact@v3
-        id: pages_upload
-        with:
-          path: store/site
-      - name: Run the actual wrapper without a Pages deployment
-        uses: ./source/.github/actions/pages-artifact-check
-        timeout-minutes: 3
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PAGES_ARTIFACT_ID: ${{ steps.pages_upload.outputs.artifact_id }}

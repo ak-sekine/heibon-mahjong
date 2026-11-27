@@ -184,9 +184,7 @@ test('configuration drift cannot publish a candidate bound to a different Worker
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('Worker deployment requires a fresh snapshot reserved by this run and attempt', () => {
-  const script = readFileSync(new URL('../.github/scripts/deploy-isolated-worker.mjs', import.meta.url), 'utf8')
-    .replace(/^import .*;$/gm, '');
+test('Pages reservation requires a fresh snapshot reserved by this run and attempt', () => {
   for (const [environment, branch, config] of [
     ['production', 'main', 'wrangler.jsonc'],
     ['development', 'develop', 'wrangler.development.jsonc'],
@@ -222,16 +220,7 @@ test('Worker deployment requires a fresh snapshot reserved by this run and attem
       };
       const deploy = (overrides = {}) => {
         const deploymentEnv = { ...env, ...overrides };
-        return vm.runInNewContext(script, {
-          process: { argv: ['node', 'script', environment, store], env: deploymentEnv },
-          publicationIdentity,
-          checkPublication: (dir, url) => checkPublication(dir, url, deploymentEnv, exec),
-          execFileSync: exec,
-          appendFileSync: (file, value) => {
-            assert.equal(file, 'output');
-            assert.equal(value, 'url=' + workerUrl + '\n');
-          },
-        });
+        return checkPublication(store, workerUrl, deploymentEnv, exec);
       };
       const prepare = (dir = candidate, overrides = {}) => preparePublication(store, dir, workerUrl, { ...env, ...overrides }, exec);
       const before = digest(inventory(store));
@@ -249,7 +238,6 @@ test('Worker deployment requires a fresh snapshot reserved by this run and attem
       assert.throws(() => deploy({ GITHUB_RUN_ID: '11' }), /does not belong/);
       assert.throws(() => deploy({ GITHUB_RUN_ATTEMPT: '2' }), /does not belong/);
       assert.throws(() => deploy({ GITHUB_EVENT_NAME: 'push' }), /branch or event/);
-      assert.throws(() => deploy({ CLOUDFLARE_ACCOUNT_ID: '' }), /Missing explicit/);
       remoteStore = 'e'.repeat(40);
       assert.throws(deploy, /Remote snapshot changed/);
       remoteStore = commit;
@@ -259,14 +247,14 @@ test('Worker deployment requires a fresh snapshot reserved by this run and attem
       assert.equal(digest(inventory(store)), reserved);
       assert.deepEqual(externalCalls, []);
 
-      deploy();
-      assert.deepEqual(externalCalls, [['npx', ['wrangler', 'deploy', '--config', config]]]);
+      assert.equal(deploy(), environment);
+      assert.deepEqual(externalCalls, []);
       finalize(store);
       const published = digest(inventory(store));
       assert.throws(() => prepare(), /already published/);
       assert.throws(deploy, /does not belong/);
       assert.equal(digest(inventory(store)), published);
-      assert.equal(externalCalls.length, 1);
+      assert.equal(externalCalls.length, 0);
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });

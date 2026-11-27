@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { inspectRecoverySnapshots, verifyRecoveryPublicSite } from '../../scripts/environments/pages-recovery.mjs';
 import { REQUIRED_ENVIRONMENT_JOBS } from './check-browser-ui-matrix.mjs';
 import { validateEvidence } from './reuse-production-ci.mjs';
+import { validatePagesSourceEvidence } from './pages-source-evidence.mjs';
 
 const SHA = /^[a-f0-9]{40}$/;
 export function verifyPagesRecoveryEvidence(evidence, expected) {
@@ -22,7 +23,7 @@ export function verifyPagesRecoveryEvidence(evidence, expected) {
   assert.equal(jobs[0].run_id, Number(expected.runId));
   assert.equal(jobs[0].run_attempt, Number(expected.attempt));
   assert.ok(Number.isSafeInteger(jobs[0].id) && jobs[0].id > 0, 'Invalid original Pages job ID');
-  const steps = jobs[0].steps?.filter(step => step.name === 'Run actions/deploy-pages@v4') || [];
+  const steps = jobs[0].steps?.filter(step => step.name === 'Run actions/deploy-pages@v4' || step.name === 'Run actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e') || [];
   assert.equal(steps.length, 1, 'Pages deploy step not unique');
   assert.equal(steps[0].conclusion, 'success', 'Pages deploy step did not confirm success');
   assert.match(expected.pagesDeploymentId || '', /^[a-zA-Z0-9_-]+$/);
@@ -35,7 +36,12 @@ export function verifyPagesRecoveryEvidence(evidence, expected) {
   assert.equal(deployment?.sha, expected.sha, 'Wrong GitHub Pages deployment SHA');
   assert.equal(deploymentStatus?.log_url, `https://github.com/${expected.repository}/actions/runs/${expected.runId}/job/${jobs[0].id}`, 'Pages deployment belongs to another job');
   assert.ok(belongs(ciRun), 'Source CI identity mismatch');
-  if (expected.sourceVerification) {
+  if (expected.pagesSource) {
+    const source = validatePagesSourceEvidence(expected.pagesSource, { environment: expected.environment, sha: expected.sha });
+    assert.equal(ciRun.id, source.runId); assert.equal(ciRun.run_attempt, source.attempt);
+    if (source.kind === 'production-reuse') { assert.equal(ciRun.event, 'push'); assert.equal(ciRun.conclusion, 'success'); }
+    else assert.equal(ciRun.event, 'workflow_dispatch');
+  } else if (expected.sourceVerification) {
     const source = validateEvidence(expected.sourceVerification);
     assert.equal(ciRun.id, source.runId); assert.equal(ciRun.run_attempt, source.attempt);
     assert.equal(ciRun.event, 'push'); assert.equal(ciRun.conclusion, 'success');
@@ -61,12 +67,12 @@ async function cli() {
   const pending = state.pending;
   assert.ok(pending && ['production', 'development'].includes(pending.environment));
   const record = pending.current[pending.environment], publication = record.publication;
-  const expected = { repository: env.GITHUB_REPOSITORY, snapshot: env.RECOVERY_SNAPSHOT, parent: env.RECOVERY_PARENT, sha: pending.sha, environment: pending.environment, workerUrl: record.workerUrl, siteDigest: pending.siteDigest, runId: pending.reservation.runId, attempt: pending.reservation.attempt, branch: pending.environment === 'production' ? 'main' : publication.sourceRef.slice('refs/heads/'.length), sourceVerification: publication?.sourceVerification, pagesDeploymentId: env.PAGES_DEPLOYMENT_ID };
+  const expected = { repository: env.GITHUB_REPOSITORY, snapshot: env.RECOVERY_SNAPSHOT, parent: env.RECOVERY_PARENT, sha: pending.sha, environment: pending.environment, workerUrl: record.workerUrl, siteDigest: pending.siteDigest, runId: pending.reservation.runId, attempt: pending.reservation.attempt, branch: pending.environment === 'production' ? 'main' : publication.sourceRef.slice('refs/heads/'.length), sourceVerification: publication?.sourceVerification, pagesSource: publication?.pagesSource, pagesDeploymentId: env.PAGES_DEPLOYMENT_ID };
   const rev = (dir, ref) => execFileSync('git', ['-C', dir, 'rev-parse', ref], { encoding: 'utf8' }).trim();
   const api = endpoint => JSON.parse(execFileSync('gh', ['api', `repos/${env.GITHUB_REPOSITORY}/${endpoint}`], { encoding: 'utf8' }));
   const jobs = (id, attempt) => { const response = api(`actions/runs/${id}/attempts/${attempt}/jobs?per_page=100`); assert.equal(response.total_count, response.jobs.length, 'Incomplete job list'); return response.jobs; };
-  const ciId = expected.sourceVerification?.runId ?? Number(expected.runId);
-  const ciAttempt = expected.sourceVerification?.attempt ?? Number(expected.attempt);
+  const ciId = expected.pagesSource?.runId ?? expected.sourceVerification?.runId ?? Number(expected.runId);
+  const ciAttempt = expected.pagesSource?.attempt ?? expected.sourceVerification?.attempt ?? Number(expected.attempt);
   const [deployment] = api('deployments?environment=github-pages&per_page=1');
   assert.ok(deployment?.id, 'Pages deployment not found');
   const originalJobs = jobs(expected.runId, expected.attempt);

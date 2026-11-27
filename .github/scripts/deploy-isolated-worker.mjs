@@ -1,22 +1,3 @@
-import { appendFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
-import { checkPublication, publicationIdentity } from './publication-reservation.mjs';
-if (process.argv[2] === 'independent') {
-  import('./worker-independent.mjs')
-    .then(({ runIndependentWorker }) => runIndependentWorker())
-    .catch(error => { console.error(error.message); process.exitCode = 1; });
-} else {
-  const env = process.argv[2];
-  if (!['production', 'development'].includes(env)) throw new Error('Invalid environment');
-  if (publicationIdentity(process.env).environment !== env) throw new Error('Wrong deployment branch');
-  if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID || !process.env.EXPECTED_WORKER_URL) throw new Error('Missing explicit deployment configuration');
-  const name = env === 'production' ? 'heibon-mahjong-online' : 'heibon-mahjong-online-dev';
-  const expected = process.env.EXPECTED_WORKER_URL;
-  if (!new RegExp('^https://' + name + '\\.[a-z0-9-]+\\.workers\\.dev$').test(expected)) throw new Error('Wrong configured Worker endpoint');
-  if (checkPublication(process.argv[3], expected) !== env) throw new Error('Wrong reserved Worker environment');
-  let output;
-  try { output = execFileSync('npx', ['wrangler', 'deploy', '--config', env === 'production' ? 'wrangler.jsonc' : 'wrangler.development.jsonc'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); }
-  catch { throw new Error('Wrangler failed; output suppressed to protect credentials. Check Cloudflare account setup.'); }
-  if (!output.includes(expected)) throw new Error('Deployed Worker URL differs from tested candidate');
-  appendFileSync(process.env.GITHUB_OUTPUT, 'url=' + expected + '\n');
-}
+import { runIndependentWorker } from './worker-independent.mjs';
+if (process.argv.length !== 3 || process.argv[2] !== 'independent') throw new Error('Only independent Worker publication is supported');
+await runIndependentWorker();

@@ -33,6 +33,9 @@ test('classifies product and tooling changes, including shared transitive import
   assert.equal(pathImpact('worker/development.ts', 'production'), 'none');
   assert.equal(pathImpact('worker/development.ts', 'development'), 'worker');
   assert.equal(pathImpact('.github/scripts/unclassified.mjs'), 'unknown');
+  for (const file of ['pages-source-evidence.mjs', 'pages-predeploy-evidence.mjs', 'pages-resume-preflight.mjs', 'pages-resume-artifact.mjs']) {
+    assert.equal(pathImpact(`.github/scripts/${file}`), 'none');
+  }
   for (const file of ['src/environment.ts', 'src/online/diagnostics.ts', 'src/rendering/pending-discard.ts']) assert.equal(pathImpact(file), 'both', file);
   assert.equal(pathImpact('scripts/environments/unknown.mjs'), 'unknown');
 });

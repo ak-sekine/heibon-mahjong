@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isIssueRef } from '../../scripts/environments/issue-ref.mjs';
 import { validateEvidence } from './reuse-production-ci.mjs';
+import { productionArtifactEvidence, validatePagesSourceEvidence } from './pages-source-evidence.mjs';
 import { digest, inventory, stage } from '../../scripts/environments/artifacts.mjs';
 
 export function publicationIdentity(env) {
@@ -48,7 +49,14 @@ export function preparePublication(store, candidate, workerUrl, env = process.en
     if (String(publication.sourceVerification.runId) === publication.runId) {
       throw new Error('Source and publication run must differ');
     }
+    if (env.PAGES_REQUIRE_EVIDENCE === 'true') publication.pagesSource = productionArtifactEvidence(publication.sourceVerification, publication.sha);
   } else if (env.SOURCE_VERIFICATION) throw new Error('Unexpected source verification evidence');
+  if (env.PAGES_SOURCE_EVIDENCE) {
+    if (publication.pagesSource) throw new Error('Duplicate Pages source evidence');
+    publication.pagesSource = validatePagesSourceEvidence(JSON.parse(env.PAGES_SOURCE_EVIDENCE), { environment: publication.environment, sha: publication.sha });
+    if (env.PAGES_RESUMING !== 'true' && (publication.pagesSource.kind !== 'full' || String(publication.pagesSource.runId) !== publication.runId || String(publication.pagesSource.attempt) !== publication.attempt)) throw new Error('Full source evidence belongs to another run');
+  }
+  if (env.PAGES_REQUIRE_EVIDENCE === 'true' && !publication.pagesSource) throw new Error('Missing Pages source evidence');
   stage(store, candidate, latestSha, workerUrl, publication);
 }
 

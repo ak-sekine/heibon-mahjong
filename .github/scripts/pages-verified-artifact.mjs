@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { appendFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkArchive } from './reuse-production-ci.mjs';
+import { fullArtifactEvidence } from './pages-source-evidence.mjs';
 
 export function verifyPagesArtifactMetadata(artifact, expected, now = Date.now()) {
   assert.ok(Number.isSafeInteger(expected.id) && expected.id > 0 && /^[a-f0-9]{64}$/.test(expected.digest || ''));
@@ -24,5 +25,7 @@ function main() {
   const bytes = execFileSync('gh', ['api', endpoint + '/zip'], { maxBuffer: 128 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
   checkArchive(bytes, 'sha256:' + expected.digest);
   writeFileSync(path.join(env.RUNNER_TEMP, 'pages-only-verified.zip'), bytes, { flag: 'wx' });
+  const evidence = fullArtifactEvidence({ environment: env.GITHUB_REF === 'refs/heads/main' ? 'production' : 'development', sha: env.GITHUB_SHA, runId: expected.runId, attempt: Number(env.GITHUB_RUN_ATTEMPT), metadata });
+  appendFileSync(env.GITHUB_OUTPUT, 'evidence=' + JSON.stringify(evidence) + '\n');
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) main();

@@ -2,6 +2,15 @@ name: Publish verified environment snapshots
 on:
   workflow_call:
     inputs:
+      pages_resume:
+        type: boolean
+        default: false
+      resume_snapshot:
+        type: string
+        default: ''
+      resume_parent:
+        type: string
+        default: ''
       verified_artifact_id:
         type: string
         default: ''
@@ -131,96 +140,94 @@ jobs:
           TARGET: ${{ inputs.publication_target }}
         run: |
           if [[ "$TARGET" == none ]]; then echo 'No publication: explicit none.' >> "$GITHUB_STEP_SUMMARY"; else echo 'No publication: automatic comparison found no changes.' >> "$GITHUB_STEP_SUMMARY"; fi
-  reserve:
-    needs: [worker-credentials, verify-production-source]
+  resume-preflight:
     if: >-
-      ${{ !cancelled() && false && inputs.publication_target == 'both' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) &&
-        needs.worker-credentials.result == 'success' &&
-        ((inputs.reuse_production && needs.verify-production-source.result == 'success') ||
-          (!inputs.reuse_production && needs.verify-production-source.result == 'skipped')) }}
+      ${{ !cancelled() && inputs.pages_resume && inputs.publication_target == 'pages'
+        && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true'
+        && (github.ref == 'refs/heads/main' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      deployment: false
     permissions:
       contents: write
       actions: read
+      pages: read
       deployments: read
     outputs:
-      snapshot: ${{ steps.reserve.outputs.snapshot }}
-      production_worker: ${{ steps.reserve.outputs.production_worker }}
+      evidence: ${{ steps.source.outputs.evidence }}
+      snapshot_digest: ${{ steps.source.outputs.snapshot_digest }}
     steps:
+      - name: Validate immutable recovery references
+        env:
+          RECOVERY_SNAPSHOT: ${{ inputs.resume_snapshot }}
+          RECOVERY_PARENT: ${{ inputs.resume_parent }}
+        run: |
+          [[ "$RECOVERY_SNAPSHOT" =~ ^[a-f0-9]{40}$ && "$RECOVERY_PARENT" =~ ^[a-f0-9]{40}$ && "$RECOVERY_SNAPSHOT" != "$RECOVERY_PARENT" ]]
       - uses: actions/checkout@v4
         with:
           path: source
+          fetch-depth: 0
           persist-credentials: false
-      - name: Fetch durable store (missing or unreadable must fail closed)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: pages-verified
           path: store
-          fetch-depth: 1
-      - uses: actions/download-artifact@v4
-        if: ${{ !inputs.reuse_production }}
+          fetch-depth: 0
+      - uses: actions/checkout@v4
         with:
-          name: ${{ github.ref_name == 'main' && 'pages-dist' || 'development-dist' }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: candidate
-      - uses: actions/download-artifact@v4
-        if: ${{ inputs.reuse_production }}
+          ref: ${{ inputs.resume_parent }}
+          path: previous
+          persist-credentials: false
+      - uses: actions/setup-node@v4
         with:
-          name: checked-production-zip-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/checked-production
-      - name: Prevent the legacy route from bypassing independent Worker records
+          node-version: '24'
+      - name: Verify original CI, pre-request failure, snapshots and live Pages
+        run: node source/.github/scripts/pages-resume-preflight.mjs store previous
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          environment=development
-          if [[ "$GITHUB_REF" == refs/heads/main ]]; then environment=production; fi
-          count="$(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=heibon-independent-worker-$environment&per_page=1" --jq 'length')"
-          if [[ "$count" != 0 ]]; then
-            echo '::error::Independent Worker records exist; the legacy combined route must not bypass them.'
-            exit 1
-          fi
-      - name: Reserve the verified snapshot before deploying the Worker
-        id: reserve
+          RECOVERY_SNAPSHOT: ${{ inputs.resume_snapshot }}
+          RECOVERY_PARENT: ${{ inputs.resume_parent }}
+          EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+      - name: Restore the finalized parent without deleting history
         env:
           GH_TOKEN: ${{ github.token }}
-          REUSE_PRODUCTION: ${{ inputs.reuse_production }}
-          SOURCE_VERIFICATION: ${{ needs.verify-production-source.outputs.evidence }}
-          EXPECTED_WORKER_URL: ${{ github.ref_name == 'main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+          RECOVERY_SNAPSHOT: ${{ inputs.resume_snapshot }}
+          RECOVERY_PARENT: ${{ inputs.resume_parent }}
         run: |
           set -euo pipefail
-          if [[ "$REUSE_PRODUCTION" == true ]]; then
-            archive="$RUNNER_TEMP/checked-production/verified-pages.zip"
-            node source/.github/scripts/reuse-production-ci.mjs check-zip "$archive"
-            python3 source/.github/scripts/extract-pages-zip.py "$archive" candidate
-          fi
-          if [[ "$GITHUB_REF" == refs/heads/issue/* ]]; then
-            node source/.github/scripts/check-issue-publication-ci.mjs
-            production_worker="$(node source/.github/scripts/check-issue-publication-site.mjs worker store)"
-            printf 'production_worker=%s\n' "$production_worker" >> "$GITHUB_OUTPUT"
-            node source/.github/scripts/check-issue-publication-site.mjs bytes store
-          fi
-          node source/.github/scripts/publication-reservation.mjs prepare store candidate
+          [[ "$RECOVERY_SNAPSHOT" =~ ^[a-f0-9]{40}$ && "$RECOVERY_PARENT" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git -C store rev-parse HEAD)" = "$RECOVERY_SNAPSHOT"
+          test "$(git -C store rev-parse HEAD^)" = "$RECOVERY_PARENT"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/pages-verified" --jq .object.sha)" = "$RECOVERY_SNAPSHOT"
           git -C store config user.name github-actions[bot]
           git -C store config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git -C store add state.json site
-          git -C store commit -m "Stage $GITHUB_REF_NAME $GITHUB_SHA for Pages (pending)"
-          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$GITHUB_REF_NAME" --jq .object.sha)"
-          test "$latest_sha" = "$GITHUB_SHA"
-          if [[ "$GITHUB_REF" == refs/heads/issue/* ]]; then
-            # Keep the source commit reachable after the temporary branch is removed.
-            git -C store fetch --no-tags origin "$GITHUB_REF"
-            test "$(git -C store rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
-            git -C store push --atomic origin HEAD:pages-verified "$GITHUB_SHA:refs/tags/verified/development/$GITHUB_SHA"
-          else
-            git -C store push origin HEAD:pages-verified
-          fi
-          printf 'snapshot=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git -C store revert --no-commit "$RECOVERY_SNAPSHOT"
+          git -C store diff --exit-code "$RECOVERY_PARENT" -- .
+          git -C store commit -m "Restore confirmed Pages snapshot before retrying $RECOVERY_SNAPSHOT"
+          git -C store push origin HEAD:pages-verified
+      - name: Download and revalidate the original verified Artifact
+        id: source
+        run: node source/.github/scripts/pages-resume-artifact.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_DIR: ${{ github.workspace }}/source
+          RESUME_CANDIDATE: ${{ runner.temp }}/pages-resume-candidate
+          EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pages-resume-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pages-resume-candidate
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
   pages-only:
-    needs: [worker-credentials, verify-production-source, plan-auto]
+    needs: [worker-credentials, verify-production-source, plan-auto, resume-preflight]
     if: >-
       ${{ !cancelled() && (inputs.publication_target == 'pages' || inputs.publication_target == 'both' || (inputs.publication_target == 'auto' && needs.plan-auto.result == 'success' && needs.plan-auto.outputs.pages == 'true'))
         && ((inputs.publication_target == 'pages' && needs.worker-credentials.result == 'skipped') || (inputs.publication_target != 'pages' && needs.worker-credentials.result == 'success'))
         && ((inputs.reuse_production && needs.verify-production-source.result == 'success') || (!inputs.reuse_production && needs.verify-production-source.result == 'skipped'))
+        && ((inputs.pages_resume && needs.resume-preflight.result == 'success') || (!inputs.pages_resume && needs.resume-preflight.result == 'skipped'))
         && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true'
         && (github.ref == 'refs/heads/main' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
     runs-on: ubuntu-latest
@@ -266,7 +273,8 @@ jobs:
           path: store
           fetch-depth: 0
       - name: Verify the original same-run Artifact ZIP and identity
-        if: ${{ !inputs.reuse_production }}
+        id: candidate_evidence
+        if: ${{ !inputs.reuse_production && !inputs.pages_resume }}
         run: |
           set -euo pipefail
           node source/.github/scripts/pages-verified-artifact.mjs
@@ -275,6 +283,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERIFIED_ARTIFACT_ID: ${{ inputs.verified_artifact_id }}
           VERIFIED_ARTIFACT_DIGEST: ${{ inputs.verified_artifact_digest }}
+      - uses: actions/download-artifact@v4
+        if: ${{ inputs.pages_resume }}
+        with:
+          name: pages-resume-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: candidate
+      - name: Verify the resumed candidate against the original sealed snapshot
+        if: ${{ inputs.pages_resume }}
+        run: node source/.github/scripts/pages-resume-artifact.mjs candidate candidate
+        env:
+          PAGES_SOURCE_EVIDENCE: ${{ needs.resume-preflight.outputs.evidence }}
+          RESUME_SNAPSHOT_DIGEST: ${{ needs.resume-preflight.outputs.snapshot_digest }}
+          EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
       - uses: actions/download-artifact@v4
         if: ${{ inputs.reuse_production }}
         with:
@@ -286,6 +306,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REUSE_PRODUCTION: ${{ inputs.reuse_production }}
           SOURCE_VERIFICATION: ${{ needs.verify-production-source.outputs.evidence }}
+          PAGES_SOURCE_EVIDENCE: ${{ inputs.pages_resume && needs.resume-preflight.outputs.evidence || steps.candidate_evidence.outputs.evidence }}
+          PAGES_RESUMING: ${{ inputs.pages_resume }}
+          PAGES_REQUIRE_EVIDENCE: 'true'
           EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
         run: |
           set -euo pipefail
@@ -333,7 +356,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PAGES_ARTIFACT_ID: ${{ steps.pages_upload.outputs.artifact_id }}
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
         id: deploy
       - name: Verify served bytes and both pinned snapshots
         run: |
@@ -450,233 +473,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           WORKER_DEPLOYMENT_ID: ${{ steps.worker.outputs.deployment }}
           WORKER_VERSION: ${{ steps.worker.outputs.version }}
-  worker-production:
-    needs: reserve
-    if: ${{ !cancelled() && needs.reserve.result == 'success' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' }}
-    runs-on: ubuntu-latest
-    concurrency:
-      group: worker-production
-      cancel-in-progress: false
-    environment: worker-production
-    outputs:
-      url: ${{ steps.deploy.outputs.url }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.reserve.outputs.snapshot }}
-          path: store
-          persist-credentials: false
-      - id: deploy
-        run: node .github/scripts/deploy-isolated-worker.mjs production store
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PUBLICATION_SNAPSHOT: ${{ needs.reserve.outputs.snapshot }}
-          EXPECTED_WORKER_URL: ${{ vars.PRODUCTION_WORKER_URL }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-  worker-development:
-    needs: reserve
-    if: ${{ !cancelled() && needs.reserve.result == 'success' && (github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' }}
-    runs-on: ubuntu-latest
-    concurrency:
-      group: worker-development
-      cancel-in-progress: false
-    environment: worker-development
-    outputs:
-      url: ${{ steps.deploy.outputs.url }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.reserve.outputs.snapshot }}
-          path: store
-          persist-credentials: false
-      - id: deploy
-        run: node .github/scripts/deploy-isolated-worker.mjs development store
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PUBLICATION_SNAPSHOT: ${{ needs.reserve.outputs.snapshot }}
-          EXPECTED_WORKER_URL: ${{ vars.DEVELOPMENT_WORKER_URL }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-  online:
-    outputs:
-      worker_url: ${{ needs.worker-production.outputs.url || needs.worker-development.outputs.url }}
-    needs: [reserve, worker-production, worker-development]
-    if: >-
-      ${{ !cancelled() && (
-        (github.ref == 'refs/heads/main' && needs.worker-production.result == 'success' && needs.worker-development.result == 'skipped')
-        || ((github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) && needs.worker-development.result == 'success' && needs.worker-production.result == 'skipped')
-      ) }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.reserve.outputs.snapshot }}
-          path: store
-          persist-credentials: false
-      - name: Verify the reservation before testing the deployed Worker
-        run: node .github/scripts/publication-reservation.mjs ${{ github.ref == 'refs/heads/main' && 'check-production-continuation' || 'check' }} store
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PUBLICATION_SNAPSHOT: ${{ needs.reserve.outputs.snapshot }}
-          EXPECTED_WORKER_URL: ${{ needs.worker-production.outputs.url || needs.worker-development.outputs.url }}
-      - run: npm run test:online:production
-        env:
-          ONLINE_API_URL: ${{ needs.worker-production.outputs.url || needs.worker-development.outputs.url }}
-          ONLINE_TEST_ORIGIN: https://ak-sekine.github.io
-          ONLINE_SECONDARY_TEST_ORIGIN: ${{ github.ref_name == 'main' && 'https://html-classic.itch.zone' || '' }}
-      - name: Build independent production itch ZIP with the deployed endpoint
-        if: github.ref_name == 'main'
-        run: npm run build:itch
-        env:
-          VITE_ONLINE_API_URL: ${{ vars.PRODUCTION_WORKER_URL }}
-      - name: Save production itch ZIP
-        if: github.ref_name == 'main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: itch-html5-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/itch/heibon-mahjong.zip
-          if-no-files-found: error
-          retention-days: 90
-  publish:
-    needs: [reserve, online]
-    if: ${{ !cancelled() && needs.reserve.result == 'success' && needs.online.result == 'success' }}
-    runs-on: ubuntu-latest
-    outputs:
-      finalized: ${{ steps.finalize.outputs.commit }}
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-      deployments: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: source
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.reserve.outputs.snapshot }}
-          path: store
-          fetch-depth: 1
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: store/site
-      - name: Recheck reservation immediately before publication
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PUBLICATION_SNAPSHOT: ${{ needs.reserve.outputs.snapshot }}
-          EXPECTED_WORKER_URL: ${{ needs.online.outputs.worker_url }}
-        run: node source/.github/scripts/publication-reservation.mjs ${{ github.ref == 'refs/heads/main' && 'check-production-continuation' || 'check' }} store
-      - name: Confirm production Worker still matches the preflight deployment
-        if: startsWith(github.ref, 'refs/heads/issue/')
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PRODUCTION_WORKER: ${{ needs.reserve.outputs.production_worker }}
-        run: test "$(node source/.github/scripts/check-issue-publication-site.mjs worker store)" = "$PRODUCTION_WORKER"
-      - uses: actions/deploy-pages@v4
-        id: deploy
-      - name: Verify served snapshot and unchanged production Worker
-        if: startsWith(github.ref, 'refs/heads/issue/')
-        env:
-          PUBLICATION_SNAPSHOT: ${{ needs.reserve.outputs.snapshot }}
-          EXPECTED_WORKER_URL: ${{ needs.online.outputs.worker_url }}
-          GH_TOKEN: ${{ github.token }}
-          PRODUCTION_WORKER: ${{ needs.reserve.outputs.production_worker }}
-        run: |
-          node source/.github/scripts/check-issue-publication-site.mjs bytes store
-          test "$(node source/.github/scripts/check-issue-publication-site.mjs worker store)" = "$PRODUCTION_WORKER"
-          node source/.github/scripts/publication-reservation.mjs check store
-      - name: Confirm snapshot after successful Pages deployment
-        id: finalize
-        run: |
-          set -euo pipefail
-          node source/scripts/environments/artifacts.mjs finalize store
-          git -C store config user.name github-actions[bot]
-          git -C store config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git -C store add state.json
-          git -C store commit -m "Confirm Pages $GITHUB_REF_NAME $GITHUB_SHA"
-          git -C store push origin HEAD:pages-verified
-          printf 'commit=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Report Pages deployment and ledger finalization separately
-        if: ${{ always() }}
-        env:
-          PAGES_OUTCOME: ${{ steps.deploy.outcome }}
-          FINALIZE_OUTCOME: ${{ steps.finalize.outcome }}
-          FINALIZED_COMMIT: ${{ steps.finalize.outputs.commit }}
-        run: |
-          report() {
-            case "$2" in
-              success) printf '%s: confirmed by this run.\n' "$1" ;;
-              skipped|'') printf '%s: step did not run.\n' "$1" ;;
-              *) printf '%s: unconfirmed (%s). Check live state before retrying.\n' "$1" "$2" ;;
-            esac
-          }
-          {
-            report 'Pages deployment' "$PAGES_OUTCOME"
-            report 'Ledger finalization' "$FINALIZE_OUTCOME"
-            if [[ "$FINALIZE_OUTCOME" == success ]]; then
-              printf 'Finalized snapshot: `%s`\n' "$FINALIZED_COMMIT"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-  audit-production:
-    needs: publish
-    # The unselected Worker job is an intentionally skipped ancestor.
-    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && needs.publish.result == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      deployments: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.publish.outputs.finalized }}
-          path: store
-          persist-credentials: false
-      - name: Audit finalized production separately from deployment
-        env:
-          GH_TOKEN: ${{ github.token }}
-          FINALIZED_SNAPSHOT: ${{ needs.publish.outputs.finalized }}
-        run: node .github/scripts/audit-main-publication.mjs store
-
-  check-publication-completion:
-    needs: [reserve, publish, audit-production]
-    if: >-
-      ${{ !cancelled() && needs.reserve.result == 'success'
-        && (needs.publish.result != 'success'
-          || (github.ref == 'refs/heads/main' && needs.audit-production.result != 'success')) }}
-    runs-on: ubuntu-latest
-    permissions: {}
-    steps:
-      - name: Report incomplete publication
-        run: exit 1
-
   check-worker-only-completion:
     needs: [worker-only, plan-auto]
     if: ${{ !cancelled() && (inputs.publication_target == 'worker' || inputs.publication_target == 'both' || (inputs.publication_target == 'auto' && needs.plan-auto.outputs.worker == 'true')) && needs.worker-only.result != 'success' }}
@@ -713,3 +509,11 @@ jobs:
             if [[ "$TARGET" == auto ]]; then printf 'Automatic comparison: `%s` (planning: `%s`)\n' "${CLASSIFICATION:-unknown}" "$PLAN_RESULT"; fi
             printf 'Pages publication: `%s`; Pages audit: `%s`; Worker publication and online verification: `%s`.\n' "$PAGES_RESULT" "$PAGES_AUDIT_RESULT" "$WORKER_RESULT"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  check-resume-completion:
+    needs: [resume-preflight]
+    if: ${{ !cancelled() && inputs.pages_resume && needs.resume-preflight.result != 'success' }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - run: exit 1

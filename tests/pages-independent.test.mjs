@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -94,4 +95,62 @@ test('same-run artifact identity, ZIP digest metadata and expiry are required', 
   for (const bad of [{ ...metadata, id: 78 }, { ...metadata, digest: 'sha256:' + 'b'.repeat(64) }, { ...metadata, expired: true }, { ...metadata, workflow_run: { id: 112, head_sha: sha } }, { ...metadata, name: expected.name + '-2' }]) {
     assert.throws(() => verifyPagesArtifactMetadata(bad, expected));
   }
+});
+
+test('resumed candidate must match the original sealed snapshot and source identity', async () => {
+  const { verifyResumeCandidate } = await import('../.github/scripts/pages-resume-artifact.mjs');
+  const { digest } = await import('../scripts/environments/artifacts.mjs');
+  const f = setup('production');
+  try {
+    const source = { version: 1, kind: 'full', environment: 'production', sha, runId: 111, attempt: 1, artifactId: 77, digest: 'sha256:' + 'b'.repeat(64), name: `pages-dist-${sha}-1`, expiresAt: '2099-01-01T00:00:00Z' };
+    const expected = digest(inventory(f.candidate));
+    assert.equal(verifyResumeCandidate(f.candidate, source, expected, urls.production).sha, sha);
+    assert.throws(() => verifyResumeCandidate(f.candidate, source, 'f'.repeat(64), urls.production), /differs/);
+    assert.throws(() => verifyResumeCandidate(f.candidate, source, expected, urls.development));
+    writeFileSync(path.join(f.candidate, 'index.html'), 'tampered');
+    assert.throws(() => verifyResumeCandidate(f.candidate, source, expected, urls.production));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test('a proven pre-request failure can be reverted and restaged under a new run while preserving the original CI evidence', async () => {
+  const { digest } = await import('../scripts/environments/artifacts.mjs');
+  const { verifyResumeSnapshots } = await import('../.github/scripts/pages-resume-preflight.mjs');
+  const f = setup('production');
+  const source = { version: 1, kind: 'full', environment: 'production', sha, runId: 111, attempt: 1, artifactId: 77, digest: 'sha256:' + 'b'.repeat(64), name: `pages-dist-${sha}-1`, expiresAt: '2099-01-01T00:00:00Z' };
+  const runGit = (...args) => execFileSync('git', args, { cwd: f.store, encoding: 'utf8' }).trim();
+  try {
+    runGit('init', '-q'); runGit('config', 'user.name', 'Fixture'); runGit('config', 'user.email', 'fixture@example.invalid');
+    runGit('add', '.'); runGit('commit', '-qm', 'finalized parent'); const parent = runGit('rev-parse', 'HEAD');
+    const original = { environment: 'production', sha, runId: '111', attempt: '1', pagesSource: source };
+    stage(f.store, f.candidate, sha, urls.production, original); runGit('add', '.'); runGit('commit', '-qm', 'old pending'); const pending = runGit('rev-parse', 'HEAD');
+    const pendingState = JSON.parse(readFileSync(path.join(f.store, 'state.json')));
+    const expected = { environment: 'production', sha, workerUrl: urls.production, siteDigest: pendingState.pending.siteDigest, runId: '111', attempt: '1' };
+    await verifyResumeSnapshots({ store: f.store, previousStore: f.previous, expected, get: f.serve(f.previous) });
+    await assert.rejects(verifyResumeSnapshots({ store: f.store, previousStore: f.previous, expected, get: f.serve(f.store) }), /bytes differ/);
+    runGit('revert', '--no-commit', pending); runGit('diff', '--exit-code', parent, '--', '.'); runGit('commit', '-qm', 'revert old pending');
+    assert.equal(JSON.parse(readFileSync(path.join(f.store, 'state.json'))).pending, null);
+    const env = { ...context('production'), GITHUB_RUN_ID: '222', PAGES_RESUMING: 'true', PAGES_REQUIRE_EVIDENCE: 'true', PAGES_SOURCE_EVIDENCE: JSON.stringify(source) };
+    const exec = () => sha;
+    await preparePages(f.store, repo, f.candidate, env, f.serve(f.previous), exec, gitFixture);
+    const next = JSON.parse(readFileSync(path.join(f.store, 'state.json')));
+    assert.deepEqual(next.pending.reservation, { runId: '222', attempt: '1' });
+    assert.deepEqual(next.pending.current.production.publication.pagesSource, source);
+    assert.equal(digest(inventory(f.candidate)), next.pending.current.production.snapshotDigest);
+    await verifyStaged({ store: f.store, previousStore: f.previous, env, get: f.serve(f.store) });
+    finalize(f.store);
+    assert.equal(JSON.parse(readFileSync(path.join(f.store, 'state.json'))).current.production.sha, sha);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test('reconciliation of a successful resumed run checks the separate original full CI', () => {
+  const source = { version: 1, kind: 'full', environment: 'production', sha, runId: 111, attempt: 1, artifactId: 77, digest: 'sha256:' + 'b'.repeat(64), name: `pages-dist-${sha}-1`, expiresAt: '2099-01-01T00:00:00Z' };
+  const expected = { snapshot: '1'.repeat(40), parent: '2'.repeat(40), sha, environment: 'production', branch: 'main', repository: 'ak-sekine/heibon-mahjong', runId: '222', attempt: '1', pagesDeploymentId: 'dep-222', pagesSource: source };
+  const run = id => ({ id, run_attempt: 1, head_sha: sha, head_branch: 'main', event: 'workflow_dispatch', status: 'completed', repository: { full_name: expected.repository }, head_repository: { full_name: expected.repository }, path: '.github/workflows/environments.yml' });
+  const evidence = { ledgerHead: expected.snapshot, snapshotHead: expected.snapshot, snapshotParent: expected.parent, parentHead: expected.parent,
+    originalRun: run(222), ciRun: run(111), originalJobs: [{ name: 'publish / pages-only', id: 5, run_id: 222, run_attempt: 1, steps: [{ name: 'Run actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e', conclusion: 'success' }] }],
+    ciJobs: REQUIRED_ENVIRONMENT_JOBS.map(name => ({ name, run_id: 111, run_attempt: 1, head_sha: sha, conclusion: 'success' })), deployment: { sha },
+    deploymentStatus: { log_url: `https://github.com/${expected.repository}/actions/runs/222/job/5` }, pagesStatus: { status: 'succeed' }, originalJobLog: `Created deployment for ${sha}, ID: dep-222\n` };
+  verifyPagesRecoveryEvidence(evidence, expected);
+  assert.throws(() => verifyPagesRecoveryEvidence({ ...evidence, ciRun: run(222) }, expected));
+  assert.throws(() => verifyPagesRecoveryEvidence({ ...evidence, ciJobs: evidence.ciJobs.map(job => ({ ...job, run_id: 222 })) }, expected));
 });

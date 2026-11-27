@@ -30,19 +30,19 @@ function jobCondition(workflow, id) {
   assert.match(expression, /^\$\{\{[\s\S]*\}\}$/);
   return expression.slice(3, -2).trim();
 }
-function workflowContext({ branch = 'develop', repository = 'ak-sekine/heibon-mahjong', ref = `refs/heads/${branch}`, event = 'workflow_dispatch', publish = true, dualPages = 'true', canceled = false, results = {}, fullSuite = 'true', reuse = 'false', reuseProduction = false, productionValidation = 'full', publicationTarget = 'both', autoPages = 'false', autoWorker = 'false', autoClassification = 'none' } = {}) {
+function workflowContext({ branch = 'develop', repository = 'ak-sekine/heibon-mahjong', ref = `refs/heads/${branch}`, event = 'workflow_dispatch', publish = true, dualPages = 'true', canceled = false, results = {}, fullSuite = 'true', reuse = 'false', reuseProduction = false, productionValidation = 'full', publicationTarget = 'both', pagesResume = false, autoPages = 'false', autoWorker = 'false', autoClassification = 'none' } = {}) {
   const jobResults = {
     'classify-changes': 'success', 'docs-check': 'success', verify: 'success', 'browser-ui': 'success', 'isolation-browser': 'success',
-    'local-online': 'success', audit: 'success', 'worker-credentials': 'success', 'verify-production-source': 'skipped', 'plan-auto': 'skipped', ...results,
+    'local-online': 'success', audit: 'success', 'worker-credentials': 'success', 'verify-production-source': 'skipped', 'plan-auto': 'skipped', 'resume-preflight': 'skipped', ...results,
   };
   return {
     github: { ref, event_name: event, repository },
     startsWith: (value, prefix) => value.startsWith(prefix),
-    inputs: { publish, reuse_production: reuseProduction, production_validation: productionValidation, publication_target: publicationTarget },
+    inputs: { publish, reuse_production: reuseProduction, production_validation: productionValidation, publication_target: publicationTarget, pages_resume: pagesResume },
     vars: { DUAL_PAGES_ENABLED: dualPages },
     needs: Object.fromEntries(Object.entries(jobResults).map(([name, result]) => [name, {
       result,
-      outputs: name === 'classify-changes' ? { run_full_suite: fullSuite, reuse } : name === 'plan-auto' ? { pages: autoPages, worker: autoWorker, classification: autoClassification } : {},
+      outputs: name === 'classify-changes' ? { run_full_suite: fullSuite, reuse, resume: String(pagesResume && publicationTarget === 'pages' && publish && event === 'workflow_dispatch') } : name === 'plan-auto' ? { pages: autoPages, worker: autoWorker, classification: autoClassification } : {},
     }])),
     always: () => true,
     success: () => true,
@@ -72,44 +72,6 @@ test('production and development configs bind their own DO namespace, with no ex
     assert.deepEqual(config.migrations, prod.migrations);
   }
 });
-test('development worker job never references production token, and push cannot publish during migration', () => {
-  const workflow = read('.github/workflows/environments.yml');
-  const audit = workflow.split('  audit:')[1].split('  worker-production:')[0];
-  assert.match(audit, /if: \$\{\{ always\(\) && needs.classify-changes.outputs.reuse != 'true' \}\}/);
-  assert.match(audit, /Audit all four Browser UI groups/);
-  assert.match(audit, /Confirm intentional docs-only skips/);
-  assert(workflow.includes('test -s artifacts/itch/heibon-mahjong.zip'));
-  assert(workflow.includes('node scripts/environments/artifacts.mjs verify dist'));
-  assert(workflow.includes('node scripts/environments/artifacts.mjs verify dist-dev'));
-  const publisher = read('.github/workflows/publish-environments.yml');
-  const dev = jobSection(publisher, 'worker-development');
-  assert(!dev.includes('CLOUDFLARE_PRODUCTION_API_TOKEN'));
-  assert(!dev.includes('wrangler.jsonc'));
-  assert(dev.includes("github.ref == 'refs/heads/develop'"));
-  const prod = jobSection(publisher, 'worker-production');
-  assert(prod.includes("github.ref == 'refs/heads/main'"));
-  assert(prod.includes('environment: worker-production'));
-  assert(dev.includes('environment: worker-development'));
-  for (const job of [prod, dev]) assert(job.includes('CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}'));
-  assert(!workflow.includes('CLOUDFLARE_PRODUCTION_ACCOUNT_ID'));
-  assert(!workflow.includes('CLOUDFLARE_DEVELOPMENT_ACCOUNT_ID'));
-  assert.match(publisher, /^concurrency:\n  group: pages-publication\n  cancel-in-progress: false\njobs:/m);
-  assert.equal(publisher.match(/group: pages-publication/g)?.length, 1);
-  const reserve = jobSection(publisher, 'reserve');
-  assert(reserve.indexOf('publication-reservation.mjs prepare') < reserve.indexOf('git -C store push origin HEAD:pages-verified'));
-  assert(reserve.indexOf('git -C store push origin HEAD:pages-verified') < reserve.indexOf("printf 'snapshot="));
-  for (const job of [prod, dev]) {
-    assert.match(job, /needs: reserve/);
-    assert.match(job, /PUBLICATION_SNAPSHOT: \$\{\{ needs.reserve.outputs.snapshot \}\}/);
-  }
-  const pages = jobSection(publisher, 'publish');
-  assert.match(pages, /needs: \[reserve, online\]/);
-  assert.match(pages, /EXPECTED_WORKER_URL: \$\{\{ needs.online.outputs.worker_url \}\}/);
-  const reservationCheck = pages.indexOf('run: node source/.github/scripts/publication-reservation.mjs');
-  assert(reservationCheck >= 0 && reservationCheck < pages.indexOf('uses: actions/deploy-pages@v4'));
-  assert(pages.indexOf('artifacts.mjs finalize') > pages.indexOf('uses: actions/deploy-pages@v4'));
-});
-
 test('publication mode accepts unset, false, and true, rejects other values, and logs no raw value', () => {
   const workflow = read('.github/workflows/environments.yml');
   assert.equal(publicationMode(undefined), 'disabled (unset)');
@@ -123,143 +85,6 @@ test('publication mode accepts unset, false, and true, rejects other values, and
   assert(workflow.includes('node .github/scripts/validate-publication-mode.mjs | tee -a "$GITHUB_STEP_SUMMARY"'));
   assert.doesNotMatch(workflow, /echo .*DUAL_PAGES_ENABLED/);
   assert.match(read('.github/scripts/validate-publication-mode.mjs'), /Publication mode:/);
-});
-
-test('publisher forwards only the two declared Worker secrets and checks the selected environment before reservation', () => {
-  const caller = jobSection(read('.github/workflows/environments.yml'), 'publish');
-  const publisher = read('.github/workflows/publish-environments.yml');
-  const credentials = jobSection(publisher, 'worker-credentials');
-  const reserve = jobSection(publisher, 'reserve');
-  const checkScript = credentials.match(/^\s+run: \|\n([\s\S]+)$/m)?.[1];
-  const callerSecrets = caller.split('\n    secrets:\n')[1];
-  assert(checkScript);
-  assert(callerSecrets);
-  assert.match(credentials, /deployment: false/);
-  assert.match(reserve, /^    needs: \[worker-credentials, verify-production-source\]$/m);
-  assert.match(jobCondition(publisher, 'reserve'), /needs.worker-credentials.result == 'success'/);
-  const evaluate = (key, context) => {
-    const binding = credentials.split('\n').find(line => line.trimStart().startsWith(key + ':'));
-    assert(binding, key);
-    const expression = binding.trim().slice(key.length + ': ${{ '.length, -' }}'.length);
-    return runInNewContext(expression, context, { timeout: 100 });
-  };
-  const names = ['CLOUDFLARE_PRODUCTION_API_TOKEN', 'CLOUDFLARE_DEVELOPMENT_API_TOKEN'];
-  assert.deepEqual(callerSecrets.trim().split('\n').map(line => line.trim()), [
-    "CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ inputs.publication_target != 'pages' && inputs.publication_target != 'none' && github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_PRODUCTION_API_TOKEN || '' }}",
-    "CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ inputs.publication_target != 'pages' && inputs.publication_target != 'none' && secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN || '' }}",
-  ]);
-
-  for (const [branch, environment, name] of [
-    ['main', 'worker-production', names[0]],
-    ['develop', 'worker-development', names[1]],
-  ]) {
-    assert(publisher.split('\njobs:\n')[0].includes('      ' + name + ':\n        required: true'));
-    assert(jobSection(publisher, environment).includes('CLOUDFLARE_API_TOKEN: ${{ secrets.' + name + ' }}'));
-    const context = workflowContext({ branch });
-    assert.equal(evaluate('name', context), environment);
-    assert.equal(evaluate('TOKEN_NAME', context), name);
-    for (const available of [false, true]) {
-      const dummy = 'mock-token-not-for-output';
-      const secrets = Object.fromEntries(names.map(key => [key, key === name && !available ? '' : dummy]));
-      const token = evaluate('CLOUDFLARE_API_TOKEN', { ...context, secrets });
-      const result = spawnSync('bash', ['-c', checkScript], {
-        encoding: 'utf8', env: { TOKEN_NAME: name, CLOUDFLARE_API_TOKEN: token },
-      });
-      assert.equal(result.status, available ? 0 : 1);
-      const output = result.stdout + result.stderr;
-      assert(!output.includes(dummy));
-      if (available) assert.equal(output, '');
-      else assert(output.includes(name));
-      context.needs['worker-credentials'].result = result.status === 0 ? 'success' : 'failure';
-      assert.equal(evaluateJobCondition(jobCondition(publisher, 'reserve'), context,
-        [result.status === 0 ? 'success' : 'failure']), false);
-    }
-  }
-});
-
-test('new publication remains manual and branch scoped; legacy production gate is unchanged', () => {
-  const workflow = read('.github/workflows/environments.yml');
-  assert.match(workflow, /workflow_dispatch:[\s\S]*?publish:[\s\S]*?type: boolean[\s\S]*?default: false/);
-  const publisher = read('.github/workflows/publish-environments.yml');
-  for (const [name, expectedBranch] of [['worker-production', 'main'], ['worker-development', 'develop']]) {
-    const condition = jobCondition(publisher, name);
-    for (const branch of ['main', 'develop']) {
-      const context = workflowContext({ branch, results: { reserve: 'success' } });
-      assert.equal(evaluateJobCondition(condition, context, ['success']), branch === expectedBranch);
-      context.needs.reserve.result = 'failure';
-      assert.equal(evaluateJobCondition(condition, context, ['failure']), false);
-    }
-  }
-
-  const caller = jobSection(workflow, 'publish');
-  const condition = jobCondition(workflow, 'publish');
-  const gates = ['classify-changes', 'docs-check', 'verify', 'browser-ui', 'isolation-browser', 'local-online', 'audit'];
-  const needs = caller.match(/^    needs: \[([^\]]+)\]$/m)?.[1].split(',').map(value => value.trim());
-  assert.deepEqual(needs, gates);
-  assert(caller.includes('uses: ./.github/workflows/publish-environments.yml'));
-  const evaluate = options => {
-    const context = workflowContext(options);
-    return evaluateJobCondition(condition, context, gates.map(gate => context.jobResults[gate]));
-  };
-  for (const branch of ['main', 'develop']) {
-    assert.equal(evaluate({ branch }), true);
-    for (const gate of gates) {
-      for (const result of ['failure', 'skipped', 'cancelled']) {
-        assert.equal(evaluate({ branch, results: { [gate]: result } }), false);
-      }
-    }
-    for (const options of [
-      { event: 'push' }, { publish: false }, { dualPages: 'false' }, { dualPages: '' },
-      { ref: 'refs/tags/main' }, { ref: 'refs/heads/feature/test' },
-    ]) assert.equal(evaluate({ branch, ...options }), false);
-  }
-
-  const online = jobCondition(publisher, 'online');
-  const pages = jobCondition(publisher, 'publish');
-  assert.match(jobSection(publisher, 'online'), /needs: \[reserve, worker-production, worker-development\]/);
-  for (const branch of ['main', 'develop']) {
-    const own = branch === 'main' ? 'worker-production' : 'worker-development';
-    const other = branch === 'main' ? 'worker-development' : 'worker-production';
-    const evaluateOnline = (active, inactive, canceled = false) => {
-      const context = workflowContext({ branch, canceled, results: { [own]: active, [other]: inactive } });
-      return evaluateJobCondition(online, context, [active, inactive]);
-    };
-    assert.equal(evaluateOnline('success', 'skipped'), true);
-    assert.equal(evaluateOnline('success', 'success'), false);
-    assert.equal(evaluateOnline('failure', 'skipped'), false);
-    assert.equal(evaluateOnline('skipped', 'success'), false);
-    assert.equal(evaluateOnline('success', 'skipped', true), false);
-    const evaluatePages = (reservation, onlineResult, canceled = false) => {
-      const context = workflowContext({ branch, canceled, results: { reserve: reservation, online: onlineResult } });
-      // The unselected Worker is a transitively skipped dependency.
-      return evaluateJobCondition(pages, context, [reservation, onlineResult, 'skipped']);
-    };
-    assert.equal(evaluatePages('success', evaluateOnline('success', 'skipped') ? 'success' : 'skipped'), true);
-    assert.equal(evaluatePages('success', evaluateOnline('failure', 'skipped') ? 'success' : 'skipped'), false);
-    assert.equal(evaluatePages('success', 'success', true), false);
-    for (const result of ['failure', 'skipped', 'cancelled']) {
-      assert.equal(evaluatePages(result, 'success'), false);
-      assert.equal(evaluatePages('success', result), false);
-    }
-  }
-
-  const issue = workflowContext({ branch: 'issue/64-main-github-flow', results: { reserve: 'success' } });
-  assert.equal(evaluateJobCondition(condition, issue, []), true);
-  assert.equal(evaluateJobCondition(jobCondition(publisher, 'worker-development'), issue, []), true);
-  assert.equal(evaluateJobCondition(jobCondition(publisher, 'worker-production'), issue, []), false);
-  for (const overrides of [{ event: 'push' }, { publish: false }, { repository: 'other/fork' }, { ref: 'refs/tags/issue/64-main-github-flow' }]) {
-    assert.equal(evaluateJobCondition(condition, workflowContext({ branch: 'issue/64-main-github-flow', ...overrides }), []), false);
-  }
-  const legacy = read('.github/workflows/deploy.yml');
-  assert.match(legacy, /group: pages-publication[\s\S]*?cancel-in-progress: false/);
-  assert.match(legacy, /if: \$\{\{ vars\.DUAL_PAGES_ENABLED != 'true' \}\}/);
-  assert.match(legacy, /deploy_to_production:[\s\S]*?type: boolean[\s\S]*?default: false/);
-  assert.match(legacy, /needs\.detect-changes\.outputs\.deploy_required == 'true'[\s\S]*?needs\.verify\.result == 'success'[\s\S]*?needs\.browser-ui\.result == 'success'[\s\S]*?needs\.browser-ui-matrix-audit\.result == 'success'[\s\S]*?needs\.release-freshness\.result == 'success'[\s\S]*?inputs\.deploy_to_production == true/);
-  const reserve = jobCondition(publisher, 'reserve');
-  for (const branch of ['main', 'develop']) {
-    assert.equal(evaluateJobCondition(reserve, workflowContext({ branch }), []), false);
-    assert.equal(evaluateJobCondition(reserve, workflowContext({ branch, event: 'push' }), []), false);
-  }
 });
 
 test('environment workflow reuses safe change classification and reserves light mode for docs-only pushes', () => {
@@ -351,58 +176,6 @@ test('environment workflow reuses safe change classification and reserves light 
   }
 });
 
-test('Issue publish requires full push CI and keeps live E2E and special reservation audit out of publication', () => {
-  const jobs = [
-    'classify-changes', 'docs-check', 'verify', 'local-online', 'audit',
-    'isolation-browser (chromium)', 'isolation-browser (webkit)',
-    'browser-ui / browser-ui (chromium, group 1)', 'browser-ui / browser-ui (chromium, group 2)',
-    'browser-ui / browser-ui (webkit, group 1)', 'browser-ui / browser-ui (webkit, group 2)',
-  ].map(name => ({ name, conclusion: 'success' }));
-  assert(hasRequiredIssueJobs({ jobs }));
-  assert(!hasRequiredIssueJobs({ jobs: jobs.slice(0, -1) }));
-  assert(!hasRequiredIssueJobs({ jobs: [...jobs, jobs[0]] }));
-  assert(!hasRequiredIssueJobs({ jobs: [{ ...jobs[0], conclusion: 'skipped' }, ...jobs.slice(1)] }));
-
-  const publisher = read('.github/workflows/publish-environments.yml');
-  const reserve = jobSection(publisher, 'reserve');
-  assert(reserve.indexOf('check-issue-publication-ci.mjs') < reserve.indexOf('publication-reservation.mjs prepare'));
-  assert.match(reserve, /push --atomic origin HEAD:pages-verified.*refs\/tags\/verified\/development/);
-  const pages = jobSection(publisher, 'publish');
-  assert(pages.indexOf('actions/deploy-pages') < pages.indexOf('check-issue-publication-site.mjs bytes'));
-  assert(pages.indexOf('check-issue-publication-site.mjs bytes') < pages.indexOf('artifacts.mjs finalize'));
-  const e2e = read('.github/workflows/live-development-e2e.yml');
-  assert.doesNotMatch(e2e, /^  (push|workflow_call|pull_request):|secrets\./m);
-  assert.match(e2e, /inputs\.run_live_e2e == true/);
-  assert.doesNotMatch(read('.github/workflows/issue47-phase6a-live-audit.yml'), /44839474104|secrets\./);
-});
-
-test('main reuse deliberately skips the repeated suite but requires successful read-only source validation', () => {
-  const caller = read('.github/workflows/environments.yml');
-  const publisher = read('.github/workflows/publish-environments.yml');
-  const heavy = ['verify', 'browser-ui', 'isolation-browser', 'local-online', 'audit'];
-  const results = Object.fromEntries(heavy.map(job => [job, 'skipped']));
-  const context = workflowContext({ branch: 'main', reuse: 'true', productionValidation: 'reuse', results });
-  assert.equal(evaluateJobCondition(jobCondition(caller, 'publish'), context, Object.values(results)), true);
-  assert.equal(evaluateJobCondition(jobCondition(caller, 'verify'), context, ['success']), false);
-  assert.equal(evaluateJobCondition(jobCondition(caller, 'audit'), context, ['skipped']), false);
-  assert.equal(evaluateJobCondition(jobCondition(caller, 'publish'),
-    workflowContext({ branch: 'main', productionValidation: 'reuse' }), []), false);
-  const source = jobSection(publisher, 'verify-production-source');
-  assert.match(source, /permissions:\s*contents: read\s*actions: read/);
-  assert.doesNotMatch(source, /secrets\.|: write/);
-  for (const reuseProduction of [true, false]) {
-    for (const result of ['success', 'failure', 'skipped', 'cancelled']) {
-      const release = workflowContext({ branch: 'main', reuseProduction, results: { 'verify-production-source': result } });
-      assert.equal(evaluateJobCondition(jobCondition(publisher, 'reserve'), release, ['success', result]),
-        false);
-    }
-  }
-  const audit = jobSection(publisher, 'audit-production');
-  assert.match(audit, /needs: publish/);
-  assert.match(audit, /contents: read\s*deployments: read/);
-  assert.doesNotMatch(audit, /secrets\.|: write/);
-});
-
 test('only production reuse validates the selected Worker settings', () => {
   const caller = read('.github/workflows/environments.yml');
   const publisher = read('.github/workflows/publish-environments.yml');
@@ -430,111 +203,12 @@ test('only production reuse validates the selected Worker settings', () => {
   assert.match(validate(['unknown']).stderr, /Unknown publication settings mode/);
 });
 
-test('production continuation runs only downstream of the successful Worker and online checks', () => {
-  const publisher = read('.github/workflows/publish-environments.yml');
-  const continuation = /github\.ref == 'refs\/heads\/main' && 'check-production-continuation' \|\| 'check'/;
-  for (const job of ['online', 'publish']) assert.match(jobSection(publisher, job), continuation);
-  for (const job of ['reserve', 'worker-production', 'worker-development']) {
-    assert.doesNotMatch(jobSection(publisher, job), /check-production-continuation/);
-  }
-  const pages = jobSection(publisher, 'publish');
-  assert.match(pages, /needs: \[reserve, online\]/);
-  assert.match(pages, /PAGES_OUTCOME: .*steps\.deploy\.outcome/);
-  assert.match(pages, /FINALIZE_OUTCOME: .*steps\.finalize\.outcome/);
-  for (const result of ['success', 'failure', 'skipped', 'cancelled']) {
-    for (const canceled of [false, true]) {
-      const results = { reserve: 'success', 'worker-production': result, 'worker-development': 'skipped', online: result };
-      const context = workflowContext({ branch: 'main', canceled, results });
-      for (const job of ['online', 'publish']) {
-        assert.equal(evaluateJobCondition(jobCondition(publisher, job), context, Object.values(results)),
-          result === 'success' && !canceled, `${job}, ${result}, ${canceled}`);
-      }
-    }
-  }
-});
-
-test('production audit runs after successful Pages publication despite an intentionally skipped Worker', () => {
-  const publisher = read('.github/workflows/publish-environments.yml');
-  const condition = jobCondition(publisher, 'audit-production');
-  const cases = [
-    { name: 'production success', publishResult: 'success', expected: true },
-    { name: 'Pages or ledger finalization failed', publishResult: 'failure' },
-    { name: 'Pages job cancelled', publishResult: 'cancelled' },
-    { name: 'Pages job skipped', publishResult: 'skipped' },
-    { name: 'workflow cancelled after publication', publishResult: 'success', canceled: true },
-    { name: 'develop publication', branch: 'develop', publishResult: 'success' },
-    { name: 'Issue branch publication', branch: 'issue/62-audit', publishResult: 'success' },
-  ];
-  for (const { name, publishResult, expected = false, branch = 'main', canceled = false } of cases) {
-    const production = branch === 'main';
-    const results = {
-      'worker-production': production ? 'success' : 'skipped',
-      'worker-development': production ? 'skipped' : 'success',
-      reserve: 'success',
-      online: 'success',
-      publish: publishResult,
-    };
-    const context = workflowContext({ branch, canceled, results });
-    assert.equal(evaluateJobCondition(condition, context, Object.values(results)), expected, name);
-  }
-});
-
-test('selected Worker requires a successful reservation and tolerates an intentionally skipped source check', () => {
-  const publisher = read('.github/workflows/publish-environments.yml');
-  const cases = [
-    { name: 'production full', expected: 'worker-production' },
-    { name: 'production reuse', reuseProduction: true, source: 'success', expected: 'worker-production' },
-    { name: 'development Issue', branch: 'issue/62-candidate', expected: 'worker-development' },
-    { name: 'develop ref', branch: 'develop', expected: 'worker-development' },
-    { name: 'invalid ref', branch: 'feature/other' },
-    { name: 'untrusted Issue ref', branch: 'issue/62-candidate', repository: 'other/repo' },
-    { name: 'push', event: 'push' },
-    { name: 'publication disabled', dualPages: 'false' },
-    { name: 'workflow cancelled', canceled: true },
-  ];
-  for (const { name, expected, source = 'skipped', ...options } of cases) {
-    for (const reserve of ['success', 'failure', 'skipped', 'cancelled']) {
-      const context = workflowContext({ branch: 'main', ...options, results: { reserve } });
-      for (const worker of ['worker-production', 'worker-development']) {
-        assert.equal(evaluateJobCondition(jobCondition(publisher, worker), context, ['success', source, reserve]),
-          reserve === 'success' && worker === expected, `${name}, ${reserve}, ${worker}`);
-      }
-    }
-  }
-});
-
-test('a reserved publication fails closed if Pages or the required production audit does not complete', () => {
-  const publisher = read('.github/workflows/publish-environments.yml');
-  const completion = jobSection(publisher, 'check-publication-completion');
-  assert.match(completion, /needs: \[reserve, publish, audit-production\]/);
-  assert.match(completion, /permissions: \{\}/);
-  assert.match(completion, /^        run: exit 1$/m);
-  const condition = jobCondition(publisher, 'check-publication-completion');
-  for (const branch of ['main', 'issue/62-candidate']) {
-    for (const publish of ['success', 'failure', 'skipped', 'cancelled']) {
-      for (const audit of ['success', 'failure', 'skipped', 'cancelled']) {
-        const results = { reserve: 'success', publish, 'audit-production': audit };
-        const context = workflowContext({ branch, results });
-        assert.equal(evaluateJobCondition(condition, context, Object.values(results)),
-          publish !== 'success' || (branch === 'main' && audit !== 'success'), `${branch}, ${publish}, ${audit}`);
-      }
-    }
-  }
-  for (const options of [{ results: { reserve: 'skipped' } }, { canceled: true, results: { reserve: 'success' } }]) {
-    const results = { publish: 'skipped', 'audit-production': 'skipped', ...options.results };
-    assert.equal(evaluateJobCondition(condition, workflowContext({ branch: 'main', ...options, results }),
-      Object.values(results)), false);
-  }
-});
-
 test('independent Worker job is manual, branch scoped, requires credentials and skips the combined reserve', () => {
   const publisher = read('.github/workflows/publish-environments.yml');
   const worker = jobCondition(publisher, 'worker-only');
-  const reserve = jobCondition(publisher, 'reserve');
   for (const branch of ['main', 'issue/69-test']) {
     const context = workflowContext({ branch, publicationTarget: 'worker' });
     assert.equal(evaluateJobCondition(worker, context, ['success', 'skipped']), true);
-    assert.equal(evaluateJobCondition(reserve, context, ['success', 'skipped']), false);
     context.needs['worker-credentials'].result = 'failure';
     assert.equal(evaluateJobCondition(worker, context, ['failure', 'skipped']), false);
   }
@@ -546,7 +220,7 @@ test('independent Worker job is manual, branch scoped, requires credentials and 
   assert.match(body, /environment:.*worker-production.*worker-development/);
   assert.match(body, /check-issue-publication-ci\.mjs/);
   assert.match(body, /test:online:production/);
-  assert.match(jobSection(publisher, 'reserve'), /Independent Worker records exist/);
+  assert.doesNotMatch(publisher, /^  reserve:/m);
 });
 
 test('worker-only caller requires every same-run CI gate and never enables production reuse', () => {
@@ -574,7 +248,7 @@ test('Pages-only route skips Worker credentials and reservation and preserves fu
     const context = workflowContext({ branch, publicationTarget: 'pages', results: { 'worker-credentials': 'skipped' } });
     assert.equal(evaluateJobCondition(condition, context, ['skipped', 'skipped']), true);
     assert.equal(evaluateJobCondition(jobCondition(publisher, 'worker-credentials'), context, []), false);
-    assert.equal(evaluateJobCondition(jobCondition(publisher, 'reserve'), context, []), false);
+    assert.doesNotMatch(publisher, /^  reserve:/m);
     assert.equal(evaluateJobCondition(jobCondition(publisher, 'worker-only'), context, []), false);
     const gate = jobCondition(caller, 'publish');
     for (const required of ['verify', 'browser-ui', 'isolation-browser', 'local-online', 'audit']) {
@@ -616,7 +290,7 @@ test('auto and explicit targets select independent jobs and fail closed on unkno
     assert.equal(evaluateJobCondition(jobCondition(wf, 'check-auto-completion'), context, []), true);
   }
   assert.match(jobSection(wf, 'plan-auto'), /deployment: false/);
-  assert.match(jobSection(wf, 'reserve'), /false &&/);
+  assert.doesNotMatch(wf, /^  (reserve|worker-production|worker-development|online|publish|audit-production|check-publication-completion):/m);
   assert.match(jobSection(read('.github/workflows/deploy.yml'), 'release-freshness'), /retired[\s\S]*exit 1/);
   assert.match(jobSection(wf, 'pages-only'), /Verify uploaded Pages artifact via the deploy-pages lookup\s+timeout-minutes: 3\s+uses:/);
   assert.match(read('.github/workflows/environments.yml'), /itch-html5-\$\{\{ github.sha \}\}/);
@@ -649,4 +323,62 @@ test('partial both outcomes remain separate and failures are not masked by skipp
     assert.equal(evaluateJobCondition(workerCheck, context, []), workerFail);
   }
   assert.match(jobSection(wf, 'publication-summary'), /PAGES_RESULT[\s\S]*WORKER_RESULT/);
+});
+
+test('independent publication preserves CI, Issue identity, target isolation and Pages finalization gates', () => {
+  const caller = read('.github/workflows/environments.yml');
+  const publisher = read('.github/workflows/publish-environments.yml');
+  const jobNames = ['classify-changes', 'docs-check', 'verify', 'local-online', 'audit',
+    'isolation-browser (chromium)', 'isolation-browser (webkit)',
+    'browser-ui / browser-ui (chromium, group 1)', 'browser-ui / browser-ui (chromium, group 2)',
+    'browser-ui / browser-ui (webkit, group 1)', 'browser-ui / browser-ui (webkit, group 2)'];
+  const jobs = jobNames.map(name => ({ name, conclusion: 'success' }));
+  assert(hasRequiredIssueJobs({ jobs }));
+  assert(!hasRequiredIssueJobs({ jobs: jobs.slice(1) }));
+  assert(!hasRequiredIssueJobs({ jobs: [...jobs, jobs[0]] }));
+  assert(!hasRequiredIssueJobs({ jobs: [{ ...jobs[0], conclusion: 'failure' }, ...jobs.slice(1)] }));
+  const gate = jobCondition(caller, 'publish');
+  for (const branch of ['main', 'issue/69-test']) for (const target of ['pages', 'worker', 'both', 'auto']) {
+    const options = { branch, publicationTarget: target };
+    assert.equal(evaluateJobCondition(gate, workflowContext(options), []), true);
+    for (const required of ['classify-changes', 'docs-check', 'verify', 'browser-ui', 'isolation-browser', 'local-online', 'audit']) {
+      assert.equal(evaluateJobCondition(gate, workflowContext({ ...options, results: { [required]: 'failure' } }), []), false, `${target} ${required}`);
+    }
+    assert.equal(evaluateJobCondition(gate, workflowContext({ ...options, publish: false }), []), false);
+  }
+  const page = jobSection(publisher, 'pages-only');
+  assert(page.indexOf('check-issue-publication-ci.mjs') < page.indexOf('pages-independent.mjs prepare'));
+  assert(page.indexOf('pages-independent.mjs prepare') < page.indexOf('git -C store push origin HEAD:pages-verified'));
+  assert(page.indexOf('pages-independent.mjs check store') < page.indexOf('actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e'));
+  assert(page.indexOf('pages-independent.mjs verify-staged') < page.indexOf('artifacts.mjs finalize'));
+  assert.match(page, /push --atomic origin HEAD:pages-verified.*refs\/tags\/verified\/development/);
+  assert.match(jobSection(publisher, 'pages-only-audit'), /contents: read\s*deployments: read/);
+  assert.match(publisher, /^concurrency:\n  group: pages-publication\n  cancel-in-progress: false\njobs:/m);
+  assert.doesNotMatch(publisher, /^  (reserve|worker-production|worker-development|online|publish|audit-production|check-publication-completion):/m);
+  const old = jobSection(read('.github/workflows/deploy.yml'), 'release-freshness');
+  assert.match(old, /retired[\s\S]*exit 1/);
+});
+
+test('Pages resume uses the same publication job only after preflight and skips new full CI', () => {
+  const caller = read('.github/workflows/environments.yml'), publisher = read('.github/workflows/publish-environments.yml');
+  const heavy = ['verify', 'browser-ui', 'isolation-browser', 'local-online', 'audit'];
+  const skipped = Object.fromEntries(heavy.map(job => [job, 'skipped']));
+  for (const branch of ['main', 'issue/69-test']) {
+    const callerContext = workflowContext({ branch, pagesResume: true, publicationTarget: 'pages', results: skipped });
+    assert.equal(evaluateJobCondition(jobCondition(caller, 'publish'), callerContext, Object.values(skipped)), true);
+    assert.equal(evaluateJobCondition(jobCondition(caller, 'verify'), callerContext, ['success']), false);
+    assert.equal(evaluateJobCondition(jobCondition(caller, 'audit'), callerContext, ['success']), false);
+    const pageContext = workflowContext({ branch, pagesResume: true, publicationTarget: 'pages', results: { 'worker-credentials': 'skipped', 'resume-preflight': 'success' } });
+    assert.equal(evaluateJobCondition(jobCondition(publisher, 'pages-only'), pageContext, []), true);
+    pageContext.needs['resume-preflight'].result = 'failure';
+    assert.equal(evaluateJobCondition(jobCondition(publisher, 'pages-only'), pageContext, []), false);
+    assert.equal(evaluateJobCondition(jobCondition(publisher, 'check-resume-completion'), pageContext, []), true);
+    assert.equal(evaluateJobCondition(jobCondition(publisher, 'worker-only'), pageContext, []), false);
+  }
+  const job = jobSection(publisher, 'resume-preflight');
+  assert(job.indexOf('pages-resume-preflight.mjs') < job.indexOf('git -C store revert --no-commit'));
+  assert(job.indexOf('git -C store revert --no-commit') < job.indexOf('pages-resume-artifact.mjs'));
+  assert.match(job, /git -C store diff --exit-code/);
+  assert.doesNotMatch(job, /wrangler|deploy-pages|--force/);
+  assert.match(jobSection(publisher, 'pages-only'), /needs.resume-preflight.outputs.evidence/);
 });
