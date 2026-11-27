@@ -1,5 +1,15 @@
 # Issue #69 Phase 2-B-2: Pages 専用候補
 
+## Phase 3-B 開発公開とauto停止（2026-11-27）
+
+公開した候補SHAは `da1962ce27c500d9e01b998df2f0828794a7c1cd`。開発Worker初回公開 [run 46010218955](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46010218955) はオンライン検証まで成功。公開前に承認・照合したversionは `2f35e7e9-8e31-4cb8-9032-d20299e7e7a3`、公開後は `132dd0c6-57e4-444b-9515-0bda6392ca2f`。独立Deployment `8111581288` は候補SHA、`deployed:` と `verified:` のsuccessを記録した。Worker公開直後のPages台帳HEADは旧 `3c96a4ef4606d4890dd6c34bd0d0b59ece0b642c` のまま。
+
+開発Pages専用公開 [run 46019125645](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46019125645) はCI、Pages公開、実配信照合、確定、独立auditが成功し、Worker公開jobはskip。確定commit `1fe28edd010856a79e9f300732d13ce7735181e4` の開発SHAは候補SHA、snapshotDigestは `ee6ddf1402f38dc6eb52f591a42c36f5a9effe06067825222cfd5ab3d7f710bf`、pendingはnull。検証済みArtifact IDは `15207002494`、ZIP digestは `sha256:0fd172832c9e65bfe01332c36169292bf3793a3fbd4c66827d474221825790f9`。本番Pagesの製品ファイルとrelease.jsonは旧確定commitとの差分なし。共有environments.jsonは開発更新に伴い変化した。Worker独立記録は同じverified statusのまま、本番Workerの最新GitHub公開記録 `8074552298` も維持されていた。
+
+両基準SHAの一致とpendingなしを確認して実行したauto [run 46021197973](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46021197973) は必須CIで停止した。WebKit group 2の `tests/browser-round-end-ui.py` は320×480で対局結果ダイアログを閉じた後に再表示されなかったためassertion failureとなった。原因は未確定。publish jobはskipされ、autoの差分判定・Cloudflare現version再照合は未実行。Worker独立記録とPages台帳HEADは変更されていない。再実行や追加実装は行っていない。
+
+CI内のChromium/WebKit・環境分離・local-online、Pages公開時の既存オンライン検証は成功したが、auto runのWebKit failureを含むため開発環境の全自動確認は完了扱いにしない。公開後のiPhone Safariでは開発Pagesの起動、CPU対局、オンライン卓作成・参加・操作・同期・再接続、PWA更新・再起動と本番との区別をユーザーが確認する。本番Workerの稼働versionは直接確認していない。
+
 この文書は候補の挙動と移行前提を示す。実公開・現行台帳の移行・復旧は未実施。現行運用の規則を置き換えない。
 
 ## Pages 専用経路
