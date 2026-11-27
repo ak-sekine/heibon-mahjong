@@ -11,6 +11,18 @@ on:
         required: true
         type: boolean
         default: false
+      artifact_probe:
+        type: boolean
+        default: false
+      artifact_probe_run:
+        type: string
+        required: false
+      artifact_probe_id:
+        type: string
+        required: false
+      artifact_probe_digest:
+        type: string
+        required: false
       publication_target:
         description: Choose the existing combined publication or the independent Worker route.
         type: choice
@@ -83,7 +95,7 @@ jobs:
   verify:
     needs: classify-changes
     if: >-
-      ${{ !cancelled() && needs.classify-changes.outputs.reuse != 'true'
+      ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && inputs.artifact_probe == true && inputs.publish == false) && needs.classify-changes.outputs.reuse != 'true'
         && (needs.classify-changes.result != 'success'
         || needs.classify-changes.outputs.run_full_suite != 'false') }}
     runs-on: ubuntu-latest
@@ -226,7 +238,7 @@ jobs:
           ONLINE_API_URL=http://127.0.0.1:8788 ONLINE_TEST_ORIGIN=http://localhost:5173 npm run test:online:production
   audit:
     needs: [classify-changes, docs-check, verify, browser-ui, isolation-browser, local-online]
-    if: ${{ always() && needs.classify-changes.outputs.reuse != 'true' }}
+    if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.artifact_probe == true && inputs.publish == false) && needs.classify-changes.outputs.reuse != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -324,3 +336,69 @@ jobs:
     secrets:
       CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ inputs.publication_target != 'pages' && inputs.publication_target != 'none' && github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_PRODUCTION_API_TOKEN || '' }}
       CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ inputs.publication_target != 'pages' && inputs.publication_target != 'none' && secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN || '' }}
+
+  artifact-wrapper-probe:
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' && inputs.publish == false && inputs.artifact_probe == true
+        && github.ref == 'refs/heads/issue/69-independent-publication-v2' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned wrapper dependencies
+        run: npm ci --ignore-scripts --prefix source/.github/actions/pages-artifact-check
+      - name: Check original Artifact metadata and ZIP digest
+        if: ${{ inputs.artifact_probe_run != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.artifact_probe_run }}
+          SOURCE_ID: ${{ inputs.artifact_probe_id }}
+          SOURCE_DIGEST: ${{ inputs.artifact_probe_digest }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ && "$SOURCE_ID" =~ ^[0-9]+$ && "$SOURCE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ID" > "$RUNNER_TEMP/probe-metadata.json"
+          jq -e --argjson id "$SOURCE_ID" --argjson run "$SOURCE_RUN" --arg digest "$SOURCE_DIGEST" '.id == $id and .workflow_run.id == $run and .digest == $digest and .expired == false' "$RUNNER_TEMP/probe-metadata.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ID/zip" > "$RUNNER_TEMP/probe-source.zip"
+          printf '%s  %s\n' "${SOURCE_DIGEST#sha256:}" "$RUNNER_TEMP/probe-source.zip" | sha256sum -c -
+      - uses: actions/download-artifact@v4
+        if: ${{ inputs.artifact_probe_run != '' }}
+        with:
+          artifact-ids: ${{ inputs.artifact_probe_id }}
+          run-id: ${{ inputs.artifact_probe_run }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: store/site
+      - name: Prepare or verify isolated fixture
+        env:
+          SOURCE_RUN: ${{ inputs.artifact_probe_run }}
+        run: |
+          set -euo pipefail
+          mkdir -p store/site/dev
+          if [[ -z "$SOURCE_RUN" ]]; then printf 'isolated production\n' > store/site/index.html; printf 'isolated development\n' > store/site/dev/index.html; fi
+          test "$(cat store/site/index.html)" = 'isolated production'
+          test "$(cat store/site/dev/index.html)" = 'isolated development'
+      - uses: actions/upload-artifact@v4
+        id: fixture
+        with:
+          name: issue69-wrapper-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: store/site
+          retention-days: 1
+      - uses: actions/upload-pages-artifact@v3
+        id: pages_upload
+        with:
+          path: store/site
+      - name: Run the actual wrapper without a Pages deployment
+        uses: ./source/.github/actions/pages-artifact-check
+        timeout-minutes: 3
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGES_ARTIFACT_ID: ${{ steps.pages_upload.outputs.artifact_id }}
