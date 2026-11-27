@@ -5,6 +5,7 @@ import { publicationIdentity } from './publication-reservation.mjs';
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const SHA = /^[a-f0-9]{40}$/;
+const FIRST_PUBLICATION_ACCOUNT = 'abb9bbfd207cd6e56648a331d5638f6b';
 const specs = {
   production: { name: 'heibon-mahjong-online', url: 'https://heibon-mahjong-online.ak-sekine.workers.dev', config: 'wrangler.jsonc' },
   development: { name: 'heibon-mahjong-online-dev', url: 'https://heibon-mahjong-online-dev.ak-sekine.workers.dev', config: 'wrangler.development.jsonc' },
@@ -27,7 +28,7 @@ export function configuration(env) {
   const spec = specs[identity.environment];
   if (env.EXPECTED_WORKER_URL !== spec.url) throw new Error('Worker URL or environment mismatch');
   const firstPublication = env.WORKER_FIRST_PUBLICATION === 'true';
-  if (firstPublication && (env.PUBLICATION_TARGET !== 'worker' || env.PUBLISH_REQUESTED !== 'true' || !UUID.test(env.EXPECTED_CURRENT_WORKER_VERSION || ''))) throw new Error('Invalid first Worker publication request');
+  if (firstPublication && (env.PUBLICATION_TARGET !== 'worker' || env.PUBLISH_REQUESTED !== 'true' || !UUID.test(env.EXPECTED_CURRENT_WORKER_VERSION || '') || env.CLOUDFLARE_ACCOUNT_ID.toLowerCase() !== FIRST_PUBLICATION_ACCOUNT)) throw new Error('Invalid first Worker publication request');
   if (!firstPublication && (env.WORKER_FIRST_PUBLICATION && env.WORKER_FIRST_PUBLICATION !== 'false' || env.EXPECTED_CURRENT_WORKER_VERSION)) throw new Error('Unexpected first Worker publication inputs');
   return { ...identity, ...spec, firstPublication, expectedCurrentVersion: firstPublication ? env.EXPECTED_CURRENT_WORKER_VERSION.toLowerCase() : '', repository: env.GITHUB_REPOSITORY, account: env.CLOUDFLARE_ACCOUNT_ID, githubToken: env.GH_TOKEN, cloudflareToken: env.CLOUDFLARE_API_TOKEN, ledgerEnvironment: `heibon-independent-worker-${identity.environment}` };
 }

@@ -151,8 +151,8 @@ test('first Worker publication preserves unresolved records after start, deploy 
 });
 
 test('first publication input requires explicit worker target, publish and valid approved version', () => {
-  const input = { ...env(), WORKER_FIRST_PUBLICATION: 'true', PUBLICATION_TARGET: 'worker', PUBLISH_REQUESTED: 'true', EXPECTED_CURRENT_WORKER_VERSION: oldVersion };
+  const input = { ...env(), CLOUDFLARE_ACCOUNT_ID: 'abb9bbfd207cd6e56648a331d5638f6b', WORKER_FIRST_PUBLICATION: 'true', PUBLICATION_TARGET: 'worker', PUBLISH_REQUESTED: 'true', EXPECTED_CURRENT_WORKER_VERSION: oldVersion };
   assert.equal(configuration(input).expectedCurrentVersion, oldVersion);
-  for (const override of [{ PUBLICATION_TARGET: 'pages' }, { PUBLICATION_TARGET: 'both' }, { PUBLICATION_TARGET: 'auto' }, { PUBLICATION_TARGET: 'none' }, { PUBLISH_REQUESTED: 'false' }, { EXPECTED_CURRENT_WORKER_VERSION: '' }]) assert.throws(() => configuration({ ...input, ...override }), /Invalid first/);
+  for (const override of [{ PUBLICATION_TARGET: 'pages' }, { PUBLICATION_TARGET: 'both' }, { PUBLICATION_TARGET: 'auto' }, { PUBLICATION_TARGET: 'none' }, { PUBLISH_REQUESTED: 'false' }, { EXPECTED_CURRENT_WORKER_VERSION: '' }, { CLOUDFLARE_ACCOUNT_ID: 'f'.repeat(32) }]) assert.throws(() => configuration({ ...input, ...override }), /Invalid first/);
   assert.throws(() => configuration({ ...input, WORKER_FIRST_PUBLICATION: 'false' }), /Unexpected/);
 });
