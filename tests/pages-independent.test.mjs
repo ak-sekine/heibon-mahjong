@@ -72,10 +72,14 @@ test('wrong Worker URL, corrupt artifact and pending snapshots fail safely', asy
 });
 
 test('recovery evidence requires the original successful deploy step, CI and unchanged pinned refs', () => {
-  const expected = { snapshot: '1'.repeat(40), parent: '2'.repeat(40), sha, branch: 'main', repository: 'ak-sekine/heibon-mahjong', runId: '111', attempt: '1' };
+  const expected = { snapshot: '1'.repeat(40), parent: '2'.repeat(40), sha, branch: 'main', repository: 'ak-sekine/heibon-mahjong', runId: '111', attempt: '1', pagesDeploymentId: 'dep-123' };
   const run = { id: 111, run_attempt: 1, head_sha: sha, head_branch: 'main', event: 'workflow_dispatch', status: 'completed', repository: { full_name: expected.repository }, head_repository: { full_name: expected.repository }, path: '.github/workflows/environments.yml' };
-  const evidence = { ledgerHead: expected.snapshot, snapshotHead: expected.snapshot, snapshotParent: expected.parent, parentHead: expected.parent, originalRun: run, ciRun: run, originalJobs: [{ name: 'publish / pages-only', run_id: 111, run_attempt: 1, steps: [{ name: 'Run actions/deploy-pages@v4', conclusion: 'success' }] }], ciJobs: REQUIRED_ENVIRONMENT_JOBS.map(name => ({ name, run_id: 111, run_attempt: 1, head_sha: sha, conclusion: 'success' })), deployment: { sha }, deploymentStatus: { log_url: `https://github.com/${expected.repository}/actions/runs/111/job/5` }, pagesStatus: { status: 'succeed' } };
+  const evidence = { ledgerHead: expected.snapshot, snapshotHead: expected.snapshot, snapshotParent: expected.parent, parentHead: expected.parent, originalRun: run, ciRun: run, originalJobs: [{ name: 'publish / pages-only', id: 5, run_id: 111, run_attempt: 1, steps: [{ name: 'Run actions/deploy-pages@v4', conclusion: 'success' }] }], ciJobs: REQUIRED_ENVIRONMENT_JOBS.map(name => ({ name, run_id: 111, run_attempt: 1, head_sha: sha, conclusion: 'success' })), deployment: { sha }, deploymentStatus: { log_url: `https://github.com/${expected.repository}/actions/runs/111/job/5` }, pagesStatus: { status: 'succeed' }, originalJobLog: `Created deployment for ${sha}, ID: dep-123\n` };
   verifyPagesRecoveryEvidence(evidence, expected);
+  assert.throws(() => verifyPagesRecoveryEvidence(evidence, { ...expected, pagesDeploymentId: 'another-success' }), /ID does not belong/);
+  assert.throws(() => verifyPagesRecoveryEvidence({ ...evidence, originalJobLog: '' }, expected), /absent or ambiguous/);
+  assert.throws(() => verifyPagesRecoveryEvidence({ ...evidence, originalJobLog: evidence.originalJobLog.repeat(2) }, expected), /absent or ambiguous/);
+  assert.throws(() => verifyPagesRecoveryEvidence({ ...evidence, deploymentStatus: { log_url: `https://github.com/${expected.repository}/actions/runs/111/job/6` } }, expected), /another job/);
   assert.throws(() => verifyPagesRecoveryEvidence({ ...evidence, ledgerHead: 'f'.repeat(40) }, expected), /changed/);
   assert.throws(() => verifyPagesRecoveryEvidence({ ...evidence, pagesStatus: { status: 'unknown' } }, expected), /not confirmed/);
   assert.throws(() => verifyPagesRecoveryEvidence({ ...evidence, ciJobs: evidence.ciJobs.slice(1) }, expected), /CI job/);

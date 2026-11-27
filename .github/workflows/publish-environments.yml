@@ -10,7 +10,7 @@ on:
         default: ''
       publication_target:
         type: string
-        default: both
+        default: auto
       reuse_production:
         type: boolean
         default: false
@@ -66,7 +66,7 @@ jobs:
           retention-days: 1
           compression-level: 0
   worker-credentials:
-    if: ${{ inputs.publication_target != 'pages' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
+    if: ${{ inputs.publication_target != 'pages' && inputs.publication_target != 'none' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'worker-production' || 'worker-development' }}
@@ -81,10 +81,60 @@ jobs:
             echo "::error::$TOKEN_NAME is unavailable in the selected Worker environment."
             exit 1
           fi
+  plan-auto:
+    needs: worker-credentials
+    if: ${{ !cancelled() && inputs.publication_target == 'auto' && needs.worker-credentials.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'worker-production' || 'worker-development' }}
+      deployment: false
+    permissions:
+      contents: read
+      deployments: read
+    outputs:
+      pages: ${{ steps.plan.outputs.pages }}
+      worker: ${{ steps.plan.outputs.worker }}
+      classification: ${{ steps.plan.outputs.classification }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: pages-verified
+          path: store
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Compare independently verified Pages and Worker baselines
+        id: plan
+        run: node source/.github/scripts/publication-auto.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGES_STORE: ${{ github.workspace }}/store
+          SOURCE_DIR: ${{ github.workspace }}/source
+          EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets[github.ref == 'refs/heads/main' && 'CLOUDFLARE_PRODUCTION_API_TOKEN' || 'CLOUDFLARE_DEVELOPMENT_API_TOKEN'] }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+  no-publication:
+    needs: plan-auto
+    if: >-
+      ${{ !cancelled() && (inputs.publication_target == 'none' || (inputs.publication_target == 'auto' && needs.plan-auto.result == 'success' && needs.plan-auto.outputs.classification == 'none')) }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Record why no publication was selected
+        env:
+          TARGET: ${{ inputs.publication_target }}
+        run: |
+          if [[ "$TARGET" == none ]]; then echo 'No publication: explicit none.' >> "$GITHUB_STEP_SUMMARY"; else echo 'No publication: automatic comparison found no changes.' >> "$GITHUB_STEP_SUMMARY"; fi
   reserve:
     needs: [worker-credentials, verify-production-source]
     if: >-
-      ${{ !cancelled() && inputs.publication_target == 'both' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) &&
+      ${{ !cancelled() && false && inputs.publication_target == 'both' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) &&
         needs.worker-credentials.result == 'success' &&
         ((inputs.reuse_production && needs.verify-production-source.result == 'success') ||
           (!inputs.reuse_production && needs.verify-production-source.result == 'skipped')) }}
@@ -166,9 +216,10 @@ jobs:
           fi
           printf 'snapshot=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
   pages-only:
-    needs: [worker-credentials, verify-production-source]
+    needs: [worker-credentials, verify-production-source, plan-auto]
     if: >-
-      ${{ !cancelled() && inputs.publication_target == 'pages' && needs.worker-credentials.result == 'skipped'
+      ${{ !cancelled() && (inputs.publication_target == 'pages' || inputs.publication_target == 'both' || (inputs.publication_target == 'auto' && needs.plan-auto.result == 'success' && needs.plan-auto.outputs.pages == 'true'))
+        && ((inputs.publication_target == 'pages' && needs.worker-credentials.result == 'skipped') || (inputs.publication_target != 'pages' && needs.worker-credentials.result == 'success'))
         && ((inputs.reuse_production && needs.verify-production-source.result == 'success') || (!inputs.reuse_production && needs.verify-production-source.result == 'skipped'))
         && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true'
         && (github.ref == 'refs/heads/main' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
@@ -265,6 +316,7 @@ jobs:
           printf 'snapshot=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
+        id: pages_upload
         with:
           path: store/site
       - name: Recheck Pages pending before deployment
@@ -273,6 +325,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PUBLICATION_SNAPSHOT: ${{ steps.stage.outputs.snapshot }}
           EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+      - name: Install the pinned Pages lookup client
+        run: npm ci --ignore-scripts --prefix source/.github/actions/pages-artifact-check
+      - name: Verify uploaded Pages artifact via the deploy-pages lookup
+        uses: ./source/.github/actions/pages-artifact-check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGES_ARTIFACT_ID: ${{ steps.pages_upload.outputs.artifact_id }}
       - uses: actions/deploy-pages@v4
         id: deploy
       - name: Verify served bytes and both pinned snapshots
@@ -324,19 +383,18 @@ jobs:
           FINALIZED_SNAPSHOT: ${{ needs.pages-only.outputs.finalized }}
           EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
   check-pages-only-completion:
-    needs: [pages-only, pages-only-audit]
-    if: ${{ !cancelled() && inputs.publication_target == 'pages' && (needs.pages-only.result != 'success' || needs.pages-only-audit.result != 'success') }}
+    needs: [pages-only, pages-only-audit, plan-auto]
+    if: ${{ !cancelled() && (inputs.publication_target == 'pages' || inputs.publication_target == 'both' || (inputs.publication_target == 'auto' && needs.plan-auto.outputs.pages == 'true')) && (needs.pages-only.result != 'success' || needs.pages-only-audit.result != 'success') }}
     runs-on: ubuntu-latest
     permissions: {}
     steps:
       - run: exit 1
   worker-only:
-    needs: [worker-credentials, verify-production-source]
+    needs: [worker-credentials, verify-production-source, plan-auto]
     if: >-
-      ${{ !cancelled() && inputs.publication_target == 'worker'
-        && inputs.reuse_production == false
+      ${{ !cancelled() && (inputs.publication_target == 'worker' || inputs.publication_target == 'both' || (inputs.publication_target == 'auto' && needs.plan-auto.result == 'success' && needs.plan-auto.outputs.worker == 'true'))
         && needs.worker-credentials.result == 'success'
-        && needs.verify-production-source.result == 'skipped'
+        && ((inputs.reuse_production && needs.verify-production-source.result == 'success') || (!inputs.reuse_production && needs.verify-production-source.result == 'skipped'))
         && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true'
         && (github.ref == 'refs/heads/main' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
     runs-on: ubuntu-latest
@@ -619,9 +677,38 @@ jobs:
         run: exit 1
 
   check-worker-only-completion:
-    needs: [worker-only]
-    if: ${{ !cancelled() && inputs.publication_target == 'worker' && needs.worker-only.result != 'success' }}
+    needs: [worker-only, plan-auto]
+    if: ${{ !cancelled() && (inputs.publication_target == 'worker' || inputs.publication_target == 'both' || (inputs.publication_target == 'auto' && needs.plan-auto.outputs.worker == 'true')) && needs.worker-only.result != 'success' }}
     runs-on: ubuntu-latest
     permissions: {}
     steps:
       - run: exit 1
+
+  check-auto-completion:
+    needs: [plan-auto]
+    if: ${{ !cancelled() && inputs.publication_target == 'auto' && needs.plan-auto.result != 'success' }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - run: exit 1
+
+  publication-summary:
+    needs: [plan-auto, pages-only, pages-only-audit, worker-only]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Report selected target and each independent result
+        env:
+          TARGET: ${{ inputs.publication_target }}
+          PLAN_RESULT: ${{ needs.plan-auto.result }}
+          CLASSIFICATION: ${{ needs.plan-auto.outputs.classification }}
+          PAGES_RESULT: ${{ needs.pages-only.result }}
+          PAGES_AUDIT_RESULT: ${{ needs.pages-only-audit.result }}
+          WORKER_RESULT: ${{ needs.worker-only.result }}
+        run: |
+          {
+            printf 'Requested target: `%s`\n' "$TARGET"
+            if [[ "$TARGET" == auto ]]; then printf 'Automatic comparison: `%s` (planning: `%s`)\n' "${CLASSIFICATION:-unknown}" "$PLAN_RESULT"; fi
+            printf 'Pages publication: `%s`; Pages audit: `%s`; Worker publication and online verification: `%s`.\n' "$PAGES_RESULT" "$PAGES_AUDIT_RESULT" "$WORKER_RESULT"
+          } >> "$GITHUB_STEP_SUMMARY"

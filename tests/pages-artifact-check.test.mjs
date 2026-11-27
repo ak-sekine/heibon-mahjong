@@ -30,3 +30,13 @@ test('stops at deadline if listing or metadata cannot complete', async () => {
   await assert.rejects(waitForPagesArtifact(fixture({ list: () => new Promise(() => {}), timeoutMs: 5 })), /timeout/);
   await assert.rejects(waitForPagesArtifact(fixture({ list: async () => [artifact], metadata: () => new Promise(() => {}), timeoutMs: 5 })), /timeout/);
 });
+
+test('temporary REST metadata lookup failure is retried while permanent errors stop', async () => {
+  let calls = 0;
+  const details = { id: 7, name: 'github-pages', digest: 'sha256:' + 'a'.repeat(64), expired: false, expires_at: '2099-01-01T00:00:00Z' };
+  const opts = { name: details.name, id: 7, digest: details.digest, list: async () => [{ name: details.name, id: 7 }], wait: async () => {}, timeoutMs: 1000 };
+  const result = await waitForPagesArtifact({ ...opts, metadata: async () => { if (++calls === 1) { const error = new Error('temporary'); error.retryable = true; throw error; } return details; } });
+  assert.equal(result.id, 7);
+  assert.equal(calls, 2);
+  await assert.rejects(waitForPagesArtifact({ ...opts, metadata: async () => { throw new Error('forbidden'); } }), /forbidden/);
+});

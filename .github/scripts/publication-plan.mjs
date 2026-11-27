@@ -3,10 +3,12 @@ import { execFileSync } from 'node:child_process';
 const shaPattern = /^[a-f0-9]{40}$/;
 const pipelinePaths = new Set([
   '.github/workflows/deploy.yml', '.github/workflows/environments.yml', '.github/workflows/publish-environments.yml',
-  '.github/workflows/browser-ui.yml', '.github/scripts/publication-plan.mjs', '.github/scripts/pages-artifact-check.mjs',
+  '.github/workflows/browser-ui.yml', '.github/workflows/pages-reconcile.yml', '.github/scripts/publication-plan.mjs', '.github/scripts/pages-artifact-check.mjs',
   '.github/scripts/classify-changes.mjs', '.github/scripts/deployment-decision.mjs', '.github/scripts/deployment-state.mjs',
   '.github/scripts/publication-reservation.mjs', '.github/scripts/deploy-isolated-worker.mjs',
-  '.github/scripts/worker-independent.mjs', '.github/scripts/worker-online-confirm.mjs', '.github/scripts/pages-independent.mjs', '.github/scripts/pages-independent-recovery.mjs', '.github/scripts/pages-verified-artifact.mjs',
+  '.github/scripts/worker-independent.mjs', '.github/scripts/worker-online-confirm.mjs', '.github/scripts/pages-independent.mjs', '.github/scripts/pages-independent-recovery.mjs', '.github/scripts/pages-verified-artifact.mjs', '.github/scripts/publication-auto.mjs', '.github/scripts/check-pages-upload.py',
+  '.github/actions/pages-artifact-check/action.yml', '.github/actions/pages-artifact-check/index.cjs',
+  '.github/actions/pages-artifact-check/package.json', '.github/actions/pages-artifact-check/package-lock.json',
   '.github/scripts/reuse-production-ci.mjs', '.github/scripts/audit-main-publication.mjs',
 ]);
 

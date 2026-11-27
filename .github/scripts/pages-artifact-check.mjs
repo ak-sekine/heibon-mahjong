@@ -28,7 +28,16 @@ export async function waitForPagesArtifact({ list, metadata, name, id, digest, n
         let metaTimer;
         try {
           details = await Promise.race([Promise.resolve().then(() => metadata(id)), new Promise(resolve => { metaTimer = setTimeout(() => resolve(timedOut), budget); })]);
+        } catch (error) {
+          if (!error?.retryable) throw error;
+          details = null;
         } finally { clearTimeout(metaTimer); }
+        if (details === null) {
+          const left = deadline - now();
+          if (left <= 0) throw new Error('artifact lookup timeout');
+          await wait(Math.min(intervalMs, left));
+          continue;
+        }
         if (details === timedOut) throw new Error('artifact lookup timeout');
         if (!details || details.id !== id || details.name !== name) throw new Error('artifact metadata mismatch');
         if (details.digest !== digest) throw new Error('artifact digest mismatch');

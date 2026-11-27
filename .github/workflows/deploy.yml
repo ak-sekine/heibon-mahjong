@@ -101,6 +101,10 @@ jobs:
       }}
     runs-on: ubuntu-latest
     steps:
+      - name: Refuse the retired combined publication route
+        run: |
+          echo '::error::The combined publication route is retired. Use the independent publication workflow.'
+          exit 1
       - name: Require the latest main SHA before publishing
         env:
           GH_TOKEN: ${{ github.token }}

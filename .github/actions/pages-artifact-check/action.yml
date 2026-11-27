@@ -1,0 +1,5 @@
+name: Verify uploaded Pages artifact
+description: Check runtime lookup and verify the uploaded archive against the staged site.
+runs:
+  using: node24
+  main: index.cjs

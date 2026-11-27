@@ -1,0 +1,75 @@
+name: Reconcile a confirmed Pages snapshot
+on:
+  workflow_dispatch:
+    inputs:
+      snapshot:
+        description: Pending pages-verified commit SHA.
+        required: true
+        type: string
+      parent:
+        description: Finalized parent commit SHA.
+        required: true
+        type: string
+      pages_deployment_id:
+        description: Pages deployment ID from the original deploy-pages job log.
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: pages-publication
+  cancel-in-progress: false
+jobs:
+  finalize-confirmed-pages:
+    if: >-
+      ${{ github.repository == 'ak-sekine/heibon-mahjong' && github.event_name == 'workflow_dispatch'
+        && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/issue/')) }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      deployment: false
+    permissions:
+      contents: write
+      actions: read
+      pages: read
+      deployments: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.snapshot }}
+          path: store
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.parent }}
+          path: previous
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Reconcile original run, deployment, CI, snapshots and live bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RECOVERY_SNAPSHOT: ${{ inputs.snapshot }}
+          RECOVERY_PARENT: ${{ inputs.parent }}
+          PAGES_DEPLOYMENT_ID: ${{ inputs.pages_deployment_id }}
+        run: node source/.github/scripts/pages-independent-recovery.mjs store previous
+      - name: Finalize the same pending snapshot without deploying
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RECOVERY_SNAPSHOT: ${{ inputs.snapshot }}
+        run: |
+          set -euo pipefail
+          [[ "$RECOVERY_SNAPSHOT" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git -C store rev-parse HEAD)" = "$RECOVERY_SNAPSHOT"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/pages-verified" --jq .object.sha)" = "$RECOVERY_SNAPSHOT"
+          node source/scripts/environments/artifacts.mjs finalize store
+          git -C store config user.name github-actions[bot]
+          git -C store config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C store add state.json
+          git -C store commit -m "Confirm reconciled Pages snapshot $RECOVERY_SNAPSHOT"
+          git -C store push origin HEAD:pages-verified
+          echo 'Confirmed the previously deployed snapshot without a new Pages or Worker deployment.' >> "$GITHUB_STEP_SUMMARY"

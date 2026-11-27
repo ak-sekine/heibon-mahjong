@@ -14,8 +14,8 @@ on:
       publication_target:
         description: Choose the existing combined publication or the independent Worker route.
         type: choice
-        options: [both, worker, pages]
-        default: both
+        options: [auto, pages, worker, both, none]
+        default: auto
       production_validation:
         description: Reuse verified main push CI, or explicitly run full validation for production.
         type: choice
@@ -33,7 +33,7 @@ jobs:
         ${{ github.repository == 'ak-sekine/heibon-mahjong'
           && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
           && inputs.publish == true && vars.DUAL_PAGES_ENABLED == 'true'
-          && inputs.production_validation == 'reuse' && inputs.publication_target != 'worker' }}
+          && inputs.production_validation == 'reuse' && inputs.publication_target != 'worker' && inputs.publication_target != 'auto' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -146,6 +146,21 @@ jobs:
         with:
           name: itch-dist-${{ github.sha }}-${{ github.run_attempt }}
           path: dist-itch
+          if-no-files-found: error
+          retention-days: 90
+      - name: Build production-endpoint itch ZIP for independent manual distribution
+        if: ${{ vars.PRODUCTION_WORKER_URL == 'https://heibon-mahjong-online.ak-sekine.workers.dev' }}
+        run: |
+          npm run build:itch
+          (cd artifacts/itch && sha256sum heibon-mahjong.zip > SHA256SUMS)
+          printf '%s\n' "$GITHUB_SHA" > artifacts/itch/source-sha.txt
+        env:
+          VITE_ONLINE_API_URL: ${{ vars.PRODUCTION_WORKER_URL }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ vars.PRODUCTION_WORKER_URL == 'https://heibon-mahjong-online.ak-sekine.workers.dev' }}
+        with:
+          name: itch-html5-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/itch
           if-no-files-found: error
           retention-days: 90
   browser-ui:
@@ -292,7 +307,7 @@ jobs:
           || (needs.classify-changes.outputs.reuse == 'false' && needs.verify.result == 'success'
             && needs.browser-ui.result == 'success' && needs.isolation-browser.result == 'success'
             && needs.local-online.result == 'success' && needs.audit.result == 'success'
-            && (github.ref != 'refs/heads/main' || inputs.production_validation == 'full' || inputs.publication_target == 'worker'))) }}
+            && (github.ref != 'refs/heads/main' || inputs.production_validation == 'full' || inputs.publication_target == 'worker' || inputs.publication_target == 'auto'))) }}
     needs: [classify-changes, docs-check, verify, browser-ui, isolation-browser, local-online, audit]
     permissions:
       contents: write
@@ -303,9 +318,9 @@ jobs:
     uses: ./.github/workflows/publish-environments.yml
     with:
       reuse_production: ${{ needs.classify-changes.outputs.reuse == 'true' }}
-      publication_target: ${{ inputs.publication_target || 'both' }}
+      publication_target: ${{ inputs.publication_target || 'auto' }}
       verified_artifact_id: ${{ github.ref_name == 'main' && needs.verify.outputs.pages_id || needs.verify.outputs.development_id }}
       verified_artifact_digest: ${{ github.ref_name == 'main' && needs.verify.outputs.pages_digest || needs.verify.outputs.development_digest }}
     secrets:
-      CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ inputs.publication_target != 'pages' && github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_PRODUCTION_API_TOKEN || '' }}
-      CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ inputs.publication_target != 'pages' && secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN || '' }}
+      CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ inputs.publication_target != 'pages' && inputs.publication_target != 'none' && github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_PRODUCTION_API_TOKEN || '' }}
+      CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ inputs.publication_target != 'pages' && inputs.publication_target != 'none' && secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN || '' }}
