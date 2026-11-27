@@ -19,3 +19,11 @@ GitHub APIで `worker-development` 最新の誤Deployment `8107050354`、SHA `c3
 元の正常Deployment `7980952202`、SHA `99f6d146049133a1471bd62265089f5b65500563` は[公開run 45038169955 / job 137259637776](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45038169955/job/137259637776) に対応し、最新statusは `success`（ID 22861091348、2026-11-22 15:36:24 UTC）。過去statusは新しい順に `in_progress`（22861076849）、`queued`（22861075502、22861075273）、`waiting`（22861074385）で、inactiveへの変更は確認されなかった。元runのWorker公開・オンラインjobは成功。
 
 事前確認時、`pages-verified` HEADは `3c96a4ef4606d4890dd6c34bd0d0b59ece0b642c`、pendingはnullで、保存済み35ファイルと実配信のhashが一致した。queued・in_progress・waitingのActions runは0件。両Deploymentと全statusのAPI応答・診断workflow・台帳の写しは作業環境の `/tmp/issue69-deployment-recovery/` に保存した。Webhook一覧はGitHub APIがHTTP 403を返し、status変更による外部連携の有無を確認できなかった。削除・status変更は行っていない。
+
+## 誤Deployment復旧の再開と権限不足（2026-11-27）
+
+管理者がリポジトリWebhookは登録なし、GitHub AppsはChatGPT Codex Connectorのみ、Deployment状態から外部サービスを自動公開するその他の仕組みもないと確認し、外部連携に関する停止条件を解除した。復旧直前のAPI再確認で誤 `8107050354` が最新、正常 `7980952202` がその次で、正常statusは元の `success`（ID 22861091348）、Pages pendingはnull、queued・in_progress・waiting runは0件だった。
+
+誤Deploymentに限定し、説明 `Recovery of record accidentally created by read-only diagnostic`、`auto_inactive=false` で `inactive` statusの追加を要求したが、GitHub APIはHTTP 403 `Resource not accessible by integration` を返し、必要権限として `deployments=write` を示した。書き込みを停止し、削除APIは実行していない。再取得により誤記録の最新statusは診断jobの `success`（ID 23297617226）のまま、正常記録も元の `success` のままと確認した。`pages-verified` HEADは変わらず、保存済み35ファイルと実配信は再照合ですべて一致した。Worker・Pagesの再公開、正常Deploymentのstatus変更、DOデータや独立基準への操作は行っていない。
+
+復旧は未完了であり、旧監査の開発Worker Deployment SHA不一致は残る。管理者が対象・最新状態・競合を再確認し、Deployment書き込み権限を持つ承認済み手段で誤 `8107050354` だけをinactive化し、GitHubの削除APIのHTTP 204と再取得を確認する必要がある。正常 `7980952202` のstatusが引き続きsuccessなら変更しない。削除後に旧監査、台帳HEAD・pending、snapshotと実配信を再照合し、その結果を追記する。現在のCloudflare versionに対応するソースSHAは引き続き未確定であり、独立Worker基準の初期化を意味しない。
