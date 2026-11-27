@@ -2,6 +2,9 @@ name: Publish verified environment snapshots
 on:
   workflow_call:
     inputs:
+      publication_target:
+        type: string
+        default: both
       reuse_production:
         type: boolean
         default: false
@@ -70,7 +73,7 @@ jobs:
   reserve:
     needs: [worker-credentials, verify-production-source]
     if: >-
-      ${{ !cancelled() && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) &&
+      ${{ !cancelled() && inputs.publication_target == 'both' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) &&
         needs.worker-credentials.result == 'success' &&
         ((inputs.reuse_production && needs.verify-production-source.result == 'success') ||
           (!inputs.reuse_production && needs.verify-production-source.result == 'skipped')) }}
@@ -103,6 +106,18 @@ jobs:
         with:
           name: checked-production-zip-${{ github.run_attempt }}
           path: ${{ runner.temp }}/checked-production
+      - name: Prevent the legacy route from bypassing independent Worker records
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          environment=development
+          if [[ "$GITHUB_REF" == refs/heads/main ]]; then environment=production; fi
+          count="$(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=heibon-independent-worker-$environment&per_page=1" --jq 'length')"
+          if [[ "$count" != 0 ]]; then
+            echo '::error::Independent Worker records exist; the legacy combined route must not bypass them.'
+            exit 1
+          fi
       - name: Reserve the verified snapshot before deploying the Worker
         id: reserve
         env:
@@ -139,6 +154,67 @@ jobs:
             git -C store push origin HEAD:pages-verified
           fi
           printf 'snapshot=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  worker-only:
+    needs: [worker-credentials, verify-production-source]
+    if: >-
+      ${{ !cancelled() && inputs.publication_target == 'worker'
+        && inputs.reuse_production == false
+        && needs.worker-credentials.result == 'success'
+        && needs.verify-production-source.result == 'skipped'
+        && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true'
+        && (github.ref == 'refs/heads/main' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.ref == 'refs/heads/main' && 'worker-production' || 'worker-development' }}
+      cancel-in-progress: false
+    environment: ${{ github.ref == 'refs/heads/main' && 'worker-production' || 'worker-development' }}
+    permissions:
+      contents: read
+      actions: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Validate Worker configuration and same-SHA Issue CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRODUCTION_WORKER_URL: ${{ vars.PRODUCTION_WORKER_URL }}
+          DEVELOPMENT_WORKER_URL: ${{ vars.DEVELOPMENT_WORKER_URL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/heads/main ]]; then node .github/scripts/validate-publication-settings.mjs production-reuse; else node .github/scripts/validate-publication-settings.mjs; fi
+          if [[ "$GITHUB_REF" == refs/heads/issue/* ]]; then node .github/scripts/check-issue-publication-ci.mjs; fi
+      - name: Record start and publish the selected Worker
+        id: worker
+        run: node .github/scripts/deploy-isolated-worker.mjs independent
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets[github.ref == 'refs/heads/main' && 'CLOUDFLARE_PRODUCTION_API_TOKEN' || 'CLOUDFLARE_DEVELOPMENT_API_TOKEN'] }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Verify the deployed Worker online
+        run: npm run test:online:production
+        env:
+          ONLINE_API_URL: ${{ steps.worker.outputs.url }}
+          ONLINE_TEST_ORIGIN: https://ak-sekine.github.io
+          ONLINE_SECONDARY_TEST_ORIGIN: ${{ github.ref == 'refs/heads/main' && 'https://html-classic.itch.zone' || '' }}
+      - name: Record successful online verification
+        run: node .github/scripts/worker-online-confirm.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets[github.ref == 'refs/heads/main' && 'CLOUDFLARE_PRODUCTION_API_TOKEN' || 'CLOUDFLARE_DEVELOPMENT_API_TOKEN'] }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          WORKER_DEPLOYMENT_ID: ${{ steps.worker.outputs.deployment }}
+          WORKER_VERSION: ${{ steps.worker.outputs.version }}
   worker-production:
     needs: reserve
     if: ${{ !cancelled() && needs.reserve.result == 'success' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' }}
@@ -365,3 +441,11 @@ jobs:
     steps:
       - name: Report incomplete publication
         run: exit 1
+
+  check-worker-only-completion:
+    needs: [worker-only]
+    if: ${{ !cancelled() && inputs.publication_target == 'worker' && needs.worker-only.result != 'success' }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - run: exit 1

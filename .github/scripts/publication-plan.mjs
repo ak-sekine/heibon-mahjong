@@ -6,6 +6,7 @@ const pipelinePaths = new Set([
   '.github/workflows/browser-ui.yml', '.github/scripts/publication-plan.mjs', '.github/scripts/pages-artifact-check.mjs',
   '.github/scripts/classify-changes.mjs', '.github/scripts/deployment-decision.mjs', '.github/scripts/deployment-state.mjs',
   '.github/scripts/publication-reservation.mjs', '.github/scripts/deploy-isolated-worker.mjs',
+  '.github/scripts/worker-independent.mjs', '.github/scripts/worker-online-confirm.mjs',
   '.github/scripts/reuse-production-ci.mjs', '.github/scripts/audit-main-publication.mjs',
 ]);
 

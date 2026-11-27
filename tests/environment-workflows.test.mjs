@@ -30,7 +30,7 @@ function jobCondition(workflow, id) {
   assert.match(expression, /^\$\{\{[\s\S]*\}\}$/);
   return expression.slice(3, -2).trim();
 }
-function workflowContext({ branch = 'develop', repository = 'ak-sekine/heibon-mahjong', ref = `refs/heads/${branch}`, event = 'workflow_dispatch', publish = true, dualPages = 'true', canceled = false, results = {}, fullSuite = 'true', reuse = 'false', reuseProduction = false, productionValidation = 'full' } = {}) {
+function workflowContext({ branch = 'develop', repository = 'ak-sekine/heibon-mahjong', ref = `refs/heads/${branch}`, event = 'workflow_dispatch', publish = true, dualPages = 'true', canceled = false, results = {}, fullSuite = 'true', reuse = 'false', reuseProduction = false, productionValidation = 'full', publicationTarget = 'both' } = {}) {
   const jobResults = {
     'classify-changes': 'success', 'docs-check': 'success', verify: 'success', 'browser-ui': 'success', 'isolation-browser': 'success',
     'local-online': 'success', audit: 'success', 'worker-credentials': 'success', 'verify-production-source': 'skipped', ...results,
@@ -38,7 +38,7 @@ function workflowContext({ branch = 'develop', repository = 'ak-sekine/heibon-ma
   return {
     github: { ref, event_name: event, repository },
     startsWith: (value, prefix) => value.startsWith(prefix),
-    inputs: { publish, reuse_production: reuseProduction, production_validation: productionValidation },
+    inputs: { publish, reuse_production: reuseProduction, production_validation: productionValidation, publication_target: publicationTarget },
     vars: { DUAL_PAGES_ENABLED: dualPages },
     needs: Object.fromEntries(Object.entries(jobResults).map(([name, result]) => [name, {
       result,
@@ -251,7 +251,7 @@ test('new publication remains manual and branch scoped; legacy production gate i
     assert.equal(evaluateJobCondition(condition, workflowContext({ branch: 'issue/64-main-github-flow', ...overrides }), []), false);
   }
   const legacy = read('.github/workflows/deploy.yml');
-  assert.match(legacy, /group: production-deploy[\s\S]*?cancel-in-progress: false/);
+  assert.match(legacy, /group: pages-publication[\s\S]*?cancel-in-progress: false/);
   assert.match(legacy, /if: \$\{\{ vars\.DUAL_PAGES_ENABLED != 'true' \}\}/);
   assert.match(legacy, /deploy_to_production:[\s\S]*?type: boolean[\s\S]*?default: false/);
   assert.match(legacy, /needs\.detect-changes\.outputs\.deploy_required == 'true'[\s\S]*?needs\.verify\.result == 'success'[\s\S]*?needs\.browser-ui\.result == 'success'[\s\S]*?needs\.browser-ui-matrix-audit\.result == 'success'[\s\S]*?needs\.release-freshness\.result == 'success'[\s\S]*?inputs\.deploy_to_production == true/);
@@ -525,4 +525,43 @@ test('a reserved publication fails closed if Pages or the required production au
     assert.equal(evaluateJobCondition(condition, workflowContext({ branch: 'main', ...options, results }),
       Object.values(results)), false);
   }
+});
+
+test('independent Worker job is manual, branch scoped, requires credentials and skips the combined reserve', () => {
+  const publisher = read('.github/workflows/publish-environments.yml');
+  const worker = jobCondition(publisher, 'worker-only');
+  const reserve = jobCondition(publisher, 'reserve');
+  for (const branch of ['main', 'issue/69-test']) {
+    const context = workflowContext({ branch, publicationTarget: 'worker' });
+    assert.equal(evaluateJobCondition(worker, context, ['success', 'skipped']), true);
+    assert.equal(evaluateJobCondition(reserve, context, ['success', 'skipped']), false);
+    context.needs['worker-credentials'].result = 'failure';
+    assert.equal(evaluateJobCondition(worker, context, ['failure', 'skipped']), false);
+  }
+  for (const opts of [{ branch: 'develop' }, { event: 'push' }, { dualPages: 'false' }, { canceled: true }, { reuseProduction: true }]) {
+    assert.equal(evaluateJobCondition(worker, workflowContext({ publicationTarget: 'worker', ...opts }), ['success', 'skipped']), false);
+  }
+  const body = jobSection(publisher, 'worker-only');
+  assert.match(body, /deployments: write/);
+  assert.match(body, /environment:.*worker-production.*worker-development/);
+  assert.match(body, /check-issue-publication-ci\.mjs/);
+  assert.match(body, /test:online:production/);
+  assert.match(jobSection(publisher, 'reserve'), /Independent Worker records exist/);
+});
+
+test('worker-only caller requires every same-run CI gate and never enables production reuse', () => {
+  const workflow = read('.github/workflows/environments.yml');
+  const condition = jobCondition(workflow, 'publish');
+  for (const branch of ['main', 'issue/69-test']) {
+    const options = { branch, publicationTarget: 'worker', productionValidation: 'reuse' };
+    assert.equal(evaluateJobCondition(condition, workflowContext(options), []), true);
+    for (const gate of ['classify-changes', 'docs-check', 'verify', 'browser-ui', 'isolation-browser', 'local-online', 'audit']) {
+      assert.equal(evaluateJobCondition(condition, workflowContext({ ...options, results: { [gate]: 'failure' } }), []), false, gate);
+    }
+    assert.equal(evaluateJobCondition(condition, workflowContext({ ...options, publish: false }), []), false);
+  }
+  assert.match(jobSection(workflow, 'classify-changes'), /inputs\.publication_target != 'worker'/);
+  const old = read('.github/workflows/deploy.yml');
+  assert.match(old, /group: pages-publication/);
+  assert.match(jobSection(old, 'release-freshness'), /heibon-independent-worker-production/);
 });

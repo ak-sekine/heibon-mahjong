@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: production-deploy
+  group: pages-publication
   cancel-in-progress: false
 
 jobs:
@@ -87,6 +87,9 @@ jobs:
           echo "Release target SHA: $HEAD_REF"
 
   release-freshness:
+    permissions:
+      contents: read
+      deployments: read
     needs: [detect-changes, verify, browser-ui, browser-ui-matrix-audit]
     if: >-
       ${{
@@ -113,6 +116,11 @@ jobs:
           latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
           if [[ "$latest_sha" != "$TARGET_SHA" ]]; then
             echo "::error::Refusing to publish stale SHA $TARGET_SHA; main is now $latest_sha. The newer run must publish the latest commit."
+            exit 1
+          fi
+          count="$(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=heibon-independent-worker-production&per_page=1" --jq 'length')"
+          if [[ "$count" != 0 ]]; then
+            echo '::error::Independent Worker records exist; the legacy production route must not bypass them.'
             exit 1
           fi
           echo "Verified release target $TARGET_SHA is current main."

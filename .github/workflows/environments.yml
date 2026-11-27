@@ -11,6 +11,11 @@ on:
         required: true
         type: boolean
         default: false
+      publication_target:
+        description: Choose the existing combined publication or the independent Worker route.
+        type: choice
+        options: [both, worker]
+        default: both
       production_validation:
         description: Reuse verified main push CI, or explicitly run full validation for production.
         type: choice
@@ -28,7 +33,7 @@ jobs:
         ${{ github.repository == 'ak-sekine/heibon-mahjong'
           && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
           && inputs.publish == true && vars.DUAL_PAGES_ENABLED == 'true'
-          && inputs.production_validation == 'reuse' }}
+          && inputs.production_validation == 'reuse' && inputs.publication_target != 'worker' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -284,17 +289,18 @@ jobs:
           || (needs.classify-changes.outputs.reuse == 'false' && needs.verify.result == 'success'
             && needs.browser-ui.result == 'success' && needs.isolation-browser.result == 'success'
             && needs.local-online.result == 'success' && needs.audit.result == 'success'
-            && (github.ref != 'refs/heads/main' || inputs.production_validation == 'full'))) }}
+            && (github.ref != 'refs/heads/main' || inputs.production_validation == 'full' || inputs.publication_target == 'worker'))) }}
     needs: [classify-changes, docs-check, verify, browser-ui, isolation-browser, local-online, audit]
     permissions:
       contents: write
       pages: write
       id-token: write
       actions: read
-      deployments: read
+      deployments: write
     uses: ./.github/workflows/publish-environments.yml
     with:
       reuse_production: ${{ needs.classify-changes.outputs.reuse == 'true' }}
+      publication_target: ${{ inputs.publication_target || 'both' }}
     secrets:
       CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_PRODUCTION_API_TOKEN || '' }}
       CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}
