@@ -50,3 +50,11 @@ node .github/scripts/pages-independent-recovery.mjs <pending-checkout> <parent-c
 原因をテスト固有と断定できないため、製品・テストの修正、根拠のない再試行およびauto実行は行わない。次の調査では保存済みArtifactをアクセス可能な方法で確認し、必要なら320×480に限定してclose・focus・viewport・pointer/clickの時系列を観測する。観測結果を基に実UIとテスト操作を区別してから最小修正を判断する。
 
 調査時点のGitHub記録では開発Worker独立Deployment 8111581288 は公開SHA `da1962ce27c500d9e01b998df2f0828794a7c1cd`、最新statusは `success` / `verified:132dd0c6-57e4-444b-9515-0bda6392ca2f`。Pages stateは開発の同SHA、本番 `8b66b925fad1eab2a773a512e0e36b9e87eb3b01`、pending null。Cloudflare稼働versionの今回の直接再確認や実配信の全ファイル再照合は行っていない。autoは候補SHA変更後の実行承認と、必須CI・直前の公開状態確認を必要とする。
+
+### 320×480 WebKit 限定再現診断（2026-11-27）
+
+既存ResultReopenTraceをWebKit 320×480にも適用し、既存の1280×800での診断は維持した。操作・assertionは変更せず、主要mark・window captureイベント・上限・停止理由・欠落件数をログに要約した。候補 `50555c9cff141008d01d6c4d9d5cdc1e3c71d561` の [限定診断 46025650946](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46025650946) は1回実行し成功、元の失敗は再現しなかった。追加診断は行っていない。
+
+320×480の記録では、320×320で最終順位を閉じた後にフォーカスが再表示ボタンへ戻り、viewportを320×480へ復元すると局結果ボタンは同じDOM tokenのまま `(11, 240.59375, 146, 44)` から `(11, 400.59375, 146, 44)` に移動した。クリック直前のhit testは当該ボタンで、pointerdown、mousedown、pointerup、mouseup、clickが到達し、window capture時点ではdefaultPreventedはいずれもfalseだった。pointercancel、lostpointercaptureは記録されず、結果ダイアログは開いてフォーカスが卓表示ボタンへ移った。既存assertionがResultDialog.openの1回呼び出しを確認した。traceの停止理由はtest-finished、480件上限でdropped 0、主要markはすべて存在した。window capture時点のdefaultPreventedは後続の処理による変更を証明しない。
+
+成功した1回の時系列は元の失敗を説明せず、製品不具合とテスト固有問題のいずれとも特定できない。既存の失敗ArtifactのHTTP 403を繰り返さず、成功するまでの再試行も行わなかった。自動CIの結果は診断コミットに紐付く実行を参照する。auto公開は実行していない。
