@@ -66,3 +66,7 @@ node .github/scripts/pages-independent-recovery.mjs <pending-checkout> <parent-c
 前後ともpages-verified HEADは `1fe28edd010856a79e9f300732d13ce7735181e4`、pending null、本番Pages SHA `8b66b925fad1eab2a773a512e0e36b9e87eb3b01`、開発Pages SHA `da1962ce27c500d9e01b998df2f0828794a7c1cd`、開発snapshotDigest `ee6ddf1402f38dc6eb52f591a42c36f5a9effe06067825222cfd5ab3d7f710bf`。開発Workerの独立Deployment 8111581288は同公開SHA、最新status 23312614759は `success` / `verified:132dd0c6-57e4-444b-9515-0bda6392ca2f` のままだった。今回のrunでWorker・Pagesの公開処理は実行されていない。Cloudflare稼働versionの照合はplan-autoの成功に基づき、run後の別途直接照合は行っていない。
 
 開発Worker初回公開・オンライン検証は[run 46010218955](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46010218955)、開発Pages専用公開・確定・auditは[run 46019125645](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46019125645)で成功済み。今回のautoと合わせPhase 3-Bの自動検証を完了とする。過去のWebKit失敗の原因は未確定。iPhone Safari実機での開発Pages起動、CPU対局、オンライン卓作成・参加・同期・再接続、PWA起動と環境分離は未確認であり、自動検証と区別する。本番Workerの現在versionを直接確認していない。main統合・本番切替は未実施。
+
+### 開発環境のiPhone Safari実機確認（2026-11-28）
+
+ユーザー本人による報告：開発Pages正常起動、CPU対局の開始・基本操作、局結果・最終順位を閉じた後の再表示、オンライン卓の作成・参加、操作・状態同期、切断後の再接続、開発PWAの更新・再起動、本番・開発の設定・保存情報の分離はいずれもOK。OK 8件、NG 0件、報告対象内の未確認0件。過去のWebKit失敗は限定診断で非再現、後続必須CI成功、今回の実機確認OKだが、根本原因は未確定。
