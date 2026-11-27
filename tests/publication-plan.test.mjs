@@ -44,6 +44,8 @@ test('classifies product and tooling changes, including shared transitive import
   assert.equal(pathImpact('.github/scripts/unclassified.mjs'), 'unknown');
   assert.equal(pathImpact('docs/unclassified.js'), 'unknown');
   assert.equal(pathImpact('docs/verification/result.png'), 'none');
+  assert.equal(pathImpact('docs/verification/result.jsonl'), 'none');
+  assert.equal(pathImpact('docs/verification/new-format.webp'), 'unknown');
   // A deleted or renamed historical path still appears in a no-renames diff.
   for (const file of [
     '.github/scripts/check-browser-ui-matrix.mjs', '.github/scripts/check-issue-publication-ci.mjs',
