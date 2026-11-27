@@ -100,3 +100,59 @@ test('online failure, verification recording failure and a newer competing recor
     assert.equal(f.deploys, 1);
   }
 });
+
+for (const branch of ['main', 'issue/69-test']) test(`first Worker publication establishes the verified ${branch} baseline`, async () => {
+  const f = fixture(branch); f.records.length = 0;
+  f.config.firstPublication = true; f.config.expectedCurrentVersion = oldVersion;
+  const result = await publishWorker(f.config, f.api, f.deploy, f.git);
+  assert.equal(result.workerPending, null);
+  assert.equal(f.records[0].statuses[0].description, `deployed:${newVersion}`);
+  await assert.rejects(inspectWorker(f.config, f.api), /incomplete/);
+  await confirmOnline(f.config, f.api, result.id, result.version);
+  assert.deepEqual(await inspectWorker(f.config, f.api), { id: result.id, sha, version: newVersion });
+  await assert.rejects(publishWorker(f.config, f.api, f.deploy, f.git), /no existing independent record/);
+  assert.equal(f.deploys, 1);
+});
+
+test('first Worker publication fails closed before deploy on missing proof, competing record or version change', async () => {
+  for (const scenario of ['record', 'api-error', 'invalid-list', 'wrong-version', 'split', 'record-race', 'version-race', 'ref-race', 'create-error']) {
+    const f = fixture(); f.records.length = 0; f.config.firstPublication = true; f.config.expectedCurrentVersion = oldVersion;
+    if (scenario === 'record') f.records.push({ id: 1, statuses: [{ state: 'failure' }] });
+    if (scenario === 'api-error') f.api.list = async () => { throw Error('API unavailable'); };
+    if (scenario === 'invalid-list') f.api.list = async () => ({ error: 'not a deployment list' });
+    if (scenario === 'wrong-version') f.active = newVersion;
+    if (scenario === 'split') f.api.live = async () => ({ success: true, result: { deployments: [{ versions: [{ version_id: oldVersion, percentage: 50 }, { version_id: newVersion, percentage: 50 }] }] } });
+    if (scenario === 'record-race') { let n=0; f.api.list = async () => ++n === 1 ? [] : [{ id: 3 }]; }
+    if (scenario === 'version-race') { let n=0; f.api.live = async () => ({ success: true, result: { deployments: [{ versions: [{ version_id: ++n === 1 ? oldVersion : newVersion, percentage: 100 }] }] } }); }
+    if (scenario === 'ref-race') { let n=0; f.api.ref = async () => ({ object: { sha: ++n === 1 ? sha : oldSha } }); }
+    if (scenario === 'create-error') f.failStart = true;
+    await assert.rejects(publishWorker(f.config, f.api, f.deploy, f.git), undefined, scenario);
+    assert.equal(f.deploys, 0, scenario);
+  }
+});
+
+test('first Worker publication preserves unresolved records after start, deploy or online failure', async () => {
+  for (const scenario of ['pending-status-failure', 'cancel', 'record-failure', 'online-failure', 'verified-status-failure']) {
+    const f = fixture(); f.records.length = 0; f.config.firstPublication = true; f.config.expectedCurrentVersion = oldVersion;
+    if (scenario === 'record-failure') f.failSuccess = true;
+    if (scenario === 'pending-status-failure') f.api.status = async () => { throw Error('pending denied'); };
+    if (scenario === 'online-failure' || scenario === 'verified-status-failure') {
+      const result = await publishWorker(f.config, f.api, f.deploy, f.git);
+      if (scenario === 'verified-status-failure') {
+        f.api.status = async () => { throw Error('verification denied'); };
+        await assert.rejects(confirmOnline(f.config, f.api, result.id, result.version), /verification denied/);
+      }
+      await assert.rejects(inspectWorker(f.config, f.api), /incomplete/);
+    } else await assert.rejects(publishWorker(f.config, f.api, scenario === 'cancel' ? async () => { throw Error('cancelled'); } : f.deploy, f.git));
+    await assert.rejects(publishWorker(f.config, f.api, f.deploy, f.git), /no existing independent record/);
+    assert.ok(f.records.length === 1);
+    if (scenario === 'pending-status-failure') assert.equal(f.deploys, 0);
+  }
+});
+
+test('first publication input requires explicit worker target, publish and valid approved version', () => {
+  const input = { ...env(), WORKER_FIRST_PUBLICATION: 'true', PUBLICATION_TARGET: 'worker', PUBLISH_REQUESTED: 'true', EXPECTED_CURRENT_WORKER_VERSION: oldVersion };
+  assert.equal(configuration(input).expectedCurrentVersion, oldVersion);
+  for (const override of [{ PUBLICATION_TARGET: 'pages' }, { PUBLICATION_TARGET: 'both' }, { PUBLICATION_TARGET: 'auto' }, { PUBLICATION_TARGET: 'none' }, { PUBLISH_REQUESTED: 'false' }, { EXPECTED_CURRENT_WORKER_VERSION: '' }]) assert.throws(() => configuration({ ...input, ...override }), /Invalid first/);
+  assert.throws(() => configuration({ ...input, WORKER_FIRST_PUBLICATION: 'false' }), /Unexpected/);
+});

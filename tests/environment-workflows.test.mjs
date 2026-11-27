@@ -30,15 +30,15 @@ function jobCondition(workflow, id) {
   assert.match(expression, /^\$\{\{[\s\S]*\}\}$/);
   return expression.slice(3, -2).trim();
 }
-function workflowContext({ branch = 'develop', repository = 'ak-sekine/heibon-mahjong', ref = `refs/heads/${branch}`, event = 'workflow_dispatch', publish = true, dualPages = 'true', canceled = false, results = {}, fullSuite = 'true', reuse = 'false', reuseProduction = false, productionValidation = 'full', publicationTarget = 'both', pagesResume = false, autoPages = 'false', autoWorker = 'false', autoClassification = 'none' } = {}) {
+function workflowContext({ branch = 'develop', repository = 'ak-sekine/heibon-mahjong', ref = `refs/heads/${branch}`, event = 'workflow_dispatch', publish = true, dualPages = 'true', canceled = false, results = {}, fullSuite = 'true', reuse = 'false', reuseProduction = false, productionValidation = 'full', publicationTarget = 'both', pagesResume = false, firstWorker = false, autoPages = 'false', autoWorker = 'false', autoClassification = 'none' } = {}) {
   const jobResults = {
     'classify-changes': 'success', 'docs-check': 'success', verify: 'success', 'browser-ui': 'success', 'isolation-browser': 'success',
-    'local-online': 'success', audit: 'success', 'worker-credentials': 'success', 'verify-production-source': 'skipped', 'plan-auto': 'skipped', 'resume-preflight': 'skipped', ...results,
+    'local-online': 'success', audit: 'success', 'worker-credentials': 'success', 'verify-production-source': 'skipped', 'plan-auto': 'skipped', 'resume-preflight': 'skipped', 'validate-worker-first-publication': firstWorker ? 'success' : 'skipped', ...results,
   };
   return {
     github: { ref, event_name: event, repository },
     startsWith: (value, prefix) => value.startsWith(prefix),
-    inputs: { publish, reuse_production: reuseProduction, production_validation: productionValidation, publication_target: publicationTarget, pages_resume: pagesResume },
+    inputs: { publish, reuse_production: reuseProduction, production_validation: productionValidation, publication_target: publicationTarget, pages_resume: pagesResume, worker_first_publication: firstWorker },
     vars: { DUAL_PAGES_ENABLED: dualPages },
     needs: Object.fromEntries(Object.entries(jobResults).map(([name, result]) => [name, {
       result,
@@ -238,6 +238,26 @@ test('worker-only caller requires every same-run CI gate and never enables produ
   const old = read('.github/workflows/deploy.yml');
   assert.match(old, /group: pages-publication/);
   assert.match(jobSection(old, 'release-freshness'), /heibon-independent-worker-production/);
+});
+
+test('first Worker publication requires a successful input gate and never selects Pages', () => {
+  const caller = read('.github/workflows/environments.yml');
+  const publisher = read('.github/workflows/publish-environments.yml');
+  const gate = jobSection(caller, 'validate-worker-first-publication');
+  const script = gate.match(/run: \|\n((?: {10}[^\n]*\n)+)/)?.[1];
+  assert.ok(script);
+  const runGate = overrides => spawnSync('bash', ['-c', script], { env: { FIRST:'true', PUBLISH:'true', TARGET:'worker', VERSION:'11111111-1111-4111-8111-111111111111', ...overrides } }).status;
+  assert.equal(runGate({}), 0);
+  for (const overrides of [{FIRST:'false'}, {PUBLISH:'false'}, {TARGET:'pages'}, {TARGET:'both'}, {TARGET:'auto'}, {TARGET:'none'}, {VERSION:'invalid'}]) assert.notEqual(runGate(overrides), 0);
+  const opts = { branch:'issue/69-test', publicationTarget:'worker', firstWorker:true };
+  assert.equal(evaluateJobCondition(jobCondition(caller, 'publish'), workflowContext(opts), []), true);
+  assert.equal(evaluateJobCondition(jobCondition(caller, 'publish'), workflowContext({ ...opts, results:{ 'validate-worker-first-publication':'failure' } }), []), false);
+  assert.equal(evaluateJobCondition(jobCondition(publisher, 'pages-only'), workflowContext({ ...opts, publicationTarget:'both' }), []), false);
+  assert.equal(evaluateJobCondition(jobCondition(publisher, 'worker-only'), workflowContext(opts), []), true);
+  for (const publicationTarget of ['pages','both','auto','none']) assert.equal(evaluateJobCondition(jobCondition(publisher, 'worker-only'), workflowContext({ ...opts, publicationTarget }), []), false);
+  const job = jobSection(publisher, 'worker-only');
+  assert.match(job, /WORKER_FIRST_PUBLICATION:/); assert.match(job, /EXPECTED_CURRENT_WORKER_VERSION:/);
+  assert.doesNotMatch(job, /pages-verified|deploy-pages|upload-pages-artifact/);
 });
 
 test('Pages-only route skips Worker credentials and reservation and preserves full or reused CI gates', () => {

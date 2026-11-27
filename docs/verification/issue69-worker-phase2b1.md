@@ -1,5 +1,13 @@
 # Issue #69 Phase 2-B-1: Worker 専用候補
 
+## 初回公開の候補（未導入）
+
+独立Deployment記録のない環境では、承認済み `environments.yml` 手動実行で `publish=true`、`publication_target=worker`、`worker_first_publication=true`、`expected_current_worker_version=<直前に確認・承認した稼働version UUID>` を指定する。本番は最新main、開発は承認済みIssue候補で、既存の同一SHA必須CI、Environment、共有排他、環境別Workerとオンライン検証を維持する。別対象、空・不正なversion、publish=falseは拒否する。
+
+Cloudflareが単一version・traffic 100%であり、指定versionと一致することと、独立Deploymentが空であることを公開前に二度確認する。APIエラー、既存の成功・失敗・pending・不明記録、version変更、競合は停止する。過去のソースSHAは推測せず、開始記録・deploy・deployed・オンライン確認・verifiedの処理は通常公開と共通。開始記録後に失敗した場合は記録を消して再実行せず、公開結果を再照合する。verified記録後、通常のWorker基準取得を再確認する。
+
+初回開発公開前に旧ref・手動公開の停止と権限を確認し、現時点のCloudflare versionを読み取り、対象環境とversionについて承認を受ける。過去の `2f35e7e9-8e31-4cb8-9032-d20299e7e7a3` は現在値として流用しない。初回公開成功後、開発Pages専用公開とautoの公開不要判定を検証する。実公開、独立基準の初期化、main統合は未実施。
+
 この文書は候補ブランチの実装と未検証事項を記録する。新方式は実公開・実台帳移行済みではない。現行方式の運用規則を置き換えない。
 
 ## 候補の経路

@@ -26,7 +26,10 @@ export function configuration(env) {
   if (identity.environment === 'production' && (env.GITHUB_WORKFLOW_REF !== `${env.GITHUB_REPOSITORY}/.github/workflows/environments.yml@refs/heads/main` || env.GITHUB_WORKFLOW_SHA !== identity.sha)) throw new Error('Wrong production workflow identity');
   const spec = specs[identity.environment];
   if (env.EXPECTED_WORKER_URL !== spec.url) throw new Error('Worker URL or environment mismatch');
-  return { ...identity, ...spec, repository: env.GITHUB_REPOSITORY, account: env.CLOUDFLARE_ACCOUNT_ID, githubToken: env.GH_TOKEN, cloudflareToken: env.CLOUDFLARE_API_TOKEN, ledgerEnvironment: `heibon-independent-worker-${identity.environment}` };
+  const firstPublication = env.WORKER_FIRST_PUBLICATION === 'true';
+  if (firstPublication && (env.PUBLICATION_TARGET !== 'worker' || env.PUBLISH_REQUESTED !== 'true' || !UUID.test(env.EXPECTED_CURRENT_WORKER_VERSION || ''))) throw new Error('Invalid first Worker publication request');
+  if (!firstPublication && (env.WORKER_FIRST_PUBLICATION && env.WORKER_FIRST_PUBLICATION !== 'false' || env.EXPECTED_CURRENT_WORKER_VERSION)) throw new Error('Unexpected first Worker publication inputs');
+  return { ...identity, ...spec, firstPublication, expectedCurrentVersion: firstPublication ? env.EXPECTED_CURRENT_WORKER_VERSION.toLowerCase() : '', repository: env.GITHUB_REPOSITORY, account: env.CLOUDFLARE_ACCOUNT_ID, githubToken: env.GH_TOKEN, cloudflareToken: env.CLOUDFLARE_API_TOKEN, ledgerEnvironment: `heibon-independent-worker-${identity.environment}` };
 }
 
 export function createApi(config, fetchImpl = fetch) {
@@ -67,17 +70,31 @@ export async function inspectWorker(config, api) {
   return { sha: d.sha, version, id: d.id };
 }
 
+async function inspectFirstWorker(config, api) {
+  if (!config.firstPublication || !UUID.test(config.expectedCurrentVersion || '')) throw new Error('First Worker publication is not explicitly authorized');
+  const records = await api.list();
+  if (!Array.isArray(records) || records.length !== 0) throw new Error('First Worker publication requires no existing independent record');
+  const version = activeVersion(await api.live());
+  if (version !== config.expectedCurrentVersion) throw new Error('Current Worker version differs from the approved version');
+  return version;
+}
+
 export async function publishWorker(config, api, deploy, git = execFileSync) {
-  const baseline = await inspectWorker(config, api);
-  const plan = planPublication({ environment: config.environment, candidate: config.sha, workerBase: baseline.sha, pagesBase: '', target: 'worker', git });
+  const baseline = config.firstPublication ? await inspectFirstWorker(config, api) : await inspectWorker(config, api);
+  const plan = config.firstPublication ? { classification: 'unknown', workerPending: null } : planPublication({ environment: config.environment, candidate: config.sha, workerBase: baseline.sha, pagesBase: '', target: 'worker', git });
   if (plan.blocked) throw new Error(`Worker change comparison failed: ${plan.reason}`);
   if ((await api.ref(config.branch))?.object?.sha !== config.sha) throw new Error('Stale source SHA');
   if (config.environment === 'development') {
     const base = (await api.ref('main'))?.object?.sha;
     if (!SHA.test(base || '') || (await api.compare(base, config.sha))?.status !== 'ahead' || (await api.ref('main'))?.object?.sha !== base) throw new Error('Issue candidate must be based on current main');
   }
-  const checked = await inspectWorker(config, api);
-  if (checked.id !== baseline.id || checked.sha !== baseline.sha || checked.version !== baseline.version) throw new Error('Worker publication history changed during preflight');
+  if ((await api.ref(config.branch))?.object?.sha !== config.sha) throw new Error('Stale source SHA');
+  if (config.firstPublication) {
+    if (await inspectFirstWorker(config, api) !== baseline) throw new Error('Worker changed during first publication preflight');
+  } else {
+    const checked = await inspectWorker(config, api);
+    if (checked.id !== baseline.id || checked.sha !== baseline.sha || checked.version !== baseline.version) throw new Error('Worker publication history changed during preflight');
+  }
   const deployment = await api.create({ ref: config.sha, environment: config.ledgerEnvironment, auto_merge: false, required_contexts: [], transient_environment: false, production_environment: false, description: `Worker ${config.environment} publication`, payload: { worker: config.name, environment: config.environment, runId: config.runId, attempt: config.attempt } });
   if (!Number.isSafeInteger(deployment?.id) || deployment.sha !== config.sha || deployment.environment !== config.ledgerEnvironment || deployment.payload?.runId !== config.runId || deployment.payload?.attempt !== config.attempt) throw new Error('Worker start record not confirmed');
   const pending = await api.status(deployment.id, { state: 'pending', description: 'Worker deployment requested', auto_inactive: false });
@@ -109,6 +126,8 @@ export async function confirmOnline(config, api, id, version) {
   if (activeVersion(await api.live()) !== version) throw new Error('Worker changed before online confirmation');
   const recorded = await api.status(id, { state: 'success', description: `verified:${version}`, auto_inactive: false });
   if (recorded?.state !== 'success' || recorded.description !== `verified:${version}`) throw new Error('Online verification record not confirmed');
+  const confirmed = await inspectWorker(config, api);
+  if (confirmed.id !== id || confirmed.sha !== config.sha || confirmed.version !== version) throw new Error('Verified Worker baseline could not be confirmed');
 }
 
 export async function runIndependentWorker(env = process.env) {

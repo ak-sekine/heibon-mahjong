@@ -2,6 +2,12 @@ name: Publish verified environment snapshots
 on:
   workflow_call:
     inputs:
+      worker_first_publication:
+        type: boolean
+        default: false
+      expected_current_worker_version:
+        type: string
+        default: ''
       pages_resume:
         type: boolean
         default: false
@@ -92,7 +98,7 @@ jobs:
           fi
   plan-auto:
     needs: worker-credentials
-    if: ${{ !cancelled() && inputs.publication_target == 'auto' && needs.worker-credentials.result == 'success' }}
+    if: ${{ !cancelled() && !inputs.worker_first_publication && inputs.publication_target == 'auto' && needs.worker-credentials.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'worker-production' || 'worker-development' }}
@@ -224,7 +230,7 @@ jobs:
   pages-only:
     needs: [worker-credentials, verify-production-source, plan-auto, resume-preflight]
     if: >-
-      ${{ !cancelled() && (inputs.publication_target == 'pages' || inputs.publication_target == 'both' || (inputs.publication_target == 'auto' && needs.plan-auto.result == 'success' && needs.plan-auto.outputs.pages == 'true'))
+      ${{ !cancelled() && !inputs.worker_first_publication && (inputs.publication_target == 'pages' || inputs.publication_target == 'both' || (inputs.publication_target == 'auto' && needs.plan-auto.result == 'success' && needs.plan-auto.outputs.pages == 'true'))
         && ((inputs.publication_target == 'pages' && needs.worker-credentials.result == 'skipped') || (inputs.publication_target != 'pages' && needs.worker-credentials.result == 'success'))
         && ((inputs.reuse_production && needs.verify-production-source.result == 'success') || (!inputs.reuse_production && needs.verify-production-source.result == 'skipped'))
         && ((inputs.pages_resume && needs.resume-preflight.result == 'success') || (!inputs.pages_resume && needs.resume-preflight.result == 'skipped'))
@@ -416,7 +422,7 @@ jobs:
   worker-only:
     needs: [worker-credentials, verify-production-source, plan-auto]
     if: >-
-      ${{ !cancelled() && (inputs.publication_target == 'worker' || inputs.publication_target == 'both' || (inputs.publication_target == 'auto' && needs.plan-auto.result == 'success' && needs.plan-auto.outputs.worker == 'true'))
+      ${{ !cancelled() && (!inputs.worker_first_publication || inputs.publication_target == 'worker') && (inputs.publication_target == 'worker' || inputs.publication_target == 'both' || (inputs.publication_target == 'auto' && needs.plan-auto.result == 'success' && needs.plan-auto.outputs.worker == 'true'))
         && needs.worker-credentials.result == 'success'
         && ((inputs.reuse_production && needs.verify-production-source.result == 'success') || (!inputs.reuse_production && needs.verify-production-source.result == 'skipped'))
         && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true'
@@ -458,6 +464,10 @@ jobs:
           EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
           CLOUDFLARE_API_TOKEN: ${{ secrets[github.ref == 'refs/heads/main' && 'CLOUDFLARE_PRODUCTION_API_TOKEN' || 'CLOUDFLARE_DEVELOPMENT_API_TOKEN'] }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          WORKER_FIRST_PUBLICATION: ${{ inputs.worker_first_publication }}
+          EXPECTED_CURRENT_WORKER_VERSION: ${{ inputs.expected_current_worker_version }}
+          PUBLICATION_TARGET: ${{ inputs.publication_target }}
+          PUBLISH_REQUESTED: 'true'
       - name: Verify the deployed Worker online
         run: npm run test:online:production
         env:

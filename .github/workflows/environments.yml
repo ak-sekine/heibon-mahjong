@@ -6,6 +6,14 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      worker_first_publication:
+        description: First independent Worker publication only (requires an approved current version).
+        type: boolean
+        default: false
+      expected_current_worker_version:
+        description: Approved currently active Worker version UUID for first publication.
+        type: string
+        required: false
       publish:
         description: Publish after external isolation and bootstrap have been verified.
         required: true
@@ -36,6 +44,19 @@ on:
 permissions:
   contents: read
 jobs:
+  validate-worker-first-publication:
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.worker_first_publication == true || inputs.expected_current_worker_version != '') }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Reject invalid first publication requests
+        env:
+          FIRST: ${{ inputs.worker_first_publication }}
+          PUBLISH: ${{ inputs.publish }}
+          TARGET: ${{ inputs.publication_target }}
+          VERSION: ${{ inputs.expected_current_worker_version }}
+        run: |
+          [[ "$FIRST" == true && "$PUBLISH" == true && "$TARGET" == worker && "$VERSION" =~ ^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$ ]]
   classify-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -312,6 +333,7 @@ jobs:
     if: >-
       ${{ !cancelled() && github.event_name == 'workflow_dispatch'
         && inputs.publish == true
+        && ((inputs.worker_first_publication == true && needs.validate-worker-first-publication.result == 'success') || (inputs.worker_first_publication != true && needs.validate-worker-first-publication.result == 'skipped'))
         && vars.DUAL_PAGES_ENABLED == 'true'
         && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
           || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/')))
@@ -323,7 +345,7 @@ jobs:
             && needs.browser-ui.result == 'success' && needs.isolation-browser.result == 'success'
             && needs.local-online.result == 'success' && needs.audit.result == 'success'
             && (github.ref != 'refs/heads/main' || inputs.production_validation == 'full' || inputs.publication_target == 'worker' || inputs.publication_target == 'auto'))) }}
-    needs: [classify-changes, docs-check, verify, browser-ui, isolation-browser, local-online, audit]
+    needs: [classify-changes, docs-check, verify, browser-ui, isolation-browser, local-online, audit, validate-worker-first-publication]
     permissions:
       contents: write
       pages: write
@@ -333,6 +355,8 @@ jobs:
     uses: ./.github/workflows/publish-environments.yml
     with:
       reuse_production: ${{ needs.classify-changes.outputs.reuse == 'true' }}
+      worker_first_publication: ${{ inputs.worker_first_publication || false }}
+      expected_current_worker_version: ${{ inputs.expected_current_worker_version || '' }}
       pages_resume: ${{ needs.classify-changes.outputs.resume == 'true' }}
       resume_snapshot: ${{ inputs.resume_snapshot || '' }}
       resume_parent: ${{ inputs.resume_parent || '' }}
