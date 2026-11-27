@@ -8,83 +8,31 @@
       "snapshotDigest": "165aaaf15ce409d4b9c4a2cf9000cf371e4b88fe166e2b309bc49028cb3d1b49"
     },
     "development": {
-      "sha": "99f6d146049133a1471bd62265089f5b65500563",
-      "digest": "755f6e0b445047c4626b983a816d6495bd4744b3779dd0f3ee0b8d4af69a2315",
+      "sha": "da1962ce27c500d9e01b998df2f0828794a7c1cd",
+      "digest": "7fa5f96a61ef959f44e025615520613181e445191445fa8fd1adfa8f23073d40",
       "workerUrl": "https://heibon-mahjong-online-dev.ak-sekine.workers.dev",
-      "snapshotDigest": "b7626c1bd146eb8121405f775bca06f862ec4946e2abe3e1d178344992111216",
+      "snapshotDigest": "ee6ddf1402f38dc6eb52f591a42c36f5a9effe06067825222cfd5ab3d7f710bf",
       "publication": {
-        "sourceRef": "refs/heads/issue/64-main-github-flow",
-        "workflowRef": "ak-sekine/heibon-mahjong/.github/workflows/environments.yml@refs/heads/issue/64-main-github-flow",
-        "workflowSha": "99f6d146049133a1471bd62265089f5b65500563",
-        "baseSha": "db9dab59c836c26e54abf2563a0235fc2f5811ff",
-        "runId": "45038169955",
-        "attempt": "1"
+        "sourceRef": "refs/heads/issue/69-independent-publication-v2",
+        "workflowRef": "ak-sekine/heibon-mahjong/.github/workflows/environments.yml@refs/heads/issue/69-independent-publication-v2",
+        "workflowSha": "da1962ce27c500d9e01b998df2f0828794a7c1cd",
+        "baseSha": "fa4d4437f8e5b6ca015b3db3e353d12bc4423968",
+        "runId": "46019125645",
+        "attempt": "1",
+        "pagesSource": {
+          "version": 1,
+          "kind": "full",
+          "environment": "development",
+          "sha": "da1962ce27c500d9e01b998df2f0828794a7c1cd",
+          "runId": 46019125645,
+          "attempt": 1,
+          "artifactId": 15207002494,
+          "digest": "sha256:0fd172832c9e65bfe01332c36169292bf3793a3fbd4c66827d474221825790f9",
+          "name": "development-dist-da1962ce27c500d9e01b998df2f0828794a7c1cd-1",
+          "expiresAt": "2027-02-25T14:47:50Z"
+        }
       }
     }
   },
-  "pending": {
-    "environment": "development",
-    "sha": "da1962ce27c500d9e01b998df2f0828794a7c1cd",
-    "previous": {
-      "production": {
-        "sha": "8b66b925fad1eab2a773a512e0e36b9e87eb3b01",
-        "digest": "db77fe988b3549f71e51daae76f81ca61fa07c04cb446217d66c0381ad7b6c4c",
-        "workerUrl": "https://heibon-mahjong-online.ak-sekine.workers.dev",
-        "snapshotDigest": "165aaaf15ce409d4b9c4a2cf9000cf371e4b88fe166e2b309bc49028cb3d1b49"
-      },
-      "development": {
-        "sha": "99f6d146049133a1471bd62265089f5b65500563",
-        "digest": "755f6e0b445047c4626b983a816d6495bd4744b3779dd0f3ee0b8d4af69a2315",
-        "workerUrl": "https://heibon-mahjong-online-dev.ak-sekine.workers.dev",
-        "snapshotDigest": "b7626c1bd146eb8121405f775bca06f862ec4946e2abe3e1d178344992111216",
-        "publication": {
-          "sourceRef": "refs/heads/issue/64-main-github-flow",
-          "workflowRef": "ak-sekine/heibon-mahjong/.github/workflows/environments.yml@refs/heads/issue/64-main-github-flow",
-          "workflowSha": "99f6d146049133a1471bd62265089f5b65500563",
-          "baseSha": "db9dab59c836c26e54abf2563a0235fc2f5811ff",
-          "runId": "45038169955",
-          "attempt": "1"
-        }
-      }
-    },
-    "current": {
-      "production": {
-        "sha": "8b66b925fad1eab2a773a512e0e36b9e87eb3b01",
-        "digest": "db77fe988b3549f71e51daae76f81ca61fa07c04cb446217d66c0381ad7b6c4c",
-        "workerUrl": "https://heibon-mahjong-online.ak-sekine.workers.dev",
-        "snapshotDigest": "165aaaf15ce409d4b9c4a2cf9000cf371e4b88fe166e2b309bc49028cb3d1b49"
-      },
-      "development": {
-        "sha": "da1962ce27c500d9e01b998df2f0828794a7c1cd",
-        "digest": "7fa5f96a61ef959f44e025615520613181e445191445fa8fd1adfa8f23073d40",
-        "workerUrl": "https://heibon-mahjong-online-dev.ak-sekine.workers.dev",
-        "snapshotDigest": "ee6ddf1402f38dc6eb52f591a42c36f5a9effe06067825222cfd5ab3d7f710bf",
-        "publication": {
-          "sourceRef": "refs/heads/issue/69-independent-publication-v2",
-          "workflowRef": "ak-sekine/heibon-mahjong/.github/workflows/environments.yml@refs/heads/issue/69-independent-publication-v2",
-          "workflowSha": "da1962ce27c500d9e01b998df2f0828794a7c1cd",
-          "baseSha": "fa4d4437f8e5b6ca015b3db3e353d12bc4423968",
-          "runId": "46019125645",
-          "attempt": "1",
-          "pagesSource": {
-            "version": 1,
-            "kind": "full",
-            "environment": "development",
-            "sha": "da1962ce27c500d9e01b998df2f0828794a7c1cd",
-            "runId": 46019125645,
-            "attempt": 1,
-            "artifactId": 15207002494,
-            "digest": "sha256:0fd172832c9e65bfe01332c36169292bf3793a3fbd4c66827d474221825790f9",
-            "name": "development-dist-da1962ce27c500d9e01b998df2f0828794a7c1cd-1",
-            "expiresAt": "2027-02-25T14:47:50Z"
-          }
-        }
-      }
-    },
-    "siteDigest": "27a5013c558c7c654c9a294b5ad874541b1f24c8f4ff71e9203b090b5ff112e5",
-    "reservation": {
-      "runId": "46019125645",
-      "attempt": "1"
-    }
-  }
+  "pending": null
 }
