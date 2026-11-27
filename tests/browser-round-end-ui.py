@@ -845,7 +845,7 @@ with sync_playwright() as p:
         assert page.locator('#match-result-dialog').is_visible()
         assert page.locator('#match-result-body').evaluate('(body) => body.scrollTop === 0')
         reopen_diagnostic_path = OUT / f'{ENGINE}-{width}x{height}-result-reopen-diagnostic.json'
-        with ResultReopenTrace(page, ENGINE == 'webkit' and (width, height) == (1280, 800)) as trace:
+        with ResultReopenTrace(page, ENGINE == 'webkit' and (width, height) in ((1280, 800), (320, 480))) as trace:
             try:
                 trace.mark('before-match-close')
                 page.locator('#match-result-close').click()
@@ -1114,6 +1114,14 @@ with sync_playwright() as p:
                 if timeline is not None:
                     save_report(reopen_diagnostic_path.with_name(
                         reopen_diagnostic_path.name.replace('-diagnostic.json', '-timeline.json')), timeline)
+                    events = [entry for entry in timeline['timeline'] if entry['kind'] == 'event' and entry['phase'] == 'window-capture']
+                    print('Result reopen timeline summary: ' + json.dumps({
+                        'viewport': [width, height], 'stopped': timeline['stopped'],
+                        'limit': timeline['limit'], 'dropped': timeline['dropped'],
+                        'marks': timeline['marks'],
+                        'events': [{'type': event['type'], 'target': event['target'],
+                                    'defaultPrevented': event['defaultPrevented']} for event in events],
+                    }), flush=True)
         page.locator('#view-table').click()
         page.locator('#show-match-result').click()
         page.locator('#match-result-new-game').click()
