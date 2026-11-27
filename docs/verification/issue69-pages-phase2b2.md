@@ -58,3 +58,11 @@ node .github/scripts/pages-independent-recovery.mjs <pending-checkout> <parent-c
 320×480の記録では、320×320で最終順位を閉じた後にフォーカスが再表示ボタンへ戻り、viewportを320×480へ復元すると局結果ボタンは同じDOM tokenのまま `(11, 240.59375, 146, 44)` から `(11, 400.59375, 146, 44)` に移動した。クリック直前のhit testは当該ボタンで、pointerdown、mousedown、pointerup、mouseup、clickが到達し、window capture時点ではdefaultPreventedはいずれもfalseだった。pointercancel、lostpointercaptureは記録されず、結果ダイアログは開いてフォーカスが卓表示ボタンへ移った。既存assertionがResultDialog.openの1回呼び出しを確認した。traceの停止理由はtest-finished、480件上限でdropped 0、主要markはすべて存在した。window capture時点のdefaultPreventedは後続の処理による変更を証明しない。
 
 成功した1回の時系列は元の失敗を説明せず、製品不具合とテスト固有問題のいずれとも特定できない。既存の失敗ArtifactのHTTP 403を繰り返さず、成功するまでの再試行も行わなかった。自動CIの結果は診断コミットに紐付く実行を参照する。auto公開は実行していない。
+
+### Phase 3-B auto再検証（2026-11-27）
+
+承認済み候補 `0d6cb4715203bcf76ee4ca72388d4381fdcf943f` に対する [auto run 46029408933](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46029408933) は成功した。手動入力は `publish=true`、`publication_target=auto`、`worker_first_publication=false`、期待version空欄、`pages_resume=false`、`production_validation=full`。同runのverify、local-online、Chromium/WebKit両group、環境分離とauditは成功した。plan-autoは正常snapshot・全実配信ファイルと独立Worker記録・Cloudflare稼働versionを既存処理で照合し成功、summaryは `classification=none`、Pages・Workerの公開jobはskip、no-publicationは成功した。
+
+前後ともpages-verified HEADは `1fe28edd010856a79e9f300732d13ce7735181e4`、pending null、本番Pages SHA `8b66b925fad1eab2a773a512e0e36b9e87eb3b01`、開発Pages SHA `da1962ce27c500d9e01b998df2f0828794a7c1cd`、開発snapshotDigest `ee6ddf1402f38dc6eb52f591a42c36f5a9effe06067825222cfd5ab3d7f710bf`。開発Workerの独立Deployment 8111581288は同公開SHA、最新status 23312614759は `success` / `verified:132dd0c6-57e4-444b-9515-0bda6392ca2f` のままだった。今回のrunでWorker・Pagesの公開処理は実行されていない。Cloudflare稼働versionの照合はplan-autoの成功に基づき、run後の別途直接照合は行っていない。
+
+開発Worker初回公開・オンライン検証は[run 46010218955](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46010218955)、開発Pages専用公開・確定・auditは[run 46019125645](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46019125645)で成功済み。今回のautoと合わせPhase 3-Bの自動検証を完了とする。過去のWebKit失敗の原因は未確定。iPhone Safari実機での開発Pages起動、CPU対局、オンライン卓作成・参加・同期・再接続、PWA起動と環境分離は未確認であり、自動検証と区別する。本番Workerの現在versionを直接確認していない。main統合・本番切替は未実施。
