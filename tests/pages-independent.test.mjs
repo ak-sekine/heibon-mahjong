@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { buildPwa, DEV_PWA_BASE, PWA_BASE } from '../scripts/build-pwa.mjs';
@@ -11,8 +10,8 @@ import { preparePages, verifyStaged, independentIdentity } from '../.github/scri
 import { verifyPagesRecoveryEvidence } from '../.github/scripts/pages-independent-recovery.mjs';
 import { REQUIRED_ENVIRONMENT_JOBS } from '../.github/scripts/check-browser-ui-matrix.mjs';
 const repo = path.resolve(import.meta.dirname, '..');
-const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
-const sha = git('rev-parse', 'HEAD'), baseSha = git('rev-parse', 'origin/main');
+const sha = 'a'.repeat(40), baseSha = 'b'.repeat(40);
+const gitFixture = (_cmd, args) => args[0] === 'diff' ? 'index.html\0' : '';
 const urls = { production: 'https://heibon-mahjong-online.ak-sekine.workers.dev', development: 'https://heibon-mahjong-online-dev.ak-sekine.workers.dev' };
 function fixture(root, environment, value) {
   mkdirSync(path.join(root, 'assets'), { recursive: true });
@@ -43,14 +42,14 @@ for (const environment of ['production', 'development']) test(`Pages-only ${envi
   try {
     const before = inventory(path.join(f.store, 'site'));
     const exec = (_cmd, args) => args.includes('.status') ? 'ahead' : args[1].endsWith('/heads/main') && environment === 'development' ? baseSha : sha;
-    const result = await preparePages(f.store, repo, f.candidate, env, f.serve(f.previous), exec);
+    const result = await preparePages(f.store, repo, f.candidate, env, f.serve(f.previous), exec, gitFixture);
     assert.equal(result.workerPending, null);
     const staged = JSON.parse(readFileSync(path.join(f.store, 'state.json')));
     assert.equal(staged.current[environment].sha, baseSha);
     assert.equal(staged.pending.current[environment].sha, sha);
     const retained = environment === 'production' ? 'development' : 'production';
     assert.deepEqual(staged.pending.current[retained], staged.current[retained]);
-    await assert.rejects(preparePages(f.store, repo, f.candidate, env, f.serve(f.previous), exec), /pending/);
+    await assert.rejects(preparePages(f.store, repo, f.candidate, env, f.serve(f.previous), exec, gitFixture), /pending/);
     const verified = await verifyStaged({ store: f.store, previousStore: f.previous, env, get: f.serve(f.store) });
     assert.notDeepEqual(before, verified.candidate);
     await assert.rejects(verifyStaged({ store: f.store, previousStore: f.previous, env, get: f.serve(f.previous) }));
@@ -67,7 +66,7 @@ test('wrong Worker URL, corrupt artifact and pending snapshots fail safely', asy
   try {
     assert.throws(() => independentIdentity({ ...env, EXPECTED_WORKER_URL: urls.development }), /identity/);
     writeFileSync(path.join(f.candidate, 'index.html'), 'corrupt');
-    await assert.rejects(preparePages(f.store, repo, f.candidate, env, f.serve(f.previous), () => sha), /Artifact bytes changed|Required asset|Broken reference/);
+    await assert.rejects(preparePages(f.store, repo, f.candidate, env, f.serve(f.previous), () => sha, gitFixture), /Artifact bytes changed|Required asset|Broken reference/);
     assert.equal(JSON.parse(readFileSync(path.join(f.store, 'state.json'))).pending, null);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });

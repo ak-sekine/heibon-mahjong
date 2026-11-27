@@ -19,16 +19,16 @@ export function independentIdentity(env) {
       env.EXPECTED_WORKER_URL !== targets[identity.environment]) throw new Error('Invalid Pages publication identity');
   return identity;
 }
-export function planPages(store, source, env = process.env) {
+export function planPages(store, source, env = process.env, gitExec = execFileSync) {
   const identity = independentIdentity(env);
   const state = JSON.parse(readFileSync(path.join(store, 'state.json'), 'utf8'));
   if (state.version !== 1 || state.pending !== null || !state.current?.production || !state.current?.development) throw new Error('Pages snapshot unavailable or pending');
-  const result = planPublication({ environment: identity.environment, candidate: identity.sha, pagesBase: state.current[identity.environment].sha, workerBase: '', target: 'pages', git: (cmd, args, opts) => execFileSync(cmd, args, { ...opts, cwd: source }) });
+  const result = planPublication({ environment: identity.environment, candidate: identity.sha, pagesBase: state.current[identity.environment].sha, workerBase: '', target: 'pages', git: (cmd, args, opts) => gitExec(cmd, args, { ...opts, cwd: source }) });
   if (result.blocked) throw new Error('Pages comparison failed: ' + result.reason);
   return result;
 }
-export async function preparePages(store, source, candidate, env = process.env, get = fetch, exec = execFileSync) {
-  const result = planPages(store, source, env);
+export async function preparePages(store, source, candidate, env = process.env, get = fetch, exec = execFileSync, gitExec = execFileSync) {
+  const result = planPages(store, source, env, gitExec);
   // Compare the previously finalized site, never an unresolved staged site.
   await verifyRecoveryPublicSite(inventory(path.join(store, 'site')), get);
   preparePublication(store, candidate, env.EXPECTED_WORKER_URL, env, exec);
