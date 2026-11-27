@@ -14,7 +14,7 @@ on:
       publication_target:
         description: Choose the existing combined publication or the independent Worker route.
         type: choice
-        options: [both, worker]
+        options: [both, worker, pages]
         default: both
       production_validation:
         description: Reuse verified main push CI, or explicitly run full validation for production.
@@ -90,6 +90,8 @@ jobs:
     outputs:
       pages_id: ${{ steps.pages.outputs.artifact-id }}
       pages_digest: ${{ steps.pages.outputs.artifact-digest }}
+      development_id: ${{ steps.development.outputs.artifact-id }}
+      development_digest: ${{ steps.development.outputs.artifact-digest }}
     steps:
       - uses: actions/checkout@v4
       - name: Validate raw publication variables without exposing values
@@ -134,6 +136,7 @@ jobs:
           if-no-files-found: error
           retention-days: 90
       - uses: actions/upload-artifact@v4
+        id: development
         with:
           name: development-dist-${{ github.sha }}-${{ github.run_attempt }}
           path: dist-dev
@@ -301,6 +304,8 @@ jobs:
     with:
       reuse_production: ${{ needs.classify-changes.outputs.reuse == 'true' }}
       publication_target: ${{ inputs.publication_target || 'both' }}
+      verified_artifact_id: ${{ github.ref_name == 'main' && needs.verify.outputs.pages_id || needs.verify.outputs.development_id }}
+      verified_artifact_digest: ${{ github.ref_name == 'main' && needs.verify.outputs.pages_digest || needs.verify.outputs.development_digest }}
     secrets:
-      CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_PRODUCTION_API_TOKEN || '' }}
-      CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}
+      CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ inputs.publication_target != 'pages' && github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_PRODUCTION_API_TOKEN || '' }}
+      CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ inputs.publication_target != 'pages' && secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN || '' }}

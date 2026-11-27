@@ -2,6 +2,12 @@ name: Publish verified environment snapshots
 on:
   workflow_call:
     inputs:
+      verified_artifact_id:
+        type: string
+        default: ''
+      verified_artifact_digest:
+        type: string
+        default: ''
       publication_target:
         type: string
         default: both
@@ -22,7 +28,7 @@ concurrency:
 jobs:
   verify-production-source:
     needs: worker-credentials
-    if: ${{ inputs.reuse_production && needs.worker-credentials.result == 'success' }}
+    if: ${{ !cancelled() && inputs.reuse_production && (needs.worker-credentials.result == 'success' || (inputs.publication_target == 'pages' && needs.worker-credentials.result == 'skipped')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -41,11 +47,16 @@ jobs:
         id: source
         env:
           GH_TOKEN: ${{ github.token }}
+          PUBLICATION_TARGET: ${{ inputs.publication_target }}
           DUAL_PAGES_ENABLED: ${{ vars.DUAL_PAGES_ENABLED }}
           PRODUCTION_WORKER_URL: ${{ vars.PRODUCTION_WORKER_URL }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          node .github/scripts/validate-publication-settings.mjs production-reuse
+          if [[ "$PUBLICATION_TARGET" == pages ]]; then
+            test "$PRODUCTION_WORKER_URL" = 'https://heibon-mahjong-online.ak-sekine.workers.dev'
+          else
+            node .github/scripts/validate-publication-settings.mjs production-reuse
+          fi
           node .github/scripts/reuse-production-ci.mjs
       - uses: actions/upload-artifact@v4
         with:
@@ -55,7 +66,7 @@ jobs:
           retention-days: 1
           compression-level: 0
   worker-credentials:
-    if: ${{ github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
+    if: ${{ inputs.publication_target != 'pages' && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'worker-production' || 'worker-development' }}
@@ -154,6 +165,171 @@ jobs:
             git -C store push origin HEAD:pages-verified
           fi
           printf 'snapshot=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  pages-only:
+    needs: [worker-credentials, verify-production-source]
+    if: >-
+      ${{ !cancelled() && inputs.publication_target == 'pages' && needs.worker-credentials.result == 'skipped'
+        && ((inputs.reuse_production && needs.verify-production-source.result == 'success') || (!inputs.reuse_production && needs.verify-production-source.result == 'skipped'))
+        && github.event_name == 'workflow_dispatch' && vars.DUAL_PAGES_ENABLED == 'true'
+        && (github.ref == 'refs/heads/main' || (github.repository == 'ak-sekine/heibon-mahjong' && startsWith(github.ref, 'refs/heads/issue/'))) }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    permissions:
+      contents: write
+      actions: read
+      pages: write
+      id-token: write
+      deployments: read
+    outputs:
+      finalized: ${{ steps.finalize.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: source/package-lock.json
+      - run: npm ci
+        working-directory: source
+      - name: Check the selected Pages and Worker identities
+        working-directory: source
+        run: node --input-type=module -e "import { independentIdentity } from './.github/scripts/pages-independent.mjs'; independentIdentity(process.env)"
+        env:
+          EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+      - name: Verify selected published Worker online
+        working-directory: source
+        run: npm run test:online:production
+        env:
+          ONLINE_API_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+          ONLINE_TEST_ORIGIN: https://ak-sekine.github.io
+          ONLINE_SECONDARY_TEST_ORIGIN: ${{ github.ref == 'refs/heads/main' && 'https://html-classic.itch.zone' || '' }}
+      - uses: actions/checkout@v4
+        with:
+          ref: pages-verified
+          path: store
+          fetch-depth: 0
+      - name: Verify the original same-run Artifact ZIP and identity
+        if: ${{ !inputs.reuse_production }}
+        run: |
+          set -euo pipefail
+          node source/.github/scripts/pages-verified-artifact.mjs
+          python3 source/.github/scripts/extract-pages-zip.py "$RUNNER_TEMP/pages-only-verified.zip" candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_ARTIFACT_ID: ${{ inputs.verified_artifact_id }}
+          VERIFIED_ARTIFACT_DIGEST: ${{ inputs.verified_artifact_digest }}
+      - uses: actions/download-artifact@v4
+        if: ${{ inputs.reuse_production }}
+        with:
+          name: checked-production-zip-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/checked-production
+      - name: Verify source and persist a Pages-only pending snapshot
+        id: stage
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REUSE_PRODUCTION: ${{ inputs.reuse_production }}
+          SOURCE_VERIFICATION: ${{ needs.verify-production-source.outputs.evidence }}
+          EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+        run: |
+          set -euo pipefail
+          export SOURCE_DIR="$GITHUB_WORKSPACE/source"
+          if [[ "$REUSE_PRODUCTION" == true ]]; then
+            archive="$RUNNER_TEMP/checked-production/verified-pages.zip"
+            node source/.github/scripts/reuse-production-ci.mjs check-zip "$archive"
+            python3 source/.github/scripts/extract-pages-zip.py "$archive" candidate
+          fi
+          if [[ "$GITHUB_REF" == refs/heads/issue/* ]]; then node source/.github/scripts/check-issue-publication-ci.mjs; fi
+          parent="$(git -C store rev-parse HEAD)"
+          node source/.github/scripts/pages-independent.mjs prepare store candidate
+          git -C store config user.name github-actions[bot]
+          git -C store config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C store add state.json site
+          git -C store commit -m "Stage Pages $GITHUB_REF_NAME $GITHUB_SHA (pending)"
+          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$GITHUB_REF_NAME" --jq .object.sha)"
+          test "$latest_sha" = "$GITHUB_SHA"
+          if [[ "$GITHUB_REF" == refs/heads/issue/* ]]; then
+            git -C store fetch --no-tags origin "$GITHUB_REF"
+            test "$(git -C store rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+            git -C store push --atomic origin HEAD:pages-verified "$GITHUB_SHA:refs/tags/verified/development/$GITHUB_SHA"
+          else
+            git -C store push origin HEAD:pages-verified
+          fi
+          mkdir "$RUNNER_TEMP/previous-pages"
+          git -C store archive "$parent" | tar -x -C "$RUNNER_TEMP/previous-pages"
+          printf 'snapshot=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: store/site
+      - name: Recheck Pages pending before deployment
+        run: node source/.github/scripts/pages-independent.mjs check store
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLICATION_SNAPSHOT: ${{ steps.stage.outputs.snapshot }}
+          EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+      - uses: actions/deploy-pages@v4
+        id: deploy
+      - name: Verify served bytes and both pinned snapshots
+        run: |
+          set -euo pipefail
+          test "$PAGES_OUTCOME" = success
+          node source/.github/scripts/pages-independent.mjs check store
+          node source/.github/scripts/pages-independent.mjs verify-staged store "$RUNNER_TEMP/previous-pages"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLICATION_SNAPSHOT: ${{ steps.stage.outputs.snapshot }}
+          PAGES_OUTCOME: ${{ steps.deploy.outcome }}
+          EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+      - name: Confirm Pages snapshot after successful deployment and byte verification
+        id: finalize
+        run: |
+          set -euo pipefail
+          node source/.github/scripts/pages-independent.mjs check store
+          node source/scripts/environments/artifacts.mjs finalize store
+          git -C store add state.json
+          git -C store commit -m "Confirm Pages $GITHUB_REF_NAME $GITHUB_SHA"
+          git -C store push origin HEAD:pages-verified
+          printf 'commit=%s\n' "$(git -C store rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLICATION_SNAPSHOT: ${{ steps.stage.outputs.snapshot }}
+          EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+  pages-only-audit:
+    needs: pages-only
+    if: ${{ !cancelled() && needs.pages-only.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.pages-only.outputs.finalized }}
+          path: store
+          persist-credentials: false
+      - name: Audit finalized Pages independently of Worker deployment
+        run: node source/.github/scripts/pages-independent.mjs audit store
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINALIZED_SNAPSHOT: ${{ needs.pages-only.outputs.finalized }}
+          EXPECTED_WORKER_URL: ${{ github.ref == 'refs/heads/main' && vars.PRODUCTION_WORKER_URL || vars.DEVELOPMENT_WORKER_URL }}
+  check-pages-only-completion:
+    needs: [pages-only, pages-only-audit]
+    if: ${{ !cancelled() && inputs.publication_target == 'pages' && (needs.pages-only.result != 'success' || needs.pages-only-audit.result != 'success') }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - run: exit 1
   worker-only:
     needs: [worker-credentials, verify-production-source]
     if: >-

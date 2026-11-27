@@ -145,8 +145,8 @@ test('publisher forwards only the two declared Worker secrets and checks the sel
   };
   const names = ['CLOUDFLARE_PRODUCTION_API_TOKEN', 'CLOUDFLARE_DEVELOPMENT_API_TOKEN'];
   assert.deepEqual(callerSecrets.trim().split('\n').map(line => line.trim()), [
-    "CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_PRODUCTION_API_TOKEN || '' }}",
-    'CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}',
+    "CLOUDFLARE_PRODUCTION_API_TOKEN: ${{ inputs.publication_target != 'pages' && github.ref == 'refs/heads/main' && secrets.CLOUDFLARE_PRODUCTION_API_TOKEN || '' }}",
+    "CLOUDFLARE_DEVELOPMENT_API_TOKEN: ${{ inputs.publication_target != 'pages' && secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN || '' }}",
   ]);
 
   for (const [branch, environment, name] of [
@@ -564,4 +564,32 @@ test('worker-only caller requires every same-run CI gate and never enables produ
   const old = read('.github/workflows/deploy.yml');
   assert.match(old, /group: pages-publication/);
   assert.match(jobSection(old, 'release-freshness'), /heibon-independent-worker-production/);
+});
+
+test('Pages-only route skips Worker credentials and reservation and preserves full or reused CI gates', () => {
+  const caller = read('.github/workflows/environments.yml');
+  const publisher = read('.github/workflows/publish-environments.yml');
+  const condition = jobCondition(publisher, 'pages-only');
+  for (const branch of ['main', 'issue/69-test']) {
+    const context = workflowContext({ branch, publicationTarget: 'pages', results: { 'worker-credentials': 'skipped' } });
+    assert.equal(evaluateJobCondition(condition, context, ['skipped', 'skipped']), true);
+    assert.equal(evaluateJobCondition(jobCondition(publisher, 'worker-credentials'), context, []), false);
+    assert.equal(evaluateJobCondition(jobCondition(publisher, 'reserve'), context, []), false);
+    assert.equal(evaluateJobCondition(jobCondition(publisher, 'worker-only'), context, []), false);
+    const gate = jobCondition(caller, 'publish');
+    for (const required of ['verify', 'browser-ui', 'isolation-browser', 'local-online', 'audit']) {
+      assert.equal(evaluateJobCondition(gate, workflowContext({ branch, publicationTarget: 'pages', results: { [required]: 'failure' } }), []), false, required);
+    }
+  }
+  const reused = workflowContext({ branch: 'main', publicationTarget: 'pages', reuseProduction: true, results: { 'worker-credentials': 'skipped', 'verify-production-source': 'success' } });
+  assert.equal(evaluateJobCondition(jobCondition(publisher, 'verify-production-source'), reused, ['skipped']), true);
+  assert.equal(evaluateJobCondition(condition, reused, ['skipped', 'success']), true);
+  const body = jobSection(publisher, 'pages-only');
+  assert.match(body, /pages-independent\.mjs prepare/);
+  assert.match(body, /pages-independent\.mjs verify-staged/);
+  assert.match(body, /PAGES_OUTCOME/);
+  assert.match(body, /test:online:production/);
+  assert.doesNotMatch(body, /wrangler|CLOUDFLARE_.*TOKEN|worker-independent\.mjs|deploy-isolated-worker/);
+  assert.match(jobSection(publisher, 'pages-only-audit'), /pages-independent\.mjs audit/);
+  assert.match(publisher, /group: pages-publication/);
 });

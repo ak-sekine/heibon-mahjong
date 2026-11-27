@@ -33,6 +33,13 @@ function readComposite(root, current) {
   return files;
 }
 
+export function inspectFinalizedSnapshot(store) {
+  const state = readJson(store, 'state.json');
+  assert.equal(state.version, 1);
+  assert.equal(state.pending, null, 'Unresolved Pages publication');
+  return { state, files: readComposite(store, state.current) };
+}
+
 /** Inspect the two already pinned Git trees. The caller verifies Git and external evidence. */
 export function inspectRecoverySnapshots({ previousStore, store, expected }) {
   const previous = readJson(previousStore, 'state.json');
@@ -42,20 +49,23 @@ export function inspectRecoverySnapshots({ previousStore, store, expected }) {
   assert.equal(staged.version, 1);
   assert.deepEqual(staged.current, previous.current, 'Current snapshot differs from the parent ledger');
   const { pending } = staged;
-  assert.equal(pending?.environment, 'production', 'A production reservation is required');
+  const environment = expected.environment ?? 'production';
+  assert.ok(['production', 'development'].includes(environment), 'Invalid recovery environment');
+  const retained = environment === 'production' ? 'development' : 'production';
+  assert.equal(pending?.environment, environment, 'Wrong reserved environment');
   assert.deepEqual(pending.reservation, { runId: expected.runId, attempt: expected.attempt }, 'Wrong reservation owner');
   assert.equal(pending.sha, expected.sha, 'Wrong reserved source');
-  assert.equal(pending.current.production.sha, expected.sha);
-  assert.equal(pending.current.production.workerUrl, expected.workerUrl);
+  assert.equal(pending.current[environment].sha, expected.sha);
+  assert.equal(pending.current[environment].workerUrl, expected.workerUrl);
   assert.equal(pending.siteDigest, expected.siteDigest, 'Wrong reserved digest');
   assert.deepEqual(pending.previous, previous.current);
-  assert.deepEqual(pending.current.development, previous.current.development, 'Preserved development record changed');
+  assert.deepEqual(pending.current[retained], previous.current[retained], 'Preserved environment record changed');
 
   const before = readComposite(previousStore, previous.current);
   const candidate = readComposite(store, pending.current);
   assert.equal(digest(candidate), expected.siteDigest, 'Reserved site bytes changed');
-  const developmentFiles = files => Object.entries(files).filter(([name]) => name.startsWith('dev/'));
-  assert.deepEqual(developmentFiles(candidate), developmentFiles(before), 'Preserved development bytes changed');
+  const retainedFiles = files => Object.entries(files).filter(([name]) => name !== 'environments.json' && name.startsWith('dev/') === (retained === 'development'));
+  assert.deepEqual(retainedFiles(candidate), retainedFiles(before), 'Preserved environment bytes changed');
   return { before, candidate };
 }
 
