@@ -1,56 +1,40 @@
-name: Issue 47 Phase 6-A live Pages audit
-run-name: Issue 47 Phase 6-A audit @ ${{ github.sha }}
+name: Temporary read-only development Worker diagnosis
 on:
   workflow_dispatch:
 permissions:
   contents: read
-  actions: read
-  deployments: read
-concurrency:
-  group: issue47-phase6a-live-audit
-  cancel-in-progress: false
 jobs:
-  audit:
+  inspect:
+    if: ${{ github.repository == 'ak-sekine/heibon-mahjong' && github.ref == 'refs/heads/issue/69-independent-publication-v2' }}
+    environment: worker-development
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 3
     steps:
-      - name: Initialize audit diagnostics
-        run: |
-          mkdir -p artifacts
-          printf '%s\n' '{"schemaVersion":1,"outcome":"NOT_STARTED"}' > artifacts/phase6a-live-audit.json
-      - name: Checkout audit code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-          fetch-depth: 1
-      - name: Checkout read-only pages-verified snapshot
-        uses: actions/checkout@v4
-        with:
-          ref: pages-verified
-          path: pages-verified
-          persist-credentials: false
-          fetch-depth: 1
-      - name: Record snapshot branch SHA
-        id: snapshot
-        run: echo "sha=$(git -C pages-verified rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Audit public Pages URLs and saved snapshot
+      - name: Read Cloudflare Worker deployment and Durable Object bindings
         env:
-          AUDIT_REPORT_PATH: artifacts/phase6a-live-audit.json
-          GITHUB_REF: ${{ github.ref }}
-          GITHUB_SHA: ${{ github.sha }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
-          GH_TOKEN: ${{ github.token }}
-          SNAPSHOT_ROOT: pages-verified
-          SNAPSHOT_SHA: ${{ steps.snapshot.outputs.sha }}
-        run: node scripts/environments/pages-live-audit.mjs
-      - name: Upload audit diagnostics
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: issue47-phase6a-live-audit-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/phase6a-live-audit.json
-          if-no-files-found: warn
-          retention-days: 90
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEVELOPMENT_API_TOKEN }}
+        run: |
+          node <<'NODE'
+          const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+          if (!/^[a-f0-9]{32}$/i.test(account || '') || !token) {
+            console.log(JSON.stringify({stage:'configuration', error:'account or environment credential unavailable'}));
+            process.exit(1);
+          }
+          const worker = 'heibon-mahjong-online-dev';
+          async function read(suffix) {
+            const endpoint = `https://api.cloudflare.com/client/v4/accounts/${account}/workers/scripts/${worker}/${suffix}`;
+            try {
+              const response = await fetch(endpoint, {headers:{authorization:`Bearer ${token}`},redirect:'error',signal:AbortSignal.timeout(20000)});
+              const body = await response.json();
+              if (!response.ok || body.success !== true) return {status:response.status, success:false, codes:(body.errors||[]).map(x=>x.code).filter(Number.isInteger)};
+              if (suffix === 'deployments') {
+                const list = body.result?.deployments;
+                return {status:response.status, success:true, deployments:Array.isArray(list)?list.slice(0,2).map(d=>({id:d.id,created_on:d.created_on,versions:d.versions?.map(v=>({version_id:v.version_id,percentage:v.percentage}))})):null};
+              }
+              return {status:response.status,success:true,bindings:(body.result?.bindings||[]).filter(b=>b.type==='durable_object_namespace').map(({name,class_name,script_name,namespace_id})=>({name,class_name,script_name,namespace_id}))};
+            } catch { return {status:null,success:false,error:'request or response failed'}; }
+          }
+          (async()=>{const deployments=await read('deployments'); const settings=await read('settings'); console.log(JSON.stringify({account,worker,deployments,settings})); if(!deployments.success || !settings.success) process.exitCode=1})()
+          NODE
