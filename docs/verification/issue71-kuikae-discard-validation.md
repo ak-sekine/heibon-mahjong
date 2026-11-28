@@ -33,3 +33,43 @@ Cloudのネットワーク許可付きGit接続でfetchと候補pushが成功。
 同一SHAの[main CI 46116410833](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46116410833)も全必須ジョブとauditに成功。オフラインでは固定局面で禁止牌を選んだ後の confirm() 直接呼び出しが無操作となることを確認した。本番の公開前基準はWorker `8d968ea`、Pages `77c6c35`、Pages台帳 `5fff1df`（pendingなし）。Worker→Pagesの順で独立公開する。旧Workerと新クライアントの組み合わせでも禁止牌の打牌はできない。
 
 本番Worker [46117258131](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46117258131) は公開・両Originのオンライン検証・稼働version照合に成功。Deployment 8125800589、verified version `53f5c0eb-e0c3-4e28-adc0-d23e69d246fa`。続く本番Pages [46118159491](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46118159491) は同一SHAのmain CI成果物を再利用し、Workerとのオンライン検証、公開、実配信ファイル照合、独立auditが成功。Pages台帳 `d8a85638e557f0278242d6750ea1c7795c523113`、pendingなし。開発Pages SHAとWorkerのverified記録は保持。技術的なitch候補は [#46検証記録](issue46-itch-html5-2026-11-05.md) を参照。Draftの更新、ユーザー実機確認、Issue Closeは未実施。
+
+## 2026-11-28 ユーザー実機確認・最終受入評価
+
+ユーザー本人の報告による実機確認。対象として報告されたitch.io配布候補は [artifact `15252075166`](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46115547301/artifacts/15252075166)、ソースSHA `32c3dd7a48369e4dbf155550d35575d69a0646e2`、候補内側ZIP SHA-256 `62228077b80acfdcf4761721903d5bf5259ffe61e6981fd2cc9159ecdfa783a4`、100,030 bytes。本人がこの候補をアップロードしたとの報告を記録する。Draft管理画面やアップロード済みファイルのdigestは独立照合しておらず、配布候補とアップロード済みZIPのバイト一致を確認したとは扱わない。
+
+### 実機報告
+
+| 環境 | 確認項目 | 結果 |
+| --- | --- | --- |
+| Pages・itch.io間オンライン対局 | チー後の喰い替え禁止牌を選択できる | OK |
+| Pages・itch.io間オンライン対局 | ポン後の喰い替え禁止牌を選択できる | OK |
+| Pages・itch.io間オンライン対局 | 禁止牌が通常牌と同じ選択表示になる | OK |
+| Pages・itch.io間オンライン対局 | 「喰い替え禁止のため、この牌は打牌できません。」と表示される | OK |
+| Pages・itch.io間オンライン対局 | 禁止牌選択中は打牌ボタンが無効になる | OK |
+| Pages・itch.io間オンライン対局 | 合法牌を選び直すとメッセージが通常表示に戻る | OK |
+| Pages・itch.io間オンライン対局 | 合法牌を正常に打牌できる | OK |
+| Pages・itch.io間オンライン対局 | Pages版とitch.io版で対局状態が同期する | OK |
+| Pages・itch.io間オンライン対局 | 選択解除時に禁止メッセージが消える | OK |
+| オフラインCPU対局 | 禁止牌を選択でき、通常の選択表示になる | OK |
+| オフラインCPU対局 | 禁止牌選択時に指定メッセージが表示される | OK |
+| オフラインCPU対局 | 禁止牌選択中は打牌ボタンが無効になる | OK |
+| オフラインCPU対局 | 合法牌を選び直すと正常に打牌できる | OK |
+| オフラインCPU対局 | 選択解除時に禁止メッセージが消える | OK |
+
+集計は報告対象14件すべてOK、NG 0件、報告対象内の未確認0件。特記事項なし。端末・OS・ブラウザーの内訳、再接続後の操作、個別の牌・牌種の組み合わせは報告されていないため補完しない。したがってiPhone Safari、PC、再接続後、特定の実機局面の確認済みとは記録しない。なお特定のチー端牌・中央牌、ポン、赤牌の決定的ケースは自動テストで別途確認済みであり、これを実機報告には含めない。
+
+### 最終仕様と受入評価
+
+今回の評価では、旧Issue本文にある「喰い替え禁止牌を選択できない」という文言に代え、選択は可能だが通常表示のまま打牌不可理由を表示し、確定・送信を防止する現在の仕様を適用する。オンライン・オフラインで同じ操作仕様とする。Workerの合法牌一覧と不正打牌拒否は維持する。
+
+| 受入範囲 | 結果 | 根拠・制限 |
+| --- | --- | --- |
+| 禁止牌と合法牌の選択・表示 | 達成 | チー後・ポン後および通常牌と同じ表示は本人の実機報告でOK。固定局面の自動テストとChromium／WebKit Browser UIも成功。具体的な実機牌組み合わせは未報告。 |
+| 禁止理由・打牌ボタン・選び直し・解除 | 達成 | 指定文言、ボタン無効、合法牌への変更、選択解除はオンライン・オフラインの実機報告でOK。禁止牌の確定・送信を防ぐBrowser UI検証、Worker拒否、実WebSocket直接送信試験も成功。 |
+| 喰い替え・赤牌・合法打牌・状態保護 | 達成 | 決定的な牌局面のテストとWorkerの実WebSocket試験で確認。禁止牌の直接送信はinvalid_actionとなりrevision・対局状態不変、合法打牌は双方へ同期。個別組み合わせは実機では未報告。 |
+| 既存制限・通信互換性・再接続 | 達成（自動検証） | 既存テスト、通信契約、再接続回帰、CIで確認。ユーザー実機の再接続操作は今回報告されていないため実機範囲には含めない。 |
+| Chromium・WebKit、CI・audit | 達成 | 候補CI [46115547301](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46115547301)、同一製品SHAのmain CI [46116410833](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46116410833) と文書コミットのmain docs-only CI・audit [46133821064](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46133821064) が成功。 |
+| 本番公開・新itch.io候補・ユーザー実機 | 達成 | Worker [46117258131](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46117258131)、Pages [46118159491](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46118159491) の公開と公開後確認が成功。候補ZIPはartifact `15252075166`。ユーザーは上記14項目をOKと報告したが、アップロード済みZIPとのdigest一致は独立確認していない。 |
+
+**最終評価：今回指定された最終仕様の必須受入条件は達成し、Issue #71はClose可能と評価する。** 今回報告されなかった端末・ブラウザー、再接続、具体的な実機牌組み合わせは確認済みとみなさない。再接続と牌組み合わせは自動検証で確認されており、今回の必須実機操作として指定された14項目はすべてOKとの報告である。Issue本文・チェックボックス・状態はこの作業では変更しない。旧本文の選択不可記述との整合・Issueの最終更新とCloseは別途ChatGPT側の操作に委ねる。
