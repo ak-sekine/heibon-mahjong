@@ -11,3 +11,13 @@
 v1の項目・型と保存形式は同一。既存Pagesと#46 ZIPのクライアントには修正済みWorkerが返す一覧を適用できるため、機能上はWorker更新で足りる見込み。既存の公開分類はgame-view.tsをboth扱いするため、実公開前に正常公開済みツリーとの差分とWorker専用経路の適合を確認する。分類や公開ゲートを変更しない。#46 ZIPの再生成は今回の修正に不要と見込む。Draft上のZIP同一性は未確認。
 
 公開後にiPhone SafariのPagesとitchの2人卓でチー・ポンを行い、禁止牌の選択不可、別牌の打牌、両画面の同期と進行を記録する。可能なら再接続後も同じ手順を行う。三筒チー後の六筒が出現しなければ、その局面だけを未確認とする。PagesビルドSHAとitch ZIP digest、確認日、端末を記録する。
+
+## 継続対応
+
+Cloudのネットワーク許可付きGit接続でfetchと候補pushが成功。基準mainに追加変更はなく、既存検証と同じ `8d968ea17b538d52c469999a26ab236d5c19ca9a` を使用した。候補 [46111215186](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46111215186) とfast-forward後のmain [46112079496](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46112079496) はChromium・WebKit全グループ、verify、local-online、環境分離、audit成功。実WebSocketの既存回帰では通常打牌と再接続を確認。喰い替えの固定局面そのものはreducerと操作パネルでの確認で、同局面の実WebSocket・専用ブラウザー操作試験は未実施。
+
+公開前に、Pages台帳 `5fff1df032e672948187bb610f54691b3086c70f` のpendingなしと本番Pages・独立Workerの正常SHA `77c6c35cc381ffe6987f4ace8bca8cff0fe1653f` を照合。Workerの直前の検証済み記録はDeployment 8121540156、version `01b049b2-0c4a-4055-b5c1-22a870d61d5f`。累積差分のうちゲーム実行コードの変更はgame-view.tsだけで、createPlayerGameViewの呼び出し元はWorker。既存クライアントの合法牌一覧を使う処理とv1契約は同一のため、既存の明示的なWorker専用経路を選択した。公開分類とゲートを変更していない。#46の既存ZIPは技術上再使用可能。Draftとの一致は未確認。
+
+本番Worker専用の公開runは [46112839558](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46112839558)。
+
+公開runは成功。独立Deployment 8125234245 はソース `8d968ea17b538d52c469999a26ab236d5c19ca9a`、version `439310d5-241a-4f6c-bf62-fdb6ea152056` でdeployed・verified。公開先で両Originを使用する既存オンライン検証とWorker稼働versionの照合、公開runのauditと最終summaryが成功。Pages公開ジョブはskip、台帳HEADは公開前と同一でpendingなし。別の公開後監査runは追加実行していない。#46のZIPの差し替えは今回の修正には不要。本人の相互対戦による確認を待つためClose不可。
