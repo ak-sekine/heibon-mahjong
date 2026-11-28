@@ -1,5 +1,7 @@
 # itch.io HTML5 Draft 準備 — Issue #46
 
+> 以下の初版・過去の評価は当時の履歴です。現行の配布手順・権利・実機確認は[公開準備手順](../operations/itch-release-readiness.md)と末尾の2026-11-28再評価を参照してください。旧記録の同一SHA・Worker先行公開方針は現行運用ではありません。また、旧記録の「public/iconsは生成されたオリジナル」は誤りです。実際には提供された画像が優先され、出典と利用条件は未確認です。
+
 更新日: 2026-11-05
 
 対象: `ak-sekine/heibon-mahjong` Issue [#46](https://github.com/ak-sekine/heibon-mahjong/issues/46)
@@ -385,3 +387,39 @@ itch.io Draftに現在アップロード済みのZIPをそのまま使えます�
 実行OriginとWorker受信HTTP Originは過去に `https://html-classic.itch.zone` と記録されているが、WebSocket handshake Originは実測未確認。#69の本番オンライン自動検証とユーザーの現行Draft実機報告を、握手ヘッダーの実測値に置き換えない。Pages・Worker・itchのソースSHA一致を互換性の必須条件としない。
 
 公式[HTML5配布](https://itch.io/docs/creators/html5)と[ページ作成](https://itch.io/docs/creators/getting-started)を2026-11-28に確認。複数ファイルのZIPには `index.html` と必要ファイルを含め相対パスを使用する。coverは315:250比、最低315×250、630×500推奨、スクリーンショットは3〜5枚推奨。上記の旧素材案の16:9は公式cover推奨比ではない。現行Draft設定、画像の公開適性と権利、実機の個別操作、PWAインストール・オフラインCPU、依存ライセンス等の確認は未完了。IssueのCloseおよび一般公開準備完了と評価しない。
+
+## 2026-11-28 継続調査・受入再評価
+
+基準 `c2ffd745a53eb5273155c8f71761a7eefd877381`。前回候補 `bdb3249ef220e34c084fb02e7d3eceda9c48516b` の[CI 46091133527](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46091133527)はverify・Chromium/WebKit Browser UI・local-online・docs-check・auditが成功、publish skip。#31は2026-11-03にiPhone Safariのホーム追加・オフラインCPU操作を実機確認（[7項目](issue31-pwa-2026-11-03.md#2026-11-03-iphone-safari実機結果とclose判定)）。#69では2026-11-28に現在のDraftの起動・CPU基本操作、両方向参加・同期・再接続、PWA更新・再起動とCPU操作を本人がOKと報告。後者は端末内訳や個別操作を列挙せず、同一ZIPのSHA・digest・配布日は不明。過去報告から端末・操作を補わない。
+
+#32はPC表示・操作やiPhone表示、#52・#54・#55は鳴き・ロン・カンUIの変更と検証、#66は座席確定後の準備復元、#67はルーム画面、#47は環境分離、#57・#58はCI分類とBrowser UI分割、#70は固定v1契約と保存・再接続の保護、#69は独立公開と現行Draftの通信確認の証跡。各Issueのcloseは#46の新ZIPの実機確認を意味しない。最新公開Pages・Workerについて#69の[本番Worker 46083763674](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46083763674)・[本番Pages 46084987199](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46084987199)と同記録のユーザー報告を再利用する。#69の過去のWebKit失敗の根本原因は未確定のまま記録する。
+
+正式GitHub連携からCI artifactのファイル参照を得たが、実行環境で取得するとHTTP 403。外側のartifact digestを内側配布ZIPのdigestと混同しない。ローカル代替ZIPのCRC・相対パス・API設定・既存パッケージテストは確認したが、実ZIPのChromium/WebKit実行は未実施。CI smokeは同じ製品ツリーのmock APIビルドを対象とする。詳細・掲載文・権利・設定・新ZIP実機手順は[公開準備手順](../operations/itch-release-readiness.md)。
+
+画像を実見した結果、`public/icons/icon-512.png` は512×512で素材の出典・権利が未確認。`step13.5.4/screenshots/sizes/normal-1280x800-start.png` は1280×1175、`normal-390x844-start.png` は390×959で、いずれも開発用表示と旧UIがあり公開用には採用しない。`docs/screenshots/riichi-step13-1/390x844-tsumo-result.png` は390×844の旧結果画面で現行表示との一致・画像権利を確認できず採用しない。ファイル名のviewport寸法と実画像寸法は異なる。現行UIのcover 630×500とPC・スマートフォンのCPU／オンライン／結果画面の3〜5枚は未用意。現在のDraftまたはPagesから撮影し、実画像・権利・個人情報・認証情報・非公開牌・テスト表示を確認する。カバーの最終選択はユーザーが行う。
+
+### 作業範囲7件
+
+| 項目 | 判定 | 根拠・残作業 |
+| --- | --- | --- |
+| 配布形式調査 | 達成 | 公式HTML5・画像仕様と手順を[公開準備手順](../operations/itch-release-readiness.md)に記載。Draft画面の実設定は別途確認 |
+| itchビルド | 一部達成 | 相対パスZIPと既存CI smokeは成功。配布ZIPのライセンス表示と実ZIPのブラウザー実行が未確認 |
+| PWA分離 | 達成 | itch ZIPにmanifest・SW・アイコンなし。#31実機と#69更新報告、CI PWA回帰を区別。itchでのオフライン起動は保証しない |
+| オンライン接続 | 達成 | WorkerのPages・itch Origin完全一致と拒否系テスト、本番オンライン検証、旧Draft実機報告。Handshake Origin実測は補助診断で未確認 |
+| クロス公開元対戦 | 一部達成 | #69で旧Draft双方の作成・参加・操作同期・再接続OK。新ZIP、準備・席確定・打牌・鳴き・和了の個別実機証跡は未確認 |
+| 素材・情報 | 一部達成 | 掲載文・権利棚卸しを用意。現行画像、提供アイコンの権利、Vite表示と管理画面設定は未完了 |
+| 配布・更新手順 | 一部達成 | 手順・記録項目と切り戻し条件を作成。確定ZIPの権利表示、実画面設定と新ZIP実機確認は未了 |
+
+### 受入条件7件
+
+| 条件 | 判定 | 根拠・残作業 |
+| --- | --- | --- |
+| 再現可能なZIPと直下index | 達成 | `build:itch`・CRC・パッケージテスト成功。成果物の配布条件は別項で未解決 |
+| DraftでPC・iPhone CPU | 一部達成 | 旧DraftのiPhone起動OK／CPU概ね良好と#69の端末不明の起動・CPU報告。PCを特定した旧Draft実機と新ZIP両端末は未確認 |
+| 双方の作成・参加と個別同期 | 一部達成 | #69旧Draftで両方向参加・操作同期OK。準備・座席確定・開始・打牌・鳴き・和了結果の個別報告、新ZIPは未確認 |
+| 再接続後の同期 | 一部達成 | #69旧Draftで再接続OK。復元した状態の具体的範囲と新ZIPは未確認 |
+| 未許可Origin拒否・Pages PWA回帰なし | 一部達成 | Origin自動拒否、#31 iPhoneでホーム追加・オフラインCPU、#69本番PWA更新・再起動・CPU基本操作、CI PWA回帰。現行本番PWAの機内モードCPUは未報告で、回帰を追加確認する |
+| 未確認事項を明記 | 達成 | 記録と手順に自動・実機・設定・権利の範囲を区別 |
+| 公開素材・手順と公開判断 | 一部達成 | 文面・手順・権利一覧・確認表は用意。画像、Vite表示・提供アイコン等の権利、管理画面、新ZIP確認が残る |
+
+**判定：Close不可。** 特に現行ZIPにVite生成のmodulepreload補助コードが含まれ、MIT原文の表示条件について配布物にはライセンスファイルがない。必要な表示・同梱方法の判断と配布処理の修正範囲は別途評価し、権利未確定の画像を使わない。Draft更新・一般公開はユーザーの操作。Issue本文・状態は変更しない。
