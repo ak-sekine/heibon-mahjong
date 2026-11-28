@@ -373,3 +373,15 @@ itch.io Draftに現在アップロード済みのZIPをそのまま使えます�
 残作業は、PC実機のDraft／CPU確認、必要に応じてPCとiPhoneの対象を明示した相互対戦・再接続操作記録、鳴き・和了局面が出た場合の同期確認、公開用画像選定、第三者素材・コード依存・表示文言の権利確認、Draftの無料・支援設定確認です。Android／Firefox等の追加対応やitch内PWA導入は本Issueの必須条件にせず、追加対応を行う場合は別Issue候補として扱います。
 
 検証記録更新は文書のみの変更です。ゲームテストの再実行・Worker／Pages再デプロイは行わず、GitHub Actionsのdocs-checkを確認します。
+
+## 2026-11-28 追加調査（途中記録）
+
+この節は調査途中の記録であり、以下の歴史的評価を消さず、Issue #46の最終受入評価を置き換えない。調査基準mainは `c2ffd745a53eb5273155c8f71761a7eefd877381`。[#69最終記録](issue69-pages-phase2b2.md#issue-69-最終評価2026-11-28)によれば、ユーザーは現在のitch Draftの起動・CPU基本操作、Pages↔itch双方の作成・参加、操作・状態同期、切断後の再接続、本番PWAの更新・再起動とCPU基本操作をOKと報告した。11項目の報告に端末別内訳や準備・座席確定・打牌・鳴き・和了の個別操作は記載されておらず、それらを推定しない。DraftのZIPの元SHA・digest・配布日は不明のままである。従来のiPhone Safari起動・CPUの報告と区別する。
+
+基準mainと `77c6c35cc381ffe6987f4ace8bca8cff0fe1653f` の差分は#69検証文書のみ。同SHAの[main CI 46045430838](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46045430838)で成功した [itch HTML5 artifact 15222436013](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46045430838/artifacts/15222436013) は未失効（2027-02-25まで）。GitHubが示す外側artifactのdigestは `30fe2513c921f983b1f10c3bbc9a7f29ae01bb138d68d15da7d0a629308e65aa`、92,568 bytes。取得は保存先でHTTP 403となり、内側ZIPのdigest・内容は未確認。外側digestを内側ZIPへ流用しない。
+
+代替として基準mainで本番API `https://heibon-mahjong-online.ak-sekine.workers.dev` を指定し `npm run build:itch` を実行した。型検査・ビルド成功。ローカル `artifacts/itch/heibon-mahjong.zip` は92,120 bytes、SHA-256 `294a8f0ea85c79655f0cffb069b474f0a66a2f944c03987efb3548b99ff289ed`。ZIPのCRC検査成功、内容は `index.html`、`assets/main-B-E01t_8.js`、`assets/main-XaFuRHRL.css`（合計352,940 bytes）。`node --test tests/itch-package.test.mjs` 成功。これはCI artifactのバイト一致やDraft配布物との同一性を示さない。ローカルZIPのブラウザー実行・秘密情報の網羅的検査は未実施。
+
+実行OriginとWorker受信HTTP Originは過去に `https://html-classic.itch.zone` と記録されているが、WebSocket handshake Originは実測未確認。#69の本番オンライン自動検証とユーザーの現行Draft実機報告を、握手ヘッダーの実測値に置き換えない。Pages・Worker・itchのソースSHA一致を互換性の必須条件としない。
+
+公式[HTML5配布](https://itch.io/docs/creators/html5)と[ページ作成](https://itch.io/docs/creators/getting-started)を2026-11-28に確認。複数ファイルのZIPには `index.html` と必要ファイルを含め相対パスを使用する。coverは315:250比、最低315×250、630×500推奨、スクリーンショットは3〜5枚推奨。上記の旧素材案の16:9は公式cover推奨比ではない。現行Draft設定、画像の公開適性と権利、実機の個別操作、PWAインストール・オフラインCPU、依存ライセンス等の確認は未完了。IssueのCloseおよび一般公開準備完了と評価しない。
