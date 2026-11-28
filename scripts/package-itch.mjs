@@ -1,18 +1,23 @@
 // Assemble a small, deterministic ZIP containing only the browser build.
 // Kept dependency-free so packaging works with the repository's npm install.
 import { deflateRawSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const OUTPUT = path.resolve('artifacts/itch/heibon-mahjong.zip');
+const VITE_ROOT = path.resolve('node_modules/vite');
+const NOTICE_NAME = 'THIRD-PARTY-NOTICES.txt';
+const VITE_LICENSE_VERSION = '7.3.7';
+const VITE_LICENSE_SHA256 = 'a77a1c089806b39ad339535bdf3677f636c91d96693e8ad7b11fe733f650ea64';
 const MAX_FILES = 1000;
 const MAX_PATH_LENGTH = 240;
 const MAX_TOTAL_BYTES = 500 * 1024 * 1024;
 const MAX_SINGLE_BYTES = 200 * 1024 * 1024;
 const ALLOWED_ASSET_EXTENSIONS = new Set(['.css', '.js', '.mjs', '.png', '.svg', '.webp', '.woff', '.woff2']);
 const PWA_ONLY_PATHS = new Set(['manifest.webmanifest', 'sw.js']);
-const DEVELOPMENT_ONLY_PATHS = new Set(['test.html', 'kan-test.html']);
+const DEVELOPMENT_ONLY_PATHS = new Set(['test.html', 'kan-test.html', 'call-test.html']);
 
 function crc32(bytes) {
   let crc = 0xffffffff;
@@ -170,10 +175,26 @@ function zipBuffer(files) {
   return Buffer.concat([...localParts, centralDirectory, end]);
 }
 
-export function makeItchZip(distDir, outputPath = OUTPUT, { requireOnlineApiUrl = false } = {}) {
+export function makeItchZip(distDir, outputPath = OUTPUT, { requireOnlineApiUrl = false, viteRoot = VITE_ROOT } = {}) {
   const absoluteDistDir = path.resolve(distDir);
   if (!existsSync(absoluteDistDir)) throw new Error(`Missing itch.io build directory: ${absoluteDistDir}`);
   const files = packageSources(absoluteDistDir);
+  // Copy the installed Vite license verbatim, including its bundled notices.
+  // Fail closed if npm installation/version does not match the lockfile.
+  const lockedVite = JSON.parse(readFileSync(path.resolve('package-lock.json'), 'utf8')).packages['node_modules/vite'];
+  const installedVite = JSON.parse(readFileSync(path.join(viteRoot, 'package.json'), 'utf8'));
+  if (!lockedVite || installedVite.version !== lockedVite.version || installedVite.version !== VITE_LICENSE_VERSION || installedVite.license !== 'MIT') {
+    throw new Error('Installed Vite license or version differs from package-lock.json.');
+  }
+  const licensePath = path.join(viteRoot, 'LICENSE.md');
+  const licenseInfo = lstatSync(licensePath);
+  if (!licenseInfo.isFile() || licenseInfo.isSymbolicLink()) throw new Error('Vite license must be a regular file.');
+  const license = readFileSync(licensePath);
+  if (createHash('sha256').update(license).digest('hex') !== VITE_LICENSE_SHA256) {
+    throw new Error('Installed Vite license differs from the verified original.');
+  }
+  files.push({ name: NOTICE_NAME, bytes: license });
+  files.sort((left, right) => left.name.localeCompare(right.name, 'en'));
   validateReferences(files);
   const extractedBytes = validateItchLimits(files);
   if (requireOnlineApiUrl) {

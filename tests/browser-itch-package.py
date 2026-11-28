@@ -277,6 +277,15 @@ def capture_failure(page, context, events, repetition, error, observations):
 
 def run_iteration(browser, repetition):
     context = browser.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=1)
+    if os.environ.get('HEIBON_ITCH_LOCAL_ONLY') == '1':
+        base = urlsplit(BASE_URL)
+        def local_only(route):
+            target = urlsplit(route.request.url)
+            if (target.scheme, target.hostname, target.port) == (base.scheme, base.hostname, base.port):
+                route.continue_()
+            else:
+                route.abort('blockedbyclient')
+        context.route('**/*', local_only)
     context.add_init_script('''(() => {
       Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
       document.execCommand = command => {
@@ -318,7 +327,7 @@ def run_iteration(browser, repetition):
         copied = page.evaluate('window.__copiedDiagnosticText')
         assert 'Build Mode: itch' in copied
         assert f'Execution Origin: {page.evaluate("location.origin")}' in copied
-        assert 'API Origin: https://online-mock.invalid' in copied
+        assert f'API Origin: {os.environ.get("HEIBON_ITCH_EXPECTED_API", "https://online-mock.invalid")}' in copied
         assert 'token=' not in copied and 'participantToken' not in copied
         page.locator('#diagnostic-close').click()
 
@@ -328,6 +337,9 @@ def run_iteration(browser, repetition):
         page.wait_for_function("document.querySelectorAll('#player-hand li').length >= 13", timeout=10000)
         decisions = wait_for_human_action(page)
         observations['startupDecisions'] = decisions
+        if os.environ.get('HEIBON_ITCH_CAPTURE_CPU') == '1':
+            ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(ARTIFACT_DIR / f'{BROWSER_NAME}-cpu-{repetition}.png'))
         before = collect_game_state(page)
         observations['beforeDiscard'] = before
         assert before['phase'] == 'awaiting-discard', before

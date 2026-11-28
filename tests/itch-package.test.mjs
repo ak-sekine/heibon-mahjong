@@ -19,6 +19,8 @@ function fixture() {
   writeFileSync(path.join(dist, 'sw.js'), 'self;');
   writeFileSync(path.join(dist, 'icons/icon-192.png'), 'pwa-only');
   writeFileSync(path.join(dist, 'test.html'), 'development-only');
+  writeFileSync(path.join(dist, 'kan-test.html'), 'development-only');
+  writeFileSync(path.join(dist, 'call-test.html'), 'development-only');
   return { root, dist };
 }
 
@@ -54,18 +56,41 @@ test('itch ZIP is deterministic, has a root entry point, and excludes developmen
     const second = makeItchZip(dist, output);
     const secondZip = readFileSync(output);
     assert.deepEqual(firstZip, secondZip);
-    assert.equal(first.files, 4);
+    assert.equal(first.files, 5);
     assert.equal(second.zipBytes, firstZip.length);
     const entries = zipEntries(firstZip);
-    assert.deepEqual([...entries.keys()], ['assets/app.css', 'assets/app.js', 'assets/tile.svg', 'index.html']);
+    assert.deepEqual([...entries.keys()], ['assets/app.css', 'assets/app.js', 'assets/tile.svg', 'index.html', 'THIRD-PARTY-NOTICES.txt']);
+    assert.deepEqual(entries.get('THIRD-PARTY-NOTICES.txt'), readFileSync('node_modules/vite/LICENSE.md'));
     assert(entries.has('index.html'), 'index.html is at the archive root');
     assert(!entries.has('test.html'));
+    assert(!entries.has('kan-test.html'));
+    assert(!entries.has('call-test.html'));
     assert(!entries.has('manifest.webmanifest'));
     assert(!entries.has('sw.js'));
     assert(![...entries.keys()].some(name => name.startsWith('icons/')));
     const html = entries.get('index.html').toString('utf8');
     assert(!html.includes('manifest.webmanifest'));
     assert(html.includes('./assets/app.js'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('itch ZIP fails closed when the installed Vite license is missing or invalid', () => {
+  const { root, dist } = fixture();
+  try {
+    const output = path.join(root, 'game.zip');
+    const viteRoot = path.join(root, 'vite');
+    mkdirSync(viteRoot);
+    const metadata = readFileSync('node_modules/vite/package.json');
+    writeFileSync(path.join(viteRoot, 'package.json'), metadata);
+    assert.throws(() => makeItchZip(dist, output, { viteRoot }), /ENOENT/);
+    writeFileSync(path.join(viteRoot, 'LICENSE.md'), 'MIT');
+    assert.throws(() => makeItchZip(dist, output, { viteRoot }), /differs from the verified original/);
+    writeFileSync(path.join(viteRoot, 'package.json'), JSON.stringify({ version: '0.0.0', license: 'MIT' }));
+    assert.throws(() => makeItchZip(dist, output, { viteRoot }), /differs from package-lock/);
+    writeFileSync(path.join(dist, 'unexpected.txt'), 'not an allowed notice');
+    assert.throws(() => makeItchZip(dist, output), /Unexpected file/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

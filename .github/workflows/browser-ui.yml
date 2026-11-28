@@ -309,6 +309,45 @@ jobs:
       - name: Install browser (${{ matrix.browser }})
         shell: bash
         run: python .github/scripts/timed-playwright-install.py install "${{ matrix.browser }}"
+      - name: Download production-endpoint itch ZIP
+        if: ${{ inputs.reuse_build && matrix.group == 2 && vars.PRODUCTION_WORKER_URL == 'https://heibon-mahjong-online.ak-sekine.workers.dev' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: itch-html5-${{ github.sha }}-${{ github.run_attempt }}
+          path: /tmp/heibon-itch-release
+      - name: Smoke-test the exact production-endpoint ZIP without external requests
+        if: ${{ inputs.reuse_build && matrix.group == 2 && vars.PRODUCTION_WORKER_URL == 'https://heibon-mahjong-online.ak-sekine.workers.dev' }}
+        shell: bash
+        env:
+          BROWSER: ${{ matrix.browser }}
+        run: |
+          set -euo pipefail
+          cd /tmp/heibon-itch-release
+          sha256sum --check SHA256SUMS
+          test "$(cat source-sha.txt)" = "$GITHUB_SHA"
+          unzip -t heibon-mahjong.zip
+          mkdir site
+          unzip -q heibon-mahjong.zip -d site
+          python -m http.server 4176 --bind 127.0.0.1 --directory site > /tmp/heibon-itch-release.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4176/ > /dev/null; then break; fi
+            sleep 1
+          done
+          cd "$GITHUB_WORKSPACE"
+          HEIBON_ITCH_URL=http://127.0.0.1:4176/ HEIBON_ITCH_LOCAL_ONLY=1 \
+            HEIBON_ITCH_EXPECTED_API=https://heibon-mahjong-online.ak-sekine.workers.dev \
+            HEIBON_BROWSER="$BROWSER" HEIBON_SMOKE_REPETITIONS=1 HEIBON_ITCH_CAPTURE_CPU=1 \
+            HEIBON_SMOKE_ARTIFACT_DIR=/tmp/heibon-itch-release-smoke python tests/browser-itch-package.py
+      - name: Save release CPU screenshot for review
+        if: ${{ inputs.reuse_build && matrix.group == 2 && vars.PRODUCTION_WORKER_URL == 'https://heibon-mahjong-online.ak-sekine.workers.dev' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: itch-release-cpu-${{ matrix.browser }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: /tmp/heibon-itch-release-smoke/${{ matrix.browser }}-cpu-1.png
+          if-no-files-found: error
+          retention-days: 90
       - name: Run standalone itch smoke test before Browser UI suite
         if: ${{ matrix.group == 2 }}
         shell: bash
