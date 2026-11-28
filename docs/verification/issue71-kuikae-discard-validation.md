@@ -73,3 +73,25 @@ Cloudのネットワーク許可付きGit接続でfetchと候補pushが成功。
 | 本番公開・新itch.io候補・ユーザー実機 | 達成 | Worker [46117258131](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46117258131)、Pages [46118159491](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46118159491) の公開と公開後確認が成功。候補ZIPはartifact `15252075166`。ユーザーは上記14項目をOKと報告したが、アップロード済みZIPとのdigest一致は独立確認していない。 |
 
 **最終評価：今回指定された最終仕様の必須受入条件は達成し、Issue #71はClose可能と評価する。** 今回報告されなかった端末・ブラウザー、再接続、具体的な実機牌組み合わせは確認済みとみなさない。再接続と牌組み合わせは自動検証で確認されており、今回の必須実機操作として指定された14項目はすべてOKとの報告である。Issue本文・チェックボックス・状態はこの作業では変更しない。旧本文の選択不可記述との整合・Issueの最終更新とCloseは別途ChatGPT側の操作に委ねる。
+
+## 2026-11-28 候補CIのWebKit group 1失敗
+
+文書のみの候補SHA `c354056459ff9d869794eeb34e366af8df31c466` に対する [Environments run 46138662149](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46138662149) は失敗した。`origin/main`との差分は本書と[#46検証記録](issue46-itch-html5-2026-11-05.md)のMarkdown 2件だけで、製品コード・テスト・CI設定に差分はない。
+
+初回push時のworkflowログで `BASE_REF=0000000000000000000000000000000000000000`、`run_full_suite=true`、`classification=application-or-unknown` を確認した。これは信頼できる差分基準がないとき全体検証を選ぶ既存の安全側動作であり、分類異常ではない。run 46138662149では `docs-check`、`verify`、`local-online`、両engineのisolation、Chromium両group、WebKit group 2が成功し、WebKit group 1が失敗、`audit`も失敗した。失敗済みの全体run・auditを成功扱いしない。
+
+WebKit job [140959900731](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46138662149/job/140959900731) のログには、`tests/browser-candidate-geometry.py` が1280×720を完了した後、次の既定viewportに入って失敗した記録がある。テストの既定順序から失敗viewportは **1366×768** と特定できる。例外は896行目で、selector `#online-game-controls [data-panel-part="candidate-options"] button` の先頭要素を取得する `Locator.evaluate` が30秒でタイムアウトした。例外行はオンライン分岐の「候補画面を戻るで閉じた後、再び開き、候補を確定する」部分にあるため、処理段階は再表示操作後・候補確定前である。
+
+同じ箇所のソース上では、鳴き種類ボタンに対するhit-test・enabled・画面内検査を通過した後に `page.mouse.click` と2回の `requestAnimationFrame` 待機が行われ、その後に候補ボタンを取得する。この実行順序は確認できるが、このviewport／scenarioにはclickイベント観測器がなく、clickイベントや製品のclick handlerが動いたかは確認できない。失敗ログから確定できるのは、候補ボタンselectorの要素を待ち時間内に取得できなかったことまでである。
+
+失敗診断artifact [15261700069](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46138662149/artifacts/15261700069) は未期限切れで、metadata上の外側artifactは924,931 bytes、SHA-256 `0acaf785d0e2b1b26a16e4f95b46fc0c76e6542f8473abd7af691c863492e735`。正規connectorから返されたファイル参照とGitHub artifact API URLの両方を使った取得はHTTP 403となり、内部の診断JSONを確認できなかった。したがって**失敗scenarioは未特定**とする。候補画面のDOM詳細、鳴き判断・送信待ち・期限切れの状態、ページエラー、最後のmeasurementに記録されたviewport以外の値は推測で補わない。
+
+このため `targeted_candidate_geometry` は実行していない。viewport・online modeは分かるがscenarioを限定できず、全scenarioへの拡張は失敗局面だけの診断という条件を満たさない。追加実行は行わない。
+
+### 関連する過去事象との比較
+
+- [Issue #73](https://github.com/ak-sekine/heibon-mahjong/issues/73) はWebKit 320×480で最終順位を閉じた後、局結果ボタンに対するポインター操作のclickが発生せず、再表示されない事象を記録する。今回の失敗は1366×768のオンライン鳴き候補画面で候補ボタンselectorが取得できない事象であり、操作対象と観測された症状が異なる。同じWebKitの再表示操作だけでは共通原因と判断できない。
+- [Issue #52の1440×900オンラインchi診断](issue52-webkit-chi-reopen-diagnostics.md)では、候補再表示の取得タイムアウト後、同じSHAの独立Browser UIと限定診断で再表示・1回送信が成功したが、根本原因は未確定である。その診断観測は1440×900のonline chiに限られ、今回の1366×768・scenario不明の失敗を説明しない。
+- [Issue #32の候補座標記録](issue32-candidate-anchor-2026-11-09.md)には、過去の狭いviewportでの配置不備と、後続のChromium／WebKit候補座標matrix成功（132局面ずつ）が記録されている。今回も同じcandidate geometryテスト系列だが、今回は座標assertionでなく再表示後の候補ボタン取得で失敗している。過去のレイアウト修正やmatrix成功から、今回の原因を特定することはできない。
+
+今回の差分は文書だけなのでこの失敗を文書変更による製品退行とみなす証拠はない。一方、既存製品・テスト経路に間欠的な候補再表示問題がある可能性も否定できない。発生画面が#73とは異なるため、共通原因の証拠が得られるまでは候補画面再表示の別Issueで追跡するのが適切である。
