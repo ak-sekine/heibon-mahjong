@@ -433,3 +433,15 @@ itch.io Draftに現在アップロード済みのZIPをそのまま使えます�
 ローカル `npm test` は105ファイル中101成功、公開基盤関連4ファイル失敗。詳細診断では `spawnSync git`・`tar`・`python3` の `EPERM`。失敗を保持し、別環境の候補CIでの結果を別に確認する。Pages production/development build、Worker型検査は成功。本番・開発Pages buildにもmodulepreload補助コードがあり、ライセンス表示の別対応が必要。公開済みPagesの直接確認や修正・再公開は未実施。
 
 ユーザー実機・権利確認・現行画像の確認は引き続き未完了。Issue #46はOpen・Close不可。完成前のCI結果や配布物のdigestはこの時点で成功扱いしない。
+
+### 候補CI失敗・停止（2026-11-28）
+
+候補 `067412eaf2d7532da5220e9808676220c2810cca` の[CI 46099090749](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46099090749)はverify・local-online・環境分離Chromium/WebKitに成功し、配布予定の本番接続先ZIPの実体をダウンロード・digest照合・展開して起動とCPU打牌を試す新smokeもChromium/WebKitで成功した。しかしWebKit group 2の既存 `tests/browser-round-end-ui.py` は320×480で最終順位を閉じた後の局結果再表示に失敗し、`buttonClicks: 0`、結果ダイアログは閉じたままだった。直前のitch smokeは成功。2026-11-27の#69記録にも類似のWebKit click未発生があり、根本原因は未確定。今回の新smokeとの因果や製品・テスト・実行環境のいずれの問題かは確定しない。失敗を消さず、無根拠な再試行、テスト緩和、main統合は行わない。
+
+本候補が生成した[itch HTML5 artifact 15244871776](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46099090749/artifacts/15244871776)とreview用CPU画像は存在するが、CI全体が失敗したため配布候補として確定しない。外側のdigestは内側ZIPのdigestではない。この実行環境では既存のartifact取得経路はHTTP 403で、内側ZIPのdigestや画像を直接確認できていない。ZIPのソースSHAを示す `source-sha.txt` と内側の `SHA256SUMS` はartifact内にある。公開画像は未検査のため未採用。別途、検査する内側ZIPのdigest・内容・容量をCIログへ出す修正は作業ツリーに未commitのまま保持し、失敗を無視してCI再実行しない。
+
+### 2026-11-28 再調査：限定診断の条件
+
+失敗jobのResultReopenTraceと#69の限定成功runを比較した。双方の320×480で同じボタン・hit test、viewport復元後の同一座標、close後のfocus復元を観測。失敗ではpointerdown/mousedown/pointerup/mouseupが届いたがclickなし、成功ではclickあり。DOM置換・ページエラーは観測されず、window captureのdefaultPreventedはその後のイベント処理を保証しない。#69の失敗は今回のitch ZIP smoke導入前で、今回のsmokeが失敗の必要条件だとする根拠はないが、干渉は排除できない。
+
+診断前に上限を**候補SHA・WebKit・320×480・browser-round-end-uiの1回**と定める。既存のpointer操作とassertion・traceを変更せず、明示指定した手動限定診断に限りviewportを絞る。通常のpush CIと全viewportは変更しない。成功は原因の解明を意味せず、失敗を含め結果をそのまま残す。ローカルWebKitの取得は正規ネットワーク許可付きのPlaywright installでcdn.playwright.dev等が403 Domain forbiddenを返し実行不能、Chromium起動制限は回避しない。

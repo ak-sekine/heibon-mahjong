@@ -14,6 +14,9 @@ ENGINE = os.environ.get('HEIBON_BROWSER', 'chromium')
 WIDTHS = [(320, 568), (355, 700), (375, 667), (390, 844), (430, 932), (1280, 800)]
 if ENGINE == 'webkit':
     WIDTHS += [(320, 480), (375, 547)]
+if os.environ.get('HEIBON_DIAGNOSTIC_ROUND_END_VIEWPORT'):
+    assert ENGINE == 'webkit' and os.environ['HEIBON_DIAGNOSTIC_ROUND_END_VIEWPORT'] == '320x480'
+    WIDTHS = [(320, 480)]
 SUMMARY_YAKU_NAMES = {
     'menzen-tsumo': '門前清自摸和',
     'yakuhai-white': '役牌：白',

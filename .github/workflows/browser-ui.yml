@@ -52,6 +52,11 @@ on:
         required: false
         type: string
         default: ''
+      diagnostic_round_end_viewport:
+        description: Limit the exact WebKit round-end diagnostic to 320x480; empty runs all existing viewports.
+        required: false
+        type: string
+        default: ''
   workflow_call:
     inputs:
       reuse_build:
@@ -324,8 +329,11 @@ jobs:
           set -euo pipefail
           cd /tmp/heibon-itch-release
           sha256sum --check SHA256SUMS
+          cat SHA256SUMS
           test "$(cat source-sha.txt)" = "$GITHUB_SHA"
           unzip -t heibon-mahjong.zip
+          unzip -l heibon-mahjong.zip
+          wc -c < heibon-mahjong.zip
           mkdir site
           unzip -q heibon-mahjong.zip -d site
           python -m http.server 4176 --bind 127.0.0.1 --directory site > /tmp/heibon-itch-release.log 2>&1 &
@@ -379,6 +387,7 @@ jobs:
           HEIBON_CANDIDATE_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.targeted_candidate_geometry && inputs.candidate_geometry_mode || '' }}
           HEIBON_CANDIDATE_SCENARIO: ${{ github.event_name == 'workflow_dispatch' && inputs.targeted_candidate_geometry && inputs.candidate_geometry_scenario || '' }}
           HEIBON_DIAGNOSTIC_BROWSER: ${{ inputs.diagnostic_browser }}
+          HEIBON_DIAGNOSTIC_ROUND_END_VIEWPORT: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic_mode == 'scenarios' && inputs.diagnostic_browser == 'webkit' && inputs.diagnostic_scenarios == 'browser-round-end-ui-webkit' && inputs.diagnostic_round_end_viewport || '' }}
         run: |
           VITE_ONLINE_API_URL=https://online-mock.invalid npm run dev -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/heibon-vite.log 2>&1 &
           vite_pid=$!
