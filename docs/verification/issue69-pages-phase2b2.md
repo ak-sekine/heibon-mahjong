@@ -80,3 +80,76 @@ main `77c6c35cc381ffe6987f4ace8bca8cff0fe1653f`、必須CI [46045430838](https:/
 [Pages専用公開 46084987199](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46084987199) はmain push CI run 46045430838 attempt 1のArtifact 15222420956、ZIP digest `sha256:d7579ac3178a8f8d3941d7487eb99f964d425bdfdbe5b0b667d5505d621c6f11`（期限 2027-02-25 17:54:28 UTC）を再利用し成功、全配信ファイル照合と独立auditに成功した。確定commit `5fff1df032e672948187bb610f54691b3086c70f`、本番snapshotDigest `ff3de58d7e3ea1eb206fb85560ec11e5e332b7f00b726843445077504d6718cb`、pending null。開発snapshot SHA `da1962ce27c500d9e01b998df2f0828794a7c1cd`、digest `ee6ddf1402f38dc6eb52f591a42c36f5a9effe06067825222cfd5ab3d7f710bf` と `site/dev` は保持された。共有 `environments.json` は本番更新に伴い変更。Pages公開でWorker jobはskipされ、本番独立Deploymentは1件のまま、開発Deployment 8111581288は `verified:132dd0c6-57e4-444b-9515-0bda6392ca2f` を保持した。開発Worker稼働versionの別途直接再照合は未実施。
 
 本番Pages・PWAおよび現在のitch.io Draft実配布物について、ユーザー実機での起動、CPU対局、Pages↔itch.ioの卓作成・参加・基本操作・同期・再接続を次段階で確認する。itch.io ZIPの元SHA・digestは不明で、既存配布物との実機互換性を今回のOriginテスト成功だけで保証しない。Issue #69はOpenのまま。
+
+## Issue #69 最終評価（2026-11-28）
+
+### ユーザー本人による実機確認
+
+2026-11-28、本番Pages・PWAおよび現在のitch.io Draftについて、ユーザーが次の11項目をすべてOKと報告した。NG 0、報告対象内の未確認0。
+
+1. 本番Pagesの正常起動。
+2. 本番PagesのCPU対局・基本操作。
+3. 本番PWAの更新・再起動。
+4. 本番PWAのCPU対局・基本操作。
+5. itch.io Draftの正常起動。
+6. itch.io DraftのCPU対局・基本操作。
+7. Pagesで卓を作成しitch.ioから参加。
+8. itch.ioで卓を作成しPagesから参加。
+9. Pages・itch.io間の操作・状態同期。
+10. Pages・itch.io間の切断後の再接続。
+11. 本番・開発の設定・保存情報の分離。
+
+先に記録した開発環境のiPhone Safari実機8項目と合わせ、ユーザー報告はOK 19、NG 0、報告対象内の未確認0。現在のDraftを使った検証でありZIP再アップロードは行っていない。ユーザーによる実機報告と、以下のActions自動検証は別の証跡である。
+
+### 自動検証・公開証跡
+
+- 本番main公開SHA `77c6c35cc381ffe6987f4ace8bca8cff0fe1653f`：同一SHAの[main必須CI・audit 46045430838](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46045430838)。公開後の記録のみを含む開始時mainは `8716a6a212984e5dd678d22b093ce0cc643a1e24`。
+- 開発Worker：[46010218955](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46010218955)、独立Deployment `8111581288`、verified version `132dd0c6-57e4-444b-9515-0bda6392ca2f`。開発Pages：[46019125645](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46019125645)、公開SHA `da1962ce27c500d9e01b998df2f0828794a7c1cd`、snapshotDigest `ee6ddf1402f38dc6eb52f591a42c36f5a9effe06067825222cfd5ab3d7f710bf`。開発[auto 46029408933](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46029408933) はnoneで公開jobをskipした。
+- 本番Worker：[46083763674](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46083763674)、独立Deployment `8121540156`、verified version `01b049b2-0c4a-4055-b5c1-22a870d61d5f`。本番Pages：[46084987199](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46084987199)、CI由来Artifact `15222420956`、ZIP digest `sha256:d7579ac3178a8f8d3941d7487eb99f964d425bdfdbe5b0b667d5505d621c6f11`、確定commit `5fff1df032e672948187bb610f54691b3086c70f`、snapshotDigest `ff3de58d7e3ea1eb206fb85560ec11e5e332b7f00b726843445077504d6718cb`。実配信全ファイル照合と独立audit成功。Pages公開後も開発snapshotとWorker記録は保持された。
+- [復旧の検証記録](issue69-pages-resume.md)は固定Action wrapperの非公開Actionsと障害時の隔離テストを示す。失敗を本番へ注入して実復旧した結果ではない。[運用規則](../operations/environments.md)・[通信契約](../operations/online-compatibility.md)とAGENTS.mdはmainに反映済み。
+
+### Issue作業範囲８件の評価
+
+1. **達成：現行調査・安全要件の棚卸し。** [段階調査](issue69-phase2b.md)、[Worker記録](issue69-worker-phase2b1.md)、[Pages記録](issue69-pages-resume.md)と運用文書に依存・処理・安全要件を記録。段階記録の未実装表記は当時の履歴であり、後続の本最終記録を参照する。
+2. **達成：通信契約・互換性方針。** #70の[v1契約](../operations/online-compatibility.md)、固定テスト、保存・再接続と今回の実機19項目を根拠とする。全過去版の無期限互換や将来の非互換保存変更を保証しない。
+3. **達成：独立対象判定。** `publication-plan.mjs`・`tests/publication-plan.test.mjs`とworkflowのテストでUI、Worker、共有、文書、未知・累積差分を検証。実環境の各専用公開とauto noneは上記runで確認。非互換変更は順序を個別判断する。
+4. **達成：Pages保持・合成・再照合設計。** currentとPages固有pending、snapshot digestと不変Git履歴、共有排他、証跡に基づく停止・復旧を[手順](issue69-pages-resume.md)に記録。異常系は隔離検証であり、実事故の完全自動復旧を保証しない。
+5. **達成：Artifact検索・限定復旧。** 名前・ID・REST digest・期限・上限付き再検索は既存テストと非公開Actions [45948557979](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45948557979)、[45948683288](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45948683288)で確認。公開前・結果不明・記録失敗を区別し、証拠不足時は停止する。
+6. **達成：itch.io独立手動配布。** ZIPのSHA・digest・配布日・確認結果の記録方法を運用文書に整理し、現在のDraftはユーザー実機で確認。既存ZIPの元SHA・digest・配布日は不明。
+7. **達成：通常公開の品質・hash評価。** Artifact、保持snapshot、合成物、実配信の各保証を区別し、全配信hash照合を維持。オンライン検証失敗とdeploy成功の記録を分ける。
+8. **達成：移行・復旧・文書。** 履歴を保持し、pending・実配信照合を前提に開発、本番の順で移行。現行手順は[環境運用](../operations/environments.md)とAGENTS.mdに反映し、成果と限定事項を本記録に残した。
+
+### Issue受入条件８件の評価
+
+1. **達成：調査・設計・移行。** 上記作業範囲1・2・8と段階記録に根拠。未確認の全旧版互換は保証範囲外。
+2. **達成：一体予約の廃止。** Worker独立DeploymentとPages専用pending/snapshotに分離。Pages固有pendingは共有サイト保護のため維持し、worker-onlyは依存しない。
+3. **達成：対象別経路。** 分類・workflowの隔離テスト、開発・本番それぞれのworker-only/pages-only公開、開発auto noneで確認。both・未知・非祖先は隔離テストであり、双方変更の障害を本番へ注入していない。
+4. **達成：相互非干渉・復旧。** 専用公開の実配信audit、保持側snapshot・開発 `site/dev` 非変更を確認。失敗候補・競合・キャンセル・結果不明の保護は隔離テストで確認。
+5. **達成：Artifact・障害時の限定復旧。** 検索失敗・不一致・期限・タイムアウト等の隔離テストと実Actions wrapper検証を実施。公開前失敗の再開・成功後の記録復旧は隔離検証で、実環境への障害注入はしていない。証跡不足時は安全停止する。
+6. **達成：通信・実機。** #70の固定契約・保存復元テスト、両Originの本番オンライン自動検証に加え、現在配布中のPages・Draft・PWAについてユーザー報告19項目OK。全旧PWAの無期限互換は保証しない。
+7. **達成：CI・品質。** main `77c6c35...` の必須CI/audit、実公開run、Artifact完全性・全配信hashを確認。Environment承認・Secrets・DO保護を維持。DO bindingの完全なnamespace IDの直接取得は未実施である。
+8. **達成：運用・比較・段階検証。** 候補CI→main CI→承認済み開発・本番公開と本比較を記録。旧refからの運用上の公開停止を継続する。将来の権限変更や非互換移行は別判断。
+
+### 旧方式と新方式の比較
+
+| 項目 | 旧一体方式 | 独立方式・証拠の範囲 |
+| --- | --- | --- |
+| 通常 | Worker→online→Pages→確定→auditの一体工程 | 対象サービスごとに公開・検証・確定。bothは独立記録 |
+| Pagesのみ | Worker公開を含む | Worker skip。開発46019125645、本番46084987199で実確認 |
+| Workerのみ | Pages予約・合成・公開・確定を伴う | Pages skip。開発46010218955、本番46083763674で実確認 |
+| 文書・テストのみ | 一体方式の公開判定に依存 | 累積製品差分なしをauto none。開発46029408933で実確認 |
+| CI・Artifact | 検証済み成果物再利用あり、部分失敗後の一体復旧が課題 | 本番Pages 46084987199で46045430838のArtifactを再利用。Worker・autoのfull検証は維持 |
+| Pages要求前の失敗 | 一体予約の調査・復旧と再検証 | 証拠に基づくstage解消、新stageと元Artifact再利用。Worker再公開不要を隔離テストで確認 |
+| Pages成功後の記録失敗 | 一体予約の証跡照合・確定 | Pagesのみ別runで証跡を照合して記録を確定、再公開しない。隔離テストで確認 |
+| 保持側 | 共有サイト合成・全hash照合 | 正常snapshotから合成・全hash照合を維持。実公開で両方向の保持とauditを確認 |
+
+参考runの開始〜終了（GitHubのcreatedAt/updatedAt）は旧#67失敗 `45710701975` が3分34秒、本番Worker `46083763674` が12分47秒、本番Pages reuse `46084987199` が2分32秒、開発Pages full `46019125645` が12分40秒。旧runは失敗、本番Pagesは既存CIを再利用、開発Pagesはfull検証という異なる条件で、同一処理の比較や時間削減率を意味しない。復旧操作回数・所要時間の実測比較はない。
+
+### 残る未確認事項とClose評価
+
+- 以前のWebKit click未発生の根本原因は未確定。限定診断で非再現、後続必須CIとユーザーの結果再表示確認は成功した。発生原因を解明済みとしない。
+- 既存itch.io Draftの元ZIPのSHA・digest・配布日は不明。現在配布物のユーザー実機検証は成功し、今後の配布時は情報を記録する。過去の来歴を推測しない。
+- DO bindingの完全namespace IDは今回直接取得していない。ユーザーは両bindingの存在を確認し、公開候補と従来のWorker/DO設定に差分はなく、既存保存・オンラインテストは成功した。直接ID照合済みとはしない。
+- 本番公開後の開発Worker versionのCloudflare直接再照合は未実施。開発独立Deploymentのverified記録と非公開jobのskipは確認したが、現在の実稼働versionを別途確認済みとはしない。
+
+これらは本Issueの合意済み保証範囲と報告対象の実機確認を超える未確認事項で、現状の証跡上はCloseを妨げる必須作業とは判断しない。新たな非互換・実機異常・公開状態の不一致が判明した場合は別途調査する。最終文書commitとその文書CIがmainで成功した後にClose可能と評価する。Issue状態の変更は行わず、ChatGPTへ評価を引き継ぐ。
