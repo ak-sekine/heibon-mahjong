@@ -445,3 +445,29 @@ itch.io Draftに現在アップロード済みのZIPをそのまま使えます�
 失敗jobのResultReopenTraceと#69の限定成功runを比較した。双方の320×480で同じボタン・hit test、viewport復元後の同一座標、close後のfocus復元を観測。失敗ではpointerdown/mousedown/pointerup/mouseupが届いたがclickなし、成功ではclickあり。DOM置換・ページエラーは観測されず、window captureのdefaultPreventedはその後のイベント処理を保証しない。#69の失敗は今回のitch ZIP smoke導入前で、今回のsmokeが失敗の必要条件だとする根拠はないが、干渉は排除できない。
 
 診断前に上限を**候補SHA・WebKit・320×480・browser-round-end-uiの1回**と定める。既存のpointer操作とassertion・traceを変更せず、明示指定した手動限定診断に限りviewportを絞る。通常のpush CIと全viewportは変更しない。成功は原因の解明を意味せず、失敗を含め結果をそのまま残す。ローカルWebKitの取得は正規ネットワーク許可付きのPlaywright installでcdn.playwright.dev等が403 Domain forbiddenを返し実行不能、Chromium起動制限は回避しない。
+
+限定診断の結果：候補 `3258358724b58deb18d520b9de14c7ad93584883` の[run 46100434908](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46100434908)は手動指定 `browser-round-end-ui-webkit`・320×480のみを1回実施し成功。最終順位close後、同一DOM token・期待座標のボタンにpointerdown/mousedown/pointerup/mouseup/clickが届き、結果ダイアログが再表示、`ResultDialog.open` の既存1回assertionとキーボード確認も成功。trace欠落0。この成功では既存の失敗は再現せず、原因を証明しない。試行上限に達したので追加試行をしない。
+
+失敗と成功ではviewport・ボタン位置・hit test・close後のfocus復元は共通。失敗側のwindow captureでは入力イベントのdefaultPreventedはいずれもfalseだが、後続リスナーでの状態、UA内部のclick生成・modal top layerの完全な解除、PlaywrightとWebKitの内部動作は未確定。buttonの置換やDOM上の明らかな遮蔽は今回の該当時点では観測されなかった。新itch smokeの前にも#69で同じ失敗があり、smokeを原因と断定できない。今回のsmokeの有無を統制した実験は未実施。実機への影響は未確認。
+
+ユーザーの停止条件に従い、原因未解明の再発を残したまま製品・テストの動作修正、main統合、配布候補の確定は行わない。候補pushに伴う自動CI [46100422129](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46100422129)は別途進行しており、成否がいずれでも失敗原因の解明とは扱わない。
+
+候補push CI [46100422129](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46100422129) は同SHAでverify・local-online・環境分離・Chromium/WebKit全group・audit成功、publish skip。旧失敗の原因は未解明であり、main統合は保留。実ZIP artifact [15245282604](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46100422129/artifacts/15245282604) の内側 `heibon-mahjong.zip` はCIログのchecksum照合でSHA-256 `e01e6f966fe50dadebe79a09fd1100d51b8296b4c25522fc8ddb31f8b1b78220`、99,827 bytes、root `index.html`・`assets/main-PXnOtANr.js`・`assets/main-XaFuRHRL.css`・`THIRD-PARTY-NOTICES.txt`。両browserの実ZIP smokeログは同一digestを出し成功。通知原文は生成時にVite 7.3.7の固定SHA-256と照合しているが、この環境ではartifactの中身を個別取得して比較できていない。GitHub artifact外側digest `378b0c0fe4e021058d3b364c877cd920991de58d8985491baacdc36a3b2ddb86` は内側のdigestとは別。取得時はartifactを展開し、内側ZIPとSHA256SUMSを照合する。これは未解決停止条件により最終配布確定ではない。
+
+### 統合判断と独立Issueへの引き継ぎ（2026-11-28）
+
+候補 `3258358724b58deb18d520b9de14c7ad93584883` はZIP生成、パッケージテスト、実ZIP smoke、手動診断と文書のみを変更する。ゲーム・ダイアログ・通信・保存・Pagesビルド処理への差分はない。通常CIのviewportとassertionを維持し、候補の必須CI・audit成功を確認後、同一SHAをmainへfast-forwardした。過去のWebKit問題は分離して追跡する。
+
+WebKit引き継ぎ。320×320で最終順位を閉じ、Enterで再表示して再度閉じた後、320×480に戻して局結果をポインターで開く工程。失敗は #69の [job 140581878590](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46021197973/job/140581878590)（artifact 15208572340）と #46の [job 140837638681](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46099090749/job/140837638681)（artifact 15244487603）。成功対照はrun 46025650946、46100434908、46100422129。失敗時も同一DOM・hit test・押下と解放を観測したがclickとopen呼び出しがなかった。製品・テスト・WebKit・Playwrightのどこで起因したか、変更との因果、実機への影響は未確認。ライセンス対応前にも発生した。
+
+追加診断は一度に一変数を変更する。基準を固定し、viewport復元あり／初めから320×480、closeイベント観測前後、フォーカス復元あり／なしの診断fixture、locator操作／座標でのネイティブ入力、固定PlaywrightおよびWebKit版／既知成功版を個別比較する。top layer・フォーカス・最終イベント取消状態を記録し、試行上限を先に定める。修正の受入条件は原因と変更の対応、短画面と通常画面で実ポインターおよびキーボード再表示、各操作でopenが1回、Chromium/WebKitとaudit成功。Issue登録はChatGPTへ引き継ぐ。
+
+Pagesライセンス引き継ぎ。本番・開発のローカルビルドにVite 7.3.7のmodulepreload補助コードを確認。MIT著作権・許諾文を含むインストール済みライセンス原文を各Pages出力へ同梱し、公開先から参照できる設計を別Issueで検討する。productionと/devの両方で配信パスとsnapshot hashを確認し、通知をオフライン提供する場合はSWのprecache対象と世代更新を検証する。新規インストール、旧キャッシュからの更新、機内モードCPU、環境間分離を回帰検証し、既存の独立公開手順で開発・本番をそれぞれ扱う。
+
+公開画像は候補CIのCPU画像artifact 15244968850（Chromium）と15244599129（WebKit）を優先。取得後に実画像を確認するまでは公開保留。現行Draft／PagesでPCとスマートフォンのCPU卓、公開情報のみのオンライン卓、局結果から3〜5枚を選ぶ。診断表示、個人情報、ルームコード、非公開牌を除外する。カバーは権利確認済みの現行卓を630×500に整え、タイトルを添える。出典未確認のPWAアイコンは採用しない。
+
+### 技術的な配布候補の確定
+
+mainの同一SHA [必須CI 46101623962](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46101623962) は全ブラウザーグループ、verify、環境分離、local-online、auditが成功。publishはskip。採用するZIPは上記の候補CI artifact 15245282604の内側ZIPのみ。mainへビルド元SHAをそのまま統合し、両ブラウザーの候補CIログにある同一digestと有効期限（2027-02-26 02:55 UTC）を照合した。main CIで生成された別ZIPはこの配布記録の対象外。画像の取得は403で実見できなかった。
+
+作業範囲は配布形式、itchビルド、PWA分離、オンライン接続、配布・更新手順が達成。クロス公開元対戦と公開素材は新ZIPの実機・画像・権利確認が残り一部達成。受入はZIP生成と未確認の明記が達成。DraftからのCPU対局、個別同期、再接続後の復元、Origin拒否と現行Pages PWA回帰、公開素材を含む公開判断は一部達成。旧配布版の実機記録は保持し、新ZIPに転用しない。IssueはClose不可。
