@@ -6,6 +6,8 @@ import { canDeclareRiichi } from '../game/riichi.ts';
 import { canDeclareTsumo } from '../game/tsumo.ts';
 import { canDeclareRon } from '../game/ron.ts';
 import { canDeclareKyuushuKyuuhai } from '../game/special-draws.ts';
+import { isForbiddenDiscard } from '../game/melds.ts';
+import { KUIKAE_DISCARD_NOTICE } from '../ui/kuikae-feedback.ts';
 import { canDiscard } from '../game/discard.ts';
 import { getKanOptions } from '../game/kan.ts';
 import { getCallOptions } from '../game/calls.ts';
@@ -31,6 +33,7 @@ export function createLocalActionPanelState(
   const selected = [...player.hand, ...(player.drawnTile ? [player.drawnTile] : [])]
     .find(tile => tile.id === selectedTileId);
   const discardTile = player.riichi ? player.drawnTile : selected;
+  const forbiddenDiscard = Boolean(discardTile && isForbiddenDiscard(player, discardTile.id));
   const discardVisible = ownTurn;
   const canRiichi = Boolean(ownTurn && selected && canDeclareRiichi(game, playerId, selected.id, match.points[viewerSeat]));
   const canTsumo = ownTurn && player.control === 'human' && canDeclareTsumo(game, playerId);
@@ -71,6 +74,7 @@ export function createLocalActionPanelState(
   else if (game.phase === 'awaiting-ron') actionStatus = 'ロン判断を待っています。';
   else if (!ownTurn) actionStatus = `${seatNames[game.turnPlayerId]}の手番です。`;
   else if (player.riichi) actionStatus = 'リーチ中：ツモ和了 または ツモ切り';
+  else if (forbiddenDiscard) actionStatus = KUIKAE_DISCARD_NOTICE;
   else if (selected) actionStatus = `選択：${tileLabel(selected.tile)}`;
   else actionStatus = 'あなたの手番：牌を選択して「打牌する」で確定';
 
@@ -78,7 +82,7 @@ export function createLocalActionPanelState(
 
   return {
     buttons: {
-      discard: button(discardVisible, discardVisible && !progressing && Boolean(discardTile), player.riichi ? 'ツモ切り' : '打牌する'),
+      discard: button(discardVisible, discardVisible && !progressing && Boolean(discardTile) && !forbiddenDiscard, player.riichi ? 'ツモ切り' : '打牌する'),
       riichi: button(canRiichi, canRiichi && !progressing, 'リーチ'),
       tsumo: button(canTsumo, canTsumo && !progressing, 'ツモ和了'),
       kyuushu: button(kyuushu, kyuushu && !progressing, '九種九牌'),

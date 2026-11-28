@@ -84,12 +84,11 @@ export class GameController {
   diagnosticSnapshot(): Record<string, unknown> { return this.runner.diagnosticSnapshot(this.game, this.match); }
   select(tileId: string): void {
     const player = this.game.players[this.playerSeat];
-    if (isForbiddenDiscard(player,tileId)) return;
-    if ((player.riichi && tileId !== player.drawnTile?.id) || this.progressing || !canDiscard(this.game, this.playerSeat) || ![...player.hand, player.drawnTile].some(tile => tile?.id === tileId)) return;
+    if (this.match.status !== 'playing' || player.control !== 'human' || (player.riichi && tileId !== player.drawnTile?.id) || this.progressing || !canDiscard(this.game, this.playerSeat) || ![...player.hand, player.drawnTile].some(tile => tile?.id === tileId)) return;
     this.selectedTileId = this.selectedTileId === tileId ? null : tileId;
   }
   private get discardId(): string | null { return this.game.players[this.playerSeat].riichi ? this.game.players[this.playerSeat].drawnTile?.id ?? null : this.selectedTileId; }
-  get canConfirm(): boolean { return !this.progressing && this.discardId !== null && canDiscard(this.game, this.playerSeat); }
+  get canConfirm(): boolean { return this.match.status === 'playing' && this.game.players[this.playerSeat].control === 'human' && !this.progressing && this.discardId !== null && !isForbiddenDiscard(this.game.players[this.playerSeat], this.discardId) && canDiscard(this.game, this.playerSeat); }
   get canRiichi(): boolean {
     return this.match.status === 'playing' && !this.progressing && this.selectedTileId !== null &&
       canDeclareRiichi(this.game, this.playerSeat, this.selectedTileId, this.match.points[this.playerSeat]);

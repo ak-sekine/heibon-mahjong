@@ -3,6 +3,14 @@ import { choiceAccessibleLabel } from '../ui/action-panel.ts';
 import { actionChoicesForDisplay } from '../ui/action-panel.ts';
 import type { PlayerGameView } from './game-view.ts';
 
+import { KUIKAE_DISCARD_NOTICE } from '../ui/kuikae-feedback.ts';
+
+export function isOnlineKuikaeSelection(view: PlayerGameView, tileId: string): boolean {
+  return view.status === 'playing' && view.phase === 'awaiting-discard' &&
+    view.turnPlayerId === view.viewerSeat && !view.self.decision && !view.seats[view.viewerSeat].riichi &&
+    Array.isArray(view.self.kuikaeForbiddenTileIds) && view.self.kuikaeForbiddenTileIds.includes(tileId);
+}
+
 const button = (visible: boolean, enabled: boolean, label: string): ActionButtonState => ({ visible, enabled, label });
 
 function displayName(seat: PlayerGameView['seats'][number]): string {
@@ -80,6 +88,7 @@ export function createOnlineActionPanelState(
   else if (view.phase === 'awaiting-ron') actionStatus = 'ロン判断を待っています。';
   else if (view.phase === 'awaiting-call') actionStatus = '鳴き判断を待っています。';
   else if (view.turnPlayerId !== view.viewerSeat) actionStatus = `${displayName(view.seats[view.turnPlayerId])}の手番です。`;
+  else if (selectedTileId && isOnlineKuikaeSelection(view, selectedTileId)) actionStatus = KUIKAE_DISCARD_NOTICE;
   else if (view.self.discardableTileIds.length) actionStatus = discardTileId ? '牌を選択中です。' : '打牌する牌を選択してください。';
   else actionStatus = 'サーバーの更新を待っています。';
 

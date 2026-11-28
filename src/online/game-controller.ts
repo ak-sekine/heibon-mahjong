@@ -9,7 +9,7 @@ import { TILE_KINDS, tileKindKey } from '../model/tile.ts';
 import { ActionPanel, type ActionPanelEvent } from '../ui/action-panel.ts';
 import { ResultDialog } from '../ui/result-dialog.ts';
 import { MatchResultDialog } from '../ui/match-result-dialog.ts';
-import { createOnlineActionPanelState } from './action-panel-state.ts';
+import { createOnlineActionPanelState, isOnlineKuikaeSelection } from './action-panel-state.ts';
 import { renderOnlineWinSummary } from './result-content.ts';
 import { onlinePlayerName } from './player-name.ts';
 import { DeclarationBubbleRenderer } from '../rendering/declaration-bubbles.ts';
@@ -117,7 +117,7 @@ export class OnlineGameController {
     this.actionPanel.setHandler(event => this.handleAction(event));
     this.playerHand.addEventListener('click', event => {
       const button = (event.target as Element).closest<HTMLButtonElement>('button[data-tile-id]');
-      if (!button || button.disabled) return;
+      if (!button || button.disabled || !this.gameConnectionReady || this.actionPending) return;
       this.selectedTileId = this.selectedTileId === button.dataset.tileId ? null : button.dataset.tileId ?? null;
       this.render();
     });
@@ -224,7 +224,7 @@ export class OnlineGameController {
     if (message.type === 'game-connection-state') {
       this.gameConnectionReady = message.ready === true;
       this.connectionNotice = typeof message.message === 'string' ? message.message : '';
-      if (this.view) this.renderActions(this.view);
+      if (this.view) this.render();
       return;
     }
     if (message.type === 'game-action-state-confirmed') {
@@ -294,7 +294,10 @@ export class OnlineGameController {
     if (!this.view || this.declarationCursor === null) {
       this.declarationBubbles.clearAll();
     }
-    if (!this.view || next.gameRevision !== this.view.gameRevision) {
+    if (!this.view || next.gameRevision !== this.view.gameRevision || next.status !== this.view.status ||
+        next.turnPlayerId !== this.view.turnPlayerId || next.phase !== this.view.phase ||
+        (this.selectedTileId && !next.self.discardableTileIds.includes(this.selectedTileId) &&
+          !isOnlineKuikaeSelection(next, this.selectedTileId))) {
       this.selectedTileId = null;
       this.kanChoicesOpen = false;
     }
@@ -363,9 +366,8 @@ export class OnlineGameController {
     const view = this.view;
     if (!view || this.actionPending) return null;
     const seat = view.seats[view.viewerSeat];
-    if (seat.riichi) return seat.drawnTile?.id ?? null;
-    return this.selectedTileId && view.self.discardableTileIds.includes(this.selectedTileId)
-      ? this.selectedTileId : null;
+    const tileId = seat.riichi ? seat.drawnTile?.id : this.selectedTileId;
+    return tileId && view.self.discardableTileIds.includes(tileId) ? tileId : null;
   }
 
   private render(): void {
@@ -509,7 +511,8 @@ export class OnlineGameController {
     button.type = 'button';
     button.className = 'tile-choice ui-button ui-button--a';
     button.dataset.tileId = tile.id;
-    button.disabled = this.actionPending || !view.self.discardableTileIds.includes(tile.id);
+    button.disabled = this.actionPending || !this.gameConnectionReady ||
+      !(view.self.discardableTileIds.includes(tile.id) || isOnlineKuikaeSelection(view, tile.id));
     button.setAttribute('aria-label', tileLabel(tile.tile));
     button.setAttribute('aria-pressed', String(this.selectedTileId === tile.id));
     if (this.selectedTileId === tile.id) button.classList.add('selected');

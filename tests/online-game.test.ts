@@ -990,8 +990,15 @@ test('online discard lists and reducer agree after chi and pon, including restor
     for (const session of [afterCall, restored]) {
       const view = createPlayerGameView(session, 0, 'ROOM', connected);
       assert.deepEqual(view.self.discardableTileIds, allowed.map(tile => tile.id), called);
+      assert.deepEqual(view.self.kuikaeForbiddenTileIds, blocked.map(tile => tile.id));
+      assert.equal(createPlayerGameView(session, 2, 'ROOM', connected).self.kuikaeForbiddenTileIds, undefined);
       for (const tile of blocked) {
-        assert.equal(createOnlineActionPanelState(view, tile.id, false, false, false, null).buttons.discard.enabled, false);
+        const panel = createOnlineActionPanelState(view, tile.id, false, false, false, null);
+        assert.equal(panel.buttons.discard.enabled, false);
+        assert.equal(panel.actionStatus, '喰い替え禁止のため、この牌は打牌できません。');
+        const legacy = { ...view, self: { ...view.self, kuikaeForbiddenTileIds: undefined } };
+        assert.equal(createOnlineActionPanelState(legacy, tile.id, false, false, false, null).actionStatus, '打牌する牌を選択してください。');
+        assert.equal(createOnlineActionPanelState(view, tile.id, false, false, false, null, '再接続中').actionStatus, '再接続中');
       }
       assert.equal(createOnlineActionPanelState(view, allowed[0].id, false, false, false, null).buttons.discard.enabled, true);
       assert.deepEqual(createPlayerGameView(session, 2, 'ROOM', connected).self.discardableTileIds, []);

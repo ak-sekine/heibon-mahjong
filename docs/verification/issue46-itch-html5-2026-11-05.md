@@ -471,3 +471,5 @@ Pagesライセンス引き継ぎ。本番・開発のローカルビルドにVit
 mainの同一SHA [必須CI 46101623962](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46101623962) は全ブラウザーグループ、verify、環境分離、local-online、auditが成功。publishはskip。採用するZIPは上記の候補CI artifact 15245282604の内側ZIPのみ。mainへビルド元SHAをそのまま統合し、両ブラウザーの候補CIログにある同一digestと有効期限（2027-02-26 02:55 UTC）を照合した。main CIで生成された別ZIPはこの配布記録の対象外。画像の取得は403で実見できなかった。
 
 作業範囲は配布形式、itchビルド、PWA分離、オンライン接続、配布・更新手順が達成。クロス公開元対戦と公開素材は新ZIPの実機・画像・権利確認が残り一部達成。受入はZIP生成と未確認の明記が達成。DraftからのCPU対局、個別同期、再接続後の復元、Origin拒否と現行Pages PWA回帰、公開素材を含む公開判断は一部達成。旧配布版の実機記録は保持し、新ZIPに転用しない。IssueはClose不可。
+
+Issue #71の選択フィードバック追加に伴い、旧配布候補 artifact 15245282604 は当時の証跡として保持する。新しい公開用候補は変更後の必須CI・実ZIP検証から確定する。

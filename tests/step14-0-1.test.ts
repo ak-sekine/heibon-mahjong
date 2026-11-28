@@ -10,7 +10,7 @@ import { callStart } from './calls-fixture.ts';
 import { cpuMadeProgress } from './cpu-progress.ts';
 import { tsumoGame } from './tsumo-fixture.ts';
 import { discardTileForOnline } from '../src/game/discard.ts';
-import { getCallOptions } from '../src/game/calls.ts';
+import { getCallOptions, resolveCallResponses } from '../src/game/calls.ts';
 import { applyOnlineGameAction } from '../src/online/game-engine.ts';
 import { DEFAULT_GAME_RULES, normalizeGameRules } from '../src/model/rules.ts';
 import type { OnlineGameSession, PlayerDecisionWindow } from '../src/online/game-view.ts';
@@ -1724,4 +1724,43 @@ test('Step 14.0.1 local Durable Object protocol and state lifecycle', { timeout:
     }));
     assert.equal((await responseObject(separateScope)).allowed, true);
   });
+});
+
+test('room WebSocket handler rejects a post-chi forbidden discard and broadcasts the legal discard', async () => {
+  const fixture = await makeRoom('Kuikae host', token('a'));
+  const guestInfo = await joinRoom(fixture, 'Kuikae guest', token('b'));
+  const host = await connectParticipant(fixture, fixture.hostToken);
+  const guest = await connectParticipant(fixture, guestInfo.token);
+  await readyAndFinalize(fixture, [host, guest]);
+  await sendGameAction(fixture, host, { type: 'start-game', requestId: 'kuikae-start', expectedGameRevision: 0 });
+  const initial = callStart(3, { 0: ['4536p', '123m', '789s', '112z'] }, 'pin-3');
+  const discarded = discardTileForOnline(initial, 3, initial.players[3].drawnTile!.id);
+  const pending = { ...discarded, phase: 'awaiting-call' as const };
+  const chi = getCallOptions(pending, 0).find(option => option.forbiddenKinds.includes('pin-6'));
+  assert.ok(chi);
+  const afterCall = resolveCallResponses(pending, [chi]);
+  saveGameSession(fixture, onlineSessionForGame(fixture, afterCall, 42));
+  fixture.room.webSocketMessage(host.server as unknown as WebSocket, JSON.stringify({ type: 'request-game-state' }));
+  const own = latestGameView(host).self as { kuikaeForbiddenTileIds: string[]; discardableTileIds: string[] };
+  assert.equal(own.kuikaeForbiddenTileIds.length, 2);
+  const before = persistedGame(fixture);
+  for (const tileId of own.kuikaeForbiddenTileIds) {
+    const bad = await sendGameAction(fixture, host, {
+      type: 'discard', requestId: `blocked-${tileId}`, expectedGameRevision: 42, tileId,
+    });
+    assert.equal(bad.ok, false);
+    assert.equal(bad.code, 'invalid_action');
+    assert.equal(bad.gameRevision, 42);
+    assert.deepEqual(persistedGame(fixture), before);
+  }
+  const tileId = own.discardableTileIds[0];
+  const good = await sendGameAction(fixture, host, { type: 'discard', requestId: 'kuikae-legal', expectedGameRevision: 42, tileId });
+  assert.equal(good.ok, true);
+  assert.equal(good.gameRevision, 43);
+  for (const viewer of [host, guest]) {
+    const view = latestGameView(viewer);
+    assert.equal(view.gameRevision, 43);
+    assert.equal((view.seats as { river: { id: string }[] }[])[0].river.at(-1)?.id, tileId);
+    assert.equal((view.self as Record<string, unknown>).kuikaeForbiddenTileIds, undefined);
+  }
 });

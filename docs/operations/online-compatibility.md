@@ -25,3 +25,5 @@ WebSocket のプロトコル検査は HTTP 作成・参加後に行われるた�
 Issue #70 の今回の候補は文書とテストのみで、クライアント・Worker の実行コードと DO 保存形式を変更しない。このため今回の開発・本番公開、itch.io 再配布および追加の実通信・実機確認は対象外であり、未実施を成功と扱わない。将来の通信実装変更や #69 の公開基盤変更では、変更内容に応じて Pages と itch.io 間のルーム作成・参加、対局の基本操作・状態同期・再接続、PWA と開いたままのタブの更新・再接続を必要な環境で確認する。itch.io Draft の現在の配布 SHA・digest・配布日は不明。実機確認と自動テストは区別する。
 
 候補 SHA `91e71050b9d473146d13b8408cfa6f877a5fc664` の CI [45863636177](https://github.com/ak-sekine/heibon-mahjong/actions/runs/45863636177) は Chromium・WebKit、環境分離、オンライン、audit が成功し公開は skip。候補 run は push CI のみで、GitHub Deployment 記録と公開台帳にも候補の公開は確認されなかった。Cloudflare 管理 API による直接確認は未実施。
+
+打牌手番の本人向け `game-state.self.kuikaeForbiddenTileIds` は任意の表示情報。現行の `discardableTileIds` は合法打牌だけを表し、送信時にも使用する。旧クライアントは追加情報を使用せず、新クライアントは項目欠落時は従来の選択範囲に従う。指示メッセージ、認証、保存形式を変更しない。

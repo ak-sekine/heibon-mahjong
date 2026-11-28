@@ -26,6 +26,10 @@ with sync_playwright() as p:
         source = """import {callStart} from '/heibon-mahjong/tests/calls-fixture.ts';
 import {discardTile} from '/heibon-mahjong/src/game/discard.ts';
 import {startMatch} from '/heibon-mahjong/src/game/match.ts';
+import {getCallOptions, resolveCallResponses} from '/heibon-mahjong/src/game/calls.ts';
+import {discardTileForOnline} from '/heibon-mahjong/src/game/discard.ts';
+import {createPlayerGameView} from '/heibon-mahjong/src/online/game-view.ts';
+import {applyOnlineGameAction} from '/heibon-mahjong/src/online/game-engine.ts';
 """ + response.text() + """
 window.loadCalls=(mode)=>{
  controller.newGame();
@@ -41,6 +45,37 @@ window.loadCalls=(mode)=>{
  const called=mode==='max'?'man-4':mode==='red'?'man-6':'man-5';
  const game=callStart(3,hands,called);
  controller.match=startMatch(discardTile(game,3,game.players[3].drawnTile.id));render();
+};
+window.loadKuikae=(online)=>{
+ const initial=callStart(3,{0:['4536p','123m','789s','112z']},'pin-3');
+ const discarded=discardTileForOnline(initial,3,initial.players[3].drawnTile.id);
+ const pending={...discarded,phase:'awaiting-call'};
+ const option=getCallOptions(pending,0).find(item=>item.forbiddenKinds.includes('pin-6'));
+ const match=startMatch(resolveCallResponses(pending,[option]));
+ const connected=new Set([0,2]);
+ const identities=match.game.players.map(({id})=>({seat:id,control:connected.has(id)?'human':'cpu',name:'席'+id}));
+ let session={schemaVersion:1,match,gameRevision:42,status:'playing',hostSeat:0,identities,decision:null,declarations:[]};
+ const view=()=>createPlayerGameView(session,0,'ROOM',connected);
+ const update=()=>onlineGameController.receive({type:'game-state',view:view()});
+ window.kuikaeActions=[];
+ if (online) {
+  onlineGameController.setActionSender((action,revision,requestId)=>{
+   window.kuikaeActions.push(action);
+   session=applyOnlineGameAction(session,0,{...action,requestId,expectedGameRevision:revision},connected);
+   update();
+   return true;
+  });
+  update();
+  window.reconnectKuikae=()=>{
+   onlineGameController.receive({type:'game-connection-state',ready:false,message:'再接続中'});
+   window.resumeKuikae=update;
+  };
+ } else {
+  controller.match=match;
+  render();
+ }
+ const {discardableTileIds,kuikaeForbiddenTileIds}=view().self;
+ return {legal:discardableTileIds[0],forbidden:kuikaeForbiddenTileIds};
 };
 window.callState=()=>controller.game;
 window.loadTurn=()=>{
@@ -418,6 +453,43 @@ window.loadTurn=()=>{
     page.wait_for_function("callState().phase!=='awaiting-call'")
     assert low_table and page.locator('#local-table').bounding_box()['width'] == low_table['width'], 'low viewport call state changed the table size'
 
+    page.set_viewport_size({'width': 320, 'height': 568})
+    for online, hand, panel, discard in [
+        (False, '#player-hand', '#local-game-controls', '#discard'),
+        (True, '#online-player-hand', '#online-game-controls', '#online-discard'),
+    ]:
+        ids = page.evaluate('loadKuikae', online)
+        assert len(ids['forbidden']) == 2
+        status = page.locator(f'{panel} [data-panel-part="action-status"]')
+        notice = '喰い替え禁止のため、この牌は打牌できません。'
+        for tile_id in ids['forbidden']:
+            tile = page.locator(f'{hand} button[data-tile-id="{tile_id}"]')
+            tile.tap()
+            assert tile.get_attribute('aria-pressed') == 'true'
+            assert status.inner_text() == notice
+            assert page.locator(discard).is_disabled()
+            tile.press('Enter')
+            assert tile.get_attribute('aria-pressed') == 'false'
+            assert status.inner_text() != notice
+        forbidden = page.locator(f'{hand} button[data-tile-id="{ids["forbidden"][0]}"]')
+        forbidden.click()
+        assert status.inner_text() == notice
+        assert page.evaluate('kuikaeActions.length') == 0
+        if online:
+            page.evaluate('reconnectKuikae()')
+            assert forbidden.is_disabled()
+            assert status.inner_text() != notice
+            page.evaluate('resumeKuikae()')
+            assert forbidden.is_enabled()
+        legal = page.locator(f'{hand} button[data-tile-id="{ids["legal"]}"]')
+        legal.click()
+        assert status.inner_text() != notice
+        assert page.locator(discard).is_enabled()
+        page.locator(discard).click()
+        if online:
+            assert page.evaluate('kuikaeActions.map(action=>action.tileId)') == [ids['legal']]
+        else:
+            assert page.evaluate('id=>callState().players[0].discardHistory.some(tile=>tile.id===id)', ids['legal'])
     assert not errors, errors
     page.close()
     browser.close()

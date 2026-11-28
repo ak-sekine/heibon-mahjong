@@ -1,5 +1,4 @@
 import { renderMelds } from './melds.ts';
-import { isForbiddenDiscard } from '../game/melds.ts';
 import { uraDoraIndicators } from '../game/dora.ts';
 import { ordinaryTile } from '../model/tile.ts';
 import type { FuEntry } from '../analysis/fu.ts';
@@ -170,7 +169,7 @@ export function renderTable(game: GameState, points?: readonly number[], settlem
 export function renderSelection(game: GameState, selectedTileId: string | null, progressing = false, viewerSeat: PlayerId = 0): void {
   for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('#player-hand button'))) {
     button.setAttribute('aria-pressed', String(button.dataset.tileId === selectedTileId));
-    button.disabled = isForbiddenDiscard(game.players[viewerSeat],button.dataset.tileId!) || progressing || !canDiscard(game, viewerSeat) || Boolean(game.players[viewerSeat].riichi && button.dataset.tileId !== game.players[viewerSeat].drawnTile?.id);
+    button.disabled = progressing || !canDiscard(game, viewerSeat) || Boolean(game.players[viewerSeat].riichi && button.dataset.tileId !== game.players[viewerSeat].drawnTile?.id);
   }
 }
 

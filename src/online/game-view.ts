@@ -131,6 +131,7 @@ export type PlayerGameView = Readonly<{
     isHost: boolean;
     nextRoundReady?: boolean;
     discardableTileIds: readonly string[];
+    kuikaeForbiddenTileIds?: readonly string[];
     riichiTileIds: readonly string[];
     canTsumo: boolean;
     canKyuushuKyuuhai: boolean;
@@ -371,6 +372,9 @@ export function createPlayerGameView(
           .filter(tile => !selfPlayer.riichi || tile.id === selfPlayer.drawnTile?.id)
           .filter(tile => !isForbiddenDiscard(selfPlayer, tile.id))
           .map(tile => tile.id) : [],
+      ...(session.status === 'playing' && canDiscard(game, viewerSeat) && selfPlayer.callDiscard ? {
+        kuikaeForbiddenTileIds: selfPlayer.hand.filter(tile => isForbiddenDiscard(selfPlayer, tile.id)).map(tile => tile.id),
+      } : {}),
       riichiTileIds: ownRiichiOptions.map(option => option.tileId),
       canTsumo: session.status === 'playing' && canDeclareTsumo(game, viewerSeat),
       canKyuushuKyuuhai: session.status === 'playing' && canDeclareKyuushuKyuuhai(game, viewerSeat),
