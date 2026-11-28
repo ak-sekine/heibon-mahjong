@@ -955,3 +955,63 @@ test('legacy readiness restores conservatively and match end never advances', ()
   assert.equal(createPlayerGameView(ready, 0, 'ABCDEF', new Set()).self.nextRoundReady, false);
   assert.equal(createPlayerGameView(ready, 1, 'ABCDEF', new Set()).self.nextRoundReady, true);
 });
+
+test('online discard lists and reducer agree after chi and pon, including restored red tiles', () => {
+  const cases = [
+    { called: 'pin-3', pair: '45', rest: '36', forbidden: ['pin-3', 'pin-6'], type: 'chi' },
+    { called: 'pin-6', pair: '45', rest: '36', forbidden: ['pin-3', 'pin-6'], type: 'chi' },
+    { called: 'pin-4', pair: '35', rest: '47', forbidden: ['pin-4'], type: 'chi' },
+    { called: 'pin-5', pair: '55', rest: '07', forbidden: ['pin-5'], type: 'pon' },
+  ] as const;
+  for (const { called, pair, rest, forbidden, type } of cases) {
+    const initial = callStart(3, { 0: [pair + rest + 'p', '123m', '789s', '112z'] }, called);
+    const discarded = discardTileForOnline(initial, 3, initial.players[3].drawnTile!.id);
+    const game = { ...discarded, phase: 'awaiting-call' as const };
+    const option = getCallOptions(game, 0).find(item =>
+      item.type === type && (type !== 'pon' || item.tiles.every(tile => !tile.tile.isRed)) && item.forbiddenKinds.length === forbidden.length &&
+      forbidden.every(kind => item.forbiddenKinds.some(actual => actual === kind)));
+    assert.ok(option, called);
+    const decision: PlayerDecisionWindow = {
+      windowId: 'd'.repeat(24), type: 'call', openedAt: 1000, expiresAt: 31_000,
+      baseGameRevision: 41, requiredSeats: [0], responses: { 0: 'pending' },
+    };
+    const connected = new Set<PlayerId>([0, 2]);
+    const afterCall = applyOnlineGameAction(sessionForGame(game, [0, 2], 41, decision), 0, {
+      type: 'declare-call', requestId: 'call', expectedGameRevision: 41,
+      windowId: decision.windowId, optionId: option.id,
+    }, connected, 2000);
+    const restored = hydrateOnlineGame(JSON.stringify(afterCall));
+    assert.ok(restored);
+    const hand = restored.match.game.players[0].hand;
+    const blocked = hand.filter(tile => forbidden.some(kind => kind === tileKindKey(tile.tile)));
+    assert.equal(blocked.length, forbidden.length === 2 ? 2 : 1);
+    if (type === 'pon') assert.equal(blocked[0].tile.isRed, true);
+    const allowed = hand.filter(tile => !blocked.includes(tile));
+    for (const session of [afterCall, restored]) {
+      const view = createPlayerGameView(session, 0, 'ROOM', connected);
+      assert.deepEqual(view.self.discardableTileIds, allowed.map(tile => tile.id), called);
+      for (const tile of blocked) {
+        assert.equal(createOnlineActionPanelState(view, tile.id, false, false, false, null).buttons.discard.enabled, false);
+      }
+      assert.equal(createOnlineActionPanelState(view, allowed[0].id, false, false, false, null).buttons.discard.enabled, true);
+      assert.deepEqual(createPlayerGameView(session, 2, 'ROOM', connected).self.discardableTileIds, []);
+    }
+    const before = JSON.stringify(restored);
+    const revision = restored.gameRevision;
+    for (const tile of blocked) {
+      assert.throws(() => applyOnlineGameAction(restored, 0, {
+        type: 'discard', requestId: 'forbidden', expectedGameRevision: revision, tileId: tile.id,
+      }, connected, 2001), { name: 'RangeError', message: 'Kuikae is forbidden' });
+      assert.equal(JSON.stringify(restored), before);
+    }
+    const advanced = applyOnlineGameAction(restored, 0, {
+      type: 'discard', requestId: 'allowed', expectedGameRevision: revision, tileId: allowed[0].id,
+    }, connected, 2002);
+    assert.equal(advanced.gameRevision, revision + 1);
+    for (const seat of connected) {
+      const view = createPlayerGameView(advanced, seat, 'ROOM', connected);
+      assert.equal(view.gameRevision, revision + 1);
+      assert.equal(view.seats[0].river.at(-1)?.id, allowed[0].id);
+    }
+  }
+});

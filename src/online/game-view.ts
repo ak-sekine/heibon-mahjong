@@ -7,6 +7,7 @@ import type { PublicDeclarationEvent } from '../model/declaration.ts';
 import { rulesForMatch, type GameRules } from '../model/rules.ts';
 import { exposedDoraIndicators, uraDoraIndicators } from '../game/dora.ts';
 import { canDiscard } from '../game/discard.ts';
+import { isForbiddenDiscard } from '../game/melds.ts';
 import { getCallOptions, type CallOption } from '../game/calls.ts';
 import { getKanOptions } from '../game/kan.ts';
 import { getRiichiDiscardOptions } from '../game/riichi.ts';
@@ -368,6 +369,7 @@ export function createPlayerGameView(
       discardableTileIds: canDiscard(game, viewerSeat)
         ? [...selfPlayer.hand, ...(selfPlayer.drawnTile ? [selfPlayer.drawnTile] : [])]
           .filter(tile => !selfPlayer.riichi || tile.id === selfPlayer.drawnTile?.id)
+          .filter(tile => !isForbiddenDiscard(selfPlayer, tile.id))
           .map(tile => tile.id) : [],
       riichiTileIds: ownRiichiOptions.map(option => option.tileId),
       canTsumo: session.status === 'playing' && canDeclareTsumo(game, viewerSeat),
