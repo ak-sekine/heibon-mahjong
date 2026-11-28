@@ -27,3 +27,9 @@ Cloudのネットワーク許可付きGit接続でfetchと候補pushが成功。
 従来の選択不可要件を変更。オンライン・オフラインとも禁止牌を選択・強調表示し、指定理由を既存欄へ出す。合法牌一覧・打牌拒否は従来どおり。本人の打牌手番だけに任意の kuikaeForbiddenTileIds を付け、項目のない旧Workerでは従来の選択制限を維持する。選択から文言を導出し、既存の接続・送信・判断・局終了表示を優先する。PagesとWorkerの両方、および新itch ZIPの検証が必要。旧クライアントは追加項目を無視できるためWorkerを先に公開可能。
 
 固定局面の単体・Workerハンドラ試験を追加し、既存Browser UIの短画面シナリオでオンライン・オフラインの選択・解除・合法打牌を検証する。Workerハンドラの試験は隔離されたSQLiteとテストソケットを使う。実ネットワーク上のWebSocket固定局面試験とは区別する。
+
+候補 `32c3dd7a48369e4dbf155550d35575d69a0646e2` の[CI 46115547301](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46115547301)は、短画面の禁止牌選択を含むChromium・WebKitの全グループ、オンライン、環境分離、auditに成功。同一SHAをmainへfast-forwardした。関連テスト109件とクライアント・Worker型検査、差分検査も成功。別のローカル作業コピーで本物のWorkerと一時SQLiteを起動し、固定局面だけをテスト用の入口で投入。実WebSocketで三筒・六筒を直接指定し、どちらも invalid_action と revision 42、再取得した対局ビュー不変を確認。合法牌の打牌は両クライアントでrevision 43と同じ公開河を確認した。固定局面の入口はリポジトリと公開バンドルに含まれない。
+
+同一SHAの[main CI 46116410833](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46116410833)も全必須ジョブとauditに成功。オフラインでは固定局面で禁止牌を選んだ後の confirm() 直接呼び出しが無操作となることを確認した。本番の公開前基準はWorker `8d968ea`、Pages `77c6c35`、Pages台帳 `5fff1df`（pendingなし）。Worker→Pagesの順で独立公開する。旧Workerと新クライアントの組み合わせでも禁止牌の打牌はできない。
+
+本番Worker [46117258131](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46117258131) は公開・両Originのオンライン検証・稼働version照合に成功。Deployment 8125800589、verified version `53f5c0eb-e0c3-4e28-adc0-d23e69d246fa`。続く本番Pages [46118159491](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46118159491) は同一SHAのmain CI成果物を再利用し、Workerとのオンライン検証、公開、実配信ファイル照合、独立auditが成功。Pages台帳 `d8a85638e557f0278242d6750ea1c7795c523113`、pendingなし。開発Pages SHAとWorkerのverified記録は保持。技術的なitch候補は [#46検証記録](issue46-itch-html5-2026-11-05.md) を参照。Draftの更新、ユーザー実機確認、Issue Closeは未実施。

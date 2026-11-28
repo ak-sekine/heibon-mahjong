@@ -473,3 +473,5 @@ mainの同一SHA [必須CI 46101623962](https://github.com/ak-sekine/heibon-mahj
 作業範囲は配布形式、itchビルド、PWA分離、オンライン接続、配布・更新手順が達成。クロス公開元対戦と公開素材は新ZIPの実機・画像・権利確認が残り一部達成。受入はZIP生成と未確認の明記が達成。DraftからのCPU対局、個別同期、再接続後の復元、Origin拒否と現行Pages PWA回帰、公開素材を含む公開判断は一部達成。旧配布版の実機記録は保持し、新ZIPに転用しない。IssueはClose不可。
 
 Issue #71の選択フィードバック追加に伴い、旧配布候補 artifact 15245282604 は当時の証跡として保持する。新しい公開用候補は変更後の必須CI・実ZIP検証から確定する。
+
+新しい技術的配布候補は [artifact 15252075166](https://github.com/ak-sekine/heibon-mahjong/actions/runs/46115547301/artifacts/15252075166)。ソース `32c3dd7a48369e4dbf155550d35575d69a0646e2`、内側ZIP SHA-256 `62228077b80acfdcf4761721903d5bf5259ffe61e6981fd2cc9159ecdfa783a4`、100,030 bytes。内容は index.html、assets/main-Dixcbpco.js、assets/main-XaFuRHRL.css、THIRD-PARTY-NOTICES.txt。両ブラウザーが同じ内側ZIPを照合し、CRC、相対パスの読み込み、PWA分離、CPU打牌、本番Worker URLの表示を確認。外部通信は隔離。Vite 7.3.7原文は生成時に照合。同一ソースのmain必須CIも成功。有効期限は2027-02-26 06:12 UTC。ユーザーが外側アーカイブを展開し、SHA256SUMSで照合した内側ZIPをDraftに登録する。実機と権利確認は引き続き必要。
